@@ -139,11 +139,11 @@ mutation MakeDraftPick($draftId: Int!, $playerId: Int!) {
 
 **Idempotency:** If the user double-clicks or retries, the server detects duplicate picks and returns the existing pick without error.
 
-### Initialize a Live Draft (Commissioner Only)
+### Initialize a Draft (Commissioner Only)
 
 ```graphql
-mutation InitializeLiveDraft($leagueId: Int!, $draftOrder: String) {
-  initializeLiveDraft(leagueId: $leagueId, draftOrder: $draftOrder) {
+mutation InitializeDraft($leagueId: Int!, $draftOrder: String, $draftMode: String, $selectionMethod: String) {
+  initializeDraft(leagueId: $leagueId, draftOrder: $draftOrder, draftMode: $draftMode, selectionMethod: $selectionMethod) {
     id
     leagueId
     draftMode

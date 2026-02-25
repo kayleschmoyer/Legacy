@@ -81,6 +81,31 @@ mutation StartDraft($leagueId: Int!, $selectionMethod: String) {
   }
 }
 
+mutation InitializeDraft(
+  $leagueId: Int!
+  $draftOrder: String
+  $draftMode: String
+  $selectionMethod: String
+) {
+  initializeDraft(
+    leagueId: $leagueId
+    draftOrder: $draftOrder
+    draftMode: $draftMode
+    selectionMethod: $selectionMethod
+  ) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    pickTimeLimitSeconds
+    currentPickDeadline
+    draftStartedAt
+    draftCompletedAt
+  }
+}
+
 mutation JoinLeagueByCode($inviteCode: String!, $teamName: String!) {
   joinLeagueByCode(inviteCode: $inviteCode, teamName: $teamName) {
     id

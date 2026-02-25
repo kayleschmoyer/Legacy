@@ -70,10 +70,14 @@ async function showDraftTimerStatus(leagueId?: number): Promise<void> {
     LOGGER.info('='.repeat(70));
 
     // Fetch raw timer fields separately to avoid drizzle type issues
+    const draftIds = drafts.map((d) => d.draftId);
     const timerData = await db.execute(sql`
       SELECT id, pick_time_limit_seconds, current_pick_deadline
       FROM drafts
-      WHERE id = ANY(${drafts.map((d) => d.draftId)})
+      WHERE id IN (${sql.join(
+        draftIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})
     `);
     const timerMap = new Map<
       number,
@@ -336,29 +340,37 @@ async function processExpiredPicks(
             .from(PublicSchema.draftTeams)
             .where(eq(PublicSchema.draftTeams.draftId, draftId));
 
-          const numTeams = draftTeams.length;
-          const currentOverall = draft.current_pick;
-          const round = Math.floor((currentOverall - 1) / numTeams) + 1;
-          const pickInRound = ((currentOverall - 1) % numTeams) + 1;
+          if (draftTeams.length === 0) {
+            throw new Error(
+              `Draft ${draftId} has no draft_teams — the draft was not properly initialized via initializeDraft`,
+            );
+          }
 
-          // Determine current team from draft order
-          const draftData = await tx
-            .select()
-            .from(PublicSchema.drafts)
-            .where(eq(PublicSchema.drafts.id, draftId))
-            .limit(1);
-          const draftOrder = (draftData[0]?.draftOrder ?? []) as number[];
+          const numTeams = draftTeams.length;
+          // current_pick tracks the LAST completed pick (0 = no picks yet)
+          // The next pick to make is current_pick + 1
+          const nextOverall = draft.current_pick + 1;
+          const round = Math.floor((nextOverall - 1) / numTeams) + 1;
+          const pickInRound = ((nextOverall - 1) % numTeams) + 1;
+
+          // Build team order from draft_teams table (sorted by draft_order position)
+          // The drafts.draft_order column stores the style ('snake'/'linear'), not team IDs
+          const draftStyle = row.draft_order as string;
+          const sortedTeams = [...draftTeams].sort(
+            (a, b) => (a.draftOrder ?? 0) - (b.draftOrder ?? 0),
+          );
+          const teamOrder = sortedTeams.map((dt) => dt.teamId);
 
           // Snake draft: reverse every other round
           let orderIndex = pickInRound - 1;
-          if (round % 2 === 0) {
+          if (draftStyle === 'snake' && round % 2 === 0) {
             orderIndex = numTeams - pickInRound;
           }
-          const currentTeamId = draftOrder[orderIndex];
+          const currentTeamId = teamOrder[orderIndex];
 
           if (!currentTeamId) {
             throw new Error(
-              `Could not determine team for pick ${currentOverall} (round ${round}, pick ${pickInRound})`,
+              `Could not determine team for pick ${nextOverall} (round ${round}, pick ${pickInRound})`,
             );
           }
 
@@ -414,13 +426,13 @@ async function processExpiredPicks(
             playerId: autoPlayerId,
             round,
             pickNumber: pickInRound,
-            overallPick: currentOverall,
+            overallPick: nextOverall,
             pickedAt: pickNow,
           });
 
           // Check if draft is complete
           const totalPicks = numTeams * maxRosterSize;
-          const isDraftComplete = currentOverall >= totalPicks;
+          const isDraftComplete = nextOverall >= totalPicks;
 
           const nextDeadline = isDraftComplete
             ? null
@@ -430,7 +442,7 @@ async function processExpiredPicks(
           await tx
             .update(PublicSchema.drafts)
             .set({
-              currentPick: currentOverall,
+              currentPick: nextOverall,
               currentPickDeadline: nextDeadline,
               updatedAt: pickNow,
               ...(isDraftComplete ? { draftCompletedAt: pickNow } : {}),
@@ -460,7 +472,7 @@ async function processExpiredPicks(
             teamId: currentTeamId,
             round,
             pickNumber: pickInRound,
-            overallPick: currentOverall,
+            overallPick: nextOverall,
             isDraftComplete,
             nextDeadline,
           };

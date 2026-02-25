@@ -85,7 +85,7 @@ This mutation is called every minute by EventBridge but can also be invoked manu
 
 | Mutation | Timer Behavior |
 |----------|---------------|
-| `initializeLiveDraft` | Sets initial deadline |
+| `initializeDraft` | Sets initial deadline (live mode) |
 | `makeDraftPick` | Advances deadline to next pick |
 | `commissionerPick` | Advances deadline to next pick |
 | `pauseDraft` | Clears deadline |

@@ -688,7 +688,7 @@ export type Mutation = {
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
-  initializeLiveDraft?: Maybe<Draft>;
+  initializeDraft?: Maybe<Draft>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
   makeDraftPick?: Maybe<DraftPick>;
@@ -802,9 +802,11 @@ export type MutationDisableDeviceTokenArgs = {
   deviceToken: Scalars['String']['input'];
 };
 
-export type MutationInitializeLiveDraftArgs = {
+export type MutationInitializeDraftArgs = {
+  draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationJoinLeagueArgs = {
@@ -2130,6 +2132,30 @@ export type StartDraftMutation = {
       teamId?: number | null;
       permissionLevel?: string | null;
     } | null;
+  } | null;
+};
+
+export type InitializeDraftMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
+  draftMode?: InputMaybe<Scalars['String']['input']>;
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type InitializeDraftMutation = {
+  __typename?: 'Mutation';
+  initializeDraft?: {
+    __typename?: 'Draft';
+    id?: number | null;
+    leagueId?: number | null;
+    draftMode?: string | null;
+    selectionMethod?: string | null;
+    draftOrder?: string | null;
+    currentPick?: number | null;
+    pickTimeLimitSeconds?: number | null;
+    currentPickDeadline?: string | null;
+    draftStartedAt?: string | null;
+    draftCompletedAt?: string | null;
   } | null;
 };
 
@@ -5239,6 +5265,78 @@ export type StartDraftMutationResult =
 export type StartDraftMutationOptions = BaseMutationOptions<
   StartDraftMutation,
   StartDraftMutationVariables
+>;
+export const InitializeDraft = gql`
+  mutation InitializeDraft(
+    $leagueId: Int!
+    $draftOrder: String
+    $draftMode: String
+    $selectionMethod: String
+  ) {
+    initializeDraft(
+      leagueId: $leagueId
+      draftOrder: $draftOrder
+      draftMode: $draftMode
+      selectionMethod: $selectionMethod
+    ) {
+      id
+      leagueId
+      draftMode
+      selectionMethod
+      draftOrder
+      currentPick
+      pickTimeLimitSeconds
+      currentPickDeadline
+      draftStartedAt
+      draftCompletedAt
+    }
+  }
+`;
+export type InitializeDraftMutationFn = MutationFunction<
+  InitializeDraftMutation,
+  InitializeDraftMutationVariables
+>;
+
+/**
+ * __useInitializeDraftMutation__
+ *
+ * To run a mutation, you first call `useInitializeDraftMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useInitializeDraftMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [initializeDraftMutation, { data, loading, error }] = useInitializeDraftMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      draftOrder: // value for 'draftOrder'
+ *      draftMode: // value for 'draftMode'
+ *      selectionMethod: // value for 'selectionMethod'
+ *   },
+ * });
+ */
+export function useInitializeDraftMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    InitializeDraftMutation,
+    InitializeDraftMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    InitializeDraftMutation,
+    InitializeDraftMutationVariables
+  >(InitializeDraft, options);
+}
+export type InitializeDraftMutationHookResult = ReturnType<
+  typeof useInitializeDraftMutation
+>;
+export type InitializeDraftMutationResult =
+  Apollo.MutationResult<InitializeDraftMutation>;
+export type InitializeDraftMutationOptions = BaseMutationOptions<
+  InitializeDraftMutation,
+  InitializeDraftMutationVariables
 >;
 export const JoinLeagueByCode = gql`
   mutation JoinLeagueByCode($inviteCode: String!, $teamName: String!) {

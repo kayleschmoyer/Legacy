@@ -180,7 +180,7 @@ cd ..
 5. **Conventional commits**: `type(scope): message`
 6. **Always add timestamps to new DB tables** — see [db-migration-write.md](db-migration-write.md)
 7. **Create leagues via `LeagueService.createLeague()`** — never raw-insert leagues. The service guarantees all related records (teams, positions, draft) are created together.
-8. **Draft records must exist for every league** — `startDraft` and `initializeLiveDraft` self-heal by upserting, but prevention is better than cure.
+8. **Draft records must exist for every league** — `startDraft` and `initializeDraft` self-heal by upserting, but prevention is better than cure.
 9. **Always `await` notification service calls** — never fire-and-forget. Lambda freezes the execution context after the handler returns; unawaited async work is silently killed. Wrap in try/catch so notification failure doesn't break the primary operation. See [WebSocket Notifications](../../docs/guides/websocket-notifications.md#critical-rules).
 10. **Never use inline `gql` tags** — define queries/mutations in `src/api/db/**/*.graphql` files and run codegen. Inline `gql` bypasses codegen, producing `any` types and requiring unsafe casts. An ESLint rule enforces this. See [codegen.md](codegen.md#-critical-never-use-inline-gql-tags).
 

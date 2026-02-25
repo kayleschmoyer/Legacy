@@ -418,7 +418,7 @@ describe('Draft Picks - Integration Tests', () => {
   });
 
   // ---------------------------------------------------------------------------
-  describe('initializeLiveDraft â€” DB preconditions', () => {
+  describe('initializeDraft — DB preconditions', () => {
     it('seeded league should have draftStatus = in-progress', async () => {
       const { league } = await seedDraftFixture();
 

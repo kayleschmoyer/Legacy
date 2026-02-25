@@ -8,7 +8,11 @@ import {
   playerMeetsMinCareerSeasons,
   PublicSchema,
 } from '@legacy-sports/db-client';
-import { createNotificationService } from '@legacy-sports/aws-utils';
+import {
+  createNotificationService,
+  DraftSqsService,
+  type StartDraftMessage,
+} from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 
@@ -405,32 +409,66 @@ builder.mutationField('makeDraftPick', (t) =>
 );
 
 /**
- * Mutation: Initialize a live draft
+ * Mutation: Initialize a draft (live or automated)
  * Creates the drafts record, randomizes team order into draft_teams, and
- * sets the league's draftStatus to 'in-progress' so makeDraftPick can proceed.
- * Unlike startDraft (which queues an automated random draft to SQS), this
- * supports a human pick-by-pick draft session.
+ * either starts a live pick-by-pick session or queues an automated draft to SQS.
+ *
+ * For live drafts: sets draftStatus to 'in-progress', sets pick deadline,
+ * sends WebSocket notification.
+ * For automated drafts: sets draftStatus to 'queued', sends SQS message to
+ * the draft-processor Lambda for background processing.
+ *
+ * This is the single entry point for all draft types — the commissioner UI
+ * calls this mutation regardless of draft mode.
  */
-builder.mutationField('initializeLiveDraft', (t) =>
+builder.mutationField('initializeDraft', (t) =>
   t.field({
     type: Draft,
     args: {
       leagueId: t.arg.int({ required: true }),
       draftOrder: t.arg.string({ required: false }), // 'snake' (default) | 'linear'
+      draftMode: t.arg.string({ required: false }), // 'live' (default) | 'automated'
+      selectionMethod: t.arg.string({ required: false }), // 'standard' | 'auction' | 'random'
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
         throw new Error('Authentication required to initialize a draft');
       }
 
-      const { leagueId, draftOrder = 'snake' } = args;
+      const { leagueId } = args;
       const userId = context.user.id;
 
-      if (draftOrder !== 'snake' && draftOrder !== 'linear') {
-        throw new Error("draftOrder must be 'snake' or 'linear'");
-      }
-
       try {
+        // Read saved draft settings from the database
+        const [savedDraft] = await context.db
+          .select({
+            draftMode: PublicSchema.drafts.draftMode,
+            selectionMethod: PublicSchema.drafts.selectionMethod,
+            draftOrder: PublicSchema.drafts.draftOrder,
+          })
+          .from(PublicSchema.drafts)
+          .where(eq(PublicSchema.drafts.leagueId, leagueId))
+          .orderBy(desc(PublicSchema.drafts.createdAt))
+          .limit(1);
+
+        // Use saved settings as defaults, then override with any explicit args
+        const draftMode = (args.draftMode ??
+          savedDraft?.draftMode ??
+          'live') as 'live' | 'automated';
+        const selectionMethod = (args.selectionMethod ??
+          savedDraft?.selectionMethod ??
+          'standard') as 'standard' | 'auction' | 'random';
+        const draftOrder = (args.draftOrder ??
+          savedDraft?.draftOrder ??
+          'snake') as 'snake' | 'linear';
+
+        if (draftOrder !== 'snake' && draftOrder !== 'linear') {
+          throw new Error("draftOrder must be 'snake' or 'linear'");
+        }
+        if (draftMode !== 'live' && draftMode !== 'automated') {
+          throw new Error("draftMode must be 'live' or 'automated'");
+        }
+
         // Fetch league
         const [league] = await context.db
           .select()
@@ -506,13 +544,13 @@ builder.mutationField('initializeLiveDraft', (t) =>
           const [updated] = await context.db
             .update(PublicSchema.drafts)
             .set({
-              draftMode: 'live',
-              selectionMethod: 'standard',
-              draftOrder: draftOrder,
+              draftMode,
+              selectionMethod,
+              draftOrder,
               currentPick: 0,
               draftStartedAt: new Date(),
               draftCompletedAt: null,
-              currentPickDeadline: null, // Will be set after we read pickTimeLimitSeconds
+              currentPickDeadline: null,
             })
             .where(eq(PublicSchema.drafts.id, existingDraft.id))
             .returning();
@@ -522,9 +560,9 @@ builder.mutationField('initializeLiveDraft', (t) =>
             .insert(PublicSchema.drafts)
             .values({
               leagueId,
-              draftMode: 'live',
-              selectionMethod: 'standard',
-              draftOrder: draftOrder,
+              draftMode,
+              selectionMethod,
+              draftOrder,
               currentPick: 0,
               draftStartedAt: new Date(),
             })
@@ -542,44 +580,101 @@ builder.mutationField('initializeLiveDraft', (t) =>
           })),
         );
 
-        // Update league status to in-progress
-        await context.db
-          .update(PublicSchema.leagues)
-          .set({ draftStatus: 'in-progress' })
-          .where(eq(PublicSchema.leagues.id, leagueId));
+        // ── Branch: Live vs Automated ───────────────────────────────
+        if (draftMode === 'live') {
+          // Update league status to in-progress
+          await context.db
+            .update(PublicSchema.leagues)
+            .set({ draftStatus: 'in-progress' })
+            .where(eq(PublicSchema.leagues.id, leagueId));
 
-        // Set the initial pick deadline now that draft is live
-        const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;
-        const initialDeadline = new Date(Date.now() + pickTimeLimit * 1000);
-        const [draftWithDeadline] = await context.db
-          .update(PublicSchema.drafts)
-          .set({ currentPickDeadline: initialDeadline })
-          .where(eq(PublicSchema.drafts.id, draft.id))
-          .returning();
-        draft = draftWithDeadline;
+          // Set the initial pick deadline now that draft is live
+          const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;
+          const initialDeadline = new Date(Date.now() + pickTimeLimit * 1000);
+          const [draftWithDeadline] = await context.db
+            .update(PublicSchema.drafts)
+            .set({ currentPickDeadline: initialDeadline })
+            .where(eq(PublicSchema.drafts.id, draft.id))
+            .returning();
+          draft = draftWithDeadline;
 
-        LOGGER.info('Live draft initialized', {
-          leagueId,
-          draftId: draft.id,
-          draftOrder,
-          teamCount: teams.length,
-        });
-
-        // Notify all league connections that the draft has started
-        if (context.notificationService) {
-          await context.notificationService.notifyDraftStarted(
+          LOGGER.info('Live draft initialized', {
             leagueId,
-            draft.id,
+            draftId: draft.id,
+            draftMode,
             draftOrder,
-            teams.length,
-            pickTimeLimit,
-            initialDeadline.toISOString(),
-          );
+            teamCount: teams.length,
+          });
+
+          // Notify all league connections that the draft has started
+          if (context.notificationService) {
+            await context.notificationService.notifyDraftStarted(
+              leagueId,
+              draft.id,
+              draftOrder,
+              teams.length,
+              pickTimeLimit,
+              initialDeadline.toISOString(),
+            );
+          }
+        } else {
+          // Automated draft: queue via SQS for background processing
+          const queueUrl = process.env.SQS_AUTOMATIC_DRAFTS_URL;
+          if (!queueUrl) {
+            throw new Error(
+              'Automated draft queue is not configured (SQS_AUTOMATIC_DRAFTS_URL)',
+            );
+          }
+
+          // Set status to 'queued' first, then send SQS message
+          // If SQS fails, rollback the status change
+          await context.db
+            .update(PublicSchema.leagues)
+            .set({ draftStatus: 'queued' })
+            .where(eq(PublicSchema.leagues.id, leagueId));
+
+          try {
+            const sqsService = new DraftSqsService(queueUrl);
+            const message: StartDraftMessage = {
+              leagueId,
+              draftMode,
+              selectionMethod,
+              draftOrder,
+              requestedBy: userId,
+              timestamp: new Date().toISOString(),
+            };
+            await sqsService.sendStartDraftMessage(message);
+          } catch (sqsError) {
+            // Rollback league status if SQS send failed
+            LOGGER.error('SQS send failed, rolling back draft status', {
+              leagueId,
+              error:
+                sqsError instanceof Error ? sqsError.message : String(sqsError),
+            });
+            await context.db
+              .update(PublicSchema.leagues)
+              .set({ draftStatus: 'not-started' })
+              .where(eq(PublicSchema.leagues.id, leagueId));
+            throw new Error(
+              `Failed to queue automated draft: ${
+                sqsError instanceof Error ? sqsError.message : 'Unknown error'
+              }`,
+            );
+          }
+
+          LOGGER.info('Automated draft queued', {
+            leagueId,
+            draftId: draft.id,
+            draftMode,
+            selectionMethod,
+            draftOrder,
+            teamCount: teams.length,
+          });
         }
 
         return draft;
       } catch (error) {
-        LOGGER.error('Error initializing live draft', {
+        LOGGER.error('Error initializing draft', {
           leagueId,
           userId,
           error: error instanceof Error ? error.message : String(error),

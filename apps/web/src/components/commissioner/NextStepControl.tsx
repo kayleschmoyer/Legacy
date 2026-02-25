@@ -18,7 +18,7 @@ import {
   useAutoSelectGamesMutation,
   useGetLeagueDraftQuery,
   useGetMatchupsForLeagueQuery,
-  useStartDraftMutation,
+  useInitializeDraftMutation,
 } from '../../api/db/graphql.generated';
 
 export interface NextStepControlProps {
@@ -62,10 +62,11 @@ export function NextStepControl({
     ],
     awaitRefetchQueries: true,
   });
-  const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
-    refetchQueries: ['GetLeagueDraft'],
-    awaitRefetchQueries: true,
-  });
+  const [initializeDraft, { loading: initializeDraftLoading }] =
+    useInitializeDraftMutation({
+      refetchQueries: ['GetLeagueDraft', 'GetLeagueById'],
+      awaitRefetchQueries: true,
+    });
   const [autoSelectGames] = useAutoSelectGamesMutation({
     refetchQueries: ['GetCurrentMatchupForLeague', 'GetMatchupsForLeague'],
     awaitRefetchQueries: true,
@@ -137,7 +138,7 @@ export function NextStepControl({
     // Prevent clicking draft button if draft is already in progress, loading, or completed
     if (
       actionType === 'draft' &&
-      (startDraftLoading || isDraftInProgress || isDraftCompleted)
+      (initializeDraftLoading || isDraftInProgress || isDraftCompleted)
     ) {
       return;
     }
@@ -150,18 +151,16 @@ export function NextStepControl({
 
     try {
       if (actionType === 'draft') {
-        // Start draft only - commissioner will create week 1 after
-        const result = await startDraft({
+        // Initialize draft — handles both live and automated modes.
+        // The mutation reads saved draft settings and branches accordingly.
+        await initializeDraft({
           variables: {
             leagueId,
           },
         });
 
-        // Update parent with new league data from mutation response
-        if (result.data?.startDraft) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-          onLeagueUpdate?.(result.data.startDraft);
-        }
+        // The mutation returns a Draft, not a League. The refetchQueries
+        // on the hook will re-fetch GetLeagueById to update the parent.
 
         setLoading(false);
         onSuccess?.('draft');
@@ -226,13 +225,14 @@ export function NextStepControl({
   };
 
   const getButtonText = () => {
-    if (loading || startDraftLoading || matchupsLoading) return 'Processing...';
+    if (loading || initializeDraftLoading || matchupsLoading)
+      return 'Processing...';
     if (isGameSelectionInProgress) return 'Game Selection In Progress...';
     if (isDraftInProgress) return 'Draft In Progress...';
     if (isDraftCompleted && actionType === 'draft') return 'Draft Completed';
 
     if (actionType === 'draft') {
-      return startDraftLoading ? 'Starting Draft...' : 'Start Draft';
+      return initializeDraftLoading ? 'Starting Draft...' : 'Start Draft';
     } else if (actionType === 'createWeek1') {
       return 'Create Week 1 Matchups';
     } else if (actionType === 'selectGame') {
@@ -387,7 +387,7 @@ export function NextStepControl({
                 onPress={handleButtonClick}
                 disabled={
                   loading ||
-                  startDraftLoading ||
+                  initializeDraftLoading ||
                   matchupsLoading ||
                   isGameSelectionInProgress ||
                   isDraftInProgress ||
@@ -395,7 +395,7 @@ export function NextStepControl({
                 }
                 icon={
                   loading ||
-                  startDraftLoading ||
+                  initializeDraftLoading ||
                   matchupsLoading ||
                   isGameSelectionInProgress ||
                   (isDraftInProgress && !isLiveDraft) ? (

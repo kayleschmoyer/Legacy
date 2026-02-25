@@ -688,7 +688,7 @@ export type Mutation = {
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
-  initializeLiveDraft?: Maybe<Draft>;
+  initializeDraft?: Maybe<Draft>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
   makeDraftPick?: Maybe<DraftPick>;
@@ -802,9 +802,11 @@ export type MutationDisableDeviceTokenArgs = {
   deviceToken: Scalars['String']['input'];
 };
 
-export type MutationInitializeLiveDraftArgs = {
+export type MutationInitializeDraftArgs = {
+  draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationJoinLeagueArgs = {

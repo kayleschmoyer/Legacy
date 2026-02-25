@@ -719,7 +719,12 @@ type Mutation {
   deleteAllLeagues: String
   deleteLeague(leagueId: Int!): String
   disableDeviceToken(deviceToken: String!): Boolean
-  initializeLiveDraft(draftOrder: String, leagueId: Int!): Draft
+  initializeDraft(
+    draftMode: String
+    draftOrder: String
+    leagueId: Int!
+    selectionMethod: String
+  ): Draft
   joinLeague(inviteCode: String!, teamName: String!): JoinLeaguePayload
   joinLeagueByCode(inviteCode: String!, teamName: String!): Team
   makeDraftPick(draftId: Int!, playerId: Int!): DraftPick
