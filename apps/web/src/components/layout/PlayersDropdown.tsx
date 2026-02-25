@@ -8,6 +8,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
+import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 
 const DropdownButton = styled(Button, {
   size: '$3',
@@ -175,7 +176,7 @@ export const PlayersDropdown: React.FC = () => {
                     width={6}
                     height={6}
                     borderRadius={3}
-                    backgroundColor="$blue9"
+                    backgroundColor={BRAND_NAVY_LIGHT}
                   />
                 )}
               </XStack>
@@ -209,7 +210,7 @@ export const PlayersDropdown: React.FC = () => {
                     width={6}
                     height={6}
                     borderRadius={3}
-                    backgroundColor="$blue9"
+                    backgroundColor={BRAND_NAVY_LIGHT}
                   />
                 )}
               </XStack>

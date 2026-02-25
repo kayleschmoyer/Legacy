@@ -23,6 +23,7 @@ import {
   type ScoringPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 import type { MatchupPlayerFragment } from '../../api/db/graphql.generated';
+import { BRAND_GOLD_LIGHT } from '../../constants/colors';
 
 export interface PlayerMatchupStatsModalProps {
   /** Player data with games and stats */
@@ -498,7 +499,7 @@ export function PlayerMatchupStatsModal({
                       <Text fontSize="$2" color="$gray11">
                         Total Score
                       </Text>
-                      <H3 color="$blue11">
+                      <H3 color={BRAND_GOLD_LIGHT}>
                         {scoreBreakdown.totalScore.toFixed(2)}
                       </H3>
                     </YStack>
@@ -513,7 +514,7 @@ export function PlayerMatchupStatsModal({
                 {/* Batting Stats */}
                 {scoreBreakdown.batting.length > 0 && (
                   <YStack gap="$2">
-                    <H4 paddingHorizontal="$3" color="$blue11">
+                    <H4 paddingHorizontal="$3" color={BRAND_GOLD_LIGHT}>
                       Batting
                     </H4>
                     <Card bordered>
@@ -560,7 +561,7 @@ export function PlayerMatchupStatsModal({
                 {/* Pitching Stats */}
                 {scoreBreakdown.pitching.length > 0 && (
                   <YStack gap="$2">
-                    <H4 paddingHorizontal="$3" color="$blue11">
+                    <H4 paddingHorizontal="$3" color={BRAND_GOLD_LIGHT}>
                       Pitching
                     </H4>
                     <Card bordered>
@@ -607,7 +608,7 @@ export function PlayerMatchupStatsModal({
                 {/* Fielding Stats */}
                 {scoreBreakdown.fielding.length > 0 && (
                   <YStack gap="$2">
-                    <H4 paddingHorizontal="$3" color="$blue11">
+                    <H4 paddingHorizontal="$3" color={BRAND_GOLD_LIGHT}>
                       Fielding
                     </H4>
                     <Card bordered>

@@ -13,6 +13,11 @@ import {
   type SeasonStats,
 } from '@legacy-sports/scoring';
 import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
+import {
   type MatchupFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
@@ -42,9 +47,9 @@ const TopBar = styled(XStack, {
   justifyContent: 'space-between',
   paddingHorizontal: '$5',
   paddingVertical: '$3',
-  backgroundColor: '$blue2',
+  backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.12),
   borderBottomWidth: 1,
-  borderBottomColor: '$blue6',
+  borderBottomColor: withAlpha(BRAND_NAVY_LIGHT, 0.35),
 });
 
 const StatusChip = styled(XStack, {
@@ -372,11 +377,11 @@ export function MatchupScoreboard({
       }
     : isCompleted
       ? {
-          bg: '$blue3',
-          border: '$blue7',
-          text: '$blue11',
+          bg: withAlpha(BRAND_NAVY_LIGHT, 0.18),
+          border: withAlpha(BRAND_NAVY_LIGHT, 0.5),
+          text: BRAND_GOLD_LIGHT,
           label: 'FINAL',
-          icon: <Trophy size={12} color="var(--blue11)" />,
+          icon: <Trophy size={12} color={BRAND_GOLD_LIGHT} />,
         }
       : {
           bg: '$gray3',
@@ -391,12 +396,12 @@ export function MatchupScoreboard({
       {/* Top Bar */}
       <TopBar>
         <XStack alignItems="center" gap="$2">
-          <Swords size={16} color="var(--blue11)" />
-          <Text fontSize="$4" fontWeight="700" color="$blue11">
+          <Swords size={16} color={BRAND_GOLD_LIGHT} />
+          <Text fontSize="$4" fontWeight="700" color={BRAND_GOLD_LIGHT}>
             Week {weekNumber}
           </Text>
           {gamesPerMatchup && (
-            <Text fontSize="$2" color="$blue9" marginLeft="$1">
+            <Text fontSize="$2" color={BRAND_NAVY_LIGHT} marginLeft="$1">
               {gamesCompleted}/{gamesPerMatchup} games
             </Text>
           )}
@@ -429,12 +434,16 @@ export function MatchupScoreboard({
       <XStack position="relative">
         {/* Team 1 */}
         <TeamPanel
-          backgroundColor={team1Leading && !isTied ? '$blue2' : '$background'}
+          backgroundColor={
+            team1Leading && !isTied
+              ? withAlpha(BRAND_NAVY_LIGHT, 0.12)
+              : '$background'
+          }
         >
           <Text
             fontSize="$5"
             fontWeight="700"
-            color={team1Leading ? '$blue11' : '$color'}
+            color={team1Leading ? BRAND_GOLD_LIGHT : '$color'}
             cursor={onTeamClick && team1Id ? 'pointer' : undefined}
             hoverStyle={
               onTeamClick && team1Id
@@ -449,7 +458,7 @@ export function MatchupScoreboard({
           </Text>
           <ScoreDisplay
             fontSize={48}
-            color={team1Leading && !isTied ? '$blue11' : '$textMuted'}
+            color={team1Leading && !isTied ? BRAND_GOLD_LIGHT : '$textMuted'}
           >
             {team1Score?.toFixed(2) ?? '0.00'}
           </ScoreDisplay>
@@ -517,12 +526,16 @@ export function MatchupScoreboard({
 
         {/* Team 2 */}
         <TeamPanel
-          backgroundColor={team2Leading && !isTied ? '$blue2' : '$background'}
+          backgroundColor={
+            team2Leading && !isTied
+              ? withAlpha(BRAND_NAVY_LIGHT, 0.12)
+              : '$background'
+          }
         >
           <Text
             fontSize="$5"
             fontWeight="700"
-            color={team2Leading ? '$blue11' : '$color'}
+            color={team2Leading ? BRAND_GOLD_LIGHT : '$color'}
             cursor={onTeamClick && team2Id ? 'pointer' : undefined}
             hoverStyle={
               onTeamClick && team2Id
@@ -537,7 +550,7 @@ export function MatchupScoreboard({
           </Text>
           <ScoreDisplay
             fontSize={48}
-            color={team2Leading && !isTied ? '$blue11' : '$textMuted'}
+            color={team2Leading && !isTied ? BRAND_GOLD_LIGHT : '$textMuted'}
           >
             {team2Score?.toFixed(2) ?? '0.00'}
           </ScoreDisplay>
@@ -598,7 +611,7 @@ export function MatchupScoreboard({
             <Text
               fontSize="$1"
               fontWeight="700"
-              color={gamesRemaining === 0 ? '$green10' : '$blue10'}
+              color={gamesRemaining === 0 ? '$green10' : BRAND_GOLD_LIGHT}
             >
               {gamesRemaining === 0
                 ? 'Complete'
@@ -615,7 +628,9 @@ export function MatchupScoreboard({
             <YStack
               height="100%"
               width={`${(gamesCompleted / gamesPerMatchup) * 100}%`}
-              backgroundColor={gamesRemaining === 0 ? '$green9' : '$blue9'}
+              backgroundColor={
+                gamesRemaining === 0 ? '$green9' : BRAND_NAVY_LIGHT
+              }
               borderRadius="$10"
               animation="quick"
             />

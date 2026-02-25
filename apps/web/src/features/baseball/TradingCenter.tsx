@@ -43,6 +43,14 @@ import {
   useVetoTradeMutation,
 } from '../../api/db/graphql.generated';
 import { useLeagueWebSocket } from '../../hooks/useLeagueWebSocket';
+import {
+  BLACK,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_LIGHT,
+  SURFACE_PANEL,
+  withAlpha,
+} from '../../constants/colors';
 
 // ── Styled helpers ────────────────────────────────────────────────────────────
 
@@ -183,7 +191,7 @@ function TradeOfferCard({
 
   return (
     <GlassCard
-      backgroundColor="rgba(17, 27, 47, 0.65)"
+      backgroundColor={withAlpha(SURFACE_PANEL, 0.65)}
       borderColor={badge.border}
       style={{
         backdropFilter: 'blur(12px)',
@@ -216,7 +224,7 @@ function TradeOfferCard({
         borderBottomColor="$outlineSubtle"
       >
         <XStack alignItems="center" gap="$2">
-          <ArrowLeftRight size={14} color="$blue10" />
+          <ArrowLeftRight size={14} color={BRAND_GOLD_LIGHT} />
           <Text fontSize="$2" fontWeight="700" color="$color">
             {isOutgoing
               ? `To: ${trade.receivingTeamName ?? 'Unknown Team'}`
@@ -263,12 +271,16 @@ function TradeOfferCard({
               <XStack key={p.id} alignItems="center" gap="$1.5">
                 {p.playerPosition && (
                   <XStack
-                    backgroundColor="$blue3"
+                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
                     borderRadius="$2"
                     paddingHorizontal="$1"
                     paddingVertical={2}
                   >
-                    <Text fontSize="$1" color="$blue11" fontWeight="700">
+                    <Text
+                      fontSize="$1"
+                      color={BRAND_GOLD_LIGHT}
+                      fontWeight="700"
+                    >
                       {p.playerPosition}
                     </Text>
                   </XStack>
@@ -308,12 +320,16 @@ function TradeOfferCard({
               <XStack key={p.id} alignItems="center" gap="$1.5">
                 {p.playerPosition && (
                   <XStack
-                    backgroundColor="$blue3"
+                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
                     borderRadius="$2"
                     paddingHorizontal="$1"
                     paddingVertical={2}
                   >
-                    <Text fontSize="$1" color="$blue11" fontWeight="700">
+                    <Text
+                      fontSize="$1"
+                      color={BRAND_GOLD_LIGHT}
+                      fontWeight="700"
+                    >
                       {p.playerPosition}
                     </Text>
                   </XStack>
@@ -565,7 +581,7 @@ function ProposeTradeDialog({
       zIndex={1000}
       alignItems="center"
       justifyContent="center"
-      backgroundColor="rgba(0,0,0,0.6)"
+      backgroundColor={withAlpha(BLACK, 0.6)}
       style={{ backdropFilter: 'blur(4px)' }}
       onPress={onDismiss}
     >
@@ -583,7 +599,7 @@ function ProposeTradeDialog({
         {/* Dialog header */}
         <XStack alignItems="center" justifyContent="space-between">
           <XStack alignItems="center" gap="$2">
-            <ArrowLeftRight size={18} color="$blue10" />
+            <ArrowLeftRight size={18} color={BRAND_GOLD_LIGHT} />
             <Text fontSize="$5" fontWeight="700" color="$color">
               Propose Trade
             </Text>
@@ -628,7 +644,11 @@ function ProposeTradeDialog({
                       height={18}
                       borderRadius={9}
                       backgroundColor={
-                        isDone ? '$green9' : isActive ? '$blue9' : '$gray5'
+                        isDone
+                          ? '$green9'
+                          : isActive
+                            ? BRAND_NAVY_LIGHT
+                            : '$gray5'
                       }
                       alignItems="center"
                       justifyContent="center"
@@ -674,7 +694,7 @@ function ProposeTradeDialog({
                   backgroundColor="$surfaceSubtle"
                   borderColor={
                     draft.receivingTeamId === team.id
-                      ? '$blue7'
+                      ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
                       : '$outlineSubtle'
                   }
                   borderWidth={1}
@@ -683,11 +703,11 @@ function ProposeTradeDialog({
                   onPress={() => handleSelectTeam(team.id ?? 0)}
                   justifyContent="flex-start"
                   animation="quick"
-                  hoverStyle={{ borderColor: '$blue7' }}
+                  hoverStyle={{ borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5) }}
                   pressStyle={{ scale: 0.98 }}
                 >
                   <XStack alignItems="center" gap="$2">
-                    <Users size={16} color="$blue10" />
+                    <Users size={16} color={BRAND_GOLD_LIGHT} />
                     <Text fontSize="$3" fontWeight="600" color="$color">
                       {team.name}
                     </Text>
@@ -705,7 +725,7 @@ function ProposeTradeDialog({
                   you will give
                 </Text>{' '}
                 to{' '}
-                <Text fontWeight="700" color="$blue11">
+                <Text fontWeight="700" color={BRAND_GOLD_LIGHT}>
                   {selectedTeam?.name}
                 </Text>
                 :
@@ -720,8 +740,16 @@ function ProposeTradeDialog({
                 return (
                   <Button
                     key={tm.id}
-                    backgroundColor={isSelected ? '$blue3' : '$surfaceSubtle'}
-                    borderColor={isSelected ? '$blue7' : '$outlineSubtle'}
+                    backgroundColor={
+                      isSelected
+                        ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
+                        : '$surfaceSubtle'
+                    }
+                    borderColor={
+                      isSelected
+                        ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                        : '$outlineSubtle'
+                    }
                     borderWidth={1}
                     borderRadius="$4"
                     padding="$2.5"
@@ -729,14 +757,18 @@ function ProposeTradeDialog({
                     justifyContent="flex-start"
                     animation="quick"
                     pressStyle={{ scale: 0.98 }}
-                    hoverStyle={{ borderColor: '$blue7' }}
+                    hoverStyle={{
+                      borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5),
+                    }}
                   >
                     <XStack alignItems="center" gap="$2" flex={1}>
-                      {isSelected && <Check size={14} color="$blue11" />}
+                      {isSelected && (
+                        <Check size={14} color={BRAND_GOLD_LIGHT} />
+                      )}
                       <Text
                         fontSize="$3"
                         fontWeight={isSelected ? '700' : '400'}
-                        color={isSelected ? '$blue11' : '$color'}
+                        color={isSelected ? BRAND_GOLD_LIGHT : '$color'}
                         flex={1}
                       >
                         {name}
@@ -760,7 +792,7 @@ function ProposeTradeDialog({
                 <Button
                   marginTop="$2"
                   onPress={() => setStep('request')}
-                  backgroundColor="$blue9"
+                  backgroundColor={BRAND_NAVY_LIGHT}
                   borderRadius="$4"
                   animation="quick"
                   pressStyle={{ scale: 0.98 }}
@@ -777,7 +809,7 @@ function ProposeTradeDialog({
             <YStack gap="$2">
               <Text fontSize="$3" color="$textMuted" marginBottom="$1">
                 Select players you want{' '}
-                <Text fontWeight="700" color="$blue11">
+                <Text fontWeight="700" color={BRAND_GOLD_LIGHT}>
                   {selectedTeam?.name}
                 </Text>{' '}
                 to{' '}
@@ -849,7 +881,7 @@ function ProposeTradeDialog({
                   <Button
                     flex={2}
                     onPress={() => setStep('confirm')}
-                    backgroundColor="$blue9"
+                    backgroundColor={BRAND_NAVY_LIGHT}
                     borderRadius="$4"
                     animation="quick"
                     pressStyle={{ scale: 0.98 }}
@@ -1002,7 +1034,7 @@ function ProposeTradeDialog({
                 <Button
                   flex={2}
                   onPress={() => void handleSubmit()}
-                  backgroundColor="$blue9"
+                  backgroundColor={BRAND_NAVY_LIGHT}
                   borderRadius="$4"
                   disabled={submitting}
                   animation="quick"
@@ -1123,7 +1155,7 @@ export function TradingCenter({
       {/* Page header */}
       <XStack alignItems="center" justifyContent="space-between">
         <XStack alignItems="center" gap="$2">
-          <ArrowLeftRight size={22} color="$blue10" />
+          <ArrowLeftRight size={22} color={BRAND_GOLD_LIGHT} />
           <YStack>
             <Text fontSize="$6" fontWeight="700" color="$color">
               Trading Center
@@ -1136,12 +1168,12 @@ export function TradingCenter({
 
         <Button
           size="$3"
-          backgroundColor="$blue9"
+          backgroundColor={BRAND_NAVY_LIGHT}
           borderRadius="$4"
           onPress={() => setShowProposeDialog(true)}
           animation="quick"
           pressStyle={{ scale: 0.97 }}
-          hoverStyle={{ backgroundColor: '$blue10' }}
+          hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY, 1) }}
           icon={<Zap size={14} color="white" />}
         >
           <Text fontSize="$3" fontWeight="700" color="white">
@@ -1236,20 +1268,20 @@ export function TradingCenter({
       {/* Outgoing offers */}
       <YStack gap="$3">
         <XStack alignItems="center" gap="$2">
-          <Send size={16} color="$blue10" />
+          <Send size={16} color={BRAND_GOLD_LIGHT} />
           <Text fontSize="$4" fontWeight="700" color="$color">
             Outgoing Offers
           </Text>
           {outgoingPending.length > 0 && (
             <XStack
-              backgroundColor="$blue3"
-              borderColor="$blue7"
+              backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
               borderWidth={1}
               borderRadius="$10"
               paddingHorizontal="$2"
               paddingVertical={2}
             >
-              <Text fontSize="$1" fontWeight="700" color="$blue11">
+              <Text fontSize="$1" fontWeight="700" color={BRAND_GOLD_LIGHT}>
                 {outgoingPending.length}
               </Text>
             </XStack>

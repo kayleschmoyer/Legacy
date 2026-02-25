@@ -21,6 +21,11 @@ import {
 import { WaiverClaimModal } from './WaiverClaimModal';
 import { useGetPlayersWithStatsQuery } from '../../api/db/graphql.generated';
 import { useLeagueTakenPlayers } from '../../hooks/useLeagueTakenPlayers';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 
@@ -245,7 +250,7 @@ const SearchBox = styled(XStack, {
   flex: 1,
   minWidth: 180,
   focusWithinStyle: {
-    borderColor: '$blue8',
+    borderColor: BRAND_NAVY_LIGHT,
   },
 });
 
@@ -258,8 +263,8 @@ const PositionChip = styled(Button, {
   variants: {
     selected: {
       true: {
-        backgroundColor: '$blue4',
-        borderColor: '$blue7',
+        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.25),
+        borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5),
       },
       false: {
         backgroundColor: 'transparent',
@@ -295,8 +300,8 @@ const DataRow = styled(XStack, {
 });
 
 const PositionBadge = styled(XStack, {
-  backgroundColor: '$blue2',
-  borderColor: '$blue6',
+  backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.12),
+  borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.35),
   borderWidth: 1,
   borderRadius: '$2',
   paddingHorizontal: '$2',
@@ -329,8 +334,8 @@ const PlayerTypeButton = styled(Button, {
   variants: {
     selected: {
       true: {
-        backgroundColor: '$blue4',
-        borderColor: '$blue7',
+        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.25),
+        borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5),
         borderWidth: 1,
       },
       false: {
@@ -423,14 +428,14 @@ const SortableHeader: React.FC<{
         fontWeight="700"
         textTransform="uppercase"
         letterSpacing={0.5}
-        color={isSorted ? '$blue10' : '$color9'}
+        color={isSorted ? BRAND_GOLD_LIGHT : '$color9'}
         numberOfLines={1}
         whiteSpace="nowrap"
       >
         {label}
       </Text>
       {isSorted && (
-        <Text fontSize={9} color="$blue10">
+        <Text fontSize={9} color={BRAND_GOLD_LIGHT}>
           {sortDirection === 'asc' ? '▲' : '▼'}
         </Text>
       )}
@@ -582,7 +587,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
               <Text
                 fontSize={13}
                 fontWeight={playerType === 'hitters' ? '700' : '500'}
-                color={playerType === 'hitters' ? '$blue11' : '$color10'}
+                color={playerType === 'hitters' ? BRAND_GOLD_LIGHT : '$color10'}
               >
                 Hitters
               </Text>
@@ -594,7 +599,9 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
               <Text
                 fontSize={13}
                 fontWeight={playerType === 'pitchers' ? '700' : '500'}
-                color={playerType === 'pitchers' ? '$blue11' : '$color10'}
+                color={
+                  playerType === 'pitchers' ? BRAND_GOLD_LIGHT : '$color10'
+                }
               >
                 Pitchers
               </Text>
@@ -640,7 +647,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                 <Text
                   fontSize={12}
                   fontWeight={positionFilter === pos ? '700' : '500'}
-                  color={positionFilter === pos ? '$blue11' : '$color10'}
+                  color={positionFilter === pos ? BRAND_GOLD_LIGHT : '$color10'}
                 >
                   {pos}
                 </Text>
@@ -745,7 +752,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
           </EmptyState>
         ) : isLoading && displayPlayers.length === 0 ? (
           <EmptyState>
-            <Spinner size="large" color="$blue10" />
+            <Spinner size="large" color={BRAND_NAVY_LIGHT} />
             <Text color="$color9" fontSize="$3">
               Loading free agents…
             </Text>
@@ -767,12 +774,12 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
               <XStack
                 paddingVertical="$1"
                 paddingHorizontal="$4"
-                backgroundColor="$blue2"
+                backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
                 alignItems="center"
                 gap="$2"
               >
-                <Spinner size="small" color="$blue10" />
-                <Text fontSize={12} color="$blue10">
+                <Spinner size="small" color={BRAND_NAVY_LIGHT} />
+                <Text fontSize={12} color={BRAND_GOLD_LIGHT}>
                   Updating…
                 </Text>
               </XStack>
@@ -840,7 +847,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                                     <Text
                                       fontSize={10}
                                       fontWeight="700"
-                                      color="$blue11"
+                                      color={BRAND_GOLD_LIGHT}
                                     >
                                       {pos}
                                     </Text>
@@ -881,7 +888,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                             <Text
                               fontSize="$3"
                               fontWeight="600"
-                              color="$blue11"
+                              color={BRAND_GOLD_LIGHT}
                             >
                               {player.eligiblePositions.join(', ')}
                             </Text>
@@ -893,7 +900,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                             <Text
                               fontSize={10}
                               fontWeight="700"
-                              color="$blue11"
+                              color={BRAND_GOLD_LIGHT}
                             >
                               {pos}
                             </Text>
@@ -929,7 +936,11 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                             ? Math.round(roleScore).toLocaleString()
                             : '–'}
                         </StatCell>
-                        <StatCell width={60} fontWeight="700" color="$blue11">
+                        <StatCell
+                          width={60}
+                          fontWeight="700"
+                          color={BRAND_GOLD_LIGHT}
+                        >
                           {proj != null ? proj.toFixed(1) : '–'}
                         </StatCell>
                       </>
@@ -1033,13 +1044,13 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                       icon={UserPlus}
                       size="$2"
                       circular
-                      backgroundColor="$blue3"
-                      borderColor="$blue7"
+                      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                      borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
                       borderWidth={1}
-                      color="$blue11"
+                      color={BRAND_GOLD_LIGHT}
                       hoverStyle={{
-                        backgroundColor: '$blue4',
-                        borderColor: '$blue8',
+                        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.25),
+                        borderColor: BRAND_NAVY_LIGHT,
                         scale: 1.05,
                       }}
                       pressStyle={{ scale: 0.95 }}

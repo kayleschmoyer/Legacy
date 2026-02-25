@@ -3,6 +3,11 @@ import { Spinner, styled, Text, XStack, YStack } from 'tamagui';
 import { AlertCircle, Calendar, Swords } from '@tamagui/lucide-icons';
 import { MatchupCard } from './MatchupCard';
 import { type MatchupFragment } from '../../api/db/graphql.generated';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 export interface MatchupGridProps {
   matchups: MatchupFragment[];
@@ -38,9 +43,9 @@ const CountBadge = styled(XStack, {
   paddingHorizontal: '$3',
   paddingVertical: '$1.5',
   borderRadius: '$10',
-  backgroundColor: '$blue3',
+  backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.18),
   borderWidth: 1,
-  borderColor: '$blue7',
+  borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5),
 });
 
 const EmptyState = styled(YStack, {
@@ -68,7 +73,7 @@ export function MatchupGrid({
     return (
       <GridContainer>
         <EmptyState>
-          <Spinner size="large" color="$blue9" />
+          <Spinner size="large" color={BRAND_NAVY_LIGHT} />
           <Text color="$textMuted" fontSize="$3" marginTop="$1">
             Loading matchups...
           </Text>
@@ -156,7 +161,7 @@ export function MatchupGrid({
             </Text>
           </XStack>
           <CountBadge>
-            <Text fontSize="$2" fontWeight="700" color="$blue11">
+            <Text fontSize="$2" fontWeight="700" color={BRAND_GOLD_LIGHT}>
               {matchups.length} matchup{matchups.length !== 1 ? 's' : ''}
             </Text>
           </CountBadge>

@@ -44,10 +44,10 @@ export function AppNavigator() {
         id="main-drawer"
         initialRouteName="HomeStack"
         screenOptions={{
-          headerStyle: { backgroundColor: '#1E1E1E' },
-          headerTintColor: '#FFFFFF',
-          drawerStyle: { backgroundColor: '#1E1E1E' },
-          drawerLabelStyle: { color: '#FFFFFF' },
+          headerStyle: { backgroundColor: '#0A0F1A' },
+          headerTintColor: '#F8FAFC',
+          drawerStyle: { backgroundColor: '#0A0F1A' },
+          drawerLabelStyle: { color: '#F8FAFC' },
         }}
       >
         <Drawer.Screen

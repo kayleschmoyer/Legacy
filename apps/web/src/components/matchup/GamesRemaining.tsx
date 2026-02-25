@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
+import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 
 export interface GamesRemainingProps {
   gamesRemaining: number;
@@ -52,7 +53,9 @@ export function GamesRemaining({
             <YStack
               height="100%"
               width={`${progressPercentage}%`}
-              backgroundColor={gamesRemaining === 0 ? '$green10' : '$blue10'}
+              backgroundColor={
+                gamesRemaining === 0 ? '$green10' : BRAND_NAVY_LIGHT
+              }
               animation="bouncy"
             />
           </YStack>

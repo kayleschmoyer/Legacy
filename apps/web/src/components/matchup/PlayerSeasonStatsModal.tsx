@@ -13,6 +13,7 @@ import {
 } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
+import { WHITE, withAlpha } from '../../constants/colors';
 import { useGetAllPlayerSeasonStatsQuery } from '../../api/db/graphql.generated';
 
 export interface PlayerSeasonStatsModalProps {
@@ -324,9 +325,9 @@ export function PlayerSeasonStatsModal({
                 size="$3"
                 circular
                 icon={X}
-                backgroundColor="rgba(255,255,255,0.2)"
+                backgroundColor={withAlpha(WHITE, 0.2)}
                 color="white"
-                hoverStyle={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+                hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.3) }}
               />
             </Dialog.Close>
           </XStack>

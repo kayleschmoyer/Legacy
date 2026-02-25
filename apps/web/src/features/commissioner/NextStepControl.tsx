@@ -20,6 +20,13 @@ import {
   useGetMatchupsForLeagueQuery,
   useInitializeDraftMutation,
 } from '../../api/db/graphql.generated';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 export interface NextStepControlProps {
   leagueId: number;
@@ -292,9 +299,13 @@ export function NextStepControl({
 
   return (
     <>
-      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+      <Card
+        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+        borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+        padding="$4"
+      >
         <YStack space="$3">
-          <H4 color="$blue11">Next Step</H4>
+          <H4 color={BRAND_GOLD_LIGHT}>Next Step</H4>
 
           {hasCurrentMatchup ? (
             <YStack space="$2">
@@ -318,7 +329,7 @@ export function NextStepControl({
                       backgroundColor={
                         currentMatchup.statsLoadingStatus ===
                         StatsLoadingStatus.Queued
-                          ? '$blue3'
+                          ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
                           : currentMatchup.statsLoadingStatus ===
                               StatsLoadingStatus.Loading
                             ? '$yellow3'
@@ -330,7 +341,7 @@ export function NextStepControl({
                       borderColor={
                         currentMatchup.statsLoadingStatus ===
                         StatsLoadingStatus.Queued
-                          ? '$blue8'
+                          ? BRAND_NAVY_LIGHT
                           : currentMatchup.statsLoadingStatus ===
                               StatsLoadingStatus.Loading
                             ? '$yellow8'
@@ -348,7 +359,7 @@ export function NextStepControl({
                         color={
                           currentMatchup.statsLoadingStatus ===
                           StatsLoadingStatus.Queued
-                            ? '$blue11'
+                            ? BRAND_GOLD_LIGHT
                             : currentMatchup.statsLoadingStatus ===
                                 StatsLoadingStatus.Loading
                               ? '$yellow11'
@@ -383,7 +394,10 @@ export function NextStepControl({
               </Link>
             ) : (
               <Button
-                theme="blue"
+                backgroundColor={BRAND_NAVY_LIGHT}
+                color="white"
+                pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                hoverStyle={{ backgroundColor: BRAND_NAVY }}
                 onPress={handleButtonClick}
                 disabled={
                   loading ||
@@ -486,7 +500,13 @@ export function NextStepControl({
               <Dialog.Close displayWhenAdapted asChild>
                 <Button theme="alt2">Cancel</Button>
               </Dialog.Close>
-              <Button theme="blue" onPress={handleConfirm}>
+              <Button
+                backgroundColor={BRAND_NAVY_LIGHT}
+                color="white"
+                pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                onPress={handleConfirm}
+              >
                 Confirm
               </Button>
             </XStack>

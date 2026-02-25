@@ -11,6 +11,11 @@ import {
   useGetUserTeamIdQuery,
 } from '../../api/db/graphql.generated';
 import { useMatchupById, useMatchupsForLeague } from '../../hooks/useMatchup';
+import {
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+} from '../../constants/colors';
 
 /**
  * MatchupDetailPage - Full matchup breakdown page
@@ -45,7 +50,7 @@ export function MatchupDetailPage() {
         justifyContent="center"
         minHeight={400}
       >
-        <Spinner size="large" color="$blue10" />
+        <Spinner size="large" color={BRAND_NAVY_LIGHT} />
         <Text marginTop="$2" color="$gray11">
           Loading matchup details...
         </Text>
@@ -69,7 +74,10 @@ export function MatchupDetailPage() {
         </Text>
         <Button
           marginTop="$4"
-          theme="blue"
+          backgroundColor={BRAND_NAVY_LIGHT}
+          color="white"
+          pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+          hoverStyle={{ backgroundColor: BRAND_NAVY }}
           onPress={() => navigate(`/baseball/league/${leagueId}`)}
         >
           Back to League
@@ -91,7 +99,10 @@ export function MatchupDetailPage() {
         </Text>
         <Button
           marginTop="$4"
-          theme="blue"
+          backgroundColor={BRAND_NAVY_LIGHT}
+          color="white"
+          pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+          hoverStyle={{ backgroundColor: BRAND_NAVY }}
           onPress={() => navigate(`/baseball/league/${leagueId}`)}
         >
           Back to League

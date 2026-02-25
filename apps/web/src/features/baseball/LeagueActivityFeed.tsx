@@ -9,6 +9,7 @@ import {
   Users,
   Zap,
 } from '@tamagui/lucide-icons';
+import { BRAND_GOLD_LIGHT } from '../../constants/colors';
 
 interface ActivityItem {
   id: string;
@@ -59,7 +60,7 @@ export function LeagueActivityFeed({
         title: 'Draft in progress',
         detail: 'Managers are making their picks now.',
         timestamp: 'Live',
-        color: '$blue11',
+        color: BRAND_GOLD_LIGHT,
       });
     } else if (draftStatus === 'queued') {
       items.push({
@@ -100,7 +101,7 @@ export function LeagueActivityFeed({
           title: `${currentMatchup - 1} week${currentMatchup - 1 > 1 ? 's' : ''} completed`,
           detail: 'Review past results in the Standings tab.',
           timestamp: 'Season',
-          color: '$blue11',
+          color: BRAND_GOLD_LIGHT,
         });
       }
     }

@@ -144,7 +144,7 @@ export function LeagueChatTab({
             value={inputText}
             onChangeText={setInputText}
             placeholder="Message the league…"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor="#9CAAC5"
             multiline
             maxLength={2000}
             returnKeyType="send"
@@ -189,11 +189,11 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#f9fafb',
+    borderColor: '#2F3B53',
+    backgroundColor: '#111B2F',
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#111827',
+    color: '#F8FAFC',
   },
 });

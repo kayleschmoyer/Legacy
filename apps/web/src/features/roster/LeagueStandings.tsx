@@ -4,6 +4,15 @@ import { XStack, YStack } from '@legacy-sports/shared-components';
 import { Card, Separator, Spinner, styled, Text } from 'tamagui';
 import { Trophy } from '@tamagui/lucide-icons';
 import { useStandings } from '../../hooks/useStandings';
+import {
+  AMBER,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  GRADIENT_ACCENT_AMBER,
+  SURFACE_PANEL,
+  SURFACE_SUBTLE,
+  withAlpha,
+} from '../../constants/colors';
 
 interface Team {
   id: number;
@@ -137,7 +146,7 @@ export function LeagueStandings({
         role="status"
         aria-live="polite"
       >
-        <Spinner size="large" color="$blue10" />
+        <Spinner size="large" color={BRAND_NAVY_LIGHT} />
         <Text color="$textMuted" fontSize="$4">
           Loading standings...
         </Text>
@@ -170,7 +179,7 @@ export function LeagueStandings({
 
   return (
     <Card
-      backgroundColor="rgba(17, 27, 47, 0.7)"
+      backgroundColor={withAlpha(SURFACE_PANEL, 0.7)}
       borderColor="$surfacePanelBorder"
       borderWidth={1}
       borderRadius="$5"
@@ -187,7 +196,7 @@ export function LeagueStandings({
         height={3}
         width="100%"
         style={{
-          background: 'linear-gradient(90deg, #F59E0B, #FBBF24, transparent)',
+          background: GRADIENT_ACCENT_AMBER,
         }}
       />
       {/* Title bar */}
@@ -196,7 +205,7 @@ export function LeagueStandings({
         paddingVertical="$3"
         justifyContent="space-between"
         alignItems="center"
-        backgroundColor="rgba(13, 21, 38, 0.6)"
+        backgroundColor={withAlpha(SURFACE_SUBTLE, 0.6)}
       >
         <XStack alignItems="center" gap="$2">
           <Trophy size={18} color="var(--color)" />
@@ -293,17 +302,19 @@ export function LeagueStandings({
                 paddingVertical="$2.5"
                 backgroundColor={
                   isUserTeam
-                    ? '$blue2'
+                    ? withAlpha(BRAND_NAVY_LIGHT, 0.12)
                     : isEven
                       ? '$background'
                       : '$surfaceSubtle'
                 }
                 borderLeftWidth={3}
-                borderLeftColor={isUserTeam ? '$blue9' : 'transparent'}
+                borderLeftColor={isUserTeam ? BRAND_NAVY_LIGHT : 'transparent'}
                 role="listitem"
                 cursor="pointer"
                 hoverStyle={{
-                  backgroundColor: isUserTeam ? '$blue3' : '$surfaceSubtle',
+                  backgroundColor: isUserTeam
+                    ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
+                    : '$surfaceSubtle',
                 }}
                 pressStyle={{ scale: 0.995, opacity: 0.9 }}
                 onPress={() => handleTeamClick(team.id)}
@@ -312,9 +323,13 @@ export function LeagueStandings({
                 minHeight={48}
                 style={
                   isUserTeam
-                    ? { boxShadow: 'inset 0 0 24px rgba(59, 130, 246, 0.1)' }
+                    ? {
+                        boxShadow: `inset 0 0 24px ${withAlpha(BRAND_NAVY_LIGHT, 0.1)}`,
+                      }
                     : rank <= 3
-                      ? { boxShadow: 'inset 0 0 20px rgba(245, 158, 11, 0.06)' }
+                      ? {
+                          boxShadow: `inset 0 0 20px ${withAlpha(AMBER, 0.06)}`,
+                        }
                       : undefined
                 }
               >
@@ -350,8 +365,8 @@ export function LeagueStandings({
                       <Text
                         fontSize={10}
                         fontWeight="800"
-                        color="$blue11"
-                        backgroundColor="$blue3"
+                        color={BRAND_GOLD_LIGHT}
+                        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
                         paddingHorizontal="$1.5"
                         paddingVertical={1}
                         borderRadius="$2"

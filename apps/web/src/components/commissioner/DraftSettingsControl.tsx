@@ -7,6 +7,7 @@ import {
   PLAYER_POOLS,
   SELECTION_METHODS,
 } from '@legacy-sports/shared-components';
+import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
 import {
   useGetLeagueDraftQuery,
   useUpdateDraftSettingsMutation,
@@ -58,8 +59,10 @@ function OptionSelector({
               key={option.value}
               size="$3"
               theme={isSelected ? 'active' : 'alt2'}
-              backgroundColor={isSelected ? '$blue6' : '$gray3'}
-              borderColor={isSelected ? '$blue8' : '$gray6'}
+              backgroundColor={
+                isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+              }
+              borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
               borderWidth={1}
               borderRadius="$3"
               onPress={() => onChange(option.value)}
@@ -72,7 +75,9 @@ function OptionSelector({
                 disabled
                   ? undefined
                   : {
-                      backgroundColor: isSelected ? '$blue7' : '$gray4',
+                      backgroundColor: isSelected
+                        ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                        : '$gray4',
                     }
               }
             >
@@ -252,7 +257,7 @@ export function DraftSettingsControl({
             {isDraftLocked ? (
               <Lock size={20} color="var(--gray10)" />
             ) : (
-              <Settings size={20} color="var(--blue10)" />
+              <Settings size={20} color={BRAND_NAVY_LIGHT} />
             )}
             <YStack>
               <H4 margin={0}>Draft Settings</H4>

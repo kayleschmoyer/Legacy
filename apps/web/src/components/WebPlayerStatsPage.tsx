@@ -8,6 +8,7 @@ import type {
   PlayerStatsFilters,
   PlayerWithStats,
 } from '@legacy-sports/shared-components';
+import { BG_DARK, BLUE_ALT, TEXT_HIGH_CONTRAST } from '../constants/colors';
 
 /**
  * Web App Player Statistics Page
@@ -171,8 +172,8 @@ export function WebPlayerStatsPage() {
     <div
       style={{
         minHeight: '100vh',
-        backgroundColor: '#0f0f23', // Dark theme background
-        color: '#bababaa', // Dark theme text
+        backgroundColor: `var(--background, ${BG_DARK})`,
+        color: `var(--color, ${TEXT_HIGH_CONTRAST})`,
         padding: 0, // Remove default padding as PlayerStatsPage handles its own
       }}
     >
@@ -216,7 +217,7 @@ export function WebPlayerDetailPage() {
         style={{
           marginBottom: '1rem',
           padding: '0.5rem 1rem',
-          backgroundColor: '#3366FF',
+          backgroundColor: BLUE_ALT,
           color: 'white',
           border: 'none',
           borderRadius: '4px',

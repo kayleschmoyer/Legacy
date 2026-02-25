@@ -8,6 +8,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { useAuth } from '@legacy-sports/shared-components';
 import { styled } from 'tamagui';
+import { BRAND_NAVY_LIGHT } from '../constants/colors';
 
 const UserMenuButton = styled(Button, {
   backgroundColor: 'transparent',
@@ -26,7 +27,7 @@ const ProfileImage = styled(YStack, {
   width: 36,
   height: 36,
   borderRadius: '$12',
-  backgroundColor: '$blue6',
+  backgroundColor: BRAND_NAVY_LIGHT,
   alignItems: 'center',
   justifyContent: 'center',
   borderWidth: 2,
@@ -141,12 +142,21 @@ export const UserProfileDropdown: React.FC = () => {
                   objectFit: 'cover',
                 }}
                 onError={(e) => {
-                  console.error('[UserProfileDropdown] Image failed to load:', userImage, e);
-                  console.log('[UserProfileDropdown] Switching to initials fallback');
+                  console.error(
+                    '[UserProfileDropdown] Image failed to load:',
+                    userImage,
+                    e,
+                  );
+                  console.log(
+                    '[UserProfileDropdown] Switching to initials fallback',
+                  );
                   setImageError(true);
                 }}
                 onLoad={() => {
-                  console.log('[UserProfileDropdown] Image loaded successfully:', userImage);
+                  console.log(
+                    '[UserProfileDropdown] Image loaded successfully:',
+                    userImage,
+                  );
                   setImageError(false);
                 }}
               />

@@ -13,6 +13,14 @@ import {
   LeaguePositionFragment,
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
+import {
+  AMBER,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  GREEN,
+  RED,
+  withAlpha,
+} from '../../constants/colors';
 
 const pitchingPositions = PITCHING_POSITIONS;
 const infieldPositions = new Set(['C', '1B', '2B', '3B', 'SS']);
@@ -73,16 +81,16 @@ const getPositionAccent = (positionType: string): PositionAccent => {
   if (pitchingPositions.has(positionType)) {
     return {
       ...baseAccent,
-      badgeBg: 'rgba(59, 130, 246, 0.22)',
-      badgeColor: '$blue11',
-      borderColor: '$blue8',
+      badgeBg: withAlpha(BRAND_NAVY_LIGHT, 0.22),
+      badgeColor: BRAND_GOLD_LIGHT,
+      borderColor: BRAND_NAVY_LIGHT,
     };
   }
 
   if (infieldPositions.has(positionType)) {
     return {
       ...baseAccent,
-      badgeBg: 'rgba(220, 38, 38, 0.16)',
+      badgeBg: withAlpha(RED, 0.16),
       badgeColor: '$sportBaseballSecondary',
       borderColor: '$red6',
     };
@@ -91,7 +99,7 @@ const getPositionAccent = (positionType: string): PositionAccent => {
   if (outfieldPositions.has(positionType)) {
     return {
       ...baseAccent,
-      badgeBg: 'rgba(34, 197, 94, 0.16)',
+      badgeBg: withAlpha(GREEN, 0.16),
       badgeColor: '$green9',
       borderColor: '$green7',
     };
@@ -100,7 +108,7 @@ const getPositionAccent = (positionType: string): PositionAccent => {
   if (utilityPositions.has(positionType)) {
     return {
       ...baseAccent,
-      badgeBg: 'rgba(245, 158, 11, 0.18)',
+      badgeBg: withAlpha(AMBER, 0.18),
       badgeColor: '$amber8',
       borderColor: '$amber7',
     };
@@ -521,10 +529,12 @@ const BenchList = ({
                 padding="$3"
                 borderRadius="$5"
                 borderWidth={1}
-                borderColor={isActive ? '$blue8' : '$surfacePanelBorder'}
+                borderColor={
+                  isActive ? BRAND_NAVY_LIGHT : '$surfacePanelBorder'
+                }
                 backgroundColor={isActive ? '$accentMuted' : '$surfaceSubtle'}
                 hoverStyle={{
-                  borderColor: '$blue8',
+                  borderColor: BRAND_NAVY_LIGHT,
                   scale: 0.995,
                 }}
                 pressStyle={{
@@ -548,7 +558,7 @@ const BenchList = ({
                   </YStack>
                   <Text
                     fontSize="$2"
-                    color={isActive ? '$blue11' : '$textMuted'}
+                    color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}
                     fontWeight={isActive ? '600' : '500'}
                   >
                     {isActive ? 'Selected' : 'Tap to select'}
@@ -700,7 +710,7 @@ export function LeagueRosterManagement({
                   borderRadius="$5"
                   borderWidth={1}
                   backgroundColor="$accentMuted"
-                  borderColor="$blue8"
+                  borderColor={BRAND_NAVY_LIGHT}
                   alignSelf="flex-start"
                 >
                   <XStack alignItems="center" gap="$3" flexWrap="wrap">

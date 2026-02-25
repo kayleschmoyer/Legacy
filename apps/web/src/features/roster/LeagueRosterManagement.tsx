@@ -18,6 +18,21 @@ import {
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 import type { PlayerMatchupData } from '../../pages/baseball/LeagueDetailPage';
+import {
+  AMBER,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+  GRADIENT_ACCENT_BRAND,
+  GRADIENT_ACCENT_GREEN,
+  GREEN,
+  RED,
+  SURFACE_PANEL,
+  SURFACE_SUBTLE,
+  VIOLET,
+  withAlpha,
+} from '../../constants/colors';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -91,22 +106,22 @@ const CATEGORY_COLORS: Record<
   { bg: string; text: string; border: string }
 > = {
   pitching: {
-    bg: 'rgba(59, 130, 246, 0.28)',
-    text: '$blue11',
-    border: '$blue7',
+    bg: withAlpha(BRAND_NAVY_LIGHT, 0.28),
+    text: BRAND_GOLD_LIGHT,
+    border: withAlpha(BRAND_NAVY_LIGHT, 0.5),
   },
   infield: {
-    bg: 'rgba(220, 38, 38, 0.22)',
+    bg: withAlpha(RED, 0.22),
     text: '$sportBaseballSecondary',
     border: '$red6',
   },
   outfield: {
-    bg: 'rgba(34, 197, 94, 0.22)',
+    bg: withAlpha(GREEN, 0.22),
     text: '$green9',
     border: '$green7',
   },
   utility: {
-    bg: 'rgba(245, 158, 11, 0.24)',
+    bg: withAlpha(AMBER, 0.24),
     text: '$amber8',
     border: '$amber7',
   },
@@ -184,7 +199,7 @@ const StatPill = styled(YStack, {
   minWidth: 72,
   animation: 'quick',
   cursor: 'default',
-  hoverStyle: { scale: 1.06, borderColor: '$blue7' },
+  hoverStyle: { scale: 1.06, borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5) },
   pressStyle: { scale: 0.97 },
 });
 
@@ -381,20 +396,20 @@ function RosterRow({
       : '$surfaceCard';
 
   const rowGlow = isSelected
-    ? 'inset 0 0 30px rgba(59, 130, 246, 0.12)'
+    ? `inset 0 0 30px ${withAlpha(BRAND_NAVY_LIGHT, 0.12)}`
     : isSwapTarget
-      ? 'inset 0 0 30px rgba(34, 197, 94, 0.12)'
+      ? `inset 0 0 30px ${withAlpha(GREEN, 0.12)}`
       : canAccept && !hasPlayer
-        ? 'inset 0 0 20px rgba(34, 197, 94, 0.06)'
+        ? `inset 0 0 20px ${withAlpha(GREEN, 0.06)}`
         : 'none';
 
   // Gradient backgrounds for eligible/swap-target rows
   const rowGradient = isSelected
-    ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(139, 92, 246, 0.10) 100%)'
+    ? `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.18)} 0%, ${withAlpha(VIOLET, 0.1)} 100%)`
     : isSwapTarget
-      ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.22) 0%, rgba(59, 130, 246, 0.10) 100%)'
+      ? `linear-gradient(135deg, ${withAlpha(GREEN, 0.22)} 0%, ${withAlpha(BRAND_NAVY_LIGHT, 0.1)} 100%)`
       : canAccept && !hasPlayer
-        ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.16) 0%, rgba(34, 197, 94, 0.04) 100%)'
+        ? `linear-gradient(135deg, ${withAlpha(GREEN, 0.16)} 0%, ${withAlpha(GREEN, 0.04)} 100%)`
         : undefined;
 
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (event) => {
@@ -440,7 +455,7 @@ function RosterRow({
       minHeight={64}
       width="100%"
       borderBottomWidth={1}
-      borderBottomColor="#1C2740"
+      borderBottomColor="$outlineSubtle"
     >
       {/* Position Badge */}
       <PositionBadge backgroundColor={colors.bg} borderColor={colors.border}>
@@ -451,7 +466,7 @@ function RosterRow({
 
       {/* Player Name & Eligibility */}
       <YStack flex={1} minWidth={0} gap="$1">
-        <Text fontSize="$3" fontWeight="700" color="#F5F7FA" numberOfLines={1}>
+        <Text fontSize="$3" fontWeight="700" color="$color12" numberOfLines={1}>
           {hasPlayer ? getPlayerName(assignedPlayer) : positionLabel}
         </Text>
         {hasPlayer && eligible.length > 0 && (
@@ -461,11 +476,13 @@ function RosterRow({
                 key={pos}
                 fontSize={10}
                 fontWeight="700"
-                color={PITCHING_POSITIONS.has(pos) ? '#93C5FD' : '#86EFAC'}
+                color={
+                  PITCHING_POSITIONS.has(pos) ? BRAND_GOLD_LIGHT : '$green10'
+                }
                 backgroundColor={
                   PITCHING_POSITIONS.has(pos)
-                    ? 'rgba(59, 130, 246, 0.18)'
-                    : 'rgba(34, 197, 94, 0.16)'
+                    ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
+                    : withAlpha(GREEN, 0.16)
                 }
                 paddingHorizontal="$1.5"
                 paddingVertical={2}
@@ -477,21 +494,21 @@ function RosterRow({
           </XStack>
         )}
         {!hasPlayer && (
-          <Text fontSize="$2" color="#9CAAC5">
+          <Text fontSize="$2" color="$textMuted">
             {canAccept && selectedPlayer
               ? `Tap to assign ${getPlayerName(selectedPlayer)}`
               : 'Select a bench player to fill this spot'}
           </Text>
         )}
         {isSwapTarget && (
-          <Text fontSize="$2" color="#86EFAC" fontWeight="600">
+          <Text fontSize="$2" color="$green10" fontWeight="600">
             Tap to swap with {getPlayerName(selectedPlayer)}
           </Text>
         )}
         {hasPlayer && isCareerIneligible && (
           <XStack alignItems="center" gap="$1" marginTop={2}>
-            <AlertTriangle size={11} color="#F59E0B" />
-            <Text fontSize={10} fontWeight="700" color="#F59E0B">
+            <AlertTriangle size={11} color="$amber9" />
+            <Text fontSize={10} fontWeight="700" color="$amber9">
               Ineligible — does not meet career minimums
             </Text>
           </XStack>
@@ -505,12 +522,12 @@ function RosterRow({
             <Text
               fontSize={10}
               fontWeight="600"
-              color="#9CAAC5"
+              color="$textMuted"
               lineHeight={12}
             >
               Score
             </Text>
-            <Text fontSize="$3" fontWeight="700" color="#F5F7FA">
+            <Text fontSize="$3" fontWeight="700" color="$color12">
               {matchupData.score.toFixed(1)}
             </Text>
           </YStack>
@@ -518,12 +535,12 @@ function RosterRow({
             <Text
               fontSize={10}
               fontWeight="600"
-              color="#9CAAC5"
+              color="$textMuted"
               lineHeight={12}
             >
               Proj
             </Text>
-            <Text fontSize="$3" fontWeight="700" color="#93C5FD">
+            <Text fontSize="$3" fontWeight="700" color={BRAND_GOLD_LIGHT}>
               {matchupData.projection.toFixed(1)}
             </Text>
           </YStack>
@@ -540,23 +557,23 @@ function RosterRow({
       >
         {isLocked ? (
           <XStack alignItems="center" gap="$1">
-            <Lock size={14} color="#FBBF24" />
-            <Text fontSize="$2" fontWeight="600" color="#FBBF24">
+            <Lock size={14} color="$amber10" />
+            <Text fontSize="$2" fontWeight="600" color="$amber10">
               Locked
             </Text>
           </XStack>
         ) : isSwapTarget ? (
-          <Text fontSize="$2" fontWeight="700" color="#86EFAC">
+          <Text fontSize="$2" fontWeight="700" color="$green10">
             Swap
           </Text>
         ) : hasPlayer ? (
-          <Text fontSize="$2" fontWeight="600" color="#9CAAC5">
+          <Text fontSize="$2" fontWeight="600" color="$textMuted">
             {isSelected ? 'Selected' : ''}
           </Text>
         ) : (
           <Text
             fontSize="$2"
-            color={canAccept ? '#86EFAC' : '#9CAAC5'}
+            color={canAccept ? '$green10' : '$textMuted'}
             fontWeight="600"
           >
             {canAccept ? 'Ready' : 'Open'}
@@ -616,13 +633,13 @@ function RosterSection({
       <XStack
         paddingHorizontal="$3"
         paddingVertical="$2.5"
-        backgroundColor="#0D1526"
+        backgroundColor="$surfaceSubtle"
         justifyContent="space-between"
         alignItems="center"
         borderBottomWidth={1}
-        borderBottomColor="#1C2740"
+        borderBottomColor="$outlineSubtle"
         borderTopWidth={1}
-        borderTopColor="#1C2740"
+        borderTopColor="$outlineSubtle"
         position="relative"
         overflow="hidden"
       >
@@ -635,15 +652,14 @@ function RosterSection({
           width={`${fillPct}%`}
           opacity={0.08}
           style={{
-            background:
-              'linear-gradient(90deg, rgba(34, 197, 94, 0.6), rgba(59, 130, 246, 0.4))',
+            background: `linear-gradient(90deg, ${withAlpha(GREEN, 0.6)}, ${withAlpha(BRAND_NAVY_LIGHT, 0.4)})`,
             transition: 'width 0.5s ease-out',
           }}
         />
         <Text
           fontSize="$2"
           fontWeight="700"
-          color="#F5F7FA"
+          color="$color12"
           textTransform="uppercase"
           letterSpacing={1}
         >
@@ -651,7 +667,7 @@ function RosterSection({
         </Text>
         <Text
           fontSize="$2"
-          color={filled === positions.length ? '#86EFAC' : '#9CAAC5'}
+          color={filled === positions.length ? '$green10' : '$textMuted'}
           fontWeight="600"
         >
           {filled}/{positions.length}
@@ -741,7 +757,7 @@ function BenchPlayerCard({
       opacity={isLocked ? 0.7 : 1}
       style={
         isActive
-          ? { boxShadow: 'inset 0 0 24px rgba(59, 130, 246, 0.12)' }
+          ? { boxShadow: `inset 0 0 24px ${withAlpha(BRAND_NAVY_LIGHT, 0.12)}` }
           : undefined
       }
       role="button"
@@ -768,11 +784,13 @@ function BenchPlayerCard({
                 key={pos}
                 fontSize={10}
                 fontWeight="700"
-                color={PITCHING_POSITIONS.has(pos) ? '$blue11' : '$green9'}
+                color={
+                  PITCHING_POSITIONS.has(pos) ? BRAND_GOLD_LIGHT : '$green9'
+                }
                 backgroundColor={
                   PITCHING_POSITIONS.has(pos)
-                    ? 'rgba(59, 130, 246, 0.18)'
-                    : 'rgba(34, 197, 94, 0.16)'
+                    ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
+                    : withAlpha(GREEN, 0.16)
                 }
                 paddingHorizontal="$1.5"
                 paddingVertical={2}
@@ -786,7 +804,7 @@ function BenchPlayerCard({
                 fontSize={10}
                 fontWeight="800"
                 color="$amber8"
-                backgroundColor="rgba(245, 158, 11, 0.20)"
+                backgroundColor={withAlpha(AMBER, 0.2)}
                 paddingHorizontal="$1"
                 paddingVertical={1}
                 borderRadius="$1"
@@ -823,7 +841,7 @@ function BenchPlayerCard({
             >
               Proj
             </Text>
-            <Text fontSize="$2" fontWeight="700" color="#93C5FD">
+            <Text fontSize="$2" fontWeight="700" color={BRAND_GOLD_LIGHT}>
               {matchupData.projection.toFixed(1)}
             </Text>
           </YStack>
@@ -833,8 +851,8 @@ function BenchPlayerCard({
       {/* Selection indicator */}
       {isLocked ? (
         <XStack alignItems="center" gap="$1" flexShrink={0}>
-          <Lock size={12} color="#FBBF24" />
-          <Text fontSize="$2" fontWeight="600" color="#FBBF24">
+          <Lock size={12} color="$amber10" />
+          <Text fontSize="$2" fontWeight="600" color="$amber10">
             Locked
           </Text>
         </XStack>
@@ -905,7 +923,7 @@ function BenchPanel({
   };
   return (
     <YStack
-      backgroundColor="rgba(17, 27, 47, 0.7)"
+      backgroundColor={withAlpha(SURFACE_PANEL, 0.7)}
       borderColor="$surfacePanelBorder"
       borderWidth={1}
       borderRadius="$5"
@@ -924,15 +942,15 @@ function BenchPanel({
         style={{
           background:
             accentColor === '$green9'
-              ? 'linear-gradient(90deg, #22C55E, #4ADE80, transparent)'
-              : 'linear-gradient(90deg, #3B82F6, #60A5FA, transparent)',
+              ? GRADIENT_ACCENT_GREEN
+              : `linear-gradient(90deg, ${BRAND_NAVY}, ${BRAND_NAVY_LIGHT}, transparent)`,
         }}
       />
       {/* Panel header */}
       <XStack
         paddingHorizontal="$3"
         paddingVertical="$2.5"
-        backgroundColor="rgba(13, 21, 38, 0.6)"
+        backgroundColor={withAlpha(SURFACE_SUBTLE, 0.6)}
         justifyContent="space-between"
         alignItems="center"
       >
@@ -1005,9 +1023,8 @@ function BenchPanel({
                 cursor="pointer"
                 onPress={handleBenchPress}
                 style={{
-                  boxShadow: 'inset 0 0 20px rgba(34, 197, 94, 0.1)',
-                  background:
-                    'linear-gradient(135deg, rgba(34, 197, 94, 0.22) 0%, rgba(59, 130, 246, 0.10) 100%)',
+                  boxShadow: `inset 0 0 20px ${withAlpha(GREEN, 0.1)}`,
+                  background: `linear-gradient(135deg, ${withAlpha(GREEN, 0.22)} 0%, ${withAlpha(BRAND_NAVY_LIGHT, 0.1)} 100%)`,
                   transition: 'box-shadow 0.3s ease, background 0.3s ease',
                 }}
                 role="button"
@@ -1053,8 +1070,8 @@ function SelectedBanner({
 }: SelectedBannerProps): React.JSX.Element {
   return (
     <XStack
-      backgroundColor="$blue3"
-      borderColor="$blue7"
+      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+      borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
       borderWidth={1}
       borderRadius="$4"
       paddingVertical="$2"
@@ -1065,28 +1082,31 @@ function SelectedBanner({
       flexWrap="wrap"
       animation="bouncy"
       enterStyle={{ opacity: 0, y: -10, scale: 0.98 }}
-      style={{ boxShadow: '0 0 24px rgba(59, 130, 246, 0.2)' }}
+      style={{ boxShadow: `0 0 24px ${withAlpha(BRAND_NAVY_LIGHT, 0.2)}` }}
     >
       <XStack alignItems="center" gap="$2">
         <YStack
           width={8}
           height={8}
           borderRadius={4}
-          backgroundColor="$blue9"
+          backgroundColor={BRAND_NAVY_LIGHT}
           animation="bouncy"
           enterStyle={{ scale: 0 }}
         />
-        <Text fontSize="$3" fontWeight="700" color="$blue11">
+        <Text fontSize="$3" fontWeight="700" color={BRAND_GOLD_LIGHT}>
           {getPlayerName(player)}
         </Text>
-        <Text fontSize="$2" color="$blue10">
+        <Text fontSize="$2" color={BRAND_GOLD_LIGHT}>
           — tap a slot to assign
         </Text>
       </XStack>
       <Button
         size="$2"
         variant="outlined"
-        theme="blue"
+        backgroundColor={BRAND_NAVY_LIGHT}
+        color="white"
+        pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+        hoverStyle={{ backgroundColor: BRAND_NAVY }}
         onPress={onClear}
         aria-label="Clear selection"
       >
@@ -1345,8 +1365,8 @@ export function LeagueRosterManagement({
           {/* ── Lineup Table ──────────────────────────────────────── */}
           <YStack flex={3} minWidth={0}>
             <YStack
-              backgroundColor="rgba(17, 27, 47, 0.85)"
-              borderColor="#1F2D48"
+              backgroundColor={withAlpha(SURFACE_PANEL, 0.85)}
+              borderColor="$surfacePanelBorder"
               borderWidth={1}
               borderRadius="$5"
               overflow="hidden"
@@ -1360,21 +1380,20 @@ export function LeagueRosterManagement({
                 height={3}
                 width="100%"
                 style={{
-                  background:
-                    'linear-gradient(90deg, #3B82F6, #8B5CF6, #EC4899)',
+                  background: GRADIENT_ACCENT_BRAND,
                 }}
               />
               {/* Column headers */}
               <TableHeaderRow
-                backgroundColor="#0D1526"
+                backgroundColor="$surfaceSubtle"
                 borderBottomWidth={1}
-                borderBottomColor="#1C2740"
+                borderBottomColor="$outlineSubtle"
               >
                 <Text
                   width={56}
                   fontSize="$1"
                   fontWeight="700"
-                  color="#F5F7FA"
+                  color="$color12"
                   textTransform="uppercase"
                   letterSpacing={0.6}
                 >
@@ -1384,7 +1403,7 @@ export function LeagueRosterManagement({
                   flex={1}
                   fontSize="$1"
                   fontWeight="700"
-                  color="#F5F7FA"
+                  color="$color12"
                   textTransform="uppercase"
                   letterSpacing={0.6}
                 >
@@ -1394,7 +1413,7 @@ export function LeagueRosterManagement({
                   width={50}
                   fontSize="$1"
                   fontWeight="700"
-                  color="#F5F7FA"
+                  color="$color12"
                   textTransform="uppercase"
                   letterSpacing={0.6}
                   textAlign="center"
@@ -1405,7 +1424,7 @@ export function LeagueRosterManagement({
                   width={50}
                   fontSize="$1"
                   fontWeight="700"
-                  color="#93C5FD"
+                  color={BRAND_GOLD_LIGHT}
                   textTransform="uppercase"
                   letterSpacing={0.6}
                   textAlign="center"
@@ -1416,7 +1435,7 @@ export function LeagueRosterManagement({
                   width={60}
                   fontSize="$1"
                   fontWeight="700"
-                  color="#F5F7FA"
+                  color="$color12"
                   textTransform="uppercase"
                   letterSpacing={0.6}
                   textAlign="right"
@@ -1505,7 +1524,7 @@ export function LeagueRosterManagement({
                   ? 'No pitchers on the bullpen.'
                   : 'Add pitchers or move them from the rotation.'
               }
-              accentColor="$blue9"
+              accentColor={BRAND_NAVY_LIGHT}
               recentlyMovedIds={recentlyMovedIds}
               playerMatchupData={playerMatchupData}
             />

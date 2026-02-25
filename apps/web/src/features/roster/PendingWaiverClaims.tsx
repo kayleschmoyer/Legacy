@@ -6,6 +6,14 @@ import {
   useCancelWaiverClaimMutation,
   useGetTeamWaiverClaimsQuery,
 } from '../../api/db/graphql.generated';
+import {
+  AMBER,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  GRADIENT_ACCENT_AMBER,
+  SURFACE_PANEL,
+  withAlpha,
+} from '../../constants/colors';
 
 interface PendingWaiverClaimsProps {
   teamId: number;
@@ -61,7 +69,7 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
 
   return (
     <Card
-      backgroundColor="rgba(17, 27, 47, 0.7)"
+      backgroundColor={withAlpha(SURFACE_PANEL, 0.7)}
       borderColor="$amber7"
       borderWidth={1}
       borderRadius="$5"
@@ -69,7 +77,7 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
       style={{
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0 0 20px rgba(245, 158, 11, 0.08)',
+        boxShadow: `0 0 20px ${withAlpha(AMBER, 0.08)}`,
       }}
     >
       <YStack>
@@ -78,7 +86,7 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
           height={2}
           width="100%"
           style={{
-            background: 'linear-gradient(90deg, #F59E0B, #FBBF24, transparent)',
+            background: GRADIENT_ACCENT_AMBER,
           }}
         />
         {/* Header */}
@@ -87,7 +95,7 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
           gap="$2"
           paddingHorizontal="$3"
           paddingVertical="$2.5"
-          backgroundColor="rgba(245, 158, 11, 0.08)"
+          backgroundColor={withAlpha(AMBER, 0.08)}
           borderBottomWidth={1}
           borderBottomColor="$amber6"
         >
@@ -159,9 +167,9 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
                   {claim.faabBid != null && claim.faabBid > 0 && (
                     <Text
                       fontSize={10}
-                      color="$blue11"
+                      color={BRAND_GOLD_LIGHT}
                       fontWeight="700"
-                      backgroundColor="rgba(59, 130, 246, 0.12)"
+                      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
                       paddingHorizontal="$1"
                       paddingVertical={1}
                       borderRadius="$1"

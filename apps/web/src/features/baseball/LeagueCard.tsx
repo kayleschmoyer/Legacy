@@ -8,6 +8,16 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { Text } from 'tamagui';
+import {
+  AMBER_LIGHT,
+  BLUE_DEEP,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  GREEN,
+  SLATE_400,
+  SURFACE_SUBTLE,
+  withAlpha,
+} from '../../constants/colors';
 
 function formatDraftStatus(status?: string | null): string {
   if (!status) return 'Unknown';
@@ -32,32 +42,32 @@ function getDraftStatusStyles(status?: string | null) {
   switch (status) {
     case 'not-started':
       return {
-        backgroundColor: 'rgba(148, 163, 184, 0.12)',
-        borderColor: 'rgba(148, 163, 184, 0.32)',
+        backgroundColor: withAlpha(SLATE_400, 0.12),
+        borderColor: withAlpha(SLATE_400, 0.32),
         textColor: '$gray11',
       };
     case 'queued':
       return {
-        backgroundColor: 'rgba(251, 191, 36, 0.12)',
-        borderColor: 'rgba(251, 191, 36, 0.32)',
+        backgroundColor: withAlpha(AMBER_LIGHT, 0.12),
+        borderColor: withAlpha(AMBER_LIGHT, 0.32),
         textColor: '$orange11',
       };
     case 'in-progress':
       return {
-        backgroundColor: 'rgba(59, 130, 246, 0.14)',
-        borderColor: 'rgba(59, 130, 246, 0.4)',
-        textColor: '$blue11',
+        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.14),
+        borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.4),
+        textColor: BRAND_GOLD_LIGHT,
       };
     case 'completed':
       return {
-        backgroundColor: 'rgba(34, 197, 94, 0.14)',
-        borderColor: 'rgba(34, 197, 94, 0.38)',
+        backgroundColor: withAlpha(GREEN, 0.14),
+        borderColor: withAlpha(GREEN, 0.38),
         textColor: '$green11',
       };
     default:
       return {
-        backgroundColor: 'rgba(148, 163, 184, 0.12)',
-        borderColor: 'rgba(148, 163, 184, 0.32)',
+        backgroundColor: withAlpha(SLATE_400, 0.12),
+        borderColor: withAlpha(SLATE_400, 0.32),
         textColor: '$gray11',
       };
   }
@@ -138,7 +148,7 @@ export function LeagueCard({
       value: league.currentWeekNumber
         ? `Week ${league.currentWeekNumber}`
         : 'Preseason Slate',
-      accentColor: '$blue11',
+      accentColor: BRAND_GOLD_LIGHT,
     },
     {
       label: 'Roster Limit',
@@ -176,11 +186,11 @@ export function LeagueCard({
                   {league.name || 'Unnamed League'}
                 </H3>
                 {summary ? (
-                  <Paragraph fontSize="$4" color="rgba(203, 213, 225, 0.92)">
+                  <Paragraph fontSize="$4" color="$glassTextSubdued">
                     {summary}
                   </Paragraph>
                 ) : (
-                  <Paragraph fontSize="$4" color="rgba(203, 213, 225, 0.92)">
+                  <Paragraph fontSize="$4" color="$glassTextSubdued">
                     Seasonal dashboard for draft prep, matchups, and standings.
                   </Paragraph>
                 )}
@@ -206,7 +216,7 @@ export function LeagueCard({
               </YStack>
             </XStack>
 
-            <Paragraph fontSize="$3" color="rgba(148, 163, 184, 0.95)">
+            <Paragraph fontSize="$3" color="$glassTextMuted">
               {statusDescription}
             </Paragraph>
           </YStack>
@@ -215,8 +225,8 @@ export function LeagueCard({
             {metrics.map((metric) => (
               <YStack
                 key={metric.label}
-                backgroundColor="rgba(15, 23, 42, 0.55)"
-                borderColor="rgba(148, 163, 184, 0.2)"
+                backgroundColor={withAlpha(SURFACE_SUBTLE, 0.55)}
+                borderColor={withAlpha(SLATE_400, 0.2)}
                 borderWidth={1}
                 borderRadius="$6"
                 paddingHorizontal="$4"
@@ -228,7 +238,7 @@ export function LeagueCard({
                   fontSize="$2"
                   textTransform="uppercase"
                   letterSpacing={0.6}
-                  color="rgba(148, 163, 184, 0.8)"
+                  color="$glassTextMuted"
                 >
                   {metric.label}
                 </Paragraph>
@@ -252,7 +262,7 @@ export function LeagueCard({
           >
             <Paragraph
               fontSize="$3"
-              color="rgba(148, 163, 184, 0.95)"
+              color="$glassTextMuted"
               flexShrink={1}
               maxWidth={300}
             >
@@ -264,25 +274,25 @@ export function LeagueCard({
               size="$4"
               borderRadius="$6"
               paddingHorizontal="$5"
-              backgroundColor="rgba(37, 99, 235, 0.16)"
-              borderColor="rgba(59, 130, 246, 0.45)"
+              backgroundColor={withAlpha(BLUE_DEEP, 0.16)}
+              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.45)}
               borderWidth={1}
-              color="$blue11"
+              color={BRAND_GOLD_LIGHT}
               accessible
               accessibilityLabel={`View ${league.name || 'Unnamed League'}`}
               accessibilityRole="button"
               hoverStyle={{
-                backgroundColor: 'rgba(37, 99, 235, 0.22)',
-                borderColor: 'rgba(59, 130, 246, 0.6)',
+                backgroundColor: withAlpha(BLUE_DEEP, 0.22),
+                borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.6),
                 transform: 'translateY(-2px)',
               }}
               pressStyle={{
-                backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                backgroundColor: withAlpha(BLUE_DEEP, 0.2),
                 transform: 'scale(0.99)',
               }}
               animation="quick"
             >
-              <Text fontWeight="700" color="$blue11">
+              <Text fontWeight="700" color={BRAND_GOLD_LIGHT}>
                 View League
               </Text>
             </Button>

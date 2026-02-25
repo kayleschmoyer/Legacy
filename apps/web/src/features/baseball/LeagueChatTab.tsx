@@ -3,6 +3,7 @@ import { Button, Spinner, styled, Text, XStack, YStack } from 'tamagui';
 import { MessageSquare } from '@tamagui/lucide-icons';
 import { SystemMessageCard } from './SystemMessageCard';
 import { useLeagueChat } from '../../hooks/useLeagueChat';
+import { BRAND_NAVY_LIGHT, GRAY_50 } from '../../constants/colors';
 
 // ---------------------------------------------------------------------------
 // Styled helpers
@@ -15,7 +16,7 @@ const Bubble = styled(YStack, {
 
   variants: {
     mine: {
-      true: { backgroundColor: '$blue9' },
+      true: { backgroundColor: BRAND_NAVY_LIGHT },
       false: { backgroundColor: '$gray3' },
     },
   } as const,
@@ -81,7 +82,7 @@ export function LeagueChatTab({
   if (loading) {
     return (
       <YStack flex={1} alignItems="center" justifyContent="center" gap="$3">
-        <Spinner size="large" color="$blue10" />
+        <Spinner size="large" color={BRAND_NAVY_LIGHT} />
         <Text color="$textMuted" fontSize="$4">
           Loading messages…
         </Text>
@@ -202,7 +203,7 @@ export function LeagueChatTab({
             padding: '10px 14px',
             fontSize: 14,
             fontFamily: 'inherit',
-            backgroundColor: 'var(--surfaceSubtle, #f9fafb)',
+            backgroundColor: `var(--surfaceSubtle, ${GRAY_50})`,
             color: 'var(--color)',
             outline: 'none',
             lineHeight: 1.5,
@@ -210,7 +211,7 @@ export function LeagueChatTab({
         />
         <Button
           size="$3"
-          backgroundColor="$blue9"
+          backgroundColor={BRAND_NAVY_LIGHT}
           color="white"
           onPress={() => void handleSend()}
           disabled={!inputText.trim() || sending}

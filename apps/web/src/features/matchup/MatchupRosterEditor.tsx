@@ -10,6 +10,13 @@ import {
   YStack,
 } from 'tamagui';
 import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
+import {
   type MatchupFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
@@ -29,7 +36,7 @@ const getPositionColors = (
   const pos = position.toUpperCase();
   if (pos === 'C') return { bg: '$amber3', text: '$amber11' };
   if (['1B', '2B', '3B', 'SS', 'IF'].includes(pos))
-    return { bg: '$blue3', text: '$blue11' };
+    return { bg: withAlpha(BRAND_NAVY_LIGHT, 0.18), text: BRAND_GOLD_LIGHT };
   if (['LF', 'CF', 'RF', 'OF'].includes(pos))
     return { bg: '$green3', text: '$green11' };
   if (pos === 'SP') return { bg: '$amber6', text: '$amber12' };
@@ -218,13 +225,19 @@ export function MatchupRosterEditor({
         paddingVertical="$2.5"
         paddingHorizontal="$3"
         backgroundColor={
-          isSelected ? '$blue3' : isSwapTarget ? '$blue1' : undefined
+          isSelected
+            ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
+            : isSwapTarget
+              ? withAlpha(BRAND_NAVY_LIGHT, 0.06)
+              : undefined
         }
         borderWidth={isSelected ? 2 : 0}
-        borderColor={isSelected ? '$blue8' : undefined}
+        borderColor={isSelected ? BRAND_NAVY_LIGHT : undefined}
         borderRadius="$3"
         hoverStyle={{
-          backgroundColor: isSwapTarget ? '$blue2' : '$gray3',
+          backgroundColor: isSwapTarget
+            ? withAlpha(BRAND_NAVY_LIGHT, 0.12)
+            : '$gray3',
           cursor: 'pointer',
         }}
         pressStyle={{ scale: 0.99 }}
@@ -253,7 +266,7 @@ export function MatchupRosterEditor({
           <Text
             fontSize="$3"
             fontWeight="600"
-            color={isSelected ? '$blue11' : '$gray12'}
+            color={isSelected ? BRAND_GOLD_LIGHT : '$gray12'}
             numberOfLines={1}
           >
             {playerName || '—'}
@@ -285,7 +298,10 @@ export function MatchupRosterEditor({
               <Button
                 key={opt.id}
                 size="$2"
-                theme="blue"
+                backgroundColor={BRAND_NAVY_LIGHT}
+                color="white"
+                pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                hoverStyle={{ backgroundColor: BRAND_NAVY }}
                 onPress={(e: { stopPropagation: () => void }) => {
                   e.stopPropagation();
                   handleAssignPosition(player, opt.id);
@@ -299,7 +315,7 @@ export function MatchupRosterEditor({
         )}
 
         {isSwapTarget && (
-          <Text fontSize="$1" color="$blue10" fontWeight="600">
+          <Text fontSize="$1" color={BRAND_GOLD_LIGHT} fontWeight="600">
             Tap to swap
           </Text>
         )}
@@ -322,7 +338,7 @@ export function MatchupRosterEditor({
         borderRadius="$6"
       >
         <XStack alignItems="center" gap="$2">
-          <Spinner size="small" color="$blue10" />
+          <Spinner size="small" color={BRAND_NAVY_LIGHT} />
           <Text color="$gray11">Loading roster...</Text>
         </XStack>
       </Card>
@@ -338,7 +354,7 @@ export function MatchupRosterEditor({
       overflow="hidden"
       borderRadius="$6"
       borderWidth={1}
-      borderColor="$blue8"
+      borderColor={BRAND_NAVY_LIGHT}
       backgroundColor="$background"
     >
       {/* Header */}
@@ -348,10 +364,10 @@ export function MatchupRosterEditor({
         alignItems="center"
         borderBottomWidth={1}
         borderBottomColor="$surfacePanelBorder"
-        backgroundColor="$blue2"
+        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
       >
         <XStack alignItems="center" gap="$2">
-          <H4 color="$blue11">Edit Lineup</H4>
+          <H4 color={BRAND_GOLD_LIGHT}>Edit Lineup</H4>
           <XStack
             paddingHorizontal="$2"
             paddingVertical="$0.5"
@@ -379,7 +395,7 @@ export function MatchupRosterEditor({
       <YStack
         paddingHorizontal="$4"
         paddingVertical="$2"
-        backgroundColor="$blue1"
+        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.06)}
         borderBottomWidth={1}
         borderBottomColor="$gray4"
       >
@@ -391,9 +407,13 @@ export function MatchupRosterEditor({
       </YStack>
 
       {mutating && (
-        <XStack padding="$2" justifyContent="center" backgroundColor="$blue2">
-          <Spinner size="small" color="$blue10" />
-          <Text marginLeft="$2" fontSize="$2" color="$blue11">
+        <XStack
+          padding="$2"
+          justifyContent="center"
+          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+        >
+          <Spinner size="small" color={BRAND_NAVY_LIGHT} />
+          <Text marginLeft="$2" fontSize="$2" color={BRAND_GOLD_LIGHT}>
             Updating lineup...
           </Text>
         </XStack>
@@ -404,7 +424,7 @@ export function MatchupRosterEditor({
         <XStack
           padding="$2.5"
           paddingHorizontal="$4"
-          backgroundColor="$blue2"
+          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
           gap="$2"
           alignItems="center"
         >
@@ -412,12 +432,12 @@ export function MatchupRosterEditor({
             width={4}
             height={16}
             borderRadius={2}
-            backgroundColor="$blue9"
+            backgroundColor={BRAND_NAVY_LIGHT}
           />
           <Text
             fontSize="$2"
             fontWeight="700"
-            color="$blue11"
+            color={BRAND_GOLD_LIGHT}
             letterSpacing={0.3}
           >
             STARTERS ({starters.length})

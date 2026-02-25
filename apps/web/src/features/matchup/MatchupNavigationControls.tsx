@@ -7,6 +7,11 @@ import {
   useGetLeagueTeamsQuery,
 } from '../../api/db/graphql.generated';
 import { useMatchupsByWeek } from '../../hooks/useMatchup';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 // ── Styled Components ─────────────────────────────────────────────────────────
 
@@ -69,7 +74,7 @@ const MatchupCardButton = styled(YStack, {
   minWidth: 160,
   gap: '$1',
   hoverStyle: {
-    borderColor: '$blue7',
+    borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5),
     backgroundColor: '$surfaceInteractive',
   },
   pressStyle: {
@@ -79,8 +84,8 @@ const MatchupCardButton = styled(YStack, {
   variants: {
     active: {
       true: {
-        borderColor: '$blue7',
-        backgroundColor: '$blue2',
+        borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5),
+        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.12),
       },
     },
   } as const,
@@ -103,11 +108,11 @@ const BackToCurrentButton = styled(XStack, {
   paddingHorizontal: '$3',
   paddingVertical: '$2',
   borderRadius: '$4',
-  backgroundColor: '$blue3',
+  backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.18),
   borderWidth: 1,
-  borderColor: '$blue7',
+  borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5),
   cursor: 'pointer',
-  hoverStyle: { backgroundColor: '$blue4' },
+  hoverStyle: { backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.25) },
   pressStyle: { scale: 0.97 },
 });
 
@@ -289,7 +294,7 @@ export function MatchupNavigationControls({
             paddingVertical="$4"
             gap="$2"
           >
-            <Spinner size="small" color="$blue10" />
+            <Spinner size="small" color={BRAND_NAVY_LIGHT} />
             <Text color="$textMuted" fontSize="$3">
               Loading matchups…
             </Text>
@@ -328,7 +333,7 @@ export function MatchupNavigationControls({
                       <Text
                         fontSize="$2"
                         fontWeight="700"
-                        color={isActive ? '$blue11' : '$color'}
+                        color={isActive ? BRAND_GOLD_LIGHT : '$color'}
                         numberOfLines={1}
                       >
                         {teamName(m.team1Id)}
@@ -336,7 +341,7 @@ export function MatchupNavigationControls({
                       <Text
                         fontSize="$2"
                         fontWeight="700"
-                        color={isActive ? '$blue11' : '$color'}
+                        color={isActive ? BRAND_GOLD_LIGHT : '$color'}
                         numberOfLines={1}
                       >
                         {teamName(m.team2Id)}
@@ -391,8 +396,8 @@ export function MatchupNavigationControls({
         {/* Back-to-current inline action */}
         {isViewingOther && onResetToDefault && (
           <BackToCurrentButton onPress={onResetToDefault} alignSelf="center">
-            <RotateCcw size={14} color="var(--blue11)" />
-            <Text fontSize="$2" fontWeight="600" color="$blue11">
+            <RotateCcw size={14} color={BRAND_GOLD_LIGHT} />
+            <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
               Back to your matchup
             </Text>
           </BackToCurrentButton>

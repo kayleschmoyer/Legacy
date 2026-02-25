@@ -8,6 +8,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { styled, Text } from 'tamagui';
 import { env } from '../../config/environment';
+import { BRAND_GOLD_LIGHT } from '../../constants/colors';
 
 const Container = styled(YStack, {
   maxWidth: 800,
@@ -51,13 +52,13 @@ const Value = styled(Text, {
 });
 
 const LinkValue = styled(Text, {
-  color: '$blue10',
+  color: BRAND_GOLD_LIGHT,
   fontSize: '$4',
   fontFamily: '$mono',
   cursor: 'pointer',
   textDecorationLine: 'underline',
   hoverStyle: {
-    color: '$blue11',
+    color: BRAND_GOLD_LIGHT,
   },
 });
 

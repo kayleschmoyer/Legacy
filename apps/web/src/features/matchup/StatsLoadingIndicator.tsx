@@ -1,6 +1,11 @@
 import React from 'react';
 import { Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import { AlertCircle, CheckCircle } from '@tamagui/lucide-icons';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 // import { StatsLoadingStatus } from '../../api/db/graphql.generated';
 
 // TODO(LS-53): Placeholder until StatsLoadingStatus is implemented in schema
@@ -34,9 +39,9 @@ export function StatsLoadingIndicator({
     switch (status) {
       case StatsLoadingStatus.Loading:
         return {
-          icon: <Spinner size="small" color="$blue10" />,
-          color: '$blue10',
-          bgColor: '$blue3',
+          icon: <Spinner size="small" color={BRAND_NAVY_LIGHT} />,
+          color: BRAND_GOLD_LIGHT,
+          bgColor: withAlpha(BRAND_NAVY_LIGHT, 0.18),
           text: 'Loading game stats...',
           description: 'Fetching player game data from Baseball Reference',
         };

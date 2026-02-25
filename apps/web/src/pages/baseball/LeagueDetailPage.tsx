@@ -12,8 +12,6 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { WebSocketClient } from '@legacy-sports/websocket-client';
-import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
 import { Card, H1, Separator, Spinner, styled, Text } from 'tamagui';
 import {
   ArrowLeftRight,
@@ -38,6 +36,8 @@ import {
   Zap,
 } from '@tamagui/lucide-icons';
 import { QRCodeSVG } from 'qrcode.react';
+import { WebSocketClient } from '@legacy-sports/websocket-client';
+import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
 import {
   calculateMatchupProjection,
   computeScoring,
@@ -65,6 +65,14 @@ import {
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../api/db/graphql.generated';
+import {
+  BG_DARK,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_LIGHT,
+  WHITE,
+  withAlpha,
+} from '../../constants/colors';
 import { LeagueRosterManagement } from '../../features/roster/LeagueRosterManagement';
 import { canPlayerPlayPosition } from '../../features/roster/LeagueRosterManagement';
 import { PendingWaiverClaims } from '../../features/roster/PendingWaiverClaims';
@@ -191,8 +199,8 @@ const QuickStatCard = styled(YStack, {
 });
 
 const DraftBanner = styled(Card, {
-  backgroundColor: '$blue2',
-  borderColor: '$blue7',
+  backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.12),
+  borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5),
   borderWidth: 2,
   borderRadius: '$6',
   padding: '$5',
@@ -232,7 +240,11 @@ function getDraftBadgeColors(status?: string | null) {
     case 'queued':
       return { bg: '$amber3', border: '$amber7', text: '$amber11' };
     case 'in-progress':
-      return { bg: '$blue3', border: '$blue7', text: '$blue11' };
+      return {
+        bg: withAlpha(BRAND_NAVY_LIGHT, 0.18),
+        border: withAlpha(BRAND_NAVY_LIGHT, 0.5),
+        text: BRAND_GOLD_LIGHT,
+      };
     case 'completed':
       return { bg: '$green3', border: '$green7', text: '$green11' };
     default:
@@ -606,7 +618,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       dispatch(
         setTeamMembers(
           teamMembersData.teamMembers.filter(
-            (m): m is TeamMemberFragment => m !== null,
+            (m: TeamMemberFragment | null) => m !== null,
           ),
         ),
       );
@@ -1052,7 +1064,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           role="main"
           aria-busy="true"
         >
-          <Spinner size="large" color="$blue10" />
+          <Spinner size="large" color={BRAND_NAVY_LIGHT} />
           <Text
             color="$textMuted"
             fontSize="$4"
@@ -1132,31 +1144,35 @@ export function LeagueDetailPage(): React.JSX.Element {
           >
             <XStack alignItems="center" gap="$3" flex={1}>
               <XStack
-                backgroundColor="$blue4"
+                backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)}
                 borderRadius="$10"
                 padding="$2"
                 alignItems="center"
                 justifyContent="center"
               >
-                <Zap size={22} color="var(--blue10)" fill="var(--blue10)" />
+                <Zap
+                  size={22}
+                  color={BRAND_NAVY_LIGHT}
+                  fill={BRAND_NAVY_LIGHT}
+                />
               </XStack>
               <YStack gap="$1" flex={1}>
-                <Text fontSize="$5" fontWeight="800" color="$blue11">
+                <Text fontSize="$5" fontWeight="800" color={BRAND_GOLD_LIGHT}>
                   Draft Is Live!
                 </Text>
-                <Text fontSize="$3" color="$blue10">
+                <Text fontSize="$3" color={BRAND_GOLD_LIGHT}>
                   Your league draft is in progress right now. Join before your
                   picks are auto-drafted.
                 </Text>
               </YStack>
             </XStack>
             <Button
-              backgroundColor="$blue9"
+              backgroundColor={BRAND_NAVY_LIGHT}
               color="white"
               borderRadius="$4"
               onPress={() => navigate(`/baseball/league/${leagueId}/draft`)}
               pressStyle={{ scale: 0.97, opacity: 0.9 }}
-              hoverStyle={{ backgroundColor: '$blue10' }}
+              hoverStyle={{ backgroundColor: BRAND_NAVY }}
               animation="quick"
               size="$4"
               aria-label="Join draft room"
@@ -1183,7 +1199,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           >
             Teams
           </Text>
-          <Text fontSize="$8" fontWeight="800" color="$blue11">
+          <Text fontSize="$8" fontWeight="800" color={BRAND_GOLD_LIGHT}>
             {teamCount}
           </Text>
         </QuickStatCard>
@@ -1260,7 +1276,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                 marginBottom="$3"
               >
                 <XStack alignItems="center" gap="$2">
-                  <Swords size={18} color="var(--blue11)" />
+                  <Swords size={18} color={BRAND_GOLD_LIGHT} />
                   <Text fontSize="$5" fontWeight="700" color="$color">
                     Current Matchup
                   </Text>
@@ -1268,13 +1284,13 @@ export function LeagueDetailPage(): React.JSX.Element {
                 <Button
                   size="$3"
                   backgroundColor="transparent"
-                  borderColor="$blue7"
+                  borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
                   borderWidth={1}
                   borderRadius="$4"
-                  color="$blue11"
+                  color={BRAND_GOLD_LIGHT}
                   onPress={() => changeTab('matchup')}
                 >
-                  <Text fontSize="$2" fontWeight="600" color="$blue11">
+                  <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
                     View Details
                   </Text>
                 </Button>
@@ -1412,13 +1428,13 @@ export function LeagueDetailPage(): React.JSX.Element {
                 <Button
                   size="$3"
                   backgroundColor="transparent"
-                  borderColor="$blue7"
+                  borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
                   borderWidth={1}
                   borderRadius="$4"
-                  color="$blue11"
+                  color={BRAND_GOLD_LIGHT}
                   onPress={() => changeTab('standings')}
                 >
-                  <Text fontSize="$2" fontWeight="600" color="$blue11">
+                  <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
                     Full Standings
                   </Text>
                 </Button>
@@ -1433,12 +1449,16 @@ export function LeagueDetailPage(): React.JSX.Element {
                     paddingHorizontal="$2"
                     borderRadius="$3"
                     backgroundColor={
-                      userTeamId === team.id ? '$blue3' : 'transparent'
+                      userTeamId === team.id
+                        ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
+                        : 'transparent'
                     }
                     cursor="pointer"
                     hoverStyle={{
                       backgroundColor:
-                        userTeamId === team.id ? '$blue4' : '$surfaceSubtle',
+                        userTeamId === team.id
+                          ? withAlpha(BRAND_NAVY_LIGHT, 0.25)
+                          : '$surfaceSubtle',
                     }}
                     pressStyle={{ scale: 0.98, opacity: 0.9 }}
                     onPress={() => handleViewTeamRoster(team.id)}
@@ -1463,7 +1483,11 @@ export function LeagueDetailPage(): React.JSX.Element {
                     </XStack>
                     <XStack alignItems="center" gap="$2">
                       {userTeamId === team.id && (
-                        <Text fontSize="$1" fontWeight="700" color="$blue11">
+                        <Text
+                          fontSize="$1"
+                          fontWeight="700"
+                          color={BRAND_GOLD_LIGHT}
+                        >
                           YOU
                         </Text>
                       )}
@@ -1488,7 +1512,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           {/* Invite Friends */}
           <InviteCard>
             <XStack alignItems="center" gap="$2" marginBottom="$4">
-              <UserPlus size={18} color="var(--blue11)" />
+              <UserPlus size={18} color={BRAND_GOLD_LIGHT} />
               <Text fontSize="$5" fontWeight="700" color="$color">
                 Invite Friends
               </Text>
@@ -1527,7 +1551,9 @@ export function LeagueDetailPage(): React.JSX.Element {
                   </YStack>
                   <Button
                     size="$3"
-                    backgroundColor={inviteLinkCopied ? '$green9' : '$blue9'}
+                    backgroundColor={
+                      inviteLinkCopied ? '$green9' : BRAND_NAVY_LIGHT
+                    }
                     color="white"
                     borderRadius="$3"
                     onPress={handleCopyInviteLink}
@@ -1586,7 +1612,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   </YStack>
                   <Button
                     size="$3"
-                    backgroundColor={linkCopied ? '$green9' : '$blue9'}
+                    backgroundColor={linkCopied ? '$green9' : BRAND_NAVY_LIGHT}
                     color="white"
                     borderRadius="$3"
                     onPress={handleCopyInviteCode}
@@ -1622,7 +1648,11 @@ export function LeagueDetailPage(): React.JSX.Element {
                     icon={<QrCode size={16} />}
                     aria-label={showQRCode ? 'Hide QR Code' : 'Show QR Code'}
                   >
-                    <Text fontSize="$2" fontWeight="600" color="$blue11">
+                    <Text
+                      fontSize="$2"
+                      fontWeight="600"
+                      color={BRAND_GOLD_LIGHT}
+                    >
                       {showQRCode ? 'Hide' : 'Show'}
                     </Text>
                   </Button>
@@ -1670,7 +1700,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         overflow="hidden"
       >
         <XStack alignItems="center" gap="$2" padding="$5" paddingBottom="$3">
-          <MessageSquare size={18} color="var(--blue11)" />
+          <MessageSquare size={18} color={BRAND_GOLD_LIGHT} />
           <Text fontSize="$5" fontWeight="700" color="$color">
             League Chat
           </Text>
@@ -1705,17 +1735,17 @@ export function LeagueDetailPage(): React.JSX.Element {
           >
             <Button
               size="$3"
-              backgroundColor="rgba(59, 130, 246, 0.12)"
-              borderColor="$blue7"
+              backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
+              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
               borderWidth={1}
               borderRadius="$4"
               onPress={handleBackToMyRoster}
-              icon={<ChevronLeft size={16} color="var(--blue11)" />}
-              hoverStyle={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}
+              icon={<ChevronLeft size={16} color={BRAND_GOLD_LIGHT} />}
+              hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY, 0.22) }}
               pressStyle={{ scale: 0.97, opacity: 0.9 }}
               animation="quick"
             >
-              <Text fontSize="$3" fontWeight="600" color="$blue11">
+              <Text fontSize="$3" fontWeight="600" color={BRAND_GOLD_LIGHT}>
                 Back to My Roster
               </Text>
             </Button>
@@ -1820,7 +1850,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         >
           <YStack gap="$4">
             <XStack alignItems="center" gap="$3">
-              <Edit3 size={20} color="var(--blue9)" />
+              <Edit3 size={20} color={BRAND_NAVY_LIGHT} />
               <Text fontSize="$6" fontWeight="700" color="$text">
                 Team Settings
               </Text>
@@ -1850,7 +1880,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                     disabled={renaming}
                     style={{
                       backgroundColor: 'var(--color2)',
-                      border: '1px solid var(--blue8)',
+                      border: `1px solid ${BRAND_NAVY_LIGHT}`,
                       borderRadius: '8px',
                       color: 'var(--color12)',
                       fontSize: '16px',
@@ -1870,7 +1900,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   <XStack gap="$2">
                     <Button
                       size="$3"
-                      backgroundColor="$blue9"
+                      backgroundColor={BRAND_NAVY_LIGHT}
                       borderRadius="$4"
                       disabled={renaming || !renameInput.trim()}
                       onPress={() => void handleRename()}
@@ -2103,21 +2133,20 @@ export function LeagueDetailPage(): React.JSX.Element {
         {/* Hero Header */}
         <HeroBar
           style={{
-            background:
-              'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 64, 175, 0.55) 100%)',
+            background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.95)} 0%, ${withAlpha(BRAND_NAVY, 0.55)} 100%)`,
           }}
         >
           <XStack alignItems="center" gap="$4" flex={1} flexWrap="wrap">
             <Button
               size="$3"
-              backgroundColor="rgba(255,255,255,0.08)"
-              borderColor="rgba(255,255,255,0.15)"
+              backgroundColor={withAlpha(WHITE, 0.08)}
+              borderColor={withAlpha(WHITE, 0.15)}
               borderWidth={1}
               borderRadius="$4"
               onPress={() => navigate('/baseball')}
               icon={<ChevronLeft size={18} color="white" />}
               aria-label="Back to leagues"
-              hoverStyle={{ backgroundColor: 'rgba(255,255,255,0.14)' }}
+              hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.14) }}
             />
             <YStack gap="$1">
               <H1
@@ -2131,12 +2160,12 @@ export function LeagueDetailPage(): React.JSX.Element {
               </H1>
               <XStack alignItems="center" gap="$3">
                 <XStack alignItems="center" gap="$1.5">
-                  <Users size={14} color="rgba(255,255,255,0.6)" />
-                  <Text fontSize="$3" color="rgba(255,255,255,0.7)">
+                  <Users size={14} color={withAlpha(WHITE, 0.65)} />
+                  <Text fontSize="$3" color={withAlpha(WHITE, 0.75)}>
                     {teamCount} teams
                   </Text>
                 </XStack>
-                <Text fontSize="$3" color="rgba(255,255,255,0.3)">
+                <Text fontSize="$3" color={withAlpha(WHITE, 0.45)}>
                   |
                 </Text>
                 <DraftBadge
@@ -2149,10 +2178,10 @@ export function LeagueDetailPage(): React.JSX.Element {
                 </DraftBadge>
                 {currentMatchup?.weekNumber && (
                   <>
-                    <Text fontSize="$3" color="rgba(255,255,255,0.3)">
+                    <Text fontSize="$3" color={withAlpha(WHITE, 0.45)}>
                       |
                     </Text>
-                    <Text fontSize="$3" color="rgba(255,255,255,0.7)">
+                    <Text fontSize="$3" color={withAlpha(WHITE, 0.75)}>
                       Week {currentMatchup.weekNumber}
                     </Text>
                   </>
@@ -2165,8 +2194,8 @@ export function LeagueDetailPage(): React.JSX.Element {
           <XStack gap="$2">
             <Button
               size="$3"
-              backgroundColor="rgba(59, 130, 246, 0.16)"
-              borderColor="rgba(59, 130, 246, 0.4)"
+              backgroundColor={withAlpha(BRAND_NAVY, 0.2)}
+              borderColor={withAlpha(BRAND_NAVY, 0.48)}
               borderWidth={1}
               borderRadius="$4"
               onPress={handleCopyInviteLink}
@@ -2174,16 +2203,16 @@ export function LeagueDetailPage(): React.JSX.Element {
                 inviteLinkCopied ? (
                   <Check size={16} color="rgb(34, 197, 94)" />
                 ) : (
-                  <Share2 size={16} color="rgb(96, 165, 250)" />
+                  <Share2 size={16} color={BRAND_GOLD_LIGHT} />
                 )
               }
-              hoverStyle={{ backgroundColor: 'rgba(59, 130, 246, 0.24)' }}
+              hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY, 0.3) }}
               aria-label="Share invite link"
             >
               <Text
                 fontSize="$3"
                 fontWeight="600"
-                color={inviteLinkCopied ? '$green11' : '$blue11'}
+                color={inviteLinkCopied ? '$green11' : BRAND_GOLD_LIGHT}
               >
                 {inviteLinkCopied ? 'Copied!' : 'Invite'}
               </Text>
@@ -2213,7 +2242,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                 backgroundColor="transparent"
                 borderWidth={0}
                 borderBottomWidth={2}
-                borderBottomColor={isActive ? '$blue9' : 'transparent'}
+                borderBottomColor={isActive ? BRAND_NAVY_LIGHT : 'transparent'}
                 borderRadius={0}
                 paddingHorizontal="$4"
                 paddingVertical="$3"
@@ -2229,10 +2258,10 @@ export function LeagueDetailPage(): React.JSX.Element {
                 aria-selected={isActive}
                 aria-controls={`panel-${tab.id}`}
                 hoverStyle={{
-                  backgroundColor: 'rgba(59, 130, 246, 0.06)',
+                  backgroundColor: withAlpha(BRAND_NAVY, 0.08),
                 }}
                 pressStyle={{
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                  backgroundColor: withAlpha(BRAND_NAVY, 0.14),
                 }}
               >
                 <XStack alignItems="center" gap="$2">
@@ -2240,7 +2269,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   <Text
                     fontSize="$3"
                     fontWeight={isActive ? '700' : '500'}
-                    color={isActive ? '$blue11' : '$textMuted'}
+                    color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}
                   >
                     {label}
                   </Text>
@@ -2420,7 +2449,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                     {isCommissioner && (
                       <Button
                         marginTop="$2"
-                        backgroundColor="$blue9"
+                        backgroundColor={BRAND_NAVY_LIGHT}
                         color="white"
                         borderRadius="$4"
                         onPress={() => changeTab('commissioner')}

@@ -28,16 +28,16 @@ const CareerStatsTable: React.FC<CareerStatsTableProps> = ({
       <div
         style={{
           marginBottom: 24,
-          backgroundColor: '#1a1a2e',
+          backgroundColor: 'var(--color2, #111B2F)',
           borderRadius: '8px',
           padding: '16px',
-          border: '1px solid #3a3a5a',
+          border: '1px solid var(--borderColor, #2F3B53)',
         }}
       >
         <h3
           style={{
             marginBottom: 16,
-            color: '#bababaa',
+            color: 'var(--color12, #F5F7FA)',
             fontSize: '18px',
             fontWeight: '600',
           }}
@@ -49,7 +49,7 @@ const CareerStatsTable: React.FC<CareerStatsTableProps> = ({
             maxHeight: '400px',
             overflowY: 'auto',
             overflowX: 'auto',
-            border: '1px solid #3a3a5a',
+            border: '1px solid var(--borderColor, #2F3B53)',
             borderRadius: '4px',
           }}
         >
@@ -57,50 +57,50 @@ const CareerStatsTable: React.FC<CareerStatsTableProps> = ({
             style={{
               width: '100%',
               borderCollapse: 'collapse',
-              backgroundColor: '#0f0f23',
+              backgroundColor: 'var(--color1, #0D1526)',
             }}
           >
-          <thead>
-            <tr>
-              {headers.map((header, index) => (
-                <th
-                  key={index}
-                  style={{
-                    padding: 12,
-                    border: '1px solid #3a3a5a',
-                    backgroundColor: '#1a1a2e',
-                    color: '#bababaa',
-                    textAlign: 'left',
-                    fontSize: 14,
-                    fontWeight: 'bold',
-                  }}
-                >
-                  {header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row, rowIndex) => (
-              <tr key={rowIndex}>
-                {row.map((cell, cellIndex) => (
-                  <td
-                    key={cellIndex}
+            <thead>
+              <tr>
+                {headers.map((header, index) => (
+                  <th
+                    key={index}
                     style={{
-                      padding: 10,
-                      border: '1px solid #3a3a5a',
-                      fontSize: 13,
-                      color: '#9a9aaa',
-                      backgroundColor: '#0f0f23',
+                      padding: 12,
+                      border: '1px solid var(--borderColor, #2F3B53)',
+                      backgroundColor: 'var(--color2, #111B2F)',
+                      color: 'var(--color12, #F5F7FA)',
+                      textAlign: 'left',
+                      fontSize: 14,
+                      fontWeight: 'bold',
                     }}
                   >
-                    {cell}
-                  </td>
+                    {header}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {row.map((cell, cellIndex) => (
+                    <td
+                      key={cellIndex}
+                      style={{
+                        padding: 10,
+                        border: '1px solid var(--borderColor, #2F3B53)',
+                        fontSize: 13,
+                        color: 'var(--color11, #DEE6FF)',
+                        backgroundColor: 'var(--color1, #0D1526)',
+                      }}
+                    >
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     );

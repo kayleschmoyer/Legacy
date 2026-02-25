@@ -3,6 +3,14 @@ import { Card, XStack, YStack } from '@legacy-sports/shared-components';
 import { BarChart3 } from '@tamagui/lucide-icons';
 import { Text } from 'tamagui';
 import {
+  BG_DARK,
+  BLACK,
+  BLUE,
+  GREEN,
+  ORANGE,
+  withAlpha,
+} from '../../constants/colors';
+import {
   createDefaultScoringSettings,
   type ScoringSettings,
 } from '../../lib/scoring';
@@ -55,19 +63,19 @@ const GROUP_CONFIG = [
     key: 'batting' as const,
     title: 'Batting',
     accent: '$blue9',
-    accentBg: 'rgba(59,130,246,0.12)',
+    accentBg: withAlpha(BLUE, 0.12),
   },
   {
     key: 'fielding' as const,
     title: 'Fielding',
     accent: '$orange9',
-    accentBg: 'rgba(249,115,22,0.12)',
+    accentBg: withAlpha(ORANGE, 0.12),
   },
   {
     key: 'pitching' as const,
     title: 'Pitching',
     accent: '$green9',
-    accentBg: 'rgba(34,197,94,0.12)',
+    accentBg: withAlpha(GREEN, 0.12),
   },
 ];
 
@@ -109,7 +117,7 @@ export function LeagueScoringSummary(
       overflow="hidden"
       width="100%"
       aria-labelledby="scoring-summary-title"
-      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.25)' }}
+      style={{ boxShadow: `0 4px 24px ${withAlpha(BLACK, 0.25)}` }}
     >
       {/* Glassmorphism header */}
       <XStack
@@ -120,8 +128,7 @@ export function LeagueScoringSummary(
         borderBottomWidth={1}
         borderBottomColor="$surfacePanelBorder"
         style={{
-          background:
-            'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(10,15,26,0.85) 60%)',
+          background: `linear-gradient(135deg, ${withAlpha(BLUE, 0.08)} 0%, ${withAlpha(BG_DARK, 0.85)} 60%)`,
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
         }}
@@ -133,9 +140,8 @@ export function LeagueScoringSummary(
           alignItems="center"
           justifyContent="center"
           style={{
-            background:
-              'linear-gradient(135deg, rgba(59,130,246,0.35), rgba(59,130,246,0.12))',
-            boxShadow: '0 0 16px rgba(59,130,246,0.25)',
+            background: `linear-gradient(135deg, ${withAlpha(BLUE, 0.35)}, ${withAlpha(BLUE, 0.12)})`,
+            boxShadow: `0 0 16px ${withAlpha(BLUE, 0.25)}`,
           }}
         >
           <BarChart3 size={20} color="$blue10" />

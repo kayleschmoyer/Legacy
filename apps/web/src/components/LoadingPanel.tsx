@@ -1,6 +1,7 @@
 import React from 'react';
 import { YStack } from '@legacy-sports/shared-components';
 import { styled } from 'tamagui';
+import { BRAND_NAVY_LIGHT } from '../constants/colors';
 
 const SpinnerContainer = styled(YStack, {
   justifyContent: 'center',
@@ -15,7 +16,7 @@ const Spinner = styled(YStack, {
   borderRadius: 50,
   borderWidth: 4,
   borderColor: '$borderColor',
-  borderTopColor: '$blue6',
+  borderTopColor: BRAND_NAVY_LIGHT,
   animation: 'spin 1s linear infinite',
 });
 

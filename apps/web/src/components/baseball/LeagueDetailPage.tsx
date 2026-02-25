@@ -43,6 +43,7 @@ import {
   useGetUserTeamIdLazyQuery,
   useUpdateTeamMemberPositionMutation,
 } from '../../api/db/graphql.generated';
+import { BG_DARK, BRAND_NAVY, WHITE, withAlpha } from '../../constants/colors';
 import { LeagueRosterManagement } from '../roster/LeagueRosterManagement';
 import { LeagueStandings } from '../roster/LeagueStandings';
 import { useLeagueScoringSettings } from '../../lib/scoring';
@@ -1241,21 +1242,20 @@ export function LeagueDetailPage(): React.JSX.Element {
       {/* Hero Header */}
       <HeroBar
         style={{
-          background:
-            'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 64, 175, 0.55) 100%)',
+          background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.95)} 0%, ${withAlpha(BRAND_NAVY, 0.55)} 100%)`,
         }}
       >
         <XStack alignItems="center" gap="$4" flex={1} flexWrap="wrap">
           <Button
             size="$3"
-            backgroundColor="rgba(255,255,255,0.08)"
-            borderColor="rgba(255,255,255,0.15)"
+            backgroundColor={withAlpha(WHITE, 0.08)}
+            borderColor={withAlpha(WHITE, 0.15)}
             borderWidth={1}
             borderRadius="$4"
             onPress={() => navigate('/baseball')}
             icon={<ChevronLeft size={18} color="white" />}
             aria-label="Back to leagues"
-            hoverStyle={{ backgroundColor: 'rgba(255,255,255,0.14)' }}
+            hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.14) }}
           />
           <YStack gap="$1">
             <H1
@@ -1269,12 +1269,12 @@ export function LeagueDetailPage(): React.JSX.Element {
             </H1>
             <XStack alignItems="center" gap="$3">
               <XStack alignItems="center" gap="$1.5">
-                <Users size={14} color="rgba(255,255,255,0.6)" />
-                <Text fontSize="$3" color="rgba(255,255,255,0.7)">
+                <Users size={14} color={withAlpha(WHITE, 0.65)} />
+                <Text fontSize="$3" color={withAlpha(WHITE, 0.75)}>
                   {teamCount} teams
                 </Text>
               </XStack>
-              <Text fontSize="$3" color="rgba(255,255,255,0.3)">
+              <Text fontSize="$3" color={withAlpha(WHITE, 0.45)}>
                 |
               </Text>
               <DraftBadge
@@ -1287,10 +1287,10 @@ export function LeagueDetailPage(): React.JSX.Element {
               </DraftBadge>
               {currentMatchup?.weekNumber && (
                 <>
-                  <Text fontSize="$3" color="rgba(255,255,255,0.3)">
+                  <Text fontSize="$3" color={withAlpha(WHITE, 0.45)}>
                     |
                   </Text>
-                  <Text fontSize="$3" color="rgba(255,255,255,0.7)">
+                  <Text fontSize="$3" color={withAlpha(WHITE, 0.75)}>
                     Week {currentMatchup.weekNumber}
                   </Text>
                 </>
@@ -1303,8 +1303,8 @@ export function LeagueDetailPage(): React.JSX.Element {
         <XStack gap="$2">
           <Button
             size="$3"
-            backgroundColor="rgba(59, 130, 246, 0.16)"
-            borderColor="rgba(59, 130, 246, 0.4)"
+            backgroundColor={withAlpha(BRAND_NAVY, 0.2)}
+            borderColor={withAlpha(BRAND_NAVY, 0.48)}
             borderWidth={1}
             borderRadius="$4"
             onPress={handleCopyInviteLink}
@@ -1315,7 +1315,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                 <Share2 size={16} color="rgb(96, 165, 250)" />
               )
             }
-            hoverStyle={{ backgroundColor: 'rgba(59, 130, 246, 0.24)' }}
+            hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY, 0.3) }}
             aria-label="Share invite link"
           >
             <Text
@@ -1350,10 +1350,10 @@ export function LeagueDetailPage(): React.JSX.Element {
               aria-selected={isActive}
               aria-controls={`panel-${tab.id}`}
               hoverStyle={{
-                backgroundColor: 'rgba(59, 130, 246, 0.06)',
+                backgroundColor: withAlpha(BRAND_NAVY, 0.08),
               }}
               pressStyle={{
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                backgroundColor: withAlpha(BRAND_NAVY, 0.14),
               }}
             >
               <XStack alignItems="center" gap="$2">

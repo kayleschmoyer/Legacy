@@ -15,8 +15,8 @@ function HomeStack() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#1E1E1E' },
-        headerTintColor: '#FFFFFF',
+        headerStyle: { backgroundColor: '#0A0F1A' },
+        headerTintColor: '#F8FAFC',
       }}
     >
       <Stack.Screen
@@ -44,10 +44,10 @@ export function TamaguiAppNavigator() {
       <Drawer.Navigator
         initialRouteName="HomeStack"
         screenOptions={{
-          headerStyle: { backgroundColor: '#1E1E1E' },
-          headerTintColor: '#FFFFFF',
-          drawerStyle: { backgroundColor: '#1E1E1E' },
-          drawerLabelStyle: { color: '#FFFFFF' },
+          headerStyle: { backgroundColor: '#0A0F1A' },
+          headerTintColor: '#F8FAFC',
+          drawerStyle: { backgroundColor: '#0A0F1A' },
+          drawerLabelStyle: { color: '#F8FAFC' },
         }}
       >
         <Drawer.Screen

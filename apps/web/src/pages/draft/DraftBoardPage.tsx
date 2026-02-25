@@ -1,5 +1,38 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
+import {
+  AMBER,
+  AMBER_LIGHT,
+  BLACK,
+  BRAND_NAVY,
+  BRAND_SEAM_RED,
+  EMERALD,
+  EMERALD_LIGHT,
+  EMERALD_LIGHTER,
+  getPositionColor as getPositionColorFromConstants,
+  GRADIENT_BOARD_BG,
+  GRADIENT_ERROR,
+  GRADIENT_GOLD,
+  GRADIENT_SEAM_RED,
+  GRADIENT_SUCCESS,
+  GRADIENT_WARNING,
+  GRADIENT_WHITE_CARD,
+  GRAY,
+  GREEN,
+  INJURY_HEALTHY,
+  INJURY_OUT,
+  INJURY_QUESTIONABLE,
+  OVERLAY_BLACK_30,
+  OVERLAY_BLACK_40,
+  OVERLAY_WHITE_05,
+  OVERLAY_WHITE_10,
+  SLATE_300,
+  SLATE_400,
+  SLATE_500,
+  VIOLET,
+  VIOLET_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 interface BaseballPlayer {
   id: number;
@@ -312,16 +345,7 @@ const mockBaseballPlayers: BaseballPlayer[] = [
 
 // Utility function to get position colors for baseball
 const getPositionColor = (position: string): string => {
-  const colorMap: Record<string, string> = {
-    C: '#ef4444', // Red
-    '1B': '#f97316', // Orange
-    '2B': '#eab308', // Yellow
-    '3B': '#22c55e', // Green
-    SS: '#3b82f6', // Blue
-    OF: '#8b5cf6', // Purple
-    P: '#06b6d4', // Cyan
-  };
-  return colorMap[position] || '#6b7280';
+  return getPositionColorFromConstants(position);
 };
 
 export function DraftBoardPage(): React.JSX.Element {
@@ -428,8 +452,7 @@ export function DraftBoardPage(): React.JSX.Element {
     <div
       style={{
         minHeight: '100vh',
-        background:
-          'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
+        background: GRADIENT_BOARD_BG,
         color: 'white',
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
         position: 'relative',
@@ -444,8 +467,7 @@ export function DraftBoardPage(): React.JSX.Element {
           left: 0,
           right: 0,
           bottom: 0,
-          background:
-            'radial-gradient(ellipse at top, rgba(255, 107, 53, 0.1) 0%, transparent 50%), radial-gradient(ellipse at bottom right, rgba(0, 255, 127, 0.1) 0%, transparent 50%)',
+          background: `radial-gradient(ellipse at top, ${withAlpha(BRAND_SEAM_RED, 0.1)} 0%, transparent 50%), radial-gradient(ellipse at bottom right, ${withAlpha(GREEN, 0.1)} 0%, transparent 50%)`,
           animation: 'pulse 4s ease-in-out infinite alternate',
         }}
       />
@@ -464,9 +486,9 @@ export function DraftBoardPage(): React.JSX.Element {
         <aside
           aria-label="My team and draft controls"
           style={{
-            background: 'rgba(0, 0, 0, 0.4)',
+            background: OVERLAY_BLACK_40,
             backdropFilter: 'blur(10px)',
-            borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRight: `1px solid ${OVERLAY_WHITE_10}`,
             padding: '20px',
             overflowY: 'auto',
           }}
@@ -474,12 +496,12 @@ export function DraftBoardPage(): React.JSX.Element {
           {/* Draft Status */}
           <div
             style={{
-              background: 'linear-gradient(135deg, #ff6b35 0%, #f7931e 100%)',
+              background: GRADIENT_SEAM_RED,
               padding: '20px',
               borderRadius: '16px',
               marginBottom: '24px',
               textAlign: 'center',
-              boxShadow: '0 8px 32px rgba(255, 107, 53, 0.3)',
+              boxShadow: `0 8px 32px ${withAlpha(BRAND_SEAM_RED, 0.3)}`,
             }}
           >
             <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>
@@ -502,14 +524,12 @@ export function DraftBoardPage(): React.JSX.Element {
             className={timeRemaining <= 10 ? 'reduced-shake' : undefined}
             style={{
               background:
-                timeRemaining <= 10
-                  ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)'
-                  : 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                timeRemaining <= 10 ? GRADIENT_ERROR : GRADIENT_SUCCESS,
               padding: '24px',
               borderRadius: '16px',
               textAlign: 'center',
               marginBottom: '24px',
-              boxShadow: '0 8px 32px rgba(5, 150, 105, 0.3)',
+              boxShadow: `0 8px 32px ${withAlpha(EMERALD, 0.3)}`,
               animation:
                 timeRemaining <= 10
                   ? 'shake 0.5s ease-in-out infinite'
@@ -537,7 +557,7 @@ export function DraftBoardPage(): React.JSX.Element {
           {/* My Team */}
           <div
             style={{
-              background: 'rgba(255, 255, 255, 0.05)',
+              background: OVERLAY_WHITE_05,
               borderRadius: '16px',
               padding: '20px',
               marginBottom: '24px',
@@ -549,7 +569,7 @@ export function DraftBoardPage(): React.JSX.Element {
                 margin: '0 0 16px 0',
                 fontSize: '18px',
                 fontWeight: 'bold',
-                color: '#ff6b35',
+                color: BRAND_SEAM_RED,
               }}
             >
               <span role="img" aria-label="Trophy">
@@ -571,12 +591,12 @@ export function DraftBoardPage(): React.JSX.Element {
                 <div
                   key={pos}
                   style={{
-                    background: 'rgba(255, 107, 53, 0.1)',
+                    background: withAlpha(BRAND_SEAM_RED, 0.1),
                     padding: '8px',
                     borderRadius: '8px',
                     textAlign: 'center',
                     fontSize: '12px',
-                    border: '1px solid rgba(255, 107, 53, 0.2)',
+                    border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.2)}`,
                   }}
                 >
                   {pos}: {myTeam.filter((p) => p.position === pos).length}
@@ -597,11 +617,11 @@ export function DraftBoardPage(): React.JSX.Element {
                       role="listitem"
                       key={player.id}
                       style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
+                        background: OVERLAY_WHITE_05,
                         padding: '12px',
                         borderRadius: '8px',
                         marginBottom: '8px',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        border: `1px solid ${OVERLAY_WHITE_10}`,
                       }}
                     >
                       <div
@@ -657,16 +677,8 @@ export function DraftBoardPage(): React.JSX.Element {
               onClick={() => setAiMode(!aiMode)}
               style={{
                 background: aiMode
-                  ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
-                  : 'rgba(255, 255, 255, 0.1)',
-                border: 'none',
-                padding: '12px 16px',
-                borderRadius: '10px',
-                color: 'white',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
+                  ? `linear-gradient(135deg, ${VIOLET} 0%, ${VIOLET_LIGHT} 100%)`
+                  : OVERLAY_WHITE_10,
               }}
               aria-pressed={aiMode}
               aria-label={`AI Assistant ${aiMode ? 'on' : 'off'}`}
@@ -680,7 +692,7 @@ export function DraftBoardPage(): React.JSX.Element {
             <button
               onClick={() => setChatOpen(!chatOpen)}
               style={{
-                background: 'rgba(255, 255, 255, 0.1)',
+                background: OVERLAY_WHITE_10,
                 border: 'none',
                 padding: '12px 16px',
                 borderRadius: '10px',
@@ -701,9 +713,7 @@ export function DraftBoardPage(): React.JSX.Element {
             <button
               onClick={() => setVrMode(!vrMode)}
               style={{
-                background: vrMode
-                  ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
-                  : 'rgba(255, 255, 255, 0.1)',
+                background: vrMode ? GRADIENT_GOLD : OVERLAY_WHITE_10,
                 border: 'none',
                 padding: '12px 16px',
                 borderRadius: '10px',
@@ -732,8 +742,7 @@ export function DraftBoardPage(): React.JSX.Element {
           {/* Header Controls */}
           <div
             style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              backdropFilter: 'blur(10px)',
+              background: OVERLAY_WHITE_05,
               padding: '16px 20px',
               borderRadius: '16px',
               marginBottom: '24px',
@@ -755,8 +764,8 @@ export function DraftBoardPage(): React.JSX.Element {
                   width: '100%',
                   padding: '12px 16px',
                   borderRadius: '10px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  background: 'rgba(0, 0, 0, 0.3)',
+                  border: `1px solid ${OVERLAY_WHITE_10}`,
+                  background: OVERLAY_BLACK_30,
                   color: 'white',
                   fontSize: '14px',
                   outline: 'none',
@@ -802,8 +811,8 @@ export function DraftBoardPage(): React.JSX.Element {
                     border: 'none',
                     background:
                       selectedPosition === pos
-                        ? 'linear-gradient(135deg, #ff6b35 0%, #f7931e 100%)'
-                        : 'rgba(255, 255, 255, 0.1)',
+                        ? GRADIENT_SEAM_RED
+                        : OVERLAY_WHITE_10,
                     color: 'white',
                     fontSize: '12px',
                     fontWeight: '600',
@@ -854,8 +863,8 @@ export function DraftBoardPage(): React.JSX.Element {
                     border: 'none',
                     background:
                       viewMode === mode
-                        ? 'rgba(255, 107, 53, 0.3)'
-                        : 'rgba(255, 255, 255, 0.1)',
+                        ? withAlpha(BRAND_SEAM_RED, 0.3)
+                        : OVERLAY_WHITE_10,
                     color: 'white',
                     fontSize: '12px',
                     cursor: 'pointer',
@@ -884,10 +893,9 @@ export function DraftBoardPage(): React.JSX.Element {
                 aria-labelledby={`player-name-${player.id}`}
                 key={player.id}
                 style={{
-                  background:
-                    'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+                  background: `linear-gradient(135deg, ${OVERLAY_WHITE_10} 0%, ${OVERLAY_WHITE_05} 100%)`,
                   backdropFilter: 'blur(10px)',
-                  border: `1px solid ${player.injury === 'healthy' ? 'rgba(34, 197, 94, 0.3)' : player.injury === 'questionable' ? 'rgba(251, 191, 36, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                  border: `1px solid ${player.injury === 'healthy' ? withAlpha(INJURY_HEALTHY, 0.3) : player.injury === 'questionable' ? withAlpha(INJURY_QUESTIONABLE, 0.3) : withAlpha(INJURY_OUT, 0.3)}`,
                   borderRadius: '16px',
                   padding: '20px',
                   cursor: 'default',
@@ -898,8 +906,7 @@ export function DraftBoardPage(): React.JSX.Element {
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform =
                     'translateY(-4px) scale(1.02)';
-                  e.currentTarget.style.boxShadow =
-                    '0 16px 40px rgba(255, 107, 53, 0.2)';
+                  e.currentTarget.style.boxShadow = `0 16px 40px ${withAlpha(BRAND_SEAM_RED, 0.2)}`;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0) scale(1)';
@@ -919,8 +926,7 @@ export function DraftBoardPage(): React.JSX.Element {
                 >
                   <div
                     style={{
-                      background:
-                        'linear-gradient(135deg, #ff6b35 0%, #f7931e 100%)',
+                      background: GRADIENT_SEAM_RED,
                       color: 'white',
                       borderRadius: '12px',
                       padding: '4px 8px',
@@ -933,7 +939,7 @@ export function DraftBoardPage(): React.JSX.Element {
                   <div
                     style={{
                       fontSize: '18px',
-                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                      filter: `drop-shadow(0 2px 4px ${OVERLAY_BLACK_30})`,
                     }}
                   >
                     {player.trend === 'up'
@@ -960,8 +966,7 @@ export function DraftBoardPage(): React.JSX.Element {
                         margin: 0,
                         fontSize: '20px',
                         fontWeight: 'bold',
-                        background:
-                          'linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%)',
+                        background: GRADIENT_WHITE_CARD,
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
                         backgroundClip: 'text',
@@ -978,7 +983,7 @@ export function DraftBoardPage(): React.JSX.Element {
                         fontSize: '12px',
                         fontWeight: 'bold',
                         color: 'white',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                        textShadow: `0 1px 2px ${OVERLAY_BLACK_30}`,
                       }}
                     >
                       {player.position}
@@ -987,7 +992,7 @@ export function DraftBoardPage(): React.JSX.Element {
 
                   <div
                     style={{
-                      color: '#94a3b8',
+                      color: SLATE_400,
                       fontSize: '14px',
                       fontWeight: '500',
                     }}
@@ -1008,7 +1013,7 @@ export function DraftBoardPage(): React.JSX.Element {
                     gap: '12px',
                     marginBottom: '16px',
                     padding: '16px',
-                    background: 'rgba(0, 0, 0, 0.2)',
+                    background: withAlpha(BLACK, 0.2),
                     borderRadius: '12px',
                   }}
                 >
@@ -1019,12 +1024,12 @@ export function DraftBoardPage(): React.JSX.Element {
                           style={{
                             fontSize: '18px',
                             fontWeight: 'bold',
-                            color: '#10b981',
+                            color: EMERALD_LIGHT,
                           }}
                         >
                           2.85
                         </div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        <div style={{ fontSize: '12px', color: SLATE_500 }}>
                           ERA
                         </div>
                       </div>
@@ -1033,12 +1038,12 @@ export function DraftBoardPage(): React.JSX.Element {
                           style={{
                             fontSize: '18px',
                             fontWeight: 'bold',
-                            color: '#f59e0b',
+                            color: AMBER,
                           }}
                         >
                           11.2
                         </div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        <div style={{ fontSize: '12px', color: SLATE_500 }}>
                           K/9
                         </div>
                       </div>
@@ -1050,12 +1055,12 @@ export function DraftBoardPage(): React.JSX.Element {
                           style={{
                             fontSize: '18px',
                             fontWeight: 'bold',
-                            color: '#10b981',
+                            color: EMERALD_LIGHT,
                           }}
                         >
                           {player.avg.toFixed(3)}
                         </div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        <div style={{ fontSize: '12px', color: SLATE_500 }}>
                           AVG
                         </div>
                       </div>
@@ -1064,12 +1069,12 @@ export function DraftBoardPage(): React.JSX.Element {
                           style={{
                             fontSize: '18px',
                             fontWeight: 'bold',
-                            color: '#f59e0b',
+                            color: AMBER,
                           }}
                         >
                           {player.hr}
                         </div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        <div style={{ fontSize: '12px', color: SLATE_500 }}>
                           HR
                         </div>
                       </div>
@@ -1078,12 +1083,12 @@ export function DraftBoardPage(): React.JSX.Element {
                           style={{
                             fontSize: '18px',
                             fontWeight: 'bold',
-                            color: '#3b82f6',
+                            color: BRAND_NAVY,
                           }}
                         >
                           {player.rbi}
                         </div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        <div style={{ fontSize: '12px', color: SLATE_500 }}>
                           RBI
                         </div>
                       </div>
@@ -1092,12 +1097,12 @@ export function DraftBoardPage(): React.JSX.Element {
                           style={{
                             fontSize: '18px',
                             fontWeight: 'bold',
-                            color: '#8b5cf6',
+                            color: VIOLET,
                           }}
                         >
                           {player.sb}
                         </div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        <div style={{ fontSize: '12px', color: SLATE_500 }}>
                           SB
                         </div>
                       </div>
@@ -1108,7 +1113,7 @@ export function DraftBoardPage(): React.JSX.Element {
                 {/* News & Actions */}
                 <div
                   style={{
-                    background: 'rgba(0, 0, 0, 0.3)',
+                    background: OVERLAY_BLACK_30,
                     padding: '12px',
                     borderRadius: '10px',
                     marginBottom: '16px',
@@ -1118,7 +1123,7 @@ export function DraftBoardPage(): React.JSX.Element {
                     style={{
                       margin: 0,
                       fontSize: '13px',
-                      color: '#cbd5e1',
+                      color: SLATE_300,
                       fontStyle: 'italic',
                       lineHeight: '1.4',
                     }}
@@ -1141,8 +1146,8 @@ export function DraftBoardPage(): React.JSX.Element {
                     style={{
                       flex: 1,
                       background: isMyPick
-                        ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
-                        : 'rgba(107, 114, 128, 0.5)',
+                        ? GRADIENT_SUCCESS
+                        : withAlpha(GRAY, 0.5),
                       color: 'white',
                       border: 'none',
                       borderRadius: '10px',
@@ -1172,8 +1177,8 @@ export function DraftBoardPage(): React.JSX.Element {
                     }
                     style={{
                       background: watchlist.includes(player.id)
-                        ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                        : 'rgba(255, 255, 255, 0.1)',
+                        ? GRADIENT_WARNING
+                        : OVERLAY_WHITE_10,
                       color: 'white',
                       border: 'none',
                       borderRadius: '10px',
@@ -1195,9 +1200,9 @@ export function DraftBoardPage(): React.JSX.Element {
         <aside
           aria-label="AI suggestions and analytics"
           style={{
-            background: 'rgba(0, 0, 0, 0.4)',
+            background: OVERLAY_BLACK_40,
             backdropFilter: 'blur(10px)',
-            borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+            borderLeft: `1px solid ${OVERLAY_WHITE_10}`,
             padding: '20px',
             overflowY: 'auto',
           }}
@@ -1205,11 +1210,11 @@ export function DraftBoardPage(): React.JSX.Element {
           {/* AI Suggestions */}
           <div
             style={{
-              background: 'rgba(139, 92, 246, 0.1)',
+              background: withAlpha(VIOLET, 0.1),
               borderRadius: '16px',
               padding: '16px',
               marginBottom: '20px',
-              border: '1px solid rgba(139, 92, 246, 0.2)',
+              border: `1px solid ${withAlpha(VIOLET, 0.2)}`,
             }}
           >
             <h3
@@ -1217,7 +1222,7 @@ export function DraftBoardPage(): React.JSX.Element {
                 margin: '0 0 12px 0',
                 fontSize: '16px',
                 fontWeight: 'bold',
-                color: '#a78bfa',
+                color: VIOLET_LIGHT,
               }}
             >
               <span role="img" aria-label="Robot">
@@ -1228,7 +1233,7 @@ export function DraftBoardPage(): React.JSX.Element {
             <div
               style={{
                 fontSize: '13px',
-                color: '#cbd5e1',
+                color: SLATE_300,
                 marginBottom: '12px',
               }}
             >
@@ -1240,7 +1245,7 @@ export function DraftBoardPage(): React.JSX.Element {
                   role="listitem"
                   key={`ai-${player.id}`}
                   style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
+                    background: OVERLAY_WHITE_05,
                     padding: '8px',
                     borderRadius: '8px',
                     marginBottom: '8px',
@@ -1259,7 +1264,7 @@ export function DraftBoardPage(): React.JSX.Element {
           {/* Recent Picks */}
           <div
             style={{
-              background: 'rgba(255, 255, 255, 0.05)',
+              background: OVERLAY_WHITE_05,
               borderRadius: '16px',
               padding: '16px',
               marginBottom: '20px',
@@ -1289,7 +1294,7 @@ export function DraftBoardPage(): React.JSX.Element {
                     style={{
                       padding: '6px 0',
                       borderBottom:
-                        idx < 4 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+                        idx < 4 ? `1px solid ${OVERLAY_WHITE_10}` : 'none',
                       fontSize: '12px',
                     }}
                   >
@@ -1306,10 +1311,10 @@ export function DraftBoardPage(): React.JSX.Element {
           {/* Live Analytics */}
           <div
             style={{
-              background: 'rgba(16, 185, 129, 0.1)',
+              background: withAlpha(EMERALD_LIGHT, 0.1),
               borderRadius: '16px',
               padding: '16px',
-              border: '1px solid rgba(16, 185, 129, 0.2)',
+              border: `1px solid ${withAlpha(EMERALD_LIGHT, 0.2)}`,
             }}
           >
             <h3
@@ -1317,7 +1322,7 @@ export function DraftBoardPage(): React.JSX.Element {
                 margin: '0 0 12px 0',
                 fontSize: '16px',
                 fontWeight: 'bold',
-                color: '#34d399',
+                color: EMERALD_LIGHTER,
               }}
             >
               <span role="img" aria-label="Chart with upward trend">
@@ -1326,7 +1331,7 @@ export function DraftBoardPage(): React.JSX.Element {
               Live Analytics
             </h3>
             <div
-              style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.6' }}
+              style={{ fontSize: '12px', color: SLATE_300, lineHeight: '1.6' }}
             >
               • {filteredPlayers.length} players available
               <br />• Avg ADP:{' '}
@@ -1347,10 +1352,10 @@ export function DraftBoardPage(): React.JSX.Element {
           {/* Watchlist */}
           <div
             style={{
-              background: 'rgba(245, 158, 11, 0.1)',
+              background: withAlpha(AMBER, 0.1),
               borderRadius: '16px',
               padding: '16px',
-              border: '1px solid rgba(245, 158, 11, 0.2)',
+              border: `1px solid ${withAlpha(AMBER, 0.2)}`,
             }}
           >
             <h3
@@ -1358,7 +1363,7 @@ export function DraftBoardPage(): React.JSX.Element {
                 margin: '0 0 12px 0',
                 fontSize: '16px',
                 fontWeight: 'bold',
-                color: '#fbbf24',
+                color: AMBER_LIGHT,
               }}
             >
               <span role="img" aria-label="Star">
@@ -1379,7 +1384,7 @@ export function DraftBoardPage(): React.JSX.Element {
                       style={{
                         padding: '6px 0',
                         fontSize: '12px',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderBottom: `1px solid ${OVERLAY_WHITE_10}`,
                       }}
                     >
                       <div style={{ fontWeight: 'bold' }}>{player.name}</div>

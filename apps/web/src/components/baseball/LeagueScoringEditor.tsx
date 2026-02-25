@@ -28,6 +28,15 @@ import {
 } from '@tamagui/lucide-icons';
 import { AnimatePresence, Input, Text } from 'tamagui';
 import {
+  BG_DARK,
+  BLACK,
+  BLUE,
+  GREEN,
+  INDIGO,
+  ORANGE,
+  withAlpha,
+} from '../../constants/colors';
+import {
   type GetLeagueScoringProfileQuery,
   ScoringStatGroup,
   useUpdateLeagueScoringProfileMutation,
@@ -62,17 +71,17 @@ const WEB_GROUP_GRADIENTS: Record<
 > = {
   [ScoringStatGroup.Batting]: {
     accent: '$blue9',
-    gradientFrom: 'rgba(59,130,246,0.18)',
+    gradientFrom: withAlpha(BLUE, 0.18),
     gradientTo: 'transparent',
   },
   [ScoringStatGroup.Pitching]: {
     accent: '$green9',
-    gradientFrom: 'rgba(34,197,94,0.18)',
+    gradientFrom: withAlpha(GREEN, 0.18),
     gradientTo: 'transparent',
   },
   [ScoringStatGroup.Fielding]: {
     accent: '$orange9',
-    gradientFrom: 'rgba(249,115,22,0.18)',
+    gradientFrom: withAlpha(ORANGE, 0.18),
     gradientTo: 'transparent',
   },
 };
@@ -264,8 +273,7 @@ export function LeagueScoringEditor(
                 borderRadius="$10"
                 flexShrink={0}
                 style={{
-                  background:
-                    'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(99,102,241,0.2))',
+                  background: `linear-gradient(135deg, ${withAlpha(BLUE, 0.25)}, ${withAlpha(INDIGO, 0.2)})`,
                 }}
               >
                 <Text fontSize={9} fontWeight="700" color="$blue10">
@@ -367,7 +375,7 @@ export function LeagueScoringEditor(
       borderWidth={1}
       borderRadius="$6"
       overflow="hidden"
-      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.25)' }}
+      style={{ boxShadow: `0 4px 24px ${withAlpha(BLACK, 0.25)}` }}
     >
       {/* Glassmorphism header */}
       <XStack
@@ -378,8 +386,7 @@ export function LeagueScoringEditor(
         borderBottomWidth={1}
         borderBottomColor="$surfacePanelBorder"
         style={{
-          background:
-            'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(10,15,26,0.85) 60%)',
+          background: `linear-gradient(135deg, ${withAlpha(BLUE, 0.08)} 0%, ${withAlpha(BG_DARK, 0.85)} 60%)`,
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
         }}
@@ -392,9 +399,8 @@ export function LeagueScoringEditor(
           justifyContent="center"
           animation="quick"
           style={{
-            background:
-              'linear-gradient(135deg, rgba(59,130,246,0.35), rgba(59,130,246,0.12))',
-            boxShadow: '0 0 16px rgba(59,130,246,0.25)',
+            background: `linear-gradient(135deg, ${withAlpha(BLUE, 0.35)}, ${withAlpha(BLUE, 0.12)})`,
+            boxShadow: `0 0 16px ${withAlpha(BLUE, 0.25)}`,
           }}
         >
           <Settings2 size={20} color="$blue10" />
@@ -416,7 +422,7 @@ export function LeagueScoringEditor(
             enterStyle={{ opacity: 0, scale: 0.8 }}
             style={{
               background: 'linear-gradient(135deg, #3B82F6, #6366F1)',
-              boxShadow: '0 0 12px rgba(59,130,246,0.4)',
+              boxShadow: `0 0 12px ${withAlpha(BLUE, 0.4)}`,
             }}
           >
             <Text fontSize={12} fontWeight="700" color="white">
@@ -488,7 +494,7 @@ export function LeagueScoringEditor(
                   hoverStyle={{ borderColor: '$borderColorHover' }}
                   style={{
                     background: `linear-gradient(180deg, ${gradients?.gradientFrom ?? 'transparent'} 0%, transparent 40%)`,
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+                    boxShadow: `0 2px 12px ${withAlpha(BLACK, 0.15)}`,
                     transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
                   }}
                 >
@@ -645,7 +651,7 @@ export function LeagueScoringEditor(
                 canSave
                   ? {
                       background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
-                      boxShadow: '0 4px 14px rgba(59,130,246,0.4)',
+                      boxShadow: `0 4px 14px ${withAlpha(BLUE, 0.4)}`,
                       transition: 'box-shadow 0.2s ease',
                     }
                   : undefined

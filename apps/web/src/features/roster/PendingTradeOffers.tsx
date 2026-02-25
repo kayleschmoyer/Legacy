@@ -16,6 +16,15 @@ import {
   useRejectTradeMutation,
 } from '../../api/db/graphql.generated';
 import { useLeagueWebSocket } from '../../hooks/useLeagueWebSocket';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  GREEN,
+  INJURY_OUT,
+  PURPLE,
+  WHITE,
+  withAlpha,
+} from '../../constants/colors';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -141,12 +150,12 @@ export function PendingTradeOffers({
     return (
       <Card
         key={offer.id}
-        backgroundColor="rgba(255,255,255,0.04)"
+        backgroundColor={withAlpha(WHITE, 0.04)}
         borderWidth={1}
         borderColor={
           variant === 'incoming'
-            ? 'rgba(59,130,246,0.35)'
-            : 'rgba(168,85,247,0.25)'
+            ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+            : withAlpha(PURPLE, 0.25)
         }
         borderRadius="$4"
         padding="$3"
@@ -155,7 +164,7 @@ export function PendingTradeOffers({
         <XStack alignItems="center" justifyContent="space-between">
           <XStack alignItems="center" gap="$2">
             {variant === 'incoming' ? (
-              <ArrowLeftRight size={14} color="var(--blue10)" />
+              <ArrowLeftRight size={14} color={BRAND_NAVY_LIGHT} />
             ) : (
               <Send size={14} color="var(--purple10)" />
             )}
@@ -210,7 +219,7 @@ export function PendingTradeOffers({
               <Button
                 size="$2"
                 flex={1}
-                backgroundColor="rgba(34,197,94,0.15)"
+                backgroundColor={withAlpha(GREEN, 0.15)}
                 borderColor="$green7"
                 borderWidth={1}
                 borderRadius="$3"
@@ -231,7 +240,7 @@ export function PendingTradeOffers({
               <Button
                 size="$2"
                 flex={1}
-                backgroundColor="rgba(239,68,68,0.12)"
+                backgroundColor={withAlpha(INJURY_OUT, 0.12)}
                 borderColor="$red7"
                 borderWidth={1}
                 borderRadius="$3"
@@ -254,7 +263,7 @@ export function PendingTradeOffers({
           {variant === 'outgoing' && (
             <Button
               size="$2"
-              backgroundColor="rgba(239,68,68,0.12)"
+              backgroundColor={withAlpha(INJURY_OUT, 0.12)}
               borderColor="$red7"
               borderWidth={1}
               borderRadius="$3"
@@ -280,22 +289,22 @@ export function PendingTradeOffers({
 
   return (
     <YStack
-      backgroundColor="rgba(255,255,255,0.02)"
+      backgroundColor={withAlpha(WHITE, 0.02)}
       borderWidth={1}
-      borderColor="rgba(255,255,255,0.08)"
+      borderColor={withAlpha(WHITE, 0.08)}
       borderRadius="$5"
       padding="$4"
       gap="$3"
     >
       <XStack alignItems="center" gap="$2">
-        <ArrowLeftRight size={16} color="var(--blue10)" />
+        <ArrowLeftRight size={16} color={BRAND_NAVY_LIGHT} />
         <Text fontSize="$4" fontWeight="700" color="$color">
           Pending Trades
         </Text>
         <Text
           fontSize="$2"
           color="$textMuted"
-          backgroundColor="rgba(59,130,246,0.15)"
+          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.15)}
           paddingHorizontal="$2"
           paddingVertical="$1"
           borderRadius="$2"
@@ -306,7 +315,7 @@ export function PendingTradeOffers({
 
       {incoming.length > 0 && (
         <YStack gap="$2">
-          <Text fontSize="$2" fontWeight="700" color="$blue10">
+          <Text fontSize="$2" fontWeight="700" color={BRAND_GOLD_LIGHT}>
             Incoming ({incoming.length})
           </Text>
           {incoming.map((o) => renderOffer(o, 'incoming'))}

@@ -18,6 +18,24 @@ import {
   useCreateLeagueAndTeamsMutation,
   useGetUserLeaguesQuery,
 } from '../../api/db/graphql.generated';
+import {
+  AMBER_LIGHT,
+  BG_DARK,
+  BLACK,
+  BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
+  GREEN,
+  INJURY_OUT,
+  SLATE_400,
+  SURFACE_PANEL,
+  WHITE,
+  withAlpha,
+  YELLOW,
+} from '../../constants/colors';
 
 /* ─── Draft Status Helpers ─── */
 
@@ -29,23 +47,23 @@ function getLeagueBadge(
     case 'in-progress':
       return {
         label: 'Drafting',
-        bg: 'rgba(59, 130, 246, 0.14)',
-        border: 'rgba(59, 130, 246, 0.38)',
-        text: '$blue11',
+        bg: withAlpha(BRAND_NAVY, 0.18),
+        border: withAlpha(BRAND_NAVY, 0.45),
+        text: BRAND_GOLD_LIGHT,
       };
     case 'completed':
       return {
         label: weekNumber ? `Week ${weekNumber}` : 'In Season',
-        bg: 'rgba(34, 197, 94, 0.14)',
-        border: 'rgba(34, 197, 94, 0.36)',
+        bg: withAlpha(GREEN, 0.14),
+        border: withAlpha(GREEN, 0.36),
         text: '$green11',
       };
     case 'queued':
     case 'not-started':
       return {
         label: 'Draft Scheduled',
-        bg: 'rgba(251, 191, 36, 0.12)',
-        border: 'rgba(251, 191, 36, 0.30)',
+        bg: withAlpha(AMBER_LIGHT, 0.12),
+        border: withAlpha(AMBER_LIGHT, 0.3),
         text: '$orange11',
       };
     default:
@@ -55,8 +73,8 @@ function getLeagueBadge(
               .replace('-', ' ')
               .replace(/\b\w/g, (l) => l.toUpperCase())
           : 'Unknown',
-        bg: 'rgba(148, 163, 184, 0.12)',
-        border: 'rgba(148, 163, 184, 0.30)',
+        bg: withAlpha(SLATE_400, 0.12),
+        border: withAlpha(SLATE_400, 0.3),
         text: '$gray11',
       };
   }
@@ -89,11 +107,11 @@ const HeroSection = styled(XStack, {
   overflow: 'hidden',
   borderRadius: '$8',
   borderWidth: 1,
-  borderColor: 'rgba(59, 130, 246, 0.22)',
+  borderColor: '$glassBorder',
   padding: '$9',
   gap: '$8',
   alignItems: 'stretch',
-  backgroundColor: 'rgba(15, 23, 42, 0.72)',
+  backgroundColor: '$glassSurface',
   animation: 'medium',
   enterStyle: { opacity: 0, y: 20 },
   $md: {
@@ -118,9 +136,9 @@ const HeroBadge = styled(XStack, {
   paddingHorizontal: '$4',
   paddingVertical: '$1.5',
   borderRadius: '$10',
-  backgroundColor: 'rgba(59, 130, 246, 0.16)',
+  backgroundColor: '$surfaceInteractive',
   borderWidth: 1,
-  borderColor: 'rgba(37, 99, 235, 0.40)',
+  borderColor: '$accentMuted',
   animation: 'medium',
   enterStyle: { opacity: 0, scale: 0.9 },
 });
@@ -141,7 +159,7 @@ const HeroTitle = styled(H1, {
 
 const HeroSubtitle = styled(Paragraph, {
   fontSize: '$5',
-  color: 'rgba(226, 232, 240, 0.92)',
+  color: '$glassTextSubdued',
   lineHeight: '$6',
   maxWidth: 520,
   animation: 'medium',
@@ -165,19 +183,19 @@ const PrimaryButton = styled(Button, {
   fontWeight: '700',
   paddingHorizontal: '$6',
   color: '$color1',
-  backgroundColor: '$blue10',
+  backgroundColor: BRAND_NAVY_LIGHT,
   borderColor: 'transparent',
   animation: 'quick',
   hoverStyle: {
-    backgroundColor: '$blue9',
+    backgroundColor: BRAND_NAVY,
     transform: 'translateY(-2px)',
-    shadowColor: 'rgba(59, 130, 246, 0.45)',
+    shadowColor: withAlpha(BRAND_NAVY, 0.5),
     shadowOpacity: 1,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
   },
   pressStyle: {
-    backgroundColor: '$blue11',
+    backgroundColor: BRAND_NAVY_DARK,
     scale: 0.98,
   },
 });
@@ -188,18 +206,18 @@ const SecondaryButton = styled(Button, {
   fontSize: '$4',
   fontWeight: '700',
   paddingHorizontal: '$6',
-  backgroundColor: 'rgba(59, 130, 246, 0.08)',
-  borderColor: 'rgba(59, 130, 246, 0.35)',
+  backgroundColor: withAlpha(BRAND_NAVY, 0.12),
+  borderColor: withAlpha(BRAND_NAVY, 0.42),
   borderWidth: 1,
-  color: '$blue10',
+  color: BRAND_GOLD_LIGHT,
   animation: 'quick',
   hoverStyle: {
-    backgroundColor: 'rgba(59, 130, 246, 0.16)',
-    borderColor: 'rgba(59, 130, 246, 0.55)',
+    backgroundColor: withAlpha(BRAND_NAVY, 0.22),
+    borderColor: withAlpha(BRAND_NAVY, 0.6),
     transform: 'translateY(-1px)',
   },
   pressStyle: {
-    backgroundColor: 'rgba(59, 130, 246, 0.20)',
+    backgroundColor: withAlpha(BRAND_NAVY, 0.28),
     scale: 0.98,
   },
 });
@@ -212,20 +230,20 @@ const HeroSidePanel = styled(YStack, {
 });
 
 const StatsCard = styled(YStack, {
-  backgroundColor: 'rgba(15, 23, 42, 0.92)',
+  backgroundColor: '$glassSurfaceLight',
   borderRadius: '$7',
   padding: '$6',
   borderWidth: 1,
-  borderColor: 'rgba(59, 130, 246, 0.18)',
+  borderColor: '$glassBorder',
   gap: '$4',
-  shadowColor: 'rgba(59, 130, 246, 0.12)',
+  shadowColor: withAlpha(BRAND_NAVY, 0.16),
   shadowOpacity: 0.6,
   shadowRadius: 24,
   shadowOffset: { width: 0, height: 12 },
   animation: 'medium',
   enterStyle: { opacity: 0, y: 15 },
   hoverStyle: {
-    borderColor: 'rgba(59, 130, 246, 0.30)',
+    borderColor: '$glassBorderHover',
   },
 });
 
@@ -247,29 +265,29 @@ const StatItem = styled(YStack, {
 const StatValue = styled(H2, {
   fontSize: '$9',
   fontWeight: '800',
-  color: '$blue10',
+  color: BRAND_GOLD_LIGHT,
   animation: 'medium',
   enterStyle: { opacity: 0, scale: 0.8 },
 });
 
 const StatLabel = styled(Paragraph, {
   fontSize: '$3',
-  color: 'rgba(148, 163, 184, 0.85)',
+  color: '$glassTextMuted',
   textTransform: 'uppercase',
   letterSpacing: 1,
 });
 
 const QuickGlanceCard = styled(YStack, {
-  backgroundColor: 'rgba(30, 41, 59, 0.72)',
+  backgroundColor: withAlpha(SURFACE_PANEL, 0.72),
   borderRadius: '$7',
   padding: '$5',
   borderWidth: 1,
-  borderColor: 'rgba(148, 163, 184, 0.14)',
+  borderColor: '$glassBorder',
   gap: '$3',
   animation: 'medium',
   enterStyle: { opacity: 0, y: 15 },
   hoverStyle: {
-    borderColor: 'rgba(148, 163, 184, 0.25)',
+    borderColor: '$glassBorderHover',
   },
 });
 
@@ -282,8 +300,8 @@ const QuickGlanceDot = styled(YStack, {
   width: 10,
   height: 10,
   borderRadius: 9999,
-  backgroundColor: '$blue9',
-  shadowColor: '$blue9',
+  backgroundColor: BRAND_NAVY_LIGHT,
+  shadowColor: BRAND_NAVY_LIGHT,
   shadowOpacity: 0.6,
   shadowRadius: 6,
   shadowOffset: { width: 0, height: 0 },
@@ -313,7 +331,7 @@ const SectionTitle = styled(H2, {
 
 const SectionDescription = styled(Paragraph, {
   fontSize: '$3',
-  color: 'rgba(148, 163, 184, 0.9)',
+  color: '$glassTextMuted',
 });
 
 const LeaguesList = styled(YStack, {
@@ -326,7 +344,7 @@ const LeagueRowOuter = styled(XStack, {
   overflow: 'hidden',
   borderRadius: '$6',
   borderWidth: 1,
-  borderColor: 'rgba(148, 163, 184, 0.14)',
+  borderColor: '$glassBorder',
   padding: '$4',
   paddingHorizontal: '$5',
   alignItems: 'center',
@@ -335,12 +353,12 @@ const LeagueRowOuter = styled(XStack, {
   animation: 'medium',
   enterStyle: { opacity: 0, x: -12 },
   hoverStyle: {
-    borderColor: 'rgba(59, 130, 246, 0.40)',
+    borderColor: withAlpha(BRAND_NAVY, 0.5),
     transform: 'translateX(4px)',
   },
   pressStyle: {
     scale: 0.995,
-    borderColor: 'rgba(59, 130, 246, 0.50)',
+    borderColor: withAlpha(BRAND_NAVY, 0.6),
   },
   $sm: {
     flexDirection: 'column',
@@ -380,18 +398,18 @@ const ViewLeagueButton = styled(Button, {
   borderRadius: '$5',
   paddingHorizontal: '$4',
   height: '$3',
-  backgroundColor: 'rgba(37, 99, 235, 0.14)',
-  borderColor: 'rgba(59, 130, 246, 0.40)',
+  backgroundColor: withAlpha(BRAND_NAVY, 0.16),
+  borderColor: withAlpha(BRAND_NAVY, 0.45),
   borderWidth: 1,
-  color: '$blue11',
+  color: BRAND_GOLD_LIGHT,
   animation: 'quick',
   hoverStyle: {
-    backgroundColor: 'rgba(37, 99, 235, 0.22)',
-    borderColor: 'rgba(59, 130, 246, 0.60)',
+    backgroundColor: withAlpha(BRAND_NAVY, 0.26),
+    borderColor: withAlpha(BRAND_NAVY, 0.65),
     transform: 'translateY(-1px)',
   },
   pressStyle: {
-    backgroundColor: 'rgba(37, 99, 235, 0.18)',
+    backgroundColor: withAlpha(BRAND_NAVY, 0.2),
     scale: 0.98,
   },
 });
@@ -400,14 +418,14 @@ const EmptyState = styled(YStack, {
   alignItems: 'center',
   padding: '$10',
   gap: '$5',
-  backgroundColor: 'rgba(15, 23, 42, 0.72)',
+  backgroundColor: '$glassSurface',
   borderRadius: '$7',
   borderWidth: 1,
-  borderColor: 'rgba(59, 130, 246, 0.18)',
+  borderColor: '$glassBorder',
   minHeight: 320,
   justifyContent: 'center',
   textAlign: 'center',
-  shadowColor: 'rgba(59, 130, 246, 0.08)',
+  shadowColor: withAlpha(BRAND_NAVY, 0.12),
   shadowOpacity: 0.5,
   shadowRadius: 24,
   shadowOffset: { width: 0, height: 10 },
@@ -429,35 +447,35 @@ const EmptyStateTitle = styled(H2, {
 
 const EmptyStateDescription = styled(Paragraph, {
   fontSize: '$4',
-  color: 'rgba(148, 163, 184, 0.92)',
+  color: '$glassTextMuted',
   maxWidth: 440,
 });
 
 const SearchContainer = styled(XStack, {
   alignItems: 'center',
   gap: '$3',
-  backgroundColor: 'rgba(15, 23, 42, 0.72)',
+  backgroundColor: '$glassSurface',
   borderRadius: '$5',
   borderWidth: 1,
-  borderColor: 'rgba(148, 163, 184, 0.24)',
+  borderColor: '$glassBorder',
   paddingHorizontal: '$3',
   paddingVertical: '$2',
   animation: 'quick',
   hoverStyle: {
-    borderColor: 'rgba(59, 130, 246, 0.40)',
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    borderColor: withAlpha(BRAND_NAVY, 0.5),
+    backgroundColor: withAlpha(BG_DARK, 0.82),
   },
   focusStyle: {
-    borderColor: 'rgba(59, 130, 246, 0.55)',
+    borderColor: withAlpha(BRAND_NAVY, 0.6),
   },
 });
 
 const NoticeCard = styled(YStack, {
-  backgroundColor: 'rgba(37, 99, 235, 0.12)',
+  backgroundColor: withAlpha(BRAND_NAVY, 0.14),
   borderRadius: '$6',
   padding: '$5',
   borderWidth: 1,
-  borderColor: 'rgba(37, 99, 235, 0.30)',
+  borderColor: withAlpha(BRAND_NAVY, 0.35),
   gap: '$3',
   animation: 'medium',
   enterStyle: { opacity: 0, y: 10 },
@@ -565,11 +583,11 @@ export function BaseballLandingPage() {
   const pageBackgroundStyle = React.useMemo(
     () => ({
       background: `
-        radial-gradient(ellipse at 10% 15%, rgba(59, 130, 246, 0.22) 0%, transparent 50%),
-        radial-gradient(ellipse at 90% 10%, rgba(14, 165, 233, 0.14) 0%, transparent 45%),
-        radial-gradient(ellipse at 50% 50%, rgba(37, 99, 235, 0.06) 0%, transparent 60%),
-        radial-gradient(ellipse at 15% 85%, rgba(15, 118, 110, 0.10) 0%, transparent 50%),
-        linear-gradient(180deg, rgba(2, 6, 23, 0.95) 0%, hsl(var(--background)) 100%)
+        radial-gradient(ellipse at 10% 15%, ${withAlpha(BRAND_NAVY, 0.28)} 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 10%, ${withAlpha(BRAND_SEAM_RED, 0.12)} 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 50%, ${withAlpha(BRAND_NAVY, 0.08)} 0%, transparent 60%),
+        radial-gradient(ellipse at 15% 85%, ${withAlpha(BRAND_GOLD, 0.1)} 0%, transparent 50%),
+        linear-gradient(180deg, ${withAlpha(BG_DARK, 0.95)} 0%, hsl(var(--background)) 100%)
       `,
       backgroundAttachment: 'fixed',
     }),
@@ -656,17 +674,15 @@ export function BaseballLandingPage() {
           role="region"
           aria-labelledby="baseball-hero-title"
           style={{
-            background:
-              'linear-gradient(135deg, rgba(15, 23, 42, 0.88) 0%, rgba(30, 64, 175, 0.55) 50%, rgba(37, 99, 235, 0.35) 100%)',
+            background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.9)} 0%, ${withAlpha(BRAND_NAVY, 0.55)} 50%, ${withAlpha(BRAND_SEAM_RED, 0.2)} 100%)`,
             backdropFilter: 'blur(28px)',
             WebkitBackdropFilter: 'blur(28px)',
-            boxShadow:
-              '0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            boxShadow: `0 8px 32px ${withAlpha(BRAND_NAVY, 0.18)}, inset 0 1px 0 ${withAlpha(WHITE, 0.05)}`,
           }}
         >
           <HeroContent>
             <HeroBadge>
-              <Text fontSize="$2" fontWeight="600" color="$blue11">
+              <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
                 <span role="img" aria-label="baseball">
                   ⚾
                 </span>{' '}
@@ -691,11 +707,7 @@ export function BaseballLandingPage() {
                 <Text fontWeight="700">Join League</Text>
               </SecondaryButton>
             </ActionButtonsRow>
-            <Paragraph
-              fontSize="$3"
-              color="rgba(148, 163, 184, 0.9)"
-              maxWidth={440}
-            >
+            <Paragraph fontSize="$3" color="$glassTextMuted" maxWidth={440}>
               Draft-ready controls, transparent roster limits, and secure
               invitations built for competitive fantasy managers.
             </Paragraph>
@@ -704,8 +716,7 @@ export function BaseballLandingPage() {
           <HeroSidePanel>
             <StatsCard
               style={{
-                background:
-                  'linear-gradient(160deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.85) 100%)',
+                background: `linear-gradient(160deg, ${withAlpha(BG_DARK, 0.95)} 0%, ${withAlpha(SURFACE_PANEL, 0.88)} 100%)`,
                 backdropFilter: 'blur(16px)',
                 WebkitBackdropFilter: 'blur(16px)',
               }}
@@ -713,7 +724,7 @@ export function BaseballLandingPage() {
               <StatsHeader>
                 <Paragraph
                   fontSize="$3"
-                  color="rgba(148, 163, 184, 0.85)"
+                  color="$glassTextMuted"
                   textTransform="uppercase"
                   letterSpacing={1}
                 >
@@ -723,7 +734,7 @@ export function BaseballLandingPage() {
                   Stay ahead of every matchup
                 </H3>
               </StatsHeader>
-              <Separator backgroundColor="rgba(148, 163, 184, 0.12)" />
+              <Separator backgroundColor="$glassBorder" />
               <StatsGrid>
                 <StatItem>
                   <StatValue>{leaguesCount}</StatValue>
@@ -746,15 +757,14 @@ export function BaseballLandingPage() {
 
             <QuickGlanceCard
               style={{
-                background:
-                  'linear-gradient(160deg, rgba(30, 41, 59, 0.80) 0%, rgba(15, 23, 42, 0.65) 100%)',
+                background: `linear-gradient(160deg, ${withAlpha(SURFACE_PANEL, 0.8)} 0%, ${withAlpha(BG_DARK, 0.65)} 100%)`,
                 backdropFilter: 'blur(14px)',
                 WebkitBackdropFilter: 'blur(14px)',
               }}
             >
               <Paragraph
                 fontSize="$3"
-                color="rgba(148, 163, 184, 0.85)"
+                color="$glassTextMuted"
                 textTransform="uppercase"
                 letterSpacing={1}
               >
@@ -766,7 +776,7 @@ export function BaseballLandingPage() {
               {quickWins.map((item, index) => (
                 <QuickGlanceRow key={index}>
                   <QuickGlanceDot />
-                  <Paragraph fontSize="$3" color="rgba(203, 213, 225, 0.9)">
+                  <Paragraph fontSize="$3" color="$glassTextSubdued">
                     {item}
                   </Paragraph>
                 </QuickGlanceRow>
@@ -777,10 +787,10 @@ export function BaseballLandingPage() {
 
         {!auth?.user && (
           <NoticeCard>
-            <Paragraph fontSize="$4" color="$blue11" fontWeight="600">
+            <Paragraph fontSize="$4" color={BRAND_GOLD_LIGHT} fontWeight="600">
               Sign in to manage your fantasy baseball leagues
             </Paragraph>
-            <Paragraph fontSize="$3" color="$blue10">
+            <Paragraph fontSize="$3" color={BRAND_GOLD_LIGHT}>
               Authentication is required to access drafts, invite codes, and
               lineup management.
             </Paragraph>
@@ -834,8 +844,7 @@ export function BaseballLandingPage() {
                     accessibilityLabel={`View ${league.name || 'league'}`}
                     role="link"
                     style={{
-                      background:
-                        'linear-gradient(135deg, rgba(15, 23, 42, 0.78) 0%, rgba(30, 41, 59, 0.55) 100%)',
+                      background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.8)} 0%, ${withAlpha(SURFACE_PANEL, 0.58)} 100%)`,
                       backdropFilter: 'blur(14px)',
                       WebkitBackdropFilter: 'blur(14px)',
                     }}
@@ -871,8 +880,8 @@ export function BaseballLandingPage() {
                       {league.weekAdvanceStatus === 'processing' ||
                       league.weekAdvanceStatus === 'queued' ? (
                         <WeekStatusChip
-                          backgroundColor="rgba(234, 179, 8, 0.12)"
-                          borderColor="rgba(234, 179, 8, 0.35)"
+                          backgroundColor={withAlpha(YELLOW, 0.12)}
+                          borderColor={withAlpha(YELLOW, 0.35)}
                         >
                           <Text
                             fontSize={11}
@@ -887,8 +896,8 @@ export function BaseballLandingPage() {
                         </WeekStatusChip>
                       ) : league.weekAdvanceStatus === 'failed' ? (
                         <WeekStatusChip
-                          backgroundColor="rgba(239, 68, 68, 0.12)"
-                          borderColor="rgba(239, 68, 68, 0.35)"
+                          backgroundColor={withAlpha(INJURY_OUT, 0.12)}
+                          borderColor={withAlpha(INJURY_OUT, 0.35)}
                         >
                           <Text fontSize={11} fontWeight="600" color="$red10">
                             <span role="img" aria-label="warning">
@@ -905,7 +914,11 @@ export function BaseballLandingPage() {
                       onPress={() => league.id && handleViewLeague(league.id)}
                       accessibilityLabel={`View ${league.name || 'league'}`}
                     >
-                      <Text fontWeight="700" color="$blue11" fontSize="$2">
+                      <Text
+                        fontWeight="700"
+                        color={BRAND_GOLD_LIGHT}
+                        fontSize="$2"
+                      >
                         View
                       </Text>
                     </ViewLeagueButton>
@@ -916,8 +929,7 @@ export function BaseballLandingPage() {
           ) : (
             <EmptyState
               style={{
-                background:
-                  'linear-gradient(135deg, rgba(15, 23, 42, 0.80) 0%, rgba(30, 64, 175, 0.18) 100%)',
+                background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.82)} 0%, ${withAlpha(BRAND_NAVY, 0.22)} 100%)`,
                 backdropFilter: 'blur(20px)',
                 WebkitBackdropFilter: 'blur(20px)',
               }}
@@ -950,7 +962,7 @@ export function BaseballLandingPage() {
             animation="medium"
             enterStyle={{ opacity: 0 }}
             exitStyle={{ opacity: 0 }}
-            backgroundColor="rgba(0, 0, 0, 0.65)"
+            backgroundColor={withAlpha(BLACK, 0.65)}
           />
           <Dialog.Content
             bordered
@@ -958,7 +970,7 @@ export function BaseballLandingPage() {
             maxWidth={560}
             width="100%"
             backgroundColor="$color2"
-            borderColor="rgba(59, 130, 246, 0.22)"
+            borderColor={withAlpha(BRAND_NAVY, 0.28)}
             borderRadius="$7"
             animation="bouncy"
             enterStyle={{ opacity: 0, y: -20, scale: 0.96 }}
@@ -968,8 +980,7 @@ export function BaseballLandingPage() {
             style={{
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
-              boxShadow:
-                '0 16px 48px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(59, 130, 246, 0.08)',
+              boxShadow: `0 16px 48px ${withAlpha(BLACK, 0.3)}, 0 0 0 1px ${withAlpha(BRAND_NAVY, 0.12)}`,
             }}
           >
             <YStack space="$4">
@@ -1007,13 +1018,17 @@ export function BaseballLandingPage() {
                       size="$3"
                       variant={teamCount === n ? 'primary' : 'outlined'}
                       onPress={() => setTeamCount(n)}
-                      backgroundColor={teamCount === n ? '$blue8' : '$color2'}
-                      borderColor={teamCount === n ? '$blue8' : '$borderColor'}
+                      backgroundColor={
+                        teamCount === n ? BRAND_NAVY_LIGHT : '$color2'
+                      }
+                      borderColor={
+                        teamCount === n ? BRAND_NAVY_LIGHT : '$borderColor'
+                      }
                       borderWidth={teamCount === n ? 2 : 1}
                       aria-pressed={teamCount === n}
                       aria-label={`Select ${n} teams`}
                     >
-                      <Text color={teamCount === n ? '$blue12' : '$color'}>
+                      <Text color={teamCount === n ? BRAND_GOLD : '$color'}>
                         {n}
                       </Text>
                     </Button>

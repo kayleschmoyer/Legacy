@@ -1,12 +1,15 @@
 import { config } from '@tamagui/config';
 import { createTamagui, type TamaguiConfig } from 'tamagui';
 
-// Professional, modern brand themes tuned for fantasy Baseball + Football
-// - Night-stadium dark with crisp surfaces
-// - Team-adjacent accents (royal blue + seam red; turf green + amber)
-// Keep existing token names for compatibility; ensure AA contrast
+// Legacy Sports — Heritage-meets-modern brand themes
+// Identity: "Night stadium" dark with vintage sport character
+// Baseball: deep navy + seam red + aged gold
+// Football: turf green + amber
+// Typography: serif headings (Playfair Display) + clean body (Inter) + tabular mono
+// Keep existing token names for full compatibility; ensure AA contrast
+
 const brandDark = {
-  // Backgrounds (neutral slate)
+  // Backgrounds — unified deep navy (single source of truth)
   background: '#0A0F1A', // deep navy/charcoal
   backgroundHover: '#0E1624',
   backgroundPress: '#0B1220',
@@ -33,14 +36,31 @@ const brandDark = {
   surfacePanelBorder: '#1F2D48',
   surfaceCard: '#16223A',
   surfaceSubtle: '#0D1526',
-  surfaceInteractive: 'rgba(59, 130, 246, 0.12)',
-  accentMuted: 'rgba(59, 130, 246, 0.18)',
+  surfaceInteractive: 'rgba(27, 58, 92, 0.22)',
+  accentMuted: 'rgba(27, 58, 92, 0.30)',
   successMuted: 'rgba(34, 197, 94, 0.18)',
   warningMuted: 'rgba(245, 158, 11, 0.18)',
   outlineSubtle: '#1C2740',
   outlineStrong: '#2F3B53',
   textMuted: '#9CAAC5',
   textOnAccent: '#F8FAFC',
+
+  // Glass surface tokens — for glassmorphism overlays & cards
+  glassSurface: 'rgba(10, 15, 26, 0.75)',
+  glassSurfaceLight: 'rgba(10, 15, 26, 0.55)',
+  glassBorder: 'rgba(255, 255, 255, 0.08)',
+  glassBorderHover: 'rgba(255, 255, 255, 0.14)',
+  glassTextSubdued: 'rgba(248, 250, 252, 0.65)',
+  glassTextMuted: 'rgba(248, 250, 252, 0.45)',
+
+  // Heritage brand accents
+  brandNavy: '#1B3A5C', // deep baseball navy
+  brandNavyLight: '#2C4A7C', // lighter navy for gradients
+  brandSeamRed: '#C41E3A', // baseball seam red
+  brandSeamRedLight: '#E63950', // lighter seam red for hover/glow
+  brandGold: '#C5A55A', // aged gold — trophies, pennants, vintage borders
+  brandGoldLight: '#D4BB78', // lighter gold for hover
+  brandGoldDark: '#A68B3E', // darker gold for press states
 
   // Text
   color: '#F8FAFC',
@@ -61,7 +81,7 @@ const brandDark = {
   shadowColorPress: 'rgba(8, 12, 20, 0.5)',
   shadowColorFocus: 'rgba(8, 12, 20, 0.8)',
 
-  // Primary (blue)
+  // Primary (deep navy blue — brand-shifted from generic Tailwind blue)
   blue1: '#0A1A37',
   blue2: '#0E2652',
   blue3: '#12316B',
@@ -89,21 +109,21 @@ const brandDark = {
   green11: '#BBF7D0',
   green12: '#ECFDF5',
 
-  // Error
+  // Error — seam-red-adjacent
   red1: '#3A0A12',
   red2: '#5C121B',
   red3: '#7F1D1D',
   red4: '#991B1B',
   red5: '#B91C1C',
-  red6: '#DC2626', // seam red
-  red7: '#EF4444',
+  red6: '#C41E3A', // seam red (heritage)
+  red7: '#E63950',
   red8: '#F87171',
   red9: '#FCA5A5',
   red10: '#FECACA',
   red11: '#FEE2E2',
   red12: '#FEF2F2',
 
-  // Secondary (amber) for football UI hints
+  // Secondary (amber / gold) — football UI hints + heritage gold
   amber1: '#2A1805',
   amber2: '#3B2107',
   amber3: '#4A2A09',
@@ -118,10 +138,18 @@ const brandDark = {
   amber12: '#FEF3C7',
 
   // Sport-specific accents (semantic helpers)
-  sportBaseballPrimary: '#2563EB', // royal blue
-  sportBaseballSecondary: '#DC2626', // seam red
+  sportBaseballPrimary: '#1B3A5C', // deep navy
+  sportBaseballSecondary: '#C41E3A', // seam red
   sportFootballPrimary: '#16A34A', // turf green
   sportFootballSecondary: '#F59E0B', // amber
+
+  // Position colors — baseball-themed
+  positionPitcher: '#C41E3A', // seam red — the baseball itself
+  positionCatcher: '#7C8794', // steel gray — catcher's gear
+  positionInfield: '#8B6F47', // warm brown — infield dirt
+  positionOutfield: '#2D6A4F', // field green — outfield grass
+  positionUtility: '#C5A55A', // aged gold — versatility/trophy
+
   focusRing: '#60A5FA',
 };
 
@@ -153,14 +181,31 @@ const brandLight = {
   surfacePanelBorder: '#D0DAE8',
   surfaceCard: '#FFFFFF',
   surfaceSubtle: '#EFF3F8',
-  surfaceInteractive: 'rgba(37, 99, 235, 0.08)',
-  accentMuted: 'rgba(37, 99, 235, 0.12)',
+  surfaceInteractive: 'rgba(27, 58, 92, 0.06)',
+  accentMuted: 'rgba(27, 58, 92, 0.10)',
   successMuted: 'rgba(34, 197, 94, 0.12)',
   warningMuted: 'rgba(245, 158, 11, 0.14)',
   outlineSubtle: '#E1E7F0',
   outlineStrong: '#C3CDDA',
   textMuted: '#5F7295',
   textOnAccent: '#FFFFFF',
+
+  // Glass surface tokens — for glassmorphism overlays & cards
+  glassSurface: 'rgba(255, 255, 255, 0.75)',
+  glassSurfaceLight: 'rgba(255, 255, 255, 0.55)',
+  glassBorder: 'rgba(0, 0, 0, 0.06)',
+  glassBorderHover: 'rgba(0, 0, 0, 0.12)',
+  glassTextSubdued: 'rgba(11, 18, 32, 0.65)',
+  glassTextMuted: 'rgba(11, 18, 32, 0.45)',
+
+  // Heritage brand accents
+  brandNavy: '#1B3A5C',
+  brandNavyLight: '#2C4A7C',
+  brandSeamRed: '#C41E3A',
+  brandSeamRedLight: '#E63950',
+  brandGold: '#A68B3E',
+  brandGoldLight: '#C5A55A',
+  brandGoldDark: '#8A7232',
 
   // Text
   color: '#0B1220',
@@ -209,20 +254,21 @@ const brandLight = {
   green11: '#0F3C22',
   green12: '#072315',
 
-  // Error
+  // Error — seam-red-adjacent
   red1: '#FEF2F2',
   red2: '#FEE2E2',
   red3: '#FECACA',
   red4: '#FCA5A5',
   red5: '#F87171',
-  red6: '#EF4444', // seam red
-  red7: '#DC2626',
+  red6: '#E63950', // seam red (heritage)
+  red7: '#C41E3A',
   red8: '#B91C1C',
   red9: '#991B1B',
   red10: '#7F1D1D',
   red11: '#5C121B',
   red12: '#3A0A12',
-  // Secondary (amber) for football UI hints
+
+  // Secondary (amber / gold) — football UI hints + heritage gold
   amber1: '#FFFBEB',
   amber2: '#FEF3C7',
   amber3: '#FDE68A',
@@ -237,10 +283,18 @@ const brandLight = {
   amber12: '#2A1805',
 
   // Sport-specific accents (semantic helpers)
-  sportBaseballPrimary: '#1D4ED8', // royal blue
-  sportBaseballSecondary: '#DC2626', // seam red
+  sportBaseballPrimary: '#1B3A5C', // deep navy
+  sportBaseballSecondary: '#C41E3A', // seam red
   sportFootballPrimary: '#16A34A', // turf green
   sportFootballSecondary: '#F59E0B', // amber
+
+  // Position colors — baseball-themed
+  positionPitcher: '#C41E3A', // seam red
+  positionCatcher: '#5A6670', // steel gray
+  positionInfield: '#7C5B3D', // warm brown — dirt
+  positionOutfield: '#2D6A4F', // field green
+  positionUtility: '#A68B3E', // aged gold
+
   focusRing: '#2563EB',
 };
 

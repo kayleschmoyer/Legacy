@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card, H3, Separator, Text, XStack, YStack } from 'tamagui';
+import { BRAND_GOLD_LIGHT } from '../../constants/colors';
 import { type GetLeagueStandingsQuery } from '../../api/db/graphql.generated';
 
 type StandingRecord = NonNullable<
@@ -114,7 +115,7 @@ export function StandingsTable({
     <Text
       fontSize="$3"
       fontWeight="bold"
-      color={sortKey === sortKeyValue ? '$blue10' : '$gray11'}
+      color={sortKey === sortKeyValue ? BRAND_GOLD_LIGHT : '$gray11'}
       cursor="pointer"
       onPress={() => handleSort(sortKeyValue)}
       userSelect="none"

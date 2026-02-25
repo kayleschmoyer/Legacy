@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button, YStack } from '@legacy-sports/shared-components';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
+import { BRAND_NAVY_LIGHT } from '../constants/colors';
 
 const DropdownButton = styled(Button, {
   size: '$2',
@@ -20,8 +21,8 @@ const DropdownButton = styled(Button, {
   variants: {
     highlight: {
       true: {
-        backgroundColor: '$blue9',
-        borderColor: '$blue9',
+        backgroundColor: BRAND_NAVY_LIGHT,
+        borderColor: BRAND_NAVY_LIGHT,
         color: 'white',
       },
     },
@@ -81,7 +82,7 @@ export const SportsDropdown: React.FC = () => {
       ? '$sportBaseballPrimary'
       : sportTone === 'football'
         ? '$sportFootballPrimary'
-        : '$blue9';
+        : BRAND_NAVY_LIGHT;
 
   // Click outside handler
   useEffect(() => {

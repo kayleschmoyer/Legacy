@@ -180,7 +180,7 @@ function Navigation() {
       <AccentBar
         style={{
           background:
-            'linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%)',
+            'linear-gradient(90deg, #1B3A5C 0%, #C41E3A 35%, #C5A55A 70%, #1B3A5C 100%)',
         }}
       />
 
@@ -206,12 +206,12 @@ function Navigation() {
                 justifyContent="center"
                 style={{
                   background:
-                    'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                    'linear-gradient(135deg, #1B3A5C 0%, #2C4A7C 100%)',
                 }}
               >
                 <Paragraph fontSize={20} lineHeight={22}>
-                  <span role="img" aria-label="football">
-                    🏈
+                  <span role="img" aria-label="baseball">
+                    ⚾
                   </span>
                 </Paragraph>
               </YStack>

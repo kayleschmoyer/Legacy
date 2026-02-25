@@ -5,6 +5,11 @@ import {
   type MatchupFragment,
   MatchupStatus,
 } from '../../api/db/graphql.generated';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 export interface MatchupCardProps {
   matchup: MatchupFragment | null | undefined;
@@ -21,7 +26,7 @@ const CardContainer = styled(Card, {
   borderColor: '$surfacePanelBorder',
   cursor: 'pointer',
   pressStyle: { scale: 0.98, opacity: 0.9 },
-  hoverStyle: { borderColor: '$blue7' },
+  hoverStyle: { borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.5) },
   animation: 'quick',
   margin: '$1',
 });
@@ -74,10 +79,10 @@ export function MatchupCard({
       }
     : isCompleted
       ? {
-          color: '$blue10',
-          bg: '$blue3',
+          color: BRAND_GOLD_LIGHT,
+          bg: withAlpha(BRAND_NAVY_LIGHT, 0.18),
           label: 'Final',
-          icon: <CheckCircle size={12} color="var(--blue10)" />,
+          icon: <CheckCircle size={12} color={BRAND_NAVY_LIGHT} />,
         }
       : {
           color: '$gray10',
@@ -86,7 +91,11 @@ export function MatchupCard({
           icon: <Clock size={12} color="var(--gray10)" />,
         };
 
-  const accentColor = isLive ? '$green9' : isCompleted ? '$blue9' : '$gray6';
+  const accentColor = isLive
+    ? '$green9'
+    : isCompleted
+      ? BRAND_NAVY_LIGHT
+      : '$gray6';
 
   return (
     <CardContainer onPress={onPress}>

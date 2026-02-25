@@ -1,5 +1,14 @@
 import React from 'react';
 import { Card, Separator, Text, XStack, YStack } from 'tamagui';
+import {
+  AMBER,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  SURFACE_PANEL,
+  SURFACE_SUBTLE,
+  VIOLET,
+  withAlpha,
+} from '../../constants/colors';
 
 export interface PlayerProjection {
   playerId: number;
@@ -79,7 +88,7 @@ export function PlayerProjections({
 
   return (
     <Card
-      backgroundColor="rgba(17, 27, 47, 0.7)"
+      backgroundColor={withAlpha(SURFACE_PANEL, 0.7)}
       borderColor="$surfacePanelBorder"
       borderWidth={1}
       borderRadius="$5"
@@ -95,14 +104,14 @@ export function PlayerProjections({
         height={2}
         width="100%"
         style={{
-          background: 'linear-gradient(90deg, #3B82F6, #8B5CF6, transparent)',
+          background: `linear-gradient(90deg, ${BRAND_NAVY_LIGHT}, ${VIOLET}, transparent)`,
         }}
       />
       {/* Title bar */}
       <XStack
         paddingHorizontal="$3"
         paddingVertical="$2.5"
-        backgroundColor="rgba(13, 21, 38, 0.6)"
+        backgroundColor={withAlpha(SURFACE_SUBTLE, 0.6)}
         justifyContent="space-between"
         alignItems="center"
       >
@@ -120,7 +129,7 @@ export function PlayerProjections({
             fontSize={10}
             fontWeight="700"
             color="$amber9"
-            backgroundColor="rgba(245, 158, 11, 0.12)"
+            backgroundColor={withAlpha(AMBER, 0.12)}
             paddingHorizontal="$1.5"
             paddingVertical={2}
             borderRadius="$2"
@@ -152,7 +161,7 @@ export function PlayerProjections({
           width={70}
           fontSize="$1"
           fontWeight="700"
-          color="$blue11"
+          color={BRAND_GOLD_LIGHT}
           textTransform="uppercase"
           letterSpacing={0.6}
           textAlign="center"
@@ -215,7 +224,7 @@ export function PlayerProjections({
                 width={70}
                 fontSize="$3"
                 fontWeight="700"
-                color="$blue11"
+                color={BRAND_GOLD_LIGHT}
                 textAlign="center"
               >
                 {player.matchupProjection.toFixed(2)}
@@ -260,7 +269,7 @@ export function PlayerProjections({
           <YStack
             width={8}
             height={8}
-            backgroundColor="$blue10"
+            backgroundColor={BRAND_NAVY_LIGHT}
             borderRadius={4}
           />
           <Text fontSize="$1" color="$textMuted">

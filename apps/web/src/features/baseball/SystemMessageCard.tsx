@@ -10,6 +10,16 @@ import {
   XCircle,
 } from '@tamagui/lucide-icons';
 import type { ChatMessage } from '../../hooks/useLeagueChat';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  GREEN,
+  INJURY_OUT,
+  ORANGE,
+  PURPLE,
+  SLATE_400,
+  withAlpha,
+} from '../../constants/colors';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,56 +45,56 @@ function getTradeConfig(action: TradeAction) {
   switch (action) {
     case 'proposed':
       return {
-        icon: <ArrowLeftRight size={16} color="var(--blue10)" />,
-        accent: 'rgba(59,130,246,0.15)',
-        border: 'rgba(59,130,246,0.35)',
+        icon: <ArrowLeftRight size={16} color={BRAND_NAVY_LIGHT} />,
+        accent: withAlpha(BRAND_NAVY_LIGHT, 0.15),
+        border: withAlpha(BRAND_NAVY_LIGHT, 0.35),
         badge: {
           label: 'Trade Offer',
-          bg: 'rgba(59,130,246,0.2)',
-          color: 'var(--blue10)',
+          bg: withAlpha(BRAND_NAVY_LIGHT, 0.2),
+          color: BRAND_NAVY_LIGHT,
         },
       };
     case 'accepted':
       return {
         icon: <CheckCircle size={16} color="var(--green10)" />,
-        accent: 'rgba(34,197,94,0.12)',
-        border: 'rgba(34,197,94,0.3)',
+        accent: withAlpha(GREEN, 0.12),
+        border: withAlpha(GREEN, 0.3),
         badge: {
           label: 'Accepted',
-          bg: 'rgba(34,197,94,0.2)',
+          bg: withAlpha(GREEN, 0.2),
           color: 'var(--green10)',
         },
       };
     case 'rejected':
       return {
         icon: <XCircle size={16} color="var(--red10)" />,
-        accent: 'rgba(239,68,68,0.1)',
-        border: 'rgba(239,68,68,0.25)',
+        accent: withAlpha(INJURY_OUT, 0.1),
+        border: withAlpha(INJURY_OUT, 0.25),
         badge: {
           label: 'Rejected',
-          bg: 'rgba(239,68,68,0.15)',
+          bg: withAlpha(INJURY_OUT, 0.15),
           color: 'var(--red10)',
         },
       };
     case 'cancelled':
       return {
         icon: <RotateCcw size={16} color="var(--gray10)" />,
-        accent: 'rgba(148,163,184,0.1)',
-        border: 'rgba(148,163,184,0.2)',
+        accent: withAlpha(SLATE_400, 0.1),
+        border: withAlpha(SLATE_400, 0.2),
         badge: {
           label: 'Cancelled',
-          bg: 'rgba(148,163,184,0.15)',
+          bg: withAlpha(SLATE_400, 0.15),
           color: 'var(--gray10)',
         },
       };
     case 'vetoed':
       return {
         icon: <ShieldAlert size={16} color="var(--orange10)" />,
-        accent: 'rgba(249,115,22,0.12)',
-        border: 'rgba(249,115,22,0.3)',
+        accent: withAlpha(ORANGE, 0.12),
+        border: withAlpha(ORANGE, 0.3),
         badge: {
           label: 'Vetoed',
-          bg: 'rgba(249,115,22,0.2)',
+          bg: withAlpha(ORANGE, 0.2),
           color: 'var(--orange10)',
         },
       };
@@ -122,7 +132,7 @@ export function SystemMessageCard({
           hoverStyle={
             onNavigate
               ? {
-                  borderColor: 'rgba(59,130,246,0.6)',
+                  borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.6),
                   backgroundColor: cfg.accent,
                 }
               : {}
@@ -175,7 +185,7 @@ export function SystemMessageCard({
               {messageText}
             </Text>
             {onNavigate && (
-              <Text fontSize="$2" color="$blue10" fontWeight="500">
+              <Text fontSize="$2" color={BRAND_GOLD_LIGHT} fontWeight="500">
                 View in Trades tab →
               </Text>
             )}
@@ -213,15 +223,15 @@ export function SystemMessageCard({
           hoverStyle={
             onNavigate
               ? {
-                  borderColor: 'rgba(34,197,94,0.5)',
-                  backgroundColor: 'rgba(34,197,94,0.15)',
+                  borderColor: withAlpha(GREEN, 0.5),
+                  backgroundColor: withAlpha(GREEN, 0.15),
                 }
               : {}
           }
           onPress={onNavigate ? () => onNavigate('free-agents') : undefined}
           style={{
-            backgroundColor: 'rgba(34,197,94,0.1)',
-            borderColor: 'rgba(34,197,94,0.28)',
+            backgroundColor: withAlpha(GREEN, 0.1),
+            borderColor: withAlpha(GREEN, 0.28),
           }}
         >
           {/* Header */}
@@ -231,7 +241,7 @@ export function SystemMessageCard({
             alignItems="center"
             gap="$2"
             borderBottomWidth={1}
-            style={{ borderBottomColor: 'rgba(34,197,94,0.28)' }}
+            style={{ borderBottomColor: withAlpha(GREEN, 0.28) }}
           >
             <Trophy size={16} color="var(--green10)" />
             <Text fontSize="$3" fontWeight="600" color="$color" flex={1}>
@@ -241,7 +251,7 @@ export function SystemMessageCard({
               paddingHorizontal="$2"
               paddingVertical="$1"
               borderRadius="$2"
-              style={{ backgroundColor: 'rgba(34,197,94,0.2)' }}
+              style={{ backgroundColor: withAlpha(GREEN, 0.2) }}
             >
               <Text fontSize="$1" fontWeight="700" color="$green10">
                 Claim
@@ -311,15 +321,15 @@ export function SystemMessageCard({
           hoverStyle={
             onNavigate
               ? {
-                  borderColor: 'rgba(168,85,247,0.5)',
-                  backgroundColor: 'rgba(168,85,247,0.12)',
+                  borderColor: withAlpha(PURPLE, 0.5),
+                  backgroundColor: withAlpha(PURPLE, 0.12),
                 }
               : {}
           }
           onPress={onNavigate ? () => onNavigate('commissioner') : undefined}
           style={{
-            backgroundColor: 'rgba(168,85,247,0.08)',
-            borderColor: 'rgba(168,85,247,0.25)',
+            backgroundColor: withAlpha(PURPLE, 0.08),
+            borderColor: withAlpha(PURPLE, 0.25),
           }}
         >
           {/* Header */}
@@ -329,7 +339,7 @@ export function SystemMessageCard({
             alignItems="center"
             gap="$2"
             borderBottomWidth={1}
-            style={{ borderBottomColor: 'rgba(168,85,247,0.25)' }}
+            style={{ borderBottomColor: withAlpha(PURPLE, 0.25) }}
           >
             <Settings size={16} color="var(--purple10)" />
             <Text fontSize="$3" fontWeight="600" color="$color" flex={1}>
@@ -339,7 +349,7 @@ export function SystemMessageCard({
               paddingHorizontal="$2"
               paddingVertical="$1"
               borderRadius="$2"
-              style={{ backgroundColor: 'rgba(168,85,247,0.18)' }}
+              style={{ backgroundColor: withAlpha(PURPLE, 0.18) }}
             >
               <Text fontSize="$1" fontWeight="700" color="$purple10">
                 Draft
@@ -371,7 +381,7 @@ export function SystemMessageCard({
                     paddingHorizontal="$2"
                     paddingVertical="$0.5"
                     borderRadius="$2"
-                    style={{ backgroundColor: 'rgba(168,85,247,0.12)' }}
+                    style={{ backgroundColor: withAlpha(PURPLE, 0.12) }}
                   >
                     <Text fontSize="$1" color="$purple10">
                       {c}

@@ -10,6 +10,17 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { ScrollView, Separator, styled, Text } from 'tamagui';
+import {
+  BG_DARK,
+  BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
+  GREEN_DEEP,
+  withAlpha,
+} from '../../constants/colors';
 
 /* ─── Styled Components ─── */
 
@@ -51,9 +62,9 @@ const HeroBadge = styled(XStack, {
   paddingHorizontal: '$4',
   paddingVertical: '$1.5',
   borderRadius: '$10',
-  backgroundColor: 'rgba(59, 130, 246, 0.14)',
+  backgroundColor: '$surfaceInteractive',
   borderWidth: 1,
-  borderColor: 'rgba(59, 130, 246, 0.30)',
+  borderColor: '$accentMuted',
   animation: 'medium',
   enterStyle: { opacity: 0, y: -10 },
 });
@@ -63,18 +74,18 @@ const SportCard = styled(YStack, {
   overflow: 'hidden',
   borderRadius: '$7',
   borderWidth: 1,
-  borderColor: 'rgba(148, 163, 184, 0.16)',
+  borderColor: '$glassBorder',
   padding: '$6',
   gap: '$4',
   cursor: 'pointer',
   animation: 'medium',
   hoverStyle: {
-    borderColor: 'rgba(59, 130, 246, 0.45)',
+    borderColor: '$glassBorderHover',
     transform: 'translateY(-4px)',
   },
   pressStyle: {
     scale: 0.98,
-    borderColor: 'rgba(59, 130, 246, 0.55)',
+    borderColor: '$borderColorFocus',
   },
   $sm: {
     padding: '$4',
@@ -94,12 +105,12 @@ const FeatureCard = styled(YStack, {
   minWidth: 220,
   borderRadius: '$6',
   borderWidth: 1,
-  borderColor: 'rgba(148, 163, 184, 0.12)',
+  borderColor: '$glassBorder',
   padding: '$5',
   gap: '$3',
   animation: 'medium',
   hoverStyle: {
-    borderColor: 'rgba(59, 130, 246, 0.35)',
+    borderColor: '$glassBorderHover',
     transform: 'translateY(-2px)',
   },
   $sm: {
@@ -114,9 +125,9 @@ const FeatureIconCircle = styled(YStack, {
   borderRadius: 9999,
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: 'rgba(59, 130, 246, 0.12)',
+  backgroundColor: '$surfaceInteractive',
   borderWidth: 1,
-  borderColor: 'rgba(59, 130, 246, 0.22)',
+  borderColor: '$accentMuted',
 });
 
 const ActionButton = styled(Button, {
@@ -125,15 +136,15 @@ const ActionButton = styled(Button, {
   fontSize: '$3',
   fontWeight: '700',
   paddingHorizontal: '$5',
-  backgroundColor: '$blue10',
+  backgroundColor: BRAND_NAVY_LIGHT,
   color: '$color1',
   borderColor: 'transparent',
   hoverStyle: {
-    backgroundColor: '$blue9',
+    backgroundColor: BRAND_NAVY,
     transform: 'translateY(-1px)',
   },
   pressStyle: {
-    backgroundColor: '$blue11',
+    backgroundColor: BRAND_NAVY_DARK,
   },
 });
 
@@ -143,16 +154,16 @@ const OutlineButton = styled(Button, {
   fontSize: '$3',
   fontWeight: '700',
   paddingHorizontal: '$5',
-  backgroundColor: 'rgba(59, 130, 246, 0.08)',
-  borderColor: 'rgba(59, 130, 246, 0.35)',
+  backgroundColor: '$surfaceInteractive',
+  borderColor: '$accentMuted',
   borderWidth: 1,
-  color: '$blue10',
+  color: BRAND_GOLD_LIGHT,
   hoverStyle: {
-    backgroundColor: 'rgba(59, 130, 246, 0.14)',
-    borderColor: 'rgba(59, 130, 246, 0.50)',
+    backgroundColor: '$accentMuted',
+    borderColor: '$borderColorFocus',
   },
   pressStyle: {
-    backgroundColor: 'rgba(59, 130, 246, 0.18)',
+    backgroundColor: '$accentMuted',
   },
 });
 
@@ -166,27 +177,25 @@ const SectionTitle = styled(H2, {
 
 const pageBackgroundStyle: React.CSSProperties = {
   background: `
-    radial-gradient(ellipse at 20% 0%, rgba(59, 130, 246, 0.18) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 10%, rgba(14, 165, 233, 0.12) 0%, transparent 45%),
-    radial-gradient(ellipse at 50% 90%, rgba(15, 118, 110, 0.08) 0%, transparent 50%)
+    radial-gradient(ellipse at 20% 0%, ${withAlpha(BRAND_NAVY, 0.18)} 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 10%, ${withAlpha(BRAND_SEAM_RED, 0.1)} 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 90%, ${withAlpha(BRAND_GOLD, 0.08)} 0%, transparent 50%)
   `,
   backgroundAttachment: 'fixed',
 };
 
 const heroGradientStyle: React.CSSProperties = {
-  background:
-    'linear-gradient(180deg, rgba(59, 130, 246, 0.10) 0%, transparent 70%)',
+  background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.15)} 0%, transparent 70%)`,
 };
 
 const sportCardGlassStyle = (accentColor: string): React.CSSProperties => ({
-  background: `linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, ${accentColor} 100%)`,
+  background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${accentColor} 100%)`,
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
 });
 
 const featureCardGlassStyle: React.CSSProperties = {
-  background:
-    'linear-gradient(135deg, rgba(15, 23, 42, 0.72) 0%, rgba(30, 41, 59, 0.55) 100%)',
+  background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.72)} 0%, ${withAlpha(BRAND_NAVY, 0.35)} 100%)`,
   backdropFilter: 'blur(16px)',
   WebkitBackdropFilter: 'blur(16px)',
 };
@@ -213,7 +222,7 @@ const SPORTS: SportConfig[] = [
     description:
       'Build your roster, dominate the draft, and track real-time stats across every matchup.',
     route: '/baseball',
-    accent: 'rgba(37, 99, 235, 0.45)',
+    accent: withAlpha(BRAND_NAVY, 0.55),
     available: true,
   },
   {
@@ -224,7 +233,7 @@ const SPORTS: SportConfig[] = [
     description:
       'Manage lineups, trade players, and lead your team through every game week.',
     route: '/football',
-    accent: 'rgba(22, 163, 74, 0.35)',
+    accent: withAlpha(GREEN_DEEP, 0.35),
     available: true,
   },
 ];
@@ -275,7 +284,7 @@ export function HomePage(): React.JSX.Element {
         {/* ─── Hero ─── */}
         <HeroSection style={heroGradientStyle}>
           <HeroBadge>
-            <Text fontSize="$2" fontWeight="600" color="$blue11">
+            <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
               {new Date().getFullYear()} Season
             </Text>
           </HeroBadge>
@@ -360,7 +369,7 @@ export function HomePage(): React.JSX.Element {
                   <XStack gap="$4" alignItems="center">
                     <SportIcon
                       style={{
-                        background: `linear-gradient(135deg, ${sport.accent}, rgba(59, 130, 246, 0.08))`,
+                        background: `linear-gradient(135deg, ${sport.accent}, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)})`,
                       }}
                     >
                       <Text fontSize="$8">
@@ -389,7 +398,7 @@ export function HomePage(): React.JSX.Element {
 
                   <Paragraph
                     fontSize="$4"
-                    color="rgba(203, 213, 225, 0.90)"
+                    color="$glassTextSubdued"
                     lineHeight="$5"
                   >
                     {sport.description}
@@ -420,7 +429,7 @@ export function HomePage(): React.JSX.Element {
             </XStack>
           </YStack>
 
-          <Separator backgroundColor="rgba(148, 163, 184, 0.10)" />
+          <Separator backgroundColor="$glassBorder" />
 
           {/* ─── Features ─── */}
           <YStack gap="$5">
@@ -446,7 +455,7 @@ export function HomePage(): React.JSX.Element {
                   </H3>
                   <Paragraph
                     fontSize="$3"
-                    color="rgba(148, 163, 184, 0.88)"
+                    color="$glassTextSubdued"
                     lineHeight="$4"
                   >
                     {feature.description}
@@ -460,17 +469,16 @@ export function HomePage(): React.JSX.Element {
           <YStack
             borderRadius="$7"
             borderWidth={1}
-            borderColor="rgba(148, 163, 184, 0.14)"
+            borderColor="$glassBorder"
             padding="$7"
             gap="$4"
             alignItems="center"
             animation="medium"
             hoverStyle={{
-              borderColor: 'rgba(59, 130, 246, 0.30)',
+              borderColor: '$glassBorderHover',
             }}
             style={{
-              background:
-                'linear-gradient(135deg, rgba(30, 64, 175, 0.20) 0%, rgba(15, 23, 42, 0.85) 100%)',
+              background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.25)} 0%, ${withAlpha(BG_DARK, 0.85)} 100%)`,
               backdropFilter: 'blur(18px)',
               WebkitBackdropFilter: 'blur(18px)',
             }}

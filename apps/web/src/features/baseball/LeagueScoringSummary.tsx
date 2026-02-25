@@ -6,6 +6,15 @@ import {
   createDefaultScoringSettings,
   type ScoringSettings,
 } from '../../lib/scoring';
+import {
+  BG_DARK,
+  BLACK,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  GREEN,
+  ORANGE,
+  withAlpha,
+} from '../../constants/colors';
 
 /** Human-readable labels for baseball stat column names (camelCase + snake_case). */
 const STAT_LABELS: Record<string, string> = {
@@ -54,20 +63,20 @@ const GROUP_CONFIG = [
   {
     key: 'batting' as const,
     title: 'Batting',
-    accent: '$blue9',
-    accentBg: 'rgba(59,130,246,0.12)',
+    accent: BRAND_NAVY_LIGHT,
+    accentBg: withAlpha(BRAND_NAVY_LIGHT, 0.12),
   },
   {
     key: 'fielding' as const,
     title: 'Fielding',
     accent: '$orange9',
-    accentBg: 'rgba(249,115,22,0.12)',
+    accentBg: withAlpha(ORANGE, 0.12),
   },
   {
     key: 'pitching' as const,
     title: 'Pitching',
     accent: '$green9',
-    accentBg: 'rgba(34,197,94,0.12)',
+    accentBg: withAlpha(GREEN, 0.12),
   },
 ];
 
@@ -80,7 +89,7 @@ const formatMultiplier = (value: number | undefined): string => {
 
 /** Return the color token for a multiplier value. */
 function multiplierColor(value: number, isOverride: boolean): string {
-  if (isOverride) return '$blue11';
+  if (isOverride) return BRAND_GOLD_LIGHT;
   if (value > 0) return '$green10';
   if (value < 0) return '$red10';
   return '$gray10';
@@ -109,7 +118,7 @@ export function LeagueScoringSummary(
       overflow="hidden"
       width="100%"
       aria-labelledby="scoring-summary-title"
-      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.25)' }}
+      style={{ boxShadow: `0 4px 24px ${withAlpha(BLACK, 0.25)}` }}
     >
       {/* Glassmorphism header */}
       <XStack
@@ -120,8 +129,7 @@ export function LeagueScoringSummary(
         borderBottomWidth={1}
         borderBottomColor="$surfacePanelBorder"
         style={{
-          background:
-            'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(10,15,26,0.85) 60%)',
+          background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)} 0%, ${withAlpha(BG_DARK, 0.85)} 60%)`,
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
         }}
@@ -133,12 +141,11 @@ export function LeagueScoringSummary(
           alignItems="center"
           justifyContent="center"
           style={{
-            background:
-              'linear-gradient(135deg, rgba(59,130,246,0.35), rgba(59,130,246,0.12))',
-            boxShadow: '0 0 16px rgba(59,130,246,0.25)',
+            background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.35)}, ${withAlpha(BRAND_NAVY_LIGHT, 0.12)})`,
+            boxShadow: `0 0 16px ${withAlpha(BRAND_NAVY_LIGHT, 0.25)}`,
           }}
         >
-          <BarChart3 size={20} color="$blue10" />
+          <BarChart3 size={20} color={BRAND_NAVY_LIGHT} />
         </XStack>
         <YStack flex={1}>
           <Text
@@ -225,12 +232,16 @@ export function LeagueScoringSummary(
                   </Text>
                   {overrideCount > 0 && (
                     <XStack
-                      backgroundColor="$blue3"
+                      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
                       paddingHorizontal="$1.5"
                       paddingVertical={1}
                       borderRadius="$10"
                     >
-                      <Text fontSize={9} fontWeight="700" color="$blue10">
+                      <Text
+                        fontSize={9}
+                        fontWeight="700"
+                        color={BRAND_GOLD_LIGHT}
+                      >
                         {overrideCount} custom
                       </Text>
                     </XStack>
@@ -256,9 +267,15 @@ export function LeagueScoringSummary(
                         borderRadius="$3"
                         borderWidth={1}
                         borderColor={
-                          isOverride ? '$blue6' : '$surfacePanelBorder'
+                          isOverride
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                            : '$surfacePanelBorder'
                         }
-                        backgroundColor={isOverride ? '$blue2' : '$background'}
+                        backgroundColor={
+                          isOverride
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.12)
+                            : '$background'
+                        }
                         animation="quick"
                         hoverStyle={{
                           backgroundColor: '$backgroundHover',

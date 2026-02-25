@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, H4, Separator, Text, XStack, YStack } from 'tamagui';
+import { BRAND_GOLD_LIGHT, BRAND_NAVY_LIGHT } from '../../constants/colors';
 
 export interface PlayerProjection {
   playerId: number;
@@ -79,7 +80,7 @@ export function PlayerProjections({
             </Text>
           </YStack>
           <YStack width={80} alignItems="center">
-            <Text fontSize="$2" fontWeight="bold" color="$blue10">
+            <Text fontSize="$2" fontWeight="bold" color={BRAND_GOLD_LIGHT}>
               Matchup
             </Text>
           </YStack>
@@ -117,7 +118,7 @@ export function PlayerProjections({
                 </Text>
               </YStack>
               <YStack width={80} alignItems="center">
-                <Text fontSize="$4" fontWeight="bold" color="$blue10">
+                <Text fontSize="$4" fontWeight="bold" color={BRAND_GOLD_LIGHT}>
                   {player.matchupProjection.toFixed(2)}
                 </Text>
               </YStack>
@@ -151,7 +152,7 @@ export function PlayerProjections({
             <YStack
               width={12}
               height={12}
-              backgroundColor="$blue10"
+              backgroundColor={BRAND_NAVY_LIGHT}
               borderRadius="$2"
             />
             <Text fontSize="$2" color="$gray11">

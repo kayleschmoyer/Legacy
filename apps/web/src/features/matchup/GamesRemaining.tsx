@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, styled, Text, XStack, YStack } from 'tamagui';
 import { CheckCircle2, Circle } from '@tamagui/lucide-icons';
+import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 
 export interface GamesRemainingProps {
   gamesRemaining: number;
@@ -125,7 +126,7 @@ export function GamesRemaining({
             <YStack
               height="100%"
               width={`${progressPercentage}%`}
-              backgroundColor={allComplete ? '$green9' : '$blue9'}
+              backgroundColor={allComplete ? '$green9' : BRAND_NAVY_LIGHT}
               borderRadius="$10"
               animation="quick"
             />

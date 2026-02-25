@@ -72,11 +72,11 @@ export function BattingStatsTable(
       <Row
         data={TABLE_HEADER}
         style={{
-          backgroundColor: theme.color2?.get?.() || '#1a1a2e',
+          backgroundColor: theme.color2?.get?.() || '#111B2F',
           height: 40,
         }}
         textStyle={{
-          color: theme.color12?.get?.() || '#bababaa',
+          color: theme.color12?.get?.() || '#F5F7FA',
           fontWeight: '600',
           textAlign: 'center',
         }}
@@ -84,11 +84,11 @@ export function BattingStatsTable(
       <Rows
         data={data}
         style={{
-          backgroundColor: theme.color1?.get?.() || '#0f0f23',
+          backgroundColor: theme.color1?.get?.() || '#0D1526',
           height: 35,
         }}
         textStyle={{
-          color: theme.color11?.get?.() || '#9a9aaa',
+          color: theme.color11?.get?.() || '#DEE6FF',
           textAlign: 'center',
         }}
       />

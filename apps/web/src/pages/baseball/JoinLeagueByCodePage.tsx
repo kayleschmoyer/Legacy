@@ -3,6 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Card, XStack, YStack } from '@legacy-sports/shared-components';
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
 import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
+import {
   useJoinLeagueByCodeMutation,
   useValidateInviteCodeLazyQuery,
 } from '../../api/db/graphql.generated';
@@ -95,7 +100,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
       aria-labelledby="join-league-title"
     >
       <YStack space="$2">
-        <H1 size="$9" color="$blue11" id="join-league-title">
+        <H1 size="$9" color={BRAND_GOLD_LIGHT} id="join-league-title">
           <span role="img" aria-label="ticket">
             🎟️
           </span>{' '}
@@ -129,7 +134,11 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
         </Card>
       )}
 
-      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$5">
+      <Card
+        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+        borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+        padding="$5"
+      >
         <form
           onSubmit={(e) => {
             void handleSubmit(e);
@@ -165,7 +174,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                 letterSpacing={2}
                 textAlign="center"
                 backgroundColor="$background"
-                borderColor="$blue7"
+                borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
                 disabled={loading}
                 id="invite-code"
                 aria-labelledby="invite-code-label"
@@ -186,7 +195,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
               {/* Live invite code status */}
               {validating && (
                 <XStack gap="$2" alignItems="center">
-                  <Spinner size="small" color="$blue9" />
+                  <Spinner size="small" color={BRAND_NAVY_LIGHT} />
                   <Text color="$gray10" fontSize="$2">
                     Checking code...
                   </Text>
@@ -240,7 +249,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                 onChangeText={setTeamName}
                 maxLength={50}
                 backgroundColor="$background"
-                borderColor="$blue7"
+                borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
                 disabled={loading}
                 id="team-name"
                 aria-labelledby="team-name-label"
@@ -321,7 +330,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                 Cancel
               </Button>
               <Button
-                backgroundColor="$blue9"
+                backgroundColor={BRAND_NAVY_LIGHT}
                 color="white"
                 onPress={handleSubmit}
                 disabled={

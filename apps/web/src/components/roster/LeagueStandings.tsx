@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Card, XStack, YStack } from '@legacy-sports/shared-components';
 import { Separator, Spinner, styled, Text } from 'tamagui';
 import { Trophy } from '@tamagui/lucide-icons';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 export interface TeamStandingData {
   teamId?: string | null;
@@ -76,7 +81,7 @@ export function LeagueStandings({
         role="status"
         aria-live="polite"
       >
-        <Spinner size="large" color="$blue10" />
+        <Spinner size="large" color={BRAND_NAVY_LIGHT} />
         <Text color="$textMuted" fontSize="$4">
           Loading standings...
         </Text>
@@ -194,16 +199,24 @@ export function LeagueStandings({
               paddingHorizontal="$4"
               paddingVertical="$3"
               borderWidth={1}
-              borderColor={isUserTeam ? '$blue7' : 'transparent'}
-              backgroundColor={isUserTeam ? '$blue2' : 'transparent'}
+              borderColor={
+                isUserTeam ? withAlpha(BRAND_NAVY_LIGHT, 0.5) : 'transparent'
+              }
+              backgroundColor={
+                isUserTeam ? withAlpha(BRAND_NAVY_LIGHT, 0.12) : 'transparent'
+              }
               borderRadius="$4"
               role="listitem"
               cursor="pointer"
               hoverStyle={{
-                backgroundColor: isUserTeam ? '$blue3' : '$surfaceSubtle',
+                backgroundColor: isUserTeam
+                  ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
+                  : '$surfaceSubtle',
               }}
               pressStyle={{
-                backgroundColor: isUserTeam ? '$blue3' : '$surfaceInteractive',
+                backgroundColor: isUserTeam
+                  ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
+                  : '$surfaceInteractive',
               }}
               onPress={() => team.teamId && handleTeamClick(team.teamId)}
               onClick={() => team.teamId && handleTeamClick(team.teamId)}
@@ -239,14 +252,18 @@ export function LeagueStandings({
                     </Text>
                     {isUserTeam && (
                       <XStack
-                        backgroundColor="$blue3"
-                        borderColor="$blue7"
+                        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                        borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
                         borderWidth={1}
                         borderRadius="$10"
                         paddingHorizontal="$2"
                         paddingVertical="$0.5"
                       >
-                        <Text fontSize="$1" fontWeight="700" color="$blue11">
+                        <Text
+                          fontSize="$1"
+                          fontWeight="700"
+                          color={BRAND_GOLD_LIGHT}
+                        >
                           YOU
                         </Text>
                       </XStack>

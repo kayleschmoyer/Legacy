@@ -2,6 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { Card, Separator, Text, XStack, YStack } from 'tamagui';
 import { Button } from '@legacy-sports/shared-components';
 import { ArrowLeftRight, ChevronDown, ChevronUp } from '@tamagui/lucide-icons';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 interface TeamMember {
   id?: number | null;
@@ -86,14 +91,14 @@ export function LeagueTradeBlock({
           </Text>
         </XStack>
         <XStack
-          backgroundColor="$blue3"
-          borderColor="$blue7"
+          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+          borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
           borderWidth={1}
           borderRadius="$10"
           paddingHorizontal="$2"
           paddingVertical="$1"
         >
-          <Text fontSize="$1" fontWeight="700" color="$blue11">
+          <Text fontSize="$1" fontWeight="700" color={BRAND_GOLD_LIGHT}>
             {benchPlayers.length} available
           </Text>
         </XStack>
@@ -159,13 +164,13 @@ export function LeagueTradeBlock({
           alignSelf="center"
           icon={
             expanded ? (
-              <ChevronUp size={14} color="var(--blue11)" />
+              <ChevronUp size={14} color={BRAND_GOLD_LIGHT} />
             ) : (
-              <ChevronDown size={14} color="var(--blue11)" />
+              <ChevronDown size={14} color={BRAND_GOLD_LIGHT} />
             )
           }
         >
-          <Text fontSize="$2" fontWeight="600" color="$blue11">
+          <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
             {expanded ? 'Show fewer' : `Show ${benchPlayers.length - 4} more`}
           </Text>
         </Button>

@@ -11,6 +11,7 @@ import {
 } from 'tamagui';
 import { AlertTriangle, Check, Settings } from '@tamagui/lucide-icons';
 import { useUpdateLeagueSettingsMutation } from '../../api/db/graphql.generated';
+import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
 
 export interface LeagueSettingsControlProps {
   leagueId: number;
@@ -246,7 +247,7 @@ export function LeagueSettingsControl({
       <YStack gap="$4">
         {/* Header */}
         <XStack alignItems="center" gap="$2">
-          <Settings size={20} color="var(--blue10)" />
+          <Settings size={20} color={BRAND_NAVY_LIGHT} />
           <YStack>
             <H4 margin={0}>League Settings</H4>
             <Text fontSize="$2" color="$gray10">
@@ -275,8 +276,10 @@ export function LeagueSettingsControl({
                   key={option.value}
                   size="$3"
                   theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={isSelected ? '$blue6' : '$gray3'}
-                  borderColor={isSelected ? '$blue8' : '$gray6'}
+                  backgroundColor={
+                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                  }
+                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
                   borderWidth={1}
                   borderRadius="$3"
                   onPress={() => handleGamesChange(option.value)}
@@ -289,7 +292,9 @@ export function LeagueSettingsControl({
                     saving
                       ? undefined
                       : {
-                          backgroundColor: isSelected ? '$blue7' : '$gray4',
+                          backgroundColor: isSelected
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                            : '$gray4',
                         }
                   }
                 >
@@ -329,8 +334,10 @@ export function LeagueSettingsControl({
                   key={option.value}
                   size="$3"
                   theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={isSelected ? '$blue6' : '$gray3'}
-                  borderColor={isSelected ? '$blue8' : '$gray6'}
+                  backgroundColor={
+                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                  }
+                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
                   borderWidth={1}
                   borderRadius="$3"
                   onPress={() => handleSpStartsChange(option.value)}
@@ -343,7 +350,9 @@ export function LeagueSettingsControl({
                     saving
                       ? undefined
                       : {
-                          backgroundColor: isSelected ? '$blue7' : '$gray4',
+                          backgroundColor: isSelected
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                            : '$gray4',
                         }
                   }
                 >
@@ -382,8 +391,10 @@ export function LeagueSettingsControl({
                   key={option.value}
                   size="$3"
                   theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={isSelected ? '$blue6' : '$gray3'}
-                  borderColor={isSelected ? '$blue8' : '$gray6'}
+                  backgroundColor={
+                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                  }
+                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
                   borderWidth={1}
                   borderRadius="$3"
                   onPress={() => handleMinCareerGamesChange(option.value)}
@@ -396,7 +407,9 @@ export function LeagueSettingsControl({
                     saving
                       ? undefined
                       : {
-                          backgroundColor: isSelected ? '$blue7' : '$gray4',
+                          backgroundColor: isSelected
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                            : '$gray4',
                         }
                   }
                 >
@@ -435,8 +448,10 @@ export function LeagueSettingsControl({
                   key={option.value}
                   size="$3"
                   theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={isSelected ? '$blue6' : '$gray3'}
-                  borderColor={isSelected ? '$blue8' : '$gray6'}
+                  backgroundColor={
+                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                  }
+                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
                   borderWidth={1}
                   borderRadius="$3"
                   onPress={() => handleMinCareerSeasonsChange(option.value)}
@@ -449,7 +464,9 @@ export function LeagueSettingsControl({
                     saving
                       ? undefined
                       : {
-                          backgroundColor: isSelected ? '$blue7' : '$gray4',
+                          backgroundColor: isSelected
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                            : '$gray4',
                         }
                   }
                 >
@@ -488,8 +505,10 @@ export function LeagueSettingsControl({
                   key={option.value}
                   size="$3"
                   theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={isSelected ? '$blue6' : '$gray3'}
-                  borderColor={isSelected ? '$blue8' : '$gray6'}
+                  backgroundColor={
+                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                  }
+                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
                   borderWidth={1}
                   borderRadius="$3"
                   onPress={() => handleTotalMatchupsChange(option.value)}
@@ -502,7 +521,9 @@ export function LeagueSettingsControl({
                     saving
                       ? undefined
                       : {
-                          backgroundColor: isSelected ? '$blue7' : '$gray4',
+                          backgroundColor: isSelected
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                            : '$gray4',
                         }
                   }
                 >

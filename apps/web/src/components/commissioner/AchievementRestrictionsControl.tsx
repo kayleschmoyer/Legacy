@@ -13,6 +13,7 @@ import {
   YStack,
 } from 'tamagui';
 import { Award, Check, Trash2 } from '@tamagui/lucide-icons';
+import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
 import {
   useDeleteAchievementRestrictionMutation,
   useGetAchievementRestrictionsQuery,
@@ -276,7 +277,7 @@ export function AchievementRestrictionsControl({
       <YStack gap="$5">
         {/* Header */}
         <XStack alignItems="center" gap="$2">
-          <Award size={20} color="var(--blue10)" />
+          <Award size={20} color={BRAND_NAVY_LIGHT} />
           <YStack>
             <H4 margin={0}>Achievement Restrictions</H4>
             <Text fontSize="$2" color="$gray10">
@@ -370,7 +371,9 @@ function AchievementRow({
   return (
     <Card
       backgroundColor="$surfaceCard"
-      borderColor={row.enabled ? '$blue6' : '$surfacePanelBorder'}
+      borderColor={
+        row.enabled ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$surfacePanelBorder'
+      }
       borderWidth={1}
       padding="$4"
       borderRadius="$5"
@@ -395,7 +398,9 @@ function AchievementRow({
               size="$3"
               checked={row.enabled}
               onCheckedChange={(checked) => onUpdate({ enabled: checked })}
-              backgroundColor={row.enabled ? '$blue6' : '$gray4'}
+              backgroundColor={
+                row.enabled ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray4'
+              }
             >
               <Switch.Thumb animation="quicker" />
             </Switch>
@@ -501,8 +506,8 @@ function AchievementRow({
               <Button
                 size="$3"
                 theme="blue"
-                backgroundColor="$blue6"
-                borderColor="$blue8"
+                backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+                borderColor={BRAND_NAVY_LIGHT}
                 icon={
                   isSaving ? (
                     <Spinner size="small" />

@@ -24,6 +24,11 @@ import {
   useGetTeamMembersQuery,
 } from '../../api/db/graphql.generated';
 import { useAppSelector } from '../../store/hooks';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
@@ -177,7 +182,7 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
               </YStack>
               <Button
                 onPress={handleClose}
-                backgroundColor="$blue8"
+                backgroundColor={BRAND_NAVY_LIGHT}
                 color="white"
                 size="$4"
                 borderRadius="$3"
@@ -207,8 +212,8 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
 
               {/* Player being added */}
               <XStack
-                backgroundColor="$blue2"
-                borderColor="$blue6"
+                backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+                borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
                 borderWidth={1}
                 borderRadius="$3"
                 padding="$3"
@@ -219,19 +224,19 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
                   width={36}
                   height={36}
                   borderRadius={18}
-                  backgroundColor="$blue4"
+                  backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)}
                   alignItems="center"
                   justifyContent="center"
                 >
-                  <UserPlus size={18} color="$blue10" />
+                  <UserPlus size={18} color={BRAND_NAVY_LIGHT} />
                 </XStack>
                 <YStack flex={1} gap="$0.5">
-                  <Text fontWeight="700" fontSize="$4" color="$blue11">
+                  <Text fontWeight="700" fontSize="$4" color={BRAND_GOLD_LIGHT}>
                     {playerName}
                   </Text>
                   {player.eligiblePositions &&
                     player.eligiblePositions.length > 0 && (
-                      <Text fontSize="$2" color="$blue9">
+                      <Text fontSize="$2" color={BRAND_NAVY_LIGHT}>
                         {player.eligiblePositions.join(', ')}
                       </Text>
                     )}
@@ -249,7 +254,7 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
               {/* Roster status / drop player section */}
               {rosterLoading ? (
                 <YStack alignItems="center" padding="$4">
-                  <Spinner size="small" color="$blue10" />
+                  <Spinner size="small" color={BRAND_NAVY_LIGHT} />
                   <Text fontSize="$2" color="$color9" marginTop="$2">
                     Loading roster…
                   </Text>
@@ -371,7 +376,7 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
               {isFaab && (
                 <YStack gap="$2">
                   <XStack alignItems="center" gap="$2">
-                    <DollarSign size={14} color="$blue10" />
+                    <DollarSign size={14} color={BRAND_NAVY_LIGHT} />
                     <Text fontSize="$3" fontWeight="600" color="$color12">
                       FAAB Bid Amount
                     </Text>
@@ -393,7 +398,7 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
                       }
                       placeholder="0"
                       keyboardType="numeric"
-                      borderColor="$blue6"
+                      borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
                       borderWidth={1}
                       borderRadius="$3"
                     />
@@ -430,7 +435,7 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
                 </Dialog.Close>
                 <Button
                   size="$3"
-                  backgroundColor={canSubmit ? '$blue8' : '$color4'}
+                  backgroundColor={canSubmit ? BRAND_NAVY_LIGHT : '$color4'}
                   disabled={!canSubmit}
                   onPress={() => void handleSubmit()}
                   icon={

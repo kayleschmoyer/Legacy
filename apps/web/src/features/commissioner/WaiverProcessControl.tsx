@@ -10,6 +10,7 @@ import {
   YStack,
 } from 'tamagui';
 import { useProcessWaiverClaimsMutation } from '../../api/db/graphql.generated';
+import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 
 export interface WaiverProcessControlProps {
   leagueId: number;
@@ -80,7 +81,7 @@ export function WaiverProcessControl({
             onPress={handleButtonClick}
             disabled={loading}
             theme="active"
-            backgroundColor="$blue9"
+            backgroundColor={BRAND_NAVY_LIGHT}
             color="white"
             size="$4"
             icon={loading ? <Spinner size="small" /> : undefined}
@@ -136,7 +137,7 @@ export function WaiverProcessControl({
               </Dialog.Close>
               <Button
                 theme="active"
-                backgroundColor="$blue9"
+                backgroundColor={BRAND_NAVY_LIGHT}
                 color="white"
                 onPress={handleConfirm}
                 disabled={loading}

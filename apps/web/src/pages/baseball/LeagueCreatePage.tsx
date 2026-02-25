@@ -7,6 +7,13 @@ import {
   GetUserLeaguesQuery,
   useCreateLeagueAndTeamsMutation,
 } from '../../api/db/graphql.generated';
+import {
+  BRAND_GOLD,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 // Now using codegen-generated hooks and types
 
@@ -303,36 +310,38 @@ export function LeagueCreatePage(): React.JSX.Element {
                       disabled={loading}
                       minWidth="$5"
                       backgroundColor={
-                        formData.numberOfTeams === count ? '$blue8' : '$color2'
+                        formData.numberOfTeams === count
+                          ? BRAND_NAVY_LIGHT
+                          : '$color2'
                       }
                       borderColor={
                         formData.numberOfTeams === count
-                          ? '$blue8'
+                          ? BRAND_NAVY_LIGHT
                           : '$borderColor'
                       }
                       borderWidth={formData.numberOfTeams === count ? 2 : 1}
                       hoverStyle={{
                         backgroundColor:
                           formData.numberOfTeams === count
-                            ? '$blue9'
+                            ? BRAND_NAVY
                             : '$color3',
                         borderColor:
                           formData.numberOfTeams === count
-                            ? '$blue9'
+                            ? BRAND_NAVY
                             : '$borderColorHover',
                       }}
                       pressStyle={{
                         scale: 0.95,
                         backgroundColor:
                           formData.numberOfTeams === count
-                            ? '$blue7'
+                            ? BRAND_NAVY_DARK
                             : '$color4',
                       }}
                     >
                       <Text
                         color={
                           formData.numberOfTeams === count
-                            ? '$blue12'
+                            ? BRAND_GOLD
                             : '$color'
                         }
                         fontWeight={
@@ -368,35 +377,39 @@ export function LeagueCreatePage(): React.JSX.Element {
                       disabled={loading}
                       minWidth="$5"
                       backgroundColor={
-                        formData.maxRosterSize === size ? '$blue8' : '$color2'
+                        formData.maxRosterSize === size
+                          ? BRAND_NAVY_LIGHT
+                          : '$color2'
                       }
                       borderColor={
                         formData.maxRosterSize === size
-                          ? '$blue8'
+                          ? BRAND_NAVY_LIGHT
                           : '$borderColor'
                       }
                       borderWidth={formData.maxRosterSize === size ? 2 : 1}
                       hoverStyle={{
                         backgroundColor:
                           formData.maxRosterSize === size
-                            ? '$blue9'
+                            ? BRAND_NAVY
                             : '$color3',
                         borderColor:
                           formData.maxRosterSize === size
-                            ? '$blue9'
+                            ? BRAND_NAVY
                             : '$borderColorHover',
                       }}
                       pressStyle={{
                         scale: 0.95,
                         backgroundColor:
                           formData.maxRosterSize === size
-                            ? '$blue7'
+                            ? BRAND_NAVY_DARK
                             : '$color4',
                       }}
                     >
                       <Text
                         color={
-                          formData.maxRosterSize === size ? '$blue12' : '$color'
+                          formData.maxRosterSize === size
+                            ? BRAND_GOLD
+                            : '$color'
                         }
                         fontWeight={
                           formData.maxRosterSize === size ? '600' : '400'
@@ -900,23 +913,28 @@ export function LeagueCreatePage(): React.JSX.Element {
         </Card>
 
         {/* Info Card */}
-        <Card size="$4" bordered backgroundColor="$blue2" borderColor="$blue6">
+        <Card
+          size="$4"
+          bordered
+          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+          borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+        >
           <Card.Header padded>
-            <H2 size="$5" color="$blue11">
+            <H2 size="$5" color={BRAND_GOLD}>
               What happens next?
             </H2>
           </Card.Header>
           <YStack padding="$4" space="$3">
-            <Text size="$3" color="$blue11">
+            <Text size="$3" color={BRAND_GOLD}>
               • Your league will be created with the specified number of teams
             </Text>
-            <Text size="$3" color="$blue11">
+            <Text size="$3" color={BRAND_GOLD}>
               • You'll be set as the league commissioner
             </Text>
-            <Text size="$3" color="$blue11">
+            <Text size="$3" color={BRAND_GOLD}>
               • Teams will be auto-generated and ready for member assignment
             </Text>
-            <Text size="$3" color="$blue11">
+            <Text size="$3" color={BRAND_GOLD}>
               • You can invite friends to join your league after creation
             </Text>
           </YStack>

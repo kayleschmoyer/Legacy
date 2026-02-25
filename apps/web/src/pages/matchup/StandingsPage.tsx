@@ -3,6 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
 import { StandingsTable } from '../../features/matchup/StandingsTable';
 import { useStandings } from '../../hooks/useStandings';
+import {
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+} from '../../constants/colors';
 
 /**
  * StandingsPage - League standings page with sortable table
@@ -22,7 +27,7 @@ export function StandingsPage() {
         justifyContent="center"
         minHeight={400}
       >
-        <Spinner size="large" color="$blue10" />
+        <Spinner size="large" color={BRAND_NAVY_LIGHT} />
         <Text marginTop="$2" color="$gray11">
           Loading standings...
         </Text>
@@ -45,7 +50,14 @@ export function StandingsPage() {
           {String(error.message)}
         </Text>
         {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return */}
-        <Button marginTop="$4" theme="blue" onPress={() => refetch()}>
+        <Button
+          marginTop="$4"
+          backgroundColor={BRAND_NAVY_LIGHT}
+          color="white"
+          pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+          hoverStyle={{ backgroundColor: BRAND_NAVY }}
+          onPress={() => refetch()}
+        >
           Retry
         </Button>
       </YStack>
@@ -74,7 +86,10 @@ export function StandingsPage() {
             Refresh
           </Button>
           <Button
-            theme="blue"
+            backgroundColor={BRAND_NAVY_LIGHT}
+            color="white"
+            pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+            hoverStyle={{ backgroundColor: BRAND_NAVY }}
             onPress={() => navigate(`/baseball/league/${leagueId ?? ''}`)}
           >
             Back to League

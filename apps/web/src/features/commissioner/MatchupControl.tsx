@@ -10,6 +10,13 @@ import {
   YStack,
 } from 'tamagui';
 import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
+import {
   type Matchup,
   useAutoAdvanceMatchupsMutation,
   useGetMatchupsForLeagueQuery,
@@ -137,9 +144,13 @@ export function MatchupControl({
 
   return (
     <>
-      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+      <Card
+        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+        borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+        padding="$4"
+      >
         <YStack space="$3">
-          <H4 color="$blue11">Matchup Management</H4>
+          <H4 color={BRAND_GOLD_LIGHT}>Matchup Management</H4>
 
           {hasCurrentMatchup ? (
             <YStack space="$2">
@@ -158,7 +169,10 @@ export function MatchupControl({
 
           <XStack justifyContent="flex-start" gap="$3">
             <Button
-              theme="blue"
+              backgroundColor={BRAND_NAVY_LIGHT}
+              color="white"
+              pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+              hoverStyle={{ backgroundColor: BRAND_NAVY }}
               onPress={handleButtonClick}
               disabled={loading || matchupsLoading}
               icon={loading || matchupsLoading ? <Spinner /> : undefined}
@@ -210,7 +224,13 @@ export function MatchupControl({
               <Dialog.Close displayWhenAdapted asChild>
                 <Button theme="alt2">Cancel</Button>
               </Dialog.Close>
-              <Button theme="blue" onPress={handleConfirm}>
+              <Button
+                backgroundColor={BRAND_NAVY_LIGHT}
+                color="white"
+                pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                onPress={handleConfirm}
+              >
                 Confirm
               </Button>
             </XStack>

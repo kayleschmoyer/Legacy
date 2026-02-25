@@ -12,6 +12,11 @@ import {
   YStack,
 } from 'tamagui';
 import { useDeleteAllLeaguesMutation } from '../../api/db/graphql.generated';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  withAlpha,
+} from '../../constants/colors';
 
 export const LeagueManagement: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -119,9 +124,13 @@ export const LeagueManagement: React.FC = () => {
           </YStack>
         </Card>
 
-        <Card padding="$4" backgroundColor="$blue1" borderColor="$blue6">
+        <Card
+          padding="$4"
+          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.06)}
+          borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+        >
           <YStack space="$3">
-            <H4 color="$blue11">Information</H4>
+            <H4 color={BRAND_GOLD_LIGHT}>Information</H4>
             <Text fontSize="$3" color="$gray10">
               • Only leagues you own will be deleted
             </Text>

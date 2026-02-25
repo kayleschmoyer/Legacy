@@ -14,6 +14,12 @@ import {
 import { X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import { useGetAllPlayerSeasonStatsQuery } from '../../api/db/graphql.generated';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY_LIGHT,
+  WHITE,
+  withAlpha,
+} from '../../constants/colors';
 
 export interface PlayerSeasonStatsModalProps {
   /** Player ID to load stats for */
@@ -64,7 +70,7 @@ function PositionDisplay({ positions }: { positions: string }) {
   if (posArray.length <= 2) {
     // Show all if 2 or fewer
     return (
-      <Text fontSize="$3" fontWeight="600" color="$blue10">
+      <Text fontSize="$3" fontWeight="600" color={BRAND_GOLD_LIGHT}>
         {positions}
       </Text>
     );
@@ -78,7 +84,7 @@ function PositionDisplay({ positions }: { positions: string }) {
     <Tooltip placement="top">
       <Tooltip.Trigger>
         <XStack gap="$1" alignItems="center">
-          <Text fontSize="$3" fontWeight="600" color="$blue10">
+          <Text fontSize="$3" fontWeight="600" color={BRAND_GOLD_LIGHT}>
             {visible}
           </Text>
           <Text
@@ -111,7 +117,7 @@ function PositionDisplay({ positions }: { positions: string }) {
         ]}
       >
         <Tooltip.Arrow />
-        <Text fontSize="$3" fontWeight="600" color="$blue11">
+        <Text fontSize="$3" fontWeight="600" color={BRAND_GOLD_LIGHT}>
           All Positions: {positions}
         </Text>
       </Tooltip.Content>
@@ -324,9 +330,9 @@ export function PlayerSeasonStatsModal({
                 size="$3"
                 circular
                 icon={X}
-                backgroundColor="rgba(255,255,255,0.2)"
+                backgroundColor={withAlpha(WHITE, 0.2)}
                 color="white"
-                hoverStyle={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+                hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.3) }}
               />
             </Dialog.Close>
           </XStack>
@@ -336,7 +342,7 @@ export function PlayerSeasonStatsModal({
             <YStack padding="$4" space="$4">
               {loading && (
                 <YStack alignItems="center" paddingVertical="$8">
-                  <Spinner size="large" color="$blue10" />
+                  <Spinner size="large" color={BRAND_NAVY_LIGHT} />
                   <Text marginTop="$2" color="$gray11">
                     Loading season statistics...
                   </Text>
@@ -378,7 +384,7 @@ export function PlayerSeasonStatsModal({
                   {/* Batting Stats Section */}
                   {seasonRows.some((s) => s.batting) && (
                     <YStack>
-                      <H4 color="$blue11" marginBottom="$2">
+                      <H4 color={BRAND_GOLD_LIGHT} marginBottom="$2">
                         Batting Statistics
                       </H4>
                       <YStack
@@ -390,7 +396,7 @@ export function PlayerSeasonStatsModal({
                       >
                         {/* Header */}
                         <XStack
-                          backgroundColor="$blue3"
+                          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
                           paddingVertical="$2"
                           paddingHorizontal="$3"
                           borderBottomWidth={1}
@@ -400,7 +406,7 @@ export function PlayerSeasonStatsModal({
                             width={70}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             YEAR
                           </Text>
@@ -408,7 +414,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             G
                           </Text>
@@ -416,7 +422,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             PA
                           </Text>
@@ -424,7 +430,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             AB
                           </Text>
@@ -432,7 +438,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             H
                           </Text>
@@ -440,7 +446,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             HR
                           </Text>
@@ -448,7 +454,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             RBI
                           </Text>
@@ -456,7 +462,7 @@ export function PlayerSeasonStatsModal({
                             width={60}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             AVG
                           </Text>
@@ -507,7 +513,7 @@ export function PlayerSeasonStatsModal({
                   {/* Pitching Stats Section */}
                   {seasonRows.some((s) => s.pitching) && (
                     <YStack>
-                      <H4 color="$blue11" marginBottom="$2">
+                      <H4 color={BRAND_GOLD_LIGHT} marginBottom="$2">
                         Pitching Statistics
                       </H4>
                       <YStack
@@ -519,7 +525,7 @@ export function PlayerSeasonStatsModal({
                       >
                         {/* Header */}
                         <XStack
-                          backgroundColor="$blue3"
+                          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
                           paddingVertical="$2"
                           paddingHorizontal="$3"
                           borderBottomWidth={1}
@@ -529,7 +535,7 @@ export function PlayerSeasonStatsModal({
                             width={70}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             YEAR
                           </Text>
@@ -537,7 +543,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             G
                           </Text>
@@ -545,7 +551,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             W
                           </Text>
@@ -553,7 +559,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             L
                           </Text>
@@ -561,7 +567,7 @@ export function PlayerSeasonStatsModal({
                             width={60}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             ERA
                           </Text>
@@ -569,7 +575,7 @@ export function PlayerSeasonStatsModal({
                             width={60}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             IP
                           </Text>
@@ -577,7 +583,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             SO
                           </Text>
@@ -625,7 +631,7 @@ export function PlayerSeasonStatsModal({
                   {/* Fielding Stats Section */}
                   {seasonRows.some((s) => s.fielding) && (
                     <YStack>
-                      <H4 color="$blue11" marginBottom="$2">
+                      <H4 color={BRAND_GOLD_LIGHT} marginBottom="$2">
                         Fielding Statistics
                       </H4>
                       <YStack
@@ -637,7 +643,7 @@ export function PlayerSeasonStatsModal({
                       >
                         {/* Header */}
                         <XStack
-                          backgroundColor="$blue3"
+                          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
                           paddingVertical="$2"
                           paddingHorizontal="$3"
                           borderBottomWidth={1}
@@ -647,7 +653,7 @@ export function PlayerSeasonStatsModal({
                             width={70}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             YEAR
                           </Text>
@@ -655,7 +661,7 @@ export function PlayerSeasonStatsModal({
                             width={100}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             POS
                           </Text>
@@ -663,7 +669,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             G
                           </Text>
@@ -671,7 +677,7 @@ export function PlayerSeasonStatsModal({
                             width={60}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             INN
                           </Text>
@@ -679,7 +685,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             PO
                           </Text>
@@ -687,7 +693,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             A
                           </Text>
@@ -695,7 +701,7 @@ export function PlayerSeasonStatsModal({
                             width={50}
                             fontSize="$2"
                             fontWeight="bold"
-                            color="$blue11"
+                            color={BRAND_GOLD_LIGHT}
                           >
                             E
                           </Text>
