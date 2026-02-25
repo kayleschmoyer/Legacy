@@ -1102,6 +1102,9 @@ export type PlayerScoring = {
   battingScore?: Maybe<Scalars['Float']['output']>;
   careerGames?: Maybe<Scalars['Int']['output']>;
   fieldingScore?: Maybe<Scalars['Float']['output']>;
+  hitterAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
+  hitterScore?: Maybe<Scalars['Float']['output']>;
+  pitchingAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
   pitchingScore?: Maybe<Scalars['Float']['output']>;
   totalScore?: Maybe<Scalars['Float']['output']>;
 };
@@ -1442,6 +1445,7 @@ export type QueryPlayersArgs = {
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QuerySearchPlayersArgs = {
@@ -3756,6 +3760,7 @@ export type GetPlayersWithStatsQueryVariables = Exact<{
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   leagueId?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetPlayersWithStatsQuery = {
@@ -3772,6 +3777,9 @@ export type GetPlayersWithStatsQuery = {
       battingScore?: number | null;
       pitchingScore?: number | null;
       fieldingScore?: number | null;
+      hitterScore?: number | null;
+      hitterAvgPointsPerGame?: number | null;
+      pitchingAvgPointsPerGame?: number | null;
       totalScore?: number | null;
       careerGames?: number | null;
       avgPointsPerGame?: number | null;
@@ -8086,6 +8094,7 @@ export const GetPlayersWithStats = gql`
     $orderDirection: String = "asc"
     $position: String
     $leagueId: Int
+    $search: String
   ) {
     players(
       limit: $limit
@@ -8094,6 +8103,7 @@ export const GetPlayersWithStats = gql`
       orderDirection: $orderDirection
       position: $position
       leagueId: $leagueId
+      search: $search
     ) {
       id
       firstName
@@ -8104,6 +8114,9 @@ export const GetPlayersWithStats = gql`
         battingScore
         pitchingScore
         fieldingScore
+        hitterScore
+        hitterAvgPointsPerGame
+        pitchingAvgPointsPerGame
         totalScore
         careerGames
         avgPointsPerGame
@@ -8171,6 +8184,7 @@ export const GetPlayersWithStats = gql`
  *      orderDirection: // value for 'orderDirection'
  *      position: // value for 'position'
  *      leagueId: // value for 'leagueId'
+ *      search: // value for 'search'
  *   },
  * });
  */

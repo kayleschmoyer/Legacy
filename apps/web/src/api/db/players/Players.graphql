@@ -8,6 +8,7 @@ query GetPlayersWithStats(
   $orderDirection: String = "asc"
   $position: String
   $leagueId: Int
+  $search: String
 ) {
   players(
     limit: $limit
@@ -16,6 +17,7 @@ query GetPlayersWithStats(
     orderDirection: $orderDirection
     position: $position
     leagueId: $leagueId
+    search: $search
   ) {
     id
     firstName
@@ -26,6 +28,9 @@ query GetPlayersWithStats(
       battingScore
       pitchingScore
       fieldingScore
+      hitterScore
+      hitterAvgPointsPerGame
+      pitchingAvgPointsPerGame
       totalScore
       careerGames
       avgPointsPerGame

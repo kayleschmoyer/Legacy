@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Button,
   Input,
@@ -158,17 +158,17 @@ const HITTER_SCORING_COLUMNS: {
   {
     key: 'totalScore',
     label: 'PTS',
-    sortKey: 'totalScore',
+    sortKey: 'hitterScore',
     width: 60,
-    description: 'Total Fantasy Points',
+    description: 'Batting + Fielding Points',
     isBold: true,
   },
   {
     key: 'avgPointsPerGame',
     label: 'PROJ',
-    sortKey: 'avgPointsPerGame',
+    sortKey: 'hitterAvgPointsPerGame',
     width: 60,
-    description: 'Projected Points This Week',
+    description: 'Projected Batting Points This Week',
     isBold: true,
   },
   {
@@ -199,17 +199,17 @@ const PITCHER_SCORING_COLUMNS: {
   {
     key: 'totalScore',
     label: 'PTS',
-    sortKey: 'totalScore',
+    sortKey: 'pitchingScore',
     width: 60,
-    description: 'Total Fantasy Points',
+    description: 'Pitching Points',
     isBold: true,
   },
   {
     key: 'avgPointsPerGame',
-    label: 'PROJ',
-    sortKey: 'avgPointsPerGame',
+    label: 'PPG',
+    sortKey: 'pitchingAvgPointsPerGame',
     width: 60,
-    description: 'Projected Points This Week',
+    description: 'Pitching Points Per Game',
     isBold: true,
   },
   {
@@ -375,7 +375,10 @@ type SortKey =
   | 'avgPointsPerGame'
   | 'battingScore'
   | 'pitchingScore'
-  | 'fieldingScore';
+  | 'fieldingScore'
+  | 'hitterScore'
+  | 'hitterAvgPointsPerGame'
+  | 'pitchingAvgPointsPerGame';
 
 /* ── Sub-components ────────────────────────────────────────────────────────── */
 
@@ -473,7 +476,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [positionFilter, setPositionFilter] = useState<string>('ALL');
-  const [sortBy, setSortBy] = useState<SortKey>('avgPointsPerGame');
+  const [sortBy, setSortBy] = useState<SortKey>('hitterAvgPointsPerGame');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [claimPlayer, setClaimPlayer] = useState<{
     id: number;
@@ -482,14 +485,24 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
     eligiblePositions?: string[] | null;
   } | null>(null);
 
+  // Debounce search input so we don't fire a query on every keystroke
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [search]);
+
   // Determine the position filter to send to the query
   const queryPosition = (() => {
     if (playerType === 'pitchers') {
       // For pitchers, use the pitcher-specific filter or 'P' for all pitchers
       return positionFilter === 'ALL' ? 'P' : positionFilter;
     }
-    // For hitters, pass through the position filter (undefined = all hitters)
-    return positionFilter === 'ALL' ? undefined : positionFilter;
+    // For hitters: use 'HITTER' (server-side excludes SP/RP-only players)
+    return positionFilter === 'ALL' ? 'HITTER' : positionFilter;
   })();
 
   const { data, loading, error } = useGetPlayersWithStatsQuery({
@@ -500,6 +513,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
       orderDirection: sortDirection,
       position: queryPosition,
       leagueId,
+      search: debouncedSearch || undefined,
     },
     fetchPolicy: 'cache-and-network',
   });
@@ -525,7 +539,11 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
   const handlePlayerTypeChange = useCallback((type: PlayerType) => {
     setPlayerType(type);
     setPositionFilter('ALL');
-    setSortBy('avgPointsPerGame');
+    setSortBy(
+      type === 'pitchers'
+        ? 'pitchingAvgPointsPerGame'
+        : 'hitterAvgPointsPerGame',
+    );
     setSortDirection('desc');
     setPage(0);
   }, []);
@@ -535,24 +553,10 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
 
   const players = data?.players ?? [];
 
-  // Client-side filtering: exclude taken players, apply local search,
-  // and for hitters mode exclude pure pitchers (SP/RP only)
-  const displayPlayers = players.filter((player) => {
-    if (!player?.id || takenPlayerIds.has(player.id)) return false;
-    if (search) {
-      const fullName = `${player.firstName} ${player.lastName}`.toLowerCase();
-      if (!fullName.includes(search.toLowerCase())) return false;
-    }
-    // When viewing hitters with ALL positions, exclude players whose only positions are SP/RP
-    if (playerType === 'hitters' && positionFilter === 'ALL') {
-      const positions = player.eligiblePositions ?? [];
-      const onlyPitcher =
-        positions.length > 0 &&
-        positions.every((p) => p === 'SP' || p === 'RP');
-      if (onlyPitcher) return false;
-    }
-    return true;
-  });
+  // Client-side: only exclude taken players (position + search filtering is now server-side)
+  const displayPlayers = players.filter(
+    (player) => !(!player?.id || takenPlayerIds.has(player.id)),
+  );
 
   const positions =
     playerType === 'hitters' ? HITTER_POSITIONS : PITCHER_POSITIONS;
@@ -903,19 +907,34 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                     )}
                   </XStack>
 
-                  {/* Scoring cells — dynamic per player type */}
-                  <StatCell width={60} fontWeight="700" color="$green11">
-                    {player.scoring?.totalScore != null
-                      ? Math.round(player.scoring.totalScore).toLocaleString()
-                      : '–'}
-                  </StatCell>
-                  <StatCell width={60} fontWeight="700" color="$blue11">
-                    {player.scoring?.avgPointsPerGame != null
-                      ? (
-                          player.scoring.avgPointsPerGame * gamesPerMatchup
-                        ).toFixed(1)
-                      : '–'}
-                  </StatCell>
+                  {/* Scoring cells — role-specific: hitters use bat+fld, pitchers use pitching only */}
+                  {(() => {
+                    const s = player.scoring;
+                    const roleScore =
+                      playerType === 'hitters'
+                        ? (s?.hitterScore ?? 0)
+                        : (s?.pitchingScore ?? 0);
+                    const proj =
+                      playerType === 'hitters'
+                        ? s?.hitterAvgPointsPerGame != null
+                          ? s.hitterAvgPointsPerGame * gamesPerMatchup
+                          : null
+                        : s?.pitchingAvgPointsPerGame != null
+                          ? s.pitchingAvgPointsPerGame
+                          : null;
+                    return (
+                      <>
+                        <StatCell width={60} fontWeight="700" color="$green11">
+                          {s != null
+                            ? Math.round(roleScore).toLocaleString()
+                            : '–'}
+                        </StatCell>
+                        <StatCell width={60} fontWeight="700" color="$blue11">
+                          {proj != null ? proj.toFixed(1) : '–'}
+                        </StatCell>
+                      </>
+                    );
+                  })()}
                   {playerType === 'hitters' ? (
                     <>
                       <StatCell width={56}>
@@ -981,7 +1000,9 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                         {statVal(pitchingStats?.losses)}
                       </StatCell>
                       <StatCell width={56} fontWeight="700">
-                        {pitchingStats?.era ?? '–'}
+                        {pitchingStats?.era != null
+                          ? Number(pitchingStats.era).toFixed(2)
+                          : '–'}
                       </StatCell>
                       <StatCell width={48}>
                         {statVal(pitchingStats?.games)}

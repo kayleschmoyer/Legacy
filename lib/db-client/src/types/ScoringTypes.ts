@@ -27,7 +27,13 @@ export interface PlayerCareerScore {
   battingScore: number;
   pitchingScore: number;
   fieldingScore: number;
+  /** battingScore + fieldingScore — the combined hitter-only contribution */
+  hitterScore: number;
   totalScore: number;
   careerGames: number;
   avgPpg: number;
+  /** hitterScore / careerGames — per-game hitter average */
+  hitterAvgPpg: number;
+  /** pitchingScore / careerGames — per-game pitching average */
+  pitchingAvgPpg: number;
 }

@@ -1037,6 +1037,9 @@ type PlayerScoring {
   battingScore: Float
   careerGames: Int
   fieldingScore: Float
+  hitterAvgPointsPerGame: Float
+  hitterScore: Float
+  pitchingAvgPointsPerGame: Float
   pitchingScore: Float
   totalScore: Float
 }
@@ -1189,6 +1192,7 @@ type Query {
     orderBy: String
     orderDirection: String
     position: String
+    search: String
   ): [Player!]
 
   """

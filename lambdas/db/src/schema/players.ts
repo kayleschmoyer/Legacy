@@ -114,9 +114,15 @@ PlayerScoringRef.implement({
     battingScore: t.exposeFloat('battingScore'),
     pitchingScore: t.exposeFloat('pitchingScore'),
     fieldingScore: t.exposeFloat('fieldingScore'),
+    /** battingScore + fieldingScore — useful for sorting/displaying hitter-only value */
+    hitterScore: t.exposeFloat('hitterScore'),
     totalScore: t.exposeFloat('totalScore'),
     careerGames: t.exposeInt('careerGames'),
     avgPointsPerGame: t.exposeFloat('avgPpg'),
+    /** hitterScore / careerGames — per-game hitter average */
+    hitterAvgPointsPerGame: t.exposeFloat('hitterAvgPpg'),
+    /** pitchingScore / careerGames — per-game pitching average */
+    pitchingAvgPointsPerGame: t.exposeFloat('pitchingAvgPpg'),
   }),
 });
 
@@ -250,6 +256,7 @@ builder.queryField('players', (t) =>
       orderBy: t.arg.string({ required: false }),
       orderDirection: t.arg.string({ required: false }),
       position: t.arg.string({ required: false }),
+      search: t.arg.string({ required: false }),
       excludeEmptyNames: t.arg.boolean({
         required: false,
         defaultValue: false,
@@ -293,6 +300,7 @@ builder.queryField('players', (t) =>
         filters: {
           excludeEmptyNames: args.excludeEmptyNames ?? false,
           position: args.position || undefined,
+          fullNameLike: args.search || undefined,
           minCareerGames,
           minCareerSeasons,
         },

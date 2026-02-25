@@ -15,9 +15,12 @@ interface ScoringResultRow {
   batting_score: string | null;
   pitching_score: string | null;
   fielding_score: string | null;
+  hitter_score: string | null;
   total_score: string | null;
   career_games: string | null;
   avg_ppg: string | null;
+  hitter_avg_ppg: string | null;
+  pitching_avg_ppg: string | null;
 }
 
 export interface PlayerFilters {
@@ -50,7 +53,10 @@ export type ScoringOrderBy =
   | 'avgPointsPerGame'
   | 'battingScore'
   | 'pitchingScore'
-  | 'fieldingScore';
+  | 'fieldingScore'
+  | 'hitterScore'
+  | 'hitterAvgPointsPerGame'
+  | 'pitchingAvgPointsPerGame';
 
 export type PlayerOrderBy =
   | 'id'
@@ -106,6 +112,9 @@ export class PlayerService {
         'battingScore',
         'pitchingScore',
         'fieldingScore',
+        'hitterScore',
+        'hitterAvgPointsPerGame',
+        'pitchingAvgPointsPerGame',
       ];
       const isCareerSort = careerSortOptions.includes(
         queryOptions.orderBy as CareerStatOrderBy,
@@ -136,7 +145,19 @@ export class PlayerService {
       if (queryOptions.filters?.position) {
         const pos = queryOptions.filters.position;
 
-        if (pos === 'P') {
+        if (pos === 'HITTER') {
+          // Hitters: players with no positions at all OR at least one non-pitcher position.
+          // Excludes pure SP/RP-only players.
+          conditions.push(
+            sql`(
+              NOT EXISTS (SELECT 1 FROM public.player_eligible_positions WHERE player_id = ${PublicSchema.players.id})
+              OR EXISTS (
+                SELECT 1 FROM public.player_eligible_positions
+                WHERE player_id = ${PublicSchema.players.id} AND position NOT IN ('SP', 'RP')
+              )
+            )`,
+          );
+        } else if (pos === 'P') {
           // Pitchers (SP, RP, P)
           conditions.push(
             inArray(
@@ -426,32 +447,59 @@ export class PlayerService {
       conditions.push(ne(PublicSchema.players.lastName, ''));
     }
 
+    const isPitcherFilter = ['P', 'SP', 'RP'].includes(filters.position ?? '');
+
     if (filters.minCareerGames !== undefined && filters.minCareerGames > 0) {
-      conditions.push(
-        sql`(
-          NOT EXISTS (SELECT 1 FROM public.career_batting WHERE player_id = ${PublicSchema.players.id})
-          OR ${PublicSchema.players.id} IN (
-            SELECT player_id FROM public.career_batting WHERE g >= ${filters.minCareerGames}
-          )
-        )`,
-      );
+      if (isPitcherFilter) {
+        conditions.push(
+          sql`(
+            NOT EXISTS (SELECT 1 FROM public.career_pitching WHERE player_id = ${PublicSchema.players.id})
+            OR ${PublicSchema.players.id} IN (
+              SELECT player_id FROM public.career_pitching WHERE g >= ${filters.minCareerGames}
+            )
+          )`,
+        );
+      } else {
+        conditions.push(
+          sql`(
+            NOT EXISTS (SELECT 1 FROM public.career_batting WHERE player_id = ${PublicSchema.players.id})
+            OR ${PublicSchema.players.id} IN (
+              SELECT player_id FROM public.career_batting WHERE g >= ${filters.minCareerGames}
+            )
+          )`,
+        );
+      }
     }
 
     if (
       filters.minCareerSeasons !== undefined &&
       filters.minCareerSeasons > 0
     ) {
-      conditions.push(
-        sql`(
-          NOT EXISTS (SELECT 1 FROM public.season_batting WHERE player_id = ${PublicSchema.players.id} AND lg_id IN ('AL', 'NL'))
-          OR ${PublicSchema.players.id} IN (
-            SELECT player_id FROM public.season_batting
-            WHERE lg_id IN ('AL', 'NL')
-            GROUP BY player_id
-            HAVING COUNT(DISTINCT season) >= ${filters.minCareerSeasons}
-          )
-        )`,
-      );
+      if (isPitcherFilter) {
+        conditions.push(
+          sql`(
+            NOT EXISTS (SELECT 1 FROM public.season_pitching WHERE player_id = ${PublicSchema.players.id} AND lg_id IN ('AL', 'NL'))
+            OR ${PublicSchema.players.id} IN (
+              SELECT player_id FROM public.season_pitching
+              WHERE lg_id IN ('AL', 'NL')
+              GROUP BY player_id
+              HAVING COUNT(DISTINCT season) >= ${filters.minCareerSeasons}
+            )
+          )`,
+        );
+      } else {
+        conditions.push(
+          sql`(
+            NOT EXISTS (SELECT 1 FROM public.season_batting WHERE player_id = ${PublicSchema.players.id} AND lg_id IN ('AL', 'NL'))
+            OR ${PublicSchema.players.id} IN (
+              SELECT player_id FROM public.season_batting
+              WHERE lg_id IN ('AL', 'NL')
+              GROUP BY player_id
+              HAVING COUNT(DISTINCT season) >= ${filters.minCareerSeasons}
+            )
+          )`,
+        );
+      }
     }
 
     return conditions;
@@ -488,11 +536,18 @@ export class PlayerService {
           pitchingScore: 'pitching_score',
           fieldingScore: 'fielding_score',
         };
-        const sortColumn =
-          scoringColumnMap[queryOptions.orderBy || 'avgPointsPerGame'] ||
-          'avg_ppg';
+        const orderByKey = queryOptions.orderBy || 'avgPointsPerGame';
         const sortDir =
           queryOptions.orderDirection === 'asc' ? sql`ASC` : sql`DESC`;
+        // derived expression columns that are not direct CS columns
+        const orderByClause =
+          orderByKey === 'hitterScore'
+            ? sql`COALESCE(cs.batting_score + cs.fielding_score, 0) ${sortDir}`
+            : orderByKey === 'hitterAvgPointsPerGame'
+              ? sql`COALESCE(CASE WHEN cs.career_games > 0 THEN (cs.batting_score + cs.fielding_score) / cs.career_games ELSE 0 END, 0) ${sortDir}`
+              : orderByKey === 'pitchingAvgPointsPerGame'
+                ? sql`COALESCE(CASE WHEN cs.career_games > 0 THEN cs.pitching_score / cs.career_games ELSE 0 END, 0) ${sortDir}`
+                : sql`COALESCE(cs.${sql.raw(scoringColumnMap[orderByKey] || 'avg_ppg')}, 0) ${sortDir}`;
 
         // Build WHERE conditions using raw SQL (must reference alias "p",
         // not the Drizzle column refs which would emit "players"."col").
@@ -516,22 +571,48 @@ export class PlayerService {
           );
         }
 
+        if (queryOptions.filters?.fullNameLike) {
+          const term = queryOptions.filters.fullNameLike;
+          rawConditions.push(
+            sql`(
+              p.first_name ILIKE ${'%' + term + '%'}
+              OR p.last_name ILIKE ${'%' + term + '%'}
+            )`,
+          );
+        }
+
+        const isPitcherPos = ['P', 'SP', 'RP'].includes(
+          queryOptions.filters?.position ?? '',
+        );
+
         if (
           queryOptions.filters?.minCareerGames !== undefined &&
           queryOptions.filters.minCareerGames > 0
         ) {
-          rawConditions.push(
-            sql`(NOT EXISTS (SELECT 1 FROM public.career_batting WHERE player_id = p.id) OR p.id IN (SELECT player_id FROM public.career_batting WHERE g >= ${queryOptions.filters.minCareerGames}))`,
-          );
+          if (isPitcherPos) {
+            rawConditions.push(
+              sql`(NOT EXISTS (SELECT 1 FROM public.career_pitching WHERE player_id = p.id) OR p.id IN (SELECT player_id FROM public.career_pitching WHERE g >= ${queryOptions.filters.minCareerGames}))`,
+            );
+          } else {
+            rawConditions.push(
+              sql`(NOT EXISTS (SELECT 1 FROM public.career_batting WHERE player_id = p.id) OR p.id IN (SELECT player_id FROM public.career_batting WHERE g >= ${queryOptions.filters.minCareerGames}))`,
+            );
+          }
         }
 
         if (
           queryOptions.filters?.minCareerSeasons !== undefined &&
           queryOptions.filters.minCareerSeasons > 0
         ) {
-          rawConditions.push(
-            sql`(NOT EXISTS (SELECT 1 FROM public.season_batting WHERE player_id = p.id AND lg_id IN ('AL', 'NL')) OR p.id IN (SELECT player_id FROM public.season_batting WHERE lg_id IN ('AL', 'NL') GROUP BY player_id HAVING COUNT(DISTINCT season) >= ${queryOptions.filters.minCareerSeasons}))`,
-          );
+          if (isPitcherPos) {
+            rawConditions.push(
+              sql`(NOT EXISTS (SELECT 1 FROM public.season_pitching WHERE player_id = p.id AND lg_id IN ('AL', 'NL')) OR p.id IN (SELECT player_id FROM public.season_pitching WHERE lg_id IN ('AL', 'NL') GROUP BY player_id HAVING COUNT(DISTINCT season) >= ${queryOptions.filters.minCareerSeasons}))`,
+            );
+          } else {
+            rawConditions.push(
+              sql`(NOT EXISTS (SELECT 1 FROM public.season_batting WHERE player_id = p.id AND lg_id IN ('AL', 'NL')) OR p.id IN (SELECT player_id FROM public.season_batting WHERE lg_id IN ('AL', 'NL') GROUP BY player_id HAVING COUNT(DISTINCT season) >= ${queryOptions.filters.minCareerSeasons}))`,
+            );
+          }
         }
 
         const whereClause =
@@ -550,13 +631,20 @@ export class PlayerService {
         const scoringQuery = sql`
           SELECT
             p.id, p.first_name, p.last_name, p.bref_id, p.stats_last_fetched_at,
-            cs.batting_score, cs.pitching_score, cs.fielding_score,
-            cs.total_score, cs.career_games, cs.avg_ppg
+            COALESCE(cs.batting_score, 0) AS batting_score,
+            COALESCE(cs.pitching_score, 0) AS pitching_score,
+            COALESCE(cs.fielding_score, 0) AS fielding_score,
+            COALESCE(cs.batting_score, 0) + COALESCE(cs.fielding_score, 0) AS hitter_score,
+            COALESCE(cs.total_score, 0) AS total_score,
+            COALESCE(cs.career_games, 0) AS career_games,
+            COALESCE(cs.avg_ppg, 0) AS avg_ppg,
+            CASE WHEN cs.career_games > 0 THEN (cs.batting_score + cs.fielding_score) / cs.career_games ELSE 0 END AS hitter_avg_ppg,
+            CASE WHEN cs.career_games > 0 THEN cs.pitching_score / cs.career_games ELSE 0 END AS pitching_avg_ppg
           FROM public.players p
           LEFT JOIN public.compute_career_scores(${leagueIdParam}) cs
             ON p.id = cs.player_id
           ${whereClause}
-          ORDER BY cs.${sql.raw(sortColumn)} ${sortDir} NULLS LAST
+          ORDER BY ${orderByClause}
           ${limitClause}
           ${offsetClause}
         `;
@@ -586,9 +674,12 @@ export class PlayerService {
             battingScore: Number(row.batting_score) || 0,
             pitchingScore: Number(row.pitching_score) || 0,
             fieldingScore: Number(row.fielding_score) || 0,
+            hitterScore: Number(row.hitter_score) || 0,
             totalScore: Number(row.total_score) || 0,
             careerGames: Number(row.career_games) || 0,
             avgPpg: Number(row.avg_ppg) || 0,
+            hitterAvgPpg: Number(row.hitter_avg_ppg) || 0,
+            pitchingAvgPpg: Number(row.pitching_avg_ppg) || 0,
           },
         }));
       },
@@ -600,6 +691,16 @@ export class PlayerService {
    * Used by getPlayersWithScoringSort where the table is aliased as "p".
    */
   private buildRawPositionFilter(pos: string): SQL {
+    if (pos === 'HITTER') {
+      // Hitters: no positions at all OR at least one non-pitcher position
+      return sql`(
+        NOT EXISTS (SELECT 1 FROM public.player_eligible_positions WHERE player_id = p.id)
+        OR EXISTS (
+          SELECT 1 FROM public.player_eligible_positions
+          WHERE player_id = p.id AND position NOT IN ('SP', 'RP')
+        )
+      )`;
+    }
     const posMap: Record<string, string[]> = {
       P: ['SP', 'RP'],
       OF: ['LF', 'CF', 'RF'],
@@ -619,7 +720,15 @@ export class PlayerService {
    * Extracted to share between getPlayers and getPlayersWithScoringSort.
    */
   private buildPositionFilter(db: PublicDb, pos: string): SQL {
-    if (pos === 'P') {
+    if (pos === 'HITTER') {
+      return sql`(
+        NOT EXISTS (SELECT 1 FROM public.player_eligible_positions WHERE player_id = ${PublicSchema.players.id})
+        OR EXISTS (
+          SELECT 1 FROM public.player_eligible_positions
+          WHERE player_id = ${PublicSchema.players.id} AND position NOT IN ('SP', 'RP')
+        )
+      )`;
+    } else if (pos === 'P') {
       return inArray(
         PublicSchema.players.id,
         db

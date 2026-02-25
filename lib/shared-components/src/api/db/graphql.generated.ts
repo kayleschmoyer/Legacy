@@ -1108,6 +1108,9 @@ export type PlayerScoring = {
   battingScore?: Maybe<Scalars['Float']['output']>;
   careerGames?: Maybe<Scalars['Int']['output']>;
   fieldingScore?: Maybe<Scalars['Float']['output']>;
+  hitterAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
+  hitterScore?: Maybe<Scalars['Float']['output']>;
+  pitchingAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
   pitchingScore?: Maybe<Scalars['Float']['output']>;
   totalScore?: Maybe<Scalars['Float']['output']>;
 };
@@ -1448,6 +1451,7 @@ export type QueryPlayersArgs = {
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QuerySearchPlayersArgs = {
