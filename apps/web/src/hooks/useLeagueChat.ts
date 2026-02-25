@@ -20,10 +20,14 @@ import {
 // ---------------------------------------------------------------------------
 export interface ChatMessage {
   id: number;
-  userId: number;
+  userId: number | null;
   username: string;
   messageText: string;
   createdAt: string;
+  /** Discriminates rendering: 'text' | 'trade' | 'waiver' | 'draft_settings' */
+  messageType: string;
+  /** Parsed JSON metadata for card rendering */
+  metadata: Record<string, unknown> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,13 +67,26 @@ export function useLeagueChat(leagueId: number): {
   useEffect(() => {
     if (!historyData) return;
     const sorted = [...(historyData.getLeagueMessages ?? [])].reverse();
-    const historyItems: ChatMessage[] = sorted.map((msg) => ({
-      id: Number(msg.id),
-      userId: Number(msg.userId),
-      username: msg.sender?.username ?? `user_${msg.userId}`,
-      messageText: msg.messageText ?? '',
-      createdAt: msg.timestamp ?? '',
-    }));
+    const historyItems: ChatMessage[] = sorted.map((msg) => {
+      let parsedMetadata: Record<string, unknown> | null = null;
+      try {
+        if (msg.metadata)
+          parsedMetadata = JSON.parse(msg.metadata) as Record<string, unknown>;
+      } catch {
+        /* ignore bad JSON */
+      }
+      return {
+        id: Number(msg.id),
+        userId: msg.userId != null ? Number(msg.userId) : null,
+        username:
+          msg.sender?.username ??
+          (msg.userId != null ? `user_${msg.userId}` : 'System'),
+        messageText: msg.messageText ?? '',
+        createdAt: msg.timestamp ?? '',
+        messageType: msg.messageType ?? 'text',
+        metadata: parsedMetadata,
+      };
+    });
     console.log(`[chat ${_ts()}] history-effect fired`, {
       historyCount: historyItems.length,
       historyIds: historyItems.map((m) => m.id),
@@ -116,10 +133,14 @@ export function useLeagueChat(leagueId: number): {
           if (!raw) return;
           const msg: ChatMessage = {
             id: Number(raw.id),
-            userId: Number(raw.userId),
-            username: raw.sender?.username ?? `user_${raw.userId}`,
+            userId: raw.userId != null ? Number(raw.userId) : null,
+            username:
+              raw.sender?.username ??
+              (raw.userId != null ? `user_${raw.userId}` : 'System'),
             messageText: raw.messageText ?? '',
             createdAt: raw.timestamp ?? '',
+            messageType: raw.messageType ?? 'text',
+            metadata: null,
           };
           console.log(`[chat ${_ts()}] onCompleted`, {
             msgId: msg.id,
@@ -197,10 +218,15 @@ export function useLeagueChat(leagueId: number): {
             ...prev,
             {
               id: numericId,
-              userId: Number(n.senderId),
+              userId: n.senderId != null ? Number(n.senderId) : null,
               username: n.senderUsername,
               messageText: n.messageText,
               createdAt: n.timestamp,
+              messageType:
+                (n as { messageType?: string }).messageType ?? 'text',
+              metadata:
+                (n as { metadata?: Record<string, unknown> | null }).metadata ??
+                null,
             },
           ];
         });

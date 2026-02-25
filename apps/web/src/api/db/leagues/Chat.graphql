@@ -4,6 +4,8 @@ query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {
     userId
     messageText
     timestamp
+    messageType
+    metadata
     sender {
       username
     }
@@ -16,6 +18,8 @@ mutation SendLeagueChatMessage($leagueId: Int!, $messageText: String!) {
     userId
     messageText
     timestamp
+    messageType
+    metadata
     sender {
       username
     }

@@ -108,11 +108,15 @@ export interface LeagueChatMessageNotification {
   type: typeof WireNotificationType.LEAGUE_CHAT_MESSAGE;
   leagueId: number;
   messageId: number;
-  senderId: number;
+  senderId: number | null;
   senderUsername: string;
   messageText: string;
   /** ISO-8601 */
   timestamp: string;
+  /** Discriminates between 'text', 'trade', 'waiver', 'draft_settings' */
+  messageType?: string;
+  /** JSON-serialised metadata for card rendering */
+  metadata?: Record<string, unknown> | null;
 }
 
 /**
@@ -139,6 +143,19 @@ export interface RosterUpdateNotification {
   type: typeof WireNotificationType.ROSTER_UPDATE;
   leagueId: number;
   updatedAt: string;
+}
+
+export interface TradeOfferNotification {
+  type: typeof WireNotificationType.TRADE_OFFER;
+  leagueId: number;
+  tradeOfferId: number;
+  proposingTeamId: number;
+  receivingTeamId: number;
+  proposingTeamName: string;
+  receivingTeamName: string;
+  playerCount: number;
+  /** ISO-8601 */
+  proposedAt: string;
 }
 
 /**
@@ -807,6 +824,63 @@ export class WebSocketNotificationService {
       });
     } catch (error) {
       LOGGER.error('Error notifying matchup viewers', { error, matchupId });
+      throw error;
+    }
+  }
+
+  /**
+   * Notify a specific user that they have received a new trade offer.
+   *
+   * @param recipientUserId - The owner of the receiving team.
+   * @param payload         - Trade offer details (excludes the `type` discriminator).
+   */
+  async notifyTradeOffer(
+    recipientUserId: number,
+    payload: Omit<TradeOfferNotification, 'type'>,
+  ): Promise<void> {
+    if (!this.websocketEndpoint) {
+      LOGGER.warn(
+        'WebSocket endpoint not configured, skipping trade offer notification',
+      );
+      return;
+    }
+
+    const notification: TradeOfferNotification = {
+      type: WireNotificationType.TRADE_OFFER,
+      ...payload,
+    };
+
+    LOGGER.info('Sending trade offer notification', {
+      recipientUserId,
+      tradeOfferId: payload.tradeOfferId,
+      leagueId: payload.leagueId,
+    });
+
+    try {
+      const connectionIds = await this.getUserConnections(recipientUserId);
+
+      if (connectionIds.length === 0) {
+        LOGGER.info(
+          'Recipient has no active WebSocket connections, trade offer stored for later retrieval',
+          { recipientUserId },
+        );
+        return;
+      }
+
+      await Promise.allSettled(
+        connectionIds.map((connectionId) =>
+          this.sendToConnection(connectionId, {
+            type: 'notification',
+            data: notification,
+          }),
+        ),
+      );
+    } catch (error) {
+      LOGGER.error('Error sending trade offer notification', {
+        error,
+        recipientUserId,
+        tradeOfferId: payload.tradeOfferId,
+      });
       throw error;
     }
   }

@@ -789,7 +789,13 @@ builder.mutationField('updateDraftSettings', (t) =>
 
         const [chatMsg] = await context.db
           .insert(PublicSchema.leagueMessages)
-          .values({ leagueId, userId, messageText: notificationText })
+          .values({
+            leagueId,
+            userId: null,
+            messageText: notificationText,
+            messageType: 'draft_settings',
+            metadata: { username, changes: changedFields },
+          })
           .returning();
 
         const notificationService = createNotificationService();
@@ -798,10 +804,12 @@ builder.mutationField('updateDraftSettings', (t) =>
             .notifyLeagueChatMessage(leagueId, {
               leagueId,
               messageId: chatMsg.id,
-              senderId: userId,
+              senderId: null,
               senderUsername: username,
               messageText: notificationText,
               timestamp: chatMsg.timestamp ?? new Date().toISOString(),
+              messageType: 'draft_settings',
+              metadata: { username, changes: changedFields },
             })
             .catch((err: unknown) => {
               LOGGER.warn(

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Spinner, styled, Text, XStack, YStack } from 'tamagui';
 import { MessageSquare } from '@tamagui/lucide-icons';
+import { SystemMessageCard } from './SystemMessageCard';
 import { useLeagueChat } from '../../hooks/useLeagueChat';
 
 // ---------------------------------------------------------------------------
@@ -36,6 +37,8 @@ function formatTime(isoString: string): string {
 interface LeagueChatTabProps {
   leagueId: number;
   userId: number;
+  /** Optional callback to navigate to another tab by ID (for system message cards) */
+  onNavigate?: (tabId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -44,6 +47,7 @@ interface LeagueChatTabProps {
 export function LeagueChatTab({
   leagueId,
   userId,
+  onNavigate,
 }: LeagueChatTabProps): React.JSX.Element {
   const { messages, loading, sending, sendMessage } = useLeagueChat(leagueId);
   const [inputText, setInputText] = useState('');
@@ -122,6 +126,22 @@ export function LeagueChatTab({
           </YStack>
         ) : (
           messages.map((msg) => {
+            const isSystemMessage =
+              msg.messageType === 'trade' ||
+              msg.messageType === 'waiver' ||
+              msg.messageType === 'draft_settings';
+
+            if (isSystemMessage) {
+              return (
+                <SystemMessageCard
+                  key={msg.id}
+                  message={msg}
+                  onNavigate={onNavigate}
+                  formatTime={formatTime}
+                />
+              );
+            }
+
             const isMe = msg.userId === userId;
             return (
               <YStack

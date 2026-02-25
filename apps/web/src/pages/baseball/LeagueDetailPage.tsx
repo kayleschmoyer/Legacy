@@ -15,6 +15,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { Card, H1, Separator, Spinner, styled, Text } from 'tamagui';
 import {
+  ArrowLeftRight,
   Check,
   ChevronLeft,
   ClipboardList,
@@ -45,6 +46,7 @@ import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { LeagueScoringSummary } from '../../features/baseball/LeagueScoringSummary';
 import { LeagueScoringEditor } from '../../features/baseball/LeagueScoringEditor';
 import { LeagueTradeBlock } from '../../features/baseball/LeagueTradeBlock';
+import { TradingCenter } from '../../features/baseball/TradingCenter';
 import { env } from '../../config/environment';
 import {
   LeagueFragment,
@@ -64,6 +66,7 @@ import {
 import { LeagueRosterManagement } from '../../features/roster/LeagueRosterManagement';
 import { canPlayerPlayPosition } from '../../features/roster/LeagueRosterManagement';
 import { PendingWaiverClaims } from '../../features/roster/PendingWaiverClaims';
+import { PendingTradeOffers } from '../../features/roster/PendingTradeOffers';
 import { LeagueStandings } from '../../features/roster/LeagueStandings';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import { LeagueFreeAgents } from '../../features/baseball/LeagueFreeAgents';
@@ -242,6 +245,7 @@ type TabId =
   | 'free-agents'
   | 'standings'
   | 'matchup'
+  | 'trades'
   | 'chat'
   | 'team-settings'
   | 'commissioner';
@@ -259,6 +263,7 @@ const TABS: TabDef[] = [
   { id: 'free-agents', label: 'Free Agents', icon: <UserPlus size={16} /> },
   { id: 'standings', label: 'Standings', icon: <Trophy size={16} /> },
   { id: 'matchup', label: 'Matchup', icon: <Swords size={16} /> },
+  { id: 'trades', label: 'Trades', icon: <ArrowLeftRight size={16} /> },
   { id: 'chat', label: 'Chat', icon: <MessageSquare size={16} /> },
   { id: 'team-settings', label: 'My Team', icon: <Edit3 size={16} /> },
   {
@@ -277,6 +282,7 @@ const TAB_ALIASES: Record<string, TabId> = {
   'free-agents': 'free-agents',
   standings: 'standings',
   matchup: 'matchup',
+  trades: 'trades',
   chat: 'chat',
   'team-settings': 'team-settings',
   commissioner: 'commissioner',
@@ -1657,6 +1663,10 @@ export function LeagueDetailPage(): React.JSX.Element {
           <PendingWaiverClaims teamId={userTeamId} />
         )}
 
+        {!isViewingOther && userTeamId && (
+          <PendingTradeOffers teamId={userTeamId} leagueId={leagueId} />
+        )}
+
         <LeagueRosterManagement
           positions={positions}
           teamPlayers={isViewingOther ? viewingTeamMembers : teamMembers}
@@ -1876,7 +1886,11 @@ export function LeagueDetailPage(): React.JSX.Element {
       height="calc(100vh - 260px)"
       minHeight={400}
     >
-      <LeagueChatTab leagueId={leagueId} userId={user?.id ?? 0} />
+      <LeagueChatTab
+        leagueId={leagueId}
+        userId={user?.id ?? 0}
+        onNavigate={(tabId) => setActiveTab(tabId as TabId)}
+      />
     </YStack>
   );
 
@@ -2354,6 +2368,13 @@ export function LeagueDetailPage(): React.JSX.Element {
               </Card>
             )}
           </YStack>
+        )}
+        {activeTab === 'trades' && userTeamId && (
+          <TradingCenter
+            leagueId={leagueId}
+            userTeamId={userTeamId}
+            isCommissioner={isCommissioner}
+          />
         )}
         {activeTab === 'chat' && renderChat()}
         {activeTab === 'team-settings' && renderTeamSettings()}

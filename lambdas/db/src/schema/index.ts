@@ -7,6 +7,7 @@ import './statistics';
 import './leagues';
 import './teams';
 import './waivers';
+import './trades';
 import './matchups';
 import './version';
 import './scoring';

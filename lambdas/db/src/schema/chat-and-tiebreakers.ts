@@ -257,9 +257,11 @@ builder.objectType(MatchupMessageConnection, {
 const LeagueChatMessage = builder.objectRef<{
   id: number;
   leagueId: number;
-  userId: number;
+  userId: number | null;
   messageText: string;
   timestamp: string | null;
+  messageType: string;
+  metadata: Record<string, unknown> | null;
 }>('LeagueChatMessage');
 
 builder.objectType(LeagueChatMessage, {
@@ -267,14 +269,20 @@ builder.objectType(LeagueChatMessage, {
   fields: (t) => ({
     id: t.exposeID('id'),
     leagueId: t.exposeInt('leagueId'),
-    userId: t.exposeInt('userId'),
+    userId: t.exposeInt('userId', { nullable: true }),
     messageText: t.exposeString('messageText'),
     timestamp: t.exposeString('timestamp', { nullable: true }),
+    messageType: t.exposeString('messageType'),
+    metadata: t.field({
+      type: 'String',
+      nullable: true,
+      resolve: (msg) => (msg.metadata ? JSON.stringify(msg.metadata) : null),
+    }),
     sender: t.field({
       type: 'User',
       nullable: true,
       resolve: async (msg, _args, context) =>
-        context.loaders.users.load(msg.userId),
+        msg.userId != null ? context.loaders.users.load(msg.userId) : null,
     }),
   }),
 });
@@ -620,6 +628,8 @@ builder.queryField('getLeagueMessages', (t) =>
         userId: msg.userId,
         messageText: msg.messageText,
         timestamp: msg.timestamp ?? null,
+        messageType: msg.messageType ?? 'text',
+        metadata: msg.metadata ?? null,
       }));
     },
   }),
@@ -854,6 +864,8 @@ builder.mutationField('sendLeagueMessage', (t) =>
         userId: msg.userId,
         messageText: msg.messageText,
         timestamp: msg.timestamp ?? null,
+        messageType: msg.messageType ?? 'text',
+        metadata: null,
       };
     },
   }),

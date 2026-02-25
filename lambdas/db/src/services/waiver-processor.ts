@@ -596,12 +596,23 @@ export class WaiverClaimProcessor {
       }
 
       try {
+        const waiverMetadata: Record<string, unknown> = {
+          teamName,
+          playerName,
+          ...(dropName ? { dropName } : {}),
+          ...(sc.waiverType === 'faab' && sc.faabBid != null
+            ? { faabBid: sc.faabBid }
+            : {}),
+        };
+
         const [chatMsg] = await db
           .insert(PublicSchema.leagueMessages)
           .values({
             leagueId: sc.leagueId,
-            userId: sc.userId,
+            userId: null,
             messageText,
+            messageType: 'waiver',
+            metadata: waiverMetadata,
           })
           .returning();
 
@@ -610,10 +621,12 @@ export class WaiverClaimProcessor {
             .notifyLeagueChatMessage(sc.leagueId, {
               leagueId: sc.leagueId,
               messageId: chatMsg.id,
-              senderId: sc.userId,
+              senderId: null,
               senderUsername: 'Waiver Wire',
               messageText,
               timestamp: chatMsg.timestamp ?? new Date().toISOString(),
+              messageType: 'waiver',
+              metadata: waiverMetadata,
             })
             .catch((err: unknown) => {
               LOGGER.warn(

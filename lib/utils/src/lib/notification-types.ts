@@ -30,6 +30,7 @@ export const WireNotificationType = {
   LEAGUE_CHAT_MESSAGE: 'LEAGUE_CHAT_MESSAGE',
   DIRECT_MESSAGE: 'DIRECT_MESSAGE',
   ROSTER_UPDATE: 'ROSTER_UPDATE',
+  TRADE_OFFER: 'TRADE_OFFER',
 } as const;
 
 export type WireNotificationType =
@@ -54,6 +55,7 @@ export const ClientNotificationType = {
   LEAGUE_CHAT_MESSAGE: 'league-chat-message',
   DIRECT_MESSAGE: 'direct-message',
   ROSTER_UPDATE: 'roster-update',
+  TRADE_OFFER: 'trade-offer',
 } as const;
 
 export type ClientNotificationType =

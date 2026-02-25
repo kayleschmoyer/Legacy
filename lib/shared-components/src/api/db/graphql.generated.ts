@@ -462,6 +462,8 @@ export type LeagueChatMessage = {
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   messageText?: Maybe<Scalars['String']['output']>;
+  messageType?: Maybe<Scalars['String']['output']>;
+  metadata?: Maybe<Scalars['String']['output']>;
   sender?: Maybe<User>;
   timestamp?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
@@ -670,6 +672,8 @@ export type Mutation = {
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
   /** Record that the user has accepted the privacy policy */
   acceptPrivacyPolicy?: Maybe<PrivacyPolicyStatus>;
+  /** Accept a pending trade offer. Players are swapped between teams immediately. */
+  acceptTrade?: Maybe<TradeOffer>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
@@ -677,6 +681,8 @@ export type Mutation = {
   autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
+  /** Cancel a pending trade offer as the team that proposed it. */
+  cancelTrade?: Maybe<TradeOffer>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
   claimFreeAgent?: Maybe<WaiverClaim>;
   commissionerPick?: Maybe<DraftPick>;
@@ -696,9 +702,13 @@ export type Mutation = {
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   pauseDraft?: Maybe<Draft>;
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
+  /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
+  proposeTrade?: Maybe<TradeOffer>;
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
   registerDeviceToken?: Maybe<DeviceToken>;
+  /** Reject a pending trade offer as the receiving team manager. */
+  rejectTrade?: Maybe<TradeOffer>;
   renameTeam?: Maybe<Team>;
   /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
   requestDataDeletion?: Maybe<DataRequest>;
@@ -721,6 +731,12 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
+  /** Commissioner-only: veto an accepted trade, reversing the player swap. */
+  vetoTrade?: Maybe<TradeOffer>;
+};
+
+export type MutationAcceptTradeArgs = {
+  tradeId: Scalars['Int']['input'];
 };
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
@@ -737,6 +753,10 @@ export type MutationAutoProcessDraftPicksArgs = {
 
 export type MutationAutoSelectGamesArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationCancelTradeArgs = {
+  tradeId: Scalars['Int']['input'];
 };
 
 export type MutationCancelWaiverClaimArgs = {
@@ -820,12 +840,25 @@ export type MutationProcessWaiverClaimsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationProposeTradeArgs = {
+  expiresInDays?: InputMaybe<Scalars['Int']['input']>;
+  leagueId: Scalars['Int']['input'];
+  message?: InputMaybe<Scalars['String']['input']>;
+  offeringPlayerIds: Array<Scalars['Int']['input']>;
+  receivingTeamId: Scalars['Int']['input'];
+  requestingPlayerIds: Array<Scalars['Int']['input']>;
+};
+
 export type MutationRecordConsentArgs = {
   input: RecordConsentInput;
 };
 
 export type MutationRegisterDeviceTokenArgs = {
   input: DeviceTokenInput;
+};
+
+export type MutationRejectTradeArgs = {
+  tradeId: Scalars['Int']['input'];
 };
 
 export type MutationRenameTeamArgs = {
@@ -917,6 +950,10 @@ export type MutationUpdateNotificationPreferencesArgs = {
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
+};
+
+export type MutationVetoTradeArgs = {
+  tradeId: Scalars['Int']['input'];
 };
 
 export type NotificationHistoryItem = {
@@ -1082,6 +1119,7 @@ export type Query = {
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
   leagueTeams?: Maybe<Array<Team>>;
+  leagueTradeOffers?: Maybe<Array<TradeOffer>>;
   /** Get all consent records for the authenticated user */
   myConsents?: Maybe<Array<UserConsent>>;
   /** Get all data export/deletion requests for the authenticated user */
@@ -1104,6 +1142,7 @@ export type Query = {
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
   teamMembers?: Maybe<Array<TeamMember>>;
+  teamTradeOffers?: Maybe<Array<TradeOffer>>;
   teamWaiverClaims?: Maybe<Array<WaiverClaim>>;
   user?: Maybe<User>;
   userByEmail?: Maybe<User>;
@@ -1296,6 +1335,11 @@ export type QueryLeagueTeamsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type QueryLeagueTradeOffersArgs = {
+  leagueId: Scalars['Int']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type QueryPlayerArgs = {
   id: Scalars['Int']['input'];
 };
@@ -1389,6 +1433,11 @@ export type QuerySeasonPitchingStatsArgs = {
 };
 
 export type QueryTeamMembersArgs = {
+  teamId: Scalars['Int']['input'];
+};
+
+export type QueryTeamTradeOffersArgs = {
+  status?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
 };
 
@@ -1698,6 +1747,36 @@ export type TiebreakerRule = {
   secondaryMethod?: Maybe<TiebreakerMethod>;
   tertiaryMethod?: Maybe<TiebreakerMethod>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A trade proposal between two teams in a fantasy league */
+export type TradeOffer = {
+  __typename?: 'TradeOffer';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  expiresAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  message?: Maybe<Scalars['String']['output']>;
+  players?: Maybe<Array<TradeOfferPlayer>>;
+  proposingTeamId?: Maybe<Scalars['Int']['output']>;
+  proposingTeamName?: Maybe<Scalars['String']['output']>;
+  receivingTeamId?: Maybe<Scalars['Int']['output']>;
+  receivingTeamName?: Maybe<Scalars['String']['output']>;
+  respondedAt?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+  vetoedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A single player leg of a trade offer */
+export type TradeOfferPlayer = {
+  __typename?: 'TradeOfferPlayer';
+  fromTeamId?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  playerPosition?: Maybe<Scalars['String']['output']>;
+  tradeOfferId?: Maybe<Scalars['Int']['output']>;
 };
 
 export type UpdateDraftSettingsInput = {

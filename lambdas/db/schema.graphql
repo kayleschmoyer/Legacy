@@ -419,6 +419,8 @@ type LeagueChatMessage {
   id: ID
   leagueId: Int
   messageText: String
+  messageType: String
+  metadata: String
   sender: User
   timestamp: String
   userId: Int
@@ -652,6 +654,11 @@ type Mutation {
   Record that the user has accepted the privacy policy
   """
   acceptPrivacyPolicy: PrivacyPolicyStatus
+
+  """
+  Accept a pending trade offer. Players are swapped between teams immediately.
+  """
+  acceptTrade(tradeId: Int!): TradeOffer
   addDefaultPositionsToLeague(leagueId: Int!): [LeaguePosition!]
 
   """
@@ -683,6 +690,11 @@ type Mutation {
     """
     leagueId: Int
   ): AutoSelectGamesResult
+
+  """
+  Cancel a pending trade offer as the team that proposed it.
+  """
+  cancelTrade(tradeId: Int!): TradeOffer
   cancelWaiverClaim(claimId: Int!): WaiverClaim
   claimFreeAgent(
     dropPlayerId: Int
@@ -717,10 +729,27 @@ type Mutation {
   processWaiverClaims(leagueId: Int): ProcessWaiverClaimsResult
 
   """
+  Propose a trade to another team. Provide the players you are offering and the players you want in return.
+  """
+  proposeTrade(
+    expiresInDays: Int
+    leagueId: Int!
+    message: String
+    offeringPlayerIds: [Int!]!
+    receivingTeamId: Int!
+    requestingPlayerIds: [Int!]!
+  ): TradeOffer
+
+  """
   Record user consent for a specific data processing type
   """
   recordConsent(input: RecordConsentInput!): UserConsent
   registerDeviceToken(input: DeviceTokenInput!): DeviceToken
+
+  """
+  Reject a pending trade offer as the receiving team manager.
+  """
+  rejectTrade(tradeId: Int!): TradeOffer
   renameTeam(leagueId: Int!, newName: String!, teamId: Int!): Team
 
   """
@@ -790,6 +819,11 @@ type Mutation {
     input: NotificationPreferenceInput!
   ): NotificationPreference
   updateTeamMemberPosition(positionId: Int, teamMemberId: Int!): TeamMember
+
+  """
+  Commissioner-only: veto an accepted trade, reversing the player swap.
+  """
+  vetoTrade(tradeId: Int!): TradeOffer
 }
 
 type NotificationHistoryItem {
@@ -1011,6 +1045,7 @@ type Query {
   leaguePositions(leagueId: Int!): [LeaguePosition!]
   leagueScoringProfile(leagueId: Int!): ScoringConfig
   leagueTeams(leagueId: Int!): [Team!]
+  leagueTradeOffers(leagueId: Int!, status: String): [TradeOffer!]
 
   """
   Get all consent records for the authenticated user
@@ -1085,6 +1120,7 @@ type Query {
     team: String
   ): [SeasonPitching!]
   teamMembers(teamId: Int!): [TeamMember!]
+  teamTradeOffers(status: String, teamId: Int!): [TradeOffer!]
   teamWaiverClaims(status: String, teamId: Int!): [WaiverClaim!]
   user(id: Int!): User
   userByEmail(email: String!): User
@@ -1383,6 +1419,38 @@ type TiebreakerRule {
   secondaryMethod: TiebreakerMethod
   tertiaryMethod: TiebreakerMethod
   updatedAt: String
+}
+
+"""
+A trade proposal between two teams in a fantasy league
+"""
+type TradeOffer {
+  createdAt: String
+  expiresAt: String
+  id: Int
+  leagueId: Int
+  message: String
+  players: [TradeOfferPlayer!]
+  proposingTeamId: Int
+  proposingTeamName: String
+  receivingTeamId: Int
+  receivingTeamName: String
+  respondedAt: String
+  status: String
+  updatedAt: String
+  vetoedAt: String
+}
+
+"""
+A single player leg of a trade offer
+"""
+type TradeOfferPlayer {
+  fromTeamId: Int
+  id: Int
+  playerId: Int
+  playerName: String
+  playerPosition: String
+  tradeOfferId: Int
 }
 
 input UpdateDraftSettingsInput {

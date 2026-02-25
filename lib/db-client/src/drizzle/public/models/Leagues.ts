@@ -11,6 +11,7 @@ import {
   timestamp,
   primaryKey,
   boolean,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import {
   draftOrder,
@@ -26,6 +27,7 @@ import {
   waiverClaimStatus,
   waiverType,
   weekAdvanceStatus,
+  tradeOfferStatus,
 } from './Enums';
 import { players } from './Players';
 
@@ -155,7 +157,11 @@ export const leagueMessages = pgTable(
     messageText: varchar('message_text').notNull(),
     timestamp: timestamp('timestamp', { mode: 'string' }).defaultNow(),
     id: serial('id').primaryKey().notNull(),
-    userId: integer('user_id').notNull(),
+    userId: integer('user_id'),
+    messageType: varchar('message_type', { length: 50 })
+      .notNull()
+      .default('text'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
   },
   (table) => {
     return {
@@ -442,6 +448,104 @@ export const rosterLockRules = pgTable(
       }),
       rosterLockRulesLeagueUk: unique('roster_lock_rules_league_uk').on(
         table.leagueId,
+      ),
+    };
+  },
+);
+
+// ── Trade Offers ───────────────────────────────────────────────────────────
+
+/**
+ * A trade proposal from one team (proposing) to another (receiving).
+ * Each offer can carry multiple players on both sides via tradeOfferPlayers.
+ *
+ * Status lifecycle:
+ *   pending → accepted | rejected | cancelled | vetoed | expired
+ */
+export const tradeOffers = pgTable(
+  'trade_offers',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    proposingTeamId: integer('proposing_team_id').notNull(),
+    receivingTeamId: integer('receiving_team_id').notNull(),
+    status: tradeOfferStatus('status').notNull().default('pending'),
+    message: varchar('message', { length: 500 }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    vetoedAt: timestamp('vetoed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      tradeOffersLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'trade_offers_league_fk',
+      }).onDelete('cascade'),
+      tradeOffersProposingTeamFk: foreignKey({
+        columns: [table.proposingTeamId],
+        foreignColumns: [teams.id],
+        name: 'trade_offers_proposing_team_fk',
+      }).onDelete('cascade'),
+      tradeOffersReceivingTeamFk: foreignKey({
+        columns: [table.receivingTeamId],
+        foreignColumns: [teams.id],
+        name: 'trade_offers_receiving_team_fk',
+      }).onDelete('cascade'),
+      leagueIdIdx: index('trade_offers_league_id_idx').on(table.leagueId),
+      proposingTeamIdIdx: index('trade_offers_proposing_team_id_idx').on(
+        table.proposingTeamId,
+      ),
+      receivingTeamIdIdx: index('trade_offers_receiving_team_id_idx').on(
+        table.receivingTeamId,
+      ),
+      statusIdx: index('trade_offers_status_idx').on(table.status),
+    };
+  },
+);
+
+/**
+ * Individual player legs of a trade offer.
+ * fromTeamId is the team that currently owns the player and will give them up
+ * if the trade is accepted. This allows asymmetric multi-player trades.
+ */
+export const tradeOfferPlayers = pgTable(
+  'trade_offer_players',
+  {
+    id: serial('id').primaryKey().notNull(),
+    tradeOfferId: integer('trade_offer_id').notNull(),
+    playerId: integer('player_id').notNull(),
+    fromTeamId: integer('from_team_id').notNull(),
+  },
+  (table) => {
+    return {
+      tradeOfferPlayersTradeFk: foreignKey({
+        columns: [table.tradeOfferId],
+        foreignColumns: [tradeOffers.id],
+        name: 'trade_offer_players_trade_fk',
+      }).onDelete('cascade'),
+      tradeOfferPlayersPlayerFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: 'trade_offer_players_player_fk',
+      }),
+      tradeOfferPlayersTeamFk: foreignKey({
+        columns: [table.fromTeamId],
+        foreignColumns: [teams.id],
+        name: 'trade_offer_players_team_fk',
+      }).onDelete('cascade'),
+      tradeIdIdx: index('trade_offer_players_trade_id_idx').on(
+        table.tradeOfferId,
+      ),
+      uniquePlayerPerOffer: unique('trade_offer_players_unique').on(
+        table.tradeOfferId,
+        table.playerId,
       ),
     };
   },

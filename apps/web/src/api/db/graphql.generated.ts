@@ -456,6 +456,8 @@ export type LeagueChatMessage = {
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   messageText?: Maybe<Scalars['String']['output']>;
+  messageType?: Maybe<Scalars['String']['output']>;
+  metadata?: Maybe<Scalars['String']['output']>;
   sender?: Maybe<User>;
   timestamp?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
@@ -664,6 +666,8 @@ export type Mutation = {
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
   /** Record that the user has accepted the privacy policy */
   acceptPrivacyPolicy?: Maybe<PrivacyPolicyStatus>;
+  /** Accept a pending trade offer. Players are swapped between teams immediately. */
+  acceptTrade?: Maybe<TradeOffer>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
@@ -671,6 +675,8 @@ export type Mutation = {
   autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
+  /** Cancel a pending trade offer as the team that proposed it. */
+  cancelTrade?: Maybe<TradeOffer>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
   claimFreeAgent?: Maybe<WaiverClaim>;
   commissionerPick?: Maybe<DraftPick>;
@@ -690,9 +696,13 @@ export type Mutation = {
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   pauseDraft?: Maybe<Draft>;
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
+  /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
+  proposeTrade?: Maybe<TradeOffer>;
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
   registerDeviceToken?: Maybe<DeviceToken>;
+  /** Reject a pending trade offer as the receiving team manager. */
+  rejectTrade?: Maybe<TradeOffer>;
   renameTeam?: Maybe<Team>;
   /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
   requestDataDeletion?: Maybe<DataRequest>;
@@ -715,6 +725,12 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
+  /** Commissioner-only: veto an accepted trade, reversing the player swap. */
+  vetoTrade?: Maybe<TradeOffer>;
+};
+
+export type MutationAcceptTradeArgs = {
+  tradeId: Scalars['Int']['input'];
 };
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
@@ -731,6 +747,10 @@ export type MutationAutoProcessDraftPicksArgs = {
 
 export type MutationAutoSelectGamesArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationCancelTradeArgs = {
+  tradeId: Scalars['Int']['input'];
 };
 
 export type MutationCancelWaiverClaimArgs = {
@@ -814,12 +834,25 @@ export type MutationProcessWaiverClaimsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationProposeTradeArgs = {
+  expiresInDays?: InputMaybe<Scalars['Int']['input']>;
+  leagueId: Scalars['Int']['input'];
+  message?: InputMaybe<Scalars['String']['input']>;
+  offeringPlayerIds: Array<Scalars['Int']['input']>;
+  receivingTeamId: Scalars['Int']['input'];
+  requestingPlayerIds: Array<Scalars['Int']['input']>;
+};
+
 export type MutationRecordConsentArgs = {
   input: RecordConsentInput;
 };
 
 export type MutationRegisterDeviceTokenArgs = {
   input: DeviceTokenInput;
+};
+
+export type MutationRejectTradeArgs = {
+  tradeId: Scalars['Int']['input'];
 };
 
 export type MutationRenameTeamArgs = {
@@ -911,6 +944,10 @@ export type MutationUpdateNotificationPreferencesArgs = {
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
+};
+
+export type MutationVetoTradeArgs = {
+  tradeId: Scalars['Int']['input'];
 };
 
 export type NotificationHistoryItem = {
@@ -1076,6 +1113,7 @@ export type Query = {
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
   leagueTeams?: Maybe<Array<Team>>;
+  leagueTradeOffers?: Maybe<Array<TradeOffer>>;
   /** Get all consent records for the authenticated user */
   myConsents?: Maybe<Array<UserConsent>>;
   /** Get all data export/deletion requests for the authenticated user */
@@ -1098,6 +1136,7 @@ export type Query = {
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
   teamMembers?: Maybe<Array<TeamMember>>;
+  teamTradeOffers?: Maybe<Array<TradeOffer>>;
   teamWaiverClaims?: Maybe<Array<WaiverClaim>>;
   user?: Maybe<User>;
   userByEmail?: Maybe<User>;
@@ -1290,6 +1329,11 @@ export type QueryLeagueTeamsArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type QueryLeagueTradeOffersArgs = {
+  leagueId: Scalars['Int']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type QueryPlayerArgs = {
   id: Scalars['Int']['input'];
 };
@@ -1383,6 +1427,11 @@ export type QuerySeasonPitchingStatsArgs = {
 };
 
 export type QueryTeamMembersArgs = {
+  teamId: Scalars['Int']['input'];
+};
+
+export type QueryTeamTradeOffersArgs = {
+  status?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
 };
 
@@ -1694,6 +1743,36 @@ export type TiebreakerRule = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+/** A trade proposal between two teams in a fantasy league */
+export type TradeOffer = {
+  __typename?: 'TradeOffer';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  expiresAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  message?: Maybe<Scalars['String']['output']>;
+  players?: Maybe<Array<TradeOfferPlayer>>;
+  proposingTeamId?: Maybe<Scalars['Int']['output']>;
+  proposingTeamName?: Maybe<Scalars['String']['output']>;
+  receivingTeamId?: Maybe<Scalars['Int']['output']>;
+  receivingTeamName?: Maybe<Scalars['String']['output']>;
+  respondedAt?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+  vetoedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A single player leg of a trade offer */
+export type TradeOfferPlayer = {
+  __typename?: 'TradeOfferPlayer';
+  fromTeamId?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  playerPosition?: Maybe<Scalars['String']['output']>;
+  tradeOfferId?: Maybe<Scalars['Int']['output']>;
+};
+
 export type UpdateDraftSettingsInput = {
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
@@ -1809,6 +1888,8 @@ export type GetLeagueChatMessagesQuery = {
     userId?: number | null;
     messageText?: string | null;
     timestamp?: string | null;
+    messageType?: string | null;
+    metadata?: string | null;
     sender?: { __typename?: 'User'; username?: string | null } | null;
   }> | null;
 };
@@ -1826,6 +1907,8 @@ export type SendLeagueChatMessageMutation = {
     userId?: number | null;
     messageText?: string | null;
     timestamp?: string | null;
+    messageType?: string | null;
+    metadata?: string | null;
     sender?: { __typename?: 'User'; username?: string | null } | null;
   } | null;
 };
@@ -3914,6 +3997,280 @@ export type CancelWaiverClaimMutation = {
   } | null;
 };
 
+export type TradeOfferPlayerFragment = {
+  __typename?: 'TradeOfferPlayer';
+  id?: number | null;
+  tradeOfferId?: number | null;
+  playerId?: number | null;
+  fromTeamId?: number | null;
+  playerName?: string | null;
+  playerPosition?: string | null;
+};
+
+export type TradeOfferFragment = {
+  __typename?: 'TradeOffer';
+  id?: number | null;
+  leagueId?: number | null;
+  proposingTeamId?: number | null;
+  receivingTeamId?: number | null;
+  status?: string | null;
+  message?: string | null;
+  expiresAt?: string | null;
+  respondedAt?: string | null;
+  vetoedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  proposingTeamName?: string | null;
+  receivingTeamName?: string | null;
+  players?: Array<{
+    __typename?: 'TradeOfferPlayer';
+    id?: number | null;
+    tradeOfferId?: number | null;
+    playerId?: number | null;
+    fromTeamId?: number | null;
+    playerName?: string | null;
+    playerPosition?: string | null;
+  }> | null;
+};
+
+export type GetTeamTradeOffersQueryVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetTeamTradeOffersQuery = {
+  __typename?: 'Query';
+  teamTradeOffers?: Array<{
+    __typename?: 'TradeOffer';
+    id?: number | null;
+    leagueId?: number | null;
+    proposingTeamId?: number | null;
+    receivingTeamId?: number | null;
+    status?: string | null;
+    message?: string | null;
+    expiresAt?: string | null;
+    respondedAt?: string | null;
+    vetoedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    proposingTeamName?: string | null;
+    receivingTeamName?: string | null;
+    players?: Array<{
+      __typename?: 'TradeOfferPlayer';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      playerId?: number | null;
+      fromTeamId?: number | null;
+      playerName?: string | null;
+      playerPosition?: string | null;
+    }> | null;
+  }> | null;
+};
+
+export type GetLeagueTradeOffersQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetLeagueTradeOffersQuery = {
+  __typename?: 'Query';
+  leagueTradeOffers?: Array<{
+    __typename?: 'TradeOffer';
+    id?: number | null;
+    leagueId?: number | null;
+    proposingTeamId?: number | null;
+    receivingTeamId?: number | null;
+    status?: string | null;
+    message?: string | null;
+    expiresAt?: string | null;
+    respondedAt?: string | null;
+    vetoedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    proposingTeamName?: string | null;
+    receivingTeamName?: string | null;
+    players?: Array<{
+      __typename?: 'TradeOfferPlayer';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      playerId?: number | null;
+      fromTeamId?: number | null;
+      playerName?: string | null;
+      playerPosition?: string | null;
+    }> | null;
+  }> | null;
+};
+
+export type ProposeTradeMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  receivingTeamId: Scalars['Int']['input'];
+  offeringPlayerIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+  requestingPlayerIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+  message?: InputMaybe<Scalars['String']['input']>;
+  expiresInDays?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type ProposeTradeMutation = {
+  __typename?: 'Mutation';
+  proposeTrade?: {
+    __typename?: 'TradeOffer';
+    id?: number | null;
+    leagueId?: number | null;
+    proposingTeamId?: number | null;
+    receivingTeamId?: number | null;
+    status?: string | null;
+    message?: string | null;
+    expiresAt?: string | null;
+    respondedAt?: string | null;
+    vetoedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    proposingTeamName?: string | null;
+    receivingTeamName?: string | null;
+    players?: Array<{
+      __typename?: 'TradeOfferPlayer';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      playerId?: number | null;
+      fromTeamId?: number | null;
+      playerName?: string | null;
+      playerPosition?: string | null;
+    }> | null;
+  } | null;
+};
+
+export type AcceptTradeMutationVariables = Exact<{
+  tradeId: Scalars['Int']['input'];
+}>;
+
+export type AcceptTradeMutation = {
+  __typename?: 'Mutation';
+  acceptTrade?: {
+    __typename?: 'TradeOffer';
+    id?: number | null;
+    leagueId?: number | null;
+    proposingTeamId?: number | null;
+    receivingTeamId?: number | null;
+    status?: string | null;
+    message?: string | null;
+    expiresAt?: string | null;
+    respondedAt?: string | null;
+    vetoedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    proposingTeamName?: string | null;
+    receivingTeamName?: string | null;
+    players?: Array<{
+      __typename?: 'TradeOfferPlayer';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      playerId?: number | null;
+      fromTeamId?: number | null;
+      playerName?: string | null;
+      playerPosition?: string | null;
+    }> | null;
+  } | null;
+};
+
+export type RejectTradeMutationVariables = Exact<{
+  tradeId: Scalars['Int']['input'];
+}>;
+
+export type RejectTradeMutation = {
+  __typename?: 'Mutation';
+  rejectTrade?: {
+    __typename?: 'TradeOffer';
+    id?: number | null;
+    leagueId?: number | null;
+    proposingTeamId?: number | null;
+    receivingTeamId?: number | null;
+    status?: string | null;
+    message?: string | null;
+    expiresAt?: string | null;
+    respondedAt?: string | null;
+    vetoedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    proposingTeamName?: string | null;
+    receivingTeamName?: string | null;
+    players?: Array<{
+      __typename?: 'TradeOfferPlayer';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      playerId?: number | null;
+      fromTeamId?: number | null;
+      playerName?: string | null;
+      playerPosition?: string | null;
+    }> | null;
+  } | null;
+};
+
+export type CancelTradeMutationVariables = Exact<{
+  tradeId: Scalars['Int']['input'];
+}>;
+
+export type CancelTradeMutation = {
+  __typename?: 'Mutation';
+  cancelTrade?: {
+    __typename?: 'TradeOffer';
+    id?: number | null;
+    leagueId?: number | null;
+    proposingTeamId?: number | null;
+    receivingTeamId?: number | null;
+    status?: string | null;
+    message?: string | null;
+    expiresAt?: string | null;
+    respondedAt?: string | null;
+    vetoedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    proposingTeamName?: string | null;
+    receivingTeamName?: string | null;
+    players?: Array<{
+      __typename?: 'TradeOfferPlayer';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      playerId?: number | null;
+      fromTeamId?: number | null;
+      playerName?: string | null;
+      playerPosition?: string | null;
+    }> | null;
+  } | null;
+};
+
+export type VetoTradeMutationVariables = Exact<{
+  tradeId: Scalars['Int']['input'];
+}>;
+
+export type VetoTradeMutation = {
+  __typename?: 'Mutation';
+  vetoTrade?: {
+    __typename?: 'TradeOffer';
+    id?: number | null;
+    leagueId?: number | null;
+    proposingTeamId?: number | null;
+    receivingTeamId?: number | null;
+    status?: string | null;
+    message?: string | null;
+    expiresAt?: string | null;
+    respondedAt?: string | null;
+    vetoedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    proposingTeamName?: string | null;
+    receivingTeamName?: string | null;
+    players?: Array<{
+      __typename?: 'TradeOfferPlayer';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      playerId?: number | null;
+      fromTeamId?: number | null;
+      playerName?: string | null;
+      playerPosition?: string | null;
+    }> | null;
+  } | null;
+};
+
 export type UserFragment = {
   __typename?: 'User';
   id?: number | null;
@@ -4219,6 +4576,37 @@ export const TeamMemberFragmentDoc = gql`
     }
   }
 `;
+export const TradeOfferPlayerFragmentDoc = gql`
+  fragment TradeOfferPlayer on TradeOfferPlayer {
+    id
+    tradeOfferId
+    playerId
+    fromTeamId
+    playerName
+    playerPosition
+  }
+`;
+export const TradeOfferFragmentDoc = gql`
+  fragment TradeOffer on TradeOffer {
+    id
+    leagueId
+    proposingTeamId
+    receivingTeamId
+    status
+    message
+    expiresAt
+    respondedAt
+    vetoedAt
+    createdAt
+    updatedAt
+    proposingTeamName
+    receivingTeamName
+    players {
+      ...TradeOfferPlayer
+    }
+  }
+  ${TradeOfferPlayerFragmentDoc}
+`;
 export const UserFragmentDoc = gql`
   fragment User on User {
     id
@@ -4233,6 +4621,8 @@ export const GetLeagueChatMessages = gql`
       userId
       messageText
       timestamp
+      messageType
+      metadata
       sender {
         username
       }
@@ -4330,6 +4720,8 @@ export const SendLeagueChatMessage = gql`
       userId
       messageText
       timestamp
+      messageType
+      metadata
       sender {
         username
       }
@@ -8200,6 +8592,463 @@ export type CancelWaiverClaimMutationResult =
 export type CancelWaiverClaimMutationOptions = BaseMutationOptions<
   CancelWaiverClaimMutation,
   CancelWaiverClaimMutationVariables
+>;
+export const GetTeamTradeOffers = gql`
+  query GetTeamTradeOffers($teamId: Int!, $status: String) {
+    teamTradeOffers(teamId: $teamId, status: $status) {
+      ...TradeOffer
+    }
+  }
+  ${TradeOfferFragmentDoc}
+`;
+
+/**
+ * __useGetTeamTradeOffersQuery__
+ *
+ * To run a query within a React component, call `useGetTeamTradeOffersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTeamTradeOffersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTeamTradeOffersQuery({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *      status: // value for 'status'
+ *   },
+ * });
+ */
+export function useGetTeamTradeOffersQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTeamTradeOffersQuery,
+    GetTeamTradeOffersQueryVariables
+  > &
+    (
+      | { variables: GetTeamTradeOffersQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetTeamTradeOffersQuery,
+    GetTeamTradeOffersQueryVariables
+  >(GetTeamTradeOffers, options);
+}
+export function useGetTeamTradeOffersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTeamTradeOffersQuery,
+    GetTeamTradeOffersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetTeamTradeOffersQuery,
+    GetTeamTradeOffersQueryVariables
+  >(GetTeamTradeOffers, options);
+}
+export function useGetTeamTradeOffersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamTradeOffersQuery,
+        GetTeamTradeOffersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTeamTradeOffersQuery,
+    GetTeamTradeOffersQueryVariables
+  >(
+    GetTeamTradeOffers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTeamTradeOffersQuery,
+          GetTeamTradeOffersQueryVariables
+        >,
+  );
+}
+export type GetTeamTradeOffersQueryHookResult = ReturnType<
+  typeof useGetTeamTradeOffersQuery
+>;
+export type GetTeamTradeOffersLazyQueryHookResult = ReturnType<
+  typeof useGetTeamTradeOffersLazyQuery
+>;
+export type GetTeamTradeOffersSuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamTradeOffersSuspenseQuery
+>;
+export type GetTeamTradeOffersQueryResult = Apollo.QueryResult<
+  GetTeamTradeOffersQuery,
+  GetTeamTradeOffersQueryVariables
+>;
+export const GetLeagueTradeOffers = gql`
+  query GetLeagueTradeOffers($leagueId: Int!, $status: String) {
+    leagueTradeOffers(leagueId: $leagueId, status: $status) {
+      ...TradeOffer
+    }
+  }
+  ${TradeOfferFragmentDoc}
+`;
+
+/**
+ * __useGetLeagueTradeOffersQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueTradeOffersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueTradeOffersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueTradeOffersQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      status: // value for 'status'
+ *   },
+ * });
+ */
+export function useGetLeagueTradeOffersQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueTradeOffersQuery,
+    GetLeagueTradeOffersQueryVariables
+  > &
+    (
+      | { variables: GetLeagueTradeOffersQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueTradeOffersQuery,
+    GetLeagueTradeOffersQueryVariables
+  >(GetLeagueTradeOffers, options);
+}
+export function useGetLeagueTradeOffersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueTradeOffersQuery,
+    GetLeagueTradeOffersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueTradeOffersQuery,
+    GetLeagueTradeOffersQueryVariables
+  >(GetLeagueTradeOffers, options);
+}
+export function useGetLeagueTradeOffersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueTradeOffersQuery,
+        GetLeagueTradeOffersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueTradeOffersQuery,
+    GetLeagueTradeOffersQueryVariables
+  >(
+    GetLeagueTradeOffers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueTradeOffersQuery,
+          GetLeagueTradeOffersQueryVariables
+        >,
+  );
+}
+export type GetLeagueTradeOffersQueryHookResult = ReturnType<
+  typeof useGetLeagueTradeOffersQuery
+>;
+export type GetLeagueTradeOffersLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueTradeOffersLazyQuery
+>;
+export type GetLeagueTradeOffersSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueTradeOffersSuspenseQuery
+>;
+export type GetLeagueTradeOffersQueryResult = Apollo.QueryResult<
+  GetLeagueTradeOffersQuery,
+  GetLeagueTradeOffersQueryVariables
+>;
+export const ProposeTrade = gql`
+  mutation ProposeTrade(
+    $leagueId: Int!
+    $receivingTeamId: Int!
+    $offeringPlayerIds: [Int!]!
+    $requestingPlayerIds: [Int!]!
+    $message: String
+    $expiresInDays: Int
+  ) {
+    proposeTrade(
+      leagueId: $leagueId
+      receivingTeamId: $receivingTeamId
+      offeringPlayerIds: $offeringPlayerIds
+      requestingPlayerIds: $requestingPlayerIds
+      message: $message
+      expiresInDays: $expiresInDays
+    ) {
+      ...TradeOffer
+    }
+  }
+  ${TradeOfferFragmentDoc}
+`;
+export type ProposeTradeMutationFn = MutationFunction<
+  ProposeTradeMutation,
+  ProposeTradeMutationVariables
+>;
+
+/**
+ * __useProposeTradeMutation__
+ *
+ * To run a mutation, you first call `useProposeTradeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useProposeTradeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [proposeTradeMutation, { data, loading, error }] = useProposeTradeMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      receivingTeamId: // value for 'receivingTeamId'
+ *      offeringPlayerIds: // value for 'offeringPlayerIds'
+ *      requestingPlayerIds: // value for 'requestingPlayerIds'
+ *      message: // value for 'message'
+ *      expiresInDays: // value for 'expiresInDays'
+ *   },
+ * });
+ */
+export function useProposeTradeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ProposeTradeMutation,
+    ProposeTradeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ProposeTradeMutation,
+    ProposeTradeMutationVariables
+  >(ProposeTrade, options);
+}
+export type ProposeTradeMutationHookResult = ReturnType<
+  typeof useProposeTradeMutation
+>;
+export type ProposeTradeMutationResult =
+  Apollo.MutationResult<ProposeTradeMutation>;
+export type ProposeTradeMutationOptions = BaseMutationOptions<
+  ProposeTradeMutation,
+  ProposeTradeMutationVariables
+>;
+export const AcceptTrade = gql`
+  mutation AcceptTrade($tradeId: Int!) {
+    acceptTrade(tradeId: $tradeId) {
+      ...TradeOffer
+    }
+  }
+  ${TradeOfferFragmentDoc}
+`;
+export type AcceptTradeMutationFn = MutationFunction<
+  AcceptTradeMutation,
+  AcceptTradeMutationVariables
+>;
+
+/**
+ * __useAcceptTradeMutation__
+ *
+ * To run a mutation, you first call `useAcceptTradeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAcceptTradeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [acceptTradeMutation, { data, loading, error }] = useAcceptTradeMutation({
+ *   variables: {
+ *      tradeId: // value for 'tradeId'
+ *   },
+ * });
+ */
+export function useAcceptTradeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    AcceptTradeMutation,
+    AcceptTradeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<AcceptTradeMutation, AcceptTradeMutationVariables>(
+    AcceptTrade,
+    options,
+  );
+}
+export type AcceptTradeMutationHookResult = ReturnType<
+  typeof useAcceptTradeMutation
+>;
+export type AcceptTradeMutationResult =
+  Apollo.MutationResult<AcceptTradeMutation>;
+export type AcceptTradeMutationOptions = BaseMutationOptions<
+  AcceptTradeMutation,
+  AcceptTradeMutationVariables
+>;
+export const RejectTrade = gql`
+  mutation RejectTrade($tradeId: Int!) {
+    rejectTrade(tradeId: $tradeId) {
+      ...TradeOffer
+    }
+  }
+  ${TradeOfferFragmentDoc}
+`;
+export type RejectTradeMutationFn = MutationFunction<
+  RejectTradeMutation,
+  RejectTradeMutationVariables
+>;
+
+/**
+ * __useRejectTradeMutation__
+ *
+ * To run a mutation, you first call `useRejectTradeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRejectTradeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [rejectTradeMutation, { data, loading, error }] = useRejectTradeMutation({
+ *   variables: {
+ *      tradeId: // value for 'tradeId'
+ *   },
+ * });
+ */
+export function useRejectTradeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RejectTradeMutation,
+    RejectTradeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<RejectTradeMutation, RejectTradeMutationVariables>(
+    RejectTrade,
+    options,
+  );
+}
+export type RejectTradeMutationHookResult = ReturnType<
+  typeof useRejectTradeMutation
+>;
+export type RejectTradeMutationResult =
+  Apollo.MutationResult<RejectTradeMutation>;
+export type RejectTradeMutationOptions = BaseMutationOptions<
+  RejectTradeMutation,
+  RejectTradeMutationVariables
+>;
+export const CancelTrade = gql`
+  mutation CancelTrade($tradeId: Int!) {
+    cancelTrade(tradeId: $tradeId) {
+      ...TradeOffer
+    }
+  }
+  ${TradeOfferFragmentDoc}
+`;
+export type CancelTradeMutationFn = MutationFunction<
+  CancelTradeMutation,
+  CancelTradeMutationVariables
+>;
+
+/**
+ * __useCancelTradeMutation__
+ *
+ * To run a mutation, you first call `useCancelTradeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCancelTradeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [cancelTradeMutation, { data, loading, error }] = useCancelTradeMutation({
+ *   variables: {
+ *      tradeId: // value for 'tradeId'
+ *   },
+ * });
+ */
+export function useCancelTradeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CancelTradeMutation,
+    CancelTradeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<CancelTradeMutation, CancelTradeMutationVariables>(
+    CancelTrade,
+    options,
+  );
+}
+export type CancelTradeMutationHookResult = ReturnType<
+  typeof useCancelTradeMutation
+>;
+export type CancelTradeMutationResult =
+  Apollo.MutationResult<CancelTradeMutation>;
+export type CancelTradeMutationOptions = BaseMutationOptions<
+  CancelTradeMutation,
+  CancelTradeMutationVariables
+>;
+export const VetoTrade = gql`
+  mutation VetoTrade($tradeId: Int!) {
+    vetoTrade(tradeId: $tradeId) {
+      ...TradeOffer
+    }
+  }
+  ${TradeOfferFragmentDoc}
+`;
+export type VetoTradeMutationFn = MutationFunction<
+  VetoTradeMutation,
+  VetoTradeMutationVariables
+>;
+
+/**
+ * __useVetoTradeMutation__
+ *
+ * To run a mutation, you first call `useVetoTradeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useVetoTradeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [vetoTradeMutation, { data, loading, error }] = useVetoTradeMutation({
+ *   variables: {
+ *      tradeId: // value for 'tradeId'
+ *   },
+ * });
+ */
+export function useVetoTradeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    VetoTradeMutation,
+    VetoTradeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<VetoTradeMutation, VetoTradeMutationVariables>(
+    VetoTrade,
+    options,
+  );
+}
+export type VetoTradeMutationHookResult = ReturnType<
+  typeof useVetoTradeMutation
+>;
+export type VetoTradeMutationResult = Apollo.MutationResult<VetoTradeMutation>;
+export type VetoTradeMutationOptions = BaseMutationOptions<
+  VetoTradeMutation,
+  VetoTradeMutationVariables
 >;
 export const GetUserById = gql`
   query GetUserById($id: Int!) {

@@ -115,6 +115,15 @@ export const matchupMessageReportStatus = pgEnum(
   ['pending', 'reviewing', 'resolved', 'dismissed'],
 );
 
+export const tradeOfferStatus = pgEnum('trade_offer_status', [
+  'pending',
+  'accepted',
+  'rejected',
+  'cancelled',
+  'vetoed',
+  'expired',
+]);
+
 export const matchupMessageType = pgEnum('matchup_message_type', [
   'text',
   'gif',

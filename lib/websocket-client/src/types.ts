@@ -122,6 +122,23 @@ export interface RosterUpdateNotification {
   updatedAt: string;
 }
 
+/**
+ * A new trade offer sent to the receiving team's manager.
+ * Pushed only to the recipient's active WebSocket connections.
+ */
+export interface TradeOfferNotification {
+  type: typeof ClientNotificationType.TRADE_OFFER;
+  leagueId: number;
+  tradeOfferId: number;
+  proposingTeamId: number;
+  receivingTeamId: number;
+  proposingTeamName: string;
+  receivingTeamName: string;
+  playerCount: number;
+  /** ISO-8601 */
+  proposedAt: string;
+}
+
 export type NotificationData =
   | DraftCompletedNotification
   | DraftStartedNotification
@@ -133,7 +150,8 @@ export type NotificationData =
   | MatchupStatsCompleteNotification
   | LeagueChatMessageNotification
   | DirectMessageNotification
-  | RosterUpdateNotification;
+  | RosterUpdateNotification
+  | TradeOfferNotification;
 
 /**
  * WebSocket message structure

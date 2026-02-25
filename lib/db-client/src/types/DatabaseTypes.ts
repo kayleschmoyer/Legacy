@@ -33,6 +33,8 @@ import {
   seasonPitching,
   teamMembers,
   teams,
+  tradeOfferPlayers,
+  tradeOffers,
   users,
 } from '../drizzle/public/schema';
 import { usersInAppInternal } from '../drizzle/internal/schema';
@@ -64,6 +66,10 @@ export type TeamMember = typeof teamMembers.$inferSelect;
 export type TeamPosition = typeof leaguePosition.$inferSelect;
 export type League = typeof leagues.$inferSelect;
 export type Team = typeof teams.$inferSelect;
+export type TradeOffer = typeof tradeOffers.$inferSelect;
+export type TradeOfferPlayer = typeof tradeOfferPlayers.$inferSelect;
+export type CreateTradeOfferInput = typeof tradeOffers.$inferInsert;
+export type CreateTradeOfferPlayerInput = typeof tradeOfferPlayers.$inferInsert;
 export type LeagueMember = typeof leagueMembers.$inferSelect;
 export type ScoringStatDefinition = typeof scoringStatDefinitions.$inferSelect;
 export type LeagueScoringProfile = typeof leagueScoringProfiles.$inferSelect;
