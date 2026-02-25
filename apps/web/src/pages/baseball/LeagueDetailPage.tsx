@@ -79,6 +79,7 @@ import {
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
+import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
 import {
@@ -1986,6 +1987,17 @@ export function LeagueDetailPage(): React.JSX.Element {
         currentMinCareerGames={league.minCareerGames ?? 50}
         currentMinCareerSeasons={league.minCareerSeasons ?? 3}
         currentTotalMatchups={league.totalMatchups ?? 10}
+        onSuccess={(message) => {
+          setMatchupSuccessMessage(message);
+          setTimeout(() => setMatchupSuccessMessage(null), 5000);
+        }}
+        onError={(err) => {
+          setMatchupErrorMessage(err.message);
+        }}
+      />
+
+      <AchievementRestrictionsControl
+        leagueId={leagueId}
         onSuccess={(message) => {
           setMatchupSuccessMessage(message);
           setTimeout(() => setMatchupSuccessMessage(null), 5000);

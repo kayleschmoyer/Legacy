@@ -10,6 +10,7 @@ import {
   pgView,
   timestamp,
   bigint,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { playerPosition } from './Enums';
 import { sql } from 'drizzle-orm';
@@ -22,6 +23,15 @@ export const players = pgTable(
     lastName: text('last_name').notNull(),
     brefId: varchar('bref_id', { length: 10 }).notNull(),
     statsLastFetchedAt: timestamp('stats_last_fetched_at'),
+    // Career achievement counts — populated by the data loader from bref award_summary
+    allStarSelections: integer('all_star_selections').notNull().default(0),
+    goldGloves: integer('gold_gloves').notNull().default(0),
+    silverSluggers: integer('silver_sluggers').notNull().default(0),
+    mvpAwards: integer('mvp_awards').notNull().default(0),
+    cyYoungAwards: integer('cy_young_awards').notNull().default(0),
+    worldSeriesRings: integer('world_series_rings').notNull().default(0),
+    hallOfFame: boolean('hall_of_fame').notNull().default(false),
+    rookieOfTheYear: boolean('rookie_of_the_year').notNull().default(false),
   },
   (table) => {
     return {

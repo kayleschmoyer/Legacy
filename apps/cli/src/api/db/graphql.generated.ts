@@ -37,6 +37,27 @@ export type Scalars = {
   Float: { input: number; output: number };
 };
 
+/** A per-league rule that restricts rosters based on a career achievement type */
+export type AchievementRestriction = {
+  __typename?: 'AchievementRestriction';
+  /** One of: all_star_selections | gold_gloves | silver_sluggers | mvp_awards | cy_young_awards | world_series_rings | hall_of_fame | rookie_of_the_year */
+  achievementType?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  /** Whether the achievement can be earned multiple times */
+  isRepeatable?: Maybe<Scalars['Boolean']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Minimum count of the award a player must have to qualify (repeatable types only) */
+  playerMinCount?: Maybe<Scalars['Int']['output']>;
+  /** Cap on the total count of a repeatable award summed across the whole roster (e.g. no more than 25 All-Star selections total on one team) */
+  repeatableRosterMax?: Maybe<Scalars['Int']['output']>;
+  /** Maximum number of qualifying players allowed on a roster */
+  rosterMax?: Maybe<Scalars['Int']['output']>;
+  /** Minimum number of qualifying players required on a roster */
+  rosterMin?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
 export type AdvanceLeagueWeekResponse = {
   __typename?: 'AdvanceLeagueWeekResponse';
   currentMatchupId?: Maybe<Scalars['Int']['output']>;
@@ -82,6 +103,27 @@ export type AverageSeasonBatting = {
   seasons?: Maybe<Scalars['Int']['output']>;
   sluggingPercentage?: Maybe<Scalars['Float']['output']>;
   stolenBases?: Maybe<Scalars['Float']['output']>;
+};
+
+/** Career honours and awards sourced from Baseball Reference */
+export type CareerAchievements = {
+  __typename?: 'CareerAchievements';
+  /** Number of All-Star game selections */
+  allStarSelections?: Maybe<Scalars['Int']['output']>;
+  /** Number of Cy Young Awards */
+  cyYoungAwards?: Maybe<Scalars['Int']['output']>;
+  /** Number of Gold Glove Awards */
+  goldGloves?: Maybe<Scalars['Int']['output']>;
+  /** Whether the player is in the Baseball Hall of Fame */
+  hallOfFame?: Maybe<Scalars['Boolean']['output']>;
+  /** Number of Most Valuable Player Awards (AL or NL) */
+  mvpAwards?: Maybe<Scalars['Int']['output']>;
+  /** Whether the player won the Rookie of the Year Award */
+  rookieOfTheYear?: Maybe<Scalars['Boolean']['output']>;
+  /** Number of Silver Slugger Awards */
+  silverSluggers?: Maybe<Scalars['Int']['output']>;
+  /** Number of World Series Championship rings */
+  worldSeriesRings?: Maybe<Scalars['Int']['output']>;
 };
 
 export type CareerBatting = {
@@ -685,6 +727,8 @@ export type Mutation = {
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   createTiebreakerRules?: Maybe<TiebreakerRule>;
+  /** Remove an achievement restriction from a league. Commissioner / owner access required. */
+  deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
@@ -725,6 +769,8 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
+  /** Create or update a single achievement restriction for a league. Commissioner / owner access required. */
+  upsertAchievementRestriction?: Maybe<AchievementRestriction>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
 };
@@ -792,6 +838,11 @@ export type MutationCreateTiebreakerRulesArgs = {
   primaryMethod: TiebreakerMethod;
   secondaryMethod?: InputMaybe<TiebreakerMethod>;
   tertiaryMethod?: InputMaybe<TiebreakerMethod>;
+};
+
+export type MutationDeleteAchievementRestrictionArgs = {
+  achievementType: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationDeleteLeagueArgs = {
@@ -948,6 +999,10 @@ export type MutationUpdateTeamMemberPositionArgs = {
   teamMemberId: Scalars['Int']['input'];
 };
 
+export type MutationUpsertAchievementRestrictionArgs = {
+  input: UpsertAchievementRestrictionInput;
+};
+
 export type MutationVetoTradeArgs = {
   tradeId: Scalars['Int']['input'];
 };
@@ -1010,6 +1065,8 @@ export type Player = {
   __typename?: 'Player';
   averageSeasonBatting?: Maybe<AverageSeasonBatting>;
   brefId?: Maybe<Scalars['String']['output']>;
+  /** Career honours and awards sourced from Baseball Reference (All-Star, Gold Glove, etc.) */
+  careerAchievements?: Maybe<CareerAchievements>;
   /** Career batting statistics for the player */
   careerBatting?: Maybe<CareerBatting>;
   /** Career pitching statistics for the player */
@@ -1074,6 +1131,8 @@ export type ProcessWaiverClaimsResult = {
 
 export type Query = {
   __typename?: 'Query';
+  /** Return all achievement restrictions configured for a league, sorted by achievement type */
+  achievementRestrictions?: Maybe<Array<AchievementRestriction>>;
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
@@ -1148,6 +1207,10 @@ export type Query = {
   validateInviteCode?: Maybe<InviteCodeInfo>;
   /** Get version and deployment information for the GraphQL API */
   version?: Maybe<VersionInfo>;
+};
+
+export type QueryAchievementRestrictionsArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type QueryCareerBattingStatsArgs = {
@@ -1812,6 +1875,15 @@ export type UpdateLeagueSettingsInput = {
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
   spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type UpsertAchievementRestrictionInput = {
+  achievementType: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
+  playerMinCount?: InputMaybe<Scalars['Int']['input']>;
+  repeatableRosterMax?: InputMaybe<Scalars['Int']['input']>;
+  rosterMax?: InputMaybe<Scalars['Int']['input']>;
+  rosterMin?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type User = {

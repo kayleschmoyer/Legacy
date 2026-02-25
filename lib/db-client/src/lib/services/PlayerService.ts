@@ -572,6 +572,15 @@ export class PlayerService {
           statsLastFetchedAt: row.stats_last_fetched_at
             ? new Date(row.stats_last_fetched_at)
             : null,
+          // Achievement fields — not fetched by this scoring query; default to zero/false
+          allStarSelections: 0,
+          goldGloves: 0,
+          silverSluggers: 0,
+          mvpAwards: 0,
+          cyYoungAwards: 0,
+          worldSeriesRings: 0,
+          hallOfFame: false,
+          rookieOfTheYear: false,
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,

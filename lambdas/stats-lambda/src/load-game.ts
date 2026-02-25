@@ -278,12 +278,28 @@ async function loadPlayerGameStats(
     lastName: string;
     brefId: string;
     statsLastFetchedAt: Date;
+    allStarSelections: number;
+    goldGloves: number;
+    silverSluggers: number;
+    mvpAwards: number;
+    cyYoungAwards: number;
+    worldSeriesRings: number;
+    hallOfFame: boolean;
+    rookieOfTheYear: boolean;
   } = {
     id: playerId,
     firstName: '',
     lastName: '',
     brefId,
     statsLastFetchedAt: new Date(),
+    allStarSelections: 0,
+    goldGloves: 0,
+    silverSluggers: 0,
+    mvpAwards: 0,
+    cyYoungAwards: 0,
+    worldSeriesRings: 0,
+    hallOfFame: false,
+    rookieOfTheYear: false,
   };
 
   try {

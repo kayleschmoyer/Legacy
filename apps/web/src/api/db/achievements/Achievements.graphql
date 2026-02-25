@@ -1,0 +1,36 @@
+fragment AchievementRestriction on AchievementRestriction {
+  id
+  leagueId
+  achievementType
+  isRepeatable
+  playerMinCount
+  rosterMin
+  rosterMax
+  repeatableRosterMax
+  createdAt
+  updatedAt
+}
+
+query GetAchievementRestrictions($leagueId: Int!) {
+  achievementRestrictions(leagueId: $leagueId) {
+    ...AchievementRestriction
+  }
+}
+
+mutation UpsertAchievementRestriction(
+  $input: UpsertAchievementRestrictionInput!
+) {
+  upsertAchievementRestriction(input: $input) {
+    ...AchievementRestriction
+  }
+}
+
+mutation DeleteAchievementRestriction(
+  $leagueId: Int!
+  $achievementType: String!
+) {
+  deleteAchievementRestriction(
+    leagueId: $leagueId
+    achievementType: $achievementType
+  )
+}

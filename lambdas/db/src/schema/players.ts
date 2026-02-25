@@ -20,7 +20,58 @@ interface PlayerShape {
   brefId: string;
   statsLastFetchedAt: Date | null;
   scoring?: PlayerCareerScore | null;
+  // Career achievement fields (from DB columns)
+  allStarSelections?: number | null;
+  goldGloves?: number | null;
+  silverSluggers?: number | null;
+  mvpAwards?: number | null;
+  cyYoungAwards?: number | null;
+  worldSeriesRings?: number | null;
+  hallOfFame?: boolean | null;
+  rookieOfTheYear?: boolean | null;
 }
+
+/** Nested career-achievements sub-type on a Player. */
+const CareerAchievementsRef = builder.objectRef<{
+  allStarSelections: number;
+  goldGloves: number;
+  silverSluggers: number;
+  mvpAwards: number;
+  cyYoungAwards: number;
+  worldSeriesRings: number;
+  hallOfFame: boolean;
+  rookieOfTheYear: boolean;
+}>('CareerAchievements');
+
+CareerAchievementsRef.implement({
+  description: 'Career honours and awards sourced from Baseball Reference',
+  fields: (t) => ({
+    allStarSelections: t.exposeInt('allStarSelections', {
+      description: 'Number of All-Star game selections',
+    }),
+    goldGloves: t.exposeInt('goldGloves', {
+      description: 'Number of Gold Glove Awards',
+    }),
+    silverSluggers: t.exposeInt('silverSluggers', {
+      description: 'Number of Silver Slugger Awards',
+    }),
+    mvpAwards: t.exposeInt('mvpAwards', {
+      description: 'Number of Most Valuable Player Awards (AL or NL)',
+    }),
+    cyYoungAwards: t.exposeInt('cyYoungAwards', {
+      description: 'Number of Cy Young Awards',
+    }),
+    worldSeriesRings: t.exposeInt('worldSeriesRings', {
+      description: 'Number of World Series Championship rings',
+    }),
+    hallOfFame: t.exposeBoolean('hallOfFame', {
+      description: 'Whether the player is in the Baseball Hall of Fame',
+    }),
+    rookieOfTheYear: t.exposeBoolean('rookieOfTheYear', {
+      description: 'Whether the player won the Rookie of the Year Award',
+    }),
+  }),
+});
 
 const PlayerRef = builder.objectRef<PlayerShape>('Player');
 
@@ -164,6 +215,26 @@ PlayerRef.implement({
       nullable: true,
       resolve: async (parent, _args, context) => {
         return context.loaders.battingSeasonsPlayed.load(parent.id);
+      },
+    }),
+    careerAchievements: t.field({
+      description:
+        'Career honours and awards sourced from Baseball Reference (All-Star, Gold Glove, etc.)',
+      type: CareerAchievementsRef,
+      nullable: true,
+      resolve: (parent) => {
+        // All achievement columns default to 0/false in the DB so they are
+        // always present on rows from the players table after the migration.
+        return {
+          allStarSelections: parent.allStarSelections ?? 0,
+          goldGloves: parent.goldGloves ?? 0,
+          silverSluggers: parent.silverSluggers ?? 0,
+          mvpAwards: parent.mvpAwards ?? 0,
+          cyYoungAwards: parent.cyYoungAwards ?? 0,
+          worldSeriesRings: parent.worldSeriesRings ?? 0,
+          hallOfFame: parent.hallOfFame ?? false,
+          rookieOfTheYear: parent.rookieOfTheYear ?? false,
+        };
       },
     }),
   }),

@@ -14,6 +14,10 @@ import {
   getGameStats,
 } from './BRefSession';
 import { getTable, getTableBody, RowParser } from './HtmlParser';
+import {
+  CareerAchievements,
+  parseCareerAchievementsFromHtml,
+} from './CareerAchievements';
 
 // Custom error type for detailed debugging information
 interface ErrorWithDetails extends Error {
@@ -408,6 +412,8 @@ export interface CareerStats {
   batting: SeasonBatting[];
   pitching: SeasonPitching[];
   fielding: SeasonFielding[];
+  /** Career achievements parsed from the same HTML page (no extra request). */
+  achievements: CareerAchievements;
 }
 
 export async function getCareerStats(player: Player): Promise<CareerStats> {
@@ -420,6 +426,7 @@ export async function getCareerStats(player: Player): Promise<CareerStats> {
     batting: getBattingStats(root, player.id),
     fielding: getFieldingStats(root, player.id),
     pitching: getPitchingStats(root, player.id),
+    achievements: parseCareerAchievementsFromHtml(html),
   };
 }
 

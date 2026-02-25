@@ -1,3 +1,42 @@
+"""
+A per-league rule that restricts rosters based on a career achievement type
+"""
+type AchievementRestriction {
+  """
+  One of: all_star_selections | gold_gloves | silver_sluggers | mvp_awards | cy_young_awards | world_series_rings | hall_of_fame | rookie_of_the_year
+  """
+  achievementType: String
+  createdAt: String
+  id: Int
+
+  """
+  Whether the achievement can be earned multiple times
+  """
+  isRepeatable: Boolean
+  leagueId: Int
+
+  """
+  Minimum count of the award a player must have to qualify (repeatable types only)
+  """
+  playerMinCount: Int
+
+  """
+  Cap on the total count of a repeatable award summed across the whole roster (e.g. no more than 25 All-Star selections total on one team)
+  """
+  repeatableRosterMax: Int
+
+  """
+  Maximum number of qualifying players allowed on a roster
+  """
+  rosterMax: Int
+
+  """
+  Minimum number of qualifying players required on a roster
+  """
+  rosterMin: Int
+  updatedAt: String
+}
+
 type AdvanceLeagueWeekResponse {
   currentMatchupId: Int
   matchups: [Matchup!]
@@ -44,6 +83,51 @@ type AverageSeasonBatting {
   seasons: Int
   sluggingPercentage: Float
   stolenBases: Float
+}
+
+"""
+Career honours and awards sourced from Baseball Reference
+"""
+type CareerAchievements {
+  """
+  Number of All-Star game selections
+  """
+  allStarSelections: Int
+
+  """
+  Number of Cy Young Awards
+  """
+  cyYoungAwards: Int
+
+  """
+  Number of Gold Glove Awards
+  """
+  goldGloves: Int
+
+  """
+  Whether the player is in the Baseball Hall of Fame
+  """
+  hallOfFame: Boolean
+
+  """
+  Number of Most Valuable Player Awards (AL or NL)
+  """
+  mvpAwards: Int
+
+  """
+  Whether the player won the Rookie of the Year Award
+  """
+  rookieOfTheYear: Boolean
+
+  """
+  Number of Silver Slugger Awards
+  """
+  silverSluggers: Int
+
+  """
+  Number of World Series Championship rings
+  """
+  worldSeriesRings: Int
 }
 
 type CareerBatting {
@@ -716,6 +800,14 @@ type Mutation {
     secondaryMethod: TiebreakerMethod
     tertiaryMethod: TiebreakerMethod
   ): TiebreakerRule
+
+  """
+  Remove an achievement restriction from a league. Commissioner / owner access required.
+  """
+  deleteAchievementRestriction(
+    achievementType: String!
+    leagueId: Int!
+  ): Boolean
   deleteAllLeagues: String
   deleteLeague(leagueId: Int!): String
   disableDeviceToken(deviceToken: String!): Boolean
@@ -826,6 +918,13 @@ type Mutation {
   updateTeamMemberPosition(positionId: Int, teamMemberId: Int!): TeamMember
 
   """
+  Create or update a single achievement restriction for a league. Commissioner / owner access required.
+  """
+  upsertAchievementRestriction(
+    input: UpsertAchievementRestrictionInput!
+  ): AchievementRestriction
+
+  """
   Commissioner-only: veto an accepted trade, reversing the player swap.
   """
   vetoTrade(tradeId: Int!): TradeOffer
@@ -885,6 +984,11 @@ type PageInfo {
 type Player {
   averageSeasonBatting: AverageSeasonBatting
   brefId: String
+
+  """
+  Career honours and awards sourced from Baseball Reference (All-Star, Gold Glove, etc.)
+  """
+  careerAchievements: CareerAchievements
 
   """
   Career batting statistics for the player
@@ -960,6 +1064,10 @@ type ProcessWaiverClaimsResult {
 }
 
 type Query {
+  """
+  Return all achievement restrictions configured for a league, sorted by achievement type
+  """
+  achievementRestrictions(leagueId: Int!): [AchievementRestriction!]
   careerBattingStats(
     after: String
     first: Int
@@ -1496,6 +1604,15 @@ input UpdateLeagueSettingsInput {
   minCareerSeasons: Int
   spStartsPerMatchup: Int
   totalMatchups: Int
+}
+
+input UpsertAchievementRestrictionInput {
+  achievementType: String!
+  leagueId: Int!
+  playerMinCount: Int
+  repeatableRosterMax: Int
+  rosterMax: Int
+  rosterMin: Int
 }
 
 type User {

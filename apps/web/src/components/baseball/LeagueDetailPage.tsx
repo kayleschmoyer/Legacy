@@ -50,6 +50,7 @@ import { NextStepControl } from '../commissioner/NextStepControl';
 import { DeleteLeagueControl } from '../commissioner/DeleteLeagueControl';
 import { DraftSettingsControl } from '../commissioner/DraftSettingsControl';
 import { LeagueSettingsControl } from '../commissioner/LeagueSettingsControl';
+import { AchievementRestrictionsControl } from '../commissioner/AchievementRestrictionsControl';
 import { useCurrentMatchup } from '../../hooks/useMatchup';
 import { MatchupScoreboard } from '../matchup/MatchupScoreboard';
 import { GamesRemaining } from '../matchup/GamesRemaining';
@@ -1188,6 +1189,17 @@ export function LeagueDetailPage(): React.JSX.Element {
         currentGamesPerMatchup={league.gamesPerMatchup ?? 5}
         currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
         currentTotalMatchups={league.totalMatchups ?? 10}
+        onSuccess={(message) => {
+          setMatchupSuccessMessage(message);
+          setTimeout(() => setMatchupSuccessMessage(null), 5000);
+        }}
+        onError={(err) => {
+          setMatchupErrorMessage(err.message);
+        }}
+      />
+
+      <AchievementRestrictionsControl
+        leagueId={leagueId}
         onSuccess={(message) => {
           setMatchupSuccessMessage(message);
           setTimeout(() => setMatchupSuccessMessage(null), 5000);

@@ -46,6 +46,14 @@ async function main() {
     firstName: 'Test',
     lastName: 'Player',
     statsLastFetchedAt: null,
+    allStarSelections: 0,
+    goldGloves: 0,
+    silverSluggers: 0,
+    mvpAwards: 0,
+    cyYoungAwards: 0,
+    worldSeriesRings: 0,
+    hallOfFame: false,
+    rookieOfTheYear: false,
   };
 
   const season = parseInt(options.season, 10);

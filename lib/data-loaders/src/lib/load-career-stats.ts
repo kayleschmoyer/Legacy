@@ -239,20 +239,35 @@ export async function loadCareerStats(
     throw error;
   }
 
-  // Update player timestamp with error handling
+  // Update player timestamp and career achievements in one query
   try {
+    const { achievements } = stats;
     LOGGER.debug(
-      `Updating stats_last_fetched_at timestamp for player ${player.id}`,
+      `Updating stats_last_fetched_at and career achievements for player ${player.id}`,
     );
     await db.execute(sql`
-      UPDATE players 
-      SET stats_last_fetched_at = NOW() 
+      UPDATE players
+      SET stats_last_fetched_at  = NOW(),
+          all_star_selections    = ${achievements.allStarSelections},
+          gold_gloves            = ${achievements.goldGloves},
+          silver_sluggers        = ${achievements.silverSluggers},
+          mvp_awards             = ${achievements.mvpAwards},
+          cy_young_awards        = ${achievements.cyYoungAwards},
+          world_series_rings     = ${achievements.worldSeriesRings},
+          hall_of_fame           = ${achievements.hallOfFame},
+          rookie_of_the_year     = ${achievements.rookieOfTheYear}
       WHERE id = ${player.id}
     `);
-    addBreadcrumb(`Updated stats_last_fetched_at for player ${playerName}`);
+    addBreadcrumb(
+      `Updated stats_last_fetched_at and achievements for player ${playerName} ` +
+        `(AS:${achievements.allStarSelections} GG:${achievements.goldGloves} ` +
+        `SS:${achievements.silverSluggers} MVP:${achievements.mvpAwards} ` +
+        `CYA:${achievements.cyYoungAwards} WS:${achievements.worldSeriesRings} ` +
+        `HOF:${achievements.hallOfFame} ROY:${achievements.rookieOfTheYear})`,
+    );
   } catch (error) {
     captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: { operation: 'load_career_stats', phase: 'timestamp_update' },
+      tags: { operation: 'load_career_stats', phase: 'achievements_update' },
       extra: {
         brefId,
         playerId: player.id,

@@ -37,6 +37,27 @@ export type Scalars = {
   Float: { input: number; output: number };
 };
 
+/** A per-league rule that restricts rosters based on a career achievement type */
+export type AchievementRestriction = {
+  __typename?: 'AchievementRestriction';
+  /** One of: all_star_selections | gold_gloves | silver_sluggers | mvp_awards | cy_young_awards | world_series_rings | hall_of_fame | rookie_of_the_year */
+  achievementType?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  /** Whether the achievement can be earned multiple times */
+  isRepeatable?: Maybe<Scalars['Boolean']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Minimum count of the award a player must have to qualify (repeatable types only) */
+  playerMinCount?: Maybe<Scalars['Int']['output']>;
+  /** Cap on the total count of a repeatable award summed across the whole roster (e.g. no more than 25 All-Star selections total on one team) */
+  repeatableRosterMax?: Maybe<Scalars['Int']['output']>;
+  /** Maximum number of qualifying players allowed on a roster */
+  rosterMax?: Maybe<Scalars['Int']['output']>;
+  /** Minimum number of qualifying players required on a roster */
+  rosterMin?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
 export type AdvanceLeagueWeekResponse = {
   __typename?: 'AdvanceLeagueWeekResponse';
   currentMatchupId?: Maybe<Scalars['Int']['output']>;
@@ -82,6 +103,27 @@ export type AverageSeasonBatting = {
   seasons?: Maybe<Scalars['Int']['output']>;
   sluggingPercentage?: Maybe<Scalars['Float']['output']>;
   stolenBases?: Maybe<Scalars['Float']['output']>;
+};
+
+/** Career honours and awards sourced from Baseball Reference */
+export type CareerAchievements = {
+  __typename?: 'CareerAchievements';
+  /** Number of All-Star game selections */
+  allStarSelections?: Maybe<Scalars['Int']['output']>;
+  /** Number of Cy Young Awards */
+  cyYoungAwards?: Maybe<Scalars['Int']['output']>;
+  /** Number of Gold Glove Awards */
+  goldGloves?: Maybe<Scalars['Int']['output']>;
+  /** Whether the player is in the Baseball Hall of Fame */
+  hallOfFame?: Maybe<Scalars['Boolean']['output']>;
+  /** Number of Most Valuable Player Awards (AL or NL) */
+  mvpAwards?: Maybe<Scalars['Int']['output']>;
+  /** Whether the player won the Rookie of the Year Award */
+  rookieOfTheYear?: Maybe<Scalars['Boolean']['output']>;
+  /** Number of Silver Slugger Awards */
+  silverSluggers?: Maybe<Scalars['Int']['output']>;
+  /** Number of World Series Championship rings */
+  worldSeriesRings?: Maybe<Scalars['Int']['output']>;
 };
 
 export type CareerBatting = {
@@ -685,6 +727,8 @@ export type Mutation = {
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   createTiebreakerRules?: Maybe<TiebreakerRule>;
+  /** Remove an achievement restriction from a league. Commissioner / owner access required. */
+  deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
@@ -725,6 +769,8 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
+  /** Create or update a single achievement restriction for a league. Commissioner / owner access required. */
+  upsertAchievementRestriction?: Maybe<AchievementRestriction>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
 };
@@ -792,6 +838,11 @@ export type MutationCreateTiebreakerRulesArgs = {
   primaryMethod: TiebreakerMethod;
   secondaryMethod?: InputMaybe<TiebreakerMethod>;
   tertiaryMethod?: InputMaybe<TiebreakerMethod>;
+};
+
+export type MutationDeleteAchievementRestrictionArgs = {
+  achievementType: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationDeleteLeagueArgs = {
@@ -948,6 +999,10 @@ export type MutationUpdateTeamMemberPositionArgs = {
   teamMemberId: Scalars['Int']['input'];
 };
 
+export type MutationUpsertAchievementRestrictionArgs = {
+  input: UpsertAchievementRestrictionInput;
+};
+
 export type MutationVetoTradeArgs = {
   tradeId: Scalars['Int']['input'];
 };
@@ -1010,6 +1065,8 @@ export type Player = {
   __typename?: 'Player';
   averageSeasonBatting?: Maybe<AverageSeasonBatting>;
   brefId?: Maybe<Scalars['String']['output']>;
+  /** Career honours and awards sourced from Baseball Reference (All-Star, Gold Glove, etc.) */
+  careerAchievements?: Maybe<CareerAchievements>;
   /** Career batting statistics for the player */
   careerBatting?: Maybe<CareerBatting>;
   /** Career pitching statistics for the player */
@@ -1074,6 +1131,8 @@ export type ProcessWaiverClaimsResult = {
 
 export type Query = {
   __typename?: 'Query';
+  /** Return all achievement restrictions configured for a league, sorted by achievement type */
+  achievementRestrictions?: Maybe<Array<AchievementRestriction>>;
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
@@ -1148,6 +1207,10 @@ export type Query = {
   validateInviteCode?: Maybe<InviteCodeInfo>;
   /** Get version and deployment information for the GraphQL API */
   version?: Maybe<VersionInfo>;
+};
+
+export type QueryAchievementRestrictionsArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type QueryCareerBattingStatsArgs = {
@@ -1814,6 +1877,15 @@ export type UpdateLeagueSettingsInput = {
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type UpsertAchievementRestrictionInput = {
+  achievementType: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
+  playerMinCount?: InputMaybe<Scalars['Int']['input']>;
+  repeatableRosterMax?: InputMaybe<Scalars['Int']['input']>;
+  rosterMax?: InputMaybe<Scalars['Int']['input']>;
+  rosterMin?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type User = {
   __typename?: 'User';
   accessLevel?: Maybe<Scalars['String']['output']>;
@@ -1875,6 +1947,72 @@ export type WaiverClaim = {
   status?: Maybe<Scalars['String']['output']>;
   teamId?: Maybe<Scalars['Int']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AchievementRestrictionFragment = {
+  __typename?: 'AchievementRestriction';
+  id?: number | null;
+  leagueId?: number | null;
+  achievementType?: string | null;
+  isRepeatable?: boolean | null;
+  playerMinCount?: number | null;
+  rosterMin?: number | null;
+  rosterMax?: number | null;
+  repeatableRosterMax?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type GetAchievementRestrictionsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetAchievementRestrictionsQuery = {
+  __typename?: 'Query';
+  achievementRestrictions?: Array<{
+    __typename?: 'AchievementRestriction';
+    id?: number | null;
+    leagueId?: number | null;
+    achievementType?: string | null;
+    isRepeatable?: boolean | null;
+    playerMinCount?: number | null;
+    rosterMin?: number | null;
+    rosterMax?: number | null;
+    repeatableRosterMax?: number | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  }> | null;
+};
+
+export type UpsertAchievementRestrictionMutationVariables = Exact<{
+  input: UpsertAchievementRestrictionInput;
+}>;
+
+export type UpsertAchievementRestrictionMutation = {
+  __typename?: 'Mutation';
+  upsertAchievementRestriction?: {
+    __typename?: 'AchievementRestriction';
+    id?: number | null;
+    leagueId?: number | null;
+    achievementType?: string | null;
+    isRepeatable?: boolean | null;
+    playerMinCount?: number | null;
+    rosterMin?: number | null;
+    rosterMax?: number | null;
+    repeatableRosterMax?: number | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
+export type DeleteAchievementRestrictionMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  achievementType: Scalars['String']['input'];
+}>;
+
+export type DeleteAchievementRestrictionMutation = {
+  __typename?: 'Mutation';
+  deleteAchievementRestriction?: boolean | null;
 };
 
 export type GetLeagueChatMessagesQueryVariables = Exact<{
@@ -4318,6 +4456,20 @@ export type GetUserByIdQuery = {
   } | null;
 };
 
+export const AchievementRestrictionFragmentDoc = gql`
+  fragment AchievementRestriction on AchievementRestriction {
+    id
+    leagueId
+    achievementType
+    isRepeatable
+    playerMinCount
+    rosterMin
+    rosterMax
+    repeatableRosterMax
+    createdAt
+    updatedAt
+  }
+`;
 export const LeagueMemberFragmentDoc = gql`
   fragment LeagueMember on LeagueMember {
     leagueId
@@ -4640,6 +4792,205 @@ export const UserFragmentDoc = gql`
     username
   }
 `;
+export const GetAchievementRestrictions = gql`
+  query GetAchievementRestrictions($leagueId: Int!) {
+    achievementRestrictions(leagueId: $leagueId) {
+      ...AchievementRestriction
+    }
+  }
+  ${AchievementRestrictionFragmentDoc}
+`;
+
+/**
+ * __useGetAchievementRestrictionsQuery__
+ *
+ * To run a query within a React component, call `useGetAchievementRestrictionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAchievementRestrictionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAchievementRestrictionsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetAchievementRestrictionsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetAchievementRestrictionsQuery,
+    GetAchievementRestrictionsQueryVariables
+  > &
+    (
+      | { variables: GetAchievementRestrictionsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetAchievementRestrictionsQuery,
+    GetAchievementRestrictionsQueryVariables
+  >(GetAchievementRestrictions, options);
+}
+export function useGetAchievementRestrictionsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetAchievementRestrictionsQuery,
+    GetAchievementRestrictionsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetAchievementRestrictionsQuery,
+    GetAchievementRestrictionsQueryVariables
+  >(GetAchievementRestrictions, options);
+}
+export function useGetAchievementRestrictionsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAchievementRestrictionsQuery,
+        GetAchievementRestrictionsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetAchievementRestrictionsQuery,
+    GetAchievementRestrictionsQueryVariables
+  >(
+    GetAchievementRestrictions,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetAchievementRestrictionsQuery,
+          GetAchievementRestrictionsQueryVariables
+        >,
+  );
+}
+export type GetAchievementRestrictionsQueryHookResult = ReturnType<
+  typeof useGetAchievementRestrictionsQuery
+>;
+export type GetAchievementRestrictionsLazyQueryHookResult = ReturnType<
+  typeof useGetAchievementRestrictionsLazyQuery
+>;
+export type GetAchievementRestrictionsSuspenseQueryHookResult = ReturnType<
+  typeof useGetAchievementRestrictionsSuspenseQuery
+>;
+export type GetAchievementRestrictionsQueryResult = Apollo.QueryResult<
+  GetAchievementRestrictionsQuery,
+  GetAchievementRestrictionsQueryVariables
+>;
+export const UpsertAchievementRestriction = gql`
+  mutation UpsertAchievementRestriction(
+    $input: UpsertAchievementRestrictionInput!
+  ) {
+    upsertAchievementRestriction(input: $input) {
+      ...AchievementRestriction
+    }
+  }
+  ${AchievementRestrictionFragmentDoc}
+`;
+export type UpsertAchievementRestrictionMutationFn = MutationFunction<
+  UpsertAchievementRestrictionMutation,
+  UpsertAchievementRestrictionMutationVariables
+>;
+
+/**
+ * __useUpsertAchievementRestrictionMutation__
+ *
+ * To run a mutation, you first call `useUpsertAchievementRestrictionMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpsertAchievementRestrictionMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [upsertAchievementRestrictionMutation, { data, loading, error }] = useUpsertAchievementRestrictionMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpsertAchievementRestrictionMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpsertAchievementRestrictionMutation,
+    UpsertAchievementRestrictionMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpsertAchievementRestrictionMutation,
+    UpsertAchievementRestrictionMutationVariables
+  >(UpsertAchievementRestriction, options);
+}
+export type UpsertAchievementRestrictionMutationHookResult = ReturnType<
+  typeof useUpsertAchievementRestrictionMutation
+>;
+export type UpsertAchievementRestrictionMutationResult =
+  Apollo.MutationResult<UpsertAchievementRestrictionMutation>;
+export type UpsertAchievementRestrictionMutationOptions = BaseMutationOptions<
+  UpsertAchievementRestrictionMutation,
+  UpsertAchievementRestrictionMutationVariables
+>;
+export const DeleteAchievementRestriction = gql`
+  mutation DeleteAchievementRestriction(
+    $leagueId: Int!
+    $achievementType: String!
+  ) {
+    deleteAchievementRestriction(
+      leagueId: $leagueId
+      achievementType: $achievementType
+    )
+  }
+`;
+export type DeleteAchievementRestrictionMutationFn = MutationFunction<
+  DeleteAchievementRestrictionMutation,
+  DeleteAchievementRestrictionMutationVariables
+>;
+
+/**
+ * __useDeleteAchievementRestrictionMutation__
+ *
+ * To run a mutation, you first call `useDeleteAchievementRestrictionMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteAchievementRestrictionMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteAchievementRestrictionMutation, { data, loading, error }] = useDeleteAchievementRestrictionMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      achievementType: // value for 'achievementType'
+ *   },
+ * });
+ */
+export function useDeleteAchievementRestrictionMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    DeleteAchievementRestrictionMutation,
+    DeleteAchievementRestrictionMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    DeleteAchievementRestrictionMutation,
+    DeleteAchievementRestrictionMutationVariables
+  >(DeleteAchievementRestriction, options);
+}
+export type DeleteAchievementRestrictionMutationHookResult = ReturnType<
+  typeof useDeleteAchievementRestrictionMutation
+>;
+export type DeleteAchievementRestrictionMutationResult =
+  Apollo.MutationResult<DeleteAchievementRestrictionMutation>;
+export type DeleteAchievementRestrictionMutationOptions = BaseMutationOptions<
+  DeleteAchievementRestrictionMutation,
+  DeleteAchievementRestrictionMutationVariables
+>;
 export const GetLeagueChatMessages = gql`
   query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {
     getLeagueMessages(leagueId: $leagueId, limit: $limit) {

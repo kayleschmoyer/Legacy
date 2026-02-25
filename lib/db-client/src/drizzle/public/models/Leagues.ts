@@ -13,6 +13,7 @@ import {
   boolean,
   jsonb,
 } from 'drizzle-orm/pg-core';
+import { players } from './Players';
 import {
   draftOrder,
   draftMode,
@@ -29,7 +30,6 @@ import {
   weekAdvanceStatus,
   tradeOfferStatus,
 } from './Enums';
-import { players } from './Players';
 
 // Define leagues first since other tables reference it
 export const leagues = pgTable(
@@ -547,6 +547,56 @@ export const tradeOfferPlayers = pgTable(
         table.tradeOfferId,
         table.playerId,
       ),
+    };
+  },
+);
+
+/**
+ * Per-league achievement-based roster restrictions set by the commissioner.
+ *
+ * achievement_type is one of the well-known keys:
+ *   Repeatable (integer count on player):
+ *     all_star_selections | gold_gloves | silver_sluggers |
+ *     mvp_awards | cy_young_awards | world_series_rings
+ *   One-time (boolean on player):
+ *     hall_of_fame | rookie_of_the_year
+ *
+ * roster_min / roster_max — number of qualifying players per roster.
+ * player_min_count — minimum award count a player must have to qualify
+ *   (only meaningful for repeatable types; for booleans it is always 1).
+ * repeatable_roster_max — cap on the TOTAL award count summed across the
+ *   whole roster (only applicable for repeatable types).
+ */
+export const leagueAchievementRestrictions = pgTable(
+  'league_achievement_restrictions',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    achievementType: varchar('achievement_type', { length: 50 }).notNull(),
+    isRepeatable: boolean('is_repeatable').notNull().default(false),
+    playerMinCount: integer('player_min_count'),
+    rosterMin: integer('roster_min'),
+    rosterMax: integer('roster_max'),
+    repeatableRosterMax: integer('repeatable_roster_max'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      larLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'league_achievement_restrictions_league_fk',
+      }).onDelete('cascade'),
+      larLeagueAchievementUk: unique('league_achievement_restrictions_uk').on(
+        table.leagueId,
+        table.achievementType,
+      ),
+      larLeagueIdIdx: index('lar_league_id_idx').on(table.leagueId),
     };
   },
 );
