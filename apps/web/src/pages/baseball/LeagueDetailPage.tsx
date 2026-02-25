@@ -247,7 +247,6 @@ type TabId =
   | 'standings'
   | 'matchup'
   | 'trades'
-  | 'chat'
   | 'team-settings'
   | 'commissioner';
 
@@ -265,7 +264,6 @@ const TABS: TabDef[] = [
   { id: 'standings', label: 'Standings', icon: <Trophy size={16} /> },
   { id: 'matchup', label: 'Matchup', icon: <Swords size={16} /> },
   { id: 'trades', label: 'Trades', icon: <ArrowLeftRight size={16} /> },
-  { id: 'chat', label: 'Chat', icon: <MessageSquare size={16} /> },
   { id: 'team-settings', label: 'My Team', icon: <Edit3 size={16} /> },
   {
     id: 'commissioner',
@@ -284,7 +282,6 @@ const TAB_ALIASES: Record<string, TabId> = {
   standings: 'standings',
   matchup: 'matchup',
   trades: 'trades',
-  chat: 'chat',
   'team-settings': 'team-settings',
   commissioner: 'commissioner',
 };
@@ -1615,6 +1612,29 @@ export function LeagueDetailPage(): React.JSX.Element {
           <LeagueTradeBlock leagueId={leagueId} teamMembers={teamMembers} />
         </YStack>
       </XStack>
+
+      {/* League Chat */}
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$surfacePanelBorder"
+        borderWidth={1}
+        borderRadius="$6"
+        overflow="hidden"
+      >
+        <XStack alignItems="center" gap="$2" padding="$5" paddingBottom="$3">
+          <MessageSquare size={18} color="var(--blue11)" />
+          <Text fontSize="$5" fontWeight="700" color="$color">
+            League Chat
+          </Text>
+        </XStack>
+        <YStack height={420}>
+          <LeagueChatTab
+            leagueId={leagueId}
+            userId={user?.id ?? 0}
+            onNavigate={(tabId) => setActiveTab(tabId as TabId)}
+          />
+        </YStack>
+      </Card>
     </YStack>
   );
 
@@ -1877,23 +1897,6 @@ export function LeagueDetailPage(): React.JSX.Element {
       </YStack>
     );
   };
-
-  const renderChat = () => (
-    <YStack
-      flex={1}
-      role="tabpanel"
-      id="panel-chat"
-      aria-labelledby="tab-chat"
-      height="calc(100vh - 260px)"
-      minHeight={400}
-    >
-      <LeagueChatTab
-        leagueId={leagueId}
-        userId={user?.id ?? 0}
-        onNavigate={(tabId) => setActiveTab(tabId as TabId)}
-      />
-    </YStack>
-  );
 
   const renderCommissionerSettings = () => (
     <YStack
@@ -2388,7 +2391,6 @@ export function LeagueDetailPage(): React.JSX.Element {
             isCommissioner={isCommissioner}
           />
         )}
-        {activeTab === 'chat' && renderChat()}
         {activeTab === 'team-settings' && renderTeamSettings()}
         {activeTab === 'commissioner' &&
           isCommissioner &&
