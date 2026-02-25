@@ -12,13 +12,7 @@
  *      4. Optional message + confirm
  *  - Commissioner veto button on accepted trades
  */
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components';
 import { Card, ScrollView, Separator, Spinner, styled, Text } from 'tamagui';
 import {
@@ -36,9 +30,6 @@ import {
   X,
   Zap,
 } from '@tamagui/lucide-icons';
-import { WebSocketClient } from '@legacy-sports/websocket-client';
-import type { NotificationData } from '@legacy-sports/websocket-client';
-import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
 import {
   TradeOfferFragment,
   useAcceptTradeMutation,
@@ -51,7 +42,7 @@ import {
   useRejectTradeMutation,
   useVetoTradeMutation,
 } from '../../api/db/graphql.generated';
-import { env } from '../../config/environment';
+import { useLeagueWebSocket } from '../../hooks/useLeagueWebSocket';
 
 // ── Styled helpers ────────────────────────────────────────────────────────────
 
@@ -1099,42 +1090,14 @@ export function TradingCenter({
   );
 
   // ── WebSocket: live-refresh on trade-offer or roster-update events ──────────
-  const handleRefetchRef = useRef(handleRefetch);
-  handleRefetchRef.current = handleRefetch;
-
-  useEffect(() => {
-    let active = true;
-    const wsUrl = env.websocketUrl;
-    if (!wsUrl) return;
-    const token =
-      typeof localStorage !== 'undefined'
-        ? (localStorage.getItem('auth_jwt') ?? '')
-        : '';
-    if (!token) return;
-
-    const client = new WebSocketClient({
-      url: wsUrl,
-      token,
-      leagueId,
-      viewContext: 'general',
-      autoConnect: false,
-    });
-
-    const handleWsNotification = (_data: NotificationData) => {
-      if (active) {
-        void handleRefetchRef.current();
-      }
-    };
-
-    client.on(ClientNotificationType.TRADE_OFFER, handleWsNotification);
-    client.on(ClientNotificationType.ROSTER_UPDATE, handleWsNotification);
-    client.connect();
-
-    return () => {
-      active = false;
-      client.dispose();
-    };
-  }, [leagueId]);
+  useLeagueWebSocket({
+    onTradeOffer: () => {
+      void handleRefetch();
+    },
+    onRosterUpdate: () => {
+      void handleRefetch();
+    },
+  });
 
   const pendingTrades = pendingData?.teamTradeOffers ?? [];
   const incomingPending = pendingTrades.filter(

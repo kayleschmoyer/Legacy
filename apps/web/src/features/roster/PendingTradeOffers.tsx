@@ -5,20 +5,17 @@
  * (user can Cancel). Subscribes to the `trade-offer` WebSocket event so
  * the list refreshes in real time without a manual page reload.
  */
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback } from 'react';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components';
 import { Card, Separator, Spinner, Text } from 'tamagui';
 import { ArrowLeftRight, Check, Clock, Send, X } from '@tamagui/lucide-icons';
-import { WebSocketClient } from '@legacy-sports/websocket-client';
-import type { NotificationData } from '@legacy-sports/websocket-client';
-import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
 import {
   useAcceptTradeMutation,
   useCancelTradeMutation,
   useGetTeamTradeOffersQuery,
   useRejectTradeMutation,
 } from '../../api/db/graphql.generated';
-import { env } from '../../config/environment';
+import { useLeagueWebSocket } from '../../hooks/useLeagueWebSocket';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -44,44 +41,15 @@ export function PendingTradeOffers({
   const [rejectTrade] = useRejectTradeMutation();
   const [cancelTrade] = useCancelTradeMutation();
 
-  // Keep stable ref for WS effect
-  const refetchRef = useRef(refetch);
-  refetchRef.current = refetch;
-
   // ── WebSocket: auto-refresh on trade-offer or roster-update events ─────────
-  useEffect(() => {
-    let active = true;
-    const wsUrl = env.websocketUrl;
-    if (!wsUrl) return;
-    const token =
-      typeof localStorage !== 'undefined'
-        ? (localStorage.getItem('auth_jwt') ?? '')
-        : '';
-    if (!token) return;
-
-    const client = new WebSocketClient({
-      url: wsUrl,
-      token,
-      leagueId,
-      viewContext: 'roster',
-      autoConnect: false,
-    });
-
-    const handleRefresh = (_notification: NotificationData) => {
-      if (active) {
-        void refetchRef.current();
-      }
-    };
-
-    client.on(ClientNotificationType.TRADE_OFFER, handleRefresh);
-    client.on(ClientNotificationType.ROSTER_UPDATE, handleRefresh);
-    client.connect();
-
-    return () => {
-      active = false;
-      client.dispose();
-    };
-  }, [leagueId]);
+  useLeagueWebSocket({
+    onTradeOffer: () => {
+      void refetch();
+    },
+    onRosterUpdate: () => {
+      void refetch();
+    },
+  });
 
   // ── Action handlers ───────────────────────────────────────────────────────
 

@@ -128,41 +128,43 @@ export function WebPlayerStatsPage() {
   );
 
   // Handle share functionality
-  const handleShare = useCallback(async (url: string) => {
-    try {
-      if (navigator.share) {
-        // Use native Web Share API if available
-        await navigator.share({
-          title: 'Player Statistics - Legacy Sports',
-          text: 'Check out these player statistics from Legacy Sports',
-          url: url,
-        });
-      } else {
-        // Fallback to clipboard
-        await navigator.clipboard.writeText(url);
-
-        // Show user feedback (you could replace this with a toast notification)
-        const originalTitle = document.title;
-        document.title = '📋 Link copied to clipboard!';
-        setTimeout(() => {
-          document.title = originalTitle;
-        }, 2000);
-        setLiveMsg('Link copied to clipboard.');
-      }
-    } catch (error) {
-      console.error('Error sharing:', error);
-      // Fallback - try to copy to clipboard
+  const handleShare = useCallback((url: string) => {
+    void (async () => {
       try {
-        await navigator.clipboard.writeText(url);
-        alert('Link copied to clipboard!');
-        setLiveMsg('Link copied to clipboard.');
-      } catch (clipboardError) {
-        console.error('Clipboard error:', clipboardError);
-        // Ultimate fallback - show the URL
-        prompt('Copy this link to share:', url);
-        setLiveMsg('Showing a prompt with a sharable link.');
+        if (navigator.share) {
+          // Use native Web Share API if available
+          await navigator.share({
+            title: 'Player Statistics - Legacy Sports',
+            text: 'Check out these player statistics from Legacy Sports',
+            url: url,
+          });
+        } else {
+          // Fallback to clipboard
+          await navigator.clipboard.writeText(url);
+
+          // Show user feedback (you could replace this with a toast notification)
+          const originalTitle = document.title;
+          document.title = '📋 Link copied to clipboard!';
+          setTimeout(() => {
+            document.title = originalTitle;
+          }, 2000);
+          setLiveMsg('Link copied to clipboard.');
+        }
+      } catch (error) {
+        console.error('Error sharing:', error);
+        // Fallback - try to copy to clipboard
+        try {
+          await navigator.clipboard.writeText(url);
+          alert('Link copied to clipboard!');
+          setLiveMsg('Link copied to clipboard.');
+        } catch (clipboardError) {
+          console.error('Clipboard error:', clipboardError);
+          // Ultimate fallback - show the URL
+          prompt('Copy this link to share:', url);
+          setLiveMsg('Showing a prompt with a sharable link.');
+        }
       }
-    }
+    })();
   }, []);
 
   return (
@@ -174,7 +176,9 @@ export function WebPlayerStatsPage() {
         padding: 0, // Remove default padding as PlayerStatsPage handles its own
       }}
     >
-      <div className="sr-only" aria-live="polite">{liveMsg}</div>
+      <div className="sr-only" aria-live="polite">
+        {liveMsg}
+      </div>
       <PlayerStatsPage
         title="MLB Player Statistics"
         initialViewMode={initialState.viewMode}

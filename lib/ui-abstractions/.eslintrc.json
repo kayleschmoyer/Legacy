@@ -2,10 +2,7 @@
   "extends": ["plugin:@nx/react", "../../.eslintrc.json"],
   "ignorePatterns": ["!**/*", "jest.config.ts", "dist", "node_modules/**"],
   "parserOptions": {
-    "project": [
-      "lib/ui-abstractions/tsconfig.json",
-      "lib/ui-abstractions/tsconfig.lib.json"
-    ]
+    "project": ["tsconfig.*?.json"]
   },
   "overrides": [
     {
@@ -21,9 +18,6 @@
     },
     {
       "files": ["*.ts", "*.tsx"],
-      "parserOptions": {
-        "project": ["lib/ui-abstractions/tsconfig.*?.json"]
-      },
       "rules": {}
     }
   ]

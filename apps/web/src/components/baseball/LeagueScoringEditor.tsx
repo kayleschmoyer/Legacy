@@ -49,12 +49,11 @@ interface ProfileStat {
 }
 type FormValueState = Record<number, string>;
 type FieldErrorState = Record<number, string | null>;
-type ScoringGroupCopy = { title: string; description: string; accent: string };
 type ScoringStatUpdate = { statDefinitionId: number; multiplier: number };
 
-// Typed aliases for lint compatibility (no-unsafe-assignment is off in web config)
-const GROUP_ORDER = SCORING_GROUP_ORDER as readonly string[];
-const GROUP_COPY = SCORING_GROUP_COPY as Record<string, ScoringGroupCopy>;
+// Typed aliases to keep local references short
+const GROUP_ORDER = SCORING_GROUP_ORDER;
+const GROUP_COPY = SCORING_GROUP_COPY;
 
 /* ── Web-specific gradient accent per group ───────────────────────────────── */
 const WEB_GROUP_GRADIENTS: Record<
@@ -474,8 +473,8 @@ export function LeagueScoringEditor(
               const copy = GROUP_COPY[group];
               const gradients = WEB_GROUP_GRADIENTS[group];
               const isExpanded = expandedGroups[group] !== false;
-              const overrideCount = statsForGroup.filter(
-                (s) => isStatOverridden(s) as boolean,
+              const overrideCount = statsForGroup.filter((s) =>
+                isStatOverridden(s),
               ).length;
 
               return (

@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
-import { WebSocketClient } from '@legacy-sports/websocket-client';
-import type { NotificationData } from '@legacy-sports/websocket-client';
-import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
-import { env } from '../config/environment';
+import { useLeagueWebSocket } from './useLeagueWebSocket';
 import {
   GetLeagueChatMessages,
   type GetLeagueChatMessagesQuery,
@@ -46,7 +43,6 @@ export function useLeagueChat(leagueId: number): {
   sendMessage: (text: string) => Promise<void>;
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const clientRef = useRef<{ dispose: () => void } | null>(null);
 
   // Load message history
   const {
@@ -166,99 +162,48 @@ export function useLeagueChat(leagueId: number): {
     [sendMutation, leagueId],
   );
 
-  // WebSocket listener for real-time updates from other members
-  useEffect(() => {
-    let active = true;
-    const wsUrl = env.websocketUrl;
-    if (!wsUrl) return;
-
-    const token =
-      typeof localStorage !== 'undefined'
-        ? (localStorage.getItem('auth_jwt') ?? '')
-        : '';
-    if (!token || !active) return;
-
-    const client = new WebSocketClient({
-      url: wsUrl,
-      token,
-      leagueId,
-      viewContext: 'chat',
-      autoConnect: false,
-    });
-
-    client.on(
-      ClientNotificationType.LEAGUE_CHAT_MESSAGE,
-      (notification: NotificationData) => {
-        const n = notification as {
-          messageId: number;
-          senderId: number;
-          senderUsername: string;
-          messageText: string;
-          timestamp: string;
-        };
-        const numericId = Number(n.messageId);
-        console.log(`[chat ${_ts()}] ws-handler received`, {
+  // Subscribe to chat messages and reconnect events via the shared socket.
+  useLeagueWebSocket({
+    onLeagueChatMessage: (n) => {
+      const numericId = Number(n.messageId);
+      console.log(`[chat ${_ts()}] ws-handler received`, {
+        messageId: numericId,
+        idType: typeof numericId,
+        rawMessageId: n.messageId,
+        rawIdType: typeof n.messageId,
+        senderId: n.senderId,
+        text: n.messageText?.substring(0, 30),
+      });
+      setMessages((prev) => {
+        const isDupe = prev.some((m) => m.id === numericId);
+        console.log(`[chat ${_ts()}] ws-handler setMessages`, {
           messageId: numericId,
-          idType: typeof numericId,
-          rawMessageId: n.messageId,
-          rawIdType: typeof n.messageId,
-          senderId: n.senderId,
-          text: n.messageText?.substring(0, 30),
+          isDupe,
+          prevIds: prev.map((m) => m.id),
+          prevIdTypes: prev.slice(-3).map((m) => `${m.id}(${typeof m.id})`),
         });
-        setMessages((prev) => {
-          const isDupe = prev.some((m) => m.id === numericId);
-          console.log(`[chat ${_ts()}] ws-handler setMessages`, {
-            messageId: numericId,
-            isDupe,
-            prevIds: prev.map((m) => m.id),
-            prevIdTypes: prev.slice(-3).map((m) => `${m.id}(${typeof m.id})`),
-          });
-          if (isDupe) return prev;
-          return [
-            ...prev,
-            {
-              id: numericId,
-              userId: n.senderId != null ? Number(n.senderId) : null,
-              username: n.senderUsername,
-              messageText: n.messageText,
-              createdAt: n.timestamp,
-              messageType:
-                (n as { messageType?: string }).messageType ?? 'text',
-              metadata:
-                (n as { metadata?: Record<string, unknown> | null }).metadata ??
-                null,
-            },
-          ];
-        });
-      },
-    );
-
-    // When the WS reconnects after a drop, refetch history to catch any
-    // messages that arrived while disconnected.
-    let wasConnected = false;
-    client.on('connected', () => {
-      if (wasConnected) {
-        console.log(`[chat ${_ts()}] ws reconnected — refetching history`);
-        void refetchRef.current();
-      }
-      wasConnected = true;
-    });
-
-    clientRef.current = client;
-
-    // Deferred connect — if Strict Mode cancels before the microtask fires
-    // the socket is never opened, avoiding the "closed before established" error.
-    void Promise.resolve().then(() => {
-      if (!active) return;
-      client.connect();
-    });
-
-    return () => {
-      active = false;
-      clientRef.current?.dispose();
-      clientRef.current = null;
-    };
-  }, [leagueId]);
+        if (isDupe) return prev;
+        return [
+          ...prev,
+          {
+            id: numericId,
+            userId: n.senderId != null ? Number(n.senderId) : null,
+            username: n.senderUsername,
+            messageText: n.messageText,
+            createdAt: n.timestamp,
+            messageType: n.messageType ?? 'text',
+            metadata: n.metadata ?? null,
+          },
+        ];
+      });
+    },
+    onReconnect: () => {
+      // Refetch history to catch any messages that arrived while the socket
+      // was down.
+      console.log(`[chat ${_ts()}] ws reconnected — refetching history`);
+      void refetchRef.current();
+    },
+  });
 
   return { messages, loading, sending, sendMessage };
 }

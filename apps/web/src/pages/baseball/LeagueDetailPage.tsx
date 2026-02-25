@@ -9,10 +9,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
   useAuth,
-  useWebSocket,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
+import { WebSocketClient } from '@legacy-sports/websocket-client';
+import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
 import { Card, H1, Separator, Spinner, styled, Text } from 'tamagui';
 import {
   ArrowLeftRight,
@@ -47,6 +48,7 @@ import { LeagueScoringSummary } from '../../features/baseball/LeagueScoringSumma
 import { LeagueScoringEditor } from '../../features/baseball/LeagueScoringEditor';
 import { LeagueTradeBlock } from '../../features/baseball/LeagueTradeBlock';
 import { TradingCenter } from '../../features/baseball/TradingCenter';
+import { LeagueWebSocketContext } from '../../context/LeagueWebSocketContext';
 import { env } from '../../config/environment';
 import {
   LeagueFragment,
@@ -483,30 +485,76 @@ export function LeagueDetailPage(): React.JSX.Element {
     void refetchCurrentMatchupRef.current?.();
   }, [refetchLeague]);
 
-  const wsAutoConnect = !!env.websocketUrl && !!authToken;
-  useEffect(() => {
-    console.log('[LeagueDetailPage] WebSocket config', {
-      websocketUrl: env.websocketUrl
-        ? `${env.websocketUrl.substring(0, 30)}...`
-        : 'NOT SET',
-      hasAuthToken: !!authToken,
-      authTokenLength: authToken?.length ?? 0,
-      leagueId,
-      autoConnect: wsAutoConnect,
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Create the single shared WebSocket connection for this league page.
+  // All child components (chat, trades, roster) subscribe via
+  // LeagueWebSocketContext instead of opening their own connections.
+  const [wsClient, setWsClient] = useState<WebSocketClient | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [wsError, setWsError] = useState<string | null>(null);
 
-  const { connected: wsConnected, error: wsError } = useWebSocket({
-    url: env.websocketUrl || undefined,
-    token: authToken || undefined,
-    leagueId,
-    viewContext: 'league',
-    autoConnect: wsAutoConnect,
-    onDraftCompleted: handleDraftCompleted,
-    onDraftStarted: handleDraftStarted,
-    onRosterUpdate: handleRosterUpdate,
-    onMatchupStatsComplete: handleMatchupStatsComplete,
-  });
+  useEffect(() => {
+    const wsUrl = env.websocketUrl;
+    console.log('[LeagueDetailPage] WebSocket config', {
+      websocketUrl: wsUrl ? `${wsUrl.substring(0, 30)}...` : 'NOT SET',
+      hasAuthToken: !!authToken,
+      leagueId,
+    });
+    if (!wsUrl || !authToken || isNaN(leagueId)) return;
+
+    let active = true;
+    const client = new WebSocketClient({
+      url: wsUrl,
+      token: authToken,
+      leagueId,
+      viewContext: 'league',
+      autoConnect: false,
+    });
+    setWsClient(client);
+    client.on('connected', () => {
+      if (active) setWsConnected(true);
+    });
+    client.on('disconnected', () => {
+      if (active) setWsConnected(false);
+    });
+    client.on('error', (err: Error) => {
+      if (active) setWsError(err.message);
+    });
+    void Promise.resolve().then(() => {
+      if (active) client.connect();
+    });
+    return () => {
+      active = false;
+      client.dispose();
+      setWsClient(null);
+      setWsConnected(false);
+    };
+  }, [leagueId, authToken]);
+
+  // Subscribe to league-level events on the shared socket.
+  useEffect(() => {
+    if (!wsClient) return;
+    const unsubs: Array<() => void> = [
+      wsClient.on(ClientNotificationType.DRAFT_COMPLETED, () =>
+        handleDraftCompleted(),
+      ),
+      wsClient.on(ClientNotificationType.DRAFT_STARTED, () =>
+        handleDraftStarted(),
+      ),
+      wsClient.on(ClientNotificationType.ROSTER_UPDATE, () =>
+        handleRosterUpdate(),
+      ),
+      wsClient.on(ClientNotificationType.MATCHUP_STATS_COMPLETE, () =>
+        handleMatchupStatsComplete(),
+      ),
+    ];
+    return () => unsubs.forEach((fn) => fn());
+  }, [
+    wsClient,
+    handleDraftCompleted,
+    handleDraftStarted,
+    handleRosterUpdate,
+    handleMatchupStatsComplete,
+  ]);
 
   useEffect(() => {
     if (wsError) {
@@ -558,8 +606,8 @@ export function LeagueDetailPage(): React.JSX.Element {
       dispatch(
         setTeamMembers(
           teamMembersData.teamMembers.filter(
-            (m: TeamMemberFragment | null) => m !== null,
-          ) as TeamMemberFragment[],
+            (m): m is TeamMemberFragment => m !== null,
+          ),
         ),
       );
     }
@@ -2048,355 +2096,359 @@ export function LeagueDetailPage(): React.JSX.Element {
   // ── Render ──
 
   return (
-    <PageContainer role="main" aria-labelledby="league-title">
-      {/* Hero Header */}
-      <HeroBar
-        style={{
-          background:
-            'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 64, 175, 0.55) 100%)',
-        }}
-      >
-        <XStack alignItems="center" gap="$4" flex={1} flexWrap="wrap">
-          <Button
-            size="$3"
-            backgroundColor="rgba(255,255,255,0.08)"
-            borderColor="rgba(255,255,255,0.15)"
-            borderWidth={1}
-            borderRadius="$4"
-            onPress={() => navigate('/baseball')}
-            icon={<ChevronLeft size={18} color="white" />}
-            aria-label="Back to leagues"
-            hoverStyle={{ backgroundColor: 'rgba(255,255,255,0.14)' }}
-          />
-          <YStack gap="$1">
-            <H1
-              id="league-title"
-              fontSize="$8"
-              fontWeight="800"
-              color="white"
-              lineHeight="$8"
-            >
-              {league.name}
-            </H1>
-            <XStack alignItems="center" gap="$3">
-              <XStack alignItems="center" gap="$1.5">
-                <Users size={14} color="rgba(255,255,255,0.6)" />
-                <Text fontSize="$3" color="rgba(255,255,255,0.7)">
-                  {teamCount} teams
-                </Text>
-              </XStack>
-              <Text fontSize="$3" color="rgba(255,255,255,0.3)">
-                |
-              </Text>
-              <DraftBadge
-                backgroundColor={draftColors.bg}
-                borderColor={draftColors.border}
-              >
-                <Text fontSize="$2" fontWeight="700" color={draftColors.text}>
-                  {formatDraftStatus(String(league.draftStatus))}
-                </Text>
-              </DraftBadge>
-              {currentMatchup?.weekNumber && (
-                <>
-                  <Text fontSize="$3" color="rgba(255,255,255,0.3)">
-                    |
-                  </Text>
-                  <Text fontSize="$3" color="rgba(255,255,255,0.7)">
-                    Week {currentMatchup.weekNumber}
-                  </Text>
-                </>
-              )}
-            </XStack>
-          </YStack>
-        </XStack>
-
-        {/* Header quick-share */}
-        <XStack gap="$2">
-          <Button
-            size="$3"
-            backgroundColor="rgba(59, 130, 246, 0.16)"
-            borderColor="rgba(59, 130, 246, 0.4)"
-            borderWidth={1}
-            borderRadius="$4"
-            onPress={handleCopyInviteLink}
-            icon={
-              inviteLinkCopied ? (
-                <Check size={16} color="rgb(34, 197, 94)" />
-              ) : (
-                <Share2 size={16} color="rgb(96, 165, 250)" />
-              )
-            }
-            hoverStyle={{ backgroundColor: 'rgba(59, 130, 246, 0.24)' }}
-            aria-label="Share invite link"
-          >
-            <Text
-              fontSize="$3"
-              fontWeight="600"
-              color={inviteLinkCopied ? '$green11' : '$blue11'}
-            >
-              {inviteLinkCopied ? 'Copied!' : 'Invite'}
-            </Text>
-          </Button>
-        </XStack>
-      </HeroBar>
-
-      {/* Tab Navigation */}
-      <TabBar role="tablist" aria-label="League sections">
-        {TABS.map((tab) => {
-          if (tab.commissionerOnly && !isCommissioner) return null;
-          const isActive = activeTab === tab.id;
-          // Dynamic roster tab label when viewing another team
-          const label =
-            tab.id === 'roster' && viewingTeamId && !isViewingOwnTeam
-              ? (viewingTeamName ?? 'Team Roster')
-              : tab.label;
-          const icon =
-            tab.id === 'roster' && viewingTeamId && !isViewingOwnTeam ? (
-              <Eye size={16} />
-            ) : (
-              tab.icon
-            );
-          return (
+    <LeagueWebSocketContext.Provider
+      value={{ client: wsClient, connected: wsConnected }}
+    >
+      <PageContainer role="main" aria-labelledby="league-title">
+        {/* Hero Header */}
+        <HeroBar
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 64, 175, 0.55) 100%)',
+          }}
+        >
+          <XStack alignItems="center" gap="$4" flex={1} flexWrap="wrap">
             <Button
-              key={tab.id}
-              backgroundColor="transparent"
-              borderWidth={0}
-              borderBottomWidth={2}
-              borderBottomColor={isActive ? '$blue9' : 'transparent'}
-              borderRadius={0}
-              paddingHorizontal="$4"
-              paddingVertical="$3"
-              onPress={() => {
-                if (tab.id === 'roster') {
-                  // Clicking the roster tab resets to viewing own roster
-                  setViewingTeamId(null);
-                }
-                changeTab(tab.id);
-              }}
-              role="tab"
-              id={`tab-${tab.id}`}
-              aria-selected={isActive}
-              aria-controls={`panel-${tab.id}`}
-              hoverStyle={{
-                backgroundColor: 'rgba(59, 130, 246, 0.06)',
-              }}
-              pressStyle={{
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              }}
-            >
-              <XStack alignItems="center" gap="$2">
-                <YStack opacity={isActive ? 1 : 0.5}>{icon}</YStack>
-                <Text
-                  fontSize="$3"
-                  fontWeight={isActive ? '700' : '500'}
-                  color={isActive ? '$blue11' : '$textMuted'}
+              size="$3"
+              backgroundColor="rgba(255,255,255,0.08)"
+              borderColor="rgba(255,255,255,0.15)"
+              borderWidth={1}
+              borderRadius="$4"
+              onPress={() => navigate('/baseball')}
+              icon={<ChevronLeft size={18} color="white" />}
+              aria-label="Back to leagues"
+              hoverStyle={{ backgroundColor: 'rgba(255,255,255,0.14)' }}
+            />
+            <YStack gap="$1">
+              <H1
+                id="league-title"
+                fontSize="$8"
+                fontWeight="800"
+                color="white"
+                lineHeight="$8"
+              >
+                {league.name}
+              </H1>
+              <XStack alignItems="center" gap="$3">
+                <XStack alignItems="center" gap="$1.5">
+                  <Users size={14} color="rgba(255,255,255,0.6)" />
+                  <Text fontSize="$3" color="rgba(255,255,255,0.7)">
+                    {teamCount} teams
+                  </Text>
+                </XStack>
+                <Text fontSize="$3" color="rgba(255,255,255,0.3)">
+                  |
+                </Text>
+                <DraftBadge
+                  backgroundColor={draftColors.bg}
+                  borderColor={draftColors.border}
                 >
-                  {label}
-                </Text>
+                  <Text fontSize="$2" fontWeight="700" color={draftColors.text}>
+                    {formatDraftStatus(String(league.draftStatus))}
+                  </Text>
+                </DraftBadge>
+                {currentMatchup?.weekNumber && (
+                  <>
+                    <Text fontSize="$3" color="rgba(255,255,255,0.3)">
+                      |
+                    </Text>
+                    <Text fontSize="$3" color="rgba(255,255,255,0.7)">
+                      Week {currentMatchup.weekNumber}
+                    </Text>
+                  </>
+                )}
               </XStack>
-            </Button>
-          );
-        })}
-      </TabBar>
+            </YStack>
+          </XStack>
 
-      {/* Tab Content */}
-      <ContentArea marginTop="$5">
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'roster' && renderRosterManagement()}
-        {activeTab === 'free-agents' && (
-          <YStack
-            role="tabpanel"
-            id="panel-free-agents"
-            aria-labelledby="tab-free-agents"
-          >
-            <LeagueFreeAgents
-              leagueId={leagueId}
-              gamesPerMatchup={currentMatchup?.gamesPerMatchup ?? 5}
-            />
-          </YStack>
-        )}
-        {activeTab === 'standings' && (
-          <YStack
-            role="tabpanel"
-            id="panel-standings"
-            aria-labelledby="tab-standings"
-          >
-            <LeagueStandings
-              leagueId={leagueId}
-              teams={leagueTeams}
-              loading={leagueTeamsLoading}
-              userTeamId={userTeamId}
-              waiverType={league?.waiverType}
-              onTeamClick={handleViewTeamRoster}
-            />
-          </YStack>
-        )}
-        {activeTab === 'matchup' && (
-          <YStack
-            role="tabpanel"
-            id="panel-matchup"
-            aria-labelledby="tab-matchup"
-            gap="$4"
-          >
-            {matchupLoading ? (
-              <Card
-                backgroundColor="$surfacePanel"
-                borderColor="$surfacePanelBorder"
-                borderWidth={1}
-                padding="$6"
-                borderRadius="$6"
+          {/* Header quick-share */}
+          <XStack gap="$2">
+            <Button
+              size="$3"
+              backgroundColor="rgba(59, 130, 246, 0.16)"
+              borderColor="rgba(59, 130, 246, 0.4)"
+              borderWidth={1}
+              borderRadius="$4"
+              onPress={handleCopyInviteLink}
+              icon={
+                inviteLinkCopied ? (
+                  <Check size={16} color="rgb(34, 197, 94)" />
+                ) : (
+                  <Share2 size={16} color="rgb(96, 165, 250)" />
+                )
+              }
+              hoverStyle={{ backgroundColor: 'rgba(59, 130, 246, 0.24)' }}
+              aria-label="Share invite link"
+            >
+              <Text
+                fontSize="$3"
+                fontWeight="600"
+                color={inviteLinkCopied ? '$green11' : '$blue11'}
               >
-                <YStack gap="$3" alignItems="center">
-                  <Spinner size="large" />
-                  <Text color="$textMuted">Loading matchup...</Text>
-                </YStack>
-              </Card>
-            ) : matchupError ? (
-              <Card
-                backgroundColor="$red2"
-                borderColor="$red6"
-                borderWidth={1}
-                padding="$4"
-                borderRadius="$6"
-              >
-                <Text color="$red11">
-                  Error loading matchup: {matchupError.message}
-                </Text>
-              </Card>
-            ) : displayedMatchup ? (
-              <YStack gap="$4">
-                {/* Matchup Navigation */}
-                <MatchupNavigationControls
-                  currentMatchup={displayedMatchup}
-                  leagueId={leagueId}
-                  allMatchups={allLeagueMatchups}
-                  userTeamId={reduxUserTeamId}
-                  isViewingOther={selectedMatchupId != null}
-                  onMatchupChange={(matchupId) => {
-                    setSelectedMatchupId(matchupId);
-                    // Update URL with matchup ID as route parameter for shareable links
-                    navigate(
-                      `/baseball/league/${leagueId}/matchup/${matchupId}`,
-                      {
-                        replace: true,
-                      },
-                    );
-                  }}
-                  onResetToDefault={() => {
-                    setSelectedMatchupId(null);
-                    // Navigate back to base matchup tab without matchupId
-                    navigate(`/baseball/league/${leagueId}/matchup`, {
-                      replace: true,
-                    });
-                  }}
-                />
-                <MatchupScoreboard
-                  matchup={displayedMatchup}
-                  gamesRemaining={
-                    (displayedMatchup.gamesPerMatchup ?? 0) -
-                    (displayedMatchup.selectedGamesCount ?? 0)
+                {inviteLinkCopied ? 'Copied!' : 'Invite'}
+              </Text>
+            </Button>
+          </XStack>
+        </HeroBar>
+
+        {/* Tab Navigation */}
+        <TabBar role="tablist" aria-label="League sections">
+          {TABS.map((tab) => {
+            if (tab.commissionerOnly && !isCommissioner) return null;
+            const isActive = activeTab === tab.id;
+            // Dynamic roster tab label when viewing another team
+            const label =
+              tab.id === 'roster' && viewingTeamId && !isViewingOwnTeam
+                ? (viewingTeamName ?? 'Team Roster')
+                : tab.label;
+            const icon =
+              tab.id === 'roster' && viewingTeamId && !isViewingOwnTeam ? (
+                <Eye size={16} />
+              ) : (
+                tab.icon
+              );
+            return (
+              <Button
+                key={tab.id}
+                backgroundColor="transparent"
+                borderWidth={0}
+                borderBottomWidth={2}
+                borderBottomColor={isActive ? '$blue9' : 'transparent'}
+                borderRadius={0}
+                paddingHorizontal="$4"
+                paddingVertical="$3"
+                onPress={() => {
+                  if (tab.id === 'roster') {
+                    // Clicking the roster tab resets to viewing own roster
+                    setViewingTeamId(null);
                   }
-                  onTeamClick={handleViewTeamRoster}
-                />
-                {displayedMatchup.gamesPerMatchup && (
-                  <GamesRemaining
+                  changeTab(tab.id);
+                }}
+                role="tab"
+                id={`tab-${tab.id}`}
+                aria-selected={isActive}
+                aria-controls={`panel-${tab.id}`}
+                hoverStyle={{
+                  backgroundColor: 'rgba(59, 130, 246, 0.06)',
+                }}
+                pressStyle={{
+                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                }}
+              >
+                <XStack alignItems="center" gap="$2">
+                  <YStack opacity={isActive ? 1 : 0.5}>{icon}</YStack>
+                  <Text
+                    fontSize="$3"
+                    fontWeight={isActive ? '700' : '500'}
+                    color={isActive ? '$blue11' : '$textMuted'}
+                  >
+                    {label}
+                  </Text>
+                </XStack>
+              </Button>
+            );
+          })}
+        </TabBar>
+
+        {/* Tab Content */}
+        <ContentArea marginTop="$5">
+          {activeTab === 'overview' && renderOverview()}
+          {activeTab === 'roster' && renderRosterManagement()}
+          {activeTab === 'free-agents' && (
+            <YStack
+              role="tabpanel"
+              id="panel-free-agents"
+              aria-labelledby="tab-free-agents"
+            >
+              <LeagueFreeAgents
+                leagueId={leagueId}
+                gamesPerMatchup={currentMatchup?.gamesPerMatchup ?? 5}
+              />
+            </YStack>
+          )}
+          {activeTab === 'standings' && (
+            <YStack
+              role="tabpanel"
+              id="panel-standings"
+              aria-labelledby="tab-standings"
+            >
+              <LeagueStandings
+                leagueId={leagueId}
+                teams={leagueTeams}
+                loading={leagueTeamsLoading}
+                userTeamId={userTeamId}
+                waiverType={league?.waiverType}
+                onTeamClick={handleViewTeamRoster}
+              />
+            </YStack>
+          )}
+          {activeTab === 'matchup' && (
+            <YStack
+              role="tabpanel"
+              id="panel-matchup"
+              aria-labelledby="tab-matchup"
+              gap="$4"
+            >
+              {matchupLoading ? (
+                <Card
+                  backgroundColor="$surfacePanel"
+                  borderColor="$surfacePanelBorder"
+                  borderWidth={1}
+                  padding="$6"
+                  borderRadius="$6"
+                >
+                  <YStack gap="$3" alignItems="center">
+                    <Spinner size="large" />
+                    <Text color="$textMuted">Loading matchup...</Text>
+                  </YStack>
+                </Card>
+              ) : matchupError ? (
+                <Card
+                  backgroundColor="$red2"
+                  borderColor="$red6"
+                  borderWidth={1}
+                  padding="$4"
+                  borderRadius="$6"
+                >
+                  <Text color="$red11">
+                    Error loading matchup: {matchupError.message}
+                  </Text>
+                </Card>
+              ) : displayedMatchup ? (
+                <YStack gap="$4">
+                  {/* Matchup Navigation */}
+                  <MatchupNavigationControls
+                    currentMatchup={displayedMatchup}
+                    leagueId={leagueId}
+                    allMatchups={allLeagueMatchups}
+                    userTeamId={reduxUserTeamId}
+                    isViewingOther={selectedMatchupId != null}
+                    onMatchupChange={(matchupId) => {
+                      setSelectedMatchupId(matchupId);
+                      // Update URL with matchup ID as route parameter for shareable links
+                      navigate(
+                        `/baseball/league/${leagueId}/matchup/${matchupId}`,
+                        {
+                          replace: true,
+                        },
+                      );
+                    }}
+                    onResetToDefault={() => {
+                      setSelectedMatchupId(null);
+                      // Navigate back to base matchup tab without matchupId
+                      navigate(`/baseball/league/${leagueId}/matchup`, {
+                        replace: true,
+                      });
+                    }}
+                  />
+                  <MatchupScoreboard
+                    matchup={displayedMatchup}
                     gamesRemaining={
                       (displayedMatchup.gamesPerMatchup ?? 0) -
                       (displayedMatchup.selectedGamesCount ?? 0)
                     }
-                    totalGames={displayedMatchup.gamesPerMatchup}
+                    onTeamClick={handleViewTeamRoster}
                   />
-                )}
-                <MatchupRosterComparison matchup={displayedMatchup} />
-                {(displayedMatchup.startTime || displayedMatchup.endTime) && (
-                  <Card
-                    backgroundColor="$surfacePanel"
-                    borderColor="$surfacePanelBorder"
-                    borderWidth={1}
-                    padding="$4"
-                    borderRadius="$6"
-                  >
-                    <YStack gap="$2">
-                      <Text fontSize="$3" fontWeight="700" color="$color">
-                        Schedule
-                      </Text>
-                      <YStack gap="$1">
-                        {displayedMatchup.startTime && (
-                          <Text fontSize="$2" color="$textMuted">
-                            Start:{' '}
-                            {new Date(
-                              String(displayedMatchup.startTime),
-                            ).toLocaleString()}
-                          </Text>
-                        )}
-                        {displayedMatchup.endTime && (
-                          <Text fontSize="$2" color="$textMuted">
-                            End:{' '}
-                            {new Date(
-                              String(displayedMatchup.endTime),
-                            ).toLocaleString()}
-                          </Text>
-                        )}
-                      </YStack>
-                    </YStack>
-                  </Card>
-                )}
-              </YStack>
-            ) : (
-              <Card
-                backgroundColor="$surfacePanel"
-                borderColor="$surfacePanelBorder"
-                borderWidth={1}
-                padding="$6"
-                borderRadius="$6"
-                alignItems="center"
-              >
-                <YStack alignItems="center" gap="$3">
-                  <Swords size={32} color="var(--textMuted)" />
-                  <Text color="$textMuted" fontSize="$5" fontWeight="600">
-                    No Active Matchup
-                  </Text>
-                  <Text
-                    color="$textMuted"
-                    fontSize="$3"
-                    textAlign="center"
-                    maxWidth={400}
-                  >
-                    {isCommissioner
-                      ? 'Head to the Commissioner tab to start the draft and create matchups.'
-                      : "The commissioner hasn't created matchups yet. Check back soon!"}
-                  </Text>
-                  {isCommissioner && (
-                    <Button
-                      marginTop="$2"
-                      backgroundColor="$blue9"
-                      color="white"
-                      borderRadius="$4"
-                      onPress={() => changeTab('commissioner')}
+                  {displayedMatchup.gamesPerMatchup && (
+                    <GamesRemaining
+                      gamesRemaining={
+                        (displayedMatchup.gamesPerMatchup ?? 0) -
+                        (displayedMatchup.selectedGamesCount ?? 0)
+                      }
+                      totalGames={displayedMatchup.gamesPerMatchup}
+                    />
+                  )}
+                  <MatchupRosterComparison matchup={displayedMatchup} />
+                  {(displayedMatchup.startTime || displayedMatchup.endTime) && (
+                    <Card
+                      backgroundColor="$surfacePanel"
+                      borderColor="$surfacePanelBorder"
+                      borderWidth={1}
+                      padding="$4"
+                      borderRadius="$6"
                     >
-                      <Text fontWeight="600" color="white">
-                        Go to Commissioner
-                      </Text>
-                    </Button>
+                      <YStack gap="$2">
+                        <Text fontSize="$3" fontWeight="700" color="$color">
+                          Schedule
+                        </Text>
+                        <YStack gap="$1">
+                          {displayedMatchup.startTime && (
+                            <Text fontSize="$2" color="$textMuted">
+                              Start:{' '}
+                              {new Date(
+                                String(displayedMatchup.startTime),
+                              ).toLocaleString()}
+                            </Text>
+                          )}
+                          {displayedMatchup.endTime && (
+                            <Text fontSize="$2" color="$textMuted">
+                              End:{' '}
+                              {new Date(
+                                String(displayedMatchup.endTime),
+                              ).toLocaleString()}
+                            </Text>
+                          )}
+                        </YStack>
+                      </YStack>
+                    </Card>
                   )}
                 </YStack>
-              </Card>
-            )}
-          </YStack>
-        )}
-        {activeTab === 'trades' && userTeamId && (
-          <TradingCenter
-            leagueId={leagueId}
-            userTeamId={userTeamId}
-            isCommissioner={isCommissioner}
-          />
-        )}
-        {activeTab === 'team-settings' && renderTeamSettings()}
-        {activeTab === 'commissioner' &&
-          isCommissioner &&
-          renderCommissionerSettings()}
-      </ContentArea>
-    </PageContainer>
+              ) : (
+                <Card
+                  backgroundColor="$surfacePanel"
+                  borderColor="$surfacePanelBorder"
+                  borderWidth={1}
+                  padding="$6"
+                  borderRadius="$6"
+                  alignItems="center"
+                >
+                  <YStack alignItems="center" gap="$3">
+                    <Swords size={32} color="var(--textMuted)" />
+                    <Text color="$textMuted" fontSize="$5" fontWeight="600">
+                      No Active Matchup
+                    </Text>
+                    <Text
+                      color="$textMuted"
+                      fontSize="$3"
+                      textAlign="center"
+                      maxWidth={400}
+                    >
+                      {isCommissioner
+                        ? 'Head to the Commissioner tab to start the draft and create matchups.'
+                        : "The commissioner hasn't created matchups yet. Check back soon!"}
+                    </Text>
+                    {isCommissioner && (
+                      <Button
+                        marginTop="$2"
+                        backgroundColor="$blue9"
+                        color="white"
+                        borderRadius="$4"
+                        onPress={() => changeTab('commissioner')}
+                      >
+                        <Text fontWeight="600" color="white">
+                          Go to Commissioner
+                        </Text>
+                      </Button>
+                    )}
+                  </YStack>
+                </Card>
+              )}
+            </YStack>
+          )}
+          {activeTab === 'trades' && userTeamId && (
+            <TradingCenter
+              leagueId={leagueId}
+              userTeamId={userTeamId}
+              isCommissioner={isCommissioner}
+            />
+          )}
+          {activeTab === 'team-settings' && renderTeamSettings()}
+          {activeTab === 'commissioner' &&
+            isCommissioner &&
+            renderCommissionerSettings()}
+        </ContentArea>
+      </PageContainer>
+    </LeagueWebSocketContext.Provider>
   );
 }
 

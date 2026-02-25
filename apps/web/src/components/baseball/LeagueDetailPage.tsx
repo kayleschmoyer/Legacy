@@ -353,8 +353,8 @@ export function LeagueDetailPage(): React.JSX.Element {
       dispatch(
         setTeamMembers(
           teamMembersData.teamMembers.filter(
-            (m: TeamMemberFragment | null) => m !== null,
-          ) as TeamMemberFragment[],
+            (m): m is TeamMemberFragment => m !== null,
+          ),
         ),
       );
     }

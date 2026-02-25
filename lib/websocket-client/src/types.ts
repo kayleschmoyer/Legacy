@@ -97,6 +97,10 @@ export interface LeagueChatMessageNotification {
   messageText: string;
   /** ISO-8601 timestamp */
   timestamp: string;
+  /** Discriminates rendering: 'text' | 'trade' | 'waiver' | 'draft_settings' */
+  messageType?: string;
+  /** Parsed JSON metadata for card rendering */
+  metadata?: Record<string, unknown> | null;
 }
 
 /**
