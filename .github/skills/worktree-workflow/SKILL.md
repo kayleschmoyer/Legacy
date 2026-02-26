@@ -45,6 +45,10 @@ From the main repo, use `twig worktree create` — it creates the branch if it d
 cd "D:\code\legacy-sports"
 twig worktree create LS-####/short-description
 
+# Register the branch as a child of main in twig's tree
+# (twig worktree create does NOT do this automatically)
+twig branch depend LS-####/short-description main
+
 # Verify — note the path twig chose
 twig worktree list
 ```
@@ -231,6 +235,7 @@ make install
 # 1. Create branch + worktree
 cd "D:\code\legacy-sports"
 twig worktree create LS-####/description
+twig branch depend LS-####/description main  # register parentage in twig tree
 twig worktree list   # note the path twig chose
 
 # 2. Jira
