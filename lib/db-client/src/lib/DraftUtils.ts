@@ -417,7 +417,7 @@ export async function filterPlayerIdsByLeagueEligibility(
                  (SELECT cb.g FROM career_batting  cb WHERE cb.player_id = p.id LIMIT 1) AS batting_games,
                  (SELECT cp.g FROM career_pitching cp WHERE cp.player_id = p.id LIMIT 1) AS pitching_games
           FROM players p
-          WHERE p.id = ANY(${currentIds})
+          WHERE p.id = ANY(${sql.param(currentIds)}::integer[])
         ) sub
       `,
     );
@@ -445,9 +445,9 @@ export async function filterPlayerIdsByLeagueEligibility(
       sql`
         SELECT player_id, COUNT(DISTINCT season) AS season_count
         FROM (
-          SELECT player_id, season FROM season_batting  WHERE player_id = ANY(${currentIds})
+          SELECT player_id, season FROM season_batting  WHERE player_id = ANY(${sql.param(currentIds)}::integer[])
           UNION
-          SELECT player_id, season FROM season_pitching WHERE player_id = ANY(${currentIds})
+          SELECT player_id, season FROM season_pitching WHERE player_id = ANY(${sql.param(currentIds)}::integer[])
         ) all_seasons
         GROUP BY player_id
       `,
