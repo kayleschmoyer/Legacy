@@ -26,6 +26,7 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 | Task                       | File                                    |
 | -------------------------- | --------------------------------------- |
 | Full workflow (start here) | `skills/workflow-ticket-to-pr/SKILL.md` |
+| Worktree workflow          | `skills/worktree-workflow/SKILL.md`     |
 | Branch/ticket workflow     | `skills/branch-create/SKILL.md`         |
 | Type errors                | `skills/fix-types/SKILL.md`             |
 | Lint errors                | `skills/fix-lint/SKILL.md`              |
