@@ -125,3 +125,38 @@ builder.queryField('searchUsers', (t) =>
     },
   }),
 );
+
+builder.mutationField('updateUserRole', (t) =>
+  t.field({
+    type: UserRef,
+    nullable: true,
+    description:
+      'Update a user\'s access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them.',
+    args: {
+      userId: t.arg.int({ required: true }),
+      accessLevel: t.arg.string({ required: true }),
+    },
+    resolve: async (parent, { userId, accessLevel }, context) => {
+      if (!context.user?.isAdmin) {
+        throw new Error('Admin access required to update user roles');
+      }
+      if (accessLevel !== 'none' && accessLevel !== 'admin') {
+        throw new Error('accessLevel must be "none" or "admin"');
+      }
+
+      const updated = await dbService.users.updateUserAccessLevel(
+        userId,
+        accessLevel,
+      );
+
+      if (!updated) return null;
+
+      return {
+        id: Number(updated.id),
+        email: updated.email,
+        username: updated.username,
+        accessLevel: updated.accessLevel,
+      };
+    },
+  }),
+);

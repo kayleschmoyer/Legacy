@@ -2,10 +2,28 @@ fragment User on User {
   id
   email
   username
+  accessLevel
 }
 
 query GetUserById($id: Int!) {
   user(id: $id) {
+    ...User
+  }
+}
+
+query GetAllUsers($limit: Int, $offset: Int) {
+  users(
+    limit: $limit
+    offset: $offset
+    orderBy: "email"
+    orderDirection: "asc"
+  ) {
+    ...User
+  }
+}
+
+mutation UpdateUserRole($userId: Int!, $accessLevel: String!) {
+  updateUserRole(userId: $userId, accessLevel: $accessLevel) {
     ...User
   }
 }

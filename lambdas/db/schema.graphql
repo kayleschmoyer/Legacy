@@ -920,6 +920,11 @@ type Mutation {
   updateTeamMemberPosition(positionId: Int, teamMemberId: Int!): TeamMember
 
   """
+  Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them.
+  """
+  updateUserRole(accessLevel: String!, userId: Int!): User
+
+  """
   Create or update a single achievement restriction for a league. Commissioner / owner access required.
   """
   upsertAchievementRestriction(

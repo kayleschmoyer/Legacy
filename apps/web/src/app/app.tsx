@@ -3,6 +3,7 @@ import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import {
   Button,
   Paragraph,
+  useAuth,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
@@ -27,6 +28,7 @@ import { TeamDetailPage } from '../pages/baseball/TeamDetailPage';
 import JoinLeagueByCodePage from '../pages/baseball/JoinLeagueByCodePage';
 import ManagementPage from '../pages/management/ManagementPage';
 import AboutPage from '../pages/about/AboutPage';
+import { AdminUsersPage } from '../pages/admin';
 import { DraftBoardPage } from '../pages/draft/DraftBoardPage';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
@@ -148,6 +150,8 @@ const MobileNavLink = styled(Button, {
 
 function Navigation() {
   const location = useLocation();
+  const { user } = useAuth();
+  const isAdmin = user?.accessLevel === 'admin';
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileRef = useRef<HTMLDivElement>(null);
 
@@ -279,6 +283,23 @@ function Navigation() {
                 </Paragraph>
               </NavLinkButton>
             </Link>
+
+            {isAdmin && (
+              <Link
+                to="/admin/users"
+                style={{ textDecoration: 'none' }}
+                aria-current={isActive('/admin/users') ? 'page' : undefined}
+              >
+                <NavLinkButton active={isActive('/admin/users')}>
+                  <Paragraph marginBottom={0}>
+                    <span role="img" aria-label="admin">
+                      🛡️
+                    </span>{' '}
+                    Admin
+                  </Paragraph>
+                </NavLinkButton>
+              </Link>
+            )}
           </NavLinks>
 
           {/* ── Right section ── */}
@@ -374,6 +395,21 @@ function Navigation() {
               </Paragraph>
             </MobileNavLink>
           </Link>
+          {isAdmin && (
+            <Link to="/admin/users" style={{ textDecoration: 'none' }}>
+              <MobileNavLink
+                active={isActive('/admin/users')}
+                onPress={() => setMobileOpen(false)}
+              >
+                <Paragraph marginBottom={0}>
+                  <span role="img" aria-label="admin">
+                    🛡️
+                  </span>{' '}
+                  Admin
+                </Paragraph>
+              </MobileNavLink>
+            </Link>
+          )}
         </MobileNavPanel>
       )}
     </YStack>
@@ -463,6 +499,7 @@ function App() {
           <Route path="/players/stats" element={<PlayerStatsPage />} />
           <Route path="/players/:id" element={<PlayerDetailPage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
         </Routes>
       </YStack>
     </MainLayout>

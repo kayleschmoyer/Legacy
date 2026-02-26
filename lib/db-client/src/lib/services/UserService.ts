@@ -12,8 +12,9 @@ import {
   SQL,
 } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils';
-import { runWithPublicClient } from '../client/Helpers';
+import { runWithInternalClient, runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
+import * as InternalSchema from '../../drizzle/internal/schema';
 import { User } from '../../types/DatabaseTypes';
 
 export interface UserFilters {
@@ -167,6 +168,24 @@ export class UserService {
         )
         .limit(limit);
     });
+  }
+
+  /**
+   * Update a user's access level in the internal schema.
+   * Returns the updated user record from the public view, or null if not found.
+   */
+  async updateUserAccessLevel(
+    userId: number,
+    accessLevel: 'none' | 'admin',
+  ): Promise<User | null> {
+    await runWithInternalClient(this.options, async (db) => {
+      await db
+        .update(InternalSchema.usersInAppInternal)
+        .set({ accessLevel })
+        .where(eq(InternalSchema.usersInAppInternal.id, userId));
+    });
+
+    return this.getUserById(userId);
   }
 
   /**

@@ -771,6 +771,8 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
+  /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
+  updateUserRole?: Maybe<User>;
   /** Create or update a single achievement restriction for a league. Commissioner / owner access required. */
   upsertAchievementRestriction?: Maybe<AchievementRestriction>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
@@ -999,6 +1001,11 @@ export type MutationUpdateNotificationPreferencesArgs = {
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
+};
+
+export type MutationUpdateUserRoleArgs = {
+  accessLevel: Scalars['String']['input'];
+  userId: Scalars['Int']['input'];
 };
 
 export type MutationUpsertAchievementRestrictionArgs = {
@@ -4462,6 +4469,7 @@ export type UserFragment = {
   id?: number | null;
   email?: string | null;
   username?: string | null;
+  accessLevel?: string | null;
 };
 
 export type GetUserByIdQueryVariables = Exact<{
@@ -4475,6 +4483,39 @@ export type GetUserByIdQuery = {
     id?: number | null;
     email?: string | null;
     username?: string | null;
+    accessLevel?: string | null;
+  } | null;
+};
+
+export type GetAllUsersQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetAllUsersQuery = {
+  __typename?: 'Query';
+  users?: Array<{
+    __typename?: 'User';
+    id?: number | null;
+    email?: string | null;
+    username?: string | null;
+    accessLevel?: string | null;
+  }> | null;
+};
+
+export type UpdateUserRoleMutationVariables = Exact<{
+  userId: Scalars['Int']['input'];
+  accessLevel: Scalars['String']['input'];
+}>;
+
+export type UpdateUserRoleMutation = {
+  __typename?: 'Mutation';
+  updateUserRole?: {
+    __typename?: 'User';
+    id?: number | null;
+    email?: string | null;
+    username?: string | null;
+    accessLevel?: string | null;
   } | null;
 };
 
@@ -4812,6 +4853,7 @@ export const UserFragmentDoc = gql`
     id
     email
     username
+    accessLevel
   }
 `;
 export const GetAchievementRestrictions = gql`
@@ -9622,4 +9664,144 @@ export type GetUserByIdSuspenseQueryHookResult = ReturnType<
 export type GetUserByIdQueryResult = Apollo.QueryResult<
   GetUserByIdQuery,
   GetUserByIdQueryVariables
+>;
+export const GetAllUsers = gql`
+  query GetAllUsers($limit: Int, $offset: Int) {
+    users(
+      limit: $limit
+      offset: $offset
+      orderBy: "email"
+      orderDirection: "asc"
+    ) {
+      ...User
+    }
+  }
+  ${UserFragmentDoc}
+`;
+
+/**
+ * __useGetAllUsersQuery__
+ *
+ * To run a query within a React component, call `useGetAllUsersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAllUsersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAllUsersQuery({
+ *   variables: {
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *   },
+ * });
+ */
+export function useGetAllUsersQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetAllUsersQuery,
+    GetAllUsersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetAllUsersQuery, GetAllUsersQueryVariables>(
+    GetAllUsers,
+    options,
+  );
+}
+export function useGetAllUsersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetAllUsersQuery,
+    GetAllUsersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetAllUsersQuery, GetAllUsersQueryVariables>(
+    GetAllUsers,
+    options,
+  );
+}
+export function useGetAllUsersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAllUsersQuery,
+        GetAllUsersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<GetAllUsersQuery, GetAllUsersQueryVariables>(
+    GetAllUsers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetAllUsersQuery,
+          GetAllUsersQueryVariables
+        >,
+  );
+}
+export type GetAllUsersQueryHookResult = ReturnType<typeof useGetAllUsersQuery>;
+export type GetAllUsersLazyQueryHookResult = ReturnType<
+  typeof useGetAllUsersLazyQuery
+>;
+export type GetAllUsersSuspenseQueryHookResult = ReturnType<
+  typeof useGetAllUsersSuspenseQuery
+>;
+export type GetAllUsersQueryResult = Apollo.QueryResult<
+  GetAllUsersQuery,
+  GetAllUsersQueryVariables
+>;
+export const UpdateUserRole = gql`
+  mutation UpdateUserRole($userId: Int!, $accessLevel: String!) {
+    updateUserRole(userId: $userId, accessLevel: $accessLevel) {
+      ...User
+    }
+  }
+  ${UserFragmentDoc}
+`;
+export type UpdateUserRoleMutationFn = MutationFunction<
+  UpdateUserRoleMutation,
+  UpdateUserRoleMutationVariables
+>;
+
+/**
+ * __useUpdateUserRoleMutation__
+ *
+ * To run a mutation, you first call `useUpdateUserRoleMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateUserRoleMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateUserRoleMutation, { data, loading, error }] = useUpdateUserRoleMutation({
+ *   variables: {
+ *      userId: // value for 'userId'
+ *      accessLevel: // value for 'accessLevel'
+ *   },
+ * });
+ */
+export function useUpdateUserRoleMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateUserRoleMutation,
+    UpdateUserRoleMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateUserRoleMutation,
+    UpdateUserRoleMutationVariables
+  >(UpdateUserRole, options);
+}
+export type UpdateUserRoleMutationHookResult = ReturnType<
+  typeof useUpdateUserRoleMutation
+>;
+export type UpdateUserRoleMutationResult =
+  Apollo.MutationResult<UpdateUserRoleMutation>;
+export type UpdateUserRoleMutationOptions = BaseMutationOptions<
+  UpdateUserRoleMutation,
+  UpdateUserRoleMutationVariables
 >;

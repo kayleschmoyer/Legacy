@@ -771,6 +771,8 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
+  /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
+  updateUserRole?: Maybe<User>;
   /** Create or update a single achievement restriction for a league. Commissioner / owner access required. */
   upsertAchievementRestriction?: Maybe<AchievementRestriction>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
@@ -999,6 +1001,11 @@ export type MutationUpdateNotificationPreferencesArgs = {
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
+};
+
+export type MutationUpdateUserRoleArgs = {
+  accessLevel: Scalars['String']['input'];
+  userId: Scalars['Int']['input'];
 };
 
 export type MutationUpsertAchievementRestrictionArgs = {
