@@ -52,7 +52,7 @@ function CreateLeagueModal({
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
     sport: 'baseball',
-    numberOfTeams: 10,
+    numberOfTeams: 12,
     playerPool: PlayerPool.ALL,
     draftMode: DraftMode.LIVE,
     selectionMethod: SelectionMethod.STANDARD,
@@ -92,7 +92,7 @@ function CreateLeagueModal({
       setFormData({
         leagueName: '',
         sport: 'baseball',
-        numberOfTeams: 10,
+        numberOfTeams: 12,
         playerPool: PlayerPool.ALL,
         draftMode: DraftMode.LIVE,
         selectionMethod: SelectionMethod.STANDARD,

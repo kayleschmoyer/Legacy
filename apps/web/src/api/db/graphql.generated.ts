@@ -234,8 +234,10 @@ export type CreateLeagueAndTeamsInput = {
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
   maxPitchers?: InputMaybe<Scalars['Int']['input']>;
   maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
+  numberOfDivisions?: InputMaybe<Scalars['Int']['input']>;
   numberOfTeams: Scalars['Int']['input'];
   playerPool: Scalars['String']['input'];
+  schedulingStrategy?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
   startDate?: InputMaybe<Scalars['String']['input']>;
   tradingEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -1737,6 +1739,7 @@ export enum StatsLoadingStatus {
 export type Team = {
   __typename?: 'Team';
   createdAt?: Maybe<Scalars['String']['output']>;
+  divisionId?: Maybe<Scalars['Int']['output']>;
   faabBudget?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;

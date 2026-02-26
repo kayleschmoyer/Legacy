@@ -54,6 +54,8 @@ export interface CreateLeagueOptions {
   ownerUsername: string;
   maxRosterSize?: number;
   numberOfTeams?: number;
+  numberOfDivisions?: number;
+  schedulingStrategy?: 'round-robin' | 'divisional' | 'random';
   playerPool?: 'all' | 'nl' | 'al';
   draftMode?: DraftMode;
   selectionMethod?: SelectionMethod;
@@ -86,6 +88,7 @@ export interface CreateLeagueResult {
     id: number;
     name: string;
     leagueId: number;
+    divisionId: number | null;
     createdAt: Date;
     updatedAt: Date;
     waiverOrder: number | null;
@@ -117,7 +120,9 @@ export class LeagueService {
       ownerId,
       ownerUsername,
       maxRosterSize = 25,
-      numberOfTeams = 4,
+      numberOfTeams = 12,
+      numberOfDivisions = 2,
+      schedulingStrategy = 'divisional',
       playerPool = 'all',
       draftMode = 'live',
       selectionMethod = 'standard',
@@ -144,6 +149,8 @@ export class LeagueService {
           waiverType,
           waiverEnabled,
           faabBudgetDefault,
+          schedulingStrategy,
+          numberOfDivisions,
         })
         .returning({
           id: PublicSchema.leagues.id,
@@ -159,14 +166,17 @@ export class LeagueService {
           faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
         });
 
-      // 2. Create teams
+      // 2. Create teams — assign each team to a division (block-assign evenly across divisions)
+      // e.g. 12 teams / 2 divisions → teams 0-5 to division 1, teams 6-11 to division 2
       const teamNames = [`${ownerUsername}'s Team`, ...DEFAULT_TEAM_NAMES];
       const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
+      const teamsPerDivision = Math.ceil(teamsToCreate / numberOfDivisions);
       const teamData = teamNames
         .slice(0, teamsToCreate)
         .map((teamName, index) => ({
           name: teamName,
           leagueId: league.id,
+          divisionId: Math.floor(index / teamsPerDivision) + 1,
           waiverOrder: index + 1,
           faabBudget: faabBudgetDefault,
         }));
@@ -178,6 +188,7 @@ export class LeagueService {
           id: PublicSchema.teams.id,
           name: PublicSchema.teams.name,
           leagueId: PublicSchema.teams.leagueId,
+          divisionId: PublicSchema.teams.divisionId,
           createdAt: PublicSchema.teams.createdAt,
           updatedAt: PublicSchema.teams.updatedAt,
           waiverOrder: PublicSchema.teams.waiverOrder,

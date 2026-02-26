@@ -132,6 +132,7 @@ Team.implement({
     id: t.exposeInt('id'),
     name: t.exposeString('name'),
     leagueId: t.exposeInt('leagueId'),
+    divisionId: t.exposeInt('divisionId', { nullable: true }),
     waiverOrder: t.exposeInt('waiverOrder', { nullable: true }),
     faabBudget: t.exposeInt('faabBudget', { nullable: true }),
     createdAt: t.string({

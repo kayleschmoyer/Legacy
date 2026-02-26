@@ -443,6 +443,7 @@ builder.objectType(TiebreakerHistory, {
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            divisionId: PublicSchema.teams.divisionId,
             createdAt: PublicSchema.teams.createdAt,
             updatedAt: PublicSchema.teams.updatedAt,
             waiverOrder: PublicSchema.teams.waiverOrder,

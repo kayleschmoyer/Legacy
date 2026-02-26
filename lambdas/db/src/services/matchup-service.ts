@@ -75,6 +75,7 @@ export class MatchupService {
         id: PublicSchema.teams.id,
         name: PublicSchema.teams.name,
         leagueId: PublicSchema.teams.leagueId,
+        divisionId: PublicSchema.teams.divisionId,
       })
       .from(PublicSchema.teams)
       .where(eq(PublicSchema.teams.leagueId, leagueId));
@@ -83,6 +84,7 @@ export class MatchupService {
       id: t.id,
       name: t.name,
       leagueId: t.leagueId,
+      divisionId: t.divisionId ?? undefined,
     }));
 
     if (teams.length < 2) {
@@ -328,6 +330,7 @@ export class MatchupService {
 
   /**
    * Factory method for creating strategies
+   * Divisional strategy uses 100% divisional games (division play only) by default.
    */
   private static createStrategy(
     strategyType: 'round-robin' | 'divisional' | 'random',
@@ -336,7 +339,7 @@ export class MatchupService {
       case 'round-robin':
         return new RoundRobinStrategy();
       case 'divisional':
-        return new DivisionalStrategy();
+        return new DivisionalStrategy({ divisionalGamePercentage: 1.0 });
       case 'random':
         return new RandomStrategy();
     }

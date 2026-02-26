@@ -230,6 +230,7 @@ builder.mutationField('renameTeam', (t) =>
           id: PublicSchema.teams.id,
           name: PublicSchema.teams.name,
           leagueId: PublicSchema.teams.leagueId,
+          divisionId: PublicSchema.teams.divisionId,
           waiverOrder: PublicSchema.teams.waiverOrder,
           faabBudget: PublicSchema.teams.faabBudget,
           createdAt: PublicSchema.teams.createdAt,

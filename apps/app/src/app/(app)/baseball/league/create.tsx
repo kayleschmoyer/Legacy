@@ -67,7 +67,7 @@ export function LeagueCreatePage(): React.JSX.Element {
   const router = useRouter();
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
-    numberOfTeams: 10,
+    numberOfTeams: 12,
     playerPool: 'all',
     draftMode: 'live',
     selectionMethod: 'standard',

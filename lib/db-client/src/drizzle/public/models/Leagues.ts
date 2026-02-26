@@ -62,6 +62,7 @@ export const leagues = pgTable(
     minCareerGames: integer('min_career_games').notNull().default(50),
     minCareerSeasons: integer('min_career_seasons').notNull().default(3),
     totalMatchups: integer('total_matchups').notNull().default(10),
+    numberOfDivisions: integer('number_of_divisions').notNull().default(2),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -86,6 +87,7 @@ export const teams = pgTable(
     id: serial('id').primaryKey().notNull(),
     name: varchar('name').notNull(),
     leagueId: integer('league_id').notNull(),
+    divisionId: integer('division_id'),
     waiverOrder: integer('waiver_order'),
     faabBudget: integer('faab_budget'),
     createdAt: timestamp('created_at', { withTimezone: true })

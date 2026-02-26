@@ -36,6 +36,8 @@ const CreateLeagueAndTeamsInput = builder.inputType(
     fields: (t) => ({
       leagueName: t.string({ required: true }),
       numberOfTeams: t.int({ required: true }),
+      numberOfDivisions: t.int({ required: false }), // default 2 (two divisions)
+      schedulingStrategy: t.string({ required: false }), // 'round-robin' | 'divisional' | 'random' (optional, defaults to 'divisional')
       playerPool: t.string({ required: true }), // 'all' | 'nl' | 'al'
       draftMode: t.string({ required: false }), // 'live' | 'automated' (optional, defaults to 'live')
       selectionMethod: t.string({ required: false }), // 'standard' | 'auction' | 'random' (optional, defaults to 'standard')
@@ -70,6 +72,7 @@ const CreateLeagueAndTeamsPayload = builder.objectRef<{
     id: number;
     name: string;
     leagueId: number;
+    divisionId: number | null;
     createdAt: Date;
     updatedAt: Date;
     waiverOrder: number | null;
@@ -144,6 +147,8 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       const {
         leagueName,
         numberOfTeams,
+        numberOfDivisions,
+        schedulingStrategy: inputSchedulingStrategy,
         playerPool = 'all',
         draftMode = 'live',
         selectionMethod = 'standard',
@@ -163,6 +168,14 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           ownerUsername: username,
           maxRosterSize: maxRosterSize || 25,
           numberOfTeams,
+          numberOfDivisions: numberOfDivisions ?? 2,
+          schedulingStrategy:
+            (inputSchedulingStrategy as
+              | 'round-robin'
+              | 'divisional'
+              | 'random'
+              | null
+              | undefined) ?? 'divisional',
           playerPool: playerPool as 'all' | 'nl' | 'al',
           draftMode: draftMode as 'live' | 'automated',
           selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',
@@ -477,6 +490,7 @@ builder.mutationField('joinLeagueByCode', (t) =>
             id: PublicSchema.teams.id,
             name: PublicSchema.teams.name,
             leagueId: PublicSchema.teams.leagueId,
+            divisionId: PublicSchema.teams.divisionId,
             createdAt: PublicSchema.teams.createdAt,
             updatedAt: PublicSchema.teams.updatedAt,
             waiverOrder: PublicSchema.teams.waiverOrder,

@@ -35,6 +35,8 @@ const DROPDOWN_TEAM_COUNT_ITEMS = Object.freeze<DropdownItem[]>([
   { text: '8', value: '8' },
   { text: '10', value: '10' },
   { text: '12', value: '12' },
+  { text: '14', value: '14' },
+  { text: '16', value: '16' },
 ]);
 
 export interface CreateLeagueModalProps {
@@ -53,7 +55,7 @@ export default function CreateLeagueModal(
     'standard' | 'auction' | 'random'
   >('standard');
   const [draftOrder, setDraftOrder] = useState<'snake' | 'linear'>('snake');
-  const [numberOfTeams, setNumberOfTeams] = useState(10);
+  const [numberOfTeams, setNumberOfTeams] = useState(12);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const router = useRouter();
 
