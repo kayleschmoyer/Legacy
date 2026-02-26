@@ -9,7 +9,7 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { ScrollView, Separator, styled, Text } from 'tamagui';
+import { ScrollView, Separator, styled, Text, H2 as TH2 } from 'tamagui';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -167,7 +167,7 @@ const OutlineButton = styled(Button, {
   },
 });
 
-const SectionTitle = styled(H2, {
+const SectionTitle = styled(TH2, {
   fontSize: '$9',
   fontWeight: '700',
   color: '$color',

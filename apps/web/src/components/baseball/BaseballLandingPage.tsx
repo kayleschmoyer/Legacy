@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
-  H1,
   H2,
   H3,
   Paragraph,
@@ -10,7 +9,16 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { Dialog, Input, Separator, styled, Text } from 'tamagui';
+import {
+  Dialog,
+  Input,
+  Separator,
+  styled,
+  Text,
+  H1 as TH1,
+  H2 as TH2,
+  Paragraph as TParagraph,
+} from 'tamagui';
 import type { League } from './LeagueCard';
 import {
   GetUserLeagues,
@@ -143,7 +151,7 @@ const HeroBadge = styled(XStack, {
   enterStyle: { opacity: 0, scale: 0.9 },
 });
 
-const HeroTitle = styled(H1, {
+const HeroTitle = styled(TH1, {
   fontSize: '$12',
   fontWeight: '800',
   lineHeight: '$12',
@@ -157,7 +165,7 @@ const HeroTitle = styled(H1, {
   },
 });
 
-const HeroSubtitle = styled(Paragraph, {
+const HeroSubtitle = styled(TParagraph, {
   fontSize: '$5',
   color: '$glassTextSubdued',
   lineHeight: '$6',
@@ -262,7 +270,7 @@ const StatItem = styled(YStack, {
   gap: '$1',
 });
 
-const StatValue = styled(H2, {
+const StatValue = styled(TH2, {
   fontSize: '$9',
   fontWeight: '800',
   color: BRAND_GOLD_LIGHT,
@@ -270,7 +278,7 @@ const StatValue = styled(H2, {
   enterStyle: { opacity: 0, scale: 0.8 },
 });
 
-const StatLabel = styled(Paragraph, {
+const StatLabel = styled(TParagraph, {
   fontSize: '$3',
   color: '$glassTextMuted',
   textTransform: 'uppercase',
@@ -321,7 +329,7 @@ const SectionHeader = styled(XStack, {
   },
 });
 
-const SectionTitle = styled(H2, {
+const SectionTitle = styled(TH2, {
   fontSize: '$9',
   fontWeight: '700',
   color: '$color',
@@ -329,7 +337,7 @@ const SectionTitle = styled(H2, {
   enterStyle: { opacity: 0, x: -10 },
 });
 
-const SectionDescription = styled(Paragraph, {
+const SectionDescription = styled(TParagraph, {
   fontSize: '$3',
   color: '$glassTextMuted',
 });
@@ -439,13 +447,13 @@ const EmptyStateIcon = styled(YStack, {
   enterStyle: { opacity: 0, scale: 0.5, y: -20 },
 });
 
-const EmptyStateTitle = styled(H2, {
+const EmptyStateTitle = styled(TH2, {
   fontSize: '$8',
   fontWeight: '700',
   color: '$color',
 });
 
-const EmptyStateDescription = styled(Paragraph, {
+const EmptyStateDescription = styled(TParagraph, {
   fontSize: '$4',
   color: '$glassTextMuted',
   maxWidth: 440,
