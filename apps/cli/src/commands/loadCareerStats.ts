@@ -1,4 +1,5 @@
 import { loadCareerStats } from '@legacy-sports/data-loaders';
+import { clearCache } from '@legacy-sports/bref-client';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { LOGGER } from '@legacy-sports/logging';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
@@ -21,12 +22,21 @@ interface HandleLoadCareerStatsArgs {
   'show-summary'?: boolean;
 }
 
+const CACHE_CLEAR_INTERVAL = 100; // Clear the bref HTML cache every N players
+
+// Shared SQS client (created once, reused across all insertIntoSqs calls)
+let sharedSqsClient: SQSClient | undefined;
+function getSqsClient(): SQSClient {
+  if (!sharedSqsClient) {
+    sharedSqsClient = new SQSClient({
+      region: process.env.AWS_REGION || 'us-east-1',
+    });
+  }
+  return sharedSqsClient;
+}
+
 async function insertIntoSqs(playerId: string): Promise<void> {
   const queueUrl = getEnvVarRequired(EnvironmentVariable.SQS_QUEUE_URL);
-
-  const sqsClient = new SQSClient({
-    region: process.env.AWS_REGION || 'us-east-1',
-  });
 
   const command = new SendMessageCommand({
     QueueUrl: queueUrl,
@@ -35,7 +45,7 @@ async function insertIntoSqs(playerId: string): Promise<void> {
     MessageDeduplicationId: `${playerId}-${Date.now()}`, // Ensure uniqueness
   });
 
-  await sqsClient.send(command);
+  await getSqsClient().send(command);
 }
 
 async function getPlayersLimited(
@@ -147,6 +157,16 @@ export async function handleLoadCareerStats(
       } catch (err) {
         LOGGER.error(`Error processing ${player.brefId}:`, String(err));
         errors.push(err);
+      }
+
+      // Periodically clear the in-memory HTML cache to prevent unbounded heap growth.
+      // Each player page can be hundreds of KB; without clearing, thousands of cached
+      // pages will exhaust the Node.js heap over a long run.
+      if ((index + 1) % CACHE_CLEAR_INTERVAL === 0) {
+        clearCache();
+        LOGGER.debug(
+          `Cache cleared after ${index + 1} players (every ${CACHE_CLEAR_INTERVAL})`,
+        );
       }
     }
 

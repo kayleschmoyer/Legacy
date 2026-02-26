@@ -15,6 +15,9 @@ $env:CLI_INVOKE_DIR = $PWD.Path
 
 Push-Location "$PSScriptRoot/apps/cli"
 try {
+    # Increase the Node.js heap limit to 4 GB to prevent OOM errors when processing
+    # large player sets (the bref HTML cache can accumulate significant memory).
+    $env:NODE_OPTIONS = "--max-old-space-size=4096"
     & pnpm exec tsx --tsconfig ../../tsconfig.base.json src/main.ts @args
 } finally {
     Pop-Location

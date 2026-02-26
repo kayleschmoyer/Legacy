@@ -158,6 +158,20 @@ export function cleanupCache(): number {
 }
 
 /**
+ * Clear the entire response cache regardless of age.
+ * Use in long-running CLI processes to prevent unbounded memory growth,
+ * since cleanupCache() only removes entries older than 15 minutes and
+ * each unique URL is typically fetched only once per run.
+ */
+export function clearCache(): void {
+  const size = responseCache.size;
+  responseCache.clear();
+  if (size > 0) {
+    LOGGER.info(`Cleared entire response cache (${size} entries removed)`);
+  }
+}
+
+/**
  * Get cache statistics for monitoring.
  */
 export function getCacheStats() {
