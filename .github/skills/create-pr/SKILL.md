@@ -113,6 +113,18 @@ The `function` was broken
 # Result: "The  was broken" (backticks gone)
 ```
 
+### 🚨 Do NOT Escape Backticks in PR Body Content
+
+When writing the PR body markdown (via `create_file` or any method), use **plain backtick characters** for inline code — never write `\`` (backslash + backtick).
+
+| ❌ Wrong               | ✅ Correct               |
+| ---------------------- | ------------------------ |
+| `\`git worktree add\`` | `` `git worktree add` `` |
+| `\`make install\``     | `` `make install` ``     |
+| `\.env\``              | `` `.env` ``             |
+
+Escaped backticks (`\``) render as a literal backslash followed by an invisible code delimiter, producing output like `\git worktree add\` instead of the intended inline code.
+
 ### Quick PR (No Description Needed)
 
 ```powershell
@@ -223,11 +235,12 @@ gh pr create --title "your title" --body-file "$env:TEMP\pr-body.md" --base main
 1. **Always use `--body-file`** for PR descriptions — never inline `--body` in PowerShell
 2. **Use `create_file` tool** to write the temp .md file — it preserves backticks and special chars
 3. **Never use PowerShell heredoc** (`@" "@`) for markdown with backticks — it strips them
-4. **Run pre-commit validation** before creating PR (`make pre-commit`)
-5. **Prefix PR title with Jira ticket key**: `LS-#### type(scope): description`
-6. **Link Jira ticket** in PR description
-7. **Add screenshots** for UI changes
-8. **Keep PRs focused** — split large changes into multiple PRs
+4. **Never escape backticks** in the PR body content — write `` `code` `` not `\`code\`` (escaped backticks render as backslashes)
+5. **Run pre-commit validation** before creating PR (`make pre-commit`)
+6. **Prefix PR title with Jira ticket key**: `LS-#### type(scope): description`
+7. **Link Jira ticket** in PR description
+8. **Add screenshots** for UI changes
+9. **Keep PRs focused** — split large changes into multiple PRs
 
 ## PR Title Format
 
