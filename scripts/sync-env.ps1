@@ -23,6 +23,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Ensure AWS_PROFILE is set so Terraform can find SSO credentials
+if (-not $env:AWS_PROFILE) {
+    $env:AWS_PROFILE = "Default"
+    Write-Host "AWS_PROFILE not set, defaulting to 'Default'" -ForegroundColor Gray
+}
+
 Write-Host "Legacy Sports Environment Sync" -ForegroundColor Cyan
 Write-Host "=================================" -ForegroundColor Cyan
 Write-Host ""
@@ -33,7 +39,8 @@ if (-not (Test-Path $TerraformDir)) {
 }
 
 if (-not (Test-Path $EnvFile)) {
-    Write-Error ".env file not found. Please run this script from the project root."
+    Write-Host "No .env file found - creating one..." -ForegroundColor Yellow
+    New-Item -ItemType File -Path $EnvFile -Force | Out-Null
 }
 
 # Backup existing .env file if requested
@@ -44,11 +51,25 @@ if ($Backup) {
 }
 
 Write-Host "Fetching Terraform outputs..." -ForegroundColor Yellow
+
+# Auto-init Terraform if backend hasn't been initialized yet
+if (-not (Test-Path "$TerraformDir/.terraform")) {
+    Write-Host "Terraform not initialized - running 'terraform init'..." -ForegroundColor Yellow
+    Push-Location $TerraformDir
+    try {
+        terraform init | Out-Null
+    } catch {
+        Pop-Location
+        Write-Error "terraform init failed. Ensure AWS credentials are valid and Terraform is installed."
+    }
+    Pop-Location
+}
+
 Push-Location $TerraformDir
 try {
     $terraformOutput = terraform output -json | ConvertFrom-Json
 } catch {
-    Write-Error "Failed to get Terraform outputs. Make sure Terraform is applied."
+    Write-Error "Failed to get Terraform outputs. Make sure Terraform is applied and AWS credentials are valid (run: aws sso login --profile $env:AWS_PROFILE)."
 } finally {
     Pop-Location
 }

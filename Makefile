@@ -401,7 +401,7 @@ terraform-destroy: ## Destroy Terraform infrastructure
 sync-env: ## Sync environment variables
 	@$(call echo_blue,Syncing environment variables...)
 ifeq ($(DETECTED_OS),Windows)
-	scripts$(PATH_SEP)sync-env.ps1
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-env.ps1
 else
 	scripts$(PATH_SEP)sync-env.sh
 endif
