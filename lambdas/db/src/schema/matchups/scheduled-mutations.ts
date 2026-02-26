@@ -69,7 +69,7 @@ builder.objectType(AutoAdvanceMatchupsResult, {
  * Access rules:
  *  - System API key (EventBridge / admin CLI) → allowed for ALL leagues.
  *  - Authenticated admin user → allowed for ALL leagues.
- *  - League commissioner / owner → allowed only when a specific `leagueId` is
+ *  - League commissioner / General Manager → allowed only when a specific `leagueId` is
  *    provided (single-league scope).
  *  - Anyone else → rejected.
  */
@@ -114,11 +114,12 @@ export async function assertAuthorized(
 
   if (
     !membership ||
-    (membership.permissionLevel !== 'owner' &&
+    (membership.permissionLevel !== 'general_manager' &&
+      membership.permissionLevel !== 'assistant_manager' &&
       membership.permissionLevel !== 'commissioner')
   ) {
     throw new Error(
-      'Unauthorized: only the league owner or commissioner can trigger this mutation for their league.',
+      'Unauthorized: only the league General Manager or commissioner can trigger this mutation for their league.',
     );
   }
 }

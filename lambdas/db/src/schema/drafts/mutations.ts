@@ -498,8 +498,10 @@ builder.mutationField('initializeDraft', (t) =>
           )
           .limit(1);
 
-        if (!membership || membership.permissionLevel !== 'owner') {
-          throw new Error('Only the league owner can initialize a draft');
+        if (!membership || membership.permissionLevel !== 'general_manager') {
+          throw new Error(
+            'Only the league General Manager can initialize a draft',
+          );
         }
 
         // Get all teams in the league
@@ -728,7 +730,9 @@ builder.mutationField('updateDraftSettings', (t) =>
         }
 
         if (league.owner !== userId) {
-          throw new Error('Only the league owner can update draft settings');
+          throw new Error(
+            'Only the league General Manager can update draft settings',
+          );
         }
 
         // Prevent changes after draft has started
@@ -934,7 +938,7 @@ builder.mutationField('updateDraftSettings', (t) =>
 
 /**
  * Mutation: Pause a live draft
- * Only the league owner/commissioner can pause. Sets status to 'paused'
+ * Only the league General Manager/commissioner can pause. Sets status to 'paused'
  * so makeDraftPick will reject picks until resumed.
  */
 builder.mutationField('pauseDraft', (t) =>
@@ -965,11 +969,12 @@ builder.mutationField('pauseDraft', (t) =>
 
       if (
         !membership ||
-        (membership.permissionLevel !== 'owner' &&
+        (membership.permissionLevel !== 'general_manager' &&
+          membership.permissionLevel !== 'assistant_manager' &&
           membership.permissionLevel !== 'commissioner')
       ) {
         throw new Error(
-          'Only the league owner or commissioner can pause the draft',
+          'Only the league General Manager or commissioner can pause the draft',
         );
       }
 
@@ -1054,11 +1059,12 @@ builder.mutationField('resumeDraft', (t) =>
 
       if (
         !membership ||
-        (membership.permissionLevel !== 'owner' &&
+        (membership.permissionLevel !== 'general_manager' &&
+          membership.permissionLevel !== 'assistant_manager' &&
           membership.permissionLevel !== 'commissioner')
       ) {
         throw new Error(
-          'Only the league owner or commissioner can resume the draft',
+          'Only the league General Manager or commissioner can resume the draft',
         );
       }
 
@@ -1125,10 +1131,10 @@ builder.mutationField('resumeDraft', (t) =>
 // ── Commissioner Pick ───────────────────────────────────────────────────────
 
 /**
- * Mutation: Commissioner makes a pick on behalf of a team owner
+ * Mutation: Commissioner makes a pick on behalf of a General Manager
  *
- * Allows the league owner/commissioner to make a pick for any team when
- * that team's owner is absent (e.g., timed out, disconnected).
+ * Allows the league General Manager/commissioner to make a pick for any team when
+ * that team's General Manager is absent (e.g., timed out, disconnected).
  * Same validation as makeDraftPick except the turn-ownership check
  * is replaced by a commissioner permission check.
  */
@@ -1182,11 +1188,12 @@ builder.mutationField('commissionerPick', (t) =>
 
           if (
             !membership ||
-            (membership.permissionLevel !== 'owner' &&
+            (membership.permissionLevel !== 'general_manager' &&
+              membership.permissionLevel !== 'assistant_manager' &&
               membership.permissionLevel !== 'commissioner')
           ) {
             throw new Error(
-              'Only the league owner or commissioner can make picks on behalf of others',
+              'Only the league General Manager or commissioner can make picks on behalf of others',
             );
           }
 

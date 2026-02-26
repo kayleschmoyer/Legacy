@@ -191,11 +191,12 @@ async function ensureLeagueCommissionerAccess(
     .limit(1);
 
   if (
-    membership[0]?.permissionLevel !== 'owner' &&
+    membership[0]?.permissionLevel !== 'general_manager' &&
+    membership[0]?.permissionLevel !== 'assistant_manager' &&
     membership[0]?.permissionLevel !== 'commissioner'
   ) {
     throw new Error(
-      'Access denied: Commissioner or owner role required to update scoring profile',
+      'Access denied: Commissioner or General Manager role required to update scoring profile',
     );
   }
 }

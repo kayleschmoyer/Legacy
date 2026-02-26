@@ -926,7 +926,8 @@ export async function canMakeRosterMove(
   // Commissioner override
   if (
     member?.permissionLevel === 'commissioner' ||
-    member?.permissionLevel === 'owner'
+    member?.permissionLevel === 'general_manager' ||
+    member?.permissionLevel === 'assistant_manager'
   ) {
     if (lockRules?.commissionerCanOverride) {
       return { allowed: true };

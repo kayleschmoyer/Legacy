@@ -161,7 +161,7 @@ builder.mutationField('upsertAchievementRestriction', (t) =>
     type: AchievementRestrictionRef,
     description:
       'Create or update a single achievement restriction for a league. ' +
-      'Commissioner / owner access required.',
+      'Commissioner / General Manager access required.',
     args: {
       input: t.arg({ type: UpsertAchievementRestrictionInput, required: true }),
     },
@@ -187,7 +187,7 @@ builder.mutationField('upsertAchievementRestriction', (t) =>
         );
       }
 
-      // Verify commissioner / owner access
+      // Verify commissioner / General Manager access
       const [membership] = await context.db
         .select({ permissionLevel: PublicSchema.leagueMembers.permissionLevel })
         .from(PublicSchema.leagueMembers)
@@ -257,7 +257,7 @@ builder.mutationField('deleteAchievementRestriction', (t) =>
     type: 'Boolean',
     description:
       'Remove an achievement restriction from a league. ' +
-      'Commissioner / owner access required.',
+      'Commissioner / General Manager access required.',
     args: {
       leagueId: t.arg.int({ required: true }),
       achievementType: t.arg.string({ required: true }),

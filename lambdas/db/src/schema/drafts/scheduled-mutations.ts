@@ -8,7 +8,7 @@
  * Uses the same 3-tier auth pattern as other scheduled mutations:
  *   - System API key (EventBridge) → allowed for ALL leagues
  *   - Admin user → allowed for ALL leagues
- *   - Commissioner / owner → allowed for their league only
+ *   - Commissioner / General Manager → allowed for their league only
  */
 
 import { PublicSchema } from '@legacy-sports/db-client';

@@ -82,7 +82,7 @@ const CreateLeagueAndTeamsPayload = builder.objectRef<{
     leagueId: number;
     userId: number;
     teamId: number | null;
-    permissionLevel: 'owner' | 'commissioner';
+    permissionLevel: 'general_manager' | 'assistant_manager' | 'commissioner';
   }>;
 }>('CreateLeagueAndTeamsPayload');
 
@@ -223,7 +223,7 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
       leagueId: t.arg.int({ required: true }),
     },
     resolve: async (parent, args, context) => {
-      // Check if user is authenticated and has owner access
+      // Check if user is authenticated and has General Manager access
       if (!context.user) {
         throw new Error('Authentication required to add positions to league');
       }
@@ -232,7 +232,7 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
       const userId = context.user.id;
 
       try {
-        // Verify user has owner access to this league
+        // Verify user has General Manager access to this league
         const leagueAccess = await context.db
           .select()
           .from(PublicSchema.leagueMembers)
@@ -240,13 +240,15 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
             and(
               eq(PublicSchema.leagueMembers.leagueId, leagueId),
               eq(PublicSchema.leagueMembers.userId, userId),
-              eq(PublicSchema.leagueMembers.permissionLevel, 'owner'),
+              eq(PublicSchema.leagueMembers.permissionLevel, 'general_manager'),
             ),
           )
           .limit(1);
 
         if (leagueAccess.length === 0) {
-          throw new Error('Only league owners can add positions to a league');
+          throw new Error(
+            'Only the league General Manager can add positions to a league',
+          );
         }
 
         // Check if league already has positions
@@ -504,7 +506,10 @@ builder.mutationField('joinLeagueByCode', (t) =>
           leagueId: number;
           userId: number;
           teamId: number;
-          permissionLevel: 'owner' | 'commissioner';
+          permissionLevel:
+            | 'general_manager'
+            | 'assistant_manager'
+            | 'commissioner';
         } = {
           leagueId: league.id,
           userId: userId,
@@ -739,14 +744,14 @@ builder.mutationField('deleteLeague', (t) =>
           throw new Error('League not found');
         }
 
-        // Check if user is the owner or admin
+        // Check if user is the General Manager or admin
         if (!context.user) {
           throw new Error('User not authenticated');
         }
 
         if (league[0].owner !== context.user.id && !context.user.isAdmin) {
           throw new Error(
-            'Only the league owner or admin can delete this league',
+            'Only the league General Manager or admin can delete this league',
           );
         }
 
@@ -889,7 +894,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
       } = args.input;
       const userId = context.user.id;
 
-      // Verify user is owner or commissioner
+      // Verify user is General Manager or commissioner
       const membership = await context.db
         .select({
           permissionLevel: PublicSchema.leagueMembers.permissionLevel,
@@ -907,8 +912,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
         throw new Error('You are not a member of this league');
       }
 
-      // Both 'owner' and 'commissioner' can update settings
-      // (In this schema, the owner has 'owner' permission level)
+      // Both 'general_manager' and 'commissioner' can update settings
 
       // Build change descriptions for the chat notification
       const changeDescriptions: string[] = [];

@@ -1,38 +1,36 @@
 import React, { useState } from 'react';
 import { Alert } from 'react-native';
-import { 
-  Button, 
-  Card, 
-  H3, 
-  H4, 
-  Separator, 
+import {
+  Button,
+  Card,
+  H3,
+  H4,
+  Separator,
   Spinner,
   Text,
   XStack,
-  YStack
+  YStack,
 } from 'tamagui';
 import { useDeleteAllLeaguesMutation } from '../../api/db/graphql.generated';
 
 export const LeagueManagement: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   const [deleteAllLeagues, { loading, error }] = useDeleteAllLeaguesMutation({
     onCompleted: (data) => {
       setIsDeleting(false);
       Alert.alert(
-        'Success', 
+        'Success',
         data.deleteAllLeagues || 'All leagues have been deleted successfully',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     },
     onError: (error) => {
       setIsDeleting(false);
-      Alert.alert(
-        'Error', 
-        `Failed to delete leagues: ${error.message}`,
-        [{ text: 'OK' }]
-      );
-    }
+      Alert.alert('Error', `Failed to delete leagues: ${error.message}`, [
+        { text: 'OK' },
+      ]);
+    },
   });
 
   const handleDeleteAllLeagues = () => {
@@ -61,11 +59,11 @@ export const LeagueManagement: React.FC = () => {
                     void deleteAllLeagues();
                   },
                 },
-              ]
+              ],
             );
           },
         },
-      ]
+      ],
     );
   };
 
@@ -97,8 +95,9 @@ export const LeagueManagement: React.FC = () => {
                 Delete All Leagues
               </Text>
               <Text fontSize="$2" color="$gray10">
-                Permanently delete all leagues you own, including all teams, roster data, 
-                positions, and member information. This action cannot be undone.
+                Permanently delete all leagues you own, including all teams,
+                roster data, positions, and member information. This action
+                cannot be undone.
               </Text>
             </YStack>
 
@@ -108,7 +107,9 @@ export const LeagueManagement: React.FC = () => {
                 size="$3"
                 disabled={isDeleting || loading}
                 onPress={handleDeleteAllLeagues}
-                icon={isDeleting || loading ? <Spinner size="small" /> : undefined}
+                icon={
+                  isDeleting || loading ? <Spinner size="small" /> : undefined
+                }
               >
                 {isDeleting || loading ? 'Deleting...' : 'Delete All Leagues'}
               </Button>
@@ -129,10 +130,11 @@ export const LeagueManagement: React.FC = () => {
         <YStack space="$3">
           <H4 color="$blue11">Information</H4>
           <Text fontSize="$3" color="$gray10">
-            • Only leagues you own will be deleted
+            • Only leagues you are the General Manager of will be deleted
           </Text>
           <Text fontSize="$3" color="$gray10">
-            • Leagues where you're a member (but not owner) will not be affected
+            • Leagues where you're a member (but not General Manager) will not
+            be affected
           </Text>
           <Text fontSize="$3" color="$gray10">
             • You can create new leagues after deletion

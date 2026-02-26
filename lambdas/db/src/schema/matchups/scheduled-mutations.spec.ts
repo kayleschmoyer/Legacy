@@ -140,20 +140,32 @@ describe('Scheduled Mutations', () => {
       expect(leagueId).toBeNull();
     });
 
-    it('should allow commissioner/owner with their leagueId', () => {
-      // Commissioner check: permissionLevel is 'owner' or 'commissioner'
+    it('should allow commissioner/GM with their leagueId', () => {
+      // Commissioner check: permissionLevel is 'general_manager' or 'assistant_manager' or 'commissioner'
       const permissionLevel = 'commissioner';
-      expect(['owner', 'commissioner']).toContain(permissionLevel);
+      expect([
+        'general_manager',
+        'assistant_manager',
+        'commissioner',
+      ]).toContain(permissionLevel);
     });
 
-    it('should allow league owner with their leagueId', () => {
-      const permissionLevel = 'owner';
-      expect(['owner', 'commissioner']).toContain(permissionLevel);
+    it('should allow league General Manager with their leagueId', () => {
+      const permissionLevel = 'general_manager';
+      expect([
+        'general_manager',
+        'assistant_manager',
+        'commissioner',
+      ]).toContain(permissionLevel);
     });
 
     it('should reject regular member even with leagueId', () => {
       const permissionLevel = 'member';
-      expect(['owner', 'commissioner']).not.toContain(permissionLevel);
+      expect([
+        'general_manager',
+        'assistant_manager',
+        'commissioner',
+      ]).not.toContain(permissionLevel);
     });
   });
 

@@ -65,7 +65,7 @@ export const League = builder.objectRef<{
     leagueId: number;
     userId: number;
     teamId: number | null;
-    permissionLevel: 'owner' | 'commissioner';
+    permissionLevel: 'general_manager' | 'assistant_manager' | 'commissioner';
   } | null;
 }>('League');
 
@@ -149,7 +149,7 @@ export const LeagueMember = builder.objectRef<{
   leagueId: number;
   userId: number;
   teamId: number | null;
-  permissionLevel: 'owner' | 'commissioner';
+  permissionLevel: 'general_manager' | 'assistant_manager' | 'commissioner';
 }>('LeagueMember');
 
 LeagueMember.implement({

@@ -809,7 +809,7 @@ type Mutation {
   ): TiebreakerRule
 
   """
-  Remove an achievement restriction from a league. Commissioner / owner access required.
+  Remove an achievement restriction from a league. Commissioner / General Manager access required.
   """
   deleteAchievementRestriction(
     achievementType: String!
@@ -930,7 +930,7 @@ type Mutation {
   updateUserRole(accessLevel: String!, userId: Int!): User
 
   """
-  Create or update a single achievement restriction for a league. Commissioner / owner access required.
+  Create or update a single achievement restriction for a league. Commissioner / General Manager access required.
   """
   upsertAchievementRestriction(
     input: UpsertAchievementRestrictionInput!

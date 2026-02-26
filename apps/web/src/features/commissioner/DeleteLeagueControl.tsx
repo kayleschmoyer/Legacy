@@ -25,7 +25,7 @@ export interface DeleteLeagueControlProps {
  *
  * Features:
  * - Requires league name confirmation to prevent accidental deletion
- * - Only available to league owner
+ * - Only available to league General Manager
  * - Deletes all associated data (teams, matchups, drafts, etc.)
  * - Redirects to home after successful deletion
  */

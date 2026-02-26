@@ -17,7 +17,8 @@ export const draftStatus = pgEnum('draft_status', [
   'completed',
 ]);
 export const leaguePermissionLevel = pgEnum('league_permission_level', [
-  'owner',
+  'general_manager',
+  'assistant_manager',
   'commissioner',
 ]);
 

@@ -788,10 +788,12 @@ builder.mutationField('vetoTrade', (t) =>
 
       if (
         !membership ||
-        !['owner', 'commissioner'].includes(membership.permissionLevel ?? '')
+        !['general_manager', 'assistant_manager', 'commissioner'].includes(
+          membership.permissionLevel ?? '',
+        )
       ) {
         throw new Error(
-          'Only the league commissioner or owner can veto a trade',
+          'Only the league General Manager or commissioner can veto a trade',
         );
       }
 

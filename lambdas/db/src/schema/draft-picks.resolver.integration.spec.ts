@@ -75,7 +75,7 @@ describe('Draft Picks - Integration Tests', () => {
       leagueId: league.id,
       userId: owner.id,
       teamId: teamFixtures[0].id,
-      permissionLevel: 'owner' as const,
+      permissionLevel: 'general_manager' as const,
     });
 
     const [draft] = await db

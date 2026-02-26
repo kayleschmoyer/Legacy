@@ -98,7 +98,7 @@ export interface CreateLeagueResult {
     leagueId: number;
     userId: number;
     teamId: number;
-    permissionLevel: 'owner' | 'commissioner';
+    permissionLevel: 'general_manager' | 'assistant_manager' | 'commissioner';
   }[];
 }
 
@@ -110,7 +110,7 @@ export class LeagueService {
   constructor(private options: DbOptions) {}
 
   /**
-   * Create a league with teams, roster positions, owner membership, and draft record.
+   * Create a league with teams, roster positions, General Manager membership, and draft record.
    * This is the single entry point for league creation — it guarantees that a draft
    * record is always created alongside the league.
    */
@@ -200,7 +200,7 @@ export class LeagueService {
         leagueId: league.id,
         userId: ownerId,
         teamId: teams[0].id,
-        permissionLevel: 'owner' as const,
+        permissionLevel: 'general_manager' as const,
       };
       await db.insert(PublicSchema.leagueMembers).values(ownerMember);
 

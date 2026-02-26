@@ -222,7 +222,8 @@ async function verifyMatchupTeamOwnership(
 
   const isCommissioner =
     memberResult[0].permissionLevel === 'commissioner' ||
-    memberResult[0].permissionLevel === 'owner';
+    memberResult[0].permissionLevel === 'general_manager' ||
+    memberResult[0].permissionLevel === 'assistant_manager';
 
   if (!isCommissioner && memberResult[0].teamId !== matchupPlayer.teamId) {
     throw new Error('You can only modify your own team roster');

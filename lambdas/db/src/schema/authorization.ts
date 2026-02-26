@@ -29,8 +29,8 @@
  * ## Pre-built guards (call from resolvers)
  *
  *   - {@link verifyLeagueMembership}   – throws if the user is not a member of the league
- *   - {@link verifyCommissionerAccess} – throws unless the user is a commissioner/owner
- *   - {@link verifyTeamEditAccess}     – team owner OR commissioner; use for roster edits
+ *   - {@link verifyCommissionerAccess} – throws unless the user is a commissioner/GM
+ *   - {@link verifyTeamEditAccess}     – team General Manager OR commissioner; use for roster edits
  *   - {@link checkPlayersNotLocked}    – throws if any player has game selections
  */
 
@@ -53,7 +53,7 @@ export interface LeagueMembership {
   leagueId: number;
   userId: number;
   teamId: number | null;
-  permissionLevel: 'owner' | 'commissioner';
+  permissionLevel: 'general_manager' | 'assistant_manager' | 'commissioner';
 }
 
 /** Minimal info about a team member loaded from the database. */
@@ -164,12 +164,13 @@ export async function getLeagueMembership(
 }
 
 /**
- * Returns `true` when the membership has commissioner or owner privileges.
+ * Returns `true` when the membership has commissioner, general manager, or assistant manager privileges.
  */
 export function isCommissionerOrOwner(membership: LeagueMembership): boolean {
   return (
     membership.permissionLevel === 'commissioner' ||
-    membership.permissionLevel === 'owner'
+    membership.permissionLevel === 'general_manager' ||
+    membership.permissionLevel === 'assistant_manager'
   );
 }
 
@@ -231,7 +232,7 @@ export async function verifyCommissionerAccess(
   const membership = await verifyLeagueMembership(db, leagueId, userId);
   if (!isCommissionerOrOwner(membership)) {
     throw new Error(
-      'Only a league commissioner or owner can perform this action',
+      'Only a league General Manager or commissioner can perform this action',
     );
   }
   return membership;
@@ -242,7 +243,7 @@ export async function verifyCommissionerAccess(
  * belong to.  Access is granted when either:
  *
  *   1. The user owns the team (their `league_members.teamId` matches), **or**
- *   2. The user is a commissioner / owner of the league.
+ *   2. The user is a commissioner / General Manager of the league.
  *
  * Use this for any mutation that modifies a team's roster, lineup, trade
  * proposals, etc.
@@ -274,7 +275,7 @@ export async function verifyTeamEditAccess(
   }
 
   throw new Error(
-    'You do not have permission to edit this roster. Only the team owner or a league commissioner can make roster changes.',
+    'You do not have permission to edit this roster. Only the General Manager or a league commissioner can make roster changes.',
   );
 }
 

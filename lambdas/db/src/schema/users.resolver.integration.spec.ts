@@ -354,7 +354,7 @@ describe('Users Resolver - Integration Tests', () => {
   });
 
   describe('relationships', () => {
-    it('should link user as league owner', async () => {
+    it('should link user as league General Manager', async () => {
       const user = getUser(2); // owner.user@example.com (admin)
       const league = getLeague(0); // Test League
 
@@ -463,7 +463,7 @@ describe('Users Resolver - Integration Tests', () => {
         INSERT INTO league_members (league_id, user_id, permission_level)
         VALUES (?, ?, ?)
       `);
-      membershipStmt.run(league.id, member.id, 'owner');
+      membershipStmt.run(league.id, member.id, 'general_manager');
 
       // Verify membership
       const membership = client
@@ -475,7 +475,7 @@ describe('Users Resolver - Integration Tests', () => {
       expect(membership).toMatchObject({
         league_id: league.id,
         user_id: member.id,
-        permission_level: 'owner',
+        permission_level: 'general_manager',
       });
     });
   });

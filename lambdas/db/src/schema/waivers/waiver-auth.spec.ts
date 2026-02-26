@@ -173,8 +173,8 @@ describe('processWaiverClaims — authorization', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('should allow owner with own leagueId', async () => {
-    const db = mockDb([{ permissionLevel: 'owner' }]);
+  it('should allow General Manager with own leagueId', async () => {
+    const db = mockDb([{ permissionLevel: 'general_manager' }]);
     await expect(
       assertAuthorized(ctx({ user: { id: 5, isAdmin: false }, db }), 42),
     ).resolves.toBeUndefined();
@@ -185,7 +185,7 @@ describe('processWaiverClaims — authorization', () => {
     await expect(
       assertAuthorized(ctx({ user: { id: 5, isAdmin: false }, db }), 42),
     ).rejects.toThrow(
-      'Unauthorized: only the league owner or commissioner can trigger this mutation for their league.',
+      'Unauthorized: only the league General Manager or commissioner can trigger this mutation for their league.',
     );
   });
 
@@ -194,7 +194,7 @@ describe('processWaiverClaims — authorization', () => {
     await expect(
       assertAuthorized(ctx({ user: { id: 5, isAdmin: false }, db }), 42),
     ).rejects.toThrow(
-      'Unauthorized: only the league owner or commissioner can trigger this mutation for their league.',
+      'Unauthorized: only the league General Manager or commissioner can trigger this mutation for their league.',
     );
   });
 });

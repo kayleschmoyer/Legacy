@@ -196,7 +196,7 @@ describe('League scoring GraphQL resolvers', () => {
                     {
                       leagueId,
                       userId,
-                      permissionLevel: 'owner',
+                      permissionLevel: 'general_manager',
                     },
                   ]),
               }),
@@ -379,7 +379,7 @@ describe('League scoring GraphQL resolvers', () => {
                     {
                       leagueId,
                       userId,
-                      permissionLevel: 'owner',
+                      permissionLevel: 'general_manager',
                     },
                   ]),
               }),

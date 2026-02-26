@@ -9,7 +9,7 @@ import {
 } from '../../api/db/graphql.generated';
 
 /**
- * TeamDetailPage - Display team roster and allow editing for team owners
+ * TeamDetailPage - Display team roster and allow editing for General Managers
  */
 export function TeamDetailPage() {
   const { teamId } = useParams<{ teamId: string }>();
@@ -65,8 +65,8 @@ export function TeamDetailPage() {
         {leagueId && <Text fontSize="$4">League ID: {leagueId}</Text>}
         {!isOwner && (
           <Text fontSize="$3" color="$gray11" fontStyle="italic">
-            You are viewing this team as a visitor. Only the team owner can make
-            changes.
+            You are viewing this team as a visitor. Only the General Manager can
+            make changes.
           </Text>
         )}
       </YStack>

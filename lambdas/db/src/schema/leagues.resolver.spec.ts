@@ -96,8 +96,8 @@ describe('League Mutations', () => {
       }
     `;
 
-    it('should successfully delete a league when user is the owner', async () => {
-      // Mock league exists and user is owner
+    it('should successfully delete a league when user is the General Manager', async () => {
+      // Mock league exists and user is General Manager
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
@@ -128,7 +128,7 @@ describe('League Mutations', () => {
     });
 
     it('should successfully delete a league when user is admin', async () => {
-      // Mock league exists but user is not owner, but is admin
+      // Mock league exists but user is not General Manager, but is admin
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
@@ -207,8 +207,8 @@ describe('League Mutations', () => {
       ).rejects.toThrow('League not found');
     });
 
-    it('should fail when user is not the owner and not admin', async () => {
-      // Mock league exists but user is not owner and not admin
+    it('should fail when user is not the General Manager and not admin', async () => {
+      // Mock league exists but user is not General Manager and not admin
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
@@ -228,12 +228,12 @@ describe('League Mutations', () => {
           undefined as never,
         ),
       ).rejects.toThrow(
-        'Only the league owner or admin can delete this league',
+        'Only the league General Manager or admin can delete this league',
       );
     });
 
     it('should delete league using CASCADE DELETE constraints', async () => {
-      // Mock league exists and user is owner
+      // Mock league exists and user is General Manager
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);

@@ -192,7 +192,8 @@ builder.mutationField('renameTeam', (t) =>
 
       const isCommish =
         membership[0].permissionLevel === 'commissioner' ||
-        membership[0].permissionLevel === 'owner';
+        membership[0].permissionLevel === 'general_manager' ||
+        membership[0].permissionLevel === 'assistant_manager';
 
       if (!isCommish && membership[0].teamId !== teamId) {
         throw new Error('You can only rename your own team');
