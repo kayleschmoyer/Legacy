@@ -39,6 +39,9 @@ export const builder = new SchemaBuilder<{
       username?: string | null;
       accessLevel?: string | null;
     };
+    ImpersonateUserResult: {
+      token: string;
+    };
     Player: {
       id: number;
       firstName: string;

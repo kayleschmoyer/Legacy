@@ -1,6 +1,8 @@
+import { sign } from 'jsonwebtoken';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
+import { getJwtSecret } from '../server/context';
 
 // Create a single database service instance to reuse across all resolvers
 const dbService = createDatabaseService(getDbOptions());
@@ -157,6 +159,61 @@ builder.mutationField('updateUserRole', (t) =>
         username: updated.username,
         accessLevel: updated.accessLevel,
       };
+    },
+  }),
+);
+
+// ─── Impersonation ────────────────────────────────────────────────────────────
+
+const ImpersonateUserResultRef = builder.objectRef<{
+  token: string;
+}>('ImpersonateUserResult');
+
+ImpersonateUserResultRef.implement({
+  fields: (t) => ({
+    token: t.exposeString('token'),
+  }),
+});
+
+/**
+ * Admin-only mutation that generates a signed impersonation JWT for a target
+ * user.  The calling user must have `isAdmin === true`.
+ */
+builder.mutationField('impersonateUser', (t) =>
+  t.field({
+    type: ImpersonateUserResultRef,
+    description:
+      'Admin only: generate a JWT that authenticates as the specified user for debugging purposes.',
+    args: {
+      userId: t.arg.int({ required: true }),
+    },
+    resolve: async (parent, { userId }, context) => {
+      if (!context.user?.isAdmin) {
+        throw new Error('Forbidden: admin access required');
+      }
+
+      const targetUser = await dbService.users.getUserById(userId);
+      if (!targetUser) {
+        throw new Error(`User ${userId} not found`);
+      }
+
+      const jwtSecret = await getJwtSecret();
+
+      const payload = {
+        id: Number(targetUser.id),
+        email: targetUser.email,
+        username: targetUser.username ?? '',
+        accessLevel: targetUser.accessLevel ?? 'none',
+        impersonatedBy: {
+          id: Number(context.user.id),
+          email: context.user.email,
+          username: context.user.username,
+        },
+      };
+
+      const token = sign(payload, jwtSecret, { expiresIn: '8h' });
+
+      return { token };
     },
   }),
 );

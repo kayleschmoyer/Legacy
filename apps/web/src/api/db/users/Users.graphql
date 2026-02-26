@@ -5,6 +5,13 @@ fragment User on User {
   accessLevel
 }
 
+fragment AdminUser on User {
+  id
+  email
+  username
+  accessLevel
+}
+
 query GetUserById($id: Int!) {
   user(id: $id) {
     ...User
@@ -25,5 +32,17 @@ query GetAllUsers($limit: Int, $offset: Int) {
 mutation UpdateUserRole($userId: Int!, $accessLevel: String!) {
   updateUserRole(userId: $userId, accessLevel: $accessLevel) {
     ...User
+  }
+}
+
+query AdminGetUsers($limit: Int, $offset: Int) {
+  users(limit: $limit, offset: $offset) {
+    ...AdminUser
+  }
+}
+
+mutation ImpersonateUser($userId: Int!) {
+  impersonateUser(userId: $userId) {
+    token
   }
 }

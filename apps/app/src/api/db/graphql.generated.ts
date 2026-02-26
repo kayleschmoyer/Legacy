@@ -454,6 +454,11 @@ export type HeadToHeadRecord = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+export type ImpersonateUserResult = {
+  __typename?: 'ImpersonateUserResult';
+  token?: Maybe<Scalars['String']['output']>;
+};
+
 export type InviteCodeInfo = {
   __typename?: 'InviteCodeInfo';
   availableSpots?: Maybe<Scalars['Int']['output']>;
@@ -736,6 +741,8 @@ export type Mutation = {
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
+  /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
+  impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
@@ -857,6 +864,10 @@ export type MutationDeleteLeagueArgs = {
 
 export type MutationDisableDeviceTokenArgs = {
   deviceToken: Scalars['String']['input'];
+};
+
+export type MutationImpersonateUserArgs = {
+  userId: Scalars['Int']['input'];
 };
 
 export type MutationInitializeDraftArgs = {

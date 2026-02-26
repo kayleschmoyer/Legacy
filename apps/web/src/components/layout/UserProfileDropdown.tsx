@@ -7,6 +7,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { useAuth } from '@legacy-sports/shared-components';
+import { useNavigate } from 'react-router-dom';
 import { styled } from 'tamagui';
 
 const UserMenuButton = styled(Button, {
@@ -75,9 +76,11 @@ const MenuIconBox = styled(YStack, {
 
 export const UserProfileDropdown: React.FC = () => {
   const auth = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isAdmin = auth?.user?.accessLevel === 'admin';
 
   // Click outside handler
   useEffect(() => {
@@ -301,6 +304,50 @@ export const UserProfileDropdown: React.FC = () => {
                 </Paragraph>
               </XStack>
             </MenuItem>
+
+            <Separator marginVertical="$2" />
+
+            <MenuItem
+              onPress={() => {
+                void navigate('/management');
+                setIsOpen(false);
+              }}
+            >
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <Paragraph fontSize={15} lineHeight={17}>
+                    <span role="img" aria-label="management">
+                      ⚙️
+                    </span>
+                  </Paragraph>
+                </MenuIconBox>
+                <Paragraph size="$3" color="$color" fontWeight="500">
+                  Management
+                </Paragraph>
+              </XStack>
+            </MenuItem>
+
+            {isAdmin && (
+              <MenuItem
+                onPress={() => {
+                  void navigate('/admin');
+                  setIsOpen(false);
+                }}
+              >
+                <XStack alignItems="center" gap="$3" flex={1}>
+                  <MenuIconBox>
+                    <Paragraph fontSize={15} lineHeight={17}>
+                      <span role="img" aria-label="admin">
+                        🛡️
+                      </span>
+                    </Paragraph>
+                  </MenuIconBox>
+                  <Paragraph size="$3" color="$color" fontWeight="500">
+                    Admin
+                  </Paragraph>
+                </XStack>
+              </MenuItem>
+            )}
 
             <Separator marginVertical="$2" />
 

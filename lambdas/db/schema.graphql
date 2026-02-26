@@ -459,6 +459,10 @@ type HeadToHeadRecord {
   totalMatchups: Int
 }
 
+type ImpersonateUserResult {
+  token: String
+}
+
 type InviteCodeInfo {
   availableSpots: Int
   isFull: Boolean
@@ -818,6 +822,11 @@ type Mutation {
   deleteAllLeagues: String
   deleteLeague(leagueId: Int!): String
   disableDeviceToken(deviceToken: String!): Boolean
+
+  """
+  Admin only: generate a JWT that authenticates as the specified user for debugging purposes.
+  """
+  impersonateUser(userId: Int!): ImpersonateUserResult
   initializeDraft(
     draftMode: String
     draftOrder: String

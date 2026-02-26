@@ -454,6 +454,11 @@ export type HeadToHeadRecord = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+export type ImpersonateUserResult = {
+  __typename?: 'ImpersonateUserResult';
+  token?: Maybe<Scalars['String']['output']>;
+};
+
 export type InviteCodeInfo = {
   __typename?: 'InviteCodeInfo';
   availableSpots?: Maybe<Scalars['Int']['output']>;
@@ -736,6 +741,8 @@ export type Mutation = {
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
+  /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
+  impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
@@ -857,6 +864,10 @@ export type MutationDeleteLeagueArgs = {
 
 export type MutationDisableDeviceTokenArgs = {
   deviceToken: Scalars['String']['input'];
+};
+
+export type MutationImpersonateUserArgs = {
+  userId: Scalars['Int']['input'];
 };
 
 export type MutationInitializeDraftArgs = {
@@ -4475,6 +4486,14 @@ export type UserFragment = {
   accessLevel?: string | null;
 };
 
+export type AdminUserFragment = {
+  __typename?: 'User';
+  id?: number | null;
+  email?: string | null;
+  username?: string | null;
+  accessLevel?: string | null;
+};
+
 export type GetUserByIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];
 }>;
@@ -4519,6 +4538,34 @@ export type UpdateUserRoleMutation = {
     email?: string | null;
     username?: string | null;
     accessLevel?: string | null;
+  } | null;
+};
+
+export type AdminGetUsersQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type AdminGetUsersQuery = {
+  __typename?: 'Query';
+  users?: Array<{
+    __typename?: 'User';
+    id?: number | null;
+    email?: string | null;
+    username?: string | null;
+    accessLevel?: string | null;
+  }> | null;
+};
+
+export type ImpersonateUserMutationVariables = Exact<{
+  userId: Scalars['Int']['input'];
+}>;
+
+export type ImpersonateUserMutation = {
+  __typename?: 'Mutation';
+  impersonateUser?: {
+    __typename?: 'ImpersonateUserResult';
+    token?: string | null;
   } | null;
 };
 
@@ -4853,6 +4900,14 @@ export const TradeOfferFragmentDoc = gql`
 `;
 export const UserFragmentDoc = gql`
   fragment User on User {
+    id
+    email
+    username
+    accessLevel
+  }
+`;
+export const AdminUserFragmentDoc = gql`
+  fragment AdminUser on User {
     id
     email
     username
@@ -9808,4 +9863,142 @@ export type UpdateUserRoleMutationResult =
 export type UpdateUserRoleMutationOptions = BaseMutationOptions<
   UpdateUserRoleMutation,
   UpdateUserRoleMutationVariables
+>;
+export const AdminGetUsers = gql`
+  query AdminGetUsers($limit: Int, $offset: Int) {
+    users(limit: $limit, offset: $offset) {
+      ...AdminUser
+    }
+  }
+  ${AdminUserFragmentDoc}
+`;
+
+/**
+ * __useAdminGetUsersQuery__
+ *
+ * To run a query within a React component, call `useAdminGetUsersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useAdminGetUsersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useAdminGetUsersQuery({
+ *   variables: {
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *   },
+ * });
+ */
+export function useAdminGetUsersQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    AdminGetUsersQuery,
+    AdminGetUsersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<AdminGetUsersQuery, AdminGetUsersQueryVariables>(
+    AdminGetUsers,
+    options,
+  );
+}
+export function useAdminGetUsersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    AdminGetUsersQuery,
+    AdminGetUsersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<AdminGetUsersQuery, AdminGetUsersQueryVariables>(
+    AdminGetUsers,
+    options,
+  );
+}
+export function useAdminGetUsersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        AdminGetUsersQuery,
+        AdminGetUsersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    AdminGetUsersQuery,
+    AdminGetUsersQueryVariables
+  >(
+    AdminGetUsers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          AdminGetUsersQuery,
+          AdminGetUsersQueryVariables
+        >,
+  );
+}
+export type AdminGetUsersQueryHookResult = ReturnType<
+  typeof useAdminGetUsersQuery
+>;
+export type AdminGetUsersLazyQueryHookResult = ReturnType<
+  typeof useAdminGetUsersLazyQuery
+>;
+export type AdminGetUsersSuspenseQueryHookResult = ReturnType<
+  typeof useAdminGetUsersSuspenseQuery
+>;
+export type AdminGetUsersQueryResult = Apollo.QueryResult<
+  AdminGetUsersQuery,
+  AdminGetUsersQueryVariables
+>;
+export const ImpersonateUser = gql`
+  mutation ImpersonateUser($userId: Int!) {
+    impersonateUser(userId: $userId) {
+      token
+    }
+  }
+`;
+export type ImpersonateUserMutationFn = MutationFunction<
+  ImpersonateUserMutation,
+  ImpersonateUserMutationVariables
+>;
+
+/**
+ * __useImpersonateUserMutation__
+ *
+ * To run a mutation, you first call `useImpersonateUserMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useImpersonateUserMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [impersonateUserMutation, { data, loading, error }] = useImpersonateUserMutation({
+ *   variables: {
+ *      userId: // value for 'userId'
+ *   },
+ * });
+ */
+export function useImpersonateUserMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ImpersonateUserMutation,
+    ImpersonateUserMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ImpersonateUserMutation,
+    ImpersonateUserMutationVariables
+  >(ImpersonateUser, options);
+}
+export type ImpersonateUserMutationHookResult = ReturnType<
+  typeof useImpersonateUserMutation
+>;
+export type ImpersonateUserMutationResult =
+  Apollo.MutationResult<ImpersonateUserMutation>;
+export type ImpersonateUserMutationOptions = BaseMutationOptions<
+  ImpersonateUserMutation,
+  ImpersonateUserMutationVariables
 >;

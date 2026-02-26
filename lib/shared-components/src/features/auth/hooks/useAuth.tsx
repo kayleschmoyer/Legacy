@@ -12,6 +12,12 @@ import type {
   OAuthResponse,
 } from '../../../platform-components/types';
 
+interface ImpersonatedBy {
+  id: number;
+  email?: string;
+  username: string;
+}
+
 interface User {
   id: number;
   email: string;
@@ -20,6 +26,8 @@ interface User {
   accessLevel: 'none' | 'user' | 'admin';
   // Legacy compatibility
   isAdmin?: boolean;
+  /** Set when this session was started via admin impersonation. */
+  impersonatedBy?: ImpersonatedBy;
 }
 
 interface JwtPayload {
@@ -29,6 +37,7 @@ interface JwtPayload {
   name?: string;
   picture?: string;
   accessLevel?: 'none' | 'user' | 'admin';
+  impersonatedBy?: ImpersonatedBy;
   [key: string]: unknown;
 }
 
@@ -43,6 +52,14 @@ interface AuthContextType {
   loginWithProvider: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  /** True when an admin is currently acting as another user. */
+  isImpersonating: boolean;
+  /** The original admin user who initiated impersonation. */
+  adminUser: User | null;
+  /** Begin impersonating another user using the given JWT. */
+  impersonateUser: (impersonationToken: string) => void;
+  /** Restore the original admin session. */
+  stopImpersonating: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,6 +96,8 @@ interface AuthState {
   user: User | null;
   isLoading: boolean;
   error: string | null;
+  isImpersonating: boolean;
+  adminUser: User | null;
 }
 
 type AuthAction =
@@ -87,12 +106,19 @@ type AuthAction =
   | { type: 'AUTH_FAILURE'; payload: string }
   | { type: 'AUTH_LOGOUT' }
   | { type: 'CLEAR_ERROR' }
-  | { type: 'SET_LOADING'; payload: boolean };
+  | { type: 'SET_LOADING'; payload: boolean }
+  | {
+      type: 'IMPERSONATE_START';
+      payload: { adminUser: User; targetUser: User };
+    }
+  | { type: 'IMPERSONATE_STOP'; payload: User };
 
 const initialAuthState: AuthState = {
   user: null,
   isLoading: true,
   error: null,
+  isImpersonating: false,
+  adminUser: null,
 };
 
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
@@ -127,6 +153,8 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: false,
         user: null,
         error: null,
+        isImpersonating: false,
+        adminUser: null,
       };
 
     case 'CLEAR_ERROR':
@@ -142,6 +170,22 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       };
     }
 
+    case 'IMPERSONATE_START':
+      return {
+        ...state,
+        isImpersonating: true,
+        adminUser: action.payload.adminUser,
+        user: action.payload.targetUser,
+      };
+
+    case 'IMPERSONATE_STOP':
+      return {
+        ...state,
+        isImpersonating: false,
+        adminUser: null,
+        user: action.payload,
+      };
+
     default:
       console.warn('authReducer - Unknown action type:', action);
       return state;
@@ -153,9 +197,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   config,
 }) => {
   const [authState, dispatchAuth] = useReducer(authReducer, initialAuthState);
-  const { user, isLoading, error } = authState;
+  const { user, isLoading, error, isImpersonating, adminUser } = authState;
 
   const authService = useMemo(() => new AuthService(config), [config]);
+
+  /** Decode a JWT string into a User object (no signature verification). */
+  const decodeUserFromToken = useCallback((token: string): User | null => {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      const payload = JSON.parse(
+        atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')),
+      ) as JwtPayload;
+      return {
+        id: payload.id || 0,
+        email: payload.email || '',
+        username: payload.username || payload.name || 'Unknown',
+        picture: payload.picture,
+        accessLevel: payload.accessLevel || ('user' as const),
+        impersonatedBy: payload.impersonatedBy,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
 
   // Initialize auth state on mount
   useEffect(() => {
@@ -170,28 +235,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
           if (isValid) {
             // Token is valid, extract user info from JWT payload
-            try {
-              const parts = token.split('.');
-              if (parts.length === 3) {
-                const payload = JSON.parse(
-                  atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')),
-                ) as JwtPayload;
+            const userInfo = decodeUserFromToken(token);
 
-                const userInfo = {
-                  id: payload.id || 0,
-                  email: payload.email || '',
-                  username: payload.username || payload.name || 'Unknown',
-                  picture: payload.picture,
-                  accessLevel: payload.accessLevel || ('user' as const),
-                };
+            if (userInfo && isMounted) {
+              // Check if we are currently impersonating
+              const adminToken =
+                typeof localStorage !== 'undefined'
+                  ? localStorage.getItem('admin_original_jwt')
+                  : null;
 
-                if (isMounted) {
-                  dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+              if (adminToken) {
+                const adminUserInfo = decodeUserFromToken(adminToken);
+                if (adminUserInfo) {
+                  dispatchAuth({
+                    type: 'IMPERSONATE_START',
+                    payload: { adminUser: adminUserInfo, targetUser: userInfo },
+                  });
+                  return;
                 }
               }
-            } catch (decodeError) {
-              console.error('Failed to decode stored token:', decodeError);
-              authService.clearTokens();
+
+              dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
             }
           } else {
             // Token is invalid, clear it
@@ -213,7 +277,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [authService]);
+  }, [authService, decodeUserFromToken]);
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -256,6 +320,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const logout = useCallback(async (): Promise<void> => {
     try {
       authService.clearTokens();
+      // Also clear any impersonation state
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('admin_original_jwt');
+      }
       dispatchAuth({ type: 'AUTH_LOGOUT' });
       await Promise.resolve(); // Ensure async behavior to match interface
     } catch (error) {
@@ -266,6 +334,72 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const clearError = useCallback(() => {
     dispatchAuth({ type: 'CLEAR_ERROR' });
   }, []);
+
+  /**
+   * Begin impersonating another user.  The calling user must be an admin.
+   * Stores the current admin token so impersonation can be reverted.
+   *
+   * @param impersonationToken - A signed JWT returned by the `impersonateUser` GraphQL mutation.
+   */
+  const impersonateUser = useCallback(
+    (impersonationToken: string) => {
+      const currentToken = authService.getStoredToken();
+      if (!currentToken) {
+        console.error('impersonateUser: no current token to save');
+        return;
+      }
+
+      const currentAdminUser = decodeUserFromToken(currentToken);
+      if (!currentAdminUser) {
+        console.error('impersonateUser: could not decode current user');
+        return;
+      }
+
+      const targetUser = decodeUserFromToken(impersonationToken);
+      if (!targetUser) {
+        console.error('impersonateUser: could not decode impersonation token');
+        return;
+      }
+
+      // Persist admin token so we can restore after impersonation
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('admin_original_jwt', currentToken);
+        localStorage.setItem('auth_jwt', impersonationToken);
+      }
+
+      dispatchAuth({
+        type: 'IMPERSONATE_START',
+        payload: { adminUser: currentAdminUser, targetUser },
+      });
+    },
+    [authService, decodeUserFromToken],
+  );
+
+  /** Restore the original admin session, ending impersonation. */
+  const stopImpersonating = useCallback(() => {
+    const adminToken =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem('admin_original_jwt')
+        : null;
+
+    if (!adminToken) {
+      console.error('stopImpersonating: no admin token stored');
+      return;
+    }
+
+    const adminUserInfo = decodeUserFromToken(adminToken);
+    if (!adminUserInfo) {
+      console.error('stopImpersonating: could not decode admin token');
+      return;
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('auth_jwt', adminToken);
+      localStorage.removeItem('admin_original_jwt');
+    }
+
+    dispatchAuth({ type: 'IMPERSONATE_STOP', payload: adminUserInfo });
+  }, [decodeUserFromToken]);
 
   const loginWithProvider = useCallback(async (): Promise<void> => {
     dispatchAuth({ type: 'AUTH_START' });
@@ -297,6 +431,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       loginWithProvider,
       logout,
       clearError,
+      isImpersonating,
+      adminUser,
+      impersonateUser,
+      stopImpersonating,
     }),
     [
       user,
@@ -308,6 +446,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       loginWithProvider,
       logout,
       clearError,
+      isImpersonating,
+      adminUser,
+      impersonateUser,
+      stopImpersonating,
     ],
   );
 

@@ -2,12 +2,19 @@ import { verify } from 'jsonwebtoken';
 import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 
+export interface ImpersonatedBy {
+  id: number;
+  email?: string;
+  username: string;
+}
+
 export interface JWTPayload {
   id: number | string;
   email?: string;
   username: string;
   accessLevel?: string;
   isAdmin?: boolean;
+  impersonatedBy?: ImpersonatedBy;
   [key: string]: unknown; // For other JWT standard fields
 }
 
@@ -16,6 +23,8 @@ export interface User {
   email?: string;
   username: string;
   isAdmin: boolean;
+  /** Present when this session was created by an admin via impersonation. */
+  impersonatedBy?: ImpersonatedBy;
 }
 
 const JWT_SECRET_NAME = process.env['JWT_SECRET_NAME'] || '';
@@ -47,11 +56,27 @@ export function parseUserFromJwtPayload(payload: JWTPayload): User {
   const accessLevel =
     typeof payload.accessLevel === 'string' ? payload.accessLevel : undefined;
 
+  let impersonatedBy: ImpersonatedBy | undefined;
+  if (
+    payload.impersonatedBy &&
+    typeof payload.impersonatedBy === 'object' &&
+    typeof payload.impersonatedBy.id === 'number' &&
+    typeof payload.impersonatedBy.username === 'string'
+  ) {
+    const raw = payload.impersonatedBy;
+    impersonatedBy = {
+      id: raw.id,
+      username: raw.username,
+      email: typeof raw.email === 'string' ? raw.email : undefined,
+    };
+  }
+
   return {
     id,
     email: typeof payload.email === 'string' ? payload.email : undefined,
     username: payload.username,
     isAdmin: payload.isAdmin === true || accessLevel === 'admin',
+    impersonatedBy,
   };
 }
 

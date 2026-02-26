@@ -82,25 +82,6 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             Players Dropdown
           </div>
           <a
-            href="/management"
-            style="text-decoration: none;"
-          >
-            <button>
-              <p
-                marginbottom="0"
-              >
-                <span
-                  aria-label="management"
-                  role="img"
-                >
-                  ⚙️
-                </span>
-                 
-                Management
-              </p>
-            </button>
-          </a>
-          <a
             href="/about"
             style="text-decoration: none;"
           >
@@ -242,25 +223,6 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             Players Dropdown
           </div>
           <a
-            href="/management"
-            style="text-decoration: none;"
-          >
-            <button>
-              <p
-                marginbottom="0"
-              >
-                <span
-                  aria-label="management"
-                  role="img"
-                >
-                  ⚙️
-                </span>
-                 
-                Management
-              </p>
-            </button>
-          </a>
-          <a
             href="/about"
             style="text-decoration: none;"
           >
@@ -399,25 +361,6 @@ exports[`App Navigation should render navigation with correct links 1`] = `
           <div>
             Players Dropdown
           </div>
-          <a
-            href="/management"
-            style="text-decoration: none;"
-          >
-            <button>
-              <p
-                marginbottom="0"
-              >
-                <span
-                  aria-label="management"
-                  role="img"
-                >
-                  ⚙️
-                </span>
-                 
-                Management
-              </p>
-            </button>
-          </a>
           <a
             href="/about"
             style="text-decoration: none;"
