@@ -138,6 +138,12 @@ Run the full validation suite before opening the PR. Fix any failures and amend/
 make pc
 ```
 
+### Step 7b: User Testing (Optional)
+
+If you want live UI verification before opening the PR, see the [user-testing skill](../user-testing/SKILL.md).
+This temporarily checks the branch out in the main repo (where dev servers run) so you can test changes
+visually, then returns `main` to main.
+
 ### Step 8: Create Pull Request
 
 See the [create-pr skill](../create-pr/SKILL.md) for the full PR template workflow. For a quick PR:

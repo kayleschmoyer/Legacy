@@ -105,6 +105,16 @@ code $wt
 
 This opens the worktree in a **new VS Code window**. Work exclusively in that window for this ticket.
 
+> **Alternative — work from the main repo window (agent access):**
+> If you want an agent running in the main VS Code window to edit files in the worktree,
+> you do **not** need a separate window. Just reference the worktree path directly.
+> VS Code will show a prompt: **"Allow reading/editing external files? … Allow this folder in this session"**.
+> Click **Allow** and the agent has full read/write access to the worktree for the rest of the session.
+>
+> Agents should start by telling the user:
+> _"I need access to `<worktree path>` — please click Allow when VS Code prompts you."_
+> Then immediately attempt to read a file in that path to trigger the prompt.
+
 ### Step 5: Implement the Ticket
 
 All commands run from within the worktree directory (`cd $wt`). Write code, add tests, update docs.
@@ -125,6 +135,12 @@ Run the full validation suite before opening the PR. Fix any failures and push a
 ```powershell
 make pc
 ```
+
+### Step 7b: User Testing (Optional)
+
+If you want to test the UI live against running dev servers before opening a PR,
+see the [user-testing skill](../user-testing/SKILL.md). This checks the branch out in the
+main repo where dev servers run, lets you verify visually, then returns main to `main`.
 
 ### Step 8: Create Pull Request
 
@@ -169,13 +185,14 @@ twig worktree list  # verify
 
 ## Key Rules
 
-| Rule                        | Detail                                                                                              |
-| --------------------------- | --------------------------------------------------------------------------------------------------- |
-| **Main stays on main**      | Never check out a feature branch in the main repo — it's the base for new worktrees                 |
-| **One worktree per branch** | Git prevents two worktrees sharing the same branch                                                  |
-| **Don't run from inside**   | `git worktree move/remove` must be run from outside the target worktree                             |
-| **Run make install**        | `node_modules` and Python deps are absent in a fresh worktree — always run `make install` inside it |
-| **Separate VS Code window** | Open each worktree in its own VS Code window for clean file watching                                |
+| Rule                          | Detail                                                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Main stays on main**        | Never check out a feature branch in the main repo — it's the base for new worktrees                    |
+| **One worktree per branch**   | Git prevents two worktrees sharing the same branch                                                     |
+| **Don't run from inside**     | `git worktree move/remove` must be run from outside the target worktree                                |
+| **Run make install**          | `node_modules` and Python deps are absent in a fresh worktree — always run `make install` inside it    |
+| **Separate VS Code window**   | Open each worktree in its own VS Code window for clean file watching                                   |
+| **Agent cross-window access** | Agent in main window can edit worktree files — VS Code will prompt "Allow this folder in this session" |
 
 ## Troubleshooting
 
