@@ -142,6 +142,11 @@ type CareerBatting {
   hits: Int
   homeRuns: Int
   intentionalBaseOnBalls: Int
+
+  """
+  Approximate offensive WAR computed from career counting stats. Includes wOBA-based batting runs, SB/CS baserunning, positional adjustment, and replacement level. Excludes fielding value.
+  """
+  offensiveWAR: Float
   onBasePercentage: Float
   plateAppearances: Int
   player: Player

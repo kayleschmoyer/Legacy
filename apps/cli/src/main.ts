@@ -47,6 +47,9 @@ import { handleTestWorkflow } from './commands/testWorkflow';
 import { handleRetryFailedPlayers } from './commands/retryFailedPlayers';
 import { handleStatsLoadingStatus } from './commands/statsLoadingStatus';
 import { handleTestDraftTimer } from './commands/testDraftTimer';
+import { handleLoadWobaWeights } from './commands/loadWobaWeights';
+import { handleLoadBrParkFactors } from './commands/loadBrParkFactors';
+import { handleLoadPositionalAdjustments } from './commands/loadPositionalAdjustments';
 
 // Initialize Sentry for CLI
 const sentryConfig = getSentryConfigFromEnv();
@@ -473,6 +476,36 @@ async function run(): Promise<void> {
         status?: boolean;
         dryRun?: boolean;
       }) => handleTestDraftTimer(options),
+    );
+
+  program
+    .command('load-woba-weights')
+    .description(
+      'Load FanGraphs wOBA season weights (1871-2025) into woba_season_weights table',
+    )
+    .option('--upsert', 'Overwrite existing rows instead of skipping')
+    .action((options: { upsert?: boolean }) => handleLoadWobaWeights(options));
+
+  program
+    .command('load-br-park-factors')
+    .description(
+      'Scrape Baseball Reference BPF/PPF park factors into park_factors table',
+    )
+    .option('--upsert', 'Overwrite existing rows instead of skipping')
+    .option('--from <year>', 'Start year (default: 1876)')
+    .option('--to <year>', 'End year (default: 2025)')
+    .action((options: { upsert?: boolean; from?: string; to?: string }) =>
+      handleLoadBrParkFactors(options),
+    );
+
+  program
+    .command('load-positional-adjustments')
+    .description(
+      'Load Baseball Reference year-specific positional adjustments (1871-2025) into positional_adjustments table',
+    )
+    .option('--upsert', 'Overwrite existing rows instead of skipping')
+    .action((options: { upsert?: boolean }) =>
+      handleLoadPositionalAdjustments(options),
     );
 
   await program.parseAsync(process.argv);

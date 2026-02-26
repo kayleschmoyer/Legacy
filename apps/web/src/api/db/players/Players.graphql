@@ -61,6 +61,7 @@ query GetPlayersWithStats(
       hitByPitch
       sacrificeHits
       totalBases
+      offensiveWAR
     }
     careerPitching {
       wins

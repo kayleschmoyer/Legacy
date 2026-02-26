@@ -139,6 +139,8 @@ export type CareerBatting = {
   hits?: Maybe<Scalars['Int']['output']>;
   homeRuns?: Maybe<Scalars['Int']['output']>;
   intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
+  /** Approximate offensive WAR computed from career counting stats. Includes wOBA-based batting runs, SB/CS baserunning, positional adjustment, and replacement level. Excludes fielding value. */
+  offensiveWAR?: Maybe<Scalars['Float']['output']>;
   onBasePercentage?: Maybe<Scalars['Float']['output']>;
   plateAppearances?: Maybe<Scalars['Int']['output']>;
   player?: Maybe<Player>;
@@ -3822,6 +3824,7 @@ export type GetPlayersWithStatsQuery = {
       hitByPitch?: number | null;
       sacrificeHits?: number | null;
       totalBases?: number | null;
+      offensiveWAR?: number | null;
     } | null;
     careerPitching?: {
       __typename?: 'CareerPitching';
@@ -8203,6 +8206,7 @@ export const GetPlayersWithStats = gql`
         hitByPitch
         sacrificeHits
         totalBases
+        offensiveWAR
       }
       careerPitching {
         wins

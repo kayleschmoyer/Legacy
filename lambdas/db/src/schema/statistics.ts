@@ -270,6 +270,7 @@ export const CareerBattingRef = builder.objectRef<{
   hbp: number | null;
   sh: number | null;
   ibb: number | null;
+  offensiveWar: number | null;
 }>('CareerBatting');
 
 CareerBattingRef.implement({
@@ -320,6 +321,19 @@ CareerBattingRef.implement({
         if (!stats.tb || !stats.ab || stats.ab === 0) return null;
         return stats.tb / stats.ab;
       },
+    }),
+    /**
+     * Offensive WAR — read from the career_batting view's computed column.
+     * Formula: (wRAA + BsR + posAdj + replRuns) / 10, computed in SQL.
+     */
+    offensiveWAR: t.field({
+      type: 'Float',
+      nullable: true,
+      description:
+        'Approximate offensive WAR computed from career counting stats. ' +
+        'Includes wOBA-based batting runs, SB/CS baserunning, positional adjustment, ' +
+        'and replacement level. Excludes fielding value.',
+      resolve: (stats) => stats.offensiveWar ?? null,
     }),
     // Player relationship
     player: t.field({

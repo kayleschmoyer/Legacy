@@ -72,7 +72,8 @@
     "/^make quick-check$/": {
       "approve": true,
       "matchCommandLine": true
-    }
+    },
+    "gh": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {

@@ -65,7 +65,8 @@ export type ScoringOrderBy =
   | 'fieldingScore'
   | 'hitterScore'
   | 'hitterAvgPointsPerGame'
-  | 'pitchingAvgPointsPerGame';
+  | 'pitchingAvgPointsPerGame'
+  | 'careerOffensiveWAR';
 
 export type PlayerOrderBy =
   | 'id'
@@ -104,222 +105,11 @@ export class PlayerService {
    * Get all players with optional filtering and pagination
    */
   async getPlayers(queryOptions: PlayerQueryOptions = {}): Promise<Player[]> {
-    return runWithPublicClient(this.options, async (db): Promise<Player[]> => {
-      let queryBuilder = db.select().from(PublicSchema.players);
-
-      const careerSortOptions: CareerStatOrderBy[] = [
-        'careerGames',
-        'careerHits',
-        'careerHomeRuns',
-        'careerRBI',
-        'careerRuns',
-        'careerStolenBases',
-      ];
-      const scoringSortOptions: ScoringOrderBy[] = [
-        'totalScore',
-        'avgPointsPerGame',
-        'battingScore',
-        'pitchingScore',
-        'fieldingScore',
-        'hitterScore',
-        'hitterAvgPointsPerGame',
-        'pitchingAvgPointsPerGame',
-      ];
-      const isCareerSort = careerSortOptions.includes(
-        queryOptions.orderBy as CareerStatOrderBy,
-      );
-      const isScoringSort = scoringSortOptions.includes(
-        queryOptions.orderBy as ScoringOrderBy,
-      );
-
-      if (isCareerSort) {
-        queryBuilder = queryBuilder.leftJoin(
-          PublicSchema.careerBatting,
-          eq(PublicSchema.players.id, PublicSchema.careerBatting.playerId),
-        ) as unknown as typeof queryBuilder;
-      }
-
-      // For scoring-based sorts, redirect to the dedicated method
-      if (isScoringSort) {
-        return this.getPlayersWithScoringSort(
-          queryOptions,
-        ) as unknown as Player[];
-      }
-
-      // Build WHERE clause
-      const conditions = queryOptions.filters
-        ? this.buildPlayerFilters(queryOptions.filters)
-        : [];
-
-      if (queryOptions.filters?.position) {
-        const pos = queryOptions.filters.position;
-
-        if (pos === 'HITTER') {
-          // Hitters: players with no positions at all OR at least one non-pitcher position.
-          // Excludes pure SP/RP-only players.
-          conditions.push(
-            sql`(
-              NOT EXISTS (SELECT 1 FROM public.player_eligible_positions WHERE player_id = ${PublicSchema.players.id})
-              OR EXISTS (
-                SELECT 1 FROM public.player_eligible_positions
-                WHERE player_id = ${PublicSchema.players.id} AND position NOT IN ('SP', 'RP')
-              )
-            )`,
-          );
-        } else if (pos === 'P') {
-          // Pitchers (SP, RP, P)
-          conditions.push(
-            inArray(
-              PublicSchema.players.id,
-              db
-                .select({ id: PublicSchema.playerEligiblePositions.playerId })
-                .from(PublicSchema.playerEligiblePositions)
-                .where(
-                  inArray(PublicSchema.playerEligiblePositions.position, [
-                    'SP',
-                    'RP',
-                  ] as const),
-                ),
-            ),
-          );
-        } else if (pos === 'OF') {
-          // Outfielders (LF, CF, RF, OF)
-          conditions.push(
-            inArray(
-              PublicSchema.players.id,
-              db
-                .select({ id: PublicSchema.playerEligiblePositions.playerId })
-                .from(PublicSchema.playerEligiblePositions)
-                .where(
-                  inArray(PublicSchema.playerEligiblePositions.position, [
-                    'LF',
-                    'CF',
-                    'RF',
-                  ] as const),
-                ),
-            ),
-          );
-        } else if (pos === 'DH') {
-          // DH is a roster slot, not a fielding position in the DB.
-          // Any non-pitcher (player with a batting position) is DH-eligible.
-          conditions.push(
-            inArray(
-              PublicSchema.players.id,
-              db
-                .select({ id: PublicSchema.playerEligiblePositions.playerId })
-                .from(PublicSchema.playerEligiblePositions)
-                .where(
-                  inArray(PublicSchema.playerEligiblePositions.position, [
-                    'C',
-                    '1B',
-                    '2B',
-                    '3B',
-                    'SS',
-                    'LF',
-                    'CF',
-                    'RF',
-                  ] as const),
-                ),
-            ),
-          );
-        } else {
-          // Specific position
-          conditions.push(
-            inArray(
-              PublicSchema.players.id,
-              db
-                .select({ id: PublicSchema.playerEligiblePositions.playerId })
-                .from(PublicSchema.playerEligiblePositions)
-                .where(
-                  eq(
-                    PublicSchema.playerEligiblePositions.position,
-                    pos as (typeof PublicSchema.playerEligiblePositions.position.enumValues)[number],
-                  ),
-                ),
-            ),
-          );
-        }
-      }
-
-      // Build final query parts
-      let orderColumn;
-      if (queryOptions.orderBy) {
-        if (queryOptions.orderBy === 'careerGames') {
-          orderColumn = PublicSchema.careerBatting.g;
-        } else if (queryOptions.orderBy === 'careerHits') {
-          orderColumn = PublicSchema.careerBatting.h;
-        } else if (queryOptions.orderBy === 'careerHomeRuns') {
-          orderColumn = PublicSchema.careerBatting.hr;
-        } else if (queryOptions.orderBy === 'careerRBI') {
-          orderColumn = PublicSchema.careerBatting.rbi;
-        } else if (queryOptions.orderBy === 'careerRuns') {
-          orderColumn = PublicSchema.careerBatting.r;
-        } else if (queryOptions.orderBy === 'careerStolenBases') {
-          orderColumn = PublicSchema.careerBatting.sb;
-        } else {
-          // Only plain player-table columns reach here (scoring sorts
-          // are redirected above via isScoringSort)
-          const playerKey = queryOptions.orderBy as
-            | 'id'
-            | 'firstName'
-            | 'lastName'
-            | 'brefId';
-          orderColumn = PublicSchema.players[playerKey];
-        }
-      }
-
-      const orderDirection = queryOptions.orderDirection || 'asc';
-
-      // Execute query with all conditions
-      let finalQuery = queryBuilder;
-
-      if (conditions.length > 0) {
-        // TypeScript has issues with Drizzle's complex query builder types
-        // This is a safe cast since we know the query is valid
-        finalQuery = finalQuery.where(and(...conditions)) as typeof finalQuery;
-      }
-
-      if (orderColumn) {
-        // Need to specify the table for sorting if joined
-        // Use nullsLast to keep players with no stats at the bottom
-        // Using sql templates because .nullsLast() is failing at runtime in lambda
-        finalQuery =
-          orderDirection === 'desc'
-            ? (finalQuery.orderBy(
-                sql`${orderColumn} DESC NULLS LAST`,
-              ) as typeof finalQuery)
-            : (finalQuery.orderBy(
-                sql`${orderColumn} ASC NULLS LAST`,
-              ) as typeof finalQuery);
-      }
-
-      if (queryOptions.limit) {
-        finalQuery = finalQuery.limit(queryOptions.limit) as typeof finalQuery;
-      }
-
-      if (queryOptions.offset) {
-        finalQuery = finalQuery.offset(
-          queryOptions.offset,
-        ) as typeof finalQuery;
-      }
-
-      const result = await finalQuery.execute();
-
-      // If we joined, the result structure might be different (e.g. { players: ..., career_batting: ... })
-      // Or Drizzle might return flattened result if not using select({ ... })
-      // Drizzle usually returns objects based on the tables.
-      // If returning joined result, we have to map back to Player[].
-      // Since we started with db.select().from(players), if we don't specify fields, it returns players.*
-      // But let's verify if Drizzle changes return type on join.
-      // Usually yes.
-      if (isCareerSort) {
-        // If we joined, Drizzle returns { players: Player, career_batting: CareerBatting }
-        return (result as unknown as Array<{ players: Player }>).map(
-          (row) => row.players,
-        );
-      }
-      return result as Player[];
-    });
+    // Always go through the scoring path so scoring data (PTS, BAT, FLD, etc.)
+    // is populated regardless of which column is being sorted.
+    return (await this.getPlayersWithScoringSort(
+      queryOptions,
+    )) as unknown as Player[];
   }
 
   /**
@@ -545,10 +335,24 @@ export class PlayerService {
           pitchingScore: 'pitching_score',
           fieldingScore: 'fielding_score',
         };
+        // Career batting column names in the career_batting view (aliased as "cb")
+        const careerBattingColumnMap: Record<string, string> = {
+          careerGames: 'g',
+          careerHits: 'h',
+          careerHomeRuns: 'hr',
+          careerRBI: 'rbi',
+          careerRuns: 'r',
+          careerStolenBases: 'sb',
+          careerOffensiveWAR: 'offensive_war',
+        };
         const orderByKey = queryOptions.orderBy || 'avgPointsPerGame';
         const sortDir =
           queryOptions.orderDirection === 'asc' ? sql`ASC` : sql`DESC`;
-        // derived expression columns that are not direct CS columns
+        const isCareerStatSort = orderByKey in careerBattingColumnMap;
+        // Join career_batting whenever we need to sort by a career stat column
+        const careerStatJoin = isCareerStatSort
+          ? sql`LEFT JOIN public.career_batting cb ON p.id = cb.player_id`
+          : sql``;
         const orderByClause =
           orderByKey === 'hitterScore'
             ? sql`COALESCE(cs.batting_score + cs.fielding_score, 0) ${sortDir}`
@@ -556,7 +360,9 @@ export class PlayerService {
               ? sql`COALESCE(CASE WHEN cs.career_games > 0 THEN (cs.batting_score + cs.fielding_score) / cs.career_games ELSE 0 END, 0) ${sortDir}`
               : orderByKey === 'pitchingAvgPointsPerGame'
                 ? sql`COALESCE(CASE WHEN cs.career_games > 0 THEN cs.pitching_score / cs.career_games ELSE 0 END, 0) ${sortDir}`
-                : sql`COALESCE(cs.${sql.raw(scoringColumnMap[orderByKey] || 'avg_ppg')}, 0) ${sortDir}`;
+                : isCareerStatSort
+                  ? sql`cb.${sql.raw(careerBattingColumnMap[orderByKey])} ${sortDir} NULLS LAST`
+                  : sql`COALESCE(cs.${sql.raw(scoringColumnMap[orderByKey] || 'avg_ppg')}, 0) ${sortDir}`;
 
         // Build WHERE conditions using raw SQL (must reference alias "p",
         // not the Drizzle column refs which would emit "players"."col").
@@ -655,6 +461,7 @@ export class PlayerService {
           FROM public.players p
           LEFT JOIN public.compute_career_scores(${leagueIdParam}) cs
             ON p.id = cs.player_id
+          ${careerStatJoin}
           ${whereClause}
           ORDER BY ${orderByClause}
           ${limitClause}

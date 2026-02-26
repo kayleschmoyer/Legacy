@@ -90,6 +90,14 @@ const HITTING_STAT_COLUMNS: {
     width: 48,
     description: 'Career Stolen Bases',
   },
+  {
+    key: 'offensiveWAR',
+    label: 'oWAR',
+    sortKey: 'careerOffensiveWAR',
+    width: 56,
+    description: 'Offensive WAR (batting + baserunning + positional)',
+    isBold: true,
+  },
 ];
 
 /** Pitching stat columns shown for the Pitchers tab */
@@ -388,6 +396,7 @@ type SortKey =
   | 'careerRBI'
   | 'careerRuns'
   | 'careerStolenBases'
+  | 'careerOffensiveWAR'
   | 'totalScore'
   | 'avgPointsPerGame'
   | 'battingScore'
@@ -1061,6 +1070,11 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                       </StatCell>
                       <StatCell width={48}>
                         {statVal(battingStats?.stolenBases)}
+                      </StatCell>
+                      <StatCell width={56} fontWeight="700">
+                        {battingStats?.offensiveWAR != null
+                          ? battingStats.offensiveWAR.toFixed(1)
+                          : '–'}
                       </StatCell>
 
                       {/* Rate stats */}

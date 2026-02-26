@@ -102,6 +102,8 @@ export interface PlayerCareerStats {
   readonly formattedOnBasePercentage: string;
   readonly formattedSluggingPercentage: string;
   readonly formattedOPS: string;
+  /** Approximate offensive WAR (oWAR) — computed server-side from counting stats */
+  readonly offensiveWAR: number | null;
   // Fielding statistics
   readonly fieldingGames?: number;
   readonly fieldingPercentage?: number;
@@ -303,6 +305,7 @@ export function transformCareerStats(
     formattedOnBasePercentage: formatStatistic(onBasePercentage),
     formattedSluggingPercentage: formatStatistic(sluggingPercentage),
     formattedOPS: formatStatistic(ops),
+    offensiveWAR: rawStats.offensiveWAR ?? null,
     // Parse positions played from the new field
     positionsPlayed: parsePositionsPlayed(rawStats.positionsPlayed),
     formattedPositions: formatPositionsPlayed(rawStats.positionsPlayed),

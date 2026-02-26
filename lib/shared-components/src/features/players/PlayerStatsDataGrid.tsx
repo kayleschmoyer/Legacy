@@ -138,6 +138,7 @@ export const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   formattedOnBasePercentage: 'onBasePercentage',
   formattedSluggingPercentage: 'sluggingPercentage',
   formattedOPS: 'ops',
+  offensiveWAR: 'careerOffensiveWAR',
 
   // Raw percentage fields (in case they're used directly)
   battingAverage: 'battingAverage',
@@ -251,6 +252,16 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
     align: 'center',
     priority: 'high',
     description: 'On-base plus slugging',
+  },
+  {
+    key: 'offensiveWAR',
+    label: 'oWAR',
+    sortable: true,
+    width: '70px',
+    align: 'center',
+    priority: 'high',
+    description: 'Offensive WAR (batting runs + baserunning + positional adj)',
+    formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '–'),
   },
   {
     key: 'stolenBases',

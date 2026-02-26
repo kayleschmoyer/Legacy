@@ -281,6 +281,7 @@ export const careerBatting = pgView('career_batting', {
   sh: bigint('sh', { mode: 'number' }),
   // You can use { mode: "bigint" } if numbers are exceeding js number limitations
   ibb: bigint('ibb', { mode: 'number' }),
+  offensiveWar: doublePrecision('offensive_war'),
 }).as(sql`SELECT player_id,
        sum(g)       AS g,
        sum(pa)      AS pa,
@@ -756,3 +757,72 @@ export const aggregateSeasonBatting = pgView('aggregate_season_batting', {
   sf: varchar('sf', { length: 10 }),
   ibb: integer('ibb'),
 }).as(sql``);
+
+/**
+ * wOBA Season Weights (FanGraphs Guts!)
+ *
+ * Season-level linear weights used by the oWAR calculation.
+ * Source: https://www.fangraphs.com/guts.aspx?type=cn
+ */
+export const wobaSeasonWeights = pgTable('woba_season_weights', {
+  season: integer('season').primaryKey().notNull(),
+  lgWoba: numeric('lg_woba', { precision: 5, scale: 3 }).notNull(),
+  wobaScale: numeric('woba_scale', { precision: 5, scale: 3 }).notNull(),
+  wBb: numeric('w_bb', { precision: 5, scale: 3 }).notNull(),
+  wHbp: numeric('w_hbp', { precision: 5, scale: 3 }).notNull(),
+  w1b: numeric('w_1b', { precision: 5, scale: 3 }).notNull(),
+  w2b: numeric('w_2b', { precision: 5, scale: 3 }).notNull(),
+  w3b: numeric('w_3b', { precision: 5, scale: 3 }).notNull(),
+  wHr: numeric('w_hr', { precision: 5, scale: 3 }).notNull(),
+  runSb: numeric('run_sb', { precision: 5, scale: 3 }).notNull(),
+  runCs: numeric('run_cs', { precision: 6, scale: 3 }).notNull(),
+  rPa: numeric('r_pa', { precision: 5, scale: 3 }).notNull(),
+  rpw: numeric('rpw', { precision: 6, scale: 3 }).notNull(),
+  cFip: numeric('c_fip', { precision: 5, scale: 3 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull(),
+});
+
+/**
+ * Park Factors (FanGraphs Guts!)
+ *
+ * Per-team per-season park factors used by the oWAR calculation.
+ * BPF = Batters' Park Factor, PPF = Pitchers' Park Factor.
+ * 3-year rolling average with IPC/OPC corrections (100 = neutral).
+ * Source: https://www.baseball-reference.com/leagues/{lg}/{year}-misc.shtml
+ */
+export const parkFactors = pgTable(
+  'park_factors',
+  {
+    season: integer('season').notNull(),
+    team: varchar('team', { length: 10 }).notNull(),
+    bpf: integer('bpf'),
+    ppf: integer('ppf'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.season, table.team] })],
+);
+
+/**
+ * Baseball Reference year-specific positional adjustments.
+ * Values are runs per 1,350 defensive innings (= 150 games × 9 innings).
+ * Source: https://www.baseball-reference.com/about/war_explained_position.shtml
+ */
+export const positionalAdjustments = pgTable('positional_adjustments', {
+  season: integer('season').primaryKey(),
+  c: numeric('c', { precision: 5, scale: 2 }).notNull(),
+  firstBase: numeric('first_base', { precision: 5, scale: 2 }).notNull(),
+  secondBase: numeric('second_base', { precision: 5, scale: 2 }).notNull(),
+  thirdBase: numeric('third_base', { precision: 5, scale: 2 }).notNull(),
+  ss: numeric('ss', { precision: 5, scale: 2 }).notNull(),
+  lf: numeric('lf', { precision: 5, scale: 2 }).notNull(),
+  cf: numeric('cf', { precision: 5, scale: 2 }).notNull(),
+  rf: numeric('rf', { precision: 5, scale: 2 }).notNull(),
+  dh: numeric('dh', { precision: 5, scale: 2 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull(),
+});

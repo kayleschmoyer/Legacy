@@ -71,10 +71,23 @@ export async function getFromBaseballReference(url: string): Promise<string> {
 
       // For rate limit / overload errors, retry with exponential backoff
       if (isRateLimitOrOverload && attempt < MAX_RETRIES) {
-        const backoffMs =
+        // Respect Retry-After header if present (BR sends seconds until unblock)
+        const retryAfterHeader = axios.isAxiosError(error)
+          ? (error.response?.headers?.['retry-after'] as string | undefined)
+          : undefined;
+        const retryAfterMs = retryAfterHeader
+          ? parseInt(retryAfterHeader, 10) * 1_000
+          : undefined;
+
+        const exponentialMs =
           INITIAL_BACKOFF_MS * Math.pow(BACKOFF_MULTIPLIER, attempt);
+        const backoffMs =
+          retryAfterMs && retryAfterMs > 0 ? retryAfterMs : exponentialMs;
+
         LOGGER.warn(
-          `Got ${status} for ${url}. Backing off ${backoffMs / 1000}s before retry ${attempt + 1}/${MAX_RETRIES}`,
+          `Got ${status} for ${url}. ` +
+            (retryAfterMs ? `Retry-After: ${retryAfterHeader}s. ` : '') +
+            `Backing off ${Math.round(backoffMs / 1000)}s before retry ${attempt + 1}/${MAX_RETRIES}`,
         );
         await new Promise((res) => setTimeout(res, backoffMs));
         // Re-apply rate limiting timestamp so the next request respects spacing
