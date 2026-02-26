@@ -6,11 +6,11 @@
 
 ## 🚨 CRITICAL
 
-**NEVER commit to main** branch first: `twig switch LS-#### -p=main`
+**NEVER commit to main** branch first: `twig worktree create LS-####/description`
 
 ## Workflow
 
-1. Jira "In Progress" 2. `twig switch LS-#### -p=main` 3. Code with `pnpm exec nx affected` 4. `make pre-commit` 5. PR + Jira "In Review"
+1. Ticket: `acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json` → note `$key` (skip if ticket exists) 2. Worktree: `twig worktree create $key/description` → note path → `make install` + copy `.env` + junction `.twig` → `code $wt` 3. Jira "In Progress" 4. Code + commit + push 5. `make pc` (must pass before PR) 6. PR + Jira "In Review" 7. Cleanup: `twig worktree clean`
 
 ## Rules
 

@@ -7,7 +7,7 @@ description: 'Complete end-to-end workflow for implementing a Jira ticket: Jira 
 
 ## Overview
 
-Complete workflow for implementing a Jira ticket from start to finish, following proper branching and PR creation practices.
+Complete workflow for implementing a Jira ticket from start to finish. **The preferred approach is to create a git worktree** so the work is fully isolated in its own directory and VS Code window. Use a simple in-place branch only for small, quick changes.
 
 ## 🚨 CRITICAL RULE: NEVER COMMIT DIRECTLY TO MAIN
 
@@ -25,29 +25,74 @@ If you find yourself on `main` after making changes, STOP and create a branch im
 
 ## Complete Workflow Steps
 
-### Step 1: Verify Current Branch
+### Step 1: Create a Jira Ticket (if one doesn't exist)
+
+If a ticket already exists, skip to Step 2.
 
 ```powershell
-# ALWAYS check your branch first
+# Create the ticket and capture the key
+$result = acli jira workitem create `
+  --summary "Short description of the work" `
+  --project LS `
+  --type Task `
+  --json | ConvertFrom-Json
+$key = $result.key   # e.g. "LS-225"
+Write-Host "Created ticket: $key"
+```
+
+Common `--type` values: `Task`, `Bug`, `Story`. Add `--parent LS-####` to nest under an Epic.
+
+### Step 2: Verify You Are on Main
+
+```powershell
+# Must be on main before creating a worktree
 git branch
 git status
 
-# If on main, STOP and create feature branch before proceeding
-```
-
-### Step 2: Create Feature Branch
-
-```powershell
-# For new ticket from main (ALWAYS specify -p=main)
 git checkout main
 git pull
+```
+
+### Step 3: Create Branch + Worktree
+
+**Preferred — worktree (full isolation):**
+
+```powershell
+cd "D:\code\legacy-sports"
+twig worktree create LS-1234/short-description
+
+# Confirm the path twig chose
+twig worktree list
+$wt = "<path-from-twig-worktree-list>"
+```
+
+Then set up the worktree environment before opening it:
+
+```powershell
+cd $wt
+make install
+Copy-Item "D:\code\legacy-sports\.env" .env
+cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
+code $wt   # open in a new VS Code window; do all work there
+```
+
+> For tickets that depend on an unmerged parent ticket, create the branch first so twig tracks the dependency, then add the worktree:
+>
+> ```powershell
+> git checkout LS-XXXX/parent-branch-name
+> twig switch LS-1234 -p=current
+> git checkout main
+> twig worktree create LS-1234/short-description
+> ```
+
+**Lightweight alternative (in-place, no separate window):**
+
+```powershell
+# For new independent ticket
+git checkout main ; git pull
 twig switch LS-1234 -p=main
 
-# For follow-up work from current branch
-twig switch LS-1234 -p=current
-
-# For ticket that depends on ANOTHER in-progress ticket (not yet merged)
-# First check out the parent ticket's branch, then branch from it:
+# For ticket dependent on an in-progress branch
 git checkout LS-XXXX/parent-branch-name
 twig switch LS-1234 -p=current
 ```
@@ -56,16 +101,14 @@ twig switch LS-1234 -p=current
 > or descriptions that indicate a dependency on another in-progress ticket.
 > Always verify with `twig tree` that the new branch appears under the right parent.
 
-**⚠️ DO NOT SKIP THIS STEP**
-
-### Step 3: Update Jira Status
+### Step 4: Update Jira Status
 
 ```powershell
 # Transition ticket to "In Progress"
 acli jira workitem transition --key LS-1234 --status "In Progress"
 ```
 
-### Step 4: Make Your Changes
+### Step 5: Make Your Changes
 
 - Edit files
 - Write code
@@ -73,18 +116,6 @@ acli jira workitem transition --key LS-1234 --status "In Progress"
 - Add tests
 
 **✅ Now safe to modify files - you're on a feature branch**
-
-### Step 5: Pre-Commit Validation
-
-```powershell
-# Run validation in order
-pnpm exec nx run db:print-schema     # 1. Regenerate GraphQL schema
-pnpm exec nx affected -t codegen     # 2. Regenerate TypeScript types from schema
-pnpm exec nx affected -t typecheck   # 3. Type checking
-pnpm exec nx affected -t lint --fix  # 4. Linting with auto-fix
-pnpm exec nx affected -t test        # 5. Testing
-pnpm exec nx affected -t build       # 6. Building
-```
 
 ### Step 6: Commit Changes
 
@@ -99,26 +130,42 @@ git commit -m "feat(scope): description (LS-1234)"
 git push origin HEAD
 ```
 
-### Step 7: Create Pull Request
+### Step 7: Pre-PR Validation
+
+Run the full validation suite before opening the PR. Fix any failures and amend/push before continuing.
 
 ```powershell
-# Create PR with twig
-twig github pr create-pr
+make pc
 ```
 
-### Step 8: Update Jira Status
+### Step 8: Create Pull Request
+
+See the [create-pr skill](../create-pr/SKILL.md) for the full PR template workflow. For a quick PR:
+
+```powershell
+gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+```
+
+### Step 9: Update Jira Status
 
 ```powershell
 # Transition to "In Review"
 acli jira workitem transition --key LS-1234 --status "In Review"
 ```
 
-### Step 9: After PR Merge
+### Step 10: After PR Merge
 
 ```powershell
 # Transition to "Done"
 acli jira workitem transition --key LS-1234 --status "Done"
+
+# Clean up the worktree (run from main repo)
+cd "D:\code\legacy-sports"
+twig worktree clean
+git branch -d "LS-1234/short-description"
 ```
+
+````
 
 ## Common Mistakes to Avoid
 
@@ -131,7 +178,7 @@ twig switch LS-1234  # ❌ twig may pick wrong parent!
 # CORRECT - always specify parent explicitly
 twig switch LS-1234 -p=main     # new independent feature
 twig switch LS-1234 -p=current  # follow-up/dependent work
-```
+````
 
 Without `-p=main`, twig may not correctly track the branch's parent,
 causing issues with rebasing, PR targets, and the branch dependency tree.
@@ -198,9 +245,9 @@ Always update Jira status at:
 - PR Created: "In Review"
 - PR Merged: "Done"
 
-### ❌ MISTAKE 3: Skipping Validation
+### ❌ MISTAKE 3: Skipping Pre-PR Validation
 
-Never skip pre-commit checks. They catch issues early.
+Always run `make pc` before creating a PR. It catches type errors, lint issues, test failures, and build breaks before reviewers see them.
 
 ### ❌ MISTAKE 4: No PR Created
 
@@ -223,40 +270,59 @@ Twig automatically creates proper names:
 
 Before starting ANY work:
 
-- [ ] Check current branch (`git branch`)
-- [ ] Verify NOT on main
-- [ ] Create feature branch if needed
+- [ ] Jira ticket exists — create one with `acli jira workitem create` if not
+- [ ] Pull latest main (`git checkout main ; git pull`)
+- [ ] Run `twig worktree create LS-####/description` from main repo
+- [ ] Run `make install`, copy `.env`, junction `.twig` in the new worktree
+- [ ] Open worktree in a new VS Code window (`code $wt`)
 - [ ] Update Jira to "In Progress"
 - [ ] NOW safe to make changes
 
 ## Quick Reference
 
 ```powershell
-# 1. Create branch (ALWAYS FIRST — specify parent!)
-twig switch LS-1234 -p=main
+# 0. Create ticket if one doesn't exist
+$result = acli jira workitem create --summary "Description" --project LS --type Task --json | ConvertFrom-Json
+$key = $result.key   # e.g. LS-225
+
+# 1. Create branch + worktree (preferred)
+cd "D:\code\legacy-sports"
+git checkout main ; git pull
+twig worktree create "$key/description"
+twig worktree list   # note $wt path
+
+# 1b. Set up worktree environment
+$wt = "<path-from-twig-worktree-list>"
+cd $wt ; make install
+Copy-Item "D:\code\legacy-sports\.env" .env
+cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
+code $wt   # open new VS Code window, do all work there
 
 # 2. Update Jira
-acli jira workitem transition --key LS-1234 --status "In Progress"
+acli jira workitem transition --key $key --status "In Progress"
 
-# 3. Make changes
+# 3. Make changes (in the worktree VS Code window)
 # ... edit files ...
 
-# 4. Validate
-pnpm exec nx affected -t typecheck
-pnpm exec nx affected -t lint --fix
-pnpm exec nx affected -t test
-pnpm exec nx affected -t build
-
-# 5. Commit
+# 4. Commit
 git add .
-git commit -m "feat(scope): description (LS-1234)"
+git commit -m "feat(scope): description ($key)"
 git push origin HEAD
 
-# 6. Create PR
-twig github pr create-pr
+# 5. Pre-PR validation
+make pc
+
+# 6. Create PR (see create-pr skill for full template)
+gh pr create --title "$key type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
 # 7. Update Jira
-acli jira workitem transition --key LS-1234 --status "In Review"
+acli jira workitem transition --key $key --status "In Review"
+
+# 8. After merge — cleanup
+cd "D:\code\legacy-sports"
+twig worktree clean
+git branch -d "$key/description"
+acli jira workitem transition --key $key --status "Done"
 ```
 
 ## Related Skills

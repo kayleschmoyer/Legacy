@@ -1,14 +1,17 @@
 # Legacy Sports — Copilot Instructions
 
-🚨 **NEVER commit to main** — branch first: `twig switch LS-#### -p=main`
+🚨 **NEVER commit to main** — create a worktree first: `twig worktree create LS-####/description`
 
 ## Workflow
 
-1. Jira "In Progress": `acli jira workitem transition --key LS-#### --status "In Progress"`
-2. Branch: `twig switch LS-#### -p=main` (new) | `-p=current` (dependent)
-3. Code: `pnpm exec nx affected -t <target>` (never `pnpm run`)
-4. Validate: `make pre-commit` — typecheck→lint→test→build, all must pass
-5. Ship: `git commit -m "type(scope): msg"` → `git push origin HEAD` → `twig github pr create-pr` → Jira "In Review"
+1. Ticket: create if needed: `acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json` → note `$key`
+2. Worktree: `twig worktree create $key/description` → `twig worktree list` (note path) → `make install` + copy `.env` + junction `.twig` → `code $wt`
+3. Jira "In Progress": `acli jira workitem transition --key LS-#### --status "In Progress"`
+4. Code: `pnpm exec nx affected -t <target>` (never `pnpm run`)
+5. Code: commit changes with `git commit -m "type(scope): msg"` → `git push origin HEAD`
+6. Validate: `make pc` — must pass before opening PR
+7. Ship: `twig github pr create-pr` → Jira "In Review"
+8. Cleanup: `twig worktree clean` → `git branch -d LS-####/description` → Jira "Done"
 
 ## Rules
 

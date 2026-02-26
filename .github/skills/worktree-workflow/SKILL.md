@@ -14,17 +14,13 @@ Git worktrees let you check out multiple branches simultaneously in separate dir
 ```
 D:\code\
 ├── legacy-sports\                  ← main repo, always on main
-└── legacy-sports-worktrees\
-    ├── LS-221\                     ← worktree for LS-221
-    ├── LS-222\                     ← worktree for LS-222
-    └── LS-219\                     ← worktree for LS-219
+└── LS-####\                        ← worktree created by twig (sibling of repo)
+    └── short-description\          ← or flat LS-####, depending on branch name
 ```
 
-**Why this layout:**
+`twig worktree create <branch>` places the worktree in the **repository's parent directory** (`D:\code\`), in a folder derived from the branch name. Run `twig worktree list` after creation to confirm the exact path — use that path for all subsequent steps.
 
-- Other repos in `D:\code\` are unaffected by worktree file-watching
-- Easy cleanup: delete the folder, then `git worktree prune`
-- `node_modules` and `.env` are gitignored and **not** present in a fresh worktree — see Prerequisites
+> Worktrees created manually (or before twig worktree commands were available) may live at `D:\code\legacy-sports-worktrees\LS-####\`. That path is still valid; twig tracks worktrees by path, not by convention.
 
 ## When to Use
 
@@ -36,104 +32,102 @@ D:\code\
 ## Prerequisites
 
 - Main repo is on `main` and up to date
-- `D:\code\legacy-sports-worktrees\` directory exists (create it if not)
 - After creating a worktree, run `make install` inside it to install Node.js and Python dependencies
-- Copy `.env` and junction `.twig` into the worktree (see Step 4)
+- Copy `.env` and junction `.twig` into the worktree (see Step 3)
 
 ## Complete Workflow
 
-### Step 1: Create the Feature Branch
+### Step 1: Create the Branch + Worktree
 
-Try twig first (it also updates Jira):
+From the main repo, use `twig worktree create` — it creates the branch if it doesn't exist and creates the worktree in one command:
 
 ```powershell
 cd "D:\code\legacy-sports"
-twig switch LS-#### -p=main
+twig worktree create LS-####/short-description
+
+# Verify — note the path twig chose
+twig worktree list
 ```
 
-If twig fails to find the Jira issue, create the branch manually:
+The worktree is placed in the repository's parent directory (`D:\code\`) in a folder derived from the branch name. Use `twig worktree list` to confirm the exact path before proceeding.
 
-```powershell
-git checkout main
-git pull
-git checkout -b "LS-####/short-description"
-git checkout main   # return to main before creating worktree
-```
+> If `twig worktree create` fails, fall back to manual creation:
+>
+> ```powershell
+> git checkout main ; git pull
+> git checkout -b "LS-####/short-description"
+> git checkout main
+> New-Item -ItemType Directory -Path "D:\code\legacy-sports-worktrees" -Force
+> git worktree add "D:\code\legacy-sports-worktrees\LS-####" "LS-####/short-description"
+> git worktree list
+> ```
 
-### Step 2: Create the Worktree
-
-```powershell
-# Ensure the worktrees directory exists
-New-Item -ItemType Directory -Path "D:\code\legacy-sports-worktrees" -Force
-
-# Create the worktree
-git worktree add "D:\code\legacy-sports-worktrees\LS-####" "LS-####/short-description"
-
-# Verify
-git worktree list
-```
-
-### Step 3: Transition Jira to In Progress
+### Step 2: Transition Jira to In Progress
 
 ```powershell
 acli jira workitem transition --key LS-#### --status "In Progress"
 ```
 
-### Step 4: Install Dependencies, Copy .env, Link .twig
+### Step 3: Install Dependencies, Copy .env, Link .twig
 
 Git worktrees only contain tracked files — `node_modules`, `.env`, and `.twig` are gitignored and absent.
 
 ```powershell
-cd "D:\code\legacy-sports-worktrees\LS-####"
+# Use the path reported by `twig worktree list`
+$wt = (twig worktree list --porcelain 2>$null | Select-String "path:" | Where-Object { $_ -match "LS-####" } | ForEach-Object { ($_ -split "path: ")[1].Trim() })
+# OR just set it manually:
+$wt = "<path-from-twig-worktree-list>"
+
+cd $wt
 
 # Install all dependencies (pnpm + poetry) using the standard Makefile target
 make install
 
 # Copy .env from main repo
-Copy-Item "D:\code\legacy-sports\.env" "D:\code\legacy-sports-worktrees\LS-####\.env"
+Copy-Item "D:\code\legacy-sports\.env" "$wt\.env"
 
 # Junction .twig so twig shares branch dependency state with the main repo
 # (junction = no admin required; symlink would require admin on Windows)
-cmd /c mklink /J "D:\code\legacy-sports-worktrees\LS-####\.twig" "D:\code\legacy-sports\.twig"
+cmd /c mklink /J "$wt\.twig" "D:\code\legacy-sports\.twig"
 ```
 
 > **Why junction not copy?** `.twig/state.json` tracks branch dependencies. Both the main repo and worktree must read/write the same file or twig commands (`twig tree`, `twig branch depend`, etc.) will diverge.
 
-### Step 5: Open in VS Code
+### Step 4: Open in VS Code
 
 ```powershell
-code "D:\code\legacy-sports-worktrees\LS-####"
+code $wt
 ```
 
 This opens the worktree in a **new VS Code window**. Work exclusively in that window for this ticket.
 
-### Step 6: Implement the Ticket
+### Step 5: Implement the Ticket
 
-All commands run from within the worktree directory:
+All commands run from within the worktree directory (`cd $wt`). Write code, add tests, update docs.
 
-```powershell
-cd "D:\code\legacy-sports-worktrees\LS-####"
-
-# Use Nx as normal — affects are scoped to this branch's changes
-pnpm exec nx affected -t typecheck
-pnpm exec nx affected -t lint --fix
-pnpm exec nx affected -t test
-pnpm exec nx affected -t build
-```
-
-### Step 7: Commit and Push
+### Step 6: Commit and Push
 
 ```powershell
-cd "D:\code\legacy-sports-worktrees\LS-####"
+cd $wt
 git add .
 git commit -m "feat(scope): description (LS-####)"
 git push -u origin HEAD
 ```
 
-### Step 8: Create Pull Request
+### Step 7: Pre-PR Validation
+
+Run the full validation suite before opening the PR. Fix any failures and push again before continuing.
 
 ```powershell
-gh pr create --title "type(scope): description" --body "..." --base main
+make pc
+```
+
+### Step 8: Create Pull Request
+
+See the [create-pr skill](../create-pr/SKILL.md) for the full PR template workflow. For a quick PR:
+
+```powershell
+gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 ```
 
 ### Step 9: Update Jira to In Review
@@ -147,18 +141,17 @@ acli jira workitem transition --key LS-#### --status "In Review"
 ```powershell
 cd "D:\code\legacy-sports"
 
-# Remove the worktree and its directory
-git worktree remove "D:\code\legacy-sports-worktrees\LS-####"
+# Remove worktrees whose branches have been merged or deleted
+twig worktree clean
 
 # Delete the branch locally
 git branch -d "LS-####/short-description"
 
-# Prune stale metadata
-git worktree prune
-
 # Verify
-git worktree list
+twig worktree list
 ```
+
+`twig worktree clean` detects worktrees with merged/deleted branches and prompts to remove them. It is safer than `git worktree remove` because it will not remove a worktree that still has an active branch.
 
 ## Moving an Existing Worktree
 
@@ -166,8 +159,8 @@ If a worktree was created at the wrong path, use `git worktree move` (not `mv`).
 
 ```powershell
 cd "D:\code\legacy-sports"   # must be in another worktree or main repo
-git worktree move "D:\code\old-path" "D:\code\legacy-sports-worktrees\LS-####"
-git worktree list  # verify
+git worktree move "D:\code\old-path" "D:\code\new-path"
+twig worktree list  # verify
 ```
 
 ## Key Rules
@@ -184,16 +177,16 @@ git worktree list  # verify
 
 ### twig tree / twig branch commands don't work in worktree
 
-`.twig/state.json` is gitignored and absent. Create a junction pointing to the main repo's `.twig`:
+`.twig/state.json` is gitignored and absent. Create a junction pointing to the main repo's `.twig` (substitute `$wt` with the worktree path from `twig worktree list`):
 
 ```powershell
-cmd /c mklink /J "D:\code\legacy-sports-worktrees\LS-####\.twig" "D:\code\legacy-sports\.twig"
+cmd /c mklink /J "$wt\.twig" "D:\code\legacy-sports\.twig"
 ```
 
 Verify it worked:
 
 ```powershell
-cd "D:\code\legacy-sports-worktrees\LS-####"
+cd $wt
 twig tree
 ```
 
@@ -209,8 +202,8 @@ git worktree move ...
 ### Worktree list shows stale entries
 
 ```powershell
-git worktree prune
-git worktree list
+twig worktree clean
+twig worktree list
 ```
 
 ### Twig fails with "Issue not found"
@@ -228,7 +221,7 @@ acli jira workitem transition --key LS-#### --status "In Progress"
 `node_modules` is gitignored so it is never present in a fresh worktree. Install all deps using the standard Makefile target:
 
 ```powershell
-cd "D:\code\legacy-sports-worktrees\LS-####"
+cd $wt   # path from twig worktree list
 make install
 ```
 
@@ -237,34 +230,35 @@ make install
 ```powershell
 # 1. Create branch + worktree
 cd "D:\code\legacy-sports"
-git checkout -b "LS-####/description"
-git checkout main
-git worktree add "D:\code\legacy-sports-worktrees\LS-####" "LS-####/description"
+twig worktree create LS-####/description
+twig worktree list   # note the path twig chose
 
 # 2. Jira
 acli jira workitem transition --key LS-#### --status "In Progress"
 
-# 3. Install deps + copy .env + link .twig
-cd "D:\code\legacy-sports-worktrees\LS-####"
+# 3. Install deps + copy .env + link .twig  (use path from twig worktree list)
+$wt = "<path-from-twig-worktree-list>"
+cd $wt
 make install
 Copy-Item "D:\code\legacy-sports\.env" .env
 cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
 
 # 4. Open VS Code
-code "D:\code\legacy-sports-worktrees\LS-####"
+code $wt
 
-# 5. Work, validate, commit (from inside the worktree)
-cd "D:\code\legacy-sports-worktrees\LS-####"
-pnpm exec nx affected -t typecheck ; pnpm exec nx affected -t lint --fix ; pnpm exec nx affected -t test ; pnpm exec nx affected -t build
+# 5. Work, commit (from inside the worktree)
 git add . ; git commit -m "feat(scope): description (LS-####)" ; git push -u origin HEAD
 
-# 5. PR + Jira
-gh pr create --title "type(scope): description" --body "..." --base main
+# 6. Pre-PR validation
+make pc
+
+# 7. PR + Jira (see create-pr skill for full template)
+gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 acli jira workitem transition --key LS-#### --status "In Review"
 
-# 6. Cleanup after merge
+# 7. Cleanup after merge
 cd "D:\code\legacy-sports"
-git worktree remove "D:\code\legacy-sports-worktrees\LS-####"
+twig worktree clean
 git branch -d "LS-####/description"
-git worktree prune
+twig worktree list
 ```
