@@ -6,7 +6,11 @@
   "tags": ["draft", "lambda", "platform:node", "scope:lambda", "type:worker"],
   "targets": {
     "build": {
-      "extends": "build:lambda",
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "dependsOn": ["^build"],
       "options": {
         "commands": [
           "vite build",

@@ -11,7 +11,11 @@
       }
     },
     "build": {
-      "extends": "build:lambda",
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "dependsOn": ["^build"],
       "options": {
         "command": "vite build",
         "cwd": "lambdas/oauth-proxy"
