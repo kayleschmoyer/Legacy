@@ -95,7 +95,7 @@
     "clean:nx": "nx reset",
     "clean:deps": "rimraf node_modules package-lock.json && pnpm install",
     "dev": "concurrently \"pnpm run dev:web\" \"pnpm run dev:lambdas\"",
-    "dev:web": "nx serve web",
+    "dev:web": "powershell -NonInteractive -File scripts/dev-web.ps1",
     "affected:build": "nx affected --target=build",
     "affected:test": "nx affected --target=test",
     "affected:lint": "nx affected --target=lint"
