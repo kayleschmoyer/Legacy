@@ -32,6 +32,7 @@ yarn-error.log
 
 # AI Agent Commands (temporary files)
 NEXT_AGENT_COMMAND.md
+.github/tmp-pr-body.md
 testem.log
 /typings
 
