@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   PlayerStatsPage,
   type PlayerStatsViewMode,
@@ -8,7 +8,13 @@ import type {
   PlayerStatsFilters,
   PlayerWithStats,
 } from '@legacy-sports/shared-components';
-import { BG_DARK, BLUE_ALT, TEXT_HIGH_CONTRAST } from '../constants/colors';
+import { PlayerDetailModal } from './PlayerDetailModal';
+import {
+  BG_DARK,
+  BRAND_NAVY_LIGHT,
+  TEXT_HIGH_CONTRAST,
+  WHITE,
+} from '../constants/colors';
 
 /**
  * Web App Player Statistics Page
@@ -20,9 +26,15 @@ import { BG_DARK, BLUE_ALT, TEXT_HIGH_CONTRAST } from '../constants/colors';
  * - Deep linking support
  */
 export function WebPlayerStatsPage() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [liveMsg, setLiveMsg] = React.useState('');
+
+  // Player detail modal state
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
   // Parse URL parameters for initial state
   const initialState = useMemo(() => {
@@ -88,14 +100,14 @@ export function WebPlayerStatsPage() {
     };
   }, [searchParams]);
 
-  // Handle player detail navigation
-  const handlePlayerDetails = useCallback(
-    (player: PlayerWithStats) => {
-      // Navigate to player detail page (if it exists)
-      navigate(`/players/${player.id}`);
-    },
-    [navigate],
-  );
+  // Handle player detail — open modal instead of navigating
+  const handlePlayerDetails = useCallback((player: PlayerWithStats) => {
+    setSelectedPlayer({
+      id: typeof player.id === 'string' ? parseInt(player.id, 10) : player.id,
+      name: player.name,
+    });
+    setDetailModalOpen(true);
+  }, []);
 
   // Handle export functionality
   const handleExport = useCallback(
@@ -191,48 +203,66 @@ export function WebPlayerStatsPage() {
         onExport={handleExport}
         onShare={handleShare}
       />
+
+      {/* Player detail modal */}
+      <PlayerDetailModal
+        open={detailModalOpen}
+        onOpenChange={setDetailModalOpen}
+        playerId={selectedPlayer?.id ?? null}
+        playerName={selectedPlayer?.name ?? ''}
+      />
     </div>
   );
 }
 
 /**
- * Player Detail Page Placeholder
+ * Player Detail Page
  *
- * This would be a separate page showing detailed stats for a specific player.
- * For now, it's a simple placeholder that could be expanded later.
+ * Renders a full-page view for `/players/:id` with the player detail modal
+ * auto-opened, and a back button to return to the stats list.
  */
 export function WebPlayerDetailPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const playerId = searchParams.get('id');
+  const { id } = useParams<{ id: string }>();
+  const playerId = id ? parseInt(id, 10) : null;
 
   const handleBackToStats = useCallback(() => {
     navigate('/players/stats');
   }, [navigate]);
 
   return (
-    <div style={{ padding: '2rem' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: `var(--background, ${BG_DARK})`,
+        color: `var(--color, ${TEXT_HIGH_CONTRAST})`,
+        padding: '2rem',
+      }}
+    >
       <button
         onClick={handleBackToStats}
         style={{
           marginBottom: '1rem',
           padding: '0.5rem 1rem',
-          backgroundColor: BLUE_ALT,
-          color: 'white',
+          backgroundColor: BRAND_NAVY_LIGHT,
+          color: WHITE,
           border: 'none',
-          borderRadius: '4px',
+          borderRadius: '6px',
           cursor: 'pointer',
+          fontWeight: 600,
         }}
       >
         ← Back to Player Statistics
       </button>
 
-      <h1>Player Detail Page</h1>
-      <p>Detailed statistics for player ID: {playerId}</p>
-      <p>
-        This page would show comprehensive player information, career history,
-        and advanced analytics.
-      </p>
+      <PlayerDetailModal
+        open={true}
+        onOpenChange={(open) => {
+          if (!open) navigate('/players/stats');
+        }}
+        playerId={playerId}
+        playerName={`Player #${playerId ?? '?'}`}
+      />
     </div>
   );
 }

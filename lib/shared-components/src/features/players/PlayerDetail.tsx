@@ -1,7 +1,11 @@
 import React from 'react';
-import { ScrollView, Text, XStack, YStack } from 'tamagui';
+import { ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 
-// Generic player detail interface
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Generic player detail interface used by the cross-platform component. */
 export interface PlayerDetailData {
   id: number;
   name: string;
@@ -20,7 +24,6 @@ export interface PlayerDetailData {
   wins?: number;
   losses?: number;
   saves?: number;
-  // Add more stats as needed
 }
 
 export interface PlayerDetailProps {
@@ -30,7 +33,10 @@ export interface PlayerDetailProps {
   onPlayerSelect?: (playerId: number) => void;
 }
 
-// Mock player data for fallback
+// ---------------------------------------------------------------------------
+// Mock data (fallback for stories / testing)
+// ---------------------------------------------------------------------------
+
 const getPlayerDetails = (playerId: number): PlayerDetailData | undefined => {
   const playersData: PlayerDetailData[] = [
     {
@@ -57,12 +63,83 @@ const getPlayerDetails = (playerId: number): PlayerDetailData | undefined => {
   return playersData.find((player) => player.id === playerId);
 };
 
+// ---------------------------------------------------------------------------
+// Stat row helper
+// ---------------------------------------------------------------------------
+
+function StatRow({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string | number;
+  accent?: boolean;
+}) {
+  return (
+    <XStack
+      justifyContent="space-between"
+      paddingVertical="$2"
+      paddingHorizontal="$3"
+      borderBottomWidth={1}
+      borderBottomColor="$borderColor"
+    >
+      <Text fontSize="$3" color="$textMuted">
+        {label}
+      </Text>
+      <Text
+        fontSize="$3"
+        fontWeight="700"
+        color={accent ? '$color12' : '$color'}
+      >
+        {value}
+      </Text>
+    </XStack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section header helper
+// ---------------------------------------------------------------------------
+
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <XStack
+      paddingHorizontal="$3"
+      paddingVertical="$2"
+      backgroundColor="$backgroundFocus"
+      borderBottomWidth={1}
+      borderBottomColor="$borderColor"
+    >
+      <Text fontSize="$4" fontWeight="700" color="$color12">
+        {title}
+      </Text>
+    </XStack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 function PlayerDetail({ player, loading, error }: PlayerDetailProps) {
   if (loading) {
     return (
-      <YStack flex={1} backgroundColor="$gray10" padding="$5">
-        <Text color="$white" fontSize="$4" textAlign="center">
-          Loading player details...
+      <YStack
+        flex={1}
+        backgroundColor="$background"
+        padding="$5"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Spinner size="large" color="$color10" />
+        <Text
+          color="$textMuted"
+          fontSize="$4"
+          marginTop="$3"
+          textAlign="center"
+        >
+          Loading player details…
         </Text>
       </YStack>
     );
@@ -70,8 +147,14 @@ function PlayerDetail({ player, loading, error }: PlayerDetailProps) {
 
   if (error) {
     return (
-      <YStack flex={1} backgroundColor="$gray10" padding="$5">
-        <Text color="$red8" fontSize="$4" textAlign="center">
+      <YStack
+        flex={1}
+        backgroundColor="$background"
+        padding="$5"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Text color="$red10" fontSize="$4" textAlign="center">
           Error: {error}
         </Text>
       </YStack>
@@ -80,8 +163,14 @@ function PlayerDetail({ player, loading, error }: PlayerDetailProps) {
 
   if (!player) {
     return (
-      <YStack flex={1} backgroundColor="$gray10" padding="$5">
-        <Text color="$red8" fontSize="$4" textAlign="center">
+      <YStack
+        flex={1}
+        backgroundColor="$background"
+        padding="$5"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Text color="$red10" fontSize="$4" textAlign="center">
           Player not found
         </Text>
       </YStack>
@@ -89,237 +178,115 @@ function PlayerDetail({ player, loading, error }: PlayerDetailProps) {
   }
 
   return (
-    <ScrollView flex={1} backgroundColor="$gray10" padding="$5">
+    <ScrollView flex={1} backgroundColor="$background" padding="$4">
+      {/* ── Player header ── */}
       <YStack
         alignItems="center"
-        marginBottom="$7"
-        paddingBottom="$5"
+        marginBottom="$5"
+        paddingBottom="$4"
         borderBottomWidth={1}
-        borderBottomColor="$gray8"
+        borderBottomColor="$borderColor"
+        gap="$1"
       >
-        <Text
-          fontSize="$8"
-          fontWeight="bold"
-          color="$yellow10"
-          marginBottom="$1"
-        >
+        <Text fontSize="$8" fontWeight="bold" color="$color12">
           {player.name}
         </Text>
-        <Text fontSize="$5" color="$white" marginBottom="$1">
-          {player.position}
-        </Text>
-        <Text fontSize="$4" color="$gray6">
-          {player.team}
-        </Text>
+        <XStack gap="$2" alignItems="center">
+          <Text
+            fontSize="$2"
+            fontWeight="700"
+            color="$color"
+            backgroundColor="$backgroundFocus"
+            paddingHorizontal="$2"
+            paddingVertical="$1"
+            borderRadius="$2"
+          >
+            {player.position}
+          </Text>
+          <Text fontSize="$4" color="$textMuted">
+            {player.team}
+          </Text>
+        </XStack>
       </YStack>
 
-      <YStack flex={1}>
-        <Text
-          fontSize="$6"
-          fontWeight="bold"
-          color="$yellow10"
-          marginBottom="$4"
-          marginTop="$2"
-        >
-          Batting Statistics
-        </Text>
+      {/* ── Batting stats ── */}
+      <YStack
+        borderRadius="$4"
+        borderWidth={1}
+        borderColor="$borderColor"
+        overflow="hidden"
+        marginBottom="$4"
+      >
+        <SectionHeader title="Batting Statistics" />
 
         {player.battingAvg !== undefined && (
-          <XStack
-            justifyContent="space-between"
-            paddingVertical="$2"
-            borderBottomWidth={1}
-            borderBottomColor="$gray8"
-          >
-            <Text fontSize="$4" color="$white">
-              Batting Average:
-            </Text>
-            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-              {player.battingAvg.toFixed(3)}
-            </Text>
-          </XStack>
+          <StatRow
+            label="Batting Average"
+            value={player.battingAvg.toFixed(3)}
+            accent
+          />
         )}
-
         {player.homeRuns !== undefined && (
-          <XStack
-            justifyContent="space-between"
-            paddingVertical="$2"
-            borderBottomWidth={1}
-            borderBottomColor="$gray8"
-          >
-            <Text fontSize="$4" color="$white">
-              Home Runs:
-            </Text>
-            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-              {player.homeRuns}
-            </Text>
-          </XStack>
+          <StatRow label="Home Runs" value={player.homeRuns} />
         )}
-
         {player.rbi !== undefined && (
-          <XStack
-            justifyContent="space-between"
-            paddingVertical="$2"
-            borderBottomWidth={1}
-            borderBottomColor="$gray8"
-          >
-            <Text fontSize="$4" color="$white">
-              RBIs:
-            </Text>
-            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-              {player.rbi}
-            </Text>
-          </XStack>
+          <StatRow label="RBIs" value={player.rbi} />
         )}
-
         {player.runs !== undefined && (
-          <XStack
-            justifyContent="space-between"
-            paddingVertical="$2"
-            borderBottomWidth={1}
-            borderBottomColor="$gray8"
-          >
-            <Text fontSize="$4" color="$white">
-              Runs:
-            </Text>
-            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-              {player.runs}
-            </Text>
-          </XStack>
+          <StatRow label="Runs" value={player.runs} />
         )}
-
         {player.hits !== undefined && (
-          <XStack
-            justifyContent="space-between"
-            paddingVertical="$2"
-            borderBottomWidth={1}
-            borderBottomColor="$gray8"
-          >
-            <Text fontSize="$4" color="$white">
-              Hits:
-            </Text>
-            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-              {player.hits}
-            </Text>
-          </XStack>
+          <StatRow label="Hits" value={player.hits} />
         )}
-
         {player.obp !== undefined && (
-          <XStack
-            justifyContent="space-between"
-            paddingVertical="$2"
-            borderBottomWidth={1}
-            borderBottomColor="$gray8"
-          >
-            <Text fontSize="$4" color="$white">
-              On-Base Percentage:
-            </Text>
-            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-              {player.obp.toFixed(3)}
-            </Text>
-          </XStack>
+          <StatRow
+            label="On-Base Percentage"
+            value={player.obp.toFixed(3)}
+            accent
+          />
         )}
-
         {player.slg !== undefined && (
-          <XStack
-            justifyContent="space-between"
-            paddingVertical="$2"
-            borderBottomWidth={1}
-            borderBottomColor="$gray8"
-          >
-            <Text fontSize="$4" color="$white">
-              Slugging Percentage:
-            </Text>
-            <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-              {player.slg.toFixed(3)}
-            </Text>
-          </XStack>
-        )}
-
-        {/* Pitching Stats */}
-        {(player.era !== undefined || player.wins !== undefined) && (
-          <>
-            <Text
-              fontSize="$6"
-              fontWeight="bold"
-              color="$yellow10"
-              marginBottom="$4"
-              marginTop="$2"
-            >
-              Pitching Statistics
-            </Text>
-
-            {player.era !== undefined && (
-              <XStack
-                justifyContent="space-between"
-                paddingVertical="$2"
-                borderBottomWidth={1}
-                borderBottomColor="$gray8"
-              >
-                <Text fontSize="$4" color="$white">
-                  ERA:
-                </Text>
-                <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-                  {player.era.toFixed(2)}
-                </Text>
-              </XStack>
-            )}
-
-            {player.wins !== undefined && (
-              <XStack
-                justifyContent="space-between"
-                paddingVertical="$2"
-                borderBottomWidth={1}
-                borderBottomColor="$gray8"
-              >
-                <Text fontSize="$4" color="$white">
-                  Wins:
-                </Text>
-                <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-                  {player.wins}
-                </Text>
-              </XStack>
-            )}
-
-            {player.losses !== undefined && (
-              <XStack
-                justifyContent="space-between"
-                paddingVertical="$2"
-                borderBottomWidth={1}
-                borderBottomColor="$gray8"
-              >
-                <Text fontSize="$4" color="$white">
-                  Losses:
-                </Text>
-                <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-                  {player.losses}
-                </Text>
-              </XStack>
-            )}
-
-            {player.saves !== undefined && (
-              <XStack
-                justifyContent="space-between"
-                paddingVertical="$2"
-                borderBottomWidth={1}
-                borderBottomColor="$gray8"
-              >
-                <Text fontSize="$4" color="$white">
-                  Saves:
-                </Text>
-                <Text fontSize="$4" color="$yellow10" fontWeight="bold">
-                  {player.saves}
-                </Text>
-              </XStack>
-            )}
-          </>
+          <StatRow
+            label="Slugging Percentage"
+            value={player.slg.toFixed(3)}
+            accent
+          />
         )}
       </YStack>
+
+      {/* ── Pitching stats (shown only if relevant) ── */}
+      {(player.era !== undefined || player.wins !== undefined) && (
+        <YStack
+          borderRadius="$4"
+          borderWidth={1}
+          borderColor="$borderColor"
+          overflow="hidden"
+          marginBottom="$4"
+        >
+          <SectionHeader title="Pitching Statistics" />
+
+          {player.era !== undefined && (
+            <StatRow label="ERA" value={player.era.toFixed(2)} accent />
+          )}
+          {player.wins !== undefined && (
+            <StatRow label="Wins" value={player.wins} />
+          )}
+          {player.losses !== undefined && (
+            <StatRow label="Losses" value={player.losses} />
+          )}
+          {player.saves !== undefined && (
+            <StatRow label="Saves" value={player.saves} />
+          )}
+        </YStack>
+      )}
     </ScrollView>
   );
 }
 
-// Component that takes a player ID and fetches data
+// ---------------------------------------------------------------------------
+// Convenience wrapper that takes only a player ID
+// ---------------------------------------------------------------------------
+
 export interface PlayerDetailByIdProps {
   playerId: number;
 }
