@@ -11,7 +11,7 @@ import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
 export const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'Content-Type, Authorization, X-Requested-With',
+    'Content-Type, Authorization, X-Requested-With, apollo-require-preflight',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
