@@ -73,7 +73,9 @@
       "approve": true,
       "matchCommandLine": true
     },
-    "gh": true
+    "gh": true,
+    "make": true,
+    "acli": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {
