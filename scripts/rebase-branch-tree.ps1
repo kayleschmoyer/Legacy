@@ -34,6 +34,10 @@ $ErrorActionPreference = "Continue"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $resolveConflictsScript = Join-Path $scriptDir "resolve-generated-conflicts.ps1"
 
+# Ensure git rebase never opens a text editor (non-interactive mode for agents/CI)
+$env:GIT_EDITOR = "true"
+$env:GIT_SEQUENCE_EDITOR = "true"
+
 # Parse skip-commits
 $skipCommitList = @()
 if ($SkipCommits) {
@@ -158,7 +162,7 @@ function Rebase-Branch {
             
             # Continue rebase
             Write-Host "[->] Continuing rebase..." -ForegroundColor Cyan
-            $continueOutput = git rebase --continue 2>&1
+            $continueOutput = git rebase --no-edit --continue 2>&1
             
             # Check if rebase completed
             if ($continueOutput -match "Successfully rebased") {
@@ -181,7 +185,7 @@ function Rebase-Branch {
             $rebaseStatus = git status 2>&1 | Out-String
             if ($rebaseStatus -match "rebase in progress") {
                 # Try to continue
-                git rebase --continue 2>&1 | Out-Null
+                git rebase --no-edit --continue 2>&1 | Out-Null
                 
                 # Check again
                 $stillInProgress = git status 2>&1 | Out-String

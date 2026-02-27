@@ -219,7 +219,7 @@ If you made this mistake, fix it by rebasing and updating twig:
 ```powershell
 # Rebase child onto correct parent
 git checkout LS-200/branch-name
-git rebase LS-199/branch-name  # resolve any conflicts
+git rebase --no-edit LS-199/branch-name  # resolve any conflicts
 
 # Update twig dependency map
 twig branch depend --exclusive LS-200/branch-name LS-199/branch-name

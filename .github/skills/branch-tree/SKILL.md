@@ -26,6 +26,8 @@ twig tree
 
 ## Alternative Commands
 
+> **Non-interactive mode**: Always use `--no-edit` with `git rebase` and `git rebase --continue` so git never opens a text editor and blocks execution. The `rebase-branch-tree.ps1` script sets `$env:GIT_EDITOR = "true"` and `$env:GIT_SEQUENCE_EDITOR = "true"` automatically.
+
 ### Interactive Rebase Tree
 
 ```powershell
@@ -133,7 +135,7 @@ git rebase --skip
 
 # For real conflicts, resolve them
 git add .
-git rebase --continue
+git rebase --no-edit --continue
 ```
 
 ### Issue: Lost commits after rebase
