@@ -63,8 +63,10 @@ export class PgDbConnection<
           rejectUnauthorized: false,
         };
       }
-    } else {
-      // For AWS RDS connections without cert path, enable SSL with relaxed verification
+    } else if (process.env.USE_LOCAL_CREDENTIALS !== 'true') {
+      // For AWS RDS connections without cert path, enable SSL with relaxed verification.
+      // Skip when running locally (USE_LOCAL_CREDENTIALS=true) since local Postgres
+      // containers do not have SSL configured.
       options.ssl = {
         rejectUnauthorized: false,
       };

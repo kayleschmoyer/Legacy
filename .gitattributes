@@ -1,6 +1,5 @@
 # Force LF line endings for all text files (consistent across platforms)
 * text=auto eol=lf
-
 # Explicitly declare text files you want to always be normalized and converted
 # to native line endings on checkout.
 *.js text
@@ -16,14 +15,11 @@
 *.css text
 *.scss text
 *.less text
-
 # Declare files that will always have lf line endings on checkout.
 *.bat text eol=lf
 *.cmd text eol=lf
-
 # Declare files that will always have LF line endings on checkout.
 *.sh text eol=lf
-
 # Denote all files that are truly binary and should not be modified.
 *.png binary
 *.jpg binary
@@ -37,3 +33,5 @@
 *.woff2 binary
 *.ttf binary
 *.eot binary
+# Git LFS - large binary assets too big for regular git
+resources/dev-seed.dump filter=lfs diff=lfs merge=lfs -text

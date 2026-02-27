@@ -9,6 +9,7 @@ import {
 } from '@legacy-sports/sentry';
 import { handleLoadPlayers } from './commands/loadPlayers';
 import { handleLoadCareerStats } from './commands/loadCareerStats';
+import { handleSeedDevData } from './commands/seedDevData';
 import { handleLoadSinglePlayerStats } from './commands/loadSinglePlayerStats';
 import { handleLoadGameStats } from './commands/loadGameStats';
 import { handleCheckStatsStatus } from './commands/checkStatsStatus';
@@ -84,6 +85,36 @@ async function run(): Promise<void> {
 
   // Simple commands without options
   program.command('load-players').action(handleLoadPlayers);
+
+  program
+    .command('seed-dev-data')
+    .description(
+      'Seed the local dev database with a subset of players and their career stats. ' +
+        'Fetches player lists from Baseball Reference for the given letters, upserts them, ' +
+        'then loads career stats for the first N players.',
+    )
+    .option(
+      '--letters <a,b,...>',
+      'Comma-separated letters to pull players from (default: a,b)',
+    )
+    .option(
+      '--stats-limit <number>',
+      'Number of players to load career stats for (default: 25)',
+      parseInt,
+    )
+    .option('--skip-stats', 'Insert players only — skip stats loading')
+    .option(
+      '--skip-players',
+      'Load stats for existing players only — skip player insert',
+    )
+    .action(
+      (options: {
+        letters?: string;
+        statsLimit?: number;
+        skipStats?: boolean;
+        skipPlayers?: boolean;
+      }) => handleSeedDevData(options),
+    );
 
   program
     .command('load-career-stats')

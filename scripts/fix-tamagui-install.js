@@ -21,6 +21,13 @@ const criticalFile = path.join(packagePath, 'dist', 'cjs', 'index.cjs');
 
 console.log('🔍 Checking Tamagui package installation...');
 
+// In Docker/CI builds the pnpm temp-dir race condition never occurs,
+// so skip the fix entirely to avoid a false-positive fatal error.
+if (process.env.DOCKER_BUILD === 'true' || process.env.CI === 'true') {
+  console.log('ℹ️  Skipping Tamagui fix in Docker/CI environment');
+  process.exit(0);
+}
+
 // Check if the critical file exists
 if (fs.existsSync(criticalFile)) {
   console.log('✅ Tamagui package is properly installed');

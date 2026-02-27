@@ -1,0 +1,57 @@
+# Dependencies (reinstalled inside image)
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+.nx/cache
+
+# Mobile artifacts
+android/build
+android/.gradle
+ios/build
+ios/Pods
+
+# Environment files (injected at runtime)
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.docker
+
+# Logs and temp files
+*.log
+logs/
+tmp/
+.tmp/
+
+# Git metadata
+.git
+.github/
+
+# Test outputs
+coverage/
+playwright-report/
+test-results/
+
+# IDE and OS files
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# AWS / Terraform state
+terraform.tfstate*
+.terraform/
+certs/
+
+# Tamagui cache
+.tamagui/
+
+# Large binary resources
+resources/*.sql
+resources/dev.dump
+
+# Documentation
+docs/

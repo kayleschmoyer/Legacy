@@ -28,8 +28,13 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | Type errors                   | `.github/skills/fix-types/SKILL.md`                                        |
 | Lint errors                   | `.github/skills/fix-lint/SKILL.md`                                         |
 | Troubleshooting               | `.github/skills/troubleshoot/SKILL.md`                                     |
+| **Docker local**              | `.github/skills/docker-local/SKILL.md`                                     |
 | DB queries                    | `.github/skills/db-query/SKILL.md`                                         |
 | DB schema reference           | `.github/skills/db-schema/SKILL.md`                                        |
+| **Dump RDS to S3**            | `.github/skills/db-dump/SKILL.md`                                          |
+| **Restore from S3**           | `.github/skills/db-restore/SKILL.md`                                       |
+| **Restore dev seed**          | `.github/skills/db-restore-dev/SKILL.md`                                   |
+| **Refresh dev seed**          | `.github/skills/db-dump-dev/SKILL.md`                                      |
 | Architecture                  | `.github/skills/architecture/SKILL.md`                                     |
 | **New library**               | `.github/skills/create-lib/SKILL.md`                                       |
 | **New lambda**                | `.github/skills/create-lambda/SKILL.md`                                    |
@@ -41,6 +46,6 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **UI Standards**              | `.github/skills/ui-standards/SKILL.md`                                     |
 | **UI Brand Colors**           | `.github/skills/ui-brand-colors/SKILL.md`                                  |
 | **User testing**              | `.github/skills/user-testing/SKILL.md`                                     |
-| All skills (49)               | `.github/skills/`                                                          |
+| All skills (54)               | `.github/skills/`                                                          |
 | CSV reference data            | `docs/agents/*.csv`                                                        |
 | Tech stack                    | React Native · Next.js · Lambda · GraphQL · PostgreSQL/Drizzle · Terraform |

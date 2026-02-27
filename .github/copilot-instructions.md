@@ -35,8 +35,13 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 | Lint errors                   | `skills/fix-lint/SKILL.md`               |
 | PR creation                   | `skills/create-pr/SKILL.md`              |
 | Troubleshooting               | `skills/troubleshoot/SKILL.md`           |
+| **Docker local stack**        | `skills/docker-local/SKILL.md`           |
 | DB queries                    | `skills/db-query/SKILL.md`               |
 | DB schema reference           | `skills/db-schema/SKILL.md`              |
+| **Dump RDS to S3**            | `skills/db-dump/SKILL.md`                |
+| **Restore from S3 dump**      | `skills/db-restore/SKILL.md`             |
+| **Restore dev seed**          | `skills/db-restore-dev/SKILL.md`         |
+| **Refresh dev seed**          | `skills/db-dump-dev/SKILL.md`            |
 | Architecture                  | `skills/architecture/SKILL.md`           |
 | **New library**               | `skills/create-lib/SKILL.md`             |
 | **New lambda**                | `skills/create-lambda/SKILL.md`          |
@@ -49,5 +54,5 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 | **UI Standards**              | `skills/ui-standards/SKILL.md`           |
 | **UI Brand Colors**           | `skills/ui-brand-colors/SKILL.md`        |
 | **User testing**              | `skills/user-testing/SKILL.md`           |
-| All skills (49 guides)        | `skills/`                                |
+| All skills (54 guides)        | `skills/`                                |
 | CSV reference data            | `docs/agents/*.csv`                      |

@@ -54,23 +54,27 @@ export async function getDatabaseConfig(): Promise<DatabaseConfig> {
   };
 
   // Add SSL configuration
-  try {
-    const certPath = getEnvVarOptional(EnvironmentVariable.DB_CERT_PATH);
-    if (certPath) {
-      config.ssl = {
-        ca: readFileSync(resolve(__dirname, '../../../..', certPath)),
-      };
-    } else {
-      // For AWS RDS, require SSL but allow self-signed certificates
+  const useLocalCredentials =
+    getEnvVarOptional(EnvironmentVariable.USE_LOCAL_CREDENTIALS) === 'true';
+  if (!useLocalCredentials) {
+    try {
+      const certPath = getEnvVarOptional(EnvironmentVariable.DB_CERT_PATH);
+      if (certPath) {
+        config.ssl = {
+          ca: readFileSync(resolve(__dirname, '../../../..', certPath)),
+        };
+      } else {
+        // For AWS RDS, require SSL but allow self-signed certificates
+        config.ssl = {
+          rejectUnauthorized: false,
+        };
+      }
+    } catch {
+      // Fallback to basic SSL for AWS RDS
       config.ssl = {
         rejectUnauthorized: false,
       };
     }
-  } catch {
-    // Fallback to basic SSL for AWS RDS
-    config.ssl = {
-      rejectUnauthorized: false,
-    };
   }
 
   return config;
@@ -134,23 +138,27 @@ export function getDatabaseConfigSync(): DatabaseConfig {
   };
 
   // Add SSL configuration if cert path is provided
-  try {
-    const certPath = getEnvVarOptional(EnvironmentVariable.DB_CERT_PATH);
-    if (certPath) {
-      config.ssl = {
-        ca: readFileSync(resolve(__dirname, '../../../..', certPath)),
-      };
-    } else {
-      // For AWS RDS, require SSL but allow self-signed certificates
+  const useLocalCredentialsMigration =
+    getEnvVarOptional(EnvironmentVariable.USE_LOCAL_CREDENTIALS) === 'true';
+  if (!useLocalCredentialsMigration) {
+    try {
+      const certPath = getEnvVarOptional(EnvironmentVariable.DB_CERT_PATH);
+      if (certPath) {
+        config.ssl = {
+          ca: readFileSync(resolve(__dirname, '../../../..', certPath)),
+        };
+      } else {
+        // For AWS RDS, require SSL but allow self-signed certificates
+        config.ssl = {
+          rejectUnauthorized: false,
+        };
+      }
+    } catch {
+      // Fallback to basic SSL for AWS RDS
       config.ssl = {
         rejectUnauthorized: false,
       };
     }
-  } catch {
-    // Fallback to basic SSL for AWS RDS
-    config.ssl = {
-      rejectUnauthorized: false,
-    };
   }
 
   return config;

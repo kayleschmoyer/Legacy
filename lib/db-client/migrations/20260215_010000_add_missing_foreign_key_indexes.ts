@@ -377,6 +377,15 @@ export const up = async ({ db }: { db: PgDatabase<any> }): Promise<void> => {
   console.log('  🔔 Tier 7: Notification system indexes');
 
   // Device tokens (user_id already has index, adding platform filter)
+  // Older installs used 'enabled' column name; canonical schema uses 'is_active'.
+  try {
+    await db.execute(
+      `ALTER TABLE device_tokens RENAME COLUMN "enabled" TO is_active`,
+    );
+    console.log('    🔄 Renamed device_tokens.enabled → is_active');
+  } catch {
+    // Already renamed or doesn't exist — continue
+  }
   await db.execute(`
     CREATE INDEX IF NOT EXISTS device_tokens_user_id_platform_idx 
       ON device_tokens USING btree (user_id, platform)

@@ -28,9 +28,15 @@ export interface User {
 }
 
 const JWT_SECRET_NAME = process.env['JWT_SECRET_NAME'] || '';
+const JWT_SECRET_LOCAL = process.env['JWT_SECRET'] || '';
 let jwtSecretPromise: Promise<string> | null = null;
 
 export async function getJwtSecret(): Promise<string> {
+  // Local dev shortcut: JWT_SECRET env var skips Secrets Manager lookup
+  if (JWT_SECRET_LOCAL) {
+    return JWT_SECRET_LOCAL;
+  }
+
   if (!JWT_SECRET_NAME) {
     throw new Error('JWT_SECRET_NAME is not set');
   }

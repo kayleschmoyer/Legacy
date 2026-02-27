@@ -1,0 +1,237 @@
+# =============================================================================
+# Legacy Sports — Local Docker Compose
+# =============================================================================
+# Runs the full backend + web stack locally without needing AWS credentials.
+#
+# Env file strategy (later file overrides earlier):
+#   .env         — real synced secrets (gitignored, run: pnpm run sync-env)
+#   .env.docker  — docker-specific overrides: local DB creds, service URLs
+#
+# Quick start:
+#   pnpm run sync-env          # pull real secrets into .env
+#   docker compose up --build
+#
+# Selective start:
+#   docker compose up postgres graphql oauth   # backend only
+#   docker compose up web                      # web app only (needs backends)
+#
+# Rebuild after npm package changes:
+#   docker compose build --no-cache
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — local database (replaces AWS RDS in dev)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: ls-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: legacy_sports
+      POSTGRES_PASSWORD: legacy_sports_dev
+      POSTGRES_DB: legacy_sports_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U legacy_sports -d legacy_sports_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Migrations — runs Drizzle migrations then exits (0 = success)
+  # All backend services wait on this before starting.
+  # ---------------------------------------------------------------------------
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ls-migrate
+    command: sh -c "cd /app/lib/db-client && pnpm run db:migrate"
+    restart: "no"
+    env_file:
+      - .env
+      - .env.docker
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./lib:/app/lib
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # CLI — run ad-hoc CLI commands against the local stack
+  # Usage: docker compose run --rm cli seed-dev-data [options]
+  #        docker compose run --rm cli list-players
+  #        docker compose run --rm cli add-user
+  # ---------------------------------------------------------------------------
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ls-cli
+    # entrypoint runs the CLI; pass the subcommand + args via `docker compose run`
+    entrypoint: ["pnpm", "exec", "tsx", "--tsconfig", "/app/tsconfig.base.json", "/app/apps/cli/src/main.ts"]
+    command: "help"
+    restart: "no"
+    env_file:
+      - .env
+      - .env.docker
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./apps/cli/src:/app/apps/cli/src
+      - ./lib:/app/lib
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # GraphQL API — lambdas/db (Apollo GraphQL server)
+  # Port: 5000  →  http://localhost:5000/graphql
+  # ---------------------------------------------------------------------------
+  graphql:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ls-graphql
+    command: pnpm exec nx run db:serve
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.docker
+    environment:
+      NODE_ENV: development
+    ports:
+      - "5000:5000"
+    volumes:
+      # Hot-reload: mount source directories only (node_modules stay in image)
+      - ./lambdas/db/src:/app/lambdas/db/src
+      - ./lib:/app/lib
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------------------
+  # OAuth Proxy — lambdas/oauth-proxy
+  # Port: 5001  →  http://localhost:5001/oauth
+  # ---------------------------------------------------------------------------
+  oauth:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ls-oauth
+    command: pnpm exec nx run oauth-proxy:serve
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.docker
+    environment:
+      NODE_ENV: development
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./lambdas/oauth-proxy/src:/app/lambdas/oauth-proxy/src
+      - ./lib:/app/lib
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------------------
+  # Stats Lambda — lambdas/stats-lambda
+  # Port: 5002  →  http://localhost:5002
+  # ---------------------------------------------------------------------------
+  stats:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ls-stats
+    command: pnpm exec nx run stats-lambda:serve
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.docker
+    environment:
+      NODE_ENV: development
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./lambdas/stats-lambda/src:/app/lambdas/stats-lambda/src
+      - ./lib:/app/lib
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------------------
+  # Game Selection Lambda — lambdas/game-selection
+  # Port: 5003  →  http://localhost:5003
+  # ---------------------------------------------------------------------------
+  game-selection:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ls-game-selection
+    command: pnpm exec nx run game-selection:serve
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.docker
+    environment:
+      NODE_ENV: development
+    ports:
+      - "5003:5003"
+    volumes:
+      - ./lambdas/game-selection/src:/app/lambdas/game-selection/src
+      - ./lib:/app/lib
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------------------
+  # Web App — apps/web (Vite dev server)
+  # Port: 4200  →  http://localhost:4200
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ls-web
+    # --host 0.0.0.0 required so Vite binds to all interfaces inside the container
+    command: pnpm exec nx run web:serve --host=0.0.0.0
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.docker
+    environment:
+      NODE_ENV: development
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./apps/web/src:/app/apps/web/src
+      - ./apps/web/public:/app/apps/web/public
+      - ./lib:/app/lib
+    depends_on:
+      graphql:
+        condition: service_started
+      oauth:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+    driver: local

@@ -6,6 +6,11 @@ static
 tmp
 /out-tsc
 
+# Database dumps - raw prod dump is too large and contains PII (stored in S3)
+# The scrubbed seed (dev-seed.dump) is tracked via Git LFS
+resources/dev.dump
+resources/*.dump.bak
+
 # IDEs and editors
 /.idea
 .project

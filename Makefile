@@ -6,9 +6,9 @@
 	lint lint-fix lint-workflows lint-skills format fmt typecheck validate \
 	test test-all test-watch test-e2e check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
-	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql \
+	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
 	android ios build-android build-ios \
-	db-migrate db-studio db-reset db-check-connections codegen \
+	db-migrate db-studio db-reset db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy \
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
@@ -310,6 +310,10 @@ graphiql: ## Start GraphQL explorer
 	@$(call echo_blue,Starting GraphQL explorer...)
 	pnpm run graphiql
 
+docker-up: ## Start Docker Compose services in detached mode
+	@$(call echo_blue,Starting Docker Compose services in detached mode...)
+	docker compose up -d --build
+
 # Mobile Development
 android: ## Run Android application
 	@$(call echo_blue,Running Android application...)
@@ -339,6 +343,38 @@ db-studio: ## Open database studio
 db-reset: ## Reset database (WARNING: Drops all tables!)
 	@$(call echo_blue,Resetting database...)
 	cd lib$(PATH_SEP)db-client && pnpm run db:reset
+
+db-dump: ## Dump RDS database to S3 (custom binary format, compressed)
+	@$(call echo_blue,Dumping RDS database to S3...)
+ifeq ($(DETECTED_OS),Windows)
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)db-dump.ps1
+else
+	@echo "db-dump is Windows-only (PowerShell script). Run on Windows or adapt for bash."
+endif
+
+db-restore: ## Download latest S3 dump and restore into local Docker postgres
+	@$(call echo_blue,Restoring database from S3 dump...)
+ifeq ($(DETECTED_OS),Windows)
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)db-restore.ps1
+else
+	@echo "db-restore is Windows-only (PowerShell script). Run on Windows or adapt for bash."
+endif
+
+db-dump-dev: ## Restore from S3, scrub PII, dump to resources/dev-seed.dump for repo (needs AWS)
+	@$(call echo_blue,Creating scrubbed dev seed dump...)
+ifeq ($(DETECTED_OS),Windows)
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)db-dump-dev.ps1
+else
+	@echo "db-dump-dev is Windows-only (PowerShell script). Run on Windows or adapt for bash."
+endif
+
+db-restore-dev: ## Restore scrubbed dev seed from repo (no AWS needed - run git lfs pull first)
+	@$(call echo_blue,Restoring database from dev seed dump...)
+ifeq ($(DETECTED_OS),Windows)
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)db-restore-dev.ps1
+else
+	@echo "db-restore-dev is Windows-only (PowerShell script). Run on Windows or adapt for bash."
+endif
 
 db-check-connections: ## Check database connection pool status
 	@$(call echo_blue,Checking database connection pool status...)

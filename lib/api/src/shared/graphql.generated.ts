@@ -1111,19 +1111,6 @@ export type Player = {
   statsLastFetchedAt?: Maybe<Scalars['String']['output']>;
 };
 
-export type PlayerGameScore = {
-  __typename?: 'PlayerGameScore';
-  battingScore?: Maybe<Scalars['Float']['output']>;
-  computedAt?: Maybe<Scalars['String']['output']>;
-  fieldingScore?: Maybe<Scalars['Float']['output']>;
-  gameNum?: Maybe<Scalars['Int']['output']>;
-  id?: Maybe<Scalars['Int']['output']>;
-  pitchingScore?: Maybe<Scalars['Float']['output']>;
-  playerId?: Maybe<Scalars['Int']['output']>;
-  season?: Maybe<Scalars['Int']['output']>;
-  totalScore?: Maybe<Scalars['Float']['output']>;
-};
-
 export type PlayerScoring = {
   __typename?: 'PlayerScoring';
   avgPointsPerGame?: Maybe<Scalars['Float']['output']>;
@@ -1189,7 +1176,6 @@ export type Query = {
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
-  getPlayerGameScores?: Maybe<Array<PlayerGameScore>>;
   getPlayoffRace?: Maybe<Array<PlayoffQualification>>;
   getPowerRankings?: Maybe<Array<TeamStanding>>;
   getSeasonResults?: Maybe<SeasonResults>;
@@ -1366,12 +1352,6 @@ export type QueryGetMatchupsForLeagueArgs = {
 export type QueryGetNotificationHistoryArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
-};
-
-export type QueryGetPlayerGameScoresArgs = {
-  gameNum?: InputMaybe<Scalars['Int']['input']>;
-  playerId: Scalars['Int']['input'];
-  season?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryGetPlayoffRaceArgs = {

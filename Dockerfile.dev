@@ -1,0 +1,78 @@
+# =============================================================================
+# Legacy Sports — Development Image
+# =============================================================================
+# Builds a base image with all Node dependencies installed.
+# Source code is mounted as a volume in docker-compose for hot-reload.
+#
+# Build:   docker build -f Dockerfile.dev -t legacy-sports-dev .
+# Compose: docker compose up
+# =============================================================================
+
+FROM node:20-alpine AS base
+
+# System dependencies needed by native Node addons and git
+RUN apk add --no-cache \
+    git \
+    python3 \
+    make \
+    g++ \
+    openssl \
+    ca-certificates
+
+# Enable pnpm via corepack (matches packageManager in package.json)
+RUN corepack enable && corepack prepare pnpm@9.12.1 --activate
+
+WORKDIR /app
+
+# Set DOCKER_BUILD so postinstall scripts skip checks that only apply on host machines
+ENV DOCKER_BUILD=true
+
+# ---------------------------------------------------------------------------
+# Dependency layer — only package manifests so this layer is cached as long
+# as no package.json / lockfile changes.
+# ---------------------------------------------------------------------------
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json ./
+COPY tsconfig.base.json tsconfig.json babel.config.json jest.preset.js ./
+# Required by the postinstall script that runs during pnpm install
+COPY scripts/ ./scripts/
+
+# Copy all package.json files for workspace packages so pnpm can build the
+# full dependency graph before copying source.
+COPY apps/app/package.json                   ./apps/app/
+COPY apps/app-e2e/package.json               ./apps/app-e2e/
+COPY apps/cli/package.json                   ./apps/cli/
+COPY apps/web/package.json                   ./apps/web/
+COPY lambdas/db/package.json                 ./lambdas/db/
+COPY lambdas/draft-processor/package.json    ./lambdas/draft-processor/
+COPY lambdas/game-selection/package.json     ./lambdas/game-selection/
+COPY lambdas/oauth-proxy/package.json        ./lambdas/oauth-proxy/
+COPY lambdas/stats-lambda/package.json       ./lambdas/stats-lambda/
+COPY lib/api/package.json                    ./lib/api/
+COPY lib/aws-utils/package.json              ./lib/aws-utils/
+COPY lib/bref-client/package.json            ./lib/bref-client/
+COPY lib/data-loaders/package.json           ./lib/data-loaders/
+COPY lib/db-client/package.json              ./lib/db-client/
+COPY lib/env-utilities/package.json          ./lib/env-utilities/
+COPY lib/logging/package.json                ./lib/logging/
+COPY lib/scoring/package.json                ./lib/scoring/
+COPY lib/sentry/package.json                 ./lib/sentry/
+COPY lib/shared-components/package.json      ./lib/shared-components/
+COPY lib/tamagui-config/package.json         ./lib/tamagui-config/
+COPY lib/ui-abstractions/package.json        ./lib/ui-abstractions/
+COPY lib/utils/package.json                  ./lib/utils/
+COPY lib/websocket-client/package.json       ./lib/websocket-client/
+
+# Install all workspace dependencies.
+# --no-frozen-lockfile is intentional: package.json declares packages that were
+# missing from the lockfile (e.g. @aws-sdk/client-dynamodb); pnpm will resolve
+# them from its virtual store without downloading anything new.
+RUN pnpm install --no-frozen-lockfile
+
+# ---------------------------------------------------------------------------
+# Source layer — copied here so the image can run without volume mounts.
+# In docker-compose the bind mounts overlay this for hot-reload.
+# ---------------------------------------------------------------------------
+COPY . .
+
+# Default command — overridden per service in docker-compose.yml
+CMD ["pnpm", "run", "dev:lambdas"]
