@@ -33,6 +33,7 @@ import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { AdminPage } from '../pages/admin/AdminPage';
+import ProfileSettingsPage from '../pages/profile/ProfileSettingsPage';
 
 /* ────────────────────────────────────────────────────────
  * Modern Header – styled components
@@ -440,6 +441,7 @@ function App() {
           <Route path="/players/:id" element={<PlayerDetailPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/profile/settings" element={<ProfileSettingsPage />} />
         </Routes>
       </YStack>
     </MainLayout>

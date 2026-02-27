@@ -247,7 +247,7 @@ export const UserProfileDropdown: React.FC = () => {
           <YStack gap="$1" paddingTop="$2">
             <MenuItem
               onPress={() => {
-                console.log('Profile clicked');
+                void navigate('/profile/settings');
                 setIsOpen(false);
               }}
             >
@@ -267,7 +267,6 @@ export const UserProfileDropdown: React.FC = () => {
 
             <MenuItem
               onPress={() => {
-                console.log('Preferences clicked');
                 setIsOpen(false);
               }}
             >
@@ -287,7 +286,6 @@ export const UserProfileDropdown: React.FC = () => {
 
             <MenuItem
               onPress={() => {
-                console.log('Help clicked');
                 setIsOpen(false);
               }}
             >
