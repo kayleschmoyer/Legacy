@@ -54,5 +54,6 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 | **UI Standards**              | `skills/ui-standards/SKILL.md`           |
 | **UI Brand Colors**           | `skills/ui-brand-colors/SKILL.md`        |
 | **User testing**              | `skills/user-testing/SKILL.md`           |
-| All skills (54 guides)        | `skills/`                                |
+| **Scratch output files**      | `skills/scratch-dir/SKILL.md`            |
+| All skills (55 guides)        | `skills/`                                |
 | CSV reference data            | `docs/agents/*.csv`                      |

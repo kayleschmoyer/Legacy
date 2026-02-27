@@ -302,3 +302,7 @@ terraform.tfvars
 playwright-report/
 test-results/
 logs/
+
+# Ad-hoc output scratch directory (lint results, CI logs, debug dumps, etc.)
+scratch/*
+!scratch/.gitkeep
