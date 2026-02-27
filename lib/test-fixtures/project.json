@@ -1,0 +1,10 @@
+{
+  "name": "test-fixtures",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/test-fixtures/src",
+  "projectType": "library",
+  "tags": ["platform:shared", "scope:lib", "type:util"],
+  "targets": {
+    "typecheck": {}
+  }
+}

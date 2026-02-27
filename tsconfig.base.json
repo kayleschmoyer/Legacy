@@ -35,6 +35,7 @@
         "lib/shared-components/src/index.ts"
       ],
       "@legacy-sports/tamagui-config": ["lib/tamagui-config/src/index.ts"],
+      "@legacy-sports/test-fixtures": ["lib/test-fixtures/src/index.ts"],
       "@legacy-sports/ui-abstractions": ["lib/ui-abstractions/src/index.ts"],
       "@legacy-sports/utils": ["lib/utils/src/index.ts"],
       "@legacy-sports/utils/notification-types": [

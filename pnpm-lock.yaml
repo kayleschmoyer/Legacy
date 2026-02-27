@@ -1087,6 +1087,8 @@ importers:
         specifier: '*'
         version: 2.8.1
 
+  lib/test-fixtures: {}
+
   lib/ui-abstractions:
     dependencies:
       react:
