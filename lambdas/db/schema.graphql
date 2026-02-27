@@ -1043,18 +1043,6 @@ type Player {
   statsLastFetchedAt: String
 }
 
-type PlayerGameScore {
-  battingScore: Float
-  computedAt: String
-  fieldingScore: Float
-  gameNum: Int
-  id: Int
-  pitchingScore: Float
-  playerId: Int
-  season: Int
-  totalScore: Float
-}
-
 type PlayerScoring {
   avgPointsPerGame: Float
   battingScore: Float
@@ -1160,11 +1148,6 @@ type Query {
   getMatchupsByWeek(leagueId: Int!, weekNumber: Int!): [Matchup!]
   getMatchupsForLeague(leagueId: Int!, weekNumber: Int): [Matchup!]
   getNotificationHistory(limit: Int, offset: Int): [NotificationHistoryItem!]
-  getPlayerGameScores(
-    gameNum: Int
-    playerId: Int!
-    season: Int
-  ): [PlayerGameScore!]
   getPlayoffRace(
     leagueId: Int!
     playoffSpots: Int!
