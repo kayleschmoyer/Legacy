@@ -247,6 +247,8 @@ function getDraftBadgeColors(status?: string | null) {
       };
     case 'completed':
       return { bg: '$green3', border: '$green7', text: '$green11' };
+    case undefined:
+    case null:
     default:
       return { bg: '$gray3', border: '$gray7', text: '$gray11' };
   }

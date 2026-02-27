@@ -1,7 +1,9 @@
 import React from 'react';
+import type * as ReactModuleType from 'react';
 import type { ApolloClient } from '@apollo/client';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { LeagueScoringEditor } from './LeagueScoringEditor';
+import type * as GraphqlGeneratedModuleType from '../../api/db/graphql.generated';
 import {
   type GetLeagueScoringProfileQuery,
   ScoringStatGroup,
@@ -51,9 +53,9 @@ function mockPickDomProps(
 }
 
 jest.mock('../../api/db/graphql.generated', () => {
-  const actual = jest.requireActual<
-    typeof import('../../api/db/graphql.generated')
-  >('../../api/db/graphql.generated');
+  const actual = jest.requireActual<typeof GraphqlGeneratedModuleType>(
+    '../../api/db/graphql.generated',
+  );
   return {
     ...actual,
     useUpdateLeagueScoringProfileMutation: jest.fn(() => [
@@ -64,7 +66,7 @@ jest.mock('../../api/db/graphql.generated', () => {
 });
 
 jest.mock('@tamagui/lucide-icons', () => {
-  const React = jest.requireActual<typeof import('react')>('react');
+  const React = jest.requireActual<typeof ReactModuleType>('react');
   return new Proxy(
     {},
     {
@@ -125,7 +127,7 @@ jest.mock('@legacy-sports/shared-components', () => {
 });
 
 jest.mock('tamagui', () => {
-  const React = jest.requireActual<typeof import('react')>('react');
+  const React = jest.requireActual<typeof ReactModuleType>('react');
 
   const View = (allProps: Record<string, unknown>) => {
     const props = { ...allProps };

@@ -64,6 +64,8 @@ function getDraftStatusStyles(status?: string | null) {
         borderColor: withAlpha(GREEN, 0.38),
         textColor: '$green11',
       };
+    case undefined:
+    case null:
     default:
       return {
         backgroundColor: withAlpha(SLATE_400, 0.12),
@@ -83,6 +85,8 @@ function getStatusDescription(status?: string | null): string {
       return 'Live draft underway. Stay nimble on positional needs and matchups.';
     case 'completed':
       return 'Rosters are set. Shift focus to lineups, waivers, and weekly matchups.';
+    case undefined:
+    case null:
     default:
       return 'Keep your managers engaged with updates, trades, and matchup highlights.';
   }
@@ -98,6 +102,8 @@ function getNextActionCopy(status?: string | null): string {
       return 'Monitor the board and be ready to counter draft snipes in real time.';
     case 'completed':
       return 'Schedule weekly reminders so managers submit lineups ahead of first pitch.';
+    case undefined:
+    case null:
     default:
       return 'Keep the league vibrant with quick updates and timely reminders.';
   }
