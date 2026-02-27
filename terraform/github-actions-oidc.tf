@@ -357,6 +357,20 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:apigateway:${local.region}::/apis/*"
         ]
       },
+      # API Gateway write permissions for Terraform apply (integration responses, methods, etc.)
+      {
+        Effect = "Allow"
+        Action = [
+          "apigateway:PUT",
+          "apigateway:POST",
+          "apigateway:PATCH",
+          "apigateway:DELETE"
+        ]
+        Resource = [
+          "arn:aws:apigateway:${local.region}::/restapis/*",
+          "arn:aws:apigateway:${local.region}::/apis/*"
+        ]
+      },
       # Lambda read permissions
       {
         Effect = "Allow"
