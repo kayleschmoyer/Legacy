@@ -2,6 +2,7 @@ import { sign } from 'jsonwebtoken';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
+import { requireAuth } from './authorization';
 import { getJwtSecret } from '../server/context';
 
 // Create a single database service instance to reuse across all resolvers
@@ -34,7 +35,13 @@ builder.queryField('users', (t) =>
       orderBy: t.arg.string({ required: false }),
       orderDirection: t.arg.string({ required: false }),
     },
-    resolve: async (root, args) => {
+    resolve: async (root, args, context) => {
+      // Admin only — this endpoint lists all users with their email addresses
+      const user = requireAuth(context);
+      if (!user.isAdmin) {
+        throw new Error('Admin access required to list all users');
+      }
+
       const orderBy = args.orderBy as 'id' | 'email' | 'username' | undefined;
       const orderDirection = args.orderDirection as 'asc' | 'desc' | undefined;
 
@@ -45,11 +52,11 @@ builder.queryField('users', (t) =>
         orderDirection: orderDirection || 'asc',
       });
 
-      return users.map((user) => ({
-        id: Number(user.id),
-        email: user.email,
-        username: user.username,
-        accessLevel: user.accessLevel,
+      return users.map((u) => ({
+        id: Number(u.id),
+        email: u.email,
+        username: u.username,
+        accessLevel: u.accessLevel,
       }));
     },
   }),
@@ -86,18 +93,24 @@ builder.queryField('userByEmail', (t) =>
     args: {
       email: t.arg.string({ required: true }),
     },
-    resolve: async (parent, { email }) => {
+    resolve: async (parent, { email }, context) => {
+      // Admin only — looking up users by email exposes PII
+      const authedUser = requireAuth(context);
+      if (!authedUser.isAdmin) {
+        throw new Error('Admin access required to look up users by email');
+      }
+
       // Using shared dbService instance
 
-      const user = await dbService.users.getUserByEmail(email);
+      const foundUser = await dbService.users.getUserByEmail(email);
 
-      if (!user) return null;
+      if (!foundUser) return null;
 
       return {
-        id: Number(user.id),
-        email: user.email,
-        username: user.username,
-        accessLevel: user.accessLevel,
+        id: Number(foundUser.id),
+        email: foundUser.email,
+        username: foundUser.username,
+        accessLevel: foundUser.accessLevel,
       };
     },
   }),
@@ -110,7 +123,10 @@ builder.queryField('searchUsers', (t) =>
       searchTerm: t.arg.string({ required: true }),
       limit: t.arg.int({ required: false }),
     },
-    resolve: async (parent, args) => {
+    resolve: async (parent, args, context) => {
+      // Requires authentication — used for inviting users to leagues
+      requireAuth(context);
+
       // Using shared dbService instance
 
       const users = await dbService.users.searchUsers(

@@ -1,6 +1,7 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { builder } from './builder';
+import { requireAuth, verifyCommissionerAccess } from './authorization';
 import { Team } from './leagues/types';
 
 /**
@@ -361,6 +362,14 @@ builder.mutationField('createPlayoffBracket', (t) =>
       multiWeekMatchups: t.arg.boolean({ required: false }),
     },
     resolve: async (_parent, args, context) => {
+      const user = requireAuth(context);
+
+      // Admin users can create playoffs for any league; commissioners can only
+      // create playoffs for leagues they manage.
+      if (!user.isAdmin) {
+        await verifyCommissionerAccess(context.db, args.leagueId, user.id);
+      }
+
       const { PlayoffService } = await import('../services/playoff-service');
       const bracket = await PlayoffService.createBracket(context.db, {
         leagueId: args.leagueId,
@@ -384,6 +393,27 @@ builder.mutationField('advancePlayoffBracket', (t) =>
       bracketId: t.arg.int({ required: true }),
     },
     resolve: async (_parent, args, context) => {
+      const user = requireAuth(context);
+
+      if (!user.isAdmin) {
+        // Look up the bracket to get the league id for access verification
+        const [bracketRow] = await context.db
+          .select({ leagueId: PublicSchema.playoffBrackets.leagueId })
+          .from(PublicSchema.playoffBrackets)
+          .where(eq(PublicSchema.playoffBrackets.id, args.bracketId))
+          .limit(1);
+
+        if (!bracketRow) {
+          throw new Error('Playoff bracket not found');
+        }
+
+        await verifyCommissionerAccess(
+          context.db,
+          bracketRow.leagueId,
+          user.id,
+        );
+      }
+
       const { PlayoffService } = await import('../services/playoff-service');
       const bracket = await PlayoffService.advanceBracket(
         context.db,
@@ -407,6 +437,37 @@ builder.mutationField('updatePlayoffMatchup', (t) =>
       status: t.arg({ type: PlayoffMatchupStatus, required: false }),
     },
     resolve: async (_parent, args, context) => {
+      const user = requireAuth(context);
+
+      if (!user.isAdmin) {
+        // Look up the matchup → bracket to get the league id
+        const [matchupRow] = await context.db
+          .select({ bracketId: PublicSchema.playoffMatchups.bracketId })
+          .from(PublicSchema.playoffMatchups)
+          .where(eq(PublicSchema.playoffMatchups.id, args.matchupId))
+          .limit(1);
+
+        if (!matchupRow) {
+          throw new Error('Playoff matchup not found');
+        }
+
+        const [bracketRow] = await context.db
+          .select({ leagueId: PublicSchema.playoffBrackets.leagueId })
+          .from(PublicSchema.playoffBrackets)
+          .where(eq(PublicSchema.playoffBrackets.id, matchupRow.bracketId))
+          .limit(1);
+
+        if (!bracketRow) {
+          throw new Error('Playoff bracket not found');
+        }
+
+        await verifyCommissionerAccess(
+          context.db,
+          bracketRow.leagueId,
+          user.id,
+        );
+      }
+
       const updateData: {
         highSeedScore?: string;
         lowSeedScore?: string;
@@ -463,6 +524,27 @@ builder.mutationField('awardChampionship', (t) =>
       bracketId: t.arg.int({ required: true }),
     },
     resolve: async (_parent, args, context) => {
+      const user = requireAuth(context);
+
+      if (!user.isAdmin) {
+        // Look up the bracket to get the league id for access verification
+        const [bracketRow] = await context.db
+          .select({ leagueId: PublicSchema.playoffBrackets.leagueId })
+          .from(PublicSchema.playoffBrackets)
+          .where(eq(PublicSchema.playoffBrackets.id, args.bracketId))
+          .limit(1);
+
+        if (!bracketRow) {
+          throw new Error('Playoff bracket not found');
+        }
+
+        await verifyCommissionerAccess(
+          context.db,
+          bracketRow.leagueId,
+          user.id,
+        );
+      }
+
       const { PlayoffService } = await import('../services/playoff-service');
       const trophy = await PlayoffService.awardChampionship(
         context.db,

@@ -15,6 +15,7 @@ import {
   MatchupStatus,
 } from './types';
 import { builder, Context } from '../builder';
+import { verifyCommissionerAccess } from '../authorization';
 import { selectSeasonsForPlayers } from '../../services/season-selector';
 import { MatchupService } from '../../services/matchup-service';
 
@@ -28,6 +29,15 @@ builder.mutationField('createMatchup', (t) =>
     resolve: async (parent, args, context) => {
       if (!context.user) {
         throw new Error('Authentication required');
+      }
+
+      // Only admins and league commissioners/GMs may create matchups
+      if (!context.user.isAdmin) {
+        await verifyCommissionerAccess(
+          context.db,
+          args.input.leagueId,
+          context.user.id,
+        );
       }
 
       // Get league configuration for defaults
@@ -84,6 +94,13 @@ builder.mutationField('updateMatchupScore', (t) =>
         throw new Error('Authentication required');
       }
 
+      // Score updates are performed by the scoring system (admin / system requests only)
+      if (!context.isSystemRequest && !context.user.isAdmin) {
+        throw new Error(
+          'Only admins or the scoring system may update matchup scores',
+        );
+      }
+
       const updateData: { team1Score?: string; team2Score?: string } = {};
 
       if (args.team1Score !== null && args.team1Score !== undefined) {
@@ -119,6 +136,13 @@ builder.mutationField('updateMatchupStatus', (t) =>
     resolve: async (parent, args, context) => {
       if (!context.user) {
         throw new Error('Authentication required');
+      }
+
+      // Status transitions are controlled by the system or admins only
+      if (!context.isSystemRequest && !context.user.isAdmin) {
+        throw new Error(
+          'Only admins or the scoring system may update matchup status',
+        );
       }
 
       const results = await context.db
@@ -929,22 +953,9 @@ builder.mutationField('createAllMatchups', (t) =>
 
       const leagueId = args.leagueId;
 
-      // Verify user is owner or commissioner
-      const membership = await context.db
-        .select({
-          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
-        })
-        .from(PublicSchema.leagueMembers)
-        .where(
-          and(
-            eq(PublicSchema.leagueMembers.leagueId, leagueId),
-            eq(PublicSchema.leagueMembers.userId, context.user.id),
-          ),
-        )
-        .limit(1);
-
-      if (membership.length === 0) {
-        throw new Error('You are not a member of this league');
+      // Verify user is commissioner, GM, or admin
+      if (!context.user.isAdmin) {
+        await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
 
       // Verify no matchups exist already
