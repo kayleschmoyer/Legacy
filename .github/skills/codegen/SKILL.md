@@ -66,7 +66,7 @@ pnpm exec nx run app:codegen
 # Verify GraphQL server is running before codegen
 # Web: Check if http://localhost:4000/graphql is accessible
 # Or check environment variable
-echo $env:VITE_GRAPHQL_HOST
+echo $env:GRAPHQL_SCHEMA
 ```
 
 ## Expected Output
@@ -91,14 +91,17 @@ pnpm exec nx run db:serve
 ### Issue: Wrong GraphQL endpoint
 
 **Symptom**: 404 or endpoint not found errors
-**Solution**: Set correct environment variable
+**Solution**: Set correct environment variable (`GRAPHQL_SCHEMA`). Can be a URL or a file path.
 
 ```powershell
-# Set GraphQL host environment variable
-$env:VITE_GRAPHQL_HOST = 'http://localhost:4000/graphql'
+# Point at a live local server
+$env:GRAPHQL_SCHEMA = 'http://localhost:5000/graphql'
 
-# Then run codegen
-pnpm exec nx affected -t codegen
+# Or point at the dev lambda
+$env:GRAPHQL_SCHEMA = 'https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/graphql'
+
+# Then run codegen (use --skip-nx-cache to force a fresh run)
+pnpm exec nx affected -t codegen --skip-nx-cache
 ```
 
 ### Issue: Schema validation errors
@@ -194,7 +197,7 @@ If a query references schema fields that don't exist yet (aspirational code), ad
 pnpm exec nx run db:print-schema
 
 # 3. Run codegen to generate TS types from the updated schema
-$env:VITE_GRAPHQL_HOST = "lambdas/db/schema.graphql"
+# GRAPHQL_SCHEMA defaults to lambdas/db/schema.graphql — no need to set it after print-schema
 pnpm exec nx affected -t codegen
 
 # 4. Verify types are correct
