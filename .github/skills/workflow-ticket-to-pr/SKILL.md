@@ -138,6 +138,18 @@ Run the full validation suite before opening the PR. Fix any failures and amend/
 make pc
 ```
 
+> ⚠️ **Formatting trap**: `make pc` runs `nx format:write` which **silently rewrites files in place**.
+> CI runs `nx format:check` and **fails** if any committed file differs from what Prettier expects.
+> After `make pc`, always check for unstaged changes and commit them:
+>
+> ```powershell
+> git status          # look for modified files after make pc
+> git diff --stat     # see what was reformatted
+> git add -A
+> git commit -m "style: fix code formatting"
+> git push origin HEAD
+> ```
+
 ### Step 7b: User Testing (Optional)
 
 If you want live UI verification before opening the PR, see the [user-testing skill](../user-testing/SKILL.md).
@@ -255,6 +267,25 @@ Always update Jira status at:
 
 Always run `make pc` before creating a PR. It catches type errors, lint issues, test failures, and build breaks before reviewers see them.
 
+### ❌ MISTAKE 3b: Not Committing Formatting Changes After `make pc`
+
+`make pc` runs `nx format:write` which rewrites files silently — it does **not** fail if files were changed.
+CI runs `nx format:check` which **does** fail on the same files. This is the most common cause of a CI
+formatting failure on a PR that passed `make pc` locally.
+
+```powershell
+# WRONG - run make pc but ignore the reformatted files
+make pc
+git push origin HEAD  # ❌ reformatted files never committed — CI will fail!
+
+# CORRECT - always check for and commit formatting changes after make pc
+make pc
+git status             # ✅ check for modified files
+git add -A
+git commit -m "style: fix code formatting"  # skip only if git status was clean
+git push origin HEAD
+```
+
 ### ❌ MISTAKE 4: No PR Created
 
 All work must go through PR review, even for documentation.
@@ -317,6 +348,12 @@ git push origin HEAD
 
 # 5. Pre-PR validation
 make pc
+
+# 5b. Commit any formatting changes make pc auto-fixed (REQUIRED)
+git add -A
+git diff --cached --stat   # confirm only formatting changes
+git commit -m "style: fix code formatting"  # skip if nothing changed
+git push origin HEAD
 
 # 6. Create PR (see create-pr skill for full template)
 gh pr create --title "$key type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
