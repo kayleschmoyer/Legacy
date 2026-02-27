@@ -282,6 +282,7 @@
     "@wdio/mocha-framework": "^9.20.0",
     "@wdio/spec-reporter": "^9.19.2",
     "ajv": "^8.0.0",
+    "axe-playwright": "^2.2.2",
     "babel-jest": "^29.7.0",
     "babel-preset-expo": "~54.0.10",
     "baseline-browser-mapping": "^2.9.17",

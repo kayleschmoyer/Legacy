@@ -33,6 +33,11 @@ const meta: Meta<typeof Dropdown> = {
       control: 'text',
       description: 'Placeholder text when no item is selected',
     },
+    'aria-label': {
+      control: 'text',
+      description:
+        'Accessible label for the dropdown (required for a11y when no visible label)',
+    },
   },
 };
 
@@ -68,6 +73,7 @@ export const Default: Story = {
     onChange: fn(),
     items: sampleItems,
     placeholder: 'Select an option...',
+    'aria-label': 'Select an option',
   },
 };
 
@@ -77,6 +83,7 @@ export const WithSelection: Story = {
     onChange: fn(),
     items: sampleItems,
     placeholder: 'Select an option...',
+    'aria-label': 'Select an option',
   },
 };
 
@@ -86,6 +93,7 @@ export const SportsDropdown: Story = {
     onChange: fn(),
     items: sportsItems,
     placeholder: 'Choose a sport...',
+    'aria-label': 'Choose a sport',
   },
 };
 
@@ -95,6 +103,7 @@ export const TeamsDropdown: Story = {
     onChange: fn(),
     items: teamItems,
     placeholder: 'Select a team...',
+    'aria-label': 'Select a team',
   },
 };
 
@@ -103,6 +112,7 @@ export const NoPlaceholder: Story = {
     value: 'option1',
     onChange: fn(),
     items: sampleItems,
+    'aria-label': 'Select an option',
   },
 };
 
@@ -112,6 +122,7 @@ export const SingleItem: Story = {
     onChange: fn(),
     items: [{ text: 'Only Option', value: 'only' }],
     placeholder: 'Single choice...',
+    'aria-label': 'Single choice',
   },
 };
 
@@ -132,6 +143,7 @@ export const LongOptions: Story = {
       { text: 'Medium length option', value: 'medium' },
     ],
     placeholder: 'Choose an option with long text...',
+    'aria-label': 'Choose an option',
   },
 };
 
@@ -144,6 +156,7 @@ export const ManyOptions: Story = {
       value: `option${i + 1}`,
     })),
     placeholder: 'Select from many options...',
+    'aria-label': 'Select from many options',
   },
 };
 
@@ -154,6 +167,7 @@ export const WithInteraction: Story = {
     onChange: fn(),
     items: sampleItems,
     placeholder: 'Select an option...',
+    'aria-label': 'Select an option',
   },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);

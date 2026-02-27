@@ -335,6 +335,7 @@ function FilterDrawer({
               onPress={onClose}
               backgroundColor="transparent"
               unstyled
+              aria-label="Close filters"
             >
               <Text fontSize={18} color="$gray400">
                 ✕

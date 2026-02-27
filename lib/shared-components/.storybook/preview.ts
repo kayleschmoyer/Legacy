@@ -32,6 +32,22 @@ const preview: Preview = {
           'Component documentation for Legacy Sports shared components',
       },
     },
+    a11y: {
+      // Global axe-core configuration applied to all stories.
+      // Per-story overrides: use parameters.a11y.config in individual stories.
+      // Set parameters.a11y.disabled = true on a story to skip the check entirely.
+      config: {
+        rules: [
+          {
+            // Disable color-contrast globally. Tamagui resolves colors via CSS
+            // custom properties (e.g. var(--token-color-text)) which axe-core
+            // cannot evaluate at test time, producing unreliable false positives.
+            id: 'color-contrast',
+            enabled: false,
+          },
+        ],
+      },
+    },
     viewport: {
       viewports: {
         mobile: {

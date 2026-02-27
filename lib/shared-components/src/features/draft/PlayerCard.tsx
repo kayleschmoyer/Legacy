@@ -282,6 +282,11 @@ function PlayerCard({
                 color={player.isWatched ? '$yellow11' : '$gray10'}
                 onPress={onWatch}
                 flex={1}
+                aria-label={
+                  player.isWatched
+                    ? 'Remove from watch list'
+                    : 'Add to watch list'
+                }
               >
                 {player.isWatched ? '★' : '☆'}
               </Button>

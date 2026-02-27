@@ -11,17 +11,26 @@ export interface DropdownProperties {
   onChange: (value: string) => void;
   items: readonly Readonly<DropdownItem>[];
   placeholder?: string;
+  /** Accessible label for the select element (required for a11y when no visible label is present) */
+  'aria-label'?: string;
 }
 
 // React Native implementation
 const RNDropdown = (props: DropdownProperties) => {
-  const { value, onChange, items, placeholder } = props;
+  const {
+    value,
+    onChange,
+    items,
+    placeholder,
+    'aria-label': ariaLabel,
+  } = props;
 
   return (
     <div style={{ padding: '10px' }}>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        aria-label={ariaLabel}
         style={{
           width: '100%',
           padding: '8px',
@@ -42,12 +51,19 @@ const RNDropdown = (props: DropdownProperties) => {
 
 // Web implementation
 const WebDropdown = (props: DropdownProperties) => {
-  const { value, onChange, items, placeholder } = props;
+  const {
+    value,
+    onChange,
+    items,
+    placeholder,
+    'aria-label': ariaLabel,
+  } = props;
 
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      aria-label={ariaLabel}
       style={{
         padding: '8px 12px',
         borderRadius: '4px',

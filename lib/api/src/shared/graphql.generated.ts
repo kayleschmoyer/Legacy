@@ -448,6 +448,11 @@ export type HeadToHeadRecord = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+export type ImpersonateUserResult = {
+  __typename?: 'ImpersonateUserResult';
+  token?: Maybe<Scalars['String']['output']>;
+};
+
 export type InviteCodeInfo = {
   __typename?: 'InviteCodeInfo';
   availableSpots?: Maybe<Scalars['Int']['output']>;
@@ -725,11 +730,13 @@ export type Mutation = {
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   createTiebreakerRules?: Maybe<TiebreakerRule>;
-  /** Remove an achievement restriction from a league. Commissioner / owner access required. */
+  /** Remove an achievement restriction from a league. Commissioner / General Manager access required. */
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
+  /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
+  impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
@@ -767,7 +774,9 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
-  /** Create or update a single achievement restriction for a league. Commissioner / owner access required. */
+  /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
+  updateUserRole?: Maybe<User>;
+  /** Create or update a single achievement restriction for a league. Commissioner / General Manager access required. */
   upsertAchievementRestriction?: Maybe<AchievementRestriction>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
@@ -849,6 +858,10 @@ export type MutationDeleteLeagueArgs = {
 
 export type MutationDisableDeviceTokenArgs = {
   deviceToken: Scalars['String']['input'];
+};
+
+export type MutationImpersonateUserArgs = {
+  userId: Scalars['Int']['input'];
 };
 
 export type MutationInitializeDraftArgs = {
@@ -995,6 +1008,11 @@ export type MutationUpdateNotificationPreferencesArgs = {
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
+};
+
+export type MutationUpdateUserRoleArgs = {
+  accessLevel: Scalars['String']['input'];
+  userId: Scalars['Int']['input'];
 };
 
 export type MutationUpsertAchievementRestrictionArgs = {
