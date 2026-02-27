@@ -744,6 +744,7 @@ export type Mutation = {
   /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
   impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
+  inviteAssistantManager?: Maybe<LeagueMember>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
   makeDraftPick?: Maybe<DraftPick>;
@@ -758,6 +759,7 @@ export type Mutation = {
   registerDeviceToken?: Maybe<DeviceToken>;
   /** Reject a pending trade offer as the receiving team manager. */
   rejectTrade?: Maybe<TradeOffer>;
+  removeAssistantManager?: Maybe<Scalars['Boolean']['output']>;
   renameTeam?: Maybe<Team>;
   /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
   requestDataDeletion?: Maybe<DataRequest>;
@@ -877,6 +879,11 @@ export type MutationInitializeDraftArgs = {
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type MutationInviteAssistantManagerArgs = {
+  teamId: Scalars['Int']['input'];
+  username: Scalars['String']['input'];
+};
+
 export type MutationJoinLeagueArgs = {
   inviteCode: Scalars['String']['input'];
   teamName: Scalars['String']['input'];
@@ -923,6 +930,11 @@ export type MutationRegisterDeviceTokenArgs = {
 
 export type MutationRejectTradeArgs = {
   tradeId: Scalars['Int']['input'];
+};
+
+export type MutationRemoveAssistantManagerArgs = {
+  teamId: Scalars['Int']['input'];
+  userId: Scalars['Int']['input'];
 };
 
 export type MutationRenameTeamArgs = {
@@ -1221,6 +1233,7 @@ export type Query = {
   seasonBattingStats?: Maybe<Array<SeasonBatting>>;
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
+  teamLeagueMembers?: Maybe<Array<LeagueMember>>;
   teamMembers?: Maybe<Array<TeamMember>>;
   teamTradeOffers?: Maybe<Array<TradeOffer>>;
   teamWaiverClaims?: Maybe<Array<WaiverClaim>>;
@@ -1515,6 +1528,10 @@ export type QuerySeasonPitchingStatsArgs = {
   playerId?: InputMaybe<Scalars['Int']['input']>;
   season?: InputMaybe<Scalars['Int']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryTeamLeagueMembersArgs = {
+  teamId: Scalars['Int']['input'];
 };
 
 export type QueryTeamMembersArgs = {
@@ -4202,6 +4219,47 @@ export type CancelWaiverClaimMutation = {
     errorMessage?: string | null;
     processedAt?: string | null;
   } | null;
+};
+
+export type GetTeamLeagueMembersQueryVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+}>;
+
+export type GetTeamLeagueMembersQuery = {
+  __typename?: 'Query';
+  teamLeagueMembers?: Array<{
+    __typename?: 'LeagueMember';
+    leagueId?: number | null;
+    userId?: number | null;
+    teamId?: number | null;
+    permissionLevel?: string | null;
+  }> | null;
+};
+
+export type InviteAssistantManagerMutationVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+  username: Scalars['String']['input'];
+}>;
+
+export type InviteAssistantManagerMutation = {
+  __typename?: 'Mutation';
+  inviteAssistantManager?: {
+    __typename?: 'LeagueMember';
+    leagueId?: number | null;
+    userId?: number | null;
+    teamId?: number | null;
+    permissionLevel?: string | null;
+  } | null;
+};
+
+export type RemoveAssistantManagerMutationVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+  userId: Scalars['Int']['input'];
+}>;
+
+export type RemoveAssistantManagerMutation = {
+  __typename?: 'Mutation';
+  removeAssistantManager?: boolean | null;
 };
 
 export type TradeOfferPlayerFragment = {
@@ -9180,6 +9238,198 @@ export type CancelWaiverClaimMutationResult =
 export type CancelWaiverClaimMutationOptions = BaseMutationOptions<
   CancelWaiverClaimMutation,
   CancelWaiverClaimMutationVariables
+>;
+export const GetTeamLeagueMembers = gql`
+  query GetTeamLeagueMembers($teamId: Int!) {
+    teamLeagueMembers(teamId: $teamId) {
+      ...LeagueMember
+    }
+  }
+  ${LeagueMemberFragmentDoc}
+`;
+
+/**
+ * __useGetTeamLeagueMembersQuery__
+ *
+ * To run a query within a React component, call `useGetTeamLeagueMembersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTeamLeagueMembersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTeamLeagueMembersQuery({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *   },
+ * });
+ */
+export function useGetTeamLeagueMembersQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTeamLeagueMembersQuery,
+    GetTeamLeagueMembersQueryVariables
+  > &
+    (
+      | { variables: GetTeamLeagueMembersQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetTeamLeagueMembersQuery,
+    GetTeamLeagueMembersQueryVariables
+  >(GetTeamLeagueMembers, options);
+}
+export function useGetTeamLeagueMembersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTeamLeagueMembersQuery,
+    GetTeamLeagueMembersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetTeamLeagueMembersQuery,
+    GetTeamLeagueMembersQueryVariables
+  >(GetTeamLeagueMembers, options);
+}
+export function useGetTeamLeagueMembersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamLeagueMembersQuery,
+        GetTeamLeagueMembersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTeamLeagueMembersQuery,
+    GetTeamLeagueMembersQueryVariables
+  >(
+    GetTeamLeagueMembers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTeamLeagueMembersQuery,
+          GetTeamLeagueMembersQueryVariables
+        >,
+  );
+}
+export type GetTeamLeagueMembersQueryHookResult = ReturnType<
+  typeof useGetTeamLeagueMembersQuery
+>;
+export type GetTeamLeagueMembersLazyQueryHookResult = ReturnType<
+  typeof useGetTeamLeagueMembersLazyQuery
+>;
+export type GetTeamLeagueMembersSuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamLeagueMembersSuspenseQuery
+>;
+export type GetTeamLeagueMembersQueryResult = Apollo.QueryResult<
+  GetTeamLeagueMembersQuery,
+  GetTeamLeagueMembersQueryVariables
+>;
+export const InviteAssistantManager = gql`
+  mutation InviteAssistantManager($teamId: Int!, $username: String!) {
+    inviteAssistantManager(teamId: $teamId, username: $username) {
+      ...LeagueMember
+    }
+  }
+  ${LeagueMemberFragmentDoc}
+`;
+export type InviteAssistantManagerMutationFn = MutationFunction<
+  InviteAssistantManagerMutation,
+  InviteAssistantManagerMutationVariables
+>;
+
+/**
+ * __useInviteAssistantManagerMutation__
+ *
+ * To run a mutation, you first call `useInviteAssistantManagerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useInviteAssistantManagerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [inviteAssistantManagerMutation, { data, loading, error }] = useInviteAssistantManagerMutation({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *      username: // value for 'username'
+ *   },
+ * });
+ */
+export function useInviteAssistantManagerMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    InviteAssistantManagerMutation,
+    InviteAssistantManagerMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    InviteAssistantManagerMutation,
+    InviteAssistantManagerMutationVariables
+  >(InviteAssistantManager, options);
+}
+export type InviteAssistantManagerMutationHookResult = ReturnType<
+  typeof useInviteAssistantManagerMutation
+>;
+export type InviteAssistantManagerMutationResult =
+  Apollo.MutationResult<InviteAssistantManagerMutation>;
+export type InviteAssistantManagerMutationOptions = BaseMutationOptions<
+  InviteAssistantManagerMutation,
+  InviteAssistantManagerMutationVariables
+>;
+export const RemoveAssistantManager = gql`
+  mutation RemoveAssistantManager($teamId: Int!, $userId: Int!) {
+    removeAssistantManager(teamId: $teamId, userId: $userId)
+  }
+`;
+export type RemoveAssistantManagerMutationFn = MutationFunction<
+  RemoveAssistantManagerMutation,
+  RemoveAssistantManagerMutationVariables
+>;
+
+/**
+ * __useRemoveAssistantManagerMutation__
+ *
+ * To run a mutation, you first call `useRemoveAssistantManagerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRemoveAssistantManagerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [removeAssistantManagerMutation, { data, loading, error }] = useRemoveAssistantManagerMutation({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *      userId: // value for 'userId'
+ *   },
+ * });
+ */
+export function useRemoveAssistantManagerMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RemoveAssistantManagerMutation,
+    RemoveAssistantManagerMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RemoveAssistantManagerMutation,
+    RemoveAssistantManagerMutationVariables
+  >(RemoveAssistantManager, options);
+}
+export type RemoveAssistantManagerMutationHookResult = ReturnType<
+  typeof useRemoveAssistantManagerMutation
+>;
+export type RemoveAssistantManagerMutationResult =
+  Apollo.MutationResult<RemoveAssistantManagerMutation>;
+export type RemoveAssistantManagerMutationOptions = BaseMutationOptions<
+  RemoveAssistantManagerMutation,
+  RemoveAssistantManagerMutationVariables
 >;
 export const GetTeamTradeOffers = gql`
   query GetTeamTradeOffers($teamId: Int!, $status: String) {

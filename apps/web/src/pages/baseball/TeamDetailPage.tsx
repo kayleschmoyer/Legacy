@@ -1,12 +1,14 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Spinner, Text, YStack } from 'tamagui';
+import { Button, H3, Separator, Spinner, Text, YStack } from 'tamagui';
 import {
   TeamMemberFragment,
+  useGetLeagueByIdQuery,
   useGetLeagueTeamsQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdQuery,
 } from '../../api/db/graphql.generated';
+import { TeamAssistantManagerSettings } from '../../features/baseball/TeamAssistantManagerSettings';
 
 /**
  * TeamDetailPage - Display team roster and allow editing for General Managers
@@ -40,8 +42,24 @@ export function TeamDetailPage() {
       skip: !leagueId,
     });
 
+  // Get league details including the user's permission level
+  const { data: leagueData, loading: leagueLoading } = useGetLeagueByIdQuery({
+    variables: { id: leagueId || 0 },
+    skip: !leagueId,
+  });
+
+  const userPermissionLevel =
+    leagueData?.league?.userMembership?.permissionLevel;
+
+  // A user is the GM if their teamId matches AND they have owner/general_manager permission
   const isOwner = userTeamData?.userTeamId === teamIdNum;
-  const loading = membersLoading || teamsLoading || userTeamLoading;
+  const isGM =
+    isOwner &&
+    (userPermissionLevel === 'owner' ||
+      userPermissionLevel === 'general_manager');
+
+  const loading =
+    membersLoading || teamsLoading || userTeamLoading || leagueLoading;
 
   if (loading) return <Spinner />;
   if (membersError)
@@ -94,6 +112,20 @@ export function TeamDetailPage() {
             ),
         )}
       </YStack>
+
+      {/* Team Settings — visible only to the team's General Manager */}
+      {isGM && leagueId && (
+        <>
+          <Separator />
+          <YStack gap="$3">
+            <H3>Team Settings</H3>
+            <TeamAssistantManagerSettings
+              teamId={teamIdNum}
+              leagueId={leagueId}
+            />
+          </YStack>
+        </>
+      )}
     </YStack>
   );
 }

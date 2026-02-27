@@ -113,3 +113,21 @@ mutation CancelWaiverClaim($claimId: Int!) {
     processedAt
   }
 }
+
+# ── Assistant Manager Settings ───────────────────────────────────────────────
+
+query GetTeamLeagueMembers($teamId: Int!) {
+  teamLeagueMembers(teamId: $teamId) {
+    ...LeagueMember
+  }
+}
+
+mutation InviteAssistantManager($teamId: Int!, $username: String!) {
+  inviteAssistantManager(teamId: $teamId, username: $username) {
+    ...LeagueMember
+  }
+}
+
+mutation RemoveAssistantManager($teamId: Int!, $userId: Int!) {
+  removeAssistantManager(teamId: $teamId, userId: $userId)
+}

@@ -175,6 +175,19 @@ export function isCommissionerOrOwner(membership: LeagueMembership): boolean {
 }
 
 /**
+ * Returns `true` when the membership is the general manager of a specific team.
+ */
+export function isTeamGeneralManager(
+  membership: LeagueMembership,
+  teamId: number,
+): boolean {
+  return (
+    membership.teamId === teamId &&
+    membership.permissionLevel === 'general_manager'
+  );
+}
+
+/**
  * Loads minimal info (teamId, leagueId, playerId) for a set of team member IDs.
  *
  * @throws Error when one or more IDs cannot be found.

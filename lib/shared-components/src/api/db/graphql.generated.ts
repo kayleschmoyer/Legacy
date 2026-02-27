@@ -750,6 +750,7 @@ export type Mutation = {
   /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
   impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
+  inviteAssistantManager?: Maybe<LeagueMember>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
   makeDraftPick?: Maybe<DraftPick>;
@@ -764,6 +765,7 @@ export type Mutation = {
   registerDeviceToken?: Maybe<DeviceToken>;
   /** Reject a pending trade offer as the receiving team manager. */
   rejectTrade?: Maybe<TradeOffer>;
+  removeAssistantManager?: Maybe<Scalars['Boolean']['output']>;
   renameTeam?: Maybe<Team>;
   /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
   requestDataDeletion?: Maybe<DataRequest>;
@@ -883,6 +885,11 @@ export type MutationInitializeDraftArgs = {
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type MutationInviteAssistantManagerArgs = {
+  teamId: Scalars['Int']['input'];
+  username: Scalars['String']['input'];
+};
+
 export type MutationJoinLeagueArgs = {
   inviteCode: Scalars['String']['input'];
   teamName: Scalars['String']['input'];
@@ -929,6 +936,11 @@ export type MutationRegisterDeviceTokenArgs = {
 
 export type MutationRejectTradeArgs = {
   tradeId: Scalars['Int']['input'];
+};
+
+export type MutationRemoveAssistantManagerArgs = {
+  teamId: Scalars['Int']['input'];
+  userId: Scalars['Int']['input'];
 };
 
 export type MutationRenameTeamArgs = {
@@ -1227,6 +1239,7 @@ export type Query = {
   seasonBattingStats?: Maybe<Array<SeasonBatting>>;
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
+  teamLeagueMembers?: Maybe<Array<LeagueMember>>;
   teamMembers?: Maybe<Array<TeamMember>>;
   teamTradeOffers?: Maybe<Array<TradeOffer>>;
   teamWaiverClaims?: Maybe<Array<WaiverClaim>>;
@@ -1521,6 +1534,10 @@ export type QuerySeasonPitchingStatsArgs = {
   playerId?: InputMaybe<Scalars['Int']['input']>;
   season?: InputMaybe<Scalars['Int']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryTeamLeagueMembersArgs = {
+  teamId: Scalars['Int']['input'];
 };
 
 export type QueryTeamMembersArgs = {

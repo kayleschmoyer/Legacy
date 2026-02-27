@@ -2,12 +2,18 @@
  * League domain — Query resolvers
  *
  * Queries: league, userLeagues, leaguePositions, leagueTeams,
- *          userTeamId, validateInviteCode
+ *          userTeamId, validateInviteCode, teamLeagueMembers
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq } from 'drizzle-orm';
-import { League, LeaguePosition, Team, TeamMember } from './types';
+import {
+  League,
+  LeagueMember,
+  LeaguePosition,
+  Team,
+  TeamMember,
+} from './types';
 import { builder } from '../builder';
 
 // Query fields
@@ -492,6 +498,79 @@ builder.queryField('validateInviteCode', (t) =>
         availableSpots,
         isFull: availableSpots === 0,
       };
+    },
+  }),
+);
+
+// ── League Members for a Team ─────────────────────────────────────────────
+
+/**
+ * Query: teamLeagueMembers
+ *
+ * Returns all league_members rows for a given team (i.e. the GM, any
+ * assistant managers, etc.).  Callers must be members of the same league.
+ */
+builder.queryField('teamLeagueMembers', (t) =>
+  t.field({
+    type: [LeagueMember],
+    args: {
+      teamId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { teamId } = args;
+      const userId = context.user.id;
+      const db = context.db;
+
+      // Resolve leagueId from team
+      const teamRows = await db
+        .select({ leagueId: PublicSchema.teams.leagueId })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.id, teamId))
+        .limit(1);
+
+      if (teamRows.length === 0) {
+        throw new Error('Team not found');
+      }
+
+      const leagueId = teamRows[0].leagueId;
+
+      // Verify caller is a member of this league
+      const callerCheck = await db
+        .select({ userId: PublicSchema.leagueMembers.userId })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (callerCheck.length === 0) {
+        throw new Error('You are not a member of this league');
+      }
+
+      // Return all league_members linked to this specific team
+      const members = await db
+        .select({
+          leagueId: PublicSchema.leagueMembers.leagueId,
+          userId: PublicSchema.leagueMembers.userId,
+          teamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.teamId, teamId),
+          ),
+        );
+
+      return members;
     },
   }),
 );

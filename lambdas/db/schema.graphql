@@ -833,6 +833,7 @@ type Mutation {
     leagueId: Int!
     selectionMethod: String
   ): Draft
+  inviteAssistantManager(teamId: Int!, username: String!): LeagueMember
   joinLeague(inviteCode: String!, teamName: String!): JoinLeaguePayload
   joinLeagueByCode(inviteCode: String!, teamName: String!): Team
   makeDraftPick(draftId: Int!, playerId: Int!): DraftPick
@@ -863,6 +864,7 @@ type Mutation {
   Reject a pending trade offer as the receiving team manager.
   """
   rejectTrade(tradeId: Int!): TradeOffer
+  removeAssistantManager(teamId: Int!, userId: Int!): Boolean
   renameTeam(leagueId: Int!, newName: String!, teamId: Int!): Team
 
   """
@@ -1257,6 +1259,7 @@ type Query {
     season: Int
     team: String
   ): [SeasonPitching!]
+  teamLeagueMembers(teamId: Int!): [LeagueMember!]
   teamMembers(teamId: Int!): [TeamMember!]
   teamTradeOffers(status: String, teamId: Int!): [TradeOffer!]
   teamWaiverClaims(status: String, teamId: Int!): [WaiverClaim!]

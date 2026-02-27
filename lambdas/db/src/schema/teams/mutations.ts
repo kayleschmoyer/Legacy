@@ -1,15 +1,16 @@
 /**
  * Teams domain — Mutation resolvers
  *
- * Mutations: updateTeamMemberPosition, swapTeamMemberPositions, renameTeam
+ * Mutations: updateTeamMemberPosition, swapTeamMemberPositions, renameTeam,
+ *            inviteAssistantManager, removeAssistantManager
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray } from 'drizzle-orm';
-import { authorized } from '../authorization';
+import { authorized, isTeamGeneralManager } from '../authorization';
 import { builder } from '../builder';
-import { Team, TeamMember } from '../leagues/types';
+import { LeagueMember, Team, TeamMember } from '../leagues/types';
 
 // ── Mutation resolvers ─────────────────────────────────────────────────────
 
@@ -287,6 +288,338 @@ builder.mutationField('renameTeam', (t) =>
       }
 
       return updated[0];
+    },
+  }),
+);
+
+// ── Invite / Remove Assistant Manager ─────────────────────────────────────
+
+/**
+ * Mutation: inviteAssistantManager
+ *
+ * Allows the General Manager (owner) of a team to invite another user as an
+ * assistant manager for that team.  The invited user must already have an
+ * account in the system and must not already be a member of the same league.
+ *
+ * Authorization: caller must be the owner/general_manager of the team, OR a
+ * league commissioner.
+ */
+builder.mutationField('inviteAssistantManager', (t) =>
+  t.field({
+    type: LeagueMember,
+    args: {
+      teamId: t.arg.int({ required: true }),
+      username: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { teamId, username } = args;
+      const userId = context.user.id;
+      const db = context.db;
+
+      // 1. Resolve teamId → leagueId
+      const teamRows = await db
+        .select({
+          id: PublicSchema.teams.id,
+          leagueId: PublicSchema.teams.leagueId,
+        })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.id, teamId))
+        .limit(1);
+
+      if (teamRows.length === 0) {
+        throw new Error('Team not found');
+      }
+
+      const leagueId = teamRows[0].leagueId;
+
+      // 2. Verify caller has permission: must be the team's GM or a commissioner
+      const callerMembership = await db
+        .select({
+          teamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (callerMembership.length === 0) {
+        throw new Error('You are not a member of this league');
+      }
+
+      const callerRole = callerMembership[0];
+      const isCommissioner = callerRole.permissionLevel === 'commissioner';
+      const isGM = isTeamGeneralManager(
+        {
+          leagueId,
+          userId,
+          teamId: callerRole.teamId,
+          permissionLevel: callerRole.permissionLevel,
+        },
+        teamId,
+      );
+
+      if (!isGM && !isCommissioner) {
+        throw new Error(
+          'Only the team General Manager or a league commissioner can invite assistant managers',
+        );
+      }
+
+      // 3. Look up the invitee by username
+      const inviteeRows = await db
+        .select({
+          id: PublicSchema.users.id,
+          username: PublicSchema.users.username,
+        })
+        .from(PublicSchema.users)
+        .where(eq(PublicSchema.users.username, username.trim()))
+        .limit(1);
+
+      if (inviteeRows.length === 0) {
+        throw new Error(`No user found with username "${username}"`);
+      }
+
+      const inviteeId = Number(inviteeRows[0].id);
+
+      if (inviteeId === userId) {
+        throw new Error('You cannot invite yourself as an assistant manager');
+      }
+
+      // 4. Check the invitee is not already a member of this league
+      const existingMembership = await db
+        .select({
+          leagueId: PublicSchema.leagueMembers.leagueId,
+          teamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, inviteeId),
+          ),
+        )
+        .limit(1);
+
+      if (existingMembership.length > 0) {
+        const existing = existingMembership[0];
+        if (
+          existing.teamId === teamId &&
+          existing.permissionLevel === 'assistant_manager'
+        ) {
+          throw new Error(
+            `${username} is already an assistant manager for this team`,
+          );
+        }
+        throw new Error(`${username} is already a member of this league`);
+      }
+
+      // 5. Insert the new league_members row with assistant_manager permission
+      const inserted = await db
+        .insert(PublicSchema.leagueMembers)
+        .values({
+          leagueId,
+          userId: inviteeId,
+          teamId,
+          permissionLevel: 'assistant_manager',
+        })
+        .returning({
+          leagueId: PublicSchema.leagueMembers.leagueId,
+          userId: PublicSchema.leagueMembers.userId,
+          teamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        });
+
+      LOGGER.info('Invited assistant manager', {
+        invitedBy: userId,
+        inviteeId,
+        teamId,
+        leagueId,
+      });
+
+      // 6. Send a league chat notification
+      const senderUsername = context.user.username ?? `user_${userId}`;
+      const notificationService = createNotificationService();
+      if (notificationService) {
+        const chatText = `${senderUsername} added ${username} as an assistant manager`;
+        try {
+          const msgRows = await db
+            .insert(PublicSchema.leagueMessages)
+            .values({ leagueId, userId, messageText: chatText })
+            .returning();
+          const msg = msgRows[0];
+          await notificationService.notifyLeagueChatMessage(leagueId, {
+            leagueId,
+            messageId: msg.id,
+            senderId: userId,
+            senderUsername,
+            messageText: chatText,
+            timestamp: msg.timestamp ?? new Date().toISOString(),
+          });
+        } catch (err: unknown) {
+          LOGGER.warn(
+            'Failed to send invite assistant manager chat notification',
+            { err },
+          );
+        }
+      }
+
+      return inserted[0];
+    },
+  }),
+);
+
+/**
+ * Mutation: removeAssistantManager
+ *
+ * Removes an assistant manager from a team.  Only the team's General Manager
+ * or a league commissioner can remove an assistant manager.
+ */
+builder.mutationField('removeAssistantManager', (t) =>
+  t.field({
+    type: 'Boolean',
+    args: {
+      teamId: t.arg.int({ required: true }),
+      userId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { teamId, userId: targetUserId } = args;
+      const callerId = context.user.id;
+      const db = context.db;
+
+      // Resolve leagueId
+      const teamRows = await db
+        .select({ leagueId: PublicSchema.teams.leagueId })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.id, teamId))
+        .limit(1);
+
+      if (teamRows.length === 0) {
+        throw new Error('Team not found');
+      }
+
+      const leagueId = teamRows[0].leagueId;
+
+      // Verify caller permission
+      const callerMembership = await db
+        .select({
+          teamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, callerId),
+          ),
+        )
+        .limit(1);
+
+      if (callerMembership.length === 0) {
+        throw new Error('You are not a member of this league');
+      }
+
+      const callerRole = callerMembership[0];
+      const isCommissioner = callerRole.permissionLevel === 'commissioner';
+      const isGM = isTeamGeneralManager(
+        {
+          leagueId,
+          userId: callerId,
+          teamId: callerRole.teamId,
+          permissionLevel: callerRole.permissionLevel,
+        },
+        teamId,
+      );
+
+      if (!isGM && !isCommissioner) {
+        throw new Error(
+          'Only the team General Manager or a league commissioner can remove assistant managers',
+        );
+      }
+
+      // Verify that the target is actually an assistant_manager for this team
+      const targetMembership = await db
+        .select({
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+          teamId: PublicSchema.leagueMembers.teamId,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, targetUserId),
+          ),
+        )
+        .limit(1);
+
+      if (targetMembership.length === 0) {
+        throw new Error('User is not a member of this league');
+      }
+
+      if (
+        targetMembership[0].permissionLevel !== 'assistant_manager' ||
+        targetMembership[0].teamId !== teamId
+      ) {
+        throw new Error('User is not an assistant manager for this team');
+      }
+
+      // Remove the league_members row
+      await db
+        .delete(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, targetUserId),
+          ),
+        );
+
+      LOGGER.info('Removed assistant manager', {
+        removedBy: callerId,
+        targetUserId,
+        teamId,
+        leagueId,
+      });
+
+      // Send a league chat notification
+      const senderUsername = context.user.username ?? `user_${callerId}`;
+      const notificationService = createNotificationService();
+      if (notificationService) {
+        const chatText = `${senderUsername} removed an assistant manager from the team`;
+        try {
+          const msgRows = await db
+            .insert(PublicSchema.leagueMessages)
+            .values({ leagueId, userId: callerId, messageText: chatText })
+            .returning();
+          const msg = msgRows[0];
+          await notificationService.notifyLeagueChatMessage(leagueId, {
+            leagueId,
+            messageId: msg.id,
+            senderId: callerId,
+            senderUsername,
+            messageText: chatText,
+            timestamp: msg.timestamp ?? new Date().toISOString(),
+          });
+        } catch (err: unknown) {
+          LOGGER.warn(
+            'Failed to send remove assistant manager chat notification',
+            { err },
+          );
+        }
+      }
+
+      return true;
     },
   }),
 );
