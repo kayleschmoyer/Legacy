@@ -5,7 +5,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { BaseballLandingPage } from '../BaseballLandingPage';
+import { BaseballLandingPage } from './BaseballLandingPage';
 
 // Mock shared-components to lightweight HTML equivalents
 jest.mock('@legacy-sports/shared-components', () => ({
@@ -78,14 +78,14 @@ jest.mock('tamagui', () => {
 });
 
 // Mock LeagueCard to a simple div for predictability
-jest.mock('../LeagueCard', () => ({
+jest.mock('./LeagueCard', () => ({
   LeagueCard: ({ league }: any) => (
     <div data-testid="league-card">{league.name}</div>
   ),
 }));
 
-// Mock GraphQL generated hooks (path from src/components/baseball/__tests__ to src/api/db)
-jest.mock('../../../api/db/graphql.generated', () => ({
+// Mock GraphQL generated hooks (path from src/components/baseball to src/api/db)
+jest.mock('../../api/db/graphql.generated', () => ({
   useGetUserLeaguesQuery: jest.fn(() => ({
     data: { userLeagues: [] },
     loading: false,
@@ -114,7 +114,7 @@ describe('BaseballLandingPage', () => {
   it('renders leagues list and supports search', () => {
     const {
       useGetUserLeaguesQuery,
-    }: any = require('../../../api/db/graphql.generated');
+    }: any = require('../../api/db/graphql.generated');
     useGetUserLeaguesQuery.mockReturnValue({
       data: {
         userLeagues: [

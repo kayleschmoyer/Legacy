@@ -1,13 +1,13 @@
 import React from 'react';
 import type { ApolloClient } from '@apollo/client';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { LeagueScoringEditor } from '../LeagueScoringEditor';
+import { LeagueScoringEditor } from './LeagueScoringEditor';
 import {
   type GetLeagueScoringProfileQuery,
   ScoringStatGroup,
   type UpdateLeagueScoringProfileMutationResult,
   useUpdateLeagueScoringProfileMutation,
-} from '../../../api/db/graphql.generated';
+} from '../../api/db/graphql.generated';
 
 function mockPickDomProps(
   props: Record<string, unknown>,
@@ -50,10 +50,10 @@ function mockPickDomProps(
   return domProps;
 }
 
-jest.mock('../../../api/db/graphql.generated', () => {
+jest.mock('../../api/db/graphql.generated', () => {
   const actual = jest.requireActual<
-    typeof import('../../../api/db/graphql.generated')
-  >('../../../api/db/graphql.generated');
+    typeof import('../../api/db/graphql.generated')
+  >('../../api/db/graphql.generated');
   return {
     ...actual,
     useUpdateLeagueScoringProfileMutation: jest.fn(() => [

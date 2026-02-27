@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render } from '../../../test-utils';
+import { fireEvent, render } from '../../test-utils';
 
 import {
   DraftStatusBar,
@@ -9,7 +9,7 @@ import {
   QuickFilters,
   SearchAndSortBar,
   SearchBar,
-} from '../index';
+} from './index';
 
 // Mock TimerBar component for testing
 interface TimerBarProps {

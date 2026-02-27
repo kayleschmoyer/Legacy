@@ -2,8 +2,8 @@
  * Tests for round-robin scheduling strategy
  */
 
-import { RoundRobinStrategy } from '../strategies/round-robin-strategy';
-import type { TeamInfo } from '../types';
+import { RoundRobinStrategy } from './strategies/round-robin-strategy';
+import type { TeamInfo } from './types';
 
 describe('RoundRobinStrategy', () => {
   const strategy = new RoundRobinStrategy();

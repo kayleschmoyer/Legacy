@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react';
-import { HomeScreen, HomeScreenProps } from '../HomeScreen';
+import { HomeScreen, HomeScreenProps } from './HomeScreen';
 
 describe('HomeScreen', () => {
   const mockOnSportPress = jest.fn();

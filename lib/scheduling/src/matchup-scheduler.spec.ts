@@ -2,15 +2,15 @@
  * Tests for matchup scheduler
  */
 
-import { MatchupScheduler } from '../matchup-scheduler';
-import { RoundRobinStrategy } from '../strategies/round-robin-strategy';
-import { RandomStrategy } from '../strategies/random-strategy';
+import { MatchupScheduler } from './matchup-scheduler';
+import { RoundRobinStrategy } from './strategies/round-robin-strategy';
+import { RandomStrategy } from './strategies/random-strategy';
 import type {
   LeagueConfig,
   ScheduleParams,
   SeasonInfo,
   TeamInfo,
-} from '../types';
+} from './types';
 
 describe('MatchupScheduler', () => {
   const teams: TeamInfo[] = [

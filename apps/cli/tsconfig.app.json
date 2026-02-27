@@ -11,6 +11,8 @@
   "files": [],
   "exclude": [
     "jest.config.ts",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
     "**/*.test.ts",
     "**/*.test.tsx",
     "src/test-setup.ts"

@@ -1,8 +1,5 @@
-import {
-  applyMultiplierGroups,
-  createDefaultScoringSettings,
-} from '../scoring';
-import { ScoringStatGroup } from '../../api/db/graphql.generated';
+import { applyMultiplierGroups, createDefaultScoringSettings } from './scoring';
+import { ScoringStatGroup } from '../api/db/graphql.generated';
 
 describe('applyMultiplierGroups', () => {
   it('returns defaults when groups are empty', () => {

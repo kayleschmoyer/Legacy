@@ -2,7 +2,7 @@ import { render } from '@testing-library/react';
 import { composeStories } from '@storybook/react';
 
 // Import Welcome stories (safe story without React Native dependencies)
-import * as WelcomeStories from '../Welcome.stories';
+import * as WelcomeStories from './Welcome.stories';
 
 // Compose stories for testing
 const { Welcome } = composeStories(WelcomeStories);

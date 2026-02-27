@@ -22,9 +22,6 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(@tamagui|tamagui|react-native-svg|@react-native-google-signin)/)',
   ],
-  testMatch: [
-    '<rootDir>/src/**/__tests__/**/*.(test|spec).(ts|tsx|js)',
-    '<rootDir>/src/**/*.(test|spec).(ts|tsx|js)',
-  ],
+  testMatch: ['<rootDir>/src/**/*.spec.(ts|tsx|js)'],
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],
 };

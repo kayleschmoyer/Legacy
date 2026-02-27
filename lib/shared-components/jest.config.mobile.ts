@@ -22,9 +22,6 @@ export default {
   transformIgnorePatterns: [
     'node_modules/(?!(react-native|@react-native|@react-native-google-signin|expo|@expo|expo-secure-store|@unimodules|unimodules|react-clone-referenced-element|@react-native-community|react-navigation|@react-navigation|@sentry/react-native|native-base|react-native-svg|react-native-screens|react-native-vector-icons)/)',
   ],
-  testMatch: [
-    '<rootDir>/src/**/__tests__/**/*.(test|spec).(ts|tsx|js)',
-    '<rootDir>/src/**/*.(test|spec).(ts|tsx|js)',
-  ],
+  testMatch: ['<rootDir>/src/**/*.spec.(ts|tsx|js)'],
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],
 };

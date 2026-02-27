@@ -8,8 +8,8 @@ import {
   type SeasonSelectionParams,
   selectRandomSeason,
   validateSeasonForMatchup,
-} from '../season-selector';
-import type { PlayerGameCount, SeasonInfo, TeamRoster } from '../types';
+} from './season-selector';
+import type { PlayerGameCount, SeasonInfo, TeamRoster } from './types';
 
 describe('determineEligibleSeasons', () => {
   it('should return eligible seasons when all players meet threshold', () => {

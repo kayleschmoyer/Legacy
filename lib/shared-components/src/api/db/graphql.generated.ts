@@ -742,7 +742,7 @@ export type Mutation = {
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   createTiebreakerRules?: Maybe<TiebreakerRule>;
-  /** Remove an achievement restriction from a league. Commissioner / owner access required. */
+  /** Remove an achievement restriction from a league. Commissioner / General Manager access required. */
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
@@ -788,7 +788,7 @@ export type Mutation = {
   updateTeamMemberPosition?: Maybe<TeamMember>;
   /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
   updateUserRole?: Maybe<User>;
-  /** Create or update a single achievement restriction for a league. Commissioner / owner access required. */
+  /** Create or update a single achievement restriction for a league. Commissioner / General Manager access required. */
   upsertAchievementRestriction?: Maybe<AchievementRestriction>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;

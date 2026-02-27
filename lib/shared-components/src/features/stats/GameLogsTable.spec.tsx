@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { GameLogsTable } from '../GameLogsTable';
+import { GameLogsTable } from './GameLogsTable';
 
 // Mock fetch globally
 global.fetch = jest.fn();

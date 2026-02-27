@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { EliteDraftBoardScreen } from '../../components/EliteDraftBoard';
+import { EliteDraftBoardScreen } from './EliteDraftBoard';
 
 // Minimal smoke + a11y semantics tests for the draft board
 
@@ -19,7 +19,9 @@ describe('EliteDraftBoardScreen a11y', () => {
 
   test('exposes timer role and shows pick status', () => {
     render(<EliteDraftBoardScreen />);
-    const timer = screen.getByRole('timer', { name: /pick timer|waiting timer/i });
+    const timer = screen.getByRole('timer', {
+      name: /pick timer|waiting timer/i,
+    });
     expect(timer).toBeInTheDocument();
   });
 
@@ -27,7 +29,9 @@ describe('EliteDraftBoardScreen a11y', () => {
     const user = userEvent.setup();
     render(<EliteDraftBoardScreen />);
 
-    const group = screen.getByRole('radiogroup', { name: /filter by position/i });
+    const group = screen.getByRole('radiogroup', {
+      name: /filter by position/i,
+    });
     expect(group).toBeInTheDocument();
 
     const allBtn = screen.getByRole('radio', { name: 'ALL' });
@@ -71,7 +75,9 @@ describe('EliteDraftBoardScreen a11y', () => {
     render(<EliteDraftBoardScreen />);
 
     // Find first player card and its watch button (☆)
-    const watchButtons = screen.getAllByRole('button', { name: /add .* to watchlist|remove .* from watchlist/i });
+    const watchButtons = screen.getAllByRole('button', {
+      name: /add .* to watchlist|remove .* from watchlist/i,
+    });
     expect(watchButtons.length).toBeGreaterThan(0);
 
     const btn = watchButtons[0];

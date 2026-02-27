@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { CareerStatsViewer } from '../CareerStatsViewer';
+import { CareerStatsViewer } from './CareerStatsViewer';
 
 // Mock fetch globally
 global.fetch = jest.fn();

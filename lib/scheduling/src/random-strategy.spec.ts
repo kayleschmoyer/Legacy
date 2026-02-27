@@ -2,8 +2,8 @@
  * Tests for random scheduling strategy
  */
 
-import { RandomStrategy } from '../strategies/random-strategy';
-import type { TeamInfo } from '../types';
+import { RandomStrategy } from './strategies/random-strategy';
+import type { TeamInfo } from './types';
 
 describe('RandomStrategy', () => {
   const strategy = new RandomStrategy();

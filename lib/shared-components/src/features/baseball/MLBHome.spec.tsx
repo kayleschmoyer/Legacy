@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { Text, View } from '../../../platform-components';
-import { MLBHome } from '../MLBHome';
+import { MLBHome } from './MLBHome';
+import { Text, View } from '../../platform-components';
 
 describe('MLBHome', () => {
   it('renders correctly with default props', () => {

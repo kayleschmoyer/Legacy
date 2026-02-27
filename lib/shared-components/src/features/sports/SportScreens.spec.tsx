@@ -1,13 +1,13 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { Text, View } from '../../../platform-components';
 import {
   BaseballScreen,
   BasketballScreen,
   FootballScreen,
   HockeyScreen,
   SportScreen,
-} from '../SportScreens';
+} from './SportScreens';
+import { Text, View } from '../../platform-components';
 
 describe('SportScreens', () => {
   describe('SportScreen', () => {
