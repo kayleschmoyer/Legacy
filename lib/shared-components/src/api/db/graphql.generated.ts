@@ -567,6 +567,8 @@ export type Matchup = {
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Auto-generated narrative recap, only available for completed matchups. */
+  recap?: Maybe<MatchupRecap>;
   /** Number of unique games selected for this matchup */
   selectedGamesCount?: Maybe<Scalars['Int']['output']>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
@@ -721,6 +723,21 @@ export type MatchupPlayerGame = {
   pitchingGame?: Maybe<GamePitching>;
   spSkipped?: Maybe<Scalars['Boolean']['output']>;
   statsLoadingStatus?: Maybe<Scalars['String']['output']>;
+};
+
+/** Auto-generated narrative recap for a completed matchup */
+export type MatchupRecap = {
+  __typename?: 'MatchupRecap';
+  /** Short headline summarising the matchup result */
+  headline?: Maybe<Scalars['String']['output']>;
+  /** Bullet-point highlights for standout player performances */
+  highlights?: Maybe<Array<Scalars['String']['output']>>;
+  /** Classification: blowout | close | normal */
+  matchupType?: Maybe<Scalars['String']['output']>;
+  /** Two-to-three sentence narrative paragraph */
+  narrative?: Maybe<Scalars['String']['output']>;
+  /** ID of the winning team, or null on a tie */
+  winnerId?: Maybe<Scalars['Int']['output']>;
 };
 
 export enum MatchupStatus {

@@ -561,6 +561,8 @@ export type Matchup = {
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Auto-generated narrative recap, only available for completed matchups. */
+  recap?: Maybe<MatchupRecap>;
   /** Number of unique games selected for this matchup */
   selectedGamesCount?: Maybe<Scalars['Int']['output']>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
@@ -715,6 +717,21 @@ export type MatchupPlayerGame = {
   pitchingGame?: Maybe<GamePitching>;
   spSkipped?: Maybe<Scalars['Boolean']['output']>;
   statsLoadingStatus?: Maybe<Scalars['String']['output']>;
+};
+
+/** Auto-generated narrative recap for a completed matchup */
+export type MatchupRecap = {
+  __typename?: 'MatchupRecap';
+  /** Short headline summarising the matchup result */
+  headline?: Maybe<Scalars['String']['output']>;
+  /** Bullet-point highlights for standout player performances */
+  highlights?: Maybe<Array<Scalars['String']['output']>>;
+  /** Classification: blowout | close | normal */
+  matchupType?: Maybe<Scalars['String']['output']>;
+  /** Two-to-three sentence narrative paragraph */
+  narrative?: Maybe<Scalars['String']['output']>;
+  /** ID of the winning team, or null on a tie */
+  winnerId?: Maybe<Scalars['Int']['output']>;
 };
 
 export enum MatchupStatus {
@@ -3678,6 +3695,41 @@ export type SwapMatchupPlayerPositionsMutation = {
   }> | null;
 };
 
+export type MatchupRecapFragmentFragment = {
+  __typename?: 'MatchupRecap';
+  headline?: string | null;
+  narrative?: string | null;
+  highlights?: Array<string> | null;
+  matchupType?: string | null;
+  winnerId?: number | null;
+};
+
+export type GetMatchupRecapQueryVariables = Exact<{
+  id: Scalars['Int']['input'];
+}>;
+
+export type GetMatchupRecapQuery = {
+  __typename?: 'Query';
+  getMatchupById?: {
+    __typename?: 'Matchup';
+    id?: string | null;
+    weekNumber?: number | null;
+    status?: MatchupStatus | null;
+    team1Id?: number | null;
+    team2Id?: number | null;
+    team1Score?: number | null;
+    team2Score?: number | null;
+    recap?: {
+      __typename?: 'MatchupRecap';
+      headline?: string | null;
+      narrative?: string | null;
+      highlights?: Array<string> | null;
+      matchupType?: string | null;
+      winnerId?: number | null;
+    } | null;
+  } | null;
+};
+
 export type NotificationPreferenceFragment = {
   __typename?: 'NotificationPreference';
   id?: number | null;
@@ -5163,6 +5215,15 @@ export const MatchupPlayerFragmentDoc = gql`
         fieldingPercentage
       }
     }
+  }
+`;
+export const MatchupRecapFragmentFragmentDoc = gql`
+  fragment MatchupRecapFragment on MatchupRecap {
+    headline
+    narrative
+    highlights
+    matchupType
+    winnerId
   }
 `;
 export const NotificationPreferenceFragmentDoc = gql`
@@ -7918,6 +7979,106 @@ export type SwapMatchupPlayerPositionsMutationResult =
 export type SwapMatchupPlayerPositionsMutationOptions = BaseMutationOptions<
   SwapMatchupPlayerPositionsMutation,
   SwapMatchupPlayerPositionsMutationVariables
+>;
+export const GetMatchupRecap = gql`
+  query GetMatchupRecap($id: Int!) {
+    getMatchupById(id: $id) {
+      id
+      weekNumber
+      status
+      team1Id
+      team2Id
+      team1Score
+      team2Score
+      recap {
+        ...MatchupRecapFragment
+      }
+    }
+  }
+  ${MatchupRecapFragmentFragmentDoc}
+`;
+
+/**
+ * __useGetMatchupRecapQuery__
+ *
+ * To run a query within a React component, call `useGetMatchupRecapQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMatchupRecapQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMatchupRecapQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetMatchupRecapQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetMatchupRecapQuery,
+    GetMatchupRecapQueryVariables
+  > &
+    (
+      | { variables: GetMatchupRecapQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetMatchupRecapQuery, GetMatchupRecapQueryVariables>(
+    GetMatchupRecap,
+    options,
+  );
+}
+export function useGetMatchupRecapLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMatchupRecapQuery,
+    GetMatchupRecapQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMatchupRecapQuery,
+    GetMatchupRecapQueryVariables
+  >(GetMatchupRecap, options);
+}
+export function useGetMatchupRecapSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupRecapQuery,
+        GetMatchupRecapQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMatchupRecapQuery,
+    GetMatchupRecapQueryVariables
+  >(
+    GetMatchupRecap,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMatchupRecapQuery,
+          GetMatchupRecapQueryVariables
+        >,
+  );
+}
+export type GetMatchupRecapQueryHookResult = ReturnType<
+  typeof useGetMatchupRecapQuery
+>;
+export type GetMatchupRecapLazyQueryHookResult = ReturnType<
+  typeof useGetMatchupRecapLazyQuery
+>;
+export type GetMatchupRecapSuspenseQueryHookResult = ReturnType<
+  typeof useGetMatchupRecapSuspenseQuery
+>;
+export type GetMatchupRecapQueryResult = Apollo.QueryResult<
+  GetMatchupRecapQuery,
+  GetMatchupRecapQueryVariables
 >;
 export const GetUserNotificationPreferences = gql`
   query GetUserNotificationPreferences {

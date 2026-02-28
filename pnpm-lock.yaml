@@ -774,6 +774,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
+      '@legacy-sports/narrative':
+        specifier: workspace:*
+        version: link:../../lib/narrative
       '@legacy-sports/sentry':
         specifier: workspace:*
         version: link:../../lib/sentry
@@ -1094,6 +1097,8 @@ importers:
         version: 2.8.1
 
   lib/logging: {}
+
+  lib/narrative: {}
 
   lib/scoring: {}
 

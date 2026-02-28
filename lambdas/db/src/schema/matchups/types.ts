@@ -2,6 +2,13 @@
  * Matchups domain — GraphQL type definitions
  */
 
+import { PublicSchema } from '@legacy-sports/db-client';
+import {
+  generateMatchupRecap,
+  type MatchupContext,
+  type PlayerPerformance,
+} from '@legacy-sports/narrative';
+import { eq } from 'drizzle-orm';
 import { builder } from '../builder';
 import { Team } from '../leagues/types';
 import {
@@ -57,6 +64,16 @@ export const Matchup = builder.objectRef<{
   endTime: string | null;
 }>('Matchup');
 
+// MatchupRecap ref — declared here so the Matchup.recap field can reference it.
+// builder.objectType(MatchupRecapType) is called below after the Matchup fields.
+export const MatchupRecapType = builder.objectRef<{
+  headline: string;
+  narrative: string;
+  highlights: string[];
+  matchupType: string;
+  winnerId: number | null;
+}>('MatchupRecap');
+
 builder.objectType(Matchup, {
   description: 'A head-to-head matchup between two teams in a league',
   fields: (t) => ({
@@ -109,6 +126,181 @@ builder.objectType(Matchup, {
       resolve: async (matchup, _args, context) => {
         return context.loaders.selectedGamesCount.load(matchup.id);
       },
+    }),
+    recap: t.field({
+      type: MatchupRecapType,
+      nullable: true,
+      description:
+        'Auto-generated narrative recap, only available for completed matchups.',
+      resolve: async (matchup, _args, context) => {
+        // Only generate recaps for completed matchups with two teams
+        if (
+          matchup.status !== 'completed' ||
+          !matchup.team1Id ||
+          !matchup.team2Id
+        ) {
+          return null;
+        }
+
+        // Load team names
+        const [team1, team2] = await Promise.all([
+          context.loaders.teams.load(matchup.team1Id),
+          context.loaders.teams.load(matchup.team2Id),
+        ]);
+
+        if (!team1 || !team2) return null;
+
+        // Load all matchup players for this matchup
+        const matchupPlayers = await context.db
+          .select()
+          .from(PublicSchema.matchupPlayers)
+          .where(eq(PublicSchema.matchupPlayers.matchupId, matchup.id));
+
+        if (matchupPlayers.length === 0) return null;
+
+        // Resolve player names, seasons, and position types in parallel
+        const playerDetails = await Promise.all(
+          matchupPlayers.map(async (mp) => {
+            const [player, position] = await Promise.all([
+              context.loaders.players.load(mp.playerId),
+              mp.positionId
+                ? context.loaders.leaguePositionById.load(mp.positionId)
+                : Promise.resolve(null),
+            ]);
+
+            const seasonKey = `${matchup.leagueId}-${matchup.weekNumber}-${mp.playerId}`;
+            const season =
+              await context.loaders.leagueWeekPlayerSeasons.load(seasonKey);
+
+            return { mp, player, position, season };
+          }),
+        );
+
+        // Resolve batting/pitching season stats for each player
+        const performanceMap = await Promise.all(
+          playerDetails.map(async ({ mp, player, position, season }) => {
+            if (!player || !season) return null;
+
+            const isSp = position?.positionType === 'SP';
+            const statsKey = `${mp.playerId}-${season}`;
+
+            let fantasyPoints = 0;
+            let perfStats: Partial<PlayerPerformance> = {};
+
+            if (isSp) {
+              const pitching =
+                await context.loaders.seasonPitching.load(statsKey);
+              if (pitching) {
+                const ip = pitching.ip ?? 0;
+                const k = pitching.so ?? 0;
+                const er = pitching.er ?? 0;
+                // Simple heuristic: IP*2 + K*1 - ER*2
+                fantasyPoints = ip * 2 + k * 1 - er * 2;
+                perfStats = {
+                  isPitcher: true,
+                  ip,
+                  k,
+                  er,
+                };
+              }
+            } else {
+              const batting =
+                await context.loaders.seasonBatting.load(statsKey);
+              if (batting) {
+                const hr = batting.hr ?? 0;
+                const rbi = batting.rbi ?? 0;
+                const h = batting.h ?? 0;
+                const sb = batting.sb ?? 0;
+                const bb = batting.bb ?? 0;
+                const ab = batting.ab ?? 0;
+                // Simple heuristic: HR*4 + RBI*2 + H*1 + SB*2 + BB*1
+                fantasyPoints = hr * 4 + rbi * 2 + h * 1 + sb * 2 + bb * 1;
+                perfStats = {
+                  hr,
+                  rbi,
+                  h,
+                  sb,
+                  bb,
+                  ba: ab > 0 ? h / ab : undefined,
+                };
+              }
+            }
+
+            const perf: PlayerPerformance = {
+              playerId: mp.playerId,
+              playerName: `${player.firstName} ${player.lastName}`,
+              season,
+              fantasyPoints,
+              ...perfStats,
+            };
+            return { teamId: mp.teamId, perf };
+          }),
+        );
+
+        // Group performers by team
+        const team1Performers: PlayerPerformance[] = [];
+        const team2Performers: PlayerPerformance[] = [];
+        for (const item of performanceMap) {
+          if (!item) continue;
+          if (item.teamId === matchup.team1Id) {
+            team1Performers.push(item.perf);
+          } else if (item.teamId === matchup.team2Id) {
+            team2Performers.push(item.perf);
+          }
+        }
+
+        const team1Score = matchup.team1Score
+          ? parseFloat(matchup.team1Score)
+          : 0;
+        const team2Score = matchup.team2Score
+          ? parseFloat(matchup.team2Score)
+          : 0;
+
+        const ctx: MatchupContext = {
+          matchupId: matchup.id,
+          weekNumber: matchup.weekNumber,
+          leagueId: matchup.leagueId,
+          team1: {
+            teamId: matchup.team1Id,
+            teamName: team1.name,
+            score: team1Score,
+            performers: team1Performers,
+          },
+          team2: {
+            teamId: matchup.team2Id,
+            teamName: team2.name,
+            score: team2Score,
+            performers: team2Performers,
+          },
+        };
+
+        return generateMatchupRecap(ctx);
+      },
+    }),
+  }),
+});
+
+// ── MatchupRecap Type Implementation ──────────────────────────────────────────
+
+builder.objectType(MatchupRecapType, {
+  description: 'Auto-generated narrative recap for a completed matchup',
+  fields: (t) => ({
+    headline: t.exposeString('headline', {
+      description: 'Short headline summarising the matchup result',
+    }),
+    narrative: t.exposeString('narrative', {
+      description: 'Two-to-three sentence narrative paragraph',
+    }),
+    highlights: t.stringList({
+      description: 'Bullet-point highlights for standout player performances',
+      resolve: (recap) => recap.highlights,
+    }),
+    matchupType: t.exposeString('matchupType', {
+      description: 'Classification: blowout | close | normal',
+    }),
+    winnerId: t.exposeInt('winnerId', {
+      nullable: true,
+      description: 'ID of the winning team, or null on a tie',
     }),
   }),
 });

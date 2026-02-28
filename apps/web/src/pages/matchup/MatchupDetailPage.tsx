@@ -6,6 +6,7 @@ import { GamesRemaining } from '../../features/matchup/GamesRemaining';
 import { MatchupNavigationControls } from '../../features/matchup/MatchupNavigationControls';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
 import { MatchupRosterEditor } from '../../features/matchup/MatchupRosterEditor';
+import { MatchupRecapPanel } from '../../features/matchup/MatchupRecapPanel';
 import {
   MatchupStatus,
   useGetUserTeamIdQuery,
@@ -183,6 +184,11 @@ export function MatchupDetailPage() {
         (matchup.team1Id === userTeamId || matchup.team2Id === userTeamId) && (
           <MatchupRosterEditor matchup={matchup} userTeamId={userTeamId} />
         )}
+
+      {/* Narrative Recap — shown only for completed matchups */}
+      {matchup.status === MatchupStatus.Completed && matchupIdNum && (
+        <MatchupRecapPanel matchupId={matchupIdNum} />
+      )}
 
       {/* Team Rosters & Player Matchups */}
       <MatchupRosterComparison matchup={matchup} />

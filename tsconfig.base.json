@@ -26,6 +26,7 @@
       "@legacy-sports/db-client": ["lib/db-client/src/index.ts"],
       "@legacy-sports/env-utilities": ["lib/env-utilities/src/index.ts"],
       "@legacy-sports/logging": ["lib/logging/src/index.ts"],
+      "@legacy-sports/narrative": ["lib/narrative/src/index.ts"],
       "@legacy-sports/scheduling": ["lib/scheduling/src/index.ts"],
       "@legacy-sports/scoring": ["lib/scoring/src/index.ts"],
       "@legacy-sports/sentry": ["lib/sentry/src/index.ts"],

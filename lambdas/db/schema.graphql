@@ -574,6 +574,11 @@ type Matchup {
   leagueId: Int
 
   """
+  Auto-generated narrative recap, only available for completed matchups.
+  """
+  recap: MatchupRecap
+
+  """
   Number of unique games selected for this matchup
   """
   selectedGamesCount: Int
@@ -745,6 +750,36 @@ type MatchupPlayerGame {
   pitchingGame: GamePitching
   spSkipped: Boolean
   statsLoadingStatus: String
+}
+
+"""
+Auto-generated narrative recap for a completed matchup
+"""
+type MatchupRecap {
+  """
+  Short headline summarising the matchup result
+  """
+  headline: String
+
+  """
+  Bullet-point highlights for standout player performances
+  """
+  highlights: [String!]
+
+  """
+  Classification: blowout | close | normal
+  """
+  matchupType: String
+
+  """
+  Two-to-three sentence narrative paragraph
+  """
+  narrative: String
+
+  """
+  ID of the winning team, or null on a tie
+  """
+  winnerId: Int
 }
 
 enum MatchupStatus {
