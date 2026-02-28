@@ -130,7 +130,22 @@ git commit -m "feat(scope): description (LS-1234)"
 git push origin HEAD
 ```
 
-### Step 7: Pre-PR Validation
+### Step 7: Rebase onto Parent Branch
+
+Before validating, rebase onto the parent branch (either `main` or a stacked feature branch) so `make pc` reflects the same base CI will use.
+
+```powershell
+git fetch origin
+twig rebase   # rebases onto twig-tracked parent: main for independent branches, parent feature branch for stacked work
+```
+
+If conflicts occur, see the [rebase-conflicts skill](../rebase-conflicts/SKILL.md). After resolving, force-push:
+
+```powershell
+git push --force-with-lease origin HEAD
+```
+
+### Step 7b: Pre-PR Validation
 
 Run the full validation suite before opening the PR. Fix any failures and amend/push before continuing.
 
@@ -150,7 +165,7 @@ make pc
 > git push origin HEAD
 > ```
 
-### Step 7b: User Testing (Optional)
+### Step 7c: User Testing (Optional)
 
 If you want live UI verification before opening the PR, see the [user-testing skill](../user-testing/SKILL.md).
 This temporarily checks the branch out in the main repo (where dev servers run) so you can test changes
