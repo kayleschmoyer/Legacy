@@ -880,6 +880,58 @@ importers:
         specifier: '*'
         version: 6.4.1(@types/node@24.10.0)(jiti@2.4.2)(lightningcss@1.31.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
 
+  lambdas/jira-proxy:
+    dependencies:
+      '@aws-sdk/client-secrets-manager':
+        specifier: '*'
+        version: 3.990.0
+      '@legacy-sports/env-utilities':
+        specifier: workspace:*
+        version: link:../../lib/env-utilities
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../../lib/logging
+      '@legacy-sports/sentry':
+        specifier: workspace:*
+        version: link:../../lib/sentry
+      '@legacy-sports/utils':
+        specifier: workspace:*
+        version: link:../../lib/utils
+      aws-lambda:
+        specifier: '*'
+        version: 1.0.7
+      cors:
+        specifier: '*'
+        version: 2.8.6
+      express:
+        specifier: '*'
+        version: 4.21.2
+    devDependencies:
+      '@types/aws-lambda':
+        specifier: '*'
+        version: 8.10.160
+      '@types/cors':
+        specifier: '*'
+        version: 2.8.19
+      '@types/express':
+        specifier: '*'
+        version: 5.0.6
+      '@types/node':
+        specifier: '*'
+        version: 24.10.0
+      jest:
+        specifier: '*'
+        version: 30.2.0(@types/node@24.10.0)(babel-plugin-macros@3.1.0)(esbuild-register@3.6.0(esbuild@0.27.2))(ts-node@10.9.2(@swc/core@1.15.10(@swc/helpers@0.5.18))(@types/node@24.10.0)(typescript@5.9.3))
+      tsx:
+        specifier: '*'
+        version: 4.21.0
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vite:
+        specifier: '*'
+        version: 6.4.1(@types/node@24.10.0)(jiti@2.4.2)(lightningcss@1.31.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+
   lambdas/oauth-proxy:
     dependencies:
       '@apollo/client':
@@ -35255,7 +35307,7 @@ snapshots:
       once: 1.4.0
       parseurl: 1.3.3
       proxy-addr: 2.0.7
-      qs: 6.14.1
+      qs: 6.14.2
       range-parser: 1.2.1
       router: 2.2.0
       send: 1.2.1
@@ -40367,7 +40419,6 @@ snapshots:
   qs@6.14.2:
     dependencies:
       side-channel: 1.1.0
-    optional: true
 
   quansync@0.2.11: {}
 
@@ -42910,7 +42961,7 @@ snapshots:
 
   union@0.5.0:
     dependencies:
-      qs: 6.14.1
+      qs: 6.14.2
 
   unique-string@2.0.0:
     dependencies:

@@ -78,6 +78,22 @@ resource "aws_ssm_parameter" "game_selection_lambda_version" {
   })
 }
 
+resource "aws_ssm_parameter" "jira_proxy_lambda_version" {
+  name        = "/legacy-sports/${var.environment}/lambda/jira-proxy/version"
+  description = "Current version of the Jira Proxy Lambda function"
+  type        = "String"
+  value       = "initial"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  tags = merge(local.common_tags, {
+    Component = "lambda-versioning"
+    Function  = "jira-proxy"
+  })
+}
+
 
 
 # Outputs for easy access to parameter names
@@ -90,5 +106,6 @@ output "lambda_version_parameters" {
     oauth_proxy    = aws_ssm_parameter.oauth_proxy_lambda_version.name
     game_selection = aws_ssm_parameter.game_selection_lambda_version.name
     websocket      = aws_ssm_parameter.websocket_lambda_version.name
+    jira_proxy     = aws_ssm_parameter.jira_proxy_lambda_version.name
   }
 }
