@@ -225,6 +225,25 @@ type CareerPitching {
   wins: Int
 }
 
+"""
+Championship trophy and historical record
+"""
+type ChampionTrophy {
+  awardedAt: String
+  championTeam: Team
+  championshipWeek: Int
+  createdAt: String
+  finalScore: Float
+  id: ID
+  leagueId: Int
+  runnerUpScore: Float
+  runnerUpTeam: Team
+  runnerUpTeamId: Int
+  season: Int
+  teamId: Int
+  updatedAt: String
+}
+
 enum ConsentType {
   analytics
   data_processing
@@ -498,6 +517,9 @@ type League {
   name: String
   owner: Int
   playerPool: String
+  playoffEnabled: Boolean
+  playoffFormat: String
+  playoffMultiWeek: Boolean
   scoringProfile: ScoringConfig
   spStartsPerMatchup: Int
   totalMatchups: Int
@@ -755,6 +777,7 @@ type Mutation {
   """
   acceptTrade(tradeId: Int!): TradeOffer
   addDefaultPositionsToLeague(leagueId: Int!): [LeaguePosition!]
+  advancePlayoffBracket(bracketId: Int!): PlayoffBracket
 
   """
   Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge.
@@ -785,6 +808,7 @@ type Mutation {
     """
     leagueId: Int
   ): AutoSelectGamesResult
+  awardChampionship(bracketId: Int!): ChampionTrophy
 
   """
   Cancel a pending trade offer as the team that proposed it.
@@ -804,6 +828,13 @@ type Mutation {
     input: CreateLeagueAndTeamsInput!
   ): CreateLeagueAndTeamsPayload
   createMatchup(input: CreateMatchupInput!): Matchup
+  createPlayoffBracket(
+    format: String!
+    leagueId: Int!
+    multiWeekMatchups: Boolean
+    season: Int!
+    startWeek: Int!
+  ): PlayoffBracket
   createTiebreakerRules(
     allowCommissionerOverride: Boolean
     leagueId: Int!
@@ -933,6 +964,12 @@ type Mutation {
   updateNotificationPreferences(
     input: NotificationPreferenceInput!
   ): NotificationPreference
+  updatePlayoffMatchup(
+    highSeedScore: Float
+    lowSeedScore: Float
+    matchupId: Int!
+    status: PlayoffMatchupStatus
+  ): PlayoffMatchup
   updateTeamMemberPosition(positionId: Int, teamMemberId: Int!): TeamMember
 
   """
@@ -1056,6 +1093,54 @@ type PlayerScoring {
 }
 
 """
+Playoff bracket configuration and status for a league season
+"""
+type PlayoffBracket {
+  championTeam: Team
+  championTeamId: Int
+  createdAt: String
+  endWeek: Int
+  format: String
+  id: ID
+  leagueId: Int
+  matchups: [PlayoffMatchup!]
+  season: Int
+  startWeek: Int
+  status: PlayoffMatchupStatus
+  updatedAt: String
+}
+
+"""
+Individual playoff matchup within a bracket
+"""
+type PlayoffMatchup {
+  bracketId: Int
+  highSeedScore: Float
+  highSeedTeam: Team
+  highSeedTeamId: Int
+  id: ID
+  isMultiWeek: Boolean
+  lowSeedScore: Float
+  lowSeedTeam: Team
+  lowSeedTeamId: Int
+  matchupNumber: Int
+  round: PlayoffRound
+  status: PlayoffMatchupStatus
+  weekNumber: Int
+  winnerTeam: Team
+  winnerTeamId: Int
+}
+
+"""
+Status of a playoff matchup
+"""
+enum PlayoffMatchupStatus {
+  completed
+  in_progress
+  scheduled
+}
+
+"""
 Playoff qualification status for a team
 """
 type PlayoffQualification {
@@ -1064,6 +1149,29 @@ type PlayoffQualification {
   standing: TeamStanding
   teamId: ID
   teamName: String
+}
+
+"""
+Playoff round designation
+"""
+enum PlayoffRound {
+  finals
+  semifinals
+  wildcard
+}
+
+"""
+Team seeding and qualification info for playoffs
+"""
+type PlayoffSeed {
+  bracketId: Int
+  id: ID
+  pointsFor: Float
+  regularSeasonLosses: Int
+  regularSeasonWins: Int
+  seedNumber: Int
+  team: Team
+  teamId: Int
 }
 
 type PrivacyPolicyStatus {
@@ -1120,6 +1228,7 @@ type Query {
     limit: Int
     search: String
   ): [DraftPlayer!]
+  getChampionshipTrophies(leagueId: Int!): [ChampionTrophy!]
   getCurrentDraftPick(draftId: Int!): CurrentDraftPick
   getCurrentMatchupForLeague(leagueId: Int!): Matchup
   getDirectMessages(limit: Int, otherUserId: Int!): [DirectMessage!]
@@ -1148,11 +1257,13 @@ type Query {
   getMatchupsByWeek(leagueId: Int!, weekNumber: Int!): [Matchup!]
   getMatchupsForLeague(leagueId: Int!, weekNumber: Int): [Matchup!]
   getNotificationHistory(limit: Int, offset: Int): [NotificationHistoryItem!]
+  getPlayoffBracket(leagueId: Int!, season: Int): PlayoffBracket
   getPlayoffRace(
     leagueId: Int!
     playoffSpots: Int!
     season: Int
   ): [PlayoffQualification!]
+  getPlayoffSeeds(bracketId: Int!): [PlayoffSeed!]
   getPowerRankings(leagueId: Int!, season: Int): [TeamStanding!]
   getSeasonResults(leagueId: Int!, season: Int): SeasonResults
   getTeamMatchupHistory(leagueId: Int!, limit: Int, teamId: Int!): [Matchup!]
@@ -1614,6 +1725,9 @@ input UpdateLeagueSettingsInput {
   leagueId: Int!
   minCareerGames: Int
   minCareerSeasons: Int
+  playoffEnabled: Boolean
+  playoffFormat: String
+  playoffMultiWeek: Boolean
   spStartsPerMatchup: Int
   totalMatchups: Int
 }

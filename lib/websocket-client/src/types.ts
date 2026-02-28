@@ -143,6 +143,17 @@ export interface TradeOfferNotification {
   proposedAt: string;
 }
 
+export interface PlayoffBracketCreatedNotification {
+  type: typeof ClientNotificationType.PLAYOFF_BRACKET_CREATED;
+  leagueId: number;
+  bracketId: number;
+  season: number;
+  format: string;
+  startWeek: number;
+  /** ISO-8601 */
+  createdAt: string;
+}
+
 export type NotificationData =
   | DraftCompletedNotification
   | DraftStartedNotification
@@ -155,7 +166,8 @@ export type NotificationData =
   | LeagueChatMessageNotification
   | DirectMessageNotification
   | RosterUpdateNotification
-  | TradeOfferNotification;
+  | TradeOfferNotification
+  | PlayoffBracketCreatedNotification;
 
 /**
  * WebSocket message structure

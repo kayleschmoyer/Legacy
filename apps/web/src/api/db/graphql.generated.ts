@@ -220,6 +220,24 @@ export type CareerPitching = {
   wins?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Championship trophy and historical record */
+export type ChampionTrophy = {
+  __typename?: 'ChampionTrophy';
+  awardedAt?: Maybe<Scalars['String']['output']>;
+  championTeam?: Maybe<Team>;
+  championshipWeek?: Maybe<Scalars['Int']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  finalScore?: Maybe<Scalars['Float']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  runnerUpScore?: Maybe<Scalars['Float']['output']>;
+  runnerUpTeam?: Maybe<Team>;
+  runnerUpTeamId?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
 export enum ConsentType {
   Analytics = 'analytics',
   DataProcessing = 'data_processing',
@@ -492,6 +510,9 @@ export type League = {
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
+  playoffEnabled?: Maybe<Scalars['Boolean']['output']>;
+  playoffFormat?: Maybe<Scalars['String']['output']>;
+  playoffMultiWeek?: Maybe<Scalars['Boolean']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
@@ -720,12 +741,14 @@ export type Mutation = {
   /** Accept a pending trade offer. Players are swapped between teams immediately. */
   acceptTrade?: Maybe<TradeOffer>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
+  advancePlayoffBracket?: Maybe<PlayoffBracket>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
   /** Automatically make draft picks for teams that have exceeded their pick deadline. Triggered every minute by EventBridge. */
   autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
+  awardChampionship?: Maybe<ChampionTrophy>;
   /** Cancel a pending trade offer as the team that proposed it. */
   cancelTrade?: Maybe<TradeOffer>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
@@ -735,6 +758,7 @@ export type Mutation = {
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
+  createPlayoffBracket?: Maybe<PlayoffBracket>;
   createTiebreakerRules?: Maybe<TiebreakerRule>;
   /** Remove an achievement restriction from a league. Commissioner / General Manager access required. */
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
@@ -781,6 +805,7 @@ export type Mutation = {
   updateMatchupScore?: Maybe<Matchup>;
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
+  updatePlayoffMatchup?: Maybe<PlayoffMatchup>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
   /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
   updateUserRole?: Maybe<User>;
@@ -798,6 +823,10 @@ export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type MutationAdvancePlayoffBracketArgs = {
+  bracketId: Scalars['Int']['input'];
+};
+
 export type MutationAutoAdvanceMatchupsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -808,6 +837,10 @@ export type MutationAutoProcessDraftPicksArgs = {
 
 export type MutationAutoSelectGamesArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationAwardChampionshipArgs = {
+  bracketId: Scalars['Int']['input'];
 };
 
 export type MutationCancelTradeArgs = {
@@ -845,6 +878,14 @@ export type MutationCreateLeagueAndTeamsArgs = {
 
 export type MutationCreateMatchupArgs = {
   input: CreateMatchupInput;
+};
+
+export type MutationCreatePlayoffBracketArgs = {
+  format: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
+  multiWeekMatchups?: InputMaybe<Scalars['Boolean']['input']>;
+  season: Scalars['Int']['input'];
+  startWeek: Scalars['Int']['input'];
 };
 
 export type MutationCreateTiebreakerRulesArgs = {
@@ -1023,6 +1064,13 @@ export type MutationUpdateNotificationPreferencesArgs = {
   input: NotificationPreferenceInput;
 };
 
+export type MutationUpdatePlayoffMatchupArgs = {
+  highSeedScore?: InputMaybe<Scalars['Float']['input']>;
+  lowSeedScore?: InputMaybe<Scalars['Float']['input']>;
+  matchupId: Scalars['Int']['input'];
+  status?: InputMaybe<PlayoffMatchupStatus>;
+};
+
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
@@ -1130,6 +1178,50 @@ export type PlayerScoring = {
   totalScore?: Maybe<Scalars['Float']['output']>;
 };
 
+/** Playoff bracket configuration and status for a league season */
+export type PlayoffBracket = {
+  __typename?: 'PlayoffBracket';
+  championTeam?: Maybe<Team>;
+  championTeamId?: Maybe<Scalars['Int']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  endWeek?: Maybe<Scalars['Int']['output']>;
+  format?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  matchups?: Maybe<Array<PlayoffMatchup>>;
+  season?: Maybe<Scalars['Int']['output']>;
+  startWeek?: Maybe<Scalars['Int']['output']>;
+  status?: Maybe<PlayoffMatchupStatus>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Individual playoff matchup within a bracket */
+export type PlayoffMatchup = {
+  __typename?: 'PlayoffMatchup';
+  bracketId?: Maybe<Scalars['Int']['output']>;
+  highSeedScore?: Maybe<Scalars['Float']['output']>;
+  highSeedTeam?: Maybe<Team>;
+  highSeedTeamId?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  isMultiWeek?: Maybe<Scalars['Boolean']['output']>;
+  lowSeedScore?: Maybe<Scalars['Float']['output']>;
+  lowSeedTeam?: Maybe<Team>;
+  lowSeedTeamId?: Maybe<Scalars['Int']['output']>;
+  matchupNumber?: Maybe<Scalars['Int']['output']>;
+  round?: Maybe<PlayoffRound>;
+  status?: Maybe<PlayoffMatchupStatus>;
+  weekNumber?: Maybe<Scalars['Int']['output']>;
+  winnerTeam?: Maybe<Team>;
+  winnerTeamId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Status of a playoff matchup */
+export enum PlayoffMatchupStatus {
+  Completed = 'completed',
+  InProgress = 'in_progress',
+  Scheduled = 'scheduled',
+}
+
 /** Playoff qualification status for a team */
 export type PlayoffQualification = {
   __typename?: 'PlayoffQualification';
@@ -1138,6 +1230,26 @@ export type PlayoffQualification = {
   standing?: Maybe<TeamStanding>;
   teamId?: Maybe<Scalars['ID']['output']>;
   teamName?: Maybe<Scalars['String']['output']>;
+};
+
+/** Playoff round designation */
+export enum PlayoffRound {
+  Finals = 'finals',
+  Semifinals = 'semifinals',
+  Wildcard = 'wildcard',
+}
+
+/** Team seeding and qualification info for playoffs */
+export type PlayoffSeed = {
+  __typename?: 'PlayoffSeed';
+  bracketId?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  pointsFor?: Maybe<Scalars['Float']['output']>;
+  regularSeasonLosses?: Maybe<Scalars['Int']['output']>;
+  regularSeasonWins?: Maybe<Scalars['Int']['output']>;
+  seedNumber?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Team>;
+  teamId?: Maybe<Scalars['Int']['output']>;
 };
 
 export type PrivacyPolicyStatus = {
@@ -1164,6 +1276,7 @@ export type Query = {
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
   getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
+  getChampionshipTrophies?: Maybe<Array<ChampionTrophy>>;
   getCurrentDraftPick?: Maybe<CurrentDraftPick>;
   getCurrentMatchupForLeague?: Maybe<Matchup>;
   getDirectMessages?: Maybe<Array<DirectMessage>>;
@@ -1182,7 +1295,9 @@ export type Query = {
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
+  getPlayoffBracket?: Maybe<PlayoffBracket>;
   getPlayoffRace?: Maybe<Array<PlayoffQualification>>;
+  getPlayoffSeeds?: Maybe<Array<PlayoffSeed>>;
   getPowerRankings?: Maybe<Array<TeamStanding>>;
   getSeasonResults?: Maybe<SeasonResults>;
   getTeamMatchupHistory?: Maybe<Array<Matchup>>;
@@ -1273,6 +1388,10 @@ export type QueryGetAvailableDraftPlayersArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QueryGetChampionshipTrophiesArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
 export type QueryGetCurrentDraftPickArgs = {
   draftId: Scalars['Int']['input'];
 };
@@ -1360,10 +1479,19 @@ export type QueryGetNotificationHistoryArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type QueryGetPlayoffBracketArgs = {
+  leagueId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type QueryGetPlayoffRaceArgs = {
   leagueId: Scalars['Int']['input'];
   playoffSpots: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetPlayoffSeedsArgs = {
+  bracketId: Scalars['Int']['input'];
 };
 
 export type QueryGetPowerRankingsArgs = {
@@ -1897,6 +2025,9 @@ export type UpdateLeagueSettingsInput = {
   leagueId: Scalars['Int']['input'];
   minCareerGames?: InputMaybe<Scalars['Int']['input']>;
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
+  playoffEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  playoffFormat?: InputMaybe<Scalars['String']['input']>;
+  playoffMultiWeek?: InputMaybe<Scalars['Boolean']['input']>;
   spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -2097,6 +2228,9 @@ export type LeagueFragment = {
   minCareerGames?: number | null;
   minCareerSeasons?: number | null;
   totalMatchups?: number | null;
+  playoffEnabled?: boolean | null;
+  playoffFormat?: string | null;
+  playoffMultiWeek?: boolean | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -2147,6 +2281,9 @@ export type GetLeagueByIdQuery = {
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
     totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2185,6 +2322,9 @@ export type CreateLeagueAndTeamsMutation = {
       minCareerGames?: number | null;
       minCareerSeasons?: number | null;
       totalMatchups?: number | null;
+      playoffEnabled?: boolean | null;
+      playoffFormat?: string | null;
+      playoffMultiWeek?: boolean | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -2220,6 +2360,9 @@ export type GetUserLeaguesQuery = {
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
     totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2287,6 +2430,9 @@ export type StartDraftMutation = {
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
     totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2448,6 +2594,9 @@ export type UpdateLeagueSettingsMutation = {
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
     totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3863,6 +4012,182 @@ export type GetPlayersWithStatsQuery = {
   }> | null;
 };
 
+export type PlayoffBracketFragment = {
+  __typename?: 'PlayoffBracket';
+  id?: string | null;
+  leagueId?: number | null;
+  season?: number | null;
+  format?: string | null;
+  startWeek?: number | null;
+  endWeek?: number | null;
+  championTeamId?: number | null;
+  status?: PlayoffMatchupStatus | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  championTeam?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+  matchups?: Array<{
+    __typename?: 'PlayoffMatchup';
+    id?: string | null;
+    bracketId?: number | null;
+    round?: PlayoffRound | null;
+    matchupNumber?: number | null;
+    highSeedTeamId?: number | null;
+    lowSeedTeamId?: number | null;
+    winnerTeamId?: number | null;
+    highSeedScore?: number | null;
+    lowSeedScore?: number | null;
+    weekNumber?: number | null;
+    status?: PlayoffMatchupStatus | null;
+    isMultiWeek?: boolean | null;
+    highSeedTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    lowSeedTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    winnerTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type PlayoffMatchupFragment = {
+  __typename?: 'PlayoffMatchup';
+  id?: string | null;
+  bracketId?: number | null;
+  round?: PlayoffRound | null;
+  matchupNumber?: number | null;
+  highSeedTeamId?: number | null;
+  lowSeedTeamId?: number | null;
+  winnerTeamId?: number | null;
+  highSeedScore?: number | null;
+  lowSeedScore?: number | null;
+  weekNumber?: number | null;
+  status?: PlayoffMatchupStatus | null;
+  isMultiWeek?: boolean | null;
+  highSeedTeam?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+  lowSeedTeam?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+  winnerTeam?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+};
+
+export type PlayoffSeedFragment = {
+  __typename?: 'PlayoffSeed';
+  id?: string | null;
+  bracketId?: number | null;
+  teamId?: number | null;
+  seedNumber?: number | null;
+  regularSeasonWins?: number | null;
+  regularSeasonLosses?: number | null;
+  pointsFor?: number | null;
+  team?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+};
+
+export type GetPlayoffBracketQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetPlayoffBracketQuery = {
+  __typename?: 'Query';
+  getPlayoffBracket?: {
+    __typename?: 'PlayoffBracket';
+    id?: string | null;
+    leagueId?: number | null;
+    season?: number | null;
+    format?: string | null;
+    startWeek?: number | null;
+    endWeek?: number | null;
+    championTeamId?: number | null;
+    status?: PlayoffMatchupStatus | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    championTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    matchups?: Array<{
+      __typename?: 'PlayoffMatchup';
+      id?: string | null;
+      bracketId?: number | null;
+      round?: PlayoffRound | null;
+      matchupNumber?: number | null;
+      highSeedTeamId?: number | null;
+      lowSeedTeamId?: number | null;
+      winnerTeamId?: number | null;
+      highSeedScore?: number | null;
+      lowSeedScore?: number | null;
+      weekNumber?: number | null;
+      status?: PlayoffMatchupStatus | null;
+      isMultiWeek?: boolean | null;
+      highSeedTeam?: {
+        __typename?: 'Team';
+        id?: number | null;
+        name?: string | null;
+      } | null;
+      lowSeedTeam?: {
+        __typename?: 'Team';
+        id?: number | null;
+        name?: string | null;
+      } | null;
+      winnerTeam?: {
+        __typename?: 'Team';
+        id?: number | null;
+        name?: string | null;
+      } | null;
+    }> | null;
+  } | null;
+};
+
+export type GetPlayoffSeedsQueryVariables = Exact<{
+  bracketId: Scalars['Int']['input'];
+}>;
+
+export type GetPlayoffSeedsQuery = {
+  __typename?: 'Query';
+  getPlayoffSeeds?: Array<{
+    __typename?: 'PlayoffSeed';
+    id?: string | null;
+    bracketId?: number | null;
+    teamId?: number | null;
+    seedNumber?: number | null;
+    regularSeasonWins?: number | null;
+    regularSeasonLosses?: number | null;
+    pointsFor?: number | null;
+    team?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+  }> | null;
+};
+
 export type GetLeagueScoringProfileQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -4649,6 +4974,9 @@ export const LeagueFragmentDoc = gql`
     minCareerGames
     minCareerSeasons
     totalMatchups
+    playoffEnabled
+    playoffFormat
+    playoffMultiWeek
     userMembership {
       ...LeagueMember
     }
@@ -4874,6 +5202,71 @@ export const NotificationHistoryItemFragmentDoc = gql`
     sentAt
     readAt
     createdAt
+  }
+`;
+export const PlayoffMatchupFragmentDoc = gql`
+  fragment PlayoffMatchup on PlayoffMatchup {
+    id
+    bracketId
+    round
+    matchupNumber
+    highSeedTeamId
+    lowSeedTeamId
+    winnerTeamId
+    highSeedScore
+    lowSeedScore
+    weekNumber
+    status
+    isMultiWeek
+    highSeedTeam {
+      id
+      name
+    }
+    lowSeedTeam {
+      id
+      name
+    }
+    winnerTeam {
+      id
+      name
+    }
+  }
+`;
+export const PlayoffBracketFragmentDoc = gql`
+  fragment PlayoffBracket on PlayoffBracket {
+    id
+    leagueId
+    season
+    format
+    startWeek
+    endWeek
+    championTeamId
+    status
+    createdAt
+    updatedAt
+    championTeam {
+      id
+      name
+    }
+    matchups {
+      ...PlayoffMatchup
+    }
+  }
+  ${PlayoffMatchupFragmentDoc}
+`;
+export const PlayoffSeedFragmentDoc = gql`
+  fragment PlayoffSeed on PlayoffSeed {
+    id
+    bracketId
+    teamId
+    seedNumber
+    regularSeasonWins
+    regularSeasonLosses
+    pointsFor
+    team {
+      id
+      name
+    }
   }
 `;
 export const TeamFragmentDoc = gql`
@@ -8412,6 +8805,189 @@ export type GetPlayersWithStatsSuspenseQueryHookResult = ReturnType<
 export type GetPlayersWithStatsQueryResult = Apollo.QueryResult<
   GetPlayersWithStatsQuery,
   GetPlayersWithStatsQueryVariables
+>;
+export const GetPlayoffBracket = gql`
+  query GetPlayoffBracket($leagueId: Int!, $season: Int) {
+    getPlayoffBracket(leagueId: $leagueId, season: $season) {
+      ...PlayoffBracket
+    }
+  }
+  ${PlayoffBracketFragmentDoc}
+`;
+
+/**
+ * __useGetPlayoffBracketQuery__
+ *
+ * To run a query within a React component, call `useGetPlayoffBracketQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPlayoffBracketQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPlayoffBracketQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      season: // value for 'season'
+ *   },
+ * });
+ */
+export function useGetPlayoffBracketQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetPlayoffBracketQuery,
+    GetPlayoffBracketQueryVariables
+  > &
+    (
+      | { variables: GetPlayoffBracketQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetPlayoffBracketQuery,
+    GetPlayoffBracketQueryVariables
+  >(GetPlayoffBracket, options);
+}
+export function useGetPlayoffBracketLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPlayoffBracketQuery,
+    GetPlayoffBracketQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPlayoffBracketQuery,
+    GetPlayoffBracketQueryVariables
+  >(GetPlayoffBracket, options);
+}
+export function useGetPlayoffBracketSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPlayoffBracketQuery,
+        GetPlayoffBracketQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPlayoffBracketQuery,
+    GetPlayoffBracketQueryVariables
+  >(
+    GetPlayoffBracket,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayoffBracketQuery,
+          GetPlayoffBracketQueryVariables
+        >,
+  );
+}
+export type GetPlayoffBracketQueryHookResult = ReturnType<
+  typeof useGetPlayoffBracketQuery
+>;
+export type GetPlayoffBracketLazyQueryHookResult = ReturnType<
+  typeof useGetPlayoffBracketLazyQuery
+>;
+export type GetPlayoffBracketSuspenseQueryHookResult = ReturnType<
+  typeof useGetPlayoffBracketSuspenseQuery
+>;
+export type GetPlayoffBracketQueryResult = Apollo.QueryResult<
+  GetPlayoffBracketQuery,
+  GetPlayoffBracketQueryVariables
+>;
+export const GetPlayoffSeeds = gql`
+  query GetPlayoffSeeds($bracketId: Int!) {
+    getPlayoffSeeds(bracketId: $bracketId) {
+      ...PlayoffSeed
+    }
+  }
+  ${PlayoffSeedFragmentDoc}
+`;
+
+/**
+ * __useGetPlayoffSeedsQuery__
+ *
+ * To run a query within a React component, call `useGetPlayoffSeedsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPlayoffSeedsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPlayoffSeedsQuery({
+ *   variables: {
+ *      bracketId: // value for 'bracketId'
+ *   },
+ * });
+ */
+export function useGetPlayoffSeedsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetPlayoffSeedsQuery,
+    GetPlayoffSeedsQueryVariables
+  > &
+    (
+      | { variables: GetPlayoffSeedsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetPlayoffSeedsQuery, GetPlayoffSeedsQueryVariables>(
+    GetPlayoffSeeds,
+    options,
+  );
+}
+export function useGetPlayoffSeedsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPlayoffSeedsQuery,
+    GetPlayoffSeedsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPlayoffSeedsQuery,
+    GetPlayoffSeedsQueryVariables
+  >(GetPlayoffSeeds, options);
+}
+export function useGetPlayoffSeedsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPlayoffSeedsQuery,
+        GetPlayoffSeedsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPlayoffSeedsQuery,
+    GetPlayoffSeedsQueryVariables
+  >(
+    GetPlayoffSeeds,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayoffSeedsQuery,
+          GetPlayoffSeedsQueryVariables
+        >,
+  );
+}
+export type GetPlayoffSeedsQueryHookResult = ReturnType<
+  typeof useGetPlayoffSeedsQuery
+>;
+export type GetPlayoffSeedsLazyQueryHookResult = ReturnType<
+  typeof useGetPlayoffSeedsLazyQuery
+>;
+export type GetPlayoffSeedsSuspenseQueryHookResult = ReturnType<
+  typeof useGetPlayoffSeedsSuspenseQuery
+>;
+export type GetPlayoffSeedsQueryResult = Apollo.QueryResult<
+  GetPlayoffSeedsQuery,
+  GetPlayoffSeedsQueryVariables
 >;
 export const GetLeagueScoringProfile = gql`
   query GetLeagueScoringProfile($leagueId: Int!) {

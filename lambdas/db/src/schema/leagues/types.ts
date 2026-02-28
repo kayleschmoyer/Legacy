@@ -61,6 +61,9 @@ export const League = builder.objectRef<{
   minCareerGames?: number;
   minCareerSeasons?: number;
   totalMatchups?: number;
+  playoffEnabled?: boolean;
+  playoffFormat?: string;
+  playoffMultiWeek?: boolean;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -89,6 +92,9 @@ League.implement({
     minCareerGames: t.exposeInt('minCareerGames', { nullable: true }),
     minCareerSeasons: t.exposeInt('minCareerSeasons', { nullable: true }),
     totalMatchups: t.exposeInt('totalMatchups', { nullable: true }),
+    playoffEnabled: t.exposeBoolean('playoffEnabled', { nullable: true }),
+    playoffFormat: t.exposeString('playoffFormat', { nullable: true }),
+    playoffMultiWeek: t.exposeBoolean('playoffMultiWeek', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,
       description:

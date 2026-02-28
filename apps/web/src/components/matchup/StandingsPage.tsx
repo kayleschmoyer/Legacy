@@ -1,8 +1,10 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Button, H2, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { StandingsTable } from './StandingsTable';
+import { PlayoffBracketDisplay } from './PlayoffBracketDisplay';
 import { useStandings } from '../../hooks/useStandings';
+import { useGetPlayoffBracketQuery } from '../../api/db/graphql.generated';
 
 /**
  * StandingsPage - League standings page with sortable table
@@ -13,6 +15,11 @@ export function StandingsPage() {
 
   const leagueIdNum = leagueId ? parseInt(leagueId, 10) : null;
   const { standings, loading, error, refetch } = useStandings(leagueIdNum);
+  const { data: bracketData, loading: bracketLoading } =
+    useGetPlayoffBracketQuery({
+      variables: { leagueId: leagueIdNum ?? 0 },
+      skip: !leagueIdNum,
+    });
 
   if (loading) {
     return (
@@ -84,6 +91,20 @@ export function StandingsPage() {
 
       {/* Standings Table */}
       <StandingsTable standings={standings} loading={loading} error={error} />
+
+      {/* Playoff Bracket */}
+      {(bracketLoading || bracketData?.getPlayoffBracket) && (
+        <>
+          <Separator />
+          {bracketLoading ? (
+            <XStack justifyContent="center" padding="$4">
+              <Spinner size="small" color="$blue10" />
+            </XStack>
+          ) : bracketData?.getPlayoffBracket ? (
+            <PlayoffBracketDisplay bracket={bracketData.getPlayoffBracket} />
+          ) : null}
+        </>
+      )}
 
       {/* Additional info */}
       <Text fontSize="$2" color="$gray10" textAlign="center">

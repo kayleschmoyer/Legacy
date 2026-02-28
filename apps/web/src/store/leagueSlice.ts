@@ -24,6 +24,9 @@ interface LeagueState {
     minCareerGames?: number | null;
     minCareerSeasons?: number | null;
     totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
   } | null;
   positions: LeaguePositionFragment[];
   teamMembers: TeamMemberFragment[];

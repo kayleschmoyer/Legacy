@@ -16,6 +16,7 @@ import './chat-and-tiebreakers';
 import './drafts';
 import './gdpr';
 import './achievements';
+import './playoff-schema';
 
 // Export the final schema
 export const schema = builder.toSchema();

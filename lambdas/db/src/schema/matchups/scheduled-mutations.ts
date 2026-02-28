@@ -9,10 +9,12 @@
 
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { createNotificationService } from '@legacy-sports/aws-utils';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { builder, type Context } from '../builder';
+import { PlayoffService } from '../../services/playoff-service';
 
 type Db = GenericDatabase<typeof PublicSchema>;
 
@@ -364,6 +366,9 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
             gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
             weekAdvanceStatus: PublicSchema.leagues.weekAdvanceStatus,
             totalMatchups: PublicSchema.leagues.totalMatchups,
+            playoffEnabled: PublicSchema.leagues.playoffEnabled,
+            playoffFormat: PublicSchema.leagues.playoffFormat,
+            playoffMultiWeek: PublicSchema.leagues.playoffMultiWeek,
           })
           .from(PublicSchema.leagues)
           .where(and(...leagueConditions));
@@ -439,10 +444,239 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
             // 4. Check the current week against totalMatchups to see if the season is over
             const currentWeek = currentMatchups[0].weekNumber;
             if (currentWeek >= league.totalMatchups) {
+              if (league.playoffEnabled === false) {
+                // Playoffs disabled — just mark current week complete and stop
+                LOGGER.info(
+                  `[autoAdvanceMatchups] League ${league.id} (${league.name}) season complete, playoffs disabled`,
+                );
+                await context.db
+                  .update(PublicSchema.matchups)
+                  .set({ status: 'completed' })
+                  .where(
+                    and(
+                      eq(PublicSchema.matchups.leagueId, league.id),
+                      eq(PublicSchema.matchups.status, 'in_progress'),
+                    ),
+                  );
+                await context.db
+                  .update(PublicSchema.leagues)
+                  .set({ weekAdvanceStatus: 'idle' })
+                  .where(eq(PublicSchema.leagues.id, league.id));
+                result.leaguesAdvanced++;
+                continue;
+              }
+
+              // Check whether a bracket already exists for this season
+              const existingBracket = await context.db
+                .select({ id: PublicSchema.playoffBrackets.id })
+                .from(PublicSchema.playoffBrackets)
+                .where(
+                  and(
+                    eq(PublicSchema.playoffBrackets.leagueId, league.id),
+                    eq(
+                      PublicSchema.playoffBrackets.season,
+                      new Date().getFullYear(),
+                    ),
+                  ),
+                )
+                .limit(1);
+
+              if (existingBracket.length > 0) {
+                LOGGER.info(
+                  `[autoAdvanceMatchups] League ${league.id} (${league.name}) playoff bracket already exists, skipping`,
+                );
+                result.leaguesSkipped++;
+                continue;
+              }
+
               LOGGER.info(
-                `[autoAdvanceMatchups] League ${league.id} (${league.name}) has reached week ${currentWeek}/${league.totalMatchups} (season complete), skipping`,
+                `[autoAdvanceMatchups] League ${league.id} (${league.name}) season complete at week ${currentWeek}, creating playoff bracket`,
               );
-              result.leaguesSkipped++;
+
+              // Mark regular season matchups as completed
+              await context.db
+                .update(PublicSchema.matchups)
+                .set({ status: 'completed' })
+                .where(
+                  and(
+                    eq(PublicSchema.matchups.leagueId, league.id),
+                    eq(PublicSchema.matchups.status, 'in_progress'),
+                  ),
+                );
+
+              // Create the playoff bracket
+              const playoffStartWeek = currentWeek + 1;
+              const format = (league.playoffFormat ?? '4-team') as
+                | '4-team'
+                | '6-team'
+                | '8-team';
+              const multiWeek = league.playoffMultiWeek ?? false;
+
+              const bracket = await PlayoffService.createBracket(context.db, {
+                leagueId: league.id,
+                season: new Date().getFullYear(),
+                format,
+                startWeek: playoffStartWeek,
+                multiWeekMatchups: multiWeek,
+              });
+
+              // Fetch the round-1 playoff_matchups to create regular matchups for scoring
+              const round1PlayoffMatchups = await context.db
+                .select()
+                .from(PublicSchema.playoffMatchups)
+                .where(
+                  and(
+                    eq(PublicSchema.playoffMatchups.bracketId, bracket.id),
+                    eq(
+                      PublicSchema.playoffMatchups.weekNumber,
+                      playoffStartWeek,
+                    ),
+                  ),
+                );
+
+              const leagueSettingsResult = await context.db
+                .select({
+                  gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+                  spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+                })
+                .from(PublicSchema.leagues)
+                .where(eq(PublicSchema.leagues.id, league.id))
+                .limit(1);
+
+              const gamesPerMatchup =
+                leagueSettingsResult[0]?.gamesPerMatchup ?? 5;
+              const spStartsPerMatchup =
+                leagueSettingsResult[0]?.spStartsPerMatchup ?? 1;
+
+              // Prior week roster positions for carry-forward
+              const priorMatchupPlayers = await context.db
+                .select({
+                  playerId: PublicSchema.matchupPlayers.playerId,
+                  teamId: PublicSchema.matchupPlayers.teamId,
+                  positionId: PublicSchema.matchupPlayers.positionId,
+                })
+                .from(PublicSchema.matchupPlayers)
+                .innerJoin(
+                  PublicSchema.matchups,
+                  eq(
+                    PublicSchema.matchupPlayers.matchupId,
+                    PublicSchema.matchups.id,
+                  ),
+                )
+                .where(
+                  and(
+                    eq(PublicSchema.matchups.leagueId, league.id),
+                    eq(PublicSchema.matchups.weekNumber, currentWeek),
+                  ),
+                );
+
+              const priorPositionsByTeam = new Map<
+                number,
+                Map<number, number | null>
+              >();
+              for (const mp of priorMatchupPlayers) {
+                if (!priorPositionsByTeam.has(mp.teamId)) {
+                  priorPositionsByTeam.set(mp.teamId, new Map());
+                }
+                priorPositionsByTeam
+                  .get(mp.teamId)!
+                  .set(mp.playerId, mp.positionId);
+              }
+
+              let firstMatchupId: number | null = null;
+              for (const pm of round1PlayoffMatchups) {
+                if (pm.highSeedTeamId === null || pm.lowSeedTeamId === null) {
+                  continue;
+                }
+
+                const [inserted] = await context.db
+                  .insert(PublicSchema.matchups)
+                  .values({
+                    leagueId: league.id,
+                    weekNumber: playoffStartWeek,
+                    team1Id: pm.highSeedTeamId,
+                    team2Id: pm.lowSeedTeamId,
+                    gamesPerMatchup,
+                    spStartsPerMatchup,
+                    status: 'scheduled' as const,
+                    team1Score: null,
+                    team2Score: null,
+                    startTime: null,
+                    endTime: null,
+                  })
+                  .returning({ id: PublicSchema.matchups.id });
+
+                if (firstMatchupId === null) {
+                  firstMatchupId = inserted.id;
+                }
+
+                // Populate matchup players with position carry-forward
+                for (const teamId of [pm.highSeedTeamId, pm.lowSeedTeamId]) {
+                  const teamMembers = await context.db
+                    .select({
+                      playerId: PublicSchema.teamMembers.playerId,
+                      positionId: PublicSchema.teamMembers.positionId,
+                    })
+                    .from(PublicSchema.teamMembers)
+                    .where(
+                      and(
+                        eq(PublicSchema.teamMembers.leagueId, league.id),
+                        eq(PublicSchema.teamMembers.teamId, teamId),
+                      ),
+                    );
+
+                  if (teamMembers.length > 0) {
+                    const priorPositions = priorPositionsByTeam.get(teamId);
+                    await context.db.insert(PublicSchema.matchupPlayers).values(
+                      teamMembers.map((p) => ({
+                        matchupId: inserted.id,
+                        playerId: p.playerId,
+                        teamId,
+                        positionId: priorPositions?.has(p.playerId)
+                          ? (priorPositions.get(p.playerId) ?? null)
+                          : p.positionId,
+                      })),
+                    );
+                  }
+                }
+              }
+
+              // Update league current matchup
+              await context.db
+                .update(PublicSchema.leagues)
+                .set({
+                  currentMatchup: firstMatchupId,
+                  weekAdvanceStatus: 'idle',
+                })
+                .where(eq(PublicSchema.leagues.id, league.id));
+
+              // Notify league members via WebSocket
+              const notificationService = createNotificationService();
+              if (notificationService) {
+                try {
+                  await notificationService.notifyPlayoffBracketCreated(
+                    league.id,
+                    {
+                      leagueId: league.id,
+                      bracketId: bracket.id,
+                      season: bracket.season,
+                      format: bracket.format,
+                      startWeek: bracket.startWeek,
+                      createdAt: new Date().toISOString(),
+                    },
+                  );
+                } catch (err: unknown) {
+                  LOGGER.warn(
+                    '[autoAdvanceMatchups] Failed to send playoff bracket notification (non-fatal)',
+                    { err },
+                  );
+                }
+              }
+
+              result.leaguesAdvanced++;
+              LOGGER.info(
+                `[autoAdvanceMatchups] Successfully created playoff bracket ${bracket.id} for league ${league.id} (${league.name}), starting week ${playoffStartWeek}`,
+              );
               continue;
             }
 

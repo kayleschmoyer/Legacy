@@ -2070,6 +2070,9 @@ export function LeagueDetailPage(): React.JSX.Element {
         currentMinCareerGames={league.minCareerGames ?? 50}
         currentMinCareerSeasons={league.minCareerSeasons ?? 3}
         currentTotalMatchups={league.totalMatchups ?? 10}
+        currentPlayoffEnabled={league.playoffEnabled ?? true}
+        currentPlayoffFormat={league.playoffFormat ?? '4-team'}
+        currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
         onSuccess={(message) => {
           setMatchupSuccessMessage(message);
           setTimeout(() => setMatchupSuccessMessage(null), 5000);

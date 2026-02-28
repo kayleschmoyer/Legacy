@@ -63,6 +63,12 @@ export const leagues = pgTable(
     minCareerSeasons: integer('min_career_seasons').notNull().default(3),
     totalMatchups: integer('total_matchups').notNull().default(10),
     numberOfDivisions: integer('number_of_divisions').notNull().default(2),
+    // Playoff settings
+    playoffEnabled: boolean('playoff_enabled').notNull().default(true),
+    playoffFormat: varchar('playoff_format', { length: 10 })
+      .notNull()
+      .default('4-team'),
+    playoffMultiWeek: boolean('playoff_multi_week').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

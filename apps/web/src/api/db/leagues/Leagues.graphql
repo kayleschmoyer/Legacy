@@ -17,6 +17,9 @@ fragment League on League {
   minCareerGames
   minCareerSeasons
   totalMatchups
+  playoffEnabled
+  playoffFormat
+  playoffMultiWeek
   userMembership {
     ...LeagueMember
   }

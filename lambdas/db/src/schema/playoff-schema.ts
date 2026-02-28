@@ -15,11 +15,6 @@ import { Team } from './leagues/types';
 // ENUMS
 // ============================================================================
 
-const PlayoffFormat = builder.enumType('PlayoffFormat', {
-  values: ['4-team', '6-team', '8-team'] as const,
-  description: 'Number of teams that qualify for playoffs',
-});
-
 const PlayoffRound = builder.enumType('PlayoffRound', {
   values: ['wildcard', 'semifinals', 'finals'] as const,
   description: 'Playoff round designation',
@@ -56,10 +51,7 @@ builder.objectType(PlayoffBracket, {
     id: t.exposeID('id'),
     leagueId: t.exposeInt('leagueId'),
     season: t.exposeInt('season'),
-    format: t.field({
-      type: PlayoffFormat,
-      resolve: (bracket) => bracket.format,
-    }),
+    format: t.exposeString('format'),
     startWeek: t.exposeInt('startWeek'),
     endWeek: t.exposeInt('endWeek'),
     championTeamId: t.exposeInt('championTeamId', { nullable: true }),
@@ -357,7 +349,7 @@ builder.mutationField('createPlayoffBracket', (t) =>
     args: {
       leagueId: t.arg.int({ required: true }),
       season: t.arg.int({ required: true }),
-      format: t.arg({ type: PlayoffFormat, required: true }),
+      format: t.arg.string({ required: true }),
       startWeek: t.arg.int({ required: true }),
       multiWeekMatchups: t.arg.boolean({ required: false }),
     },
@@ -374,7 +366,7 @@ builder.mutationField('createPlayoffBracket', (t) =>
       const bracket = await PlayoffService.createBracket(context.db, {
         leagueId: args.leagueId,
         season: args.season,
-        format: args.format,
+        format: args.format as '4-team' | '6-team' | '8-team',
         startWeek: args.startWeek,
         multiWeekMatchups: args.multiWeekMatchups ?? false,
       });

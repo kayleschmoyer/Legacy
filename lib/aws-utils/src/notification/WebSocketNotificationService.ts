@@ -158,6 +158,17 @@ export interface TradeOfferNotification {
   proposedAt: string;
 }
 
+export interface PlayoffBracketCreatedNotification {
+  type: typeof WireNotificationType.PLAYOFF_BRACKET_CREATED;
+  leagueId: number;
+  bracketId: number;
+  season: number;
+  format: string;
+  startWeek: number;
+  /** ISO-8601 */
+  createdAt: string;
+}
+
 /**
  * Service for sending real-time notifications via WebSocket.
  *
@@ -897,6 +908,36 @@ export class WebSocketNotificationService {
     };
 
     LOGGER.info('Sending roster update notification', { leagueId });
+
+    await this.broadcast(
+      {
+        type: 'notification',
+        data: notification,
+      },
+      leagueId,
+    );
+  }
+
+  /**
+   * Notify all league members that the playoff bracket has been created.
+   *
+   * @param leagueId - The league whose members should be notified.
+   * @param payload  - Bracket details (excludes the `type` discriminator).
+   */
+  async notifyPlayoffBracketCreated(
+    leagueId: number,
+    payload: Omit<PlayoffBracketCreatedNotification, 'type'>,
+  ): Promise<void> {
+    const notification: PlayoffBracketCreatedNotification = {
+      type: WireNotificationType.PLAYOFF_BRACKET_CREATED,
+      ...payload,
+    };
+
+    LOGGER.info('Sending playoff bracket created notification', {
+      leagueId,
+      bracketId: payload.bracketId,
+      format: payload.format,
+    });
 
     await this.broadcast(
       {

@@ -20,6 +20,9 @@ export interface LeagueSettingsControlProps {
   currentMinCareerGames?: number;
   currentMinCareerSeasons?: number;
   currentTotalMatchups?: number;
+  currentPlayoffEnabled?: boolean;
+  currentPlayoffFormat?: string;
+  currentPlayoffMultiWeek?: boolean;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
 }
@@ -61,6 +64,12 @@ const TOTAL_MATCHUPS_OPTIONS = [
   { label: '20', value: 20 },
 ] as const;
 
+const PLAYOFF_FORMAT_OPTIONS = [
+  { label: '4-team', value: '4-team' },
+  { label: '6-team', value: '6-team' },
+  { label: '8-team', value: '8-team' },
+] as const;
+
 /**
  * LeagueSettingsControl — Commissioner control for league-level matchup settings.
  *
@@ -74,6 +83,9 @@ export function LeagueSettingsControl({
   currentMinCareerGames = 50,
   currentMinCareerSeasons = 3,
   currentTotalMatchups = 10,
+  currentPlayoffEnabled = true,
+  currentPlayoffFormat = '4-team',
+  currentPlayoffMultiWeek = false,
   onSuccess,
   onError,
 }: LeagueSettingsControlProps) {
@@ -86,6 +98,11 @@ export function LeagueSettingsControl({
     currentMinCareerSeasons,
   );
   const [totalMatchups, setTotalMatchups] = useState(currentTotalMatchups);
+  const [playoffEnabled, setPlayoffEnabled] = useState(currentPlayoffEnabled);
+  const [playoffFormat, setPlayoffFormat] = useState(currentPlayoffFormat);
+  const [playoffMultiWeek, setPlayoffMultiWeek] = useState(
+    currentPlayoffMultiWeek,
+  );
   const [hasChanges, setHasChanges] = useState(false);
 
   const [updateLeagueSettings, { loading: saving }] =
@@ -98,13 +115,19 @@ export function LeagueSettingsControl({
       careerGames: number,
       careerSeasons: number,
       totMatchups: number,
+      poEnabled: boolean,
+      poFormat: string,
+      poMultiWeek: boolean,
     ) => {
       setHasChanges(
         games !== currentGamesPerMatchup ||
           starts !== currentSpStartsPerMatchup ||
           careerGames !== currentMinCareerGames ||
           careerSeasons !== currentMinCareerSeasons ||
-          totMatchups !== currentTotalMatchups,
+          totMatchups !== currentTotalMatchups ||
+          poEnabled !== currentPlayoffEnabled ||
+          poFormat !== currentPlayoffFormat ||
+          poMultiWeek !== currentPlayoffMultiWeek,
       );
     },
     [
@@ -113,6 +136,9 @@ export function LeagueSettingsControl({
       currentMinCareerGames,
       currentMinCareerSeasons,
       currentTotalMatchups,
+      currentPlayoffEnabled,
+      currentPlayoffFormat,
+      currentPlayoffMultiWeek,
     ],
   );
 
@@ -128,9 +154,21 @@ export function LeagueSettingsControl({
         minCareerGames,
         minCareerSeasons,
         totalMatchups,
+        playoffEnabled,
+        playoffFormat,
+        playoffMultiWeek,
       );
     },
-    [spStarts, minCareerGames, minCareerSeasons, totalMatchups, checkChanges],
+    [
+      spStarts,
+      minCareerGames,
+      minCareerSeasons,
+      totalMatchups,
+      playoffEnabled,
+      playoffFormat,
+      playoffMultiWeek,
+      checkChanges,
+    ],
   );
 
   const handleSpStartsChange = useCallback(
@@ -142,6 +180,9 @@ export function LeagueSettingsControl({
         minCareerGames,
         minCareerSeasons,
         totalMatchups,
+        playoffEnabled,
+        playoffFormat,
+        playoffMultiWeek,
       );
     },
     [
@@ -149,6 +190,9 @@ export function LeagueSettingsControl({
       minCareerGames,
       minCareerSeasons,
       totalMatchups,
+      playoffEnabled,
+      playoffFormat,
+      playoffMultiWeek,
       checkChanges,
     ],
   );
@@ -162,9 +206,21 @@ export function LeagueSettingsControl({
         value,
         minCareerSeasons,
         totalMatchups,
+        playoffEnabled,
+        playoffFormat,
+        playoffMultiWeek,
       );
     },
-    [gamesPerMatchup, spStarts, minCareerSeasons, totalMatchups, checkChanges],
+    [
+      gamesPerMatchup,
+      spStarts,
+      minCareerSeasons,
+      totalMatchups,
+      playoffEnabled,
+      playoffFormat,
+      playoffMultiWeek,
+      checkChanges,
+    ],
   );
 
   const handleMinCareerSeasonsChange = useCallback(
@@ -176,9 +232,21 @@ export function LeagueSettingsControl({
         minCareerGames,
         value,
         totalMatchups,
+        playoffEnabled,
+        playoffFormat,
+        playoffMultiWeek,
       );
     },
-    [gamesPerMatchup, spStarts, minCareerGames, totalMatchups, checkChanges],
+    [
+      gamesPerMatchup,
+      spStarts,
+      minCareerGames,
+      totalMatchups,
+      playoffEnabled,
+      playoffFormat,
+      playoffMultiWeek,
+      checkChanges,
+    ],
   );
 
   const handleTotalMatchupsChange = useCallback(
@@ -190,9 +258,99 @@ export function LeagueSettingsControl({
         minCareerGames,
         minCareerSeasons,
         value,
+        playoffEnabled,
+        playoffFormat,
+        playoffMultiWeek,
       );
     },
-    [gamesPerMatchup, spStarts, minCareerGames, minCareerSeasons, checkChanges],
+    [
+      gamesPerMatchup,
+      spStarts,
+      minCareerGames,
+      minCareerSeasons,
+      playoffEnabled,
+      playoffFormat,
+      playoffMultiWeek,
+      checkChanges,
+    ],
+  );
+
+  const handlePlayoffEnabledChange = useCallback(
+    (value: boolean) => {
+      setPlayoffEnabled(value);
+      checkChanges(
+        gamesPerMatchup,
+        spStarts,
+        minCareerGames,
+        minCareerSeasons,
+        totalMatchups,
+        value,
+        playoffFormat,
+        playoffMultiWeek,
+      );
+    },
+    [
+      gamesPerMatchup,
+      spStarts,
+      minCareerGames,
+      minCareerSeasons,
+      totalMatchups,
+      playoffFormat,
+      playoffMultiWeek,
+      checkChanges,
+    ],
+  );
+
+  const handlePlayoffFormatChange = useCallback(
+    (value: string) => {
+      setPlayoffFormat(value);
+      checkChanges(
+        gamesPerMatchup,
+        spStarts,
+        minCareerGames,
+        minCareerSeasons,
+        totalMatchups,
+        playoffEnabled,
+        value,
+        playoffMultiWeek,
+      );
+    },
+    [
+      gamesPerMatchup,
+      spStarts,
+      minCareerGames,
+      minCareerSeasons,
+      totalMatchups,
+      playoffEnabled,
+      playoffMultiWeek,
+      checkChanges,
+    ],
+  );
+
+  const handlePlayoffMultiWeekChange = useCallback(
+    (value: boolean) => {
+      setPlayoffMultiWeek(value);
+      checkChanges(
+        gamesPerMatchup,
+        spStarts,
+        minCareerGames,
+        minCareerSeasons,
+        totalMatchups,
+        playoffEnabled,
+        playoffFormat,
+        value,
+      );
+    },
+    [
+      gamesPerMatchup,
+      spStarts,
+      minCareerGames,
+      minCareerSeasons,
+      totalMatchups,
+      playoffEnabled,
+      playoffFormat,
+      checkChanges,
+    ],
   );
 
   const validationError =
@@ -213,6 +371,9 @@ export function LeagueSettingsControl({
             minCareerGames,
             minCareerSeasons,
             totalMatchups,
+            playoffEnabled,
+            playoffFormat,
+            playoffMultiWeek,
           },
         },
         refetchQueries: ['GetLeagueById'],
@@ -234,6 +395,9 @@ export function LeagueSettingsControl({
     setMinCareerGames(currentMinCareerGames);
     setMinCareerSeasons(currentMinCareerSeasons);
     setTotalMatchups(currentTotalMatchups);
+    setPlayoffEnabled(currentPlayoffEnabled);
+    setPlayoffFormat(currentPlayoffFormat);
+    setPlayoffMultiWeek(currentPlayoffMultiWeek);
     setHasChanges(false);
   };
 
@@ -539,6 +703,192 @@ export function LeagueSettingsControl({
             })}
           </XStack>
         </YStack>
+
+        <Separator />
+
+        {/* Playoff Settings */}
+        <YStack gap="$2">
+          <YStack gap="$1">
+            <Text fontSize="$3" fontWeight="600" color="$color">
+              Playoffs
+            </Text>
+            <Text fontSize="$2" color="$gray10">
+              Enable a playoff bracket at the end of the regular season. The
+              bracket is created automatically after the final matchup week.
+            </Text>
+          </YStack>
+          <XStack gap="$2" flexWrap="wrap">
+            {(
+              [
+                { label: 'Enabled', value: true },
+                { label: 'Disabled', value: false },
+              ] as const
+            ).map((option) => {
+              const isSelected = playoffEnabled === option.value;
+              return (
+                <Button
+                  key={String(option.value)}
+                  size="$3"
+                  theme={isSelected ? 'active' : 'alt2'}
+                  backgroundColor={
+                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                  }
+                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                  borderWidth={1}
+                  borderRadius="$3"
+                  onPress={() => handlePlayoffEnabledChange(option.value)}
+                  disabled={saving}
+                  opacity={saving ? 0.5 : 1}
+                  icon={isSelected ? <Check size={14} /> : undefined}
+                  aria-pressed={isSelected}
+                  aria-label={`Playoffs: ${option.label}`}
+                  hoverStyle={
+                    saving
+                      ? undefined
+                      : {
+                          backgroundColor: isSelected
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                            : '$gray4',
+                        }
+                  }
+                >
+                  <Text
+                    fontSize="$2"
+                    fontWeight={isSelected ? '700' : '400'}
+                    color={isSelected ? 'white' : '$color'}
+                  >
+                    {option.label}
+                  </Text>
+                </Button>
+              );
+            })}
+          </XStack>
+        </YStack>
+
+        {playoffEnabled && (
+          <>
+            <Separator />
+
+            {/* Playoff Format */}
+            <YStack gap="$2">
+              <YStack gap="$1">
+                <Text fontSize="$3" fontWeight="600" color="$color">
+                  Playoff Format
+                </Text>
+                <Text fontSize="$2" color="$gray10">
+                  Number of teams that qualify for the playoffs. 6-team includes
+                  a wildcard round; 8-team has two wildcard rounds.
+                </Text>
+              </YStack>
+              <XStack gap="$2" flexWrap="wrap">
+                {PLAYOFF_FORMAT_OPTIONS.map((option) => {
+                  const isSelected = playoffFormat === option.value;
+                  return (
+                    <Button
+                      key={option.value}
+                      size="$3"
+                      theme={isSelected ? 'active' : 'alt2'}
+                      backgroundColor={
+                        isSelected
+                          ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                          : '$gray3'
+                      }
+                      borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                      borderWidth={1}
+                      borderRadius="$3"
+                      onPress={() => handlePlayoffFormatChange(option.value)}
+                      disabled={saving}
+                      opacity={saving ? 0.5 : 1}
+                      icon={isSelected ? <Check size={14} /> : undefined}
+                      aria-pressed={isSelected}
+                      aria-label={`Playoff format: ${option.label}`}
+                      hoverStyle={
+                        saving
+                          ? undefined
+                          : {
+                              backgroundColor: isSelected
+                                ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                                : '$gray4',
+                            }
+                      }
+                    >
+                      <Text
+                        fontSize="$2"
+                        fontWeight={isSelected ? '700' : '400'}
+                        color={isSelected ? 'white' : '$color'}
+                      >
+                        {option.label}
+                      </Text>
+                    </Button>
+                  );
+                })}
+              </XStack>
+            </YStack>
+
+            <Separator />
+
+            {/* Playoff Multi-Week Matchups */}
+            <YStack gap="$2">
+              <YStack gap="$1">
+                <Text fontSize="$3" fontWeight="600" color="$color">
+                  Multi-Week Playoff Matchups
+                </Text>
+                <Text fontSize="$2" color="$gray10">
+                  When enabled, each playoff round spans two weeks instead of
+                  one. This increases the sample size for each matchup.
+                </Text>
+              </YStack>
+              <XStack gap="$2" flexWrap="wrap">
+                {(
+                  [
+                    { label: 'Single week', value: false },
+                    { label: 'Two weeks', value: true },
+                  ] as const
+                ).map((option) => {
+                  const isSelected = playoffMultiWeek === option.value;
+                  return (
+                    <Button
+                      key={String(option.value)}
+                      size="$3"
+                      theme={isSelected ? 'active' : 'alt2'}
+                      backgroundColor={
+                        isSelected
+                          ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                          : '$gray3'
+                      }
+                      borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                      borderWidth={1}
+                      borderRadius="$3"
+                      onPress={() => handlePlayoffMultiWeekChange(option.value)}
+                      disabled={saving}
+                      opacity={saving ? 0.5 : 1}
+                      icon={isSelected ? <Check size={14} /> : undefined}
+                      aria-pressed={isSelected}
+                      aria-label={`Multi-week playoffs: ${option.label}`}
+                      hoverStyle={
+                        saving
+                          ? undefined
+                          : {
+                              backgroundColor: isSelected
+                                ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                                : '$gray4',
+                            }
+                      }
+                    >
+                      <Text
+                        fontSize="$2"
+                        fontWeight={isSelected ? '700' : '400'}
+                        color={isSelected ? 'white' : '$color'}
+                      >
+                        {option.label}
+                      </Text>
+                    </Button>
+                  );
+                })}
+              </XStack>
+            </YStack>
+          </>
+        )}
 
         {/* Validation warning */}
         {validationError && (

@@ -866,6 +866,9 @@ const UpdateLeagueSettingsInput = builder.inputType(
       minCareerGames: t.int({ required: false }),
       minCareerSeasons: t.int({ required: false }),
       totalMatchups: t.int({ required: false }),
+      playoffEnabled: t.boolean({ required: false }),
+      playoffFormat: t.string({ required: false }),
+      playoffMultiWeek: t.boolean({ required: false }),
     }),
   },
 );
@@ -891,6 +894,9 @@ builder.mutationField('updateLeagueSettings', (t) =>
         minCareerGames,
         minCareerSeasons,
         totalMatchups,
+        playoffEnabled,
+        playoffFormat,
+        playoffMultiWeek,
       } = args.input;
       const userId = context.user.id;
 
@@ -924,6 +930,9 @@ builder.mutationField('updateLeagueSettings', (t) =>
         minCareerGames?: number;
         minCareerSeasons?: number;
         totalMatchups?: number;
+        playoffEnabled?: boolean;
+        playoffFormat?: string;
+        playoffMultiWeek?: boolean;
       } = {};
 
       if (spStartsPerMatchup !== null && spStartsPerMatchup !== undefined) {
@@ -1076,6 +1085,31 @@ builder.mutationField('updateLeagueSettings', (t) =>
             `Total matchups: ${oldValue} → ${totalMatchups}`,
           );
         }
+      }
+
+      if (playoffEnabled !== null && playoffEnabled !== undefined) {
+        leagueUpdate.playoffEnabled = playoffEnabled;
+        changeDescriptions.push(
+          `Playoffs: ${playoffEnabled ? 'enabled' : 'disabled'}`,
+        );
+      }
+
+      if (playoffFormat !== null && playoffFormat !== undefined) {
+        const validFormats = ['4-team', '6-team', '8-team'];
+        if (!validFormats.includes(playoffFormat)) {
+          throw new Error(
+            `Invalid playoff format. Must be one of: ${validFormats.join(', ')}`,
+          );
+        }
+        leagueUpdate.playoffFormat = playoffFormat;
+        changeDescriptions.push(`Playoff format: ${playoffFormat}`);
+      }
+
+      if (playoffMultiWeek !== null && playoffMultiWeek !== undefined) {
+        leagueUpdate.playoffMultiWeek = playoffMultiWeek;
+        changeDescriptions.push(
+          `Playoff multi-week matchups: ${playoffMultiWeek ? 'enabled' : 'disabled'}`,
+        );
       }
 
       if (Object.keys(leagueUpdate).length === 0) {

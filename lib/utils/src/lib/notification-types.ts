@@ -31,6 +31,7 @@ export const WireNotificationType = {
   DIRECT_MESSAGE: 'DIRECT_MESSAGE',
   ROSTER_UPDATE: 'ROSTER_UPDATE',
   TRADE_OFFER: 'TRADE_OFFER',
+  PLAYOFF_BRACKET_CREATED: 'PLAYOFF_BRACKET_CREATED',
 } as const;
 
 export type WireNotificationType =
@@ -56,6 +57,7 @@ export const ClientNotificationType = {
   DIRECT_MESSAGE: 'direct-message',
   ROSTER_UPDATE: 'roster-update',
   TRADE_OFFER: 'trade-offer',
+  PLAYOFF_BRACKET_CREATED: 'playoff-bracket-created',
 } as const;
 
 export type ClientNotificationType =
