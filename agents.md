@@ -24,27 +24,27 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 
 | Need                          | File                                                                       |
 | ----------------------------- | -------------------------------------------------------------------------- |
-| Full workflow                 | `.github/skills/workflow-ticket-to-pr/SKILL.md`                            |
-| Type errors                   | `.github/skills/fix-types/SKILL.md`                                        |
-| Lint errors                   | `.github/skills/fix-lint/SKILL.md`                                         |
-| Troubleshooting               | `.github/skills/troubleshoot/SKILL.md`                                     |
-| **Docker local**              | `.github/skills/docker-local/SKILL.md`                                     |
+| Architecture                  | `.github/skills/architecture/SKILL.md`                                     |
+| **Config ref**                | `.github/skills/config-standards/SKILL.md`                                 |
 | DB queries                    | `.github/skills/db-query/SKILL.md`                                         |
 | DB schema reference           | `.github/skills/db-schema/SKILL.md`                                        |
+| **Docker local**              | `.github/skills/docker-local/SKILL.md`                                     |
 | **Dump RDS to S3**            | `.github/skills/db-dump/SKILL.md`                                          |
-| **Restore from S3**           | `.github/skills/db-restore/SKILL.md`                                       |
-| **Restore dev seed**          | `.github/skills/db-restore-dev/SKILL.md`                                   |
-| **Refresh dev seed**          | `.github/skills/db-dump-dev/SKILL.md`                                      |
-| Architecture                  | `.github/skills/architecture/SKILL.md`                                     |
-| **New library**               | `.github/skills/create-lib/SKILL.md`                                       |
-| **New lambda**                | `.github/skills/create-lambda/SKILL.md`                                    |
-| **New app**                   | `.github/skills/create-app/SKILL.md`                                       |
-| **New skill**                 | `.github/skills/create-skill/SKILL.md`                                     |
+| Full workflow                 | `.github/skills/workflow-ticket-to-pr/SKILL.md`                            |
 | **Install packages**          | `.github/skills/install-packages/SKILL.md`                                 |
-| **Config ref**                | `.github/skills/config-standards/SKILL.md`                                 |
+| Lint errors                   | `.github/skills/fix-lint/SKILL.md`                                         |
 | **Never edit schema.graphql** | `.github/skills/no-edit-schema-graphql/SKILL.md`                           |
-| **UI Standards**              | `.github/skills/ui-standards/SKILL.md`                                     |
+| **New app**                   | `.github/skills/create-app/SKILL.md`                                       |
+| **New lambda**                | `.github/skills/create-lambda/SKILL.md`                                    |
+| **New library**               | `.github/skills/create-lib/SKILL.md`                                       |
+| **New skill**                 | `.github/skills/create-skill/SKILL.md`                                     |
+| **Refresh dev seed**          | `.github/skills/db-dump-dev/SKILL.md`                                      |
+| **Restore dev seed**          | `.github/skills/db-restore-dev/SKILL.md`                                   |
+| **Restore from S3**           | `.github/skills/db-restore/SKILL.md`                                       |
+| Troubleshooting               | `.github/skills/troubleshoot/SKILL.md`                                     |
+| Type errors                   | `.github/skills/fix-types/SKILL.md`                                        |
 | **UI Brand Colors**           | `.github/skills/ui-brand-colors/SKILL.md`                                  |
+| **UI Standards**              | `.github/skills/ui-standards/SKILL.md`                                     |
 | **User testing**              | `.github/skills/user-testing/SKILL.md`                                     |
 | All skills (54)               | `.github/skills/`                                                          |
 | CSV reference data            | `docs/agents/*.csv`                                                        |
