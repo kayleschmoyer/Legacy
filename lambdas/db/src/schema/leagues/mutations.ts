@@ -751,7 +751,7 @@ builder.mutationField('deleteLeague', (t) =>
 
         if (league[0].owner !== context.user.id && !context.user.isAdmin) {
           throw new Error(
-            'Only the league General Manager or admin can delete this league',
+            'Only the league owner or admin can delete this league',
           );
         }
 
@@ -775,7 +775,9 @@ builder.mutationField('deleteLeague', (t) =>
   }),
 );
 
-// Mutation field to delete all leagues (for development/testing)
+// Mutation field to delete all leagues owned by the current user.
+// Admins can delete all leagues system-wide; regular users only delete the
+// leagues where they are the owner.
 builder.mutationField('deleteAllLeagues', (t) =>
   t.field({
     type: 'String',
@@ -785,18 +787,19 @@ builder.mutationField('deleteAllLeagues', (t) =>
         throw new Error('Authentication required to delete leagues');
       }
 
-      // Check if user has admin access
-      if (!context.user.isAdmin) {
-        throw new Error('Admin access required to delete all leagues');
-      }
-
       try {
-        // Get all leagues in the system (admin operation)
-        const allLeagues = await context.db
+        // Admins delete every league; regular users only delete leagues they own
+        const leaguesQuery = context.db
           .select({
             id: PublicSchema.leagues.id,
           })
           .from(PublicSchema.leagues);
+
+        const allLeagues = context.user.isAdmin
+          ? await leaguesQuery
+          : await leaguesQuery.where(
+              eq(PublicSchema.leagues.owner, context.user.id),
+            );
 
         if (allLeagues.length === 0) {
           return 'No leagues found to delete';

@@ -130,11 +130,11 @@ export const LeagueManagement: React.FC = () => {
         <YStack space="$3">
           <H4 color="$blue11">Information</H4>
           <Text fontSize="$3" color="$gray10">
-            • Only leagues you are the General Manager of will be deleted
+            • Only leagues you own will be deleted
           </Text>
           <Text fontSize="$3" color="$gray10">
-            • Leagues where you're a member (but not General Manager) will not
-            be affected
+            • Leagues where you're a member (but not the owner) will not be
+            affected
           </Text>
           <Text fontSize="$3" color="$gray10">
             • You can create new leagues after deletion

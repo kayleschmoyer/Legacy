@@ -96,8 +96,8 @@ describe('League Mutations', () => {
       }
     `;
 
-    it('should successfully delete a league when user is the General Manager', async () => {
-      // Mock league exists and user is General Manager
+    it('should successfully delete a league when user is the owner', async () => {
+      // Mock league exists and user is owner
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
@@ -128,7 +128,7 @@ describe('League Mutations', () => {
     });
 
     it('should successfully delete a league when user is admin', async () => {
-      // Mock league exists but user is not General Manager, but is admin
+      // Mock league exists but user is not the owner, but is admin
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
@@ -207,8 +207,8 @@ describe('League Mutations', () => {
       ).rejects.toThrow('League not found');
     });
 
-    it('should fail when user is not the General Manager and not admin', async () => {
-      // Mock league exists but user is not General Manager and not admin
+    it('should fail when user is not the owner and not admin', async () => {
+      // Mock league exists but user is not the owner and not admin
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
@@ -228,12 +228,12 @@ describe('League Mutations', () => {
           undefined as never,
         ),
       ).rejects.toThrow(
-        'Only the league General Manager or admin can delete this league',
+        'Only the league owner or admin can delete this league',
       );
     });
 
     it('should delete league using CASCADE DELETE constraints', async () => {
-      // Mock league exists and user is General Manager
+      // Mock league exists and user is the owner
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
@@ -322,16 +322,36 @@ describe('League Mutations', () => {
       ).rejects.toThrow('Authentication required to delete leagues');
     });
 
-    it('should fail when user is not admin', async () => {
+    it('should delete only own leagues for a non-admin user', async () => {
+      // Non-admin users can delete their own leagues (where they are the owner)
+      const mockLeagues = [{ id: 1 }, { id: 2 }];
+
+      // Select chain: .select().from() returns the query builder,
+      // then .where() resolves to the filtered list of owned leagues
+      mockDb.select.mockReturnValueOnce(mockDb);
+      mockDb.from.mockReturnValueOnce(mockDb);
+      mockDb.where.mockResolvedValueOnce(mockLeagues);
+
+      // Mock delete operations (these return mockDb for chaining)
+      mockDb.delete.mockReturnValue(mockDb);
+      mockDb.where.mockResolvedValue(undefined);
+
       const mutationType = schema.getMutationType();
       const deleteAllLeaguesField = mutationType?.getFields().deleteAllLeagues;
       if (!deleteAllLeaguesField?.resolve) {
         throw new Error('deleteAllLeagues resolver not found');
       }
 
-      await expect(
-        deleteAllLeaguesField.resolve({}, {}, mockContext, undefined as never),
-      ).rejects.toThrow('Admin access required to delete all leagues');
+      const result = await deleteAllLeaguesField.resolve(
+        {},
+        {},
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toContain(
+        'Successfully deleted 2 league(s) and all associated data',
+      );
     });
 
     it('should successfully delete all leagues when user is admin', async () => {
@@ -343,12 +363,10 @@ describe('League Mutations', () => {
         db: mockDb,
       };
 
-      // Mock the SELECT query that fetches all leagues
-      // The resolver does: db.select({id: ...}).from(PublicSchema.leagues)
-      // The final .from() call returns the array of leagues
+      // Admins get all leagues without a WHERE filter — the select chain ends at
+      // .from() which resolves directly to the array
       const mockLeagues = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
-      // Set up the query chain to return the leagues array
       mockDb.select.mockReturnValueOnce(mockDb);
       mockDb.from.mockResolvedValueOnce(mockLeagues);
 
@@ -369,7 +387,6 @@ describe('League Mutations', () => {
         undefined as never,
       );
 
-      // Updated to match actual resolver return message
       expect(result).toContain(
         'Successfully deleted 3 league(s) and all associated data',
       );
