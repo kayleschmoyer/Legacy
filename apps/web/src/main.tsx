@@ -91,7 +91,12 @@ try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           config={tamaguiConfig}
         >
-          <AuthProvider config={authConfig}>
+          <AuthProvider
+            config={authConfig}
+            onUserSwitch={async () => {
+              await apolloClient.resetStore();
+            }}
+          >
             <EnhancedAuthGuard
               loginTitle="Welcome to Legacy Sports!"
               loginSubtitle="Sign in to access your fantasy leagues and stats"

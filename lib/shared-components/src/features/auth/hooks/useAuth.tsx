@@ -89,6 +89,12 @@ export const useAuth = (): AuthContextType => {
 interface AuthProviderProps {
   children: React.ReactNode;
   config: OAuthConfig;
+  /**
+   * Called after every impersonation start/stop so callers can flush any
+   * user-scoped caches (e.g. Apollo InMemoryCache) before the new identity
+   * makes its first request.
+   */
+  onUserSwitch?: () => Promise<void>;
 }
 
 // Modern authentication state management with useReducer
@@ -195,6 +201,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 export const AuthProvider: React.FC<AuthProviderProps> = ({
   children,
   config,
+  onUserSwitch,
 }) => {
   const [authState, dispatchAuth] = useReducer(authReducer, initialAuthState);
   const { user, isLoading, error, isImpersonating, adminUser } = authState;
@@ -371,8 +378,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         type: 'IMPERSONATE_START',
         payload: { adminUser: currentAdminUser, targetUser },
       });
+
+      // Flush any user-scoped caches (e.g. Apollo InMemoryCache) so the new
+      // identity never receives another user's cached responses.
+      void onUserSwitch?.();
     },
-    [authService, decodeUserFromToken],
+    [authService, decodeUserFromToken, onUserSwitch],
   );
 
   /** Restore the original admin session, ending impersonation. */
@@ -399,7 +410,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     }
 
     dispatchAuth({ type: 'IMPERSONATE_STOP', payload: adminUserInfo });
-  }, [decodeUserFromToken]);
+
+    // Flush any user-scoped caches (e.g. Apollo InMemoryCache) so the restored
+    // admin session never gets stale impersonated-user data.
+    void onUserSwitch?.();
+  }, [decodeUserFromToken, onUserSwitch]);
 
   const loginWithProvider = useCallback(async (): Promise<void> => {
     dispatchAuth({ type: 'AUTH_START' });
