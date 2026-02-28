@@ -660,8 +660,8 @@ Access the interactive GraphQL playground at:
 # Generate schema documentation
 pnpm exec graphql-codegen
 
-# Download schema
-pnpm run graphql:schema
+# Print the schema from the Pothos definition
+pnpm exec nx run db:print-schema
 ```
 
 ## Related Documentation
@@ -672,4 +672,4 @@ pnpm run graphql:schema
 
 ---
 
-_This documentation is auto-generated from the GraphQL schema. For implementation details, see the source code in `lambdas/graphql/`._
+_This documentation is auto-generated from the GraphQL schema. For implementation details, see the source code in `lambdas/db/`._

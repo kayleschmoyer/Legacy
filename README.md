@@ -77,7 +77,7 @@ pnpm audit
 
 ````
 
-For complete security details, see: **[Security Audit Status](docs/security-audit-status.md)**
+For complete security details, see: **[Security Audit Status](docs/security/security-audit-status.md)**
 
 ## �🚀 Quick Start
 
@@ -99,72 +99,67 @@ For complete security details, see: **[Security Audit Status](docs/security-audi
 
 ### Initial Setup
 
-```bash
+```powershell
 # Clone the repository
 git clone https://github.com/bkrupa/legacy-sports.git
 cd legacy-sports
 
 # Install dependencies
-pnpm install
-
-# Configure Python environment (for backend tools)
-# This tool will guide you through Python setup
-pnpm run setup:python
-````
+make install
+```
 
 ## 📱 Development
 
 ### Available Applications
 
-| App                  | Description             | Command              |
-| -------------------- | ----------------------- | -------------------- |
-| **Mobile App**       | React Native CLI app    | `pnpm run app:start` |
-| **Web App**          | Next.js web application | `pnpm run web:start` |
-| **GraphQL Explorer** | API testing interface   | `pnpm run gql:start` |
+| App                  | Description             | Command                                      |
+| -------------------- | ----------------------- | -------------------------------------------- |
+| **Mobile App**       | React Native CLI app    | `pnpm exec nx serve app`                     |
+| **Web App**          | Next.js web application | `pnpm exec nx dev web`                       |
+| **GraphQL Explorer** | API testing interface   | `pnpm exec nx serve graphql-explorer`        |
 
 ### Quick Development Commands
 
-```bash
+```powershell
 # Start all development servers
 pnpm run dev
 
 # Run tests across all projects
-pnpm exec nx run-many -t test
+pnpm exec nx affected -t test
 
 # Build all projects
-pnpm run build
+pnpm exec nx affected -t build
 
 # Lint and format code
-pnpm run lint:fix
-pnpm run format
+pnpm exec nx affected -t lint --fix
+pnpm exec nx format:write
 ```
 
 ### Mobile Development
 
-```bash
-# Start Metro bundler (from apps/app directory)
-pnpm run start
+```powershell
+# Start Metro bundler
+pnpm exec nx start app
 
 # Run on Android (requires Android Studio)
-pnpm run android
+pnpm exec nx android app
 
 # iOS builds are currently disabled
 
 # Build Android APK
-pnpm run build-android
+pnpm exec nx build-android app
 ```
 
 ### Web Development
 
-```bash
+```powershell
 # Start web development server
-pnpm run web:start
+pnpm exec nx dev web
 
 # Build for production
-pnpm run web:build
+pnpm exec nx build web
 
-# Deploy to GitHub Pages (auto-deployed on main branch)
-pnpm run web:deploy
+# Deployment is automatic via GitHub Pages on push to main
 ```
 
 ## 🏗️ Architecture
@@ -178,15 +173,23 @@ legacy-sports/
 │   ├── web/                  # Next.js web app
 │   ├── cli/                  # Command-line tools
 │   └── graphql-explorer/     # GraphQL API explorer
-├── lib/                      # Shared libraries
+├── lib/                      # Shared libraries (19 packages)
 │   ├── shared-components/    # Cross-platform UI components
 │   ├── db-client/            # Database client & migrations
+│   ├── scoring/              # Scoring engine & calculations
+│   ├── data-loaders/         # GraphQL data loaders
 │   ├── api/                  # API utilities
-│   └── utils/                # Common utilities
+│   ├── utils/                # Common utilities
+│   └── ...                   # analytics, aws-utils, codegen, env-utilities, etc.
 ├── lambdas/                  # AWS Lambda functions
-│   ├── graphql/              # GraphQL API
-│   ├── oauth-proxy/          # Authentication
-│   └── stats-lambda/         # Data processing
+│   ├── db/                   # GraphQL API (database lambda)
+│   ├── draft-processor/      # Draft pick processing (SQS)
+│   ├── game-selection/       # Game selection logic
+│   ├── oauth-proxy/          # Authentication proxy
+│   ├── stats-lambda/         # Statistics data processing
+│   ├── websocket/            # Real-time WebSocket connections
+│   ├── jira-proxy/           # Jira integration proxy
+│   └── layers/               # Shared Lambda layers
 └── terraform/                # Infrastructure as Code
 ```
 
@@ -229,7 +232,7 @@ await SecureStorage.setItem('key', 'value');
 const options = getDbOptions();
 ```
 
-**📚 Learn More**: [Hybrid Platform Resolution Guide](./docs/HYBRID_PLATFORM_RESOLUTION_GUIDE.md)
+**📚 Learn More**: [Cross-Platform Architecture](./docs/architecture/cross-platform-system.md)
 
 ## ⚙️ Configuration
 
@@ -303,30 +306,30 @@ pnpm run build-android
 
 AWS Lambda functions are deployed via S3-based Terraform automation:
 
-```bash
+```powershell
 # Deploy individual lambda
-./scripts/deploy-lambda.sh graphql
+.\scripts\deploy-lambda.ps1 db
 
 # Deploy all lambdas
-./scripts/deploy-lambda-all.sh
+.\scripts\deploy-lambda-all.ps1
 
 # Via Terraform
-cd terraform && terraform apply
+Set-Location terraform; terraform apply
 ```
 
 ## 🛠️ Development Tools
 
 ### NX Commands
 
-```bash
+```powershell
 # View project graph
 pnpm exec nx graph
 
 # Run affected tests only
-pnpm exec nx affected:test
+pnpm exec nx affected -t test
 
 # Build affected projects
-pnpm exec nx affected:build
+pnpm exec nx affected -t build
 
 # Show project details
 pnpm exec nx show project web
@@ -334,18 +337,18 @@ pnpm exec nx show project web
 
 ### Code Quality
 
-```bash
+```powershell
 # Lint all projects
-pnpm run lint
+pnpm exec nx affected -t lint
 
 # Fix lint issues
-pnpm run lint:fix
+pnpm exec nx affected -t lint --fix
 
 # Format code
-pnpm run format
+pnpm exec nx format:write
 
 # Validate package.json standards
-pnpm run validate:packages
+pnpm run validate:package-json
 ```
 
 ## 🔧 Troubleshooting
@@ -354,13 +357,12 @@ pnpm run validate:packages
 
 **Metro bundler issues (React Native)**:
 
-```bash
+```powershell
 # Clear Metro cache
 pnpm exec react-native start --reset-cache
 
 # Clean and rebuild
-pnpm run app:clean
-pnpm run app:start
+pnpm exec nx start app --reset-cache
 ```
 
 **GraphQL connection issues**:
@@ -370,12 +372,12 @@ pnpm run app:start
 
 **Build errors**:
 
-```bash
+```powershell
 # Clean all build artifacts
 pnpm run clean
 
 # Reinstall dependencies
-rm -rf node_modules package-lock.json
+Remove-Item -Recurse -Force node_modules, pnpm-lock.yaml
 pnpm install
 ```
 
@@ -425,3 +427,4 @@ The Legacy Sports backend runs on AWS serverless infrastructure managed with Ter
 ---
 
 Built with ❤️ using modern development tools and practices.
+````

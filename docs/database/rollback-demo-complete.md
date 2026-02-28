@@ -14,24 +14,24 @@ The Drizzle rollback migration system has been successfully implemented and is r
 
 ## 🎯 Available Commands
 
-```bash
+```powershell
 # Generate rollback-capable migration
-pnpm run db:generate --name my_migration
+pnpm exec nx run db:generate --name my_migration
 
 # Apply migrations
-pnpm run db:up
+pnpm exec nx run db:migrate
 
 # Rollback last migration
-pnpm run db:down
+pnpm exec nx run db:down
 
 # Check migration status
-pnpm run db:status
+pnpm exec nx run db:status
 
 # Rollback all migrations
-pnpm run db:fresh
+pnpm exec nx run db:fresh
 
 # Rollback all and reapply
-pnpm run db:refresh
+pnpm exec nx run db:refresh
 ```
 
 ## 🧪 Test the System
@@ -40,9 +40,9 @@ To test rollback capabilities:
 
 1. **Generate a test migration**:
 
-   ```bash
-   cd lib/db-client
-   pnpm run db:generate --name test_rollback
+   ```powershell
+   Set-Location lib\db-client
+   pnpm exec nx run db:generate --name test_rollback
    ```
 
 2. **Edit the generated file** to add a simple table:
@@ -67,12 +67,12 @@ To test rollback capabilities:
    ```
 
 3. **Apply and test rollback**:
-   ```bash
-   pnpm run db:status    # Check current state
-   pnpm run db:up        # Apply migration
-   pnpm run db:status    # Verify applied
-   pnpm run db:down      # Test rollback
-   pnpm run db:status    # Verify rolled back
+   ```powershell
+   pnpm exec nx run db:status    # Check current state
+   pnpm exec nx run db:migrate   # Apply migration
+   pnpm exec nx run db:status    # Verify applied
+   pnpm exec nx run db:down      # Test rollback
+   pnpm exec nx run db:status    # Verify rolled back
    ```
 
 ## 📚 Documentation

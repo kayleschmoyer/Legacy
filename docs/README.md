@@ -11,7 +11,6 @@ Welcome to the comprehensive documentation for the Legacy Sports platform - a mo
 _Start here if you're new to the project_
 
 - [📖 Development Setup](guides/development-setup.md) - Complete environment setup guide
-- [🤖 AI Agent Contribution Workflow](guides/ai-agent-contribution-workflow.md) - Complete workflow for AI agents
 - [🌳 Branch Tree Management](guides/branch-tree-management.md) - Twig tree management for clean dependent branches
 - [🔐 Authentication Guide](guides/authentication-guide.md) - OAuth and user management
 - [🛠️ Troubleshooting](guides/troubleshooting.md) - Common issues and solutions
@@ -19,7 +18,13 @@ _Start here if you're new to the project_
 - [🐛 Debugging with Database Timestamps](guides/debugging-with-database-timestamps.md) - Correlating logs with DB events
 - [⚾ Baseball-Reference Scraping](guides/baseball-reference-scraping.md) - Data scraping patterns
 - [🔒 Security & Secrets](guides/security-and-secrets.md) - Security best practices
-- [🤖 Agent Commands](guides/agent-commands.md) - AI assistant commands reference
+- [📟 CLI Player Stats Commands](guides/cli-player-stats-commands.md) - Player statistics CLI reference
+- [🏆 League Flow Complete Guide](guides/league-flow-complete-guide.md) - End-to-end league lifecycle
+- [🎯 Live Draft Frontend Integration](guides/live-draft-frontend-integration.md) - Real-time draft UI
+- [🗄️ Database Role Separation](guides/database-role-separation.md) - PostgreSQL role setup
+- [🔐 Database Schema Protection](guides/database-schema-protection-setup.md) - Schema change safeguards
+- [⚡ Lambda DB Connection Best Practices](guides/lambda-database-connection-best-practices.md) - Connection pooling
+- [📊 Player Projections](guides/PLAYER_PROJECTIONS_IMPLEMENTATION.md) - Projection system design
 
 ### 🏗️ **Architecture & Design** → [`/architecture/`](architecture/)
 
@@ -100,6 +105,9 @@ _Next.js and web application documentation_
 - [⚙️ Web Build Configurations](web/web-build-configurations.md) - Build setup
 - [🔗 Hash Routing](web/web-hash-routing.md) - Client-side routing
 - [📱 Navigation Menu](web/navigation-menu-reorganization.md) - Menu structure
+- [♿ Accessibility Guide](web/ACCESSIBILITY_GUIDE.md) - A11y standards
+- [🎨 Theme & A11y Notes](web/THEME_AND_A11Y_NOTES.md) - Theme system and accessibility
+- [📈 Google Analytics Integration](web/google-analytics-integration.md) - Analytics setup
 
 ### 💾 **Database** → [`/database/`](database/)
 
@@ -107,11 +115,18 @@ _Database migrations, schema changes, and ORM_
 
 - [📦 Drizzle Upgrade Analysis](database/drizzle-upgrade-analysis.md) - Upgrade planning
 - [✅ Drizzle Upgrade Complete](database/drizzle-upgrade-completed.md) - Migration summary
+- [🔄 Drizzle Rollback Migrations](database/drizzle-rollback-migrations.md) - Rollback procedures
+- [📋 Rollback Demo Complete](database/rollback-demo-complete.md) - Rollback demo walkthrough
+- [📐 Migration Policy](database/migration-policy.md) - Schema change rules
+- [⏰ Automatic Timestamps](database/automatic-timestamps.md) - Timestamp column conventions
+- [🗑️ Cascade Delete Implementation](database/cascade-delete-implementation.md) - FK cascade behavior
 
 ### 📚 **Additional Resources**
 
-- [� API Documentation](api/) - GraphQL schema and endpoints _(Coming Soon)_
+- [📄 API Documentation](api/) - GraphQL schema and endpoints
 - [🤖 AI Agent Instructions](agents/) - Structured CSV files for AI assistance
+- [🐛 Bug Fixes & Incidents](fixes/) - Root-cause analyses and applied fixes
+- [🌟 Feature Documentation](features/) - Major feature designs
 - [📋 Migration History](migration-history/) - Historical implementation records
 - [🗺️ Development Plans](development-plans/) - Future planning documents
 
@@ -119,11 +134,10 @@ _Database migrations, schema changes, and ORM_
 
 ### 🤖 **For AI Agents**
 
-1. [AI Agent Contribution Workflow](guides/ai-agent-contribution-workflow.md) - Complete contribution process
-2. [AI Agent Instructions (CSV)](agents/) - Structured guidelines in CSV format
-3. [Development Workflow CSV](agents/development-workflow.csv) - Workflow patterns
-4. [Common Pitfalls CSV](agents/common-pitfalls.csv) - Mistakes to avoid
-5. [Agent Commands](guides/agent-commands.md) - CLI command reference
+1. [AI Agent Instructions (CSV)](agents/) - Structured guidelines in CSV format
+2. [Development Workflow CSV](agents/development-workflow.csv) - Workflow patterns
+3. [Common Pitfalls CSV](agents/common-pitfalls.csv) - Mistakes to avoid
+4. [Contribution Workflow CSV](agents/contribution-workflow.csv) - Contribution process
 
 ### 👨‍💻 **For Software Developers**
 
@@ -253,7 +267,6 @@ docs/
 
 ### 🚧 **In Progress**
 
-- 🔨 API documentation (GraphQL schema)
 - 🔨 Performance optimization guides
 - 🔨 Component library documentation
 
@@ -311,4 +324,4 @@ docs/
 
 **📌 Remember**: This documentation is your guide to the Legacy Sports platform. Start with the [Getting Started](#-quick-navigation) section and explore from there. Each category folder contains a README.md for quick orientation.
 
-_Documentation last reorganized: October 15, 2025_
+_Documentation last reorganized: October 15, 2025 · Last reviewed: February 28, 2026_

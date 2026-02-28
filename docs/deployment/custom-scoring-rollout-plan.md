@@ -10,7 +10,7 @@ This guide coordinates the production release of the Custom Fantasy Baseball Sco
 
 ## Deployment Checklist
 
-> Run all commands from the repository root in PowerShell. Use the Nx targets in sequence: `npx nx affected -t typecheck; npx nx affected -t lint --fix; npx nx affected -t test; npx nx affected -t build` before packaging artifacts.
+> Run all commands from the repository root in PowerShell. Use the Nx targets in sequence: `pnpm exec nx affected -t typecheck; pnpm exec nx affected -t lint --fix; pnpm exec nx affected -t test; pnpm exec nx affected -t build` before packaging artifacts.
 
 1. **Freeze change window**
    - Announce code freeze to LS release Slack channel 24 hours prior.
@@ -20,14 +20,14 @@ This guide coordinates the production release of the Custom Fantasy Baseball Sco
    - Execute `scripts/run-migrations.ps1 -Stage prod` during the window; capture transcript to `\fileshare\launches\ls6\migration.log`.
    - Validate seed backfill script `scripts/add-project-tags.js` is not scheduled concurrently.
 3. **Backfill scoring defaults**
-   - Run `npx nx run data-loaders:seed-scoring-defaults --configuration=prod` to populate new leagues without overrides.
+   - Run `pnpm exec nx run data-loaders:seed-scoring-defaults --configuration=prod` to populate new leagues without overrides.
    - Verify `league_scoring_change_log` captures inserted rows by querying `SELECT COUNT(*) FROM league_scoring_change_log WHERE created_at > NOW() - INTERVAL '5 minutes';` via `scripts/run-migrations.ps1 -Stage prod -Script ".\scripts\sql\scoring_backfill_verification.sql"`.
 4. **Deploy services**
-   - Package Lambdas with `npx nx run lambdas-db:package --configuration=prod`.
+   - Package Lambdas with `pnpm exec nx run lambdas-db:package --configuration=prod`.
    - Apply infrastructure with `./scripts/deploy-lambda-all.ps1 -Environment prod -Service db` and confirm success in the console output.
-   - Redeploy projections worker (`npx nx run lambdas-projections:deploy --configuration=prod`) so cached multipliers refresh.
+   - Redeploy projections worker (`pnpm exec nx run lambdas-projections:deploy --configuration=prod`) so cached multipliers refresh.
 5. **Smoke validation**
-   - Run `npx nx run cli:scoring-check --configuration=prod --league=*` to confirm APIs return merged defaults.
+   - Run `pnpm exec nx run cli:scoring-check --configuration=prod --league=*` to confirm APIs return merged defaults.
    - Hit `/graphql` `leagueScoringProfile` query for a canary league and compare response versus baseline fixture.
    - Open `apps/web` staging canary league and ensure projected points render without errors.
 6. **Runbook updates**

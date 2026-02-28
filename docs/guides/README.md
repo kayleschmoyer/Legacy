@@ -12,8 +12,8 @@ This directory contains step-by-step guides for setting up and working with the 
 
 ### Workflow & Contribution
 
-- **[AI Agent Contribution Workflow](ai-agent-contribution-workflow.md)** - Complete contribution process for AI agents
-- **[Agent Commands](agent-commands.md)** - AI assistant commands reference
+- **[Branch Management Improvements](branch-management-improvements.md)** - Twig and branch workflow enhancements
+- **[Branch Tree Management](branch-tree-management.md)** - Twig tree management for clean dependent branches
 
 ### Reference
 
@@ -21,7 +21,13 @@ This directory contains step-by-step guides for setting up and working with the 
 - **[Baseball-Reference Scraping](baseball-reference-scraping.md)** - Data scraping patterns and troubleshooting
 - **[Debugging with Database Timestamps](debugging-with-database-timestamps.md)** - Correlating logs with DB events
 - **[WebSocket Notifications](websocket-notifications.md)** - Real-time notification system
-- **[Branch Tree Management](branch-tree-management.md)** - Twig tree management for clean dependent branches
+- **[CLI Player Stats Commands](cli-player-stats-commands.md)** - Player statistics CLI reference
+- **[League Flow Complete Guide](league-flow-complete-guide.md)** - End-to-end league lifecycle
+- **[Live Draft Frontend Integration](live-draft-frontend-integration.md)** - Real-time draft UI integration
+- **[Database Role Separation](database-role-separation.md)** - PostgreSQL role and permission setup
+- **[Database Schema Protection Setup](database-schema-protection-setup.md)** - Schema change safeguards
+- **[Lambda Database Connection Best Practices](lambda-database-connection-best-practices.md)** - Connection pooling for Lambdas
+- **[Player Projections Implementation](PLAYER_PROJECTIONS_IMPLEMENTATION.md)** - Projection system design
 
 ## 🎯 Quick Start for New Developers
 
@@ -105,21 +111,7 @@ This directory contains step-by-step guides for setting up and working with the 
 
 ## 🤖 Using AI Assistance
 
-### For AI Agents Working on This Project
-
-The **[AI Agent Contribution Workflow](ai-agent-contribution-workflow.md)** provides a complete step-by-step guide for:
-
-- Planning work with Jira tickets (using acli)
-- Creating branches with twig
-- Implementing changes in the Nx monorepo
-- Running pre-commit validations
-- Creating pull requests
-
-### For Developers Using AI Assistants
-
-The **[Agent Commands](agent-commands.md)** guide contains structured commands for working with AI assistants like GitHub Copilot.
-
-For more detailed AI instructions, see the [agents/](../agents/) directory with CSV-formatted guidelines.
+For AI agents working on this project, see the [Agent Instructions](../agents/) directory with CSV-formatted guidelines and the [Skills Documentation](../../.github/skills/) for concrete command execution.
 
 ## 📞 Getting Help
 

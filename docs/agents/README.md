@@ -12,7 +12,7 @@ This document provides structured guidance for AI agents working on the Legacy S
 
 📋 **For patterns and guidelines** (when to use certain approaches, best practices), see the **CSV files** below.
 
-**Available Skills**: 41 skill guides covering validation, development servers, workflow management, code generation, database operations, troubleshooting, and deployment. Each skill includes commands, alternatives, troubleshooting, and integration guidance.
+**Available Skills**: 56 skill guides covering validation, development servers, workflow management, code generation, database operations, troubleshooting, and deployment. Each skill includes commands, alternatives, troubleshooting, and integration guidance.
 
 ## 📁 Agent Instruction Topics
 
@@ -82,7 +82,7 @@ When encountering errors, follow this systematic approach:
 1. **Identify Error Category**: Build failure, module resolution, platform issue, or deployment
 2. **Consult Troubleshooting CSV**: Load `troubleshooting.csv` and search for error patterns
 3. **Check Build System**: If build-related, reference `build-system.csv` for dependency order
-4. **Validate Environment**: Ensure `pnpm run sync-env` has been run and credentials are set
+4. **Validate Environment**: Ensure `make sync-env` has been run and credentials are set
 5. **Apply Solution**: Follow the systematic resolution steps from the guidelines
 6. **Document Discovery**: Add new patterns to relevant CSV if solution not documented
 
@@ -158,7 +158,7 @@ When working on this codebase, ensure:
 ✅ **Build Order Compliance** - Shared libraries built before consuming applications  
 ✅ **Test Coverage** - Unit tests for business logic, integration tests for APIs  
 ✅ **Cross-Platform Testing** - Both web and mobile platforms validated  
-✅ **Environment Sync** - `pnpm run sync-env` completed before development
+✅ **Environment Sync** - `make sync-env` completed before development
 
 ### **Security & Infrastructure Standards**
 

@@ -10,21 +10,18 @@ This guide provides step-by-step instructions for setting up a complete developm
 
 For experienced developers who want to get started immediately:
 
-```bash
+```powershell
 # 1. Clone repository
 git clone <repository-url>
 cd legacy-sports
 
 # 2. Install dependencies
-pnpm install
+make install
 
-# 3. Environment setup
-pnpm run sync-env
+# 3. Environment setup (requires AWS SSO)
+make sync-env
 
-# 4. Build core libraries
-pnpm run build:libs
-
-# 5. Start development
+# 4. Start development
 pnpm run dev
 ```
 
@@ -76,13 +73,13 @@ code --install-extension ms-vscode.vscode-json
 
 ### **Step 1: Clone the Repository**
 
-```bash
+```powershell
 # Clone the repository
 git clone <repository-url>
 cd legacy-sports
 
 # Verify you're in the right place
-ls -la  # Should see package.json, nx.json, and other workspace files
+Get-ChildItem  # Should see package.json, nx.json, and other workspace files
 ```
 
 ### **Step 2: Install Dependencies**
@@ -101,9 +98,9 @@ pnpm install
 
 ### **Step 3: Environment Configuration**
 
-```bash
+```powershell
 # Set up environment variables and database connections
-pnpm run sync-env
+make sync-env
 
 # This script will:
 # - Copy environment templates
@@ -114,32 +111,29 @@ pnpm run sync-env
 
 **What if sync-env fails?**
 
-- Ensure you have proper AWS/database access
+- Ensure you have proper AWS SSO access (see `.github/skills/aws-sso-login/SKILL.md`)
 - Contact team lead for credential access
-- Use `pnpm run sync-env:dry-run` to see what would be configured
+- Without AWS access, use the dev seed: see `.github/skills/db-restore-dev/SKILL.md`
 
 ### **Step 4: Build Core Libraries**
 
-```bash
+```powershell
 # Build shared libraries that other projects depend on
-pnpm run build:libs
+pnpm exec nx affected -t build
 
 # This should complete in 1-2 minutes
-# You'll see successful builds for ~10 library projects
+# You'll see successful builds for affected library projects
 ```
 
 ### **Step 5: Validate Installation**
 
-```bash
+```powershell
 # Run workspace validation
-pnpm run validate
+make pc
 
 # This checks:
-# - Package.json consistency
-# - Dependency alignment
-# - Security configuration
-
-# Should output: "✅ All workspace dependencies are properly configured"
+# - Typecheck, lint, test, build across affected projects
+# - Must pass before opening a PR
 ```
 
 ---
@@ -152,7 +146,7 @@ Once setup is complete, you can start development servers:
 
 #### **Full Development Environment**
 
-```bash
+```powershell
 # Starts all development servers (web + lambdas)
 pnpm run dev
 
@@ -164,24 +158,22 @@ pnpm run dev
 
 #### **Individual Services**
 
-```bash
+```powershell
 # Web application only
-pnpm start
-# or
-pnpm run dev:web
+pnpm exec nx dev web
 
 # Mobile application (React Native)
-pnpm run android  # Android
-pnpm run ios      # iOS (Mac only)
+pnpm exec nx android app  # Android
+# iOS builds are currently disabled
 
 # Individual lambda functions
-pnpm run dev:db              # GraphQL API
-pnpm run dev:oauth           # OAuth proxy
-pnpm run dev:stats           # Stats processing
-pnpm run dev:game-selection  # Game selection
+pnpm exec nx serve db              # GraphQL API
+pnpm exec nx serve oauth-proxy     # OAuth proxy
+pnpm exec nx serve stats-lambda    # Stats processing
+pnpm exec nx serve game-selection  # Game selection
 
 # GraphiQL playground
-pnpm run graphiql
+pnpm exec nx serve graphql-explorer
 ```
 
 ### **Development URLs**
@@ -192,7 +184,7 @@ After starting development servers:
 - **GraphQL API**: [http://localhost:4000](http://localhost:4000)
 - **GraphQL Playground**: [http://localhost:4000/graphql](http://localhost:4000/graphql)
 - **GraphiQL**: [http://localhost:3001](http://localhost:3001)
-- **Storybook**: `pnpm run storybook` → [http://localhost:6006](http://localhost:6006)
+- **Storybook**: (if configured) [http://localhost:6006](http://localhost:6006)
 
 ---
 
@@ -200,71 +192,60 @@ After starting development servers:
 
 ### **Building Projects**
 
-```bash
-# Build everything
-pnpm run build:all
-
-# Build by project type
-pnpm run build:libs      # Shared libraries only
-pnpm run build:apps      # Applications only
-pnpm run build:lambdas   # Lambda functions only
+```powershell
+# Build affected projects
+pnpm exec nx affected -t build
 
 # Build specific project
 pnpm exec nx build <project-name>
+
+# Build all projects
+pnpm exec nx run-many -t build
 ```
 
 ### **Running Tests**
 
-```bash
-# Run all tests
-pnpm run test:all
-
-# Run tests by project type
-pnpm run test:libs       # Library tests
-pnpm run test:apps       # Application tests
-pnpm run test:lambdas    # Lambda tests
-
+```powershell
 # Run affected tests (only changed code)
-pnpm run test:changed
-pnpm run affected:test
+pnpm exec nx affected -t test
+
+# Run all tests
+pnpm exec nx run-many -t test
+
+# Run specific project tests
+pnpm exec nx test <project-name>
 
 # Watch mode for development
-pnpm run test:watch
+pnpm exec nx test <project-name> --watch
 ```
 
 ### **Code Quality & Linting**
 
-```bash
+```powershell
 # Fix all linting issues automatically
-pnpm run lint:fix:all
+pnpm exec nx affected -t lint --fix
 
-# Lint by project type
-pnpm run lint:libs
-pnpm run lint:apps
-pnpm run lint:lambdas
+# Lint specific project
+pnpm exec nx lint <project-name>
 
 # Type checking
-pnpm run typecheck
+pnpm exec nx affected -t typecheck
 
 # Format code
-pnpm exec nx run-many --target=format
+pnpm exec nx format:write
 ```
 
 ### **Database Operations**
 
-```bash
-# Test database connection
-pnpm run db:test
-
-# Connect to database CLI
-pnpm run db:psql
+```powershell
+# Run database queries
+.\scripts\db-query.ps1 "SELECT 1"
 
 # Run migrations
-pnpm run migrate
+pnpm exec nx run db:migrate
 
-# CLI database operations
-pnpm run cli:inspect-database
-pnpm run cli:test-connection
+# Generate migration after schema changes
+pnpm exec nx run db:generate
 ```
 
 ---
@@ -281,8 +262,8 @@ Error: Cannot find module '@legacy-sports/...'
 
 **Solution**: Rebuild libraries
 
-```bash
-pnpm run build:libs
+```powershell
+pnpm exec nx affected -t build
 ```
 
 #### **Environment Variable Issues**
@@ -293,15 +274,12 @@ Error: Missing environment configuration
 
 **Solutions**:
 
-```bash
+```powershell
 # 1. Re-run environment sync
-pnpm run sync-env
+make sync-env
 
-# 2. Check if sync worked
-pnpm run sync-env:dry-run
-
-# 3. Manual environment setup (if needed)
-cp .env.template .env.local
+# 2. Manual environment setup (if needed)
+Copy-Item .env.template .env.local
 # Edit .env.local with proper values
 ```
 
@@ -313,15 +291,15 @@ Error: Connection to database failed
 
 **Solutions**:
 
-```bash
+```powershell
 # 1. Test connection
-pnpm run db:test
+.\scripts\db-query.ps1 "SELECT 1"
 
-# 2. Check credentials
-pnpm run db:credentials
+# 2. Check credentials in .env file
+Select-String -Path .env -Pattern "DB_"
 
-# 3. Try production database (if development DB unavailable)
-pnpm run db:test:production
+# 3. Start local Docker database if needed
+docker compose up -d postgres
 ```
 
 #### **Port Already in Use**
@@ -349,17 +327,16 @@ Builds taking longer than expected
 
 **Solutions**:
 
-```bash
+```powershell
 # 1. Clear Nx cache
-pnpm run clean:nx
+pnpm exec nx reset
 
 # 2. Use affected builds instead of full builds
-pnpm run affected:build
+pnpm exec nx affected -t build
 
 # 3. Nuclear option - full clean
-pnpm run clean:deps
-pnpm install
-pnpm run build:libs
+pnpm run clean
+make install
 ```
 
 #### **TypeScript Errors**
@@ -370,18 +347,18 @@ Type checking errors in IDE or build
 
 **Solutions**:
 
-```bash
-# 1. Restart TypeScript language server (VS Code: Cmd+Shift+P > "TypeScript: Restart TS Server")
+```powershell
+# 1. Restart TypeScript language server (VS Code: Ctrl+Shift+P > "TypeScript: Restart TS Server")
 
 # 2. Rebuild type definitions
-pnpm run build:libs
+pnpm exec nx affected -t build
 
 # 3. Check for circular dependencies
 pnpm exec nx graph
 
 # 4. Clean TypeScript cache
-rm -rf node_modules/.cache
-pnpm run build:libs
+Remove-Item -Recurse -Force node_modules\.cache
+pnpm exec nx affected -t build
 ```
 
 #### **React Native Issues**
@@ -392,16 +369,16 @@ Metro bundler or native build failures
 
 **Solutions**:
 
-```bash
+```powershell
 # 1. Clear Metro cache
 pnpm exec react-native start --reset-cache
 
 # 2. Clean native builds
-cd apps/app
+Set-Location apps\app
 pnpm exec react-native run-android --reset-cache
 
 # 3. Rebuild native dependencies
-cd apps/app && rm -rf node_modules && pnpm install
+Set-Location apps\app; Remove-Item -Recurse -Force node_modules; pnpm install
 ```
 
 #### **Lambda Development Issues**
@@ -412,15 +389,11 @@ Lambda functions not starting or failing
 
 **Solutions**:
 
-```bash
+```powershell
 # 1. Ensure libraries are built
-pnpm run build:libs
+pnpm exec nx affected -t build
 
-# 2. Check lambda-specific dependencies
-cd lambdas/<lambda-name>
-pnpm install
-
-# 3. Restart lambda services
+# 2. Start lambda dev servers
 pnpm run dev:lambdas
 ```
 
@@ -428,24 +401,24 @@ pnpm run dev:lambdas
 
 #### **Faster Development Builds**
 
-```bash
+```powershell
 # Use affected commands instead of building everything
-pnpm run affected:build
-pnpm run affected:test
-pnpm run affected:lint
+pnpm exec nx affected -t build
+pnpm exec nx affected -t test
+pnpm exec nx affected -t lint
 
 # Enable watch mode during active development
-pnpm run test:watch
+pnpm exec nx test <project-name> --watch
 ```
 
 #### **Memory Issues**
 
-```bash
+```powershell
 # Increase Node.js memory limit
-export NODE_OPTIONS="--max-old-space-size=8192"
+$env:NODE_OPTIONS = "--max-old-space-size=8192"
 
-# Or add to .bashrc/.zshrc for permanent fix
-echo 'export NODE_OPTIONS="--max-old-space-size=8192"' >> ~/.bashrc
+# Or add to PowerShell profile for permanent fix
+Add-Content $PROFILE '$env:NODE_OPTIONS = "--max-old-space-size=8192"'
 ```
 
 ---
@@ -463,16 +436,18 @@ No additional setup required beyond the basic installation.
 1. Install Android Studio
 2. Set up Android SDK (API 29+)
 3. Configure environment variables:
-   ```bash
+   ```powershell
    export ANDROID_HOME=$HOME/Android/Sdk
    export PATH=$PATH:$ANDROID_HOME/emulator
    export PATH=$PATH:$ANDROID_HOME/tools
    export PATH=$PATH:$ANDROID_HOME/platform-tools
    ```
 4. Start Android emulator or connect physical device
-5. Run: `pnpm run android`
+5. Run: `pnpm exec nx android app`
 
 #### **iOS Setup (Mac only)**
+
+> **Note:** iOS builds are currently disabled as we are not actively using the iOS platform.
 
 1. Install Xcode from App Store
 2. Install Xcode Command Line Tools:
@@ -497,45 +472,36 @@ No additional setup required beyond the basic installation.
 
 Before starting work each day:
 
-```bash
+```powershell
 # 1. Pull latest changes
 git pull origin main
 
 # 2. Update dependencies (if package.json changed)
-pnpm install
+make install
 
-# 3. Rebuild libraries (if they changed)
-pnpm run build:libs
+# 3. Rebuild affected projects
+pnpm exec nx affected -t build
 
-# 4. Run validation
-pnpm run validate
-
-# 5. Start development
+# 4. Start development
 pnpm run dev
 ```
 
 ### **Before Committing Changes**
 
-```bash
-# 1. Run full validation
-pnpm run validate
+```powershell
+# Run full pre-commit validation (typecheck + lint + test + build)
+make pc
 
-# 2. Fix any linting issues
-pnpm run lint:fix:all
-
-# 3. Run type checking
-pnpm run typecheck
-
-# 4. Test affected code
-pnpm run test:changed
-
-# 5. Ensure everything builds
-pnpm run build:all
+# Or run individual checks:
+pnpm exec nx affected -t typecheck   # Type checking
+pnpm exec nx affected -t lint --fix  # Lint with auto-fix
+pnpm exec nx affected -t test        # Run tests
+pnpm exec nx affected -t build       # Build
 ```
 
 ### **Workspace Health Commands**
 
-```bash
+```powershell
 # Check project dependencies
 pnpm exec nx graph
 
@@ -544,9 +510,6 @@ pnpm exec nx show project <project-name>
 
 # List all projects
 pnpm exec nx show projects
-
-# Check for circular dependencies
-pnpm exec nx graph --file=dependency-graph.html
 ```
 
 ---
@@ -637,5 +600,5 @@ For questions or issues not covered in this guide, please reach out to the devel
 
 ---
 
-_Last Updated: October 12, 2025_  
+_Last Updated: February 28, 2026_  
 _Development Environment Version: Node.js 18+, Nx 21.5.2_

@@ -6,35 +6,27 @@
 
 **Metro bundler cache issues:**
 
-```bash
+```powershell
 # Clear Metro cache
 pnpm exec react-native start --reset-cache
-
-# Or from project root
-pnpm run clean:metro
 ```
 
 **Node modules corruption:**
 
-```bash
+```powershell
 # Clean and reinstall
-rm -rf node_modules package-lock.json
-pnpm install
-
-# On Windows
-rmdir /s node_modules
-del package-lock.json
+Remove-Item -Recurse -Force node_modules, pnpm-lock.yaml
 pnpm install
 ```
 
 **Nx cache issues:**
 
-```bash
+```powershell
 # Clear Nx cache
 pnpm exec nx reset
 
 # Clean all build artifacts
-pnpm run clean:all
+pnpm run clean
 ```
 
 ### Cross-Platform Issues
@@ -53,12 +45,12 @@ pnpm run clean:all
 
 **Import resolution errors:**
 
-```bash
+```powershell
 # Check Metro configuration
-cat apps/app/metro.config.js
+Get-Content apps\app\metro.config.js
 
 # Verify Vite aliases
-cat apps/web/vite.config.mts
+Get-Content apps\web\vite.config.mts
 ```
 
 ### Authentication Issues
@@ -87,7 +79,7 @@ cat apps/web/vite.config.mts
 
 - Ensure the signed-in user belongs to the league. `leagueScoringProfile` rejects non-members.
 - In GraphQL Playground, run `query { leagueScoringProfile(leagueId: 1) { profileId } }` with the same token to confirm access.
-- Run `npx nx run lambdas-db:migrate` to reseed default scoring profiles if tables were truncated.
+- Run `pnpm exec nx run db:migrate` to reseed default scoring profiles if tables were truncated.
 - Inspect the GraphQL terminal for resolver errors referencing `scoring` or `LeagueScoringService`.
 - Call `refetch()` on `useLeagueScoringSettings` or clear local storage to reset the cached provider state.
 
@@ -155,33 +147,26 @@ See: [Debugging with Database Timestamps](debugging-with-database-timestamps.md)
 
 **Wrong build order:**
 
-```bash
-# Follow tier dependency order:
-# Tier 1: env-utilities, logging, utils
-pnpm run build:libs -- --projects=env-utilities,logging,utils
-
-# Tier 2: tamagui-config, ui-abstractions
-pnpm run build:libs -- --projects=tamagui-config,ui-abstractions
-
-# Tier 3: Everything else
-pnpm run build:libs
+```powershell
+# Build affected projects (Nx resolves dependency order automatically)
+pnpm exec nx affected -t build
 ```
 
 **TypeScript errors after pull:**
 
-```bash
+```powershell
 # Rebuild all dependencies
-pnpm run build:libs
+pnpm exec nx affected -t build
 
 # Check for version mismatches
-pnpm run check:deps
+pnpm exec nx report
 ```
 
 **Linting failures:**
 
-```bash
+```powershell
 # Fix lint issues automatically
-pnpm run lint:fix
+pnpm exec nx affected -t lint --fix
 
 # Check specific project
 pnpm exec nx lint shared-components
@@ -191,22 +176,19 @@ pnpm exec nx lint shared-components
 
 **Connection failures:**
 
-```bash
-# Check database configuration
-pnpm run db:status
+```powershell
+# Check database connectivity
+.\scripts\db-query.ps1 "SELECT 1"
 
 # Verify environment variables
-cat .env | grep DB_
+Select-String -Path .env -Pattern "DB_"
 ```
 
 **Migration failures:**
 
-```bash
-# Reset database (development only)
-pnpm run db:reset
-
-# Run migrations manually
-pnpm run db:migrate
+```powershell
+# Run migrations
+pnpm exec nx run db:migrate
 ```
 
 **Schema validation errors:**
@@ -357,15 +339,15 @@ $endTime = $eventTime.AddMinutes(5).ToUnixTimeMilliseconds()
 
 **Lambda deployment failures:**
 
-```bash
+```powershell
 # Check Terraform state
-cd terraform && terraform plan
+Set-Location terraform; terraform plan
 
 # Verify AWS credentials
 aws sts get-caller-identity
 
 # Check Lambda function logs
-aws logs describe-log-groups --log-group-name-prefix /aws/lambda/
+aws logs describe-log-groups --log-group-name-prefix /aws/lambda/ --no-cli-pager
 ```
 
 **API Gateway errors:**
@@ -384,37 +366,28 @@ aws logs describe-log-groups --log-group-name-prefix /aws/lambda/
 
 **Port conflicts:**
 
-```bash
+```powershell
 # Check running processes
-netstat -ano | findstr :3000
-netstat -ano | findstr :4200
+netstat -ano | Select-String ":3000"
+netstat -ano | Select-String ":4200"
 
-# Kill specific process (Windows)
+# Kill specific process
 taskkill /PID <PID> /F
-
-# Kill specific process (Mac/Linux)
-kill -9 <PID>
 ```
 
 **Environment variable issues:**
 
-```bash
+```powershell
 # Sync environment variables
-pnpm run sync-env
+make sync-env
 
 # Check current environment
-pnpm run env:check
-
-# Validate configuration
-pnpm run validate:env
+Select-String -Path .env -Pattern "."
 ```
 
 **VS Code configuration:**
 
-```bash
-# Reset VS Code workspace
-rm -rf .vscode/settings.json
-
+```powershell
 # Reinstall recommended extensions
 code --install-extension ms-vscode.vscode-typescript-next
 ```
@@ -423,12 +396,12 @@ code --install-extension ms-vscode.vscode-typescript-next
 
 **Jest test failures:**
 
-```bash
+```powershell
 # Clear Jest cache
 pnpm exec jest --clearCache
 
 # Run tests with verbose output
-pnpm run test -- --verbose
+pnpm exec nx test <project-name> --verbose
 
 # Run specific test file
 pnpm exec nx test shared-components --testPathPattern=auth
@@ -436,37 +409,31 @@ pnpm exec nx test shared-components --testPathPattern=auth
 
 **E2E test failures:**
 
-```bash
+```powershell
 # Install Playwright dependencies
 pnpm exec playwright install
 
 # Run E2E tests with debugging
-pnpm run e2e -- --debug
+pnpm exec nx e2e web-e2e -- --debug
 
 # Check test artifacts
-ls test-results/
+Get-ChildItem test-results\
 ```
 
 **Coverage issues:**
 
-```bash
+```powershell
 # Generate coverage report
-pnpm run test:coverage
-
-# View coverage details
-open coverage/index.html
+pnpm exec nx test <project-name> --coverage
 ```
 
 ### Performance Issues
 
 **Slow build times:**
 
-```bash
-# Enable Nx cloud caching
-pnpm run nx:login
-
+```powershell
 # Check build performance
-pnpm exec nx run-many --target=build --all --parallel=3 --verbose
+pnpm exec nx affected -t build --verbose
 ```
 
 **Runtime performance:**
@@ -477,12 +444,9 @@ pnpm exec nx run-many --target=build --all --parallel=3 --verbose
 
 **Memory issues:**
 
-```bash
+```powershell
 # Increase Node.js memory limit
-export NODE_OPTIONS="--max-old-space-size=8192"
-
-# On Windows
-set NODE_OPTIONS=--max-old-space-size=8192
+$env:NODE_OPTIONS = "--max-old-space-size=8192"
 ```
 
 ## Platform-Specific Troubleshooting
@@ -539,49 +503,37 @@ pod install --repo-update
 
 ### Complete Environment Reset
 
-```bash
+```powershell
 # 1. Clean everything
-pnpm run clean:all
-rm -rf node_modules package-lock.json
+pnpm run clean
+Remove-Item -Recurse -Force node_modules, pnpm-lock.yaml
 
 # 2. Fresh install
-pnpm install
+make install
 
-# 3. Rebuild libraries in order
-pnpm run build:libs
-
-# 4. Run development setup
-pnpm run sync-env
+# 3. Run development setup
+make sync-env
 pnpm run dev
 ```
 
 ### Database Recovery (Development)
 
-```bash
-# 1. Backup current data (if needed)
-pnpm run db:backup
+```powershell
+# 1. Run fresh migrations
+pnpm exec nx run db:migrate
 
-# 2. Reset database
-pnpm run db:reset
-
-# 3. Run fresh migrations
-pnpm run db:migrate
-
-# 4. Seed development data
-pnpm run db:seed
+# 2. Or restore from dev seed (no AWS needed)
+# See: .github/skills/db-restore-dev/SKILL.md
 ```
 
 ### Production Rollback
 
-```bash
+```powershell
 # 1. Revert to previous commit
 git revert <commit-hash>
 
 # 2. Redeploy infrastructure
-cd terraform && terraform apply
-
-# 3. Verify health checks
-pnpm run health:check
+Set-Location terraform; terraform apply
 ```
 
 ## Getting Additional Help

@@ -6,7 +6,7 @@ This document provides comprehensive documentation of the Legacy Sports AWS infr
 
 **Environment**: Development (dev)  
 **Region**: us-east-1 (US East - N. Virginia)  
-**Last Updated**: September 26, 2025  
+**Last Updated**: February 28, 2026  
 **Cost Optimization Status**: Fully optimized (~$37.80/month savings achieved)  
 **Infrastructure Cleanup**: Legacy resource decommissioning completed (September 26, 2025)
 
@@ -43,13 +43,22 @@ This document provides comprehensive documentation of the Legacy Sports AWS infr
 │  │ Game Selection   │◄───┤  │         (Private Subnet)               │ │   │
 │  │    Lambda        │    │  │      + Public Access via SG            │ │   │
 │  │ (Outside VPC)    │    │  └─────────────────────────────────────────┘ │   │
+│  │                  │    │                                             │   │
+│  │ Draft Processor  │    │                                             │   │
+│  │    Lambda        │    │                                             │   │
+│  │ (Outside VPC)    │    │                                             │   │
 │  └──────────────────┘    └─────────────────────────────────────────────┘   │
 │            │                                                               │
 │            ▼                                                               │
 │  ┌──────────────────┐    ┌─────────────────────────────────────────────┐   │
-│  │  Baseball Ref    │    │              SQS & Secrets                  │   │
+│  │  Baseball Ref    │    │          Additional Lambdas                 │   │
 │  │  External APIs   │    │                                             │   │
-│  └──────────────────┘    └─────────────────────────────────────────────┘   │
+│  └──────────────────┘    │  Jira Proxy · WebSocket · Draft Processor  │   │
+│                          │                                             │   │
+│                          ├─────────────────────────────────────────────┤   │
+│                          │              SQS & Secrets                  │   │
+│                          │                                             │   │
+│                          └─────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
