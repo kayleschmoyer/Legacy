@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Button,
   H1,
   H3,
   Paragraph,
@@ -8,6 +9,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { ScrollView, styled } from 'tamagui';
+import { OnboardingTutorial } from '../../components/onboarding';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -287,289 +289,423 @@ const FAQ_ITEMS: FaqItemProps[] = [
   },
 ];
 
+/* ─── Historical concepts FAQ items ─── */
+
+const HISTORICAL_FAQ_ITEMS: FaqItemProps[] = [
+  {
+    question: 'What makes Legacy Sports different from live fantasy leagues?',
+    answer:
+      'Legacy Sports uses archived MLB box scores from a specific historical season rather than live games. Every stat is final, verified, and drawn from real history — no weather cancellations, no injury luck mid-game. Pure historical knowledge is your edge.',
+  },
+  {
+    question: 'What is a "season assignment"?',
+    answer:
+      'When a commissioner creates a league they choose an MLB calendar year (e.g. 2019) called the season assignment. All player statistics for that league are pulled exclusively from that year — so drafting Mike Trout means his actual 2019 numbers count toward your score.',
+  },
+  {
+    question: 'How does game selection work?',
+    answer:
+      'Each weekly matchup has a defined game window — specific dates in the assigned season. Every official MLB game played in that window contributes stats. Commissioners can configure which window maps to each week in the league settings.',
+  },
+  {
+    question: 'What is an archived box score?',
+    answer:
+      "An archived box score is the official record of a completed MLB game: every at-bat, hit, run, RBI, pitching line, and fielding stat. Legacy Sports reads these records to calculate your fantasy team's score with 100% accuracy against real historical data.",
+  },
+  {
+    question: 'Can I use the same player in multiple leagues?',
+    answer:
+      'Yes! Each league has its own draft and assigned season. You can own the same player in different leagues, potentially across different historical seasons, so your total score per player will differ between leagues.',
+  },
+  {
+    question: "Why did my player's stats change after the week ended?",
+    answer:
+      'Our system processes archived games in batches. Scores may take a short time to fully settle after the matchup window closes. Once all games in the window are processed, scores are final and will not change.',
+  },
+];
+
 /* ─── Main component ─── */
 
 export default function HelpPage() {
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+
   return (
-    <PageContainer>
-      <ScrollView>
-        <ContentContainer>
-          {/* ── Page header ── */}
-          <PageHeader>
-            <H1 color={BRAND_GOLD}>
-              <span role="img" aria-label="help">
-                🆘
-              </span>{' '}
-              Help &amp; Support
-            </H1>
-            <Paragraph color="$colorPress" fontSize="$5" lineHeight={28}>
-              Find answers to common questions and learn how to get the most out
-              of Legacy Sports.
-            </Paragraph>
-          </PageHeader>
+    <>
+      {tutorialOpen && (
+        <OnboardingTutorial onClose={() => setTutorialOpen(false)} />
+      )}
+      <PageContainer>
+        <ScrollView>
+          <ContentContainer>
+            {/* ── Page header ── */}
+            <PageHeader>
+              <H1 color={BRAND_GOLD}>
+                <span role="img" aria-label="help">
+                  🆘
+                </span>{' '}
+                Help &amp; Support
+              </H1>
+              <Paragraph color="$colorPress" fontSize="$5" lineHeight={28}>
+                Find answers to common questions and learn how to get the most
+                out of Legacy Sports.
+              </Paragraph>
+            </PageHeader>
 
-          {/* ── Quick links ── */}
-          <SectionCard>
-            <SectionHeader>
-              <SectionIconBox>
-                <Paragraph fontSize={18} lineHeight={20}>
-                  <span role="img" aria-label="link">
-                    🔗
-                  </span>
-                </Paragraph>
-              </SectionIconBox>
-              <H3 color="$color">Quick Links</H3>
-            </SectionHeader>
-            <SectionBody>
-              <XStack flexWrap="wrap" gap="$3">
-                <a href="/baseball" style={{ textDecoration: 'none' }}>
-                  <QuickLinkChip>
-                    <Paragraph fontSize={16} lineHeight={18}>
-                      <span role="img" aria-label="baseball">
-                        ⚾
-                      </span>
-                    </Paragraph>
-                    <Paragraph color="$color" fontWeight="500" fontSize="$3">
-                      My Leagues
-                    </Paragraph>
-                  </QuickLinkChip>
-                </a>
-                <a href="/players" style={{ textDecoration: 'none' }}>
-                  <QuickLinkChip>
-                    <Paragraph fontSize={16} lineHeight={18}>
-                      <span role="img" aria-label="players">
-                        👥
-                      </span>
-                    </Paragraph>
-                    <Paragraph color="$color" fontWeight="500" fontSize="$3">
-                      Players
-                    </Paragraph>
-                  </QuickLinkChip>
-                </a>
-                <a href="/players/stats" style={{ textDecoration: 'none' }}>
-                  <QuickLinkChip>
-                    <Paragraph fontSize={16} lineHeight={18}>
-                      <span role="img" aria-label="statistics">
-                        📊
-                      </span>
-                    </Paragraph>
-                    <Paragraph color="$color" fontWeight="500" fontSize="$3">
-                      Player Stats
-                    </Paragraph>
-                  </QuickLinkChip>
-                </a>
-                <a
-                  href="/baseball/league/create"
-                  style={{ textDecoration: 'none' }}
+            {/* ── Tutorial launcher ── */}
+            <SectionCard>
+              <SectionHeader>
+                <SectionIconBox>
+                  <Paragraph fontSize={18} lineHeight={20}>
+                    <span role="img" aria-label="book">
+                      📖
+                    </span>
+                  </Paragraph>
+                </SectionIconBox>
+                <YStack flex={1} gap="$1">
+                  <H3 color="$color">New to Legacy Sports?</H3>
+                  <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
+                    Take the interactive tutorial to learn how historical-stats
+                    scoring, season assignment, and game selection work.
+                  </Paragraph>
+                </YStack>
+              </SectionHeader>
+              <SectionBody>
+                <XStack
+                  alignItems="center"
+                  justifyContent="space-between"
+                  flexWrap="wrap"
+                  gap="$3"
                 >
-                  <QuickLinkChip>
-                    <Paragraph fontSize={16} lineHeight={18}>
-                      <span role="img" aria-label="create league">
-                        ➕
-                      </span>
-                    </Paragraph>
-                    <Paragraph color="$color" fontWeight="500" fontSize="$3">
-                      Create League
-                    </Paragraph>
-                  </QuickLinkChip>
-                </a>
-                <a href="/profile/settings" style={{ textDecoration: 'none' }}>
-                  <QuickLinkChip>
-                    <Paragraph fontSize={16} lineHeight={18}>
-                      <span role="img" aria-label="settings">
-                        ⚙️
-                      </span>
-                    </Paragraph>
-                    <Paragraph color="$color" fontWeight="500" fontSize="$3">
-                      Profile Settings
-                    </Paragraph>
-                  </QuickLinkChip>
-                </a>
-              </XStack>
-            </SectionBody>
-          </SectionCard>
-
-          {/* ── FAQ ── */}
-          <SectionCard>
-            <SectionHeader>
-              <SectionIconBox>
-                <Paragraph fontSize={18} lineHeight={20}>
-                  <span role="img" aria-label="frequently asked questions">
-                    ❓
-                  </span>
-                </Paragraph>
-              </SectionIconBox>
-              <H3 color="$color">Frequently Asked Questions</H3>
-            </SectionHeader>
-            <SectionBody>
-              {FAQ_ITEMS.map((item) => (
-                <FaqItem
-                  key={item.question}
-                  question={item.question}
-                  answer={item.answer}
-                />
-              ))}
-            </SectionBody>
-          </SectionCard>
-
-          {/* ── Getting started ── */}
-          <SectionCard>
-            <SectionHeader>
-              <SectionIconBox>
-                <Paragraph fontSize={18} lineHeight={20}>
-                  <span role="img" aria-label="rocket">
-                    🚀
-                  </span>
-                </Paragraph>
-              </SectionIconBox>
-              <H3 color="$color">Getting Started</H3>
-            </SectionHeader>
-            <SectionBody gap="$5">
-              {[
-                {
-                  step: 1,
-                  title: 'Create or join a league',
-                  body: 'Head to the Baseball section and either create a new private league or join an existing one with an invite code.',
-                },
-                {
-                  step: 2,
-                  title: 'Set your roster',
-                  body: 'Once the league draft is complete, review your roster and make any trades or waiver wire moves to build the best team.',
-                },
-                {
-                  step: 3,
-                  title: 'Follow the season',
-                  body: 'Check your matchup score throughout the week. Real MLB stats power your fantasy team — every hit, homer, and strikeout counts.',
-                },
-                {
-                  step: 4,
-                  title: 'Win the championship',
-                  body: 'Manage your roster actively through the season, make smart trades, and outlast your league-mates in the playoffs.',
-                },
-              ].map(({ step, title, body }) => (
-                <XStack key={step} gap="$4" alignItems="flex-start">
-                  <YStack
-                    width={32}
-                    height={32}
-                    borderRadius="$10"
-                    alignItems="center"
-                    justifyContent="center"
-                    flexShrink={0}
+                  <Paragraph
+                    color="$colorPress"
+                    fontSize="$3"
+                    lineHeight={22}
+                    flex={1}
+                    minWidth={200}
+                  >
+                    Our 6-step walkthrough covers the unique historical game
+                    mechanic — from archived box scores to sample matchups. Runs
+                    in under 2 minutes.
+                  </Paragraph>
+                  <Button
+                    size="$4"
+                    borderRadius="$6"
+                    fontWeight="700"
+                    onPress={() => setTutorialOpen(true)}
                     style={
                       {
-                        background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, #3a5a9c 100%)`,
+                        background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, #C41E3A 100%)`,
+                        color: '#fff',
+                        border: 'none',
                       } as never
                     }
+                    hoverStyle={{ opacity: 0.9 }}
                   >
-                    <Paragraph
-                      color={BRAND_GOLD_LIGHT}
-                      fontWeight="700"
-                      fontSize="$3"
-                    >
-                      {step}
-                    </Paragraph>
-                  </YStack>
-                  <YStack flex={1} gap="$1">
-                    <Paragraph fontWeight="700" color="$color" fontSize="$4">
-                      {title}
-                    </Paragraph>
-                    <Paragraph color="$colorPress" lineHeight={22}>
-                      {body}
-                    </Paragraph>
-                  </YStack>
+                    <span role="img" aria-label="rocket">
+                      🚀
+                    </span>{' '}
+                    Launch Tutorial
+                  </Button>
                 </XStack>
-              ))}
-            </SectionBody>
-          </SectionCard>
+              </SectionBody>
+            </SectionCard>
 
-          {/* ── Contact & support ── */}
-          <SectionCard>
-            <SectionHeader>
-              <SectionIconBox>
-                <Paragraph fontSize={18} lineHeight={20}>
-                  <span role="img" aria-label="contact">
-                    📬
-                  </span>
-                </Paragraph>
-              </SectionIconBox>
-              <H3 color="$color">Contact &amp; Support</H3>
-            </SectionHeader>
-            <SectionBody>
-              <YStack gap="$3">
-                <ContactOption
-                  icon="🐛"
-                  iconLabel="bug"
-                  title="Report a Bug"
-                  description="Found something broken? Open a GitHub issue and we'll prioritize a fix."
-                  href="https://github.com/bbarclay/legacy-sports/issues/new?labels=bug&template=bug_report.md"
-                />
-                <ContactOption
-                  icon="💡"
-                  iconLabel="idea"
-                  title="Suggest a Feature"
-                  description="Have an idea that would make Legacy Sports better? We'd love to hear it."
-                  href="https://github.com/bbarclay/legacy-sports/issues/new?labels=enhancement&template=feature_request.md"
-                />
-                <ContactOption
-                  icon="💬"
-                  iconLabel="discussion"
-                  title="Community Discussions"
-                  description="Chat with other managers, share tips, and get advice from the community."
-                  href="https://github.com/bbarclay/legacy-sports/discussions"
-                />
-              </YStack>
-
-              <Separator marginVertical="$2" />
-
-              <YStack
-                padding="$4"
-                borderRadius="$4"
-                style={
-                  { backgroundColor: withAlpha(BRAND_SEAM_RED, 0.06) } as never
-                }
-                borderWidth={1}
-                borderColor={withAlpha(BRAND_SEAM_RED, 0.2)}
-                gap="$2"
-              >
-                <Paragraph
-                  fontWeight="700"
-                  color={BRAND_SEAM_RED}
-                  fontSize="$3"
-                >
-                  <span role="img" aria-label="urgent">
-                    🚨
-                  </span>{' '}
-                  Urgent account issues?
-                </Paragraph>
-                <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
-                  For account access problems or missed draft notifications,
-                  open a GitHub issue tagged{' '}
-                  <Paragraph
-                    tag="span"
-                    fontFamily="$mono"
-                    color={BRAND_GOLD_LIGHT}
+            {/* ── Quick links ── */}
+            <SectionCard>
+              <SectionHeader>
+                <SectionIconBox>
+                  <Paragraph fontSize={18} lineHeight={20}>
+                    <span role="img" aria-label="link">
+                      🔗
+                    </span>
+                  </Paragraph>
+                </SectionIconBox>
+                <H3 color="$color">Quick Links</H3>
+              </SectionHeader>
+              <SectionBody>
+                <XStack flexWrap="wrap" gap="$3">
+                  <a href="/baseball" style={{ textDecoration: 'none' }}>
+                    <QuickLinkChip>
+                      <Paragraph fontSize={16} lineHeight={18}>
+                        <span role="img" aria-label="baseball">
+                          ⚾
+                        </span>
+                      </Paragraph>
+                      <Paragraph color="$color" fontWeight="500" fontSize="$3">
+                        My Leagues
+                      </Paragraph>
+                    </QuickLinkChip>
+                  </a>
+                  <a href="/players" style={{ textDecoration: 'none' }}>
+                    <QuickLinkChip>
+                      <Paragraph fontSize={16} lineHeight={18}>
+                        <span role="img" aria-label="players">
+                          👥
+                        </span>
+                      </Paragraph>
+                      <Paragraph color="$color" fontWeight="500" fontSize="$3">
+                        Players
+                      </Paragraph>
+                    </QuickLinkChip>
+                  </a>
+                  <a href="/players/stats" style={{ textDecoration: 'none' }}>
+                    <QuickLinkChip>
+                      <Paragraph fontSize={16} lineHeight={18}>
+                        <span role="img" aria-label="statistics">
+                          📊
+                        </span>
+                      </Paragraph>
+                      <Paragraph color="$color" fontWeight="500" fontSize="$3">
+                        Player Stats
+                      </Paragraph>
+                    </QuickLinkChip>
+                  </a>
+                  <a
+                    href="/baseball/league/create"
+                    style={{ textDecoration: 'none' }}
                   >
-                    urgent
-                  </Paragraph>{' '}
-                  and we'll respond as soon as possible.
-                </Paragraph>
-              </YStack>
-            </SectionBody>
-          </SectionCard>
+                    <QuickLinkChip>
+                      <Paragraph fontSize={16} lineHeight={18}>
+                        <span role="img" aria-label="create league">
+                          ➕
+                        </span>
+                      </Paragraph>
+                      <Paragraph color="$color" fontWeight="500" fontSize="$3">
+                        Create League
+                      </Paragraph>
+                    </QuickLinkChip>
+                  </a>
+                  <a
+                    href="/profile/settings"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <QuickLinkChip>
+                      <Paragraph fontSize={16} lineHeight={18}>
+                        <span role="img" aria-label="settings">
+                          ⚙️
+                        </span>
+                      </Paragraph>
+                      <Paragraph color="$color" fontWeight="500" fontSize="$3">
+                        Profile Settings
+                      </Paragraph>
+                    </QuickLinkChip>
+                  </a>
+                </XStack>
+              </SectionBody>
+            </SectionCard>
 
-          {/* ── Footer note ── */}
-          <YStack alignItems="center" paddingVertical="$4" gap="$1">
-            <Paragraph color="$gray10" fontSize="$3" textAlign="center">
-              © {new Date().getFullYear()} Legacy Sports · Fantasy Baseball
-              Management
-            </Paragraph>
-            <Paragraph color="$gray10" fontSize="$2" textAlign="center">
-              Powered by official MLB statistics • Data refreshed throughout
-              each game day
-            </Paragraph>
-          </YStack>
-        </ContentContainer>
-      </ScrollView>
-    </PageContainer>
+            {/* ── FAQ ── */}
+            <SectionCard>
+              <SectionHeader>
+                <SectionIconBox>
+                  <Paragraph fontSize={18} lineHeight={20}>
+                    <span role="img" aria-label="frequently asked questions">
+                      ❓
+                    </span>
+                  </Paragraph>
+                </SectionIconBox>
+                <H3 color="$color">Frequently Asked Questions</H3>
+              </SectionHeader>
+              <SectionBody>
+                {FAQ_ITEMS.map((item) => (
+                  <FaqItem
+                    key={item.question}
+                    question={item.question}
+                    answer={item.answer}
+                  />
+                ))}
+              </SectionBody>
+            </SectionCard>
+
+            {/* ── Historical Stats FAQ ── */}
+            <SectionCard>
+              <SectionHeader>
+                <SectionIconBox>
+                  <Paragraph fontSize={18} lineHeight={20}>
+                    <span role="img" aria-label="historical stats">
+                      📜
+                    </span>
+                  </Paragraph>
+                </SectionIconBox>
+                <YStack flex={1} gap="$1">
+                  <H3 color="$color">Historical Stats — How It Works</H3>
+                  <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
+                    Unique to Legacy Sports — answers to common questions about
+                    our historical-stats game mechanic.
+                  </Paragraph>
+                </YStack>
+              </SectionHeader>
+              <SectionBody>
+                {HISTORICAL_FAQ_ITEMS.map((item) => (
+                  <FaqItem
+                    key={item.question}
+                    question={item.question}
+                    answer={item.answer}
+                  />
+                ))}
+              </SectionBody>
+            </SectionCard>
+
+            <SectionCard>
+              <SectionHeader>
+                <SectionIconBox>
+                  <Paragraph fontSize={18} lineHeight={20}>
+                    <span role="img" aria-label="rocket">
+                      🚀
+                    </span>
+                  </Paragraph>
+                </SectionIconBox>
+                <H3 color="$color">Getting Started</H3>
+              </SectionHeader>
+              <SectionBody gap="$5">
+                {[
+                  {
+                    step: 1,
+                    title: 'Create or join a league',
+                    body: 'Head to the Baseball section and either create a new private league or join an existing one with an invite code.',
+                  },
+                  {
+                    step: 2,
+                    title: 'Set your roster',
+                    body: 'Once the league draft is complete, review your roster and make any trades or waiver wire moves to build the best team.',
+                  },
+                  {
+                    step: 3,
+                    title: 'Follow the season',
+                    body: 'Check your matchup score throughout the week. Real MLB stats power your fantasy team — every hit, homer, and strikeout counts.',
+                  },
+                  {
+                    step: 4,
+                    title: 'Win the championship',
+                    body: 'Manage your roster actively through the season, make smart trades, and outlast your league-mates in the playoffs.',
+                  },
+                ].map(({ step, title, body }) => (
+                  <XStack key={step} gap="$4" alignItems="flex-start">
+                    <YStack
+                      width={32}
+                      height={32}
+                      borderRadius="$10"
+                      alignItems="center"
+                      justifyContent="center"
+                      flexShrink={0}
+                      style={
+                        {
+                          background: `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, #3a5a9c 100%)`,
+                        } as never
+                      }
+                    >
+                      <Paragraph
+                        color={BRAND_GOLD_LIGHT}
+                        fontWeight="700"
+                        fontSize="$3"
+                      >
+                        {step}
+                      </Paragraph>
+                    </YStack>
+                    <YStack flex={1} gap="$1">
+                      <Paragraph fontWeight="700" color="$color" fontSize="$4">
+                        {title}
+                      </Paragraph>
+                      <Paragraph color="$colorPress" lineHeight={22}>
+                        {body}
+                      </Paragraph>
+                    </YStack>
+                  </XStack>
+                ))}
+              </SectionBody>
+            </SectionCard>
+
+            {/* ── Contact & support ── */}
+            <SectionCard>
+              <SectionHeader>
+                <SectionIconBox>
+                  <Paragraph fontSize={18} lineHeight={20}>
+                    <span role="img" aria-label="contact">
+                      📬
+                    </span>
+                  </Paragraph>
+                </SectionIconBox>
+                <H3 color="$color">Contact &amp; Support</H3>
+              </SectionHeader>
+              <SectionBody>
+                <YStack gap="$3">
+                  <ContactOption
+                    icon="🐛"
+                    iconLabel="bug"
+                    title="Report a Bug"
+                    description="Found something broken? Open a GitHub issue and we'll prioritize a fix."
+                    href="https://github.com/bbarclay/legacy-sports/issues/new?labels=bug&template=bug_report.md"
+                  />
+                  <ContactOption
+                    icon="💡"
+                    iconLabel="idea"
+                    title="Suggest a Feature"
+                    description="Have an idea that would make Legacy Sports better? We'd love to hear it."
+                    href="https://github.com/bbarclay/legacy-sports/issues/new?labels=enhancement&template=feature_request.md"
+                  />
+                  <ContactOption
+                    icon="💬"
+                    iconLabel="discussion"
+                    title="Community Discussions"
+                    description="Chat with other managers, share tips, and get advice from the community."
+                    href="https://github.com/bbarclay/legacy-sports/discussions"
+                  />
+                </YStack>
+
+                <Separator marginVertical="$2" />
+
+                <YStack
+                  padding="$4"
+                  borderRadius="$4"
+                  style={
+                    {
+                      backgroundColor: withAlpha(BRAND_SEAM_RED, 0.06),
+                    } as never
+                  }
+                  borderWidth={1}
+                  borderColor={withAlpha(BRAND_SEAM_RED, 0.2)}
+                  gap="$2"
+                >
+                  <Paragraph
+                    fontWeight="700"
+                    color={BRAND_SEAM_RED}
+                    fontSize="$3"
+                  >
+                    <span role="img" aria-label="urgent">
+                      🚨
+                    </span>{' '}
+                    Urgent account issues?
+                  </Paragraph>
+                  <Paragraph color="$colorPress" fontSize="$3" lineHeight={20}>
+                    For account access problems or missed draft notifications,
+                    open a GitHub issue tagged{' '}
+                    <Paragraph
+                      tag="span"
+                      fontFamily="$mono"
+                      color={BRAND_GOLD_LIGHT}
+                    >
+                      urgent
+                    </Paragraph>{' '}
+                    and we'll respond as soon as possible.
+                  </Paragraph>
+                </YStack>
+              </SectionBody>
+            </SectionCard>
+
+            {/* ── Footer note ── */}
+            <YStack alignItems="center" paddingVertical="$4" gap="$1">
+              <Paragraph color="$gray10" fontSize="$3" textAlign="center">
+                © {new Date().getFullYear()} Legacy Sports · Fantasy Baseball
+                Management
+              </Paragraph>
+              <Paragraph color="$gray10" fontSize="$2" textAlign="center">
+                Powered by official MLB statistics • Data refreshed throughout
+                each game day
+              </Paragraph>
+            </YStack>
+          </ContentContainer>
+        </ScrollView>
+      </PageContainer>
+    </>
   );
 }

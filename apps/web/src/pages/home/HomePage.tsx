@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -10,6 +10,8 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { ScrollView, Separator, styled, Text, H2 as TH2 } from 'tamagui';
+import { OnboardingTutorial } from '../../components/onboarding';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -277,246 +279,280 @@ const FEATURES = [
  */
 export function HomePage(): React.JSX.Element {
   const navigate = useNavigate();
+  const [onboardingComplete, setOnboardingComplete] = useLocalStorage<boolean>(
+    'ls_onboarding_complete',
+    false,
+  );
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+
+  // Auto-show tutorial once for first-time visitors.
+  useEffect(() => {
+    if (!onboardingComplete) {
+      setTutorialOpen(true);
+    }
+  }, [onboardingComplete]);
+
+  const handleTutorialClose = () => {
+    setTutorialOpen(false);
+    setOnboardingComplete(true);
+  };
 
   return (
-    <ScrollView>
-      <PageContainer style={pageBackgroundStyle}>
-        {/* ─── Hero ─── */}
-        <HeroSection style={heroGradientStyle}>
-          <HeroBadge>
-            <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
-              {new Date().getFullYear()} Season
-            </Text>
-          </HeroBadge>
+    <>
+      {tutorialOpen && <OnboardingTutorial onClose={handleTutorialClose} />}
+      <ScrollView>
+        <PageContainer style={pageBackgroundStyle}>
+          {/* ─── Hero ─── */}
+          <HeroSection style={heroGradientStyle}>
+            <HeroBadge>
+              <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
+                {new Date().getFullYear()} Season
+              </Text>
+            </HeroBadge>
 
-          <H1
-            fontSize="$12"
-            fontWeight="800"
-            color="$color"
-            textAlign="center"
-            letterSpacing={-0.5}
-            animation="medium"
-            enterStyle={{ opacity: 0, y: 20 }}
-            $sm={{ fontSize: '$10' }}
-          >
-            Legacy Sports
-          </H1>
-
-          <Paragraph
-            fontSize="$6"
-            color="$textMuted"
-            textAlign="center"
-            maxWidth={560}
-            lineHeight="$7"
-            animation="medium"
-            enterStyle={{ opacity: 0, y: 15 }}
-          >
-            Your all-in-one fantasy sports platform — draft, manage, and compete
-            with friends across every season.
-          </Paragraph>
-
-          <XStack
-            gap="$3"
-            marginTop="$2"
-            flexWrap="wrap"
-            justifyContent="center"
-            animation="medium"
-            enterStyle={{ opacity: 0, y: 10 }}
-          >
-            <ActionButton
-              onPress={() => {
-                navigate('/baseball');
-              }}
-              accessibilityLabel="Get started with baseball"
-            >
-              <Text fontWeight="700">Get Started</Text>
-            </ActionButton>
-            <OutlineButton
-              onPress={() => {
-                navigate('/players/stats');
-              }}
-              accessibilityLabel="Browse player statistics"
-            >
-              <Text fontWeight="700">Browse Stats</Text>
-            </OutlineButton>
-          </XStack>
-        </HeroSection>
-
-        <ContentContainer>
-          {/* ─── Sports ─── */}
-          <YStack gap="$5">
-            <YStack gap="$2">
-              <SectionTitle>Choose Your Sport</SectionTitle>
-              <Paragraph fontSize="$4" color="$textMuted" maxWidth={480}>
-                Jump into a sport to manage leagues, run drafts, and track your
-                teams.
-              </Paragraph>
-            </YStack>
-
-            <XStack gap="$5" flexWrap="wrap">
-              {SPORTS.map((sport) => (
-                <SportCard
-                  key={sport.key}
-                  flex={1}
-                  minWidth={300}
-                  style={sportCardGlassStyle(sport.accent)}
-                  onPress={() => {
-                    navigate(sport.route);
-                  }}
-                  accessibilityLabel={`Navigate to ${sport.title}`}
-                  role="link"
-                >
-                  <XStack gap="$4" alignItems="center">
-                    <SportIcon
-                      style={{
-                        background: `linear-gradient(135deg, ${sport.accent}, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)})`,
-                      }}
-                    >
-                      <Text fontSize="$8">
-                        <span role="img" aria-label={sport.emojiLabel}>
-                          {sport.emoji}
-                        </span>
-                      </Text>
-                    </SportIcon>
-                    <YStack gap="$1" flex={1}>
-                      <H3 fontSize="$8" fontWeight="700" color="$color">
-                        {sport.title}
-                      </H3>
-                      {!sport.available && (
-                        <Text
-                          fontSize="$2"
-                          color="$amber9"
-                          fontWeight="600"
-                          textTransform="uppercase"
-                          letterSpacing={0.5}
-                        >
-                          Coming Soon
-                        </Text>
-                      )}
-                    </YStack>
-                  </XStack>
-
-                  <Paragraph
-                    fontSize="$4"
-                    color="$glassTextSubdued"
-                    lineHeight="$5"
-                  >
-                    {sport.description}
-                  </Paragraph>
-
-                  <XStack gap="$3" marginTop="$1">
-                    <ActionButton
-                      size="$3"
-                      onPress={() => {
-                        navigate(sport.route);
-                      }}
-                    >
-                      <Text fontWeight="700">View Leagues</Text>
-                    </ActionButton>
-                    {sport.key === 'baseball' && (
-                      <OutlineButton
-                        size="$3"
-                        onPress={() => {
-                          navigate('/baseball/league/create');
-                        }}
-                      >
-                        <Text fontWeight="700">Create League</Text>
-                      </OutlineButton>
-                    )}
-                  </XStack>
-                </SportCard>
-              ))}
-            </XStack>
-          </YStack>
-
-          <Separator backgroundColor="$glassBorder" />
-
-          {/* ─── Features ─── */}
-          <YStack gap="$5">
-            <YStack gap="$2">
-              <SectionTitle>Platform Features</SectionTitle>
-              <Paragraph fontSize="$4" color="$textMuted" maxWidth={480}>
-                Everything you need to run a competitive fantasy league.
-              </Paragraph>
-            </YStack>
-
-            <XStack gap="$4" flexWrap="wrap">
-              {FEATURES.map((feature) => (
-                <FeatureCard key={feature.label} style={featureCardGlassStyle}>
-                  <FeatureIconCircle>
-                    <Text fontSize="$5">
-                      <span role="img" aria-label={feature.label}>
-                        {feature.emoji}
-                      </span>
-                    </Text>
-                  </FeatureIconCircle>
-                  <H3 fontSize="$6" fontWeight="700" color="$color">
-                    {feature.title}
-                  </H3>
-                  <Paragraph
-                    fontSize="$3"
-                    color="$glassTextSubdued"
-                    lineHeight="$4"
-                  >
-                    {feature.description}
-                  </Paragraph>
-                </FeatureCard>
-              ))}
-            </XStack>
-          </YStack>
-
-          {/* ─── Stats CTA ─── */}
-          <YStack
-            borderRadius="$7"
-            borderWidth={1}
-            borderColor="$glassBorder"
-            padding="$7"
-            gap="$4"
-            alignItems="center"
-            animation="medium"
-            hoverStyle={{
-              borderColor: '$glassBorderHover',
-            }}
-            style={{
-              background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.25)} 0%, ${withAlpha(BG_DARK, 0.85)} 100%)`,
-              backdropFilter: 'blur(18px)',
-              WebkitBackdropFilter: 'blur(18px)',
-            }}
-          >
-            <Text fontSize="$9">
-              <span role="img" aria-label="chart">
-                📊
-              </span>
-            </Text>
-            <H2
-              fontSize="$8"
-              fontWeight="700"
+            <H1
+              fontSize="$12"
+              fontWeight="800"
               color="$color"
               textAlign="center"
+              letterSpacing={-0.5}
+              animation="medium"
+              enterStyle={{ opacity: 0, y: 20 }}
+              $sm={{ fontSize: '$10' }}
             >
-              Explore Player Statistics
-            </H2>
+              Legacy Sports
+            </H1>
+
             <Paragraph
-              fontSize="$4"
+              fontSize="$6"
               color="$textMuted"
               textAlign="center"
-              maxWidth={500}
+              maxWidth={560}
+              lineHeight="$7"
+              animation="medium"
+              enterStyle={{ opacity: 0, y: 15 }}
             >
-              Dive into batting averages, ERA, touchdowns, and more. Make
-              data-driven decisions for your next trade or waiver pickup.
+              Your all-in-one fantasy sports platform — draft, manage, and
+              compete with friends across every season.
             </Paragraph>
-            <ActionButton
+
+            <XStack
+              gap="$3"
               marginTop="$2"
-              onPress={() => {
-                navigate('/players/stats');
+              flexWrap="wrap"
+              justifyContent="center"
+              animation="medium"
+              enterStyle={{ opacity: 0, y: 10 }}
+            >
+              <ActionButton
+                onPress={() => {
+                  navigate('/baseball');
+                }}
+                accessibilityLabel="Get started with baseball"
+              >
+                <Text fontWeight="700">Get Started</Text>
+              </ActionButton>
+              <OutlineButton
+                onPress={() => {
+                  navigate('/players/stats');
+                }}
+                accessibilityLabel="Browse player statistics"
+              >
+                <Text fontWeight="700">Browse Stats</Text>
+              </OutlineButton>
+              <OutlineButton
+                onPress={() => setTutorialOpen(true)}
+                accessibilityLabel="How historical stats work — open tutorial"
+              >
+                <Text fontWeight="700">
+                  <span role="img" aria-label="open book">
+                    📖
+                  </span>{' '}
+                  How It Works
+                </Text>
+              </OutlineButton>
+            </XStack>
+          </HeroSection>
+
+          <ContentContainer>
+            {/* ─── Sports ─── */}
+            <YStack gap="$5">
+              <YStack gap="$2">
+                <SectionTitle>Choose Your Sport</SectionTitle>
+                <Paragraph fontSize="$4" color="$textMuted" maxWidth={480}>
+                  Jump into a sport to manage leagues, run drafts, and track
+                  your teams.
+                </Paragraph>
+              </YStack>
+
+              <XStack gap="$5" flexWrap="wrap">
+                {SPORTS.map((sport) => (
+                  <SportCard
+                    key={sport.key}
+                    flex={1}
+                    minWidth={300}
+                    style={sportCardGlassStyle(sport.accent)}
+                    onPress={() => {
+                      navigate(sport.route);
+                    }}
+                    accessibilityLabel={`Navigate to ${sport.title}`}
+                    role="link"
+                  >
+                    <XStack gap="$4" alignItems="center">
+                      <SportIcon
+                        style={{
+                          background: `linear-gradient(135deg, ${sport.accent}, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)})`,
+                        }}
+                      >
+                        <Text fontSize="$8">
+                          <span role="img" aria-label={sport.emojiLabel}>
+                            {sport.emoji}
+                          </span>
+                        </Text>
+                      </SportIcon>
+                      <YStack gap="$1" flex={1}>
+                        <H3 fontSize="$8" fontWeight="700" color="$color">
+                          {sport.title}
+                        </H3>
+                        {!sport.available && (
+                          <Text
+                            fontSize="$2"
+                            color="$amber9"
+                            fontWeight="600"
+                            textTransform="uppercase"
+                            letterSpacing={0.5}
+                          >
+                            Coming Soon
+                          </Text>
+                        )}
+                      </YStack>
+                    </XStack>
+
+                    <Paragraph
+                      fontSize="$4"
+                      color="$glassTextSubdued"
+                      lineHeight="$5"
+                    >
+                      {sport.description}
+                    </Paragraph>
+
+                    <XStack gap="$3" marginTop="$1">
+                      <ActionButton
+                        size="$3"
+                        onPress={() => {
+                          navigate(sport.route);
+                        }}
+                      >
+                        <Text fontWeight="700">View Leagues</Text>
+                      </ActionButton>
+                      {sport.key === 'baseball' && (
+                        <OutlineButton
+                          size="$3"
+                          onPress={() => {
+                            navigate('/baseball/league/create');
+                          }}
+                        >
+                          <Text fontWeight="700">Create League</Text>
+                        </OutlineButton>
+                      )}
+                    </XStack>
+                  </SportCard>
+                ))}
+              </XStack>
+            </YStack>
+
+            <Separator backgroundColor="$glassBorder" />
+
+            {/* ─── Features ─── */}
+            <YStack gap="$5">
+              <YStack gap="$2">
+                <SectionTitle>Platform Features</SectionTitle>
+                <Paragraph fontSize="$4" color="$textMuted" maxWidth={480}>
+                  Everything you need to run a competitive fantasy league.
+                </Paragraph>
+              </YStack>
+
+              <XStack gap="$4" flexWrap="wrap">
+                {FEATURES.map((feature) => (
+                  <FeatureCard
+                    key={feature.label}
+                    style={featureCardGlassStyle}
+                  >
+                    <FeatureIconCircle>
+                      <Text fontSize="$5">
+                        <span role="img" aria-label={feature.label}>
+                          {feature.emoji}
+                        </span>
+                      </Text>
+                    </FeatureIconCircle>
+                    <H3 fontSize="$6" fontWeight="700" color="$color">
+                      {feature.title}
+                    </H3>
+                    <Paragraph
+                      fontSize="$3"
+                      color="$glassTextSubdued"
+                      lineHeight="$4"
+                    >
+                      {feature.description}
+                    </Paragraph>
+                  </FeatureCard>
+                ))}
+              </XStack>
+            </YStack>
+
+            {/* ─── Stats CTA ─── */}
+            <YStack
+              borderRadius="$7"
+              borderWidth={1}
+              borderColor="$glassBorder"
+              padding="$7"
+              gap="$4"
+              alignItems="center"
+              animation="medium"
+              hoverStyle={{
+                borderColor: '$glassBorderHover',
+              }}
+              style={{
+                background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.25)} 0%, ${withAlpha(BG_DARK, 0.85)} 100%)`,
+                backdropFilter: 'blur(18px)',
+                WebkitBackdropFilter: 'blur(18px)',
               }}
             >
-              <Text fontWeight="700">View All Stats</Text>
-            </ActionButton>
-          </YStack>
-        </ContentContainer>
-      </PageContainer>
-    </ScrollView>
+              <Text fontSize="$9">
+                <span role="img" aria-label="chart">
+                  📊
+                </span>
+              </Text>
+              <H2
+                fontSize="$8"
+                fontWeight="700"
+                color="$color"
+                textAlign="center"
+              >
+                Explore Player Statistics
+              </H2>
+              <Paragraph
+                fontSize="$4"
+                color="$textMuted"
+                textAlign="center"
+                maxWidth={500}
+              >
+                Dive into batting averages, ERA, touchdowns, and more. Make
+                data-driven decisions for your next trade or waiver pickup.
+              </Paragraph>
+              <ActionButton
+                marginTop="$2"
+                onPress={() => {
+                  navigate('/players/stats');
+                }}
+              >
+                <Text fontWeight="700">View All Stats</Text>
+              </ActionButton>
+            </YStack>
+          </ContentContainer>
+        </PageContainer>
+      </ScrollView>
+    </>
   );
 }
 
