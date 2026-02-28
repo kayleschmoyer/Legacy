@@ -1,5 +1,7 @@
 # =============================================================================
 # SECRET VALUE VARIABLES (Set via secrets.auto.tfvars - never committed to git)
+# See secrets.auto.tfvars.example for required format and all expected keys.
+# In CI these are supplied as TF_VAR_* environment variables from GitHub secrets.
 # =============================================================================
 
 variable "google_oauth_client_secret" {

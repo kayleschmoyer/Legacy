@@ -86,7 +86,16 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "lambda:ListVersionsByFunction",
           "lambda:AddPermission",
           "lambda:RemovePermission",
-          "lambda:GetPolicy"
+          "lambda:GetPolicy",
+          # Required for first-time Lambda creation via Terraform
+          "lambda:CreateFunction",
+          "lambda:DeleteFunction",
+          "lambda:TagResource",
+          "lambda:UntagResource",
+          "lambda:PutFunctionConcurrency",
+          "lambda:DeleteFunctionConcurrency",
+          "lambda:PutFunctionEventInvokeConfig",
+          "lambda:DeleteFunctionEventInvokeConfig"
         ]
         Resource = [
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-*"
