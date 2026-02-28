@@ -91,7 +91,9 @@ export const PlayersDropdown: React.FC = () => {
   const menuId = 'players-menu';
 
   const isActive =
-    location.pathname === '/players' || location.pathname === '/players/stats';
+    location.pathname === '/players' ||
+    location.pathname === '/players/stats' ||
+    location.pathname === '/players/compare';
   const isHighlighted = isActive || isOpen;
 
   // Click outside handler
@@ -206,6 +208,40 @@ export const PlayersDropdown: React.FC = () => {
                   </Paragraph>
                 </YStack>
                 {location.pathname === '/players/stats' && (
+                  <YStack
+                    width={6}
+                    height={6}
+                    borderRadius={3}
+                    backgroundColor={BRAND_NAVY_LIGHT}
+                  />
+                )}
+              </XStack>
+            </MenuItem>
+          </Link>
+
+          <Link to="/players/compare" style={{ textDecoration: 'none' }}>
+            <MenuItem
+              onPress={() => setIsOpen(false)}
+              role="menuitem"
+              active={location.pathname === '/players/compare'}
+            >
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <Paragraph fontSize={18} lineHeight={20}>
+                    <span role="img" aria-label="compare">
+                      ⚖️
+                    </span>
+                  </Paragraph>
+                </MenuIconBox>
+                <YStack flex={1} gap="$1">
+                  <Paragraph size="$4" color="$color" fontWeight="500">
+                    Compare Players
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Side-by-side stat comparison
+                  </Paragraph>
+                </YStack>
+                {location.pathname === '/players/compare' && (
                   <YStack
                     width={6}
                     height={6}

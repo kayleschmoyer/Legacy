@@ -21,6 +21,7 @@ import {
   PlayerDetailPage,
   PlayerStatsPage,
 } from '../pages/players/PlayerStatsPage';
+import { PlayerComparisonPage } from '../pages/players/PlayerComparisonPage';
 import LeagueCreatePage from '../pages/baseball/LeagueCreatePage';
 import LeagueDetailPage from '../pages/baseball/LeagueDetailPage';
 import { TeamDetailPage } from '../pages/baseball/TeamDetailPage';
@@ -470,6 +471,7 @@ function App() {
           <Route path="/management" element={<ManagementPage />} />
           <Route path="/players" element={<PlayersScreen />} />
           <Route path="/players/stats" element={<PlayerStatsPage />} />
+          <Route path="/players/compare" element={<PlayerComparisonPage />} />
           <Route path="/players/:id" element={<PlayerDetailPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/help" element={<HelpPage />} />
