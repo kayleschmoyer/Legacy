@@ -290,7 +290,7 @@ export const draftPicks = pgTable(
         columns: [table.teamId],
         foreignColumns: [teams.id],
         name: 'draft_picks_teams_id_fk',
-      }),
+      }).onDelete('cascade'),
       draftPicksPlayersIdFk: foreignKey({
         columns: [table.playerId],
         foreignColumns: [players.id],
