@@ -7,6 +7,7 @@ import {
   ScrollView,
   Sheet,
   Text,
+  VisuallyHidden,
   XStack,
   YStack,
 } from 'tamagui';
@@ -146,7 +147,7 @@ function CreateLeagueModal({
           width={Platform.OS === 'web' ? 400 : '90%'}
           maxHeight="80%"
         >
-          <Text
+          <Dialog.Title
             fontSize="$6"
             fontWeight="bold"
             color="$gray12"
@@ -154,7 +155,12 @@ function CreateLeagueModal({
             textAlign="center"
           >
             Create New League
-          </Text>
+          </Dialog.Title>
+          <VisuallyHidden>
+            <Dialog.Description>
+              Fill in the form to create a new fantasy league.
+            </Dialog.Description>
+          </VisuallyHidden>
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* League Name Input */}
@@ -395,17 +401,19 @@ function CreateLeagueModal({
 
           {/* Action Buttons */}
           <XStack gap="$3" marginTop="$4">
-            <Button
-              flex={1}
-              backgroundColor="$gray6"
-              borderRadius="$2"
-              onPress={onClose}
-              disabled={loading}
-            >
-              <Text fontWeight="600" color="$gray12">
-                Cancel
-              </Text>
-            </Button>
+            <Dialog.Close asChild>
+              <Button
+                flex={1}
+                backgroundColor="$gray6"
+                borderRadius="$2"
+                onPress={onClose}
+                disabled={loading}
+              >
+                <Text fontWeight="600" color="$gray12">
+                  Cancel
+                </Text>
+              </Button>
+            </Dialog.Close>
 
             <Button
               flex={1}
