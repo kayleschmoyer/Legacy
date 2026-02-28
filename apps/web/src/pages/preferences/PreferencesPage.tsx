@@ -15,6 +15,7 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
+import { useThemeContext } from '../../context/ThemeContext';
 
 /* ─── Storage key ─── */
 
@@ -297,15 +298,29 @@ function ChipGroup<T extends string>({
 /* ─── Main Component ─── */
 
 const PreferencesPage: React.FC = () => {
-  const [prefs, setPrefs] = useState<UserPreferences>(loadPrefs);
+  const { themePreference, setThemePreference } = useThemeContext();
+  const [prefs, setPrefs] = useState<UserPreferences>(() => ({
+    ...loadPrefs(),
+    // theme is owned by ThemeContext; sync local mirror from context
+    theme: themePreference,
+  }));
   const [saved, setSaved] = useState(false);
+
+  // Keep local mirror in sync when context changes (e.g. system preference)
+  useEffect(() => {
+    setPrefs((prev) => ({ ...prev, theme: themePreference }));
+  }, [themePreference]);
 
   const update = useCallback(
     <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
+      if (key === 'theme') {
+        // Route theme changes through ThemeContext so they apply immediately
+        setThemePreference(value as ThemePreference);
+      }
       setPrefs((prev) => ({ ...prev, [key]: value }));
       setSaved(false);
     },
-    [],
+    [setThemePreference],
   );
 
   // Auto-save on changes
@@ -385,8 +400,8 @@ const PreferencesPage: React.FC = () => {
                     Theme
                   </Paragraph>
                   <Paragraph size="$3" color="$colorPress">
-                    Choose your preferred color scheme. Takes effect on the next
-                    page load.
+                    Choose your preferred color scheme. Changes apply
+                    immediately.
                   </Paragraph>
                 </PrefLabel>
                 <ChipGroup<ThemePreference>

@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { useColorScheme } from 'react-native';
 import { TamaguiProvider } from 'tamagui';
 import Constants from 'expo-constants';
 import {
@@ -21,6 +20,7 @@ import type { NavigationRoute } from '@legacy-sports/shared-components';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { DbClientContext } from '../common/ApolloClientContext';
+import { ThemeProvider, useThemeContext } from '../context/ThemeContext';
 
 // Initialize Sentry for mobile app
 const sentryConfig = getSentryConfigFromEnv();
@@ -77,13 +77,13 @@ const authConfig: OAuthConfig = {
 
 function AuthenticatedContent(): React.JSX.Element {
   const client = React.useContext(DbClientContext);
-  const colorScheme = useColorScheme();
+  const { resolvedTheme } = useThemeContext();
 
   return (
     <AppProvider
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       apolloClient={client.apolloClient}
-      colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
+      colorScheme={resolvedTheme}
       isLoading={false}
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       tamaguiConfig={tamaguiConfig}
@@ -94,35 +94,46 @@ function AuthenticatedContent(): React.JSX.Element {
 }
 
 /**
+ * Inner layout — wraps auth guard with theme-aware content.
+ * Placed inside ThemeProvider so it can read resolvedTheme.
+ */
+function InnerLayout(): React.JSX.Element {
+  return (
+    <AuthProvider config={authConfig}>
+      <EnhancedAuthGuard
+        loginTitle="Welcome to Legacy Sports!"
+        loginSubtitle="Sign in to access your fantasy leagues and stats"
+        testMode={__DEV__} // Enable test mode in development
+        onLoginSuccess={() => {
+          console.log('Mobile app login successful!');
+        }}
+        onLoginFailure={(error) => {
+          console.error('Mobile app login failed:', error);
+          captureError(new Error(error), { context: 'mobile-app-login' });
+        }}
+      >
+        <AuthenticatedContent />
+      </EnhancedAuthGuard>
+    </AuthProvider>
+  );
+}
+
+/**
  * Main Mobile App Layout - Clean authentication flow
  * Uses EnhancedAuthGuard at root level for consistent behavior
  */
 export default function Layout() {
-  const colorScheme = useColorScheme();
-
   return (
     <ErrorBoundary reportError={captureError}>
       <TamaguiProvider
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         config={tamaguiConfig}
-        defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
+        defaultTheme="dark"
       >
-        <AuthProvider config={authConfig}>
-          <EnhancedAuthGuard
-            loginTitle="Welcome to Legacy Sports!"
-            loginSubtitle="Sign in to access your fantasy leagues and stats"
-            testMode={__DEV__} // Enable test mode in development
-            onLoginSuccess={() => {
-              console.log('Mobile app login successful!');
-            }}
-            onLoginFailure={(error) => {
-              console.error('Mobile app login failed:', error);
-              captureError(new Error(error), { context: 'mobile-app-login' });
-            }}
-          >
-            <AuthenticatedContent />
-          </EnhancedAuthGuard>
-        </AuthProvider>
+        {/* ThemeProvider must live inside TamaguiProvider so the Theme component works */}
+        <ThemeProvider>
+          <InnerLayout />
+        </ThemeProvider>
       </TamaguiProvider>
     </ErrorBoundary>
   );

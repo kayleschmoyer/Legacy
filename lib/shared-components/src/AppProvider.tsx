@@ -1,7 +1,7 @@
 import React from 'react';
 import { ApolloClient } from '@apollo/client';
 import { ApolloProvider } from '@apollo/client/react';
-import { TamaguiProvider, type TamaguiProviderProps } from 'tamagui';
+import { TamaguiProvider, type TamaguiProviderProps, Theme } from 'tamagui';
 import { Platform } from './platform-components';
 import { LoadingPanel } from './LazyLoadingPanel';
 import { ConditionalProviders } from './ConditionalProviders';
@@ -40,9 +40,12 @@ const NativeLayout = ({
         config={tamaguiConfig}
         defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
       >
-        <ConditionalProviders>
-          <ApolloProvider client={apolloClient}>{children}</ApolloProvider>
-        </ConditionalProviders>
+        {/* Theme wrapper ensures live re-renders pick up the active theme */}
+        <Theme name={colorScheme === 'dark' ? 'dark' : 'light'}>
+          <ConditionalProviders>
+            <ApolloProvider client={apolloClient}>{children}</ApolloProvider>
+          </ConditionalProviders>
+        </Theme>
       </TamaguiProvider>
     );
   } catch (error: unknown) {
@@ -71,18 +74,21 @@ const WebLayout = ({
         config={tamaguiConfig}
         defaultTheme={colorScheme === 'dark' ? 'dark' : 'light'}
       >
-        <div
-          className={`app-container ${colorScheme || 'dark'}`}
-          style={{
-            minHeight: '100vh',
-            backgroundColor: colorScheme === 'light' ? '#F7F9FC' : '#1E1E1E',
-            color: colorScheme === 'light' ? '#222B45' : '#FFFFFF',
-          }}
-        >
-          <ConditionalProviders>
-            <ApolloProvider client={apolloClient}>{children}</ApolloProvider>
-          </ConditionalProviders>
-        </div>
+        {/* Theme wrapper ensures live re-renders pick up the active theme */}
+        <Theme name={colorScheme === 'dark' ? 'dark' : 'light'}>
+          <div
+            className={`app-container ${colorScheme || 'dark'}`}
+            style={{
+              minHeight: '100vh',
+              backgroundColor: colorScheme === 'light' ? '#F7F9FC' : '#0A0F1A',
+              color: colorScheme === 'light' ? '#222B45' : '#F8FAFC',
+            }}
+          >
+            <ConditionalProviders>
+              <ApolloProvider client={apolloClient}>{children}</ApolloProvider>
+            </ConditionalProviders>
+          </div>
+        </Theme>
       </TamaguiProvider>
     );
   } catch (error: unknown) {

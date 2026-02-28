@@ -31,6 +31,7 @@ import { apolloClient } from './lib/apollo-client';
 import { default as App } from './app/app';
 import { store } from './store/store';
 import { initializeAnalytics, trackLogin } from './utils/analytics';
+import { ThemeProvider, useThemeContext } from './context/ThemeContext';
 
 // Initialize Sentry for web app
 const sentryConfig = getSentryConfigFromEnv();
@@ -49,20 +50,20 @@ const authConfig: OAuthConfig = {
   offlineAccess: true,
 };
 
-function AuthenticatedApp() {
-  const initialColorScheme: 'light' | 'dark' =
-    typeof window !== 'undefined' &&
-    window.matchMedia &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
+/**
+ * Inner component — reads the resolved theme from ThemeContext and passes it
+ * to AppProvider so TamaguiProvider re-renders with the correct active theme
+ * whenever the user changes their preference.
+ */
+function ThemeAwareApp() {
+  const { resolvedTheme } = useThemeContext();
 
   return (
     <ReduxProvider store={store}>
       <BrowserRouter future={{ v7_relativeSplatPath: true }}>
         <AppProvider
           apolloClient={apolloClient}
-          colorScheme={initialColorScheme}
+          colorScheme={resolvedTheme}
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           tamaguiConfig={tamaguiConfig}
         >
@@ -87,33 +88,35 @@ try {
   root.render(
     <StrictMode>
       <ErrorBoundary reportError={captureError}>
-        <TamaguiProvider
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          config={tamaguiConfig}
-        >
-          <AuthProvider
-            config={authConfig}
-            onUserSwitch={async () => {
-              await apolloClient.resetStore();
-            }}
+        <ThemeProvider>
+          <TamaguiProvider
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            config={tamaguiConfig}
           >
-            <EnhancedAuthGuard
-              loginTitle="Welcome to Legacy Sports!"
-              loginSubtitle="Sign in to access your fantasy leagues and stats"
-              testMode={env.authTestMode}
-              onLoginSuccess={() => {
-                console.log('Web app login successful!');
-                trackLogin('google');
-              }}
-              onLoginFailure={(error: string) => {
-                console.error('Web app login failed:', error);
-                captureError(new Error(error), { context: 'web-app-login' });
+            <AuthProvider
+              config={authConfig}
+              onUserSwitch={async () => {
+                await apolloClient.resetStore();
               }}
             >
-              <AuthenticatedApp />
-            </EnhancedAuthGuard>
-          </AuthProvider>
-        </TamaguiProvider>
+              <EnhancedAuthGuard
+                loginTitle="Welcome to Legacy Sports!"
+                loginSubtitle="Sign in to access your fantasy leagues and stats"
+                testMode={env.authTestMode}
+                onLoginSuccess={() => {
+                  console.log('Web app login successful!');
+                  trackLogin('google');
+                }}
+                onLoginFailure={(error: string) => {
+                  console.error('Web app login failed:', error);
+                  captureError(new Error(error), { context: 'web-app-login' });
+                }}
+              >
+                <ThemeAwareApp />
+              </EnhancedAuthGuard>
+            </AuthProvider>
+          </TamaguiProvider>
+        </ThemeProvider>
       </ErrorBoundary>
     </StrictMode>,
   );

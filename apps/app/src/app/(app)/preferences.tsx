@@ -9,6 +9,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { useThemeContext } from '../../context/ThemeContext';
 
 const BRAND_GOLD_LIGHT = '#C5A55A';
 const BRAND_NAVY_LIGHT = '#2C4A7C';
@@ -193,15 +194,28 @@ function SectionCard({ icon, title, subtitle, children }: SectionProps) {
 /* ─── Main Component ─── */
 
 export default function PreferencesScreen(): React.JSX.Element {
-  const [prefs, setPrefs] = useState<UserPreferences>(loadPrefs);
+  const { themePreference, setThemePreference } = useThemeContext();
+  const [prefs, setPrefs] = useState<UserPreferences>(() => ({
+    ...loadPrefs(),
+    theme: themePreference,
+  }));
   const [saved, setSaved] = useState(false);
+
+  // Keep local mirror in sync when context changes (e.g. system preference flip)
+  useEffect(() => {
+    setPrefs((prev) => ({ ...prev, theme: themePreference }));
+  }, [themePreference]);
 
   const update = useCallback(
     <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
+      if (key === 'theme') {
+        // Route theme changes through ThemeContext so they apply immediately
+        setThemePreference(value as ThemePreference);
+      }
       setPrefs((prev) => ({ ...prev, [key]: value }));
       setSaved(false);
     },
-    [],
+    [setThemePreference],
   );
 
   useEffect(() => {
