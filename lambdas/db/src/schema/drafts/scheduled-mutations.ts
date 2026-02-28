@@ -3,7 +3,8 @@
  *
  * Triggered every minute by EventBridge. Finds all in-progress drafts where
  * `current_pick_deadline` has passed, then auto-picks the best available
- * player for the timed-out team.
+ * player for the timed-out team, preferring players that fill still-open
+ * league roster position slots (minimum requirements).
  *
  * Uses the same 3-tier auth pattern as other scheduled mutations:
  *   - System API key (EventBridge) → allowed for ALL leagues
@@ -11,15 +12,142 @@
  *   - Commissioner / General Manager → allowed for their league only
  */
 
-import { PublicSchema } from '@legacy-sports/db-client';
+import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, sql } from 'drizzle-orm';
 
 import { getCurrentDraftPickInfo } from './helpers';
 import { builder } from '../builder';
 import { assertAuthorized } from '../matchups/scheduled-mutations';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
+
+// ── Position eligibility for auto-pick (mirrors draft-processor ALLOWED_POSITIONS) ──
+// Maps each league roster slot type to the player stat position keys that qualify for it.
+// Source of truth: lib/shared-components/src/utils/PositionModels.ts
+const ALLOWED_POSITIONS_FOR_AUTO_PICK: Readonly<
+  Record<string, readonly string[]>
+> = Object.freeze({
+  '1B': ['1B'],
+  '2B': ['2B'],
+  '3B': ['3B'],
+  C: ['C'],
+  CF: ['CF'],
+  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
+  IF: ['1B', '2B', '3B', 'SS'],
+  LF: ['LF'],
+  OF: ['LF', 'RF', 'CF'],
+  RF: ['RF'],
+  RP: ['RP', 'P'],
+  SP: ['SP', 'P'],
+  SS: ['SS'],
+  XDH: ['DH'],
+});
+
+/**
+ * Determine which league-defined position slot types still need a player on the
+ * given team for this draft. Uses career_fielding.positions_played JSONB data
+ * (same source as the draft-processor and GraphQL API) to map already-drafted
+ * players to slot types, then returns the slot types that still have open slots.
+ *
+ * The greedy assignment orders slots by specificity (fewest allowed player
+ * positions first) so that a multi-position player is not "wasted" on a
+ * specialist slot that another player could fill instead.
+ */
+async function getUnfilledPositionTypes(
+  tx: PublicDb,
+  draftId: number,
+  teamId: number,
+  leagueId: number,
+): Promise<string[]> {
+  // 1. League position requirements
+  const leaguePositions = await tx
+    .select({ positionType: PublicSchema.leaguePosition.positionType })
+    .from(PublicSchema.leaguePosition)
+    .where(eq(PublicSchema.leaguePosition.leagueId, leagueId));
+
+  if (leaguePositions.length === 0) return [];
+
+  // Count slots needed per position type
+  const slotsNeeded = new Map<string, number>();
+  for (const lp of leaguePositions) {
+    slotsNeeded.set(
+      lp.positionType,
+      (slotsNeeded.get(lp.positionType) ?? 0) + 1,
+    );
+  }
+
+  // 2. Team's already-drafted player IDs in this draft
+  const teamPicksResult = await tx.execute(
+    sql`SELECT player_id FROM draft_picks WHERE draft_id = ${draftId} AND team_id = ${teamId}`,
+  );
+  const teamPlayerIds = teamPicksResult.rows.map((r) => r.player_id as number);
+
+  if (teamPlayerIds.length === 0) {
+    // No picks yet — all position types are still needed
+    return [...new Set(leaguePositions.map((lp) => lp.positionType))];
+  }
+
+  // 3. Career fielding data for already-drafted players
+  const fieldingRows = await tx
+    .select({
+      playerId: PublicSchema.careerFielding.playerId,
+      positionsPlayed: PublicSchema.careerFielding.positionsPlayed,
+    })
+    .from(PublicSchema.careerFielding)
+    .where(inArray(PublicSchema.careerFielding.playerId, teamPlayerIds));
+
+  // Build map: playerId → set of slot types the player can fill
+  const playerSlotMap = new Map<number, Set<string>>();
+  for (const row of fieldingRows) {
+    if (!row.playerId) continue;
+    const positionsPlayed = row.positionsPlayed as Record<
+      string,
+      unknown
+    > | null;
+    const playerStatPositions = positionsPlayed
+      ? Object.keys(positionsPlayed)
+      : [];
+
+    const coverableSlots = new Set<string>();
+    for (const [slotType, allowedStatPositions] of Object.entries(
+      ALLOWED_POSITIONS_FOR_AUTO_PICK,
+    )) {
+      if (allowedStatPositions.some((sp) => playerStatPositions.includes(sp))) {
+        coverableSlots.add(slotType);
+      }
+    }
+    playerSlotMap.set(row.playerId, coverableSlots);
+  }
+
+  // 4. Greedily assign players to slots (most-specific slots first)
+  const slotsCovered = new Map<string, number>();
+  const orderedSlotTypes = [...slotsNeeded.keys()].sort(
+    (a, b) =>
+      (ALLOWED_POSITIONS_FOR_AUTO_PICK[a]?.length ?? 1) -
+      (ALLOWED_POSITIONS_FOR_AUTO_PICK[b]?.length ?? 1),
+  );
+
+  for (const playerId of teamPlayerIds) {
+    const coverableSlots = playerSlotMap.get(playerId);
+    if (!coverableSlots) continue;
+
+    for (const slotType of orderedSlotTypes) {
+      const needed = slotsNeeded.get(slotType) ?? 0;
+      const covered = slotsCovered.get(slotType) ?? 0;
+      if (covered < needed && coverableSlots.has(slotType)) {
+        slotsCovered.set(slotType, covered + 1);
+        break; // Each player fills exactly one slot
+      }
+    }
+  }
+
+  // 5. Return slot types that still have open slots
+  return orderedSlotTypes.filter(
+    (slotType) =>
+      (slotsCovered.get(slotType) ?? 0) < (slotsNeeded.get(slotType) ?? 0),
+  );
+}
 
 // ── Response Type ────────────────────────────────────────────────────────────
 
@@ -49,8 +177,10 @@ builder.objectType(AutoProcessDraftPicksResult, {
 // ── Mutation: autoProcessDraftPicks ──────────────────────────────────────────
 // Triggered every minute by EventBridge.
 // Finds in-progress drafts with expired currentPickDeadline, auto-picks the
-// best available player (highest-id, simple deterministic fallback), and
-// advances the draft.
+// best available player that passes league eligibility (playerPool,
+// minCareerGames, minCareerSeasons) and fills an open league position slot
+// first (minimum requirements), then falls back to any eligible player.
+// Advances the draft after each pick.
 
 builder.mutationField('autoProcessDraftPicks', (t) =>
   t.field({
@@ -170,9 +300,11 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 return null;
               }
 
-              // Find the best available player (not yet drafted)
-              // Strategy: pick the first available player by ID (deterministic)
-              // from the league's player pool
+              // Find the best available player (not yet drafted).
+              // Prefer players that can fill a still-open league roster position
+              // slot (minimum requirements), falling back to any available player.
+
+              // ── Eligibility predicates (same logic as DraftUtils.filterPlayerIdsByLeagueEligibility) ──
               const playerPoolCondition =
                 league.playerPool !== 'all'
                   ? sql`AND p.id IN (
@@ -181,22 +313,121 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     )`
                   : sql``;
 
-              const availablePlayers = await tx.execute(sql`
-                SELECT p.id
-                FROM players p
-                WHERE p.id NOT IN (
-                  SELECT dp.player_id FROM draft_picks dp WHERE dp.draft_id = ${draftId}
-                )
-                ${playerPoolCondition}
-                ORDER BY p.id ASC
-                LIMIT 1
-              `);
+              const minCareerGamesCondition =
+                (league.minCareerGames ?? 0) > 0
+                  ? sql`AND (
+                      COALESCE((SELECT g FROM career_batting  cb WHERE cb.player_id = p.id LIMIT 1), 0) +
+                      COALESCE((SELECT g FROM career_pitching cp WHERE cp.player_id = p.id LIMIT 1), 0)
+                    ) >= ${league.minCareerGames}`
+                  : sql``;
 
-              if (availablePlayers.rows.length === 0) {
-                throw new Error(`No available players for draft ${draftId}`);
+              const minCareerSeasonsCondition =
+                (league.minCareerSeasons ?? 0) > 0
+                  ? sql`AND (
+                      SELECT COUNT(DISTINCT season)
+                      FROM (
+                        SELECT season FROM season_batting  WHERE player_id = p.id
+                        UNION
+                        SELECT season FROM season_pitching WHERE player_id = p.id
+                      ) s
+                    ) >= ${league.minCareerSeasons}`
+                  : sql``;
+
+              // Determine which position slot types the team still needs to fill
+              const unfilledPositionTypes = await getUnfilledPositionTypes(
+                tx,
+                draftId,
+                currentPickInfo.teamId,
+                draftLeagueId,
+              );
+
+              LOGGER.info(
+                '[autoProcessDraftPicks] Unfilled position types for team',
+                {
+                  draftId,
+                  teamId: currentPickInfo.teamId,
+                  unfilledPositionTypes,
+                  eligibilityFilters: {
+                    playerPool: league.playerPool,
+                    minCareerGames: league.minCareerGames,
+                    minCareerSeasons: league.minCareerSeasons,
+                  },
+                },
+              );
+
+              let autoPlayerId: number | undefined;
+
+              // Try to find a player eligible for one of the unfilled positions
+              if (unfilledPositionTypes.length > 0) {
+                // Expand each unfilled slot type to its allowed stat-position keys,
+                // then check whether the player has any of those keys in
+                // career_fielding.positions_played (JSONB ? operator).
+                const allowedStatPositions = [
+                  ...new Set(
+                    unfilledPositionTypes.flatMap(
+                      (pt) => ALLOWED_POSITIONS_FOR_AUTO_PICK[pt] ?? [pt],
+                    ),
+                  ),
+                ];
+
+                // Build a chain of JSONB key-exists conditions (OR)
+                const jsonConditions = allowedStatPositions
+                  .map((pos) => sql`cf.positions_played ? ${pos}`)
+                  .reduce((acc, cond) => sql`${acc} OR ${cond}`);
+
+                const positionAwarePlayers = await tx.execute(sql`
+                  SELECT p.id
+                  FROM players p
+                  JOIN career_fielding cf ON cf.player_id = p.id
+                  WHERE p.id NOT IN (
+                    SELECT dp.player_id FROM draft_picks dp WHERE dp.draft_id = ${draftId}
+                  )
+                  ${playerPoolCondition}
+                  ${minCareerGamesCondition}
+                  ${minCareerSeasonsCondition}
+                  AND cf.positions_played IS NOT NULL
+                  AND (${jsonConditions})
+                  ORDER BY p.id ASC
+                  LIMIT 1
+                `);
+
+                if (positionAwarePlayers.rows.length > 0) {
+                  autoPlayerId = positionAwarePlayers.rows[0].id as number;
+                  LOGGER.info(
+                    '[autoProcessDraftPicks] Selected position-aware auto-pick',
+                    { draftId, playerId: autoPlayerId, unfilledPositionTypes },
+                  );
+                }
               }
 
-              const autoPlayerId = availablePlayers.rows[0].id as number;
+              // Fallback: pick any available player by ID (deterministic)
+              if (autoPlayerId === undefined) {
+                const fallbackPlayers = await tx.execute(sql`
+                  SELECT p.id
+                  FROM players p
+                  WHERE p.id NOT IN (
+                    SELECT dp.player_id FROM draft_picks dp WHERE dp.draft_id = ${draftId}
+                  )
+                  ${playerPoolCondition}
+                  ${minCareerGamesCondition}
+                  ${minCareerSeasonsCondition}
+                  ORDER BY p.id ASC
+                  LIMIT 1
+                `);
+
+                if (fallbackPlayers.rows.length === 0) {
+                  throw new Error(`No available players for draft ${draftId}`);
+                }
+
+                autoPlayerId = fallbackPlayers.rows[0].id as number;
+                LOGGER.info(
+                  '[autoProcessDraftPicks] Using fallback auto-pick (no position match)',
+                  {
+                    draftId,
+                    playerId: autoPlayerId,
+                  },
+                );
+              }
 
               // Validate roster limit
               const [rosterCount] = await tx
