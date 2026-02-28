@@ -267,6 +267,7 @@ export const UserProfileDropdown: React.FC = () => {
 
             <MenuItem
               onPress={() => {
+                void navigate('/preferences');
                 setIsOpen(false);
               }}
             >

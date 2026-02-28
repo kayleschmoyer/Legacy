@@ -35,6 +35,7 @@ import { usePageTracking } from '../hooks/usePageTracking';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { AdminPage } from '../pages/admin/AdminPage';
 import ProfileSettingsPage from '../pages/profile/ProfileSettingsPage';
+import PreferencesPage from '../pages/preferences/PreferencesPage';
 
 /* ────────────────────────────────────────────────────────
  * Modern Header – styled components
@@ -472,6 +473,7 @@ function App() {
           <Route path="/help" element={<HelpPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/profile/settings" element={<ProfileSettingsPage />} />
+          <Route path="/preferences" element={<PreferencesPage />} />
         </Routes>
       </YStack>
     </MainLayout>
