@@ -614,6 +614,10 @@ export function BaseballLandingPage() {
     navigate('/baseball/league/join');
   };
 
+  const handleMockDraft = () => {
+    navigate('/baseball/mock-draft');
+  };
+
   if (isLoading) {
     return (
       <PageContainer
@@ -713,6 +717,17 @@ export function BaseballLandingPage() {
                 accessibilityLabel="Join an existing baseball league"
               >
                 <Text fontWeight="700">Join League</Text>
+              </SecondaryButton>
+              <SecondaryButton
+                onPress={handleMockDraft}
+                accessibilityLabel="Practice with a mock draft simulator"
+              >
+                <Text fontWeight="700">
+                  <span role="img" aria-label="baseball">
+                    ⚾
+                  </span>{' '}
+                  Mock Draft
+                </Text>
               </SecondaryButton>
             </ActionButtonsRow>
             <Paragraph fontSize="$3" color="$glassTextMuted" maxWidth={440}>

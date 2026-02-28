@@ -29,6 +29,7 @@ import ManagementPage from '../pages/management/ManagementPage';
 import AboutPage from '../pages/about/AboutPage';
 import HelpPage from '../pages/help/HelpPage';
 import { DraftBoardPage } from '../pages/draft/DraftBoardPage';
+import { MockDraftPage } from '../pages/draft/MockDraftPage';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
@@ -439,6 +440,7 @@ function App() {
             path="/baseball/league/:id/draft"
             element={<DraftBoardPage />}
           />
+          <Route path="/baseball/mock-draft" element={<MockDraftPage />} />
           <Route
             path="/baseball/league/create"
             element={<LeagueCreatePage />}
