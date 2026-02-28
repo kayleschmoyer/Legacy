@@ -46,6 +46,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **UI Brand Colors**           | `.github/skills/ui-brand-colors/SKILL.md`                                  |
 | **UI Standards**              | `.github/skills/ui-standards/SKILL.md`                                     |
 | **User testing**              | `.github/skills/user-testing/SKILL.md`                                     |
-| All skills (54)               | `.github/skills/`                                                          |
+| **Rebase conflicts**          | `.github/skills/rebase-conflicts/SKILL.md`                                 |
+| All skills (55)               | `.github/skills/`                                                          |
 | CSV reference data            | `docs/agents/*.csv`                                                        |
 | Tech stack                    | React Native · Next.js · Lambda · GraphQL · PostgreSQL/Drizzle · Terraform |
