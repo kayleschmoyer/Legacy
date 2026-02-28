@@ -159,6 +159,33 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:iam::${local.account_id}:oidc-provider/token.actions.githubusercontent.com"
         ]
       },
+      # IAM write permissions for Terraform apply (creating new Lambda IAM roles/policies)
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:UpdateRole",
+          "iam:UpdateAssumeRolePolicy",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:CreatePolicy",
+          "iam:DeletePolicy",
+          "iam:CreatePolicyVersion",
+          "iam:DeletePolicyVersion",
+          "iam:SetDefaultPolicyVersion",
+          "iam:TagPolicy",
+          "iam:UntagPolicy"
+        ]
+        Resource = [
+          "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*",
+          "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*"
+        ]
+      },
       # CloudWatch Logs read permissions
       {
         Effect = "Allow"
@@ -172,6 +199,24 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group::log-stream:"
+        ]
+      },
+      # CloudWatch Logs write permissions for Terraform apply (creating new log groups)
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
+          "logs:PutRetentionPolicy",
+          "logs:DeleteRetentionPolicy",
+          "logs:TagLogGroup",
+          "logs:UntagLogGroup",
+          "logs:TagResource",
+          "logs:UntagResource"
+        ]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*"
         ]
       },
       # Secrets Manager read permissions
@@ -268,7 +313,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:ec2:${local.region}::image/*"
         ]
       },
-      # SSM Parameter Store read permissions
+      # SSM Parameter Store read/write permissions
       {
         Effect = "Allow"
         Action = [
@@ -276,7 +321,9 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ssm:GetParameters",
           "ssm:GetParametersByPath",
           "ssm:PutParameter",
-          "ssm:ListTagsForResource"
+          "ssm:ListTagsForResource",
+          "ssm:AddTagsToResource",
+          "ssm:RemoveTagsFromResource"
         ]
         Resource = [
           "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}/*",
