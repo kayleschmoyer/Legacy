@@ -12,6 +12,7 @@ import {
 import { ScrollView, Separator, styled, Text, H2 as TH2 } from 'tamagui';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -301,6 +302,10 @@ export function HomePage(): React.JSX.Element {
     <>
       {tutorialOpen && <OnboardingTutorial onClose={handleTutorialClose} />}
       <ScrollView>
+        <PageMeta
+          title="Fantasy Baseball League Manager"
+          description="Manage your fantasy baseball leagues, draft players, track live stats, and compete with friends on Legacy Sports."
+        />
         <PageContainer style={pageBackgroundStyle}>
           {/* ─── Hero ─── */}
           <HeroSection style={heroGradientStyle}>

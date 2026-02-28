@@ -7,6 +7,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { styled, Text } from 'tamagui';
+import { PageMeta } from '../../components/PageMeta';
 import { env } from '../../config/environment';
 import { BRAND_GOLD_LIGHT } from '../../constants/colors';
 
@@ -88,6 +89,10 @@ export default function AboutPage() {
 
   return (
     <Container>
+      <PageMeta
+        title="About"
+        description="Learn about Legacy Sports — the fantasy baseball league manager built for serious fans. View version, build, and deployment information."
+      />
       <YStack gap="$2" marginBottom="$4">
         <H1>
           <span role="img" aria-label="info">

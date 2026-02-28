@@ -43,6 +43,7 @@ import {
   computeScoring,
   type SeasonStats,
 } from '@legacy-sports/scoring';
+import { PageMeta } from '../../components/PageMeta';
 import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { LeagueScoringSummary } from '../../features/baseball/LeagueScoringSummary';
 import { LeagueScoringEditor } from '../../features/baseball/LeagueScoringEditor';
@@ -2135,6 +2136,10 @@ export function LeagueDetailPage(): React.JSX.Element {
       value={{ client: wsClient, connected: wsConnected }}
     >
       <PageContainer role="main" aria-labelledby="league-title">
+        <PageMeta
+          title={league.name ?? 'League'}
+          description={`Manage your ${league.name ?? 'fantasy baseball'} league on Legacy Sports — view rosters, standings, matchups, and trades.`}
+        />
         {/* Hero Header */}
         <HeroBar
           style={{

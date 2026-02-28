@@ -8,6 +8,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { ScrollView, styled } from 'tamagui';
+import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -208,6 +209,10 @@ const ProfileSettingsPage: React.FC = () => {
 
   return (
     <PageContainer style={pageBackgroundStyle}>
+      <PageMeta
+        title="Profile Settings"
+        description="Manage your Legacy Sports profile, account details, and connected services."
+      />
       <ScrollView>
         <ContentContainer>
           {/* ── Page Header ── */}

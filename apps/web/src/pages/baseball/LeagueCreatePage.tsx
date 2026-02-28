@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, H1, H2, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components';
+import { PageMeta } from '../../components/PageMeta';
 import {
   GetUserLeagues,
   GetUserLeaguesQuery,
@@ -230,6 +231,10 @@ export function LeagueCreatePage(): React.JSX.Element {
 
   return (
     <ScrollView flex={1} backgroundColor="$background">
+      <PageMeta
+        title="Create a League"
+        description="Start your own fantasy baseball league on Legacy Sports. Customize draft settings, roster rules, and invite friends to compete."
+      />
       <YStack padding="$6" space="$6" maxWidth={600} alignSelf="center">
         {/* Header */}
         <YStack alignItems="center" space="$3">

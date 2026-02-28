@@ -8,6 +8,7 @@ import type {
   PlayerStatsFilters,
   PlayerWithStats,
 } from '@legacy-sports/shared-components';
+import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
   BRAND_NAVY_LIGHT,
@@ -189,6 +190,10 @@ export function PlayerStatsPage() {
         padding: 0, // Remove default padding as PlayerStatsPage handles its own
       }}
     >
+      <PageMeta
+        title="Player Statistics"
+        description="Browse career and season statistics for every MLB player available in your Legacy Sports fantasy league."
+      />
       <div className="sr-only" aria-live="polite">
         {liveMsg}
       </div>
@@ -239,6 +244,10 @@ export function PlayerDetailPage() {
         padding: '2rem',
       }}
     >
+      <PageMeta
+        title="Player Profile"
+        description="View detailed career statistics and performance history for this MLB player on Legacy Sports."
+      />
       <button
         onClick={handleBackToStats}
         style={{

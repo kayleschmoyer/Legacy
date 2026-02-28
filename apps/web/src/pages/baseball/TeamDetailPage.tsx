@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H3, Separator, Spinner, Text, YStack } from 'tamagui';
+import { PageMeta } from '../../components/PageMeta';
 import {
   TeamMemberFragment,
   useGetLeagueByIdQuery,
@@ -74,6 +75,10 @@ export function TeamDetailPage() {
 
   return (
     <YStack padding="$4" gap="$4">
+      <PageMeta
+        title={team?.name ? `${team.name} Team` : 'Team Roster'}
+        description={`View and manage the ${team?.name ?? 'team'} fantasy baseball roster on Legacy Sports.`}
+      />
       <Button onPress={() => navigate(-1)}>Back</Button>
 
       <YStack gap="$2">

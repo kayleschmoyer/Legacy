@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Card, XStack, YStack } from '@legacy-sports/shared-components';
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
+import { PageMeta } from '../../components/PageMeta';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -99,6 +100,10 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
       role="main"
       aria-labelledby="join-league-title"
     >
+      <PageMeta
+        title="Join a League"
+        description="Enter your invitation code to join a fantasy baseball league on Legacy Sports and start competing."
+      />
       <YStack space="$2">
         <H1 size="$9" color={BRAND_GOLD_LIGHT} id="join-league-title">
           <span role="img" aria-label="ticket">

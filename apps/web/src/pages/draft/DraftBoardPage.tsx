@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
+import { PageMeta } from '../../components/PageMeta';
 import {
   AMBER,
   AMBER_LIGHT,
@@ -459,6 +460,10 @@ export function DraftBoardPage(): React.JSX.Element {
         overflow: 'hidden',
       }}
     >
+      <PageMeta
+        title="Draft Board"
+        description="Draft your fantasy baseball team. Select players in real-time and build the best roster on Legacy Sports."
+      />
       {/* Animated Background */}
       <div
         style={{

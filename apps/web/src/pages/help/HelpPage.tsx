@@ -10,6 +10,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { ScrollView, styled } from 'tamagui';
 import { OnboardingTutorial } from '../../components/onboarding';
+import { PageMeta } from '../../components/PageMeta';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -335,6 +336,10 @@ export default function HelpPage() {
         <OnboardingTutorial onClose={() => setTutorialOpen(false)} />
       )}
       <PageContainer>
+        <PageMeta
+          title="Help & Support"
+          description="Get help with Legacy Sports fantasy baseball. Browse FAQs, scoring guides, draft rules, and support topics."
+        />
         <ScrollView>
           <ContentContainer>
             {/* ── Page header ── */}

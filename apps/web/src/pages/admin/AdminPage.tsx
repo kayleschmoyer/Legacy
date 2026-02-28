@@ -10,6 +10,7 @@ import { Input, Spinner, Text, TextArea } from 'tamagui';
 import { useNavigate } from 'react-router-dom';
 import { styled } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components';
+import { PageMeta } from '../../components/PageMeta';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_DARK,
@@ -160,6 +161,10 @@ export function AdminPage(): React.JSX.Element {
 
   return (
     <PageContainer>
+      <PageMeta
+        title="Admin Console"
+        description="Legacy Sports administration panel — manage users, review activity, and debug platform issues."
+      />
       {/* Header */}
       <YStack gap="$2">
         <Paragraph

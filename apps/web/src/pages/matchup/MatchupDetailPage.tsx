@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
+import { PageMeta } from '../../components/PageMeta';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { GamesRemaining } from '../../features/matchup/GamesRemaining';
 import { MatchupNavigationControls } from '../../features/matchup/MatchupNavigationControls';
@@ -123,6 +124,14 @@ export function MatchupDetailPage() {
       padding="$4"
       space="$4"
     >
+      <PageMeta
+        title={
+          matchup.weekNumber != null
+            ? `Week ${matchup.weekNumber} Matchup`
+            : 'Matchup Details'
+        }
+        description={`View Week ${matchup.weekNumber ?? ''} fantasy baseball matchup scores, rosters, and stats on Legacy Sports.`}
+      />
       {/* Header */}
       <XStack
         justifyContent="space-between"
