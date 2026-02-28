@@ -14,6 +14,8 @@ import {
 interface CreateLeagueFormData {
   leagueName: string;
   numberOfTeams: number;
+  numberOfDivisions: number;
+  schedulingStrategy: 'divisional' | 'round-robin' | 'random';
   playerPool: 'all' | 'nl' | 'al';
   draftMode: 'live' | 'automated';
   selectionMethod: 'standard' | 'auction' | 'random';
@@ -54,11 +56,23 @@ const DRAFT_ORDER_OPTIONS = [
   { label: 'Linear', value: 'linear' },
 ] as const;
 
+// Division count options
+const DIVISION_COUNT_OPTIONS = [1, 2, 3, 4];
+
+// Scheduling strategy options
+const SCHEDULING_STRATEGY_OPTIONS = [
+  { label: 'Divisional', value: 'divisional' },
+  { label: 'Round Robin', value: 'round-robin' },
+  { label: 'Random', value: 'random' },
+] as const;
+
 export function LeagueCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
     numberOfTeams: 10,
+    numberOfDivisions: 2,
+    schedulingStrategy: 'divisional',
     playerPool: 'all',
     draftMode: 'live',
     selectionMethod: 'standard',
@@ -164,6 +178,8 @@ export function LeagueCreatePage(): React.JSX.Element {
           input: {
             leagueName: formData.leagueName.trim(),
             numberOfTeams: formData.numberOfTeams,
+            numberOfDivisions: formData.numberOfDivisions,
+            schedulingStrategy: formData.schedulingStrategy,
             playerPool: formData.playerPool,
             draftMode: formData.draftMode,
             selectionMethod: formData.selectionMethod,
@@ -319,6 +335,149 @@ export function LeagueCreatePage(): React.JSX.Element {
                 </XStack>
                 <Text size="$2" color="$gray10">
                   Select between 6-16 teams for your league
+                </Text>
+              </YStack>
+
+              {/* Number of Divisions */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Number of Divisions
+                </Text>
+                <XStack space="$2" flexWrap="wrap">
+                  {DIVISION_COUNT_OPTIONS.map((count) => (
+                    <Button
+                      key={count}
+                      size="$3"
+                      variant={
+                        formData.numberOfDivisions === count
+                          ? 'primary'
+                          : 'outlined'
+                      }
+                      onPress={() => {
+                        handleInputChange('numberOfDivisions', count);
+                      }}
+                      disabled={loading}
+                      minWidth="$5"
+                      backgroundColor={
+                        formData.numberOfDivisions === count
+                          ? '$blue8'
+                          : '$color2'
+                      }
+                      borderColor={
+                        formData.numberOfDivisions === count
+                          ? '$blue8'
+                          : '$borderColor'
+                      }
+                      borderWidth={formData.numberOfDivisions === count ? 2 : 1}
+                      hoverStyle={{
+                        backgroundColor:
+                          formData.numberOfDivisions === count
+                            ? '$blue9'
+                            : '$color3',
+                        borderColor:
+                          formData.numberOfDivisions === count
+                            ? '$blue9'
+                            : '$borderColorHover',
+                      }}
+                      pressStyle={{
+                        scale: 0.95,
+                        backgroundColor:
+                          formData.numberOfDivisions === count
+                            ? '$blue7'
+                            : '$color4',
+                      }}
+                    >
+                      <Text
+                        color={
+                          formData.numberOfDivisions === count
+                            ? '$blue12'
+                            : '$color'
+                        }
+                        fontWeight={
+                          formData.numberOfDivisions === count ? '600' : '400'
+                        }
+                      >
+                        {count}
+                      </Text>
+                    </Button>
+                  ))}
+                </XStack>
+                <Text size="$2" color="$gray10">
+                  How many divisions to split your teams into
+                </Text>
+              </YStack>
+
+              {/* Scheduling Strategy */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Scheduling Strategy
+                </Text>
+                <XStack space="$3">
+                  {SCHEDULING_STRATEGY_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      size="$3"
+                      variant={
+                        formData.schedulingStrategy === option.value
+                          ? 'primary'
+                          : 'outlined'
+                      }
+                      onPress={() => {
+                        handleInputChange('schedulingStrategy', option.value);
+                      }}
+                      disabled={loading}
+                      flex={1}
+                      backgroundColor={
+                        formData.schedulingStrategy === option.value
+                          ? '$green8'
+                          : '$color2'
+                      }
+                      borderColor={
+                        formData.schedulingStrategy === option.value
+                          ? '$green8'
+                          : '$borderColor'
+                      }
+                      borderWidth={
+                        formData.schedulingStrategy === option.value ? 2 : 1
+                      }
+                      hoverStyle={{
+                        backgroundColor:
+                          formData.schedulingStrategy === option.value
+                            ? '$green9'
+                            : '$color3',
+                        borderColor:
+                          formData.schedulingStrategy === option.value
+                            ? '$green9'
+                            : '$borderColorHover',
+                      }}
+                      pressStyle={{
+                        scale: 0.95,
+                        backgroundColor:
+                          formData.schedulingStrategy === option.value
+                            ? '$green7'
+                            : '$color4',
+                      }}
+                    >
+                      <Text
+                        color={
+                          formData.schedulingStrategy === option.value
+                            ? '$green12'
+                            : '$color'
+                        }
+                        fontWeight={
+                          formData.schedulingStrategy === option.value
+                            ? '600'
+                            : '400'
+                        }
+                      >
+                        {option.label}
+                      </Text>
+                    </Button>
+                  ))}
+                </XStack>
+                <Text size="$2" color="$gray10">
+                  Divisional schedules prioritize in-division matchups;
+                  round-robin ensures all teams play each other
                 </Text>
               </YStack>
 

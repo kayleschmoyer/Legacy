@@ -39,6 +39,19 @@ const DROPDOWN_TEAM_COUNT_ITEMS = Object.freeze<DropdownItem[]>([
   { text: '16', value: '16' },
 ]);
 
+const DIVISION_COUNT_ITEMS = Object.freeze<DropdownItem[]>([
+  { text: '1 Division', value: '1' },
+  { text: '2 Divisions', value: '2' },
+  { text: '3 Divisions', value: '3' },
+  { text: '4 Divisions', value: '4' },
+]);
+
+const SCHEDULING_STRATEGY_ITEMS = Object.freeze<DropdownItem[]>([
+  { text: 'Divisional', value: 'divisional' },
+  { text: 'Round Robin', value: 'round-robin' },
+  { text: 'Random', value: 'random' },
+]);
+
 export interface CreateLeagueModalProps {
   open: boolean;
   onOpenChange: (newValue: boolean) => void;
@@ -56,6 +69,10 @@ export default function CreateLeagueModal(
   >('standard');
   const [draftOrder, setDraftOrder] = useState<'snake' | 'linear'>('snake');
   const [numberOfTeams, setNumberOfTeams] = useState(12);
+  const [numberOfDivisions, setNumberOfDivisions] = useState(2);
+  const [schedulingStrategy, setSchedulingStrategy] = useState<
+    'divisional' | 'round-robin' | 'random'
+  >('divisional');
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const router = useRouter();
 
@@ -69,6 +86,8 @@ export default function CreateLeagueModal(
         draftOrder: draftOrder,
         leagueName: leagueName,
         numberOfTeams: numberOfTeams,
+        numberOfDivisions: numberOfDivisions,
+        schedulingStrategy: schedulingStrategy,
         startDate: addDays(new Date(), 5).toISOString(),
       },
     },
@@ -89,6 +108,16 @@ export default function CreateLeagueModal(
     }
 
     setNumberOfTeams(numVal);
+  };
+
+  const onNumberOfDivisionsChanged = (v: string) => {
+    const numVal = parseInt(v, 10);
+
+    if (isNaN(numVal)) {
+      return;
+    }
+
+    setNumberOfDivisions(numVal);
   };
 
   const submit = () => {
@@ -169,6 +198,20 @@ export default function CreateLeagueModal(
               value={draftOrder}
               onChange={(value) => setDraftOrder(value as 'snake' | 'linear')}
               items={DROPDOWN_DRAFT_ORDER_ITEMS}
+            />
+            <Dropdown
+              value={numberOfDivisions.toString()}
+              onChange={onNumberOfDivisionsChanged}
+              items={DIVISION_COUNT_ITEMS}
+            />
+            <Dropdown
+              value={schedulingStrategy}
+              onChange={(value) =>
+                setSchedulingStrategy(
+                  value as 'divisional' | 'round-robin' | 'random',
+                )
+              }
+              items={SCHEDULING_STRATEGY_ITEMS}
             />
 
             <XStack space="$2" justifyContent="space-between">
