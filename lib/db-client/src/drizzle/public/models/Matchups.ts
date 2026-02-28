@@ -194,8 +194,9 @@ export const matchupPlayerGames = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
-    // NOTE: Scores are NOT stored in DB - they are calculated on the frontend
-    // using the @legacy-sports/scoring package with league-specific settings
+    // NOTE: Per-game scores are NOT stored. They are computed server-side in the
+    // stats-lambda using league-specific scoring settings. Only the final team
+    // totals (team1_score / team2_score) are persisted to the matchups table.
   },
   (table) => {
     return {
