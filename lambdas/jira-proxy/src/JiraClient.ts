@@ -34,8 +34,14 @@ export interface CreateIssueInput {
   priority?: 'Low' | 'Medium' | 'High' | 'Critical';
   labels?: string[];
   reporterEmail?: string;
+  /** Username extracted from the authenticated JWT (added server-side). */
+  reporterUsername?: string;
   appVersion?: string;
   environment?: string;
+  /** Current page URL where the bug was reported from. */
+  pageUrl?: string;
+  /** User-agent string from the browser. */
+  userAgent?: string;
 }
 
 export interface CreateIssueResult {
@@ -107,6 +113,15 @@ function buildDescription(input: CreateIssueInput): JiraDocNode {
   }
   if (input.reporterEmail) {
     metaParts.push(`Reported by: ${input.reporterEmail}`);
+  }
+  if (input.reporterUsername) {
+    metaParts.push(`Username: ${input.reporterUsername}`);
+  }
+  if (input.pageUrl) {
+    metaParts.push(`Page URL: ${input.pageUrl}`);
+  }
+  if (input.userAgent) {
+    metaParts.push(`User Agent: ${input.userAgent}`);
   }
 
   if (metaParts.length > 0) {

@@ -169,5 +169,95 @@ describe('Jira Proxy Handler', () => {
       const body = JSON.parse(result.body) as { error: string };
       expect(body.error).toContain('Failed to create bug report');
     });
+
+    it('uses email from Authorization JWT, overriding body reporterEmail', async () => {
+      mockCreateJiraBug.mockResolvedValueOnce({
+        issueKey: 'LS-100',
+        issueUrl: 'https://test.atlassian.net/browse/LS-100',
+      });
+
+      // Build a real-ish JWT with the payload we want (signature doesn't matter)
+      const payload = {
+        email: 'auth@example.com',
+        username: 'authuser',
+        id: 42,
+      };
+      const encoded = Buffer.from(JSON.stringify(payload)).toString(
+        'base64url',
+      );
+      const fakeJwt = `header.${encoded}.signature`;
+
+      const event = makeEvent({
+        headers: { Authorization: `Bearer ${fakeJwt}` },
+        body: JSON.stringify({
+          summary: 'JWT auth test',
+          reporterEmail: 'body@example.com', // should be overridden
+        }),
+      });
+
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(201);
+
+      expect(mockCreateJiraBug).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reporterEmail: 'auth@example.com',
+          reporterUsername: 'authuser',
+        }),
+        'LS',
+        'test-secret',
+      );
+    });
+
+    it('falls back to body reporterEmail when no Authorization header', async () => {
+      mockCreateJiraBug.mockResolvedValueOnce({
+        issueKey: 'LS-101',
+        issueUrl: 'https://test.atlassian.net/browse/LS-101',
+      });
+
+      const event = makeEvent({
+        body: JSON.stringify({
+          summary: 'No auth header test',
+          reporterEmail: 'body@example.com',
+        }),
+      });
+
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(201);
+
+      expect(mockCreateJiraBug).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reporterEmail: 'body@example.com',
+        }),
+        'LS',
+        'test-secret',
+      );
+    });
+
+    it('includes pageUrl and userAgent from request body', async () => {
+      mockCreateJiraBug.mockResolvedValueOnce({
+        issueKey: 'LS-102',
+        issueUrl: 'https://test.atlassian.net/browse/LS-102',
+      });
+
+      const event = makeEvent({
+        body: JSON.stringify({
+          summary: 'Bug with page context',
+          pageUrl: 'https://app.example.com/league/123',
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0)',
+        }),
+      });
+
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(201);
+
+      expect(mockCreateJiraBug).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pageUrl: 'https://app.example.com/league/123',
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0)',
+        }),
+        'LS',
+        'test-secret',
+      );
+    });
   });
 });

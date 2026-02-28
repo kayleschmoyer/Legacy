@@ -9,6 +9,45 @@ import {
 import type { CreateIssueInput } from './JiraClient';
 import { createJiraBug } from './JiraClient';
 
+/** Minimal JWT payload we care about for attribution. */
+interface JwtUserPayload {
+  email?: string;
+  username?: string;
+  id?: number;
+}
+
+/**
+ * Decode a JWT's payload section without verifying the signature.
+ * We only use this for attribution (bug report metadata), not for access control.
+ */
+function decodeJwtPayload(token: string): JwtUserPayload | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = parts[1];
+    // Add padding so atob doesn't throw on short payloads
+    const padded = payload + '='.repeat((4 - (payload.length % 4)) % 4);
+    const decoded = Buffer.from(padded, 'base64').toString('utf-8');
+    return JSON.parse(decoded) as JwtUserPayload;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract user info from the Authorization header (Bearer token).
+ * Returns null if the header is absent or the token cannot be decoded.
+ */
+function extractAuthUser(
+  headers: APIGatewayEvent['headers'],
+): JwtUserPayload | null {
+  const authHeader =
+    headers?.['Authorization'] ?? headers?.['authorization'] ?? null;
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7);
+  return decodeJwtPayload(token);
+}
+
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
@@ -128,6 +167,20 @@ function parseBugReport(rawBody: string | null): CreateIssueInput {
     input.environment = body['environment'];
   }
 
+  if (body['pageUrl'] !== undefined) {
+    if (typeof body['pageUrl'] !== 'string') {
+      throw new Error('Field "pageUrl" must be a string');
+    }
+    input.pageUrl = body['pageUrl'];
+  }
+
+  if (body['userAgent'] !== undefined) {
+    if (typeof body['userAgent'] !== 'string') {
+      throw new Error('Field "userAgent" must be a string');
+    }
+    input.userAgent = body['userAgent'];
+  }
+
   return input;
 }
 
@@ -184,6 +237,10 @@ async function handleCreateBug(
     return jsonResponse(500, { error: 'Server configuration error' });
   }
 
+  // Extract authenticated user from JWT in Authorization header (if present).
+  // We decode without verifying — this is attribution only, not access control.
+  const authUser = extractAuthUser(event.headers ?? {});
+
   let input: CreateIssueInput;
   try {
     input = parseBugReport(event.body);
@@ -191,6 +248,18 @@ async function handleCreateBug(
     const message = err instanceof Error ? err.message : 'Invalid request';
     return jsonResponse(400, { error: message });
   }
+
+  // Prefer the server-decoded email over whatever the client sent (trusted source).
+  if (authUser?.email) {
+    input.reporterEmail = authUser.email;
+  }
+  if (authUser?.username) {
+    input.reporterUsername = authUser.username;
+  }
+
+  LOGGER.info(
+    `Bug report from ${input.reporterEmail ?? 'unauthenticated'} (user id: ${String(authUser?.id ?? 'unknown')})`,
+  );
 
   try {
     const result = await createJiraBug(input, jiraProjectKey, jiraSecretName);

@@ -15,6 +15,7 @@ import HomePage from '../pages/home/HomePage';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { SportsDropdown } from '../components/layout/SportsDropdown';
 import { PlayersDropdown } from '../components/layout/PlayersDropdown';
+import { BugReportButton } from '../components/layout/BugReportButton';
 import { BaseballScreen } from '../components/baseball';
 
 import {
@@ -290,6 +291,7 @@ function Navigation() {
 
           {/* ── Right section ── */}
           <XStack alignItems="center" gap="$3" flexShrink={0}>
+            <BugReportButton />
             <UserProfileDropdown />
 
             {/* Mobile hamburger */}

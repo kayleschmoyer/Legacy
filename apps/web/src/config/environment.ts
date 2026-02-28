@@ -21,6 +21,8 @@ export interface EnvironmentConfig {
   readonly sentryDsn?: string;
   readonly sentryTracesSampleRate?: number;
   readonly googleAnalyticsMeasurementId?: string;
+  /** URL for the Jira proxy lambda used by the bug report button. */
+  readonly jiraProxyUrl: string;
 }
 
 /**
@@ -57,6 +59,7 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   googleAnalyticsMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID as
     | string
     | undefined,
+  jiraProxyUrl: (import.meta.env.VITE_JIRA_PROXY_URL as string) || '',
 });
 
 /**
