@@ -25,48 +25,13 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           <div
             alignitems="center"
             cursor="pointer"
-            gap="$3"
+            gap="$2"
           >
-            <div
-              alignitems="center"
-              borderradius="$4"
-              height="38"
-              justifycontent="center"
-              width="38"
-            >
-              <p
-                font-size="20"
-                lineheight="22"
-              >
-                <span
-                  aria-label="baseball"
-                  role="img"
-                >
-                  ⚾
-                </span>
-              </p>
-            </div>
-            <div>
-              <p
-                color="$color"
-                font-size="18"
-                font-weight="700"
-                letter-spacing="-0.3"
-                lineheight="22"
-              >
-                Legacy Sports
-              </p>
-              <p
-                color="$colorPress"
-                font-size="11"
-                font-weight="500"
-                letter-spacing="0.5"
-                lineheight="14"
-                texttransform="uppercase"
-              >
-                Fantasy League
-              </p>
-            </div>
+            <img
+              alt="Legacy Sports"
+              src="/logo.png"
+              style="height: 38px; width: auto; display: block;"
+            />
           </div>
         </a>
         <div
@@ -185,48 +150,13 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           <div
             alignitems="center"
             cursor="pointer"
-            gap="$3"
+            gap="$2"
           >
-            <div
-              alignitems="center"
-              borderradius="$4"
-              height="38"
-              justifycontent="center"
-              width="38"
-            >
-              <p
-                font-size="20"
-                lineheight="22"
-              >
-                <span
-                  aria-label="baseball"
-                  role="img"
-                >
-                  ⚾
-                </span>
-              </p>
-            </div>
-            <div>
-              <p
-                color="$color"
-                font-size="18"
-                font-weight="700"
-                letter-spacing="-0.3"
-                lineheight="22"
-              >
-                Legacy Sports
-              </p>
-              <p
-                color="$colorPress"
-                font-size="11"
-                font-weight="500"
-                letter-spacing="0.5"
-                lineheight="14"
-                texttransform="uppercase"
-              >
-                Fantasy League
-              </p>
-            </div>
+            <img
+              alt="Legacy Sports"
+              src="/logo.png"
+              style="height: 38px; width: auto; display: block;"
+            />
           </div>
         </a>
         <div
@@ -343,48 +273,13 @@ exports[`App Navigation should render navigation with correct links 1`] = `
           <div
             alignitems="center"
             cursor="pointer"
-            gap="$3"
+            gap="$2"
           >
-            <div
-              alignitems="center"
-              borderradius="$4"
-              height="38"
-              justifycontent="center"
-              width="38"
-            >
-              <p
-                font-size="20"
-                lineheight="22"
-              >
-                <span
-                  aria-label="baseball"
-                  role="img"
-                >
-                  ⚾
-                </span>
-              </p>
-            </div>
-            <div>
-              <p
-                color="$color"
-                font-size="18"
-                font-weight="700"
-                letter-spacing="-0.3"
-                lineheight="22"
-              >
-                Legacy Sports
-              </p>
-              <p
-                color="$colorPress"
-                font-size="11"
-                font-weight="500"
-                letter-spacing="0.5"
-                lineheight="14"
-                texttransform="uppercase"
-              >
-                Fantasy League
-              </p>
-            </div>
+            <img
+              alt="Legacy Sports"
+              src="/logo.png"
+              style="height: 38px; width: auto; display: block;"
+            />
           </div>
         </a>
         <div

@@ -178,7 +178,9 @@ describe('App', () => {
     // Since we now show authenticated content immediately, check for the app content
     const appContent = container.querySelector('div');
     expect(appContent).toBeTruthy();
-    expect(container).toHaveTextContent('Legacy Sports');
+    expect(
+      container.querySelector('img[alt="Legacy Sports"]'),
+    ).toBeInTheDocument();
   });
 
   it('should render homepage with authenticated content', () => {
@@ -282,7 +284,9 @@ describe('App', () => {
       // Since we now show authenticated content immediately, no need to advance timers
       // Verify football screen content is rendered
       expect(container).toHaveTextContent('Football Screen');
-      expect(container).toHaveTextContent('Legacy Sports');
+      expect(
+        container.querySelector('img[alt="Legacy Sports"]'),
+      ).toBeInTheDocument();
     });
 
     it('should display correct football content', () => {
@@ -295,7 +299,9 @@ describe('App', () => {
       // Since we now show authenticated content immediately, no need to advance timers
       // Verify football content is present and matches expected structure
       expect(container).toHaveTextContent('Football Screen');
-      expect(container).toHaveTextContent('Legacy Sports');
+      expect(
+        container.querySelector('img[alt="Legacy Sports"]'),
+      ).toBeInTheDocument();
 
       // Verify navigation is present
       const homeLink = container.querySelector('[href="/"]');
@@ -328,7 +334,9 @@ describe('App', () => {
       );
 
       // Since user is now authenticated by default, should show navigation and content
-      expect(container).toHaveTextContent('Legacy Sports');
+      expect(
+        container.querySelector('img[alt="Legacy Sports"]'),
+      ).toBeInTheDocument();
       expect(container).toHaveTextContent('Football Screen');
 
       // Should show navigation links
@@ -349,7 +357,9 @@ describe('App', () => {
       );
 
       // Should show authenticated content immediately instead of loading
-      expect(container).toHaveTextContent('Legacy Sports');
+      expect(
+        container.querySelector('img[alt="Legacy Sports"]'),
+      ).toBeInTheDocument();
       expect(container).toHaveTextContent('Football Screen');
     });
 

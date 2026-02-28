@@ -205,45 +205,12 @@ function Navigation() {
             aria-label="Legacy Sports home"
             style={{ textDecoration: 'none', flexShrink: 0 }}
           >
-            <XStack alignItems="center" gap="$3" cursor="pointer">
-              <YStack
-                width={38}
-                height={38}
-                borderRadius="$4"
-                alignItems="center"
-                justifyContent="center"
-                style={{
-                  background:
-                    'linear-gradient(135deg, #1B3A5C 0%, #2C4A7C 100%)',
-                }}
-              >
-                <Paragraph fontSize={20} lineHeight={22}>
-                  <span role="img" aria-label="baseball">
-                    ⚾
-                  </span>
-                </Paragraph>
-              </YStack>
-              <YStack>
-                <Paragraph
-                  color="$color"
-                  fontSize={18}
-                  fontWeight="700"
-                  letterSpacing={-0.3}
-                  lineHeight={22}
-                >
-                  Legacy Sports
-                </Paragraph>
-                <Paragraph
-                  color="$colorPress"
-                  fontSize={11}
-                  fontWeight="500"
-                  letterSpacing={0.5}
-                  lineHeight={14}
-                  textTransform="uppercase"
-                >
-                  Fantasy League
-                </Paragraph>
-              </YStack>
+            <XStack alignItems="center" gap="$2" cursor="pointer">
+              <img
+                src="/logo.png"
+                alt="Legacy Sports"
+                style={{ height: 38, width: 'auto', display: 'block' }}
+              />
             </XStack>
           </Link>
 
