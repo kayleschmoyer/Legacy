@@ -22,6 +22,15 @@ import {
   useGetCareerPitchingStatsQuery,
 } from '../../api/db/graphql.generated';
 
+// ─── Brand color constants (mirror apps/web/src/constants/colors.ts) ──────────
+const BRAND_NAVY = '#1B3A5C';
+const BRAND_NAVY_LIGHT = '#2C4A7C';
+const BRAND_NAVY_DARK = '#143050';
+const BRAND_GOLD = '#C5A55A';
+const BRAND_GOLD_LIGHT = '#D4BB78';
+const TEXT_HIGH_CONTRAST = '#F5F7FA';
+const TEXT_MUTED = '#9CAAC5';
+
 // Icons
 const Search = ({ size, color }: { size?: number; color?: string }) => (
   <Text fontSize={size} color={color} accessibilityLabel="Search">
@@ -351,85 +360,106 @@ export function PitchingStatsDataGrid({
   // =============================================================================
 
   const renderControls = () => (
-    <YStack space="$3" padding="$3" backgroundColor="$color2" borderRadius="$3">
+    <YStack
+      gap="$3"
+      padding="$4"
+      style={{
+        background: `rgba(22,34,58,0.7)`,
+        border: `1px solid rgba(44,74,124,0.4)`,
+        borderRadius: 14,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}
+    >
       <XStack
-        space="$3"
+        gap="$3"
         alignItems="center"
         flexWrap="wrap"
         justifyContent="space-between"
       >
         {showSearch && (
-          <XStack flex={1} minWidth="200px" alignItems="center" space="$2">
-            <Search size={16} color="$color10" />
+          <XStack
+            flex={1}
+            minWidth="200px"
+            alignItems="center"
+            gap="$2"
+            style={{
+              background: 'rgba(10,15,26,0.6)',
+              border: '1px solid rgba(44,74,124,0.4)',
+              borderRadius: 10,
+              paddingLeft: 12,
+              paddingRight: 8,
+            }}
+          >
+            <Search size={14} color={TEXT_MUTED} />
             <Input
               flex={1}
-              placeholder="Search players..."
+              placeholder="Search pitchers..."
               value={searchTerm}
               onChangeText={handleSearchChange}
-              backgroundColor="$color1"
+              backgroundColor="transparent"
+              borderWidth={0}
+              color={TEXT_HIGH_CONTRAST}
+              placeholderTextColor={TEXT_MUTED}
             />
           </XStack>
         )}
 
         {showFilters && (
-          <XStack space="$2" alignItems="center" flexWrap="wrap">
-            <Text fontSize="$2" color="$color11" fontWeight="500">
+          <XStack gap="$2" alignItems="center" flexWrap="wrap">
+            <Text
+              fontSize="$2"
+              fontWeight="600"
+              letterSpacing={0.8}
+              textTransform="uppercase"
+              style={{ color: BRAND_GOLD_LIGHT }}
+            >
               Filters:
             </Text>
-            <XStack alignItems="center" space="$1">
-              <Text fontSize="$2" color="$color10">
-                Min G:
-              </Text>
-              <Input
-                width={60}
-                size="$2"
-                value={String(localFilters.minGames)}
-                onChangeText={(value: string) =>
-                  handleFilterChange('minGames', parseInt(value) || 0)
-                }
-                keyboardType="numeric"
-                backgroundColor="$color1"
-              />
-            </XStack>
-            <XStack alignItems="center" space="$1">
-              <Text fontSize="$2" color="$color10">
-                Min W:
-              </Text>
-              <Input
-                width={60}
-                size="$2"
-                value={String(localFilters.minWins)}
-                onChangeText={(value: string) =>
-                  handleFilterChange('minWins', parseInt(value) || 0)
-                }
-                keyboardType="numeric"
-                backgroundColor="$color1"
-              />
-            </XStack>
-            <XStack alignItems="center" space="$1">
-              <Text fontSize="$2" color="$color10">
-                Min SO:
-              </Text>
-              <Input
-                width={60}
-                size="$2"
-                value={String(localFilters.minStrikeouts)}
-                onChangeText={(value: string) =>
-                  handleFilterChange('minStrikeouts', parseInt(value) || 0)
-                }
-                keyboardType="numeric"
-                backgroundColor="$color1"
-              />
-            </XStack>
+            {[
+              { label: 'Min G', key: 'minGames', val: localFilters.minGames },
+              { label: 'Min W', key: 'minWins', val: localFilters.minWins },
+              {
+                label: 'Min SO',
+                key: 'minStrikeouts',
+                val: localFilters.minStrikeouts,
+              },
+            ].map(({ label, key, val }) => (
+              <XStack key={key} alignItems="center" gap="$1">
+                <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
+                  {label}:
+                </Text>
+                <Input
+                  width={56}
+                  size="$2"
+                  value={String(val)}
+                  onChangeText={(value: string) =>
+                    handleFilterChange(key, parseInt(value) || 0)
+                  }
+                  keyboardType="numeric"
+                  backgroundColor="rgba(10,15,26,0.6)" // dark input bg
+                  borderWidth={1}
+                  borderColor="rgba(44,74,124,0.4)"
+                  borderRadius={8}
+                  color={TEXT_HIGH_CONTRAST}
+                  textAlign="center"
+                />
+              </XStack>
+            ))}
           </XStack>
         )}
 
         <Button
           size="$2"
-          variant="outlined"
-          icon={RefreshCw}
           onPress={handleRefresh}
           disabled={loading}
+          style={{
+            background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+            border: `1px solid rgba(196,165,90,0.25)`,
+            borderRadius: 8,
+            color: BRAND_GOLD_LIGHT,
+          }}
+          icon={RefreshCw}
         >
           Refresh
         </Button>
@@ -437,8 +467,8 @@ export function PitchingStatsDataGrid({
 
       {showSorting && (
         <XStack justifyContent="center" paddingTop="$1">
-          <Text fontSize="$2" color="$color9" textAlign="center">
-            <span role="img" aria-label="Light bulb">
+          <Text fontSize="$2" style={{ color: TEXT_MUTED }} textAlign="center">
+            <span role="img" aria-label="Tip">
               💡
             </span>{' '}
             Click column headers to sort
@@ -451,14 +481,21 @@ export function PitchingStatsDataGrid({
   const renderDataGrid = () => (
     <YStack
       flex={1}
-      backgroundColor="$color1"
-      borderRadius="$3"
-      overflow="hidden"
+      style={{
+        background: `rgba(16,22,38,0.75)`,
+        border: `1px solid rgba(44,74,124,0.35)`,
+        borderRadius: 14,
+        overflow: 'hidden',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        boxShadow: `0 4px 24px rgba(0,0,0,0.3)`,
+      }}
     >
       <XStack
-        backgroundColor="$color3"
-        borderBottomWidth={2}
-        borderBottomColor="$borderColor"
+        style={{
+          background: `linear-gradient(135deg, ${BRAND_NAVY_DARK} 0%, ${BRAND_NAVY} 60%, ${BRAND_NAVY_LIGHT} 100%)`,
+          borderBottom: `2px solid rgba(196,165,90,0.25)`,
+        }}
         paddingVertical="$2"
         paddingHorizontal="$3"
       >
@@ -483,27 +520,22 @@ export function PitchingStatsDataGrid({
               paddingHorizontal="$1"
               paddingVertical="$1"
               borderRadius="$2"
-              backgroundColor={isActiveSortColumn ? '$blue3' : 'transparent'}
+              style={{
+                background: isActiveSortColumn
+                  ? 'rgba(196,165,90,0.18)'
+                  : 'transparent',
+                transition: 'background 0.15s ease',
+              }}
               hoverStyle={
                 column.sortable
                   ? {
                       backgroundColor: isActiveSortColumn
-                        ? '$blue4'
-                        : '$color4',
-                      opacity: 0.9,
+                        ? ('rgba(196,165,90,0.25)' as never)
+                        : ('rgba(255,255,255,0.07)' as never),
                     }
                   : undefined
               }
-              pressStyle={
-                column.sortable
-                  ? {
-                      backgroundColor: isActiveSortColumn
-                        ? '$blue5'
-                        : '$color5',
-                      scale: 0.98,
-                    }
-                  : undefined
-              }
+              pressStyle={column.sortable ? { scale: 0.97 } : undefined}
               cursor={column.sortable ? 'pointer' : 'default'}
               onPress={
                 column.sortable
@@ -515,21 +547,28 @@ export function PitchingStatsDataGrid({
                   : undefined
               }
             >
-              <XStack space="$1" alignItems="center">
+              <XStack gap="$1" alignItems="center">
                 <Text
                   fontSize="$3"
                   fontWeight={isActiveSortColumn ? '700' : '600'}
-                  color={isActiveSortColumn ? '$blue11' : '$color12'}
                   numberOfLines={1}
                   userSelect="none"
+                  style={{
+                    color: isActiveSortColumn
+                      ? BRAND_GOLD_LIGHT
+                      : TEXT_HIGH_CONTRAST,
+                    transition: 'color 0.15s ease',
+                  }}
                 >
                   {column.label}
                 </Text>
                 {column.sortable && (
                   <Text
                     fontSize="$2"
-                    color={isActiveSortColumn ? '$blue10' : '$color9'}
-                    opacity={isActiveSortColumn ? 1 : 0.5}
+                    style={{
+                      color: isActiveSortColumn ? BRAND_GOLD : TEXT_MUTED,
+                      opacity: isActiveSortColumn ? 1 : 0.6,
+                    }}
                   >
                     {isActiveSortColumn ? (isDescending ? '↓' : '↑') : '↕'}
                   </Text>
@@ -546,10 +585,10 @@ export function PitchingStatsDataGrid({
             justifyContent="center"
             alignItems="center"
             padding="$6"
-            backgroundColor="$color1"
+            gap="$3"
           >
-            <Spinner size="large" color="$blue10" />
-            <Text marginLeft="$3" color="$color10">
+            <Spinner size="large" color={BRAND_NAVY_LIGHT as never} />
+            <Text style={{ color: TEXT_MUTED }}>
               Loading pitching statistics...
             </Text>
           </XStack>
@@ -558,17 +597,23 @@ export function PitchingStatsDataGrid({
             justifyContent="center"
             alignItems="center"
             padding="$6"
-            space="$3"
-            backgroundColor="$color1"
+            gap="$3"
           >
-            <Text color="$color10" fontSize="$4" fontWeight="600">
+            <Text
+              fontSize="$5"
+              fontWeight="600"
+              style={{ color: TEXT_HIGH_CONTRAST }}
+            >
               No pitchers found
             </Text>
-            <Text color="$color9" fontSize="$3" textAlign="center">
+            <Text
+              fontSize="$3"
+              textAlign="center"
+              style={{ color: TEXT_MUTED }}
+            >
               Try adjusting your filters to find more pitchers.
             </Text>
             <Button
-              variant="outlined"
               onPress={() => {
                 setLocalFilters({ minGames: 0, minWins: 0, minStrikeouts: 0 });
                 updateQueryParams({
@@ -577,6 +622,12 @@ export function PitchingStatsDataGrid({
                   minStrikeouts: 0,
                   offset: 0,
                 });
+              }}
+              style={{
+                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+                border: `1px solid rgba(196,165,90,0.3)`,
+                borderRadius: 10,
+                color: BRAND_GOLD_LIGHT,
               }}
             >
               Clear Filters
@@ -587,12 +638,21 @@ export function PitchingStatsDataGrid({
             (player: CareerPitchingFragment | null, index: number) => (
               <XStack
                 key={player?.playerId || index}
-                backgroundColor={index % 2 === 0 ? '$color1' : '$color2'}
-                borderBottomWidth={1}
-                borderBottomColor="$borderColorFocus"
+                style={{
+                  background:
+                    index % 2 === 0
+                      ? 'rgba(10,15,26,0.4)'
+                      : 'rgba(22,34,58,0.35)',
+                  borderBottom: '1px solid rgba(44,74,124,0.2)',
+                  transition: 'background 0.15s ease',
+                  cursor: 'pointer',
+                }}
+                hoverStyle={{
+                  backgroundColor: `rgba(44,74,124,0.35)` as never,
+                }}
+                pressStyle={{ scale: 0.995 }}
                 paddingVertical="$2"
                 paddingHorizontal="$3"
-                pressStyle={{ backgroundColor: '$color4' }}
                 onPress={() => player && handleRowClick(player)}
                 cursor="pointer"
               >
@@ -610,7 +670,11 @@ export function PitchingStatsDataGrid({
                     }
                     alignItems="center"
                   >
-                    <Text fontSize="$3" color="$color11" numberOfLines={1}>
+                    <Text
+                      fontSize="$3"
+                      numberOfLines={1}
+                      style={{ color: TEXT_HIGH_CONTRAST }}
+                    >
                       {column.formatter
                         ? column.formatter(
                             player?.[column.key as keyof typeof player],
@@ -630,56 +694,89 @@ export function PitchingStatsDataGrid({
   );
 
   const renderPagination = () => (
-    <YStack space="$2">
+    <YStack gap="$2">
       <XStack
         justifyContent="space-between"
         alignItems="center"
         padding="$3"
-        backgroundColor="$color2"
-        borderRadius="$3"
         flexWrap="wrap"
         gap="$2"
+        style={{
+          background: `rgba(22,34,58,0.65)`,
+          border: `1px solid rgba(44,74,124,0.35)`,
+          borderRadius: 12,
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+        }}
       >
-        <XStack space="$2" alignItems="center">
-          <Text fontSize="$3" color="$color10" fontWeight="600">
+        <XStack gap="$2" alignItems="center">
+          <Text
+            fontSize="$3"
+            fontWeight="600"
+            style={{ color: TEXT_HIGH_CONTRAST }}
+          >
             Page {currentPageNumber} of {totalPages}
           </Text>
-          <Text fontSize="$2" color="$color9">
+          <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
             ({totalCount.toLocaleString()} total)
           </Text>
         </XStack>
 
-        <XStack space="$2" alignItems="center">
-          <Text fontSize="$2" color="$color10">
+        <XStack gap="$2" alignItems="center">
+          <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
             Show:
           </Text>
           {[10, 25, 50, 100].map((size) => (
             <Button
               key={size}
               size="$2"
-              variant={pageSize === size ? 'outlined' : undefined}
               onPress={() => handlePageSizeChange(size)}
               disabled={loading}
+              style={{
+                background:
+                  pageSize === size
+                    ? `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`
+                    : 'rgba(10,15,26,0.5)',
+                border:
+                  pageSize === size
+                    ? `1px solid rgba(196,165,90,0.4)`
+                    : `1px solid rgba(44,74,124,0.35)`,
+                borderRadius: 8,
+                color: pageSize === size ? BRAND_GOLD_LIGHT : TEXT_MUTED,
+                minWidth: 36,
+              }}
             >
               {size}
             </Button>
           ))}
         </XStack>
 
-        <XStack space="$2">
+        <XStack gap="$2">
           <Button
             size="$3"
-            variant="outlined"
             disabled={!hasPreviousPage || loading}
             onPress={() => handlePageChange('prev')}
+            style={{
+              background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+              border: `1px solid rgba(196,165,90,0.25)`,
+              borderRadius: 10,
+              color: BRAND_GOLD_LIGHT,
+              opacity: !hasPreviousPage || loading ? 0.4 : 1,
+            }}
           >
             ← Prev
           </Button>
           <Button
             size="$3"
-            variant="outlined"
             disabled={!hasNextPage || loading}
             onPress={() => handlePageChange('next')}
+            style={{
+              background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+              border: `1px solid rgba(196,165,90,0.25)`,
+              borderRadius: 10,
+              color: BRAND_GOLD_LIGHT,
+              opacity: !hasNextPage || loading ? 0.4 : 1,
+            }}
           >
             Next →
           </Button>
@@ -695,25 +792,46 @@ export function PitchingStatsDataGrid({
   return (
     <YStack
       flex={1}
-      space="$4"
+      gap="$4"
       padding="$4"
       backgroundColor="$background"
       className={className}
       testID={testId}
     >
-      <H2 color="$color12" textAlign="center">
+      {/* Grid Title */}
+      <H2
+        textAlign="center"
+        style={{
+          background: `linear-gradient(90deg, ${TEXT_HIGH_CONTRAST} 0%, ${BRAND_GOLD_LIGHT} 100%)`,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+        }}
+      >
         {title}
       </H2>
 
+      {/* Total Count Badge */}
       {!loading && !error && (
-        <Text
-          color="$color11"
-          textAlign="center"
-          fontSize="$4"
-          fontWeight="600"
-        >
-          Total Pitchers: {totalCount.toLocaleString()}
-        </Text>
+        <XStack justifyContent="center">
+          <YStack
+            paddingHorizontal="$3"
+            paddingVertical="$1"
+            style={{
+              background: `rgba(44,74,124,0.18)`,
+              border: `1px solid rgba(44,74,124,0.35)`,
+              borderRadius: 99,
+            }}
+          >
+            <Text
+              fontSize="$3"
+              fontWeight="600"
+              style={{ color: BRAND_GOLD_LIGHT }}
+            >
+              {totalCount.toLocaleString()} Pitchers
+            </Text>
+          </YStack>
+        </XStack>
       )}
 
       {(showSearch || showSorting || showFilters) && renderControls()}
@@ -723,19 +841,28 @@ export function PitchingStatsDataGrid({
           justifyContent="center"
           alignItems="center"
           padding="$6"
-          space="$3"
-          backgroundColor="$red2"
-          borderColor="$red6"
-          borderWidth={1}
-          borderRadius="$3"
+          gap="$3"
+          style={{
+            background: 'rgba(196,30,58,0.1)',
+            border: '1px solid rgba(196,30,58,0.35)',
+            borderRadius: 14,
+          }}
         >
           <AlertCircle size={32} color="$red10" />
           <H3 color="$red11">Error Loading Statistics</H3>
           <Text color="$red10" textAlign="center">
             {error?.message || 'Failed to load pitching statistics'}
           </Text>
-          <Button onPress={handleRefresh}>
-            <Text>Try Again</Text>
+          <Button
+            onPress={handleRefresh}
+            style={{
+              background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+              border: `1px solid rgba(196,165,90,0.3)`,
+              borderRadius: 10,
+              color: BRAND_GOLD_LIGHT,
+            }}
+          >
+            Try Again
           </Button>
         </YStack>
       )}
