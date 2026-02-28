@@ -250,6 +250,8 @@ async function run(): Promise<void> {
   program
     .command('set-user-type')
     .description('Set the access level for a user by email address')
+    .option('--email <email>', 'Email address of the user to update')
+    .option('--type <type>', 'Access level to set (none or admin)')
     .action(handleSetUserType);
 
   program

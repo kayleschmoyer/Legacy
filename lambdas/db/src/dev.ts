@@ -112,7 +112,8 @@ async function startServer() {
               id: payload.id,
               email: payload.email,
               username: payload.username,
-              isAdmin: payload.isAdmin || false,
+              isAdmin:
+                payload.isAdmin === true || payload.accessLevel === 'admin',
             };
           }
         } catch (error) {

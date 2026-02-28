@@ -514,7 +514,7 @@ builder.mutationField('joinLeagueByCode', (t) =>
           leagueId: league.id,
           userId: userId,
           teamId: team.id,
-          permissionLevel: 'commissioner',
+          permissionLevel: 'general_manager',
         };
 
         await context.db
@@ -693,7 +693,7 @@ builder.mutationField('joinLeague', (t) =>
           leagueId: league.id,
           userId: userId,
           teamId: team.id,
-          permissionLevel: 'commissioner',
+          permissionLevel: 'general_manager',
         });
 
         return {

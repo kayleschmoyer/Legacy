@@ -339,7 +339,9 @@ builder.queryField('userTeamId', (t) =>
       const userId = context.user.id;
 
       try {
-        // Get user's team ID for this league
+        // Get user's team ID for this league — only match general_manager rows
+        // so that users with commissioner/assistant roles on other teams don't
+        // get the wrong team highlighted as "YOU" in the standings.
         const membership = await context.db
           .select({
             teamId: PublicSchema.leagueMembers.teamId,
@@ -349,6 +351,7 @@ builder.queryField('userTeamId', (t) =>
             and(
               eq(PublicSchema.leagueMembers.leagueId, leagueId),
               eq(PublicSchema.leagueMembers.userId, userId),
+              eq(PublicSchema.leagueMembers.permissionLevel, 'general_manager'),
             ),
           )
           .limit(1);
