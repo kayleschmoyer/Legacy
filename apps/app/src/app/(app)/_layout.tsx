@@ -16,9 +16,16 @@ import ViewCareerStats from './view_career_stats';
 import ViewGameLogs from './view_game_logs';
 import LeagueId, { LeagueIdHeader } from './baseball/league/[leagueId]';
 import LeagueCreatePage from './baseball/league/create';
+import JoinLeagueByCode from './baseball/league/join';
+import MatchupDetail from './baseball/matchup';
 import Team, { TeamIdHeader } from './baseball/team/[teamId]';
 import FreeAgents from './FreeAgents';
 import ManagementScreen from './management';
+import AboutScreen from './about';
+import HelpScreen from './help';
+import ProfileSettingsScreen from './profile-settings';
+import PreferencesScreen from './preferences';
+import NotificationsScreen from './notifications';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
 import { LoadingPanel } from '../../common/components/LoadingPanel';
 import {
@@ -33,6 +40,8 @@ export type AppDrawerParamList = {
   view_career_stats: undefined;
   'baseball/index': undefined;
   'baseball/league/create': undefined;
+  'baseball/league/join': undefined;
+  'baseball/matchup': { matchupId: string; leagueId: string };
   'football/index': undefined;
   DraftBoardPage: undefined;
   FreeAgents: undefined;
@@ -41,6 +50,11 @@ export type AppDrawerParamList = {
   'baseball/league/[leagueId]': { leagueId: string };
   'baseball/team/[teamId]': { teamId: string };
   management: undefined;
+  about: undefined;
+  help: undefined;
+  'profile-settings': undefined;
+  preferences: undefined;
+  notifications: undefined;
 };
 
 const { Navigator, Screen } = createDrawerNavigator<AppDrawerParamList>();
@@ -90,6 +104,30 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'management',
     title: 'Management',
+  },
+  {
+    route: 'baseball/league/join',
+    title: 'Join League',
+  },
+  {
+    route: 'notifications',
+    title: 'Notifications',
+  },
+  {
+    route: 'preferences',
+    title: 'Preferences',
+  },
+  {
+    route: 'profile-settings',
+    title: 'Profile Settings',
+  },
+  {
+    route: 'help',
+    title: 'Help',
+  },
+  {
+    route: 'about',
+    title: 'About',
   },
 ]);
 
@@ -228,6 +266,41 @@ export default function Layout() {
             name="management"
             options={{ title: 'Management' }}
             component={ManagementScreen}
+          />
+          <Screen
+            name="baseball/league/join"
+            options={{ title: 'Join League' }}
+            component={JoinLeagueByCode}
+          />
+          <Screen
+            name="baseball/matchup"
+            options={{ drawerLabel: () => null, title: 'Matchup Detail' }}
+            component={MatchupDetail}
+          />
+          <Screen
+            name="about"
+            options={{ title: 'About' }}
+            component={AboutScreen}
+          />
+          <Screen
+            name="help"
+            options={{ title: 'Help & Support' }}
+            component={HelpScreen}
+          />
+          <Screen
+            name="profile-settings"
+            options={{ title: 'Profile Settings' }}
+            component={ProfileSettingsScreen}
+          />
+          <Screen
+            name="preferences"
+            options={{ title: 'Preferences' }}
+            component={PreferencesScreen}
+          />
+          <Screen
+            name="notifications"
+            options={{ title: 'Notifications' }}
+            component={NotificationsScreen}
           />
         </Navigator>
       </GestureHandlerRootView>

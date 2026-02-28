@@ -1,5 +1,9 @@
 /* eslint-disable */
-import { useGlobalSearchParams, useLocalSearchParams } from 'expo-router';
+import {
+  useGlobalSearchParams,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { HeaderTitleProps } from '@react-navigation/elements';
 import { Button, Card, H3, Spinner, Text, XStack, YStack } from 'tamagui';
@@ -25,6 +29,8 @@ import { LeagueRosterManagement } from '../../../../features/roster/LeagueRoster
 import { LeagueStandings } from '../../../../features/roster/LeagueStandings';
 import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
 import { LeagueScoringEditor } from '../../../../features/scoring/LeagueScoringEditor';
+import { MatchupList } from '../../../../features/matchup/components/MatchupList';
+import { useMatchupsForLeague } from '../../../../features/matchup/hooks/useMatchup';
 import { useLeagueScoringSettings } from '../../../../common/scoring';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
@@ -51,6 +57,7 @@ const GET_LEAGUE_TEAMS = gql`
 export default function LeagueId(): React.JSX.Element {
   const params = useLocalSearchParams();
   const leagueId = params.leagueId;
+  const router = useRouter();
   const [selectedTab, setSelectedTab] = useState('roster');
   const userInfo = useAuthorizedUserInfo();
 
@@ -63,6 +70,11 @@ export default function LeagueId(): React.JSX.Element {
   const numLeagueId = parseInt(leagueIdStr, 10);
 
   // Fetch league data
+  // Fetch matchups for the league
+  const { matchups, loading: matchupsLoading } = useMatchupsForLeague(
+    isNaN(numLeagueId) ? null : numLeagueId,
+  );
+
   const { data: leagueData, loading: leagueLoading } = useGetLeagueByIdQuery({
     skip: isNaN(numLeagueId),
     variables: {
@@ -272,7 +284,10 @@ export default function LeagueId(): React.JSX.Element {
       >
         <Tabs.List backgroundColor="$background" paddingHorizontal="$4">
           <Tabs.Tab value="roster" flex={1}>
-            <Text>My Roster</Text>
+            <Text>Roster</Text>
+          </Tabs.Tab>
+          <Tabs.Tab value="matchups" flex={1}>
+            <Text>Matchups</Text>
           </Tabs.Tab>
           <Tabs.Tab value="standings" flex={1}>
             <Text>Standings</Text>
@@ -282,7 +297,7 @@ export default function LeagueId(): React.JSX.Element {
           </Tabs.Tab>
           {isCommissioner && (
             <Tabs.Tab value="commissioner" flex={1}>
-              <Text>Commissioner</Text>
+              <Text>Settings</Text>
             </Tabs.Tab>
           )}
         </Tabs.List>
@@ -298,6 +313,25 @@ export default function LeagueId(): React.JSX.Element {
             onPlayerAssign={handlePlayerAssign}
             onPlayerRemove={handlePlayerRemove}
             loading={positionsLoading || teamMembersLoading || userTeamLoading}
+          />
+        </Tabs.Content>
+
+        <Tabs.Content value="matchups" flex={1}>
+          <MatchupList
+            matchups={matchups}
+            loading={matchupsLoading}
+            emptyMessage="No matchups found for this league"
+            onMatchupPress={(matchup) => {
+              if (matchup.id != null) {
+                router.navigate({
+                  pathname: '/baseball/matchup',
+                  params: {
+                    matchupId: String(matchup.id),
+                    leagueId: String(numLeagueId),
+                  },
+                });
+              }
+            }}
           />
         </Tabs.Content>
 
