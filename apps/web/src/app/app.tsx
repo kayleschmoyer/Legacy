@@ -27,6 +27,7 @@ import { TeamDetailPage } from '../pages/baseball/TeamDetailPage';
 import JoinLeagueByCodePage from '../pages/baseball/JoinLeagueByCodePage';
 import ManagementPage from '../pages/management/ManagementPage';
 import AboutPage from '../pages/about/AboutPage';
+import HelpPage from '../pages/help/HelpPage';
 import { DraftBoardPage } from '../pages/draft/DraftBoardPage';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
@@ -267,6 +268,21 @@ function Navigation() {
                 </Paragraph>
               </NavLinkButton>
             </Link>
+
+            <Link
+              to="/help"
+              style={{ textDecoration: 'none' }}
+              aria-current={isActive('/help') ? 'page' : undefined}
+            >
+              <NavLinkButton active={isActive('/help')}>
+                <Paragraph marginBottom={0}>
+                  <span role="img" aria-label="help">
+                    🆘
+                  </span>{' '}
+                  Help
+                </Paragraph>
+              </NavLinkButton>
+            </Link>
           </NavLinks>
 
           {/* ── Right section ── */}
@@ -346,6 +362,19 @@ function Navigation() {
                   ℹ️
                 </span>{' '}
                 About
+              </Paragraph>
+            </MobileNavLink>
+          </Link>
+          <Link to="/help" style={{ textDecoration: 'none' }}>
+            <MobileNavLink
+              active={isActive('/help')}
+              onPress={() => setMobileOpen(false)}
+            >
+              <Paragraph marginBottom={0}>
+                <span role="img" aria-label="help">
+                  🆘
+                </span>{' '}
+                Help
               </Paragraph>
             </MobileNavLink>
           </Link>
@@ -440,6 +469,7 @@ function App() {
           <Route path="/players/stats" element={<PlayerStatsPage />} />
           <Route path="/players/:id" element={<PlayerDetailPage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/help" element={<HelpPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/profile/settings" element={<ProfileSettingsPage />} />
         </Routes>
