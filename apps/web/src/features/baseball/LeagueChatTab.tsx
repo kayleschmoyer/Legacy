@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Spinner, styled, Text, XStack, YStack } from 'tamagui';
 import { MessageSquare } from '@tamagui/lucide-icons';
 import { SystemMessageCard } from './SystemMessageCard';
+import { GifPicker } from './GifPicker';
 import { useLeagueChat } from '../../hooks/useLeagueChat';
 import { BRAND_NAVY_LIGHT, GRAY_50 } from '../../constants/colors';
 
@@ -52,6 +53,7 @@ export function LeagueChatTab({
 }: LeagueChatTabProps): React.JSX.Element {
   const { messages, loading, sending, sendMessage } = useLeagueChat(leagueId);
   const [inputText, setInputText] = useState('');
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom whenever messages change
@@ -67,6 +69,14 @@ export function LeagueChatTab({
     setInputText('');
     await sendMessage(text);
   }, [inputText, sending, sendMessage]);
+
+  const handleSendGif = useCallback(
+    async (gifUrl: string) => {
+      setShowGifPicker(false);
+      await sendMessage('', gifUrl);
+    },
+    [sendMessage],
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -160,15 +170,37 @@ export function LeagueChatTab({
                     {msg.username}
                   </Text>
                 )}
-                <Bubble mine={isMe}>
-                  <Text
-                    color={isMe ? 'white' : '$color'}
-                    fontSize="$4"
-                    style={{ wordBreak: 'break-word' }}
+                {msg.messageType === 'gif' && msg.gifUrl ? (
+                  <YStack
+                    borderRadius="$3"
+                    overflow="hidden"
+                    maxWidth={240}
+                    style={{ cursor: 'pointer' }}
+                    onPress={() => {
+                      window.open(msg.gifUrl ?? '', '_blank', 'noopener');
+                    }}
                   >
-                    {msg.messageText}
-                  </Text>
-                </Bubble>
+                    <img
+                      src={msg.gifUrl}
+                      alt="GIF"
+                      style={{
+                        maxWidth: 240,
+                        borderRadius: 8,
+                        display: 'block',
+                      }}
+                    />
+                  </YStack>
+                ) : (
+                  <Bubble mine={isMe}>
+                    <Text
+                      color={isMe ? 'white' : '$color'}
+                      fontSize="$4"
+                      style={{ wordBreak: 'break-word' }}
+                    >
+                      {msg.messageText}
+                    </Text>
+                  </Bubble>
+                )}
                 <Text fontSize="$1" color="$textMuted" marginTop="$1">
                   {formatTime(msg.createdAt)}
                 </Text>
@@ -177,6 +209,21 @@ export function LeagueChatTab({
           })
         )}
       </div>
+
+      {/* GIF Picker — shown above input when active */}
+      {showGifPicker && (
+        <YStack
+          paddingHorizontal="$4"
+          paddingBottom="$2"
+          borderTopWidth={1}
+          borderTopColor="$borderColor"
+        >
+          <GifPicker
+            onSelect={(url) => void handleSendGif(url)}
+            onClose={() => setShowGifPicker(false)}
+          />
+        </YStack>
+      )}
 
       {/* Input area */}
       <XStack
@@ -188,11 +235,29 @@ export function LeagueChatTab({
         alignItems="flex-end"
         gap="$2"
       >
+        {/* GIF button */}
+        <Button
+          size="$3"
+          backgroundColor={showGifPicker ? BRAND_NAVY_LIGHT : '$gray5'}
+          color={showGifPicker ? 'white' : '$color'}
+          onPress={() => setShowGifPicker((v) => !v)}
+          paddingHorizontal="$2"
+          aria-label="Open GIF picker"
+          aria-pressed={showGifPicker}
+        >
+          <Text
+            fontSize="$2"
+            fontWeight="700"
+            color={showGifPicker ? 'white' : '$color'}
+          >
+            GIF
+          </Text>
+        </Button>
         <textarea
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Message the league… (Ctrl+Enter to send)"
+          placeholder="Message the league\u2026 (Ctrl+Enter to send)"
           maxLength={2000}
           rows={2}
           style={{
@@ -220,7 +285,7 @@ export function LeagueChatTab({
           aria-label="Send message"
         >
           <Text fontSize="$3" fontWeight="600" color="white">
-            {sending ? '…' : 'Send'}
+            {sending ? '\u2026' : 'Send'}
           </Text>
         </Button>
       </XStack>

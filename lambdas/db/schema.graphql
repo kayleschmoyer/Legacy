@@ -533,6 +533,7 @@ type League {
 A message posted to the league-wide chat room
 """
 type LeagueChatMessage {
+  gifUrl: String
   id: ID
   leagueId: Int
   messageText: String
@@ -918,7 +919,11 @@ type Mutation {
     messageText: String!
     toUserId: Int!
   ): DirectMessage
-  sendLeagueMessage(leagueId: Int!, messageText: String!): LeagueChatMessage
+  sendLeagueMessage(
+    gifUrl: String
+    leagueId: Int!
+    messageText: String!
+  ): LeagueChatMessage
   sendMatchupMessage(
     gifUrl: String
     matchupId: Int!

@@ -262,6 +262,7 @@ const LeagueChatMessage = builder.objectRef<{
   timestamp: string | null;
   messageType: string;
   metadata: Record<string, unknown> | null;
+  gifUrl: string | null;
 }>('LeagueChatMessage');
 
 builder.objectType(LeagueChatMessage, {
@@ -273,6 +274,7 @@ builder.objectType(LeagueChatMessage, {
     messageText: t.exposeString('messageText'),
     timestamp: t.exposeString('timestamp', { nullable: true }),
     messageType: t.exposeString('messageType'),
+    gifUrl: t.exposeString('gifUrl', { nullable: true }),
     metadata: t.field({
       type: 'String',
       nullable: true,
@@ -630,6 +632,7 @@ builder.queryField('getLeagueMessages', (t) =>
         messageText: msg.messageText,
         timestamp: msg.timestamp ?? null,
         messageType: msg.messageType ?? 'text',
+        gifUrl: msg.gifUrl ?? null,
         metadata: msg.metadata ?? null,
       }));
     },
@@ -797,14 +800,16 @@ builder.mutationField('sendLeagueMessage', (t) =>
     args: {
       leagueId: t.arg.int({ required: true }),
       messageText: t.arg.string({ required: true }),
+      gifUrl: t.arg.string({ required: false }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
         throw new Error('Authentication required');
       }
 
+      const gifUrl = args.gifUrl?.trim() ?? null;
       const text = args.messageText.trim();
-      if (text.length === 0) {
+      if (!gifUrl && text.length === 0) {
         throw new Error('Message cannot be empty');
       }
       if (text.length > 2000) {
@@ -834,6 +839,8 @@ builder.mutationField('sendLeagueMessage', (t) =>
           leagueId: args.leagueId,
           userId: context.user.id,
           messageText: text,
+          messageType: gifUrl ? 'gif' : 'text',
+          gifUrl: gifUrl,
         })
         .returning();
 
@@ -852,6 +859,8 @@ builder.mutationField('sendLeagueMessage', (t) =>
             senderUsername: context.user.username ?? `user_${context.user.id}`,
             messageText: text,
             timestamp: msg.timestamp ?? new Date().toISOString(),
+            messageType: msg.messageType ?? 'text',
+            gifUrl: msg.gifUrl ?? null,
           });
         } catch (err: unknown) {
           // Never let a notification failure block the mutation response
@@ -866,6 +875,7 @@ builder.mutationField('sendLeagueMessage', (t) =>
         messageText: msg.messageText,
         timestamp: msg.timestamp ?? null,
         messageType: msg.messageType ?? 'text',
+        gifUrl: msg.gifUrl ?? null,
         metadata: null,
       };
     },

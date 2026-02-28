@@ -531,6 +531,7 @@ export type League = {
 /** A message posted to the league-wide chat room */
 export type LeagueChatMessage = {
   __typename?: 'LeagueChatMessage';
+  gifUrl?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   messageText?: Maybe<Scalars['String']['output']>;
@@ -1005,6 +1006,7 @@ export type MutationSendDirectMessageArgs = {
 };
 
 export type MutationSendLeagueMessageArgs = {
+  gifUrl?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
   messageText: Scalars['String']['input'];
 };

@@ -21,6 +21,8 @@ fragment LeagueChatMessageFields on LeagueChatMessage {
   userId
   messageText
   timestamp
+  messageType
+  gifUrl
   sender {
     id
     username
@@ -76,8 +78,16 @@ query GetDirectMessages($otherUserId: Int!, $limit: Int) {
 # After a successful response the server broadcasts a
 # LEAGUE_CHAT_MESSAGE WebSocket event to all connected
 # league members — no polling required.
-mutation SendLeagueMessage($leagueId: Int!, $messageText: String!) {
-  sendLeagueMessage(leagueId: $leagueId, messageText: $messageText) {
+mutation SendLeagueMessage(
+  $leagueId: Int!
+  $messageText: String!
+  $gifUrl: String
+) {
+  sendLeagueMessage(
+    leagueId: $leagueId
+    messageText: $messageText
+    gifUrl: $gifUrl
+  ) {
     ...LeagueChatMessageFields
   }
 }

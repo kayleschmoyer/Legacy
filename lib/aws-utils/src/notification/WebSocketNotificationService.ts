@@ -113,8 +113,10 @@ export interface LeagueChatMessageNotification {
   messageText: string;
   /** ISO-8601 */
   timestamp: string;
-  /** Discriminates between 'text', 'trade', 'waiver', 'draft_settings' */
+  /** Discriminates between 'text', 'gif', 'trade', 'waiver', 'draft_settings' */
   messageType?: string;
+  /** GIF URL for gif-type messages */
+  gifUrl?: string | null;
   /** JSON-serialised metadata for card rendering */
   metadata?: Record<string, unknown> | null;
 }

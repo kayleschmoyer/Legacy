@@ -12,6 +12,7 @@ import {
   primaryKey,
   boolean,
   jsonb,
+  text,
 } from 'drizzle-orm/pg-core';
 import { players } from './Players';
 import {
@@ -170,6 +171,8 @@ export const leagueMessages = pgTable(
       .notNull()
       .default('text'),
     metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+    /** URL of GIF attachment; null for text messages */
+    gifUrl: text('gif_url'),
   },
   (table) => {
     return {

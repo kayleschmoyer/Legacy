@@ -5,6 +5,7 @@ query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {
     messageText
     timestamp
     messageType
+    gifUrl
     metadata
     sender {
       username
@@ -12,13 +13,22 @@ query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {
   }
 }
 
-mutation SendLeagueChatMessage($leagueId: Int!, $messageText: String!) {
-  sendLeagueMessage(leagueId: $leagueId, messageText: $messageText) {
+mutation SendLeagueChatMessage(
+  $leagueId: Int!
+  $messageText: String!
+  $gifUrl: String
+) {
+  sendLeagueMessage(
+    leagueId: $leagueId
+    messageText: $messageText
+    gifUrl: $gifUrl
+  ) {
     id
     userId
     messageText
     timestamp
     messageType
+    gifUrl
     metadata
     sender {
       username

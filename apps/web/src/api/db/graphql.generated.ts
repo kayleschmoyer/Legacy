@@ -525,6 +525,7 @@ export type League = {
 /** A message posted to the league-wide chat room */
 export type LeagueChatMessage = {
   __typename?: 'LeagueChatMessage';
+  gifUrl?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   messageText?: Maybe<Scalars['String']['output']>;
@@ -999,6 +1000,7 @@ export type MutationSendDirectMessageArgs = {
 };
 
 export type MutationSendLeagueMessageArgs = {
+  gifUrl?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
   messageText: Scalars['String']['input'];
 };
@@ -2184,6 +2186,7 @@ export type GetLeagueChatMessagesQuery = {
     messageText?: string | null;
     timestamp?: string | null;
     messageType?: string | null;
+    gifUrl?: string | null;
     metadata?: string | null;
     sender?: { __typename?: 'User'; username?: string | null } | null;
   }> | null;
@@ -2192,6 +2195,7 @@ export type GetLeagueChatMessagesQuery = {
 export type SendLeagueChatMessageMutationVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   messageText: Scalars['String']['input'];
+  gifUrl?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type SendLeagueChatMessageMutation = {
@@ -2203,6 +2207,7 @@ export type SendLeagueChatMessageMutation = {
     messageText?: string | null;
     timestamp?: string | null;
     messageType?: string | null;
+    gifUrl?: string | null;
     metadata?: string | null;
     sender?: { __typename?: 'User'; username?: string | null } | null;
   } | null;
@@ -5552,6 +5557,7 @@ export const GetLeagueChatMessages = gql`
       messageText
       timestamp
       messageType
+      gifUrl
       metadata
       sender {
         username
@@ -5644,13 +5650,22 @@ export type GetLeagueChatMessagesQueryResult = Apollo.QueryResult<
   GetLeagueChatMessagesQueryVariables
 >;
 export const SendLeagueChatMessage = gql`
-  mutation SendLeagueChatMessage($leagueId: Int!, $messageText: String!) {
-    sendLeagueMessage(leagueId: $leagueId, messageText: $messageText) {
+  mutation SendLeagueChatMessage(
+    $leagueId: Int!
+    $messageText: String!
+    $gifUrl: String
+  ) {
+    sendLeagueMessage(
+      leagueId: $leagueId
+      messageText: $messageText
+      gifUrl: $gifUrl
+    ) {
       id
       userId
       messageText
       timestamp
       messageType
+      gifUrl
       metadata
       sender {
         username
@@ -5678,6 +5693,7 @@ export type SendLeagueChatMessageMutationFn = MutationFunction<
  *   variables: {
  *      leagueId: // value for 'leagueId'
  *      messageText: // value for 'messageText'
+ *      gifUrl: // value for 'gifUrl'
  *   },
  * });
  */

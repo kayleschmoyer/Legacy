@@ -20,8 +20,9 @@ export interface ChatMessage {
   userId: number | null;
   username: string;
   messageText: string;
+  gifUrl: string | null;
   createdAt: string;
-  /** Discriminates rendering: 'text' | 'trade' | 'waiver' | 'draft_settings' */
+  /** Discriminates rendering: 'text' | 'gif' | 'trade' | 'waiver' | 'draft_settings' */
   messageType: string;
   /** Parsed JSON metadata for card rendering */
   metadata: Record<string, unknown> | null;
@@ -40,7 +41,7 @@ export function useLeagueChat(leagueId: number): {
   messages: ChatMessage[];
   loading: boolean;
   sending: boolean;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, gifUrl?: string) => Promise<void>;
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -78,6 +79,7 @@ export function useLeagueChat(leagueId: number): {
           msg.sender?.username ??
           (msg.userId != null ? `user_${msg.userId}` : 'System'),
         messageText: msg.messageText ?? '',
+        gifUrl: msg.gifUrl ?? null,
         createdAt: msg.timestamp ?? '',
         messageType: msg.messageType ?? 'text',
         metadata: parsedMetadata,
@@ -111,12 +113,19 @@ export function useLeagueChat(leagueId: number): {
     useSendLeagueChatMessageMutation();
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, gifUrl?: string) => {
       const trimmed = text.trim();
-      if (!trimmed) return;
-      console.log(`[chat ${_ts()}] sendMessage called`, { text: trimmed });
+      if (!trimmed && !gifUrl) return;
+      console.log(`[chat ${_ts()}] sendMessage called`, {
+        text: trimmed,
+        gifUrl,
+      });
       await sendMutation({
-        variables: { leagueId, messageText: trimmed },
+        variables: {
+          leagueId,
+          messageText: trimmed || ' ',
+          gifUrl: gifUrl ?? null,
+        },
         awaitRefetchQueries: true,
         refetchQueries: [
           {
@@ -134,6 +143,7 @@ export function useLeagueChat(leagueId: number): {
               raw.sender?.username ??
               (raw.userId != null ? `user_${raw.userId}` : 'System'),
             messageText: raw.messageText ?? '',
+            gifUrl: raw.gifUrl ?? null,
             createdAt: raw.timestamp ?? '',
             messageType: raw.messageType ?? 'text',
             metadata: null,
@@ -190,6 +200,7 @@ export function useLeagueChat(leagueId: number): {
             userId: n.senderId != null ? Number(n.senderId) : null,
             username: n.senderUsername,
             messageText: n.messageText,
+            gifUrl: n.gifUrl ?? null,
             createdAt: n.timestamp,
             messageType: n.messageType ?? 'text',
             metadata: n.metadata ?? null,
