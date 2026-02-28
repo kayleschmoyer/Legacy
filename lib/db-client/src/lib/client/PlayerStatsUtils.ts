@@ -86,36 +86,32 @@ export async function getStatsRefreshSummary(db: PublicDb): Promise<{
   const cutoffDate = new Date();
   cutoffDate.setHours(cutoffDate.getHours() - 24); // 24 hours ago
 
-  const [
-    totalCount,
-    neverFetchedCount,
-    staleCount,
-    recentCount,
-  ] = await Promise.all([
-    db.select({ count: count() }).from(Schema.players),
-    db
-      .select({ count: count() })
-      .from(Schema.players)
-      .where(isNull(Schema.players.statsLastFetchedAt)),
-    db
-      .select({ count: count() })
-      .from(Schema.players)
-      .where(
-        and(
-          isNotNull(Schema.players.statsLastFetchedAt),
-          lt(Schema.players.statsLastFetchedAt, cutoffDate),
+  const [totalCount, neverFetchedCount, staleCount, recentCount] =
+    await Promise.all([
+      db.select({ count: count() }).from(Schema.players),
+      db
+        .select({ count: count() })
+        .from(Schema.players)
+        .where(isNull(Schema.players.statsLastFetchedAt)),
+      db
+        .select({ count: count() })
+        .from(Schema.players)
+        .where(
+          and(
+            isNotNull(Schema.players.statsLastFetchedAt),
+            lt(Schema.players.statsLastFetchedAt, cutoffDate),
+          ),
         ),
-      ),
-    db
-      .select({ count: count() })
-      .from(Schema.players)
-      .where(
-        and(
-          isNotNull(Schema.players.statsLastFetchedAt),
-          gte(Schema.players.statsLastFetchedAt, cutoffDate),
+      db
+        .select({ count: count() })
+        .from(Schema.players)
+        .where(
+          and(
+            isNotNull(Schema.players.statsLastFetchedAt),
+            gte(Schema.players.statsLastFetchedAt, cutoffDate),
+          ),
         ),
-      ),
-  ]);
+    ]);
 
   return {
     totalPlayers: totalCount[0]?.count || 0,

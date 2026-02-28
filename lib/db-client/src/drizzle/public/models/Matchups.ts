@@ -117,7 +117,7 @@ export const matchupPlayers = pgTable(
         columns: [table.matchupId],
         foreignColumns: [matchups.id],
         name: 'matchup_players_matchup_fk',
-      }),
+      }).onDelete('cascade'),
       matchupPlayersPlayerFk: foreignKey({
         columns: [table.playerId],
         foreignColumns: [players.id],
@@ -132,7 +132,7 @@ export const matchupPlayers = pgTable(
         columns: [table.positionId],
         foreignColumns: [leaguePosition.id],
         name: 'matchup_players_position_fk',
-      }),
+      }).onDelete('set null'),
       teamIdIdx: index('team_members_team_id_idx').on(table.teamId),
       playerIdIdx: index('team_members_player_id_idx').on(table.playerId),
       matchupTeamIdx: index('matchup_players_matchup_team_idx').on(
@@ -159,7 +159,7 @@ export const leagueWeekPlayerSeasons = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'league_week_player_seasons_league_fk',
-      }),
+      }).onDelete('cascade'),
       leagueWeekPlayerSeasonsPlayerFk: foreignKey({
         columns: [table.playerId],
         foreignColumns: [players.id],
@@ -203,7 +203,7 @@ export const matchupPlayerGames = pgTable(
         columns: [table.matchupPlayerId],
         foreignColumns: [matchupPlayers.id],
         name: 'matchup_player_games_matchup_player_fk',
-      }),
+      }).onDelete('cascade'),
       statsLoadingStatusIdx: index(
         'matchup_player_games_stats_loading_status_idx',
       ).on(table.statsLoadingStatus),

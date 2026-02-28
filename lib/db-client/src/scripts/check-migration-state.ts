@@ -75,9 +75,7 @@ async function main() {
           const id = String(row.id).padStart(2, ' ');
           const schema = String(row.schema).padEnd(8, ' ');
           const name = String(row.name).padEnd(33, ' ');
-          const appliedAt = new Date(row.applied_at)
-            .toISOString()
-            .slice(0, 19);
+          const appliedAt = new Date(row.applied_at).toISOString().slice(0, 19);
           console.log(`${id} | ${schema} | ${name} | ${appliedAt}`);
         } else {
           console.log('   | Invalid row data format |                   |');

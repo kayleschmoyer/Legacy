@@ -183,7 +183,7 @@ export const leagueMessages = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'league_messages_leagues_id_fk',
-      }),
+      }).onDelete('cascade'),
     };
   },
 );
@@ -325,7 +325,7 @@ export const leaguePosition = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'league_position_league_fk',
-      }),
+      }).onDelete('cascade'),
       createdAt: timestamp('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
@@ -373,7 +373,7 @@ export const teamMembers = pgTable(
         columns: [table.positionId],
         foreignColumns: [leaguePosition.id],
         name: 'team_members_position_fk',
-      }),
+      }).onDelete('cascade'),
       // Ensure only one player per position per team
       teamMembersUkTeamPosition: unique('team_members_uk_team_position').on(
         table.teamId,
@@ -453,7 +453,7 @@ export const rosterLockRules = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'roster_lock_rules_league_fk',
-      }),
+      }).onDelete('cascade'),
       rosterLockRulesLeagueUk: unique('roster_lock_rules_league_uk').on(
         table.leagueId,
       ),

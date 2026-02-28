@@ -109,7 +109,7 @@ export const leagueScoringProfiles = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'league_scoring_profiles_league_fk',
-      }),
+      }).onDelete('cascade'),
       copiedFromForeignKey: foreignKey({
         columns: [table.copiedFromProfileId],
         foreignColumns: [table.id],
@@ -155,7 +155,7 @@ export const leagueScoringProfileEntries = pgTable(
         columns: [table.profileId],
         foreignColumns: [leagueScoringProfiles.id],
         name: 'league_scoring_profile_entries_profile_fk',
-      }),
+      }).onDelete('cascade'),
       statDefinitionForeignKey: foreignKey({
         columns: [table.statDefinitionId],
         foreignColumns: [scoringStatDefinitions.id],
@@ -198,7 +198,7 @@ export const leagueScoringChangeLog = pgTable(
         columns: [table.profileId],
         foreignColumns: [leagueScoringProfiles.id],
         name: 'league_scoring_change_log_profile_fk',
-      }),
+      }).onDelete('cascade'),
       changeLogStatForeignKey: foreignKey({
         columns: [table.statDefinitionId],
         foreignColumns: [scoringStatDefinitions.id],

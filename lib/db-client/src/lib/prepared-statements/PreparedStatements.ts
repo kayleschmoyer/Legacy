@@ -48,11 +48,18 @@ export class TypeSafeQueryUtils {
   /**
    * Get players with minimum home runs with proper typing and joining
    */
-  static async getPlayersWithMinHomeRuns(db: PublicDb, minHomeRuns: number, limit?: number) {
+  static async getPlayersWithMinHomeRuns(
+    db: PublicDb,
+    minHomeRuns: number,
+    limit?: number,
+  ) {
     const baseQuery = db
       .select()
       .from(PublicSchema.careerBatting)
-      .innerJoin(PublicSchema.players, eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id))
+      .innerJoin(
+        PublicSchema.players,
+        eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id),
+      )
       .where(gte(PublicSchema.careerBatting.hr, minHomeRuns))
       .orderBy(desc(PublicSchema.careerBatting.hr))
       .$dynamic();
@@ -60,18 +67,25 @@ export class TypeSafeQueryUtils {
     if (limit !== undefined) {
       return await baseQuery.limit(limit).execute();
     }
-    
+
     return await baseQuery.execute();
   }
 
   /**
    * Get players with minimum wins with proper typing and joining
    */
-  static async getPlayersWithMinWins(db: PublicDb, minWins: number, limit?: number) {
+  static async getPlayersWithMinWins(
+    db: PublicDb,
+    minWins: number,
+    limit?: number,
+  ) {
     const baseQuery = db
       .select()
       .from(PublicSchema.careerPitching)
-      .innerJoin(PublicSchema.players, eq(PublicSchema.careerPitching.playerId, PublicSchema.players.id))
+      .innerJoin(
+        PublicSchema.players,
+        eq(PublicSchema.careerPitching.playerId, PublicSchema.players.id),
+      )
       .where(gte(PublicSchema.careerPitching.w, minWins))
       .orderBy(desc(PublicSchema.careerPitching.w))
       .$dynamic();
@@ -79,7 +93,7 @@ export class TypeSafeQueryUtils {
     if (limit !== undefined) {
       return await baseQuery.limit(limit).execute();
     }
-    
+
     return await baseQuery.execute();
   }
 
@@ -97,7 +111,11 @@ export class TypeSafeQueryUtils {
   /**
    * Get season batting stats for a player with full type safety
    */
-  static async getSeasonBattingByPlayer(db: PublicDb, playerId: number, season?: number) {
+  static async getSeasonBattingByPlayer(
+    db: PublicDb,
+    playerId: number,
+    season?: number,
+  ) {
     const baseQuery = db
       .select()
       .from(PublicSchema.seasonBatting)
@@ -116,7 +134,11 @@ export class TypeSafeQueryUtils {
   /**
    * Get season pitching stats for a player with full type safety
    */
-  static async getSeasonPitchingByPlayer(db: PublicDb, playerId: number, season?: number) {
+  static async getSeasonPitchingByPlayer(
+    db: PublicDb,
+    playerId: number,
+    season?: number,
+  ) {
     const baseQuery = db
       .select()
       .from(PublicSchema.seasonPitching)

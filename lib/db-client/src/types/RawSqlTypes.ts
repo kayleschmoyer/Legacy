@@ -99,7 +99,9 @@ export interface GamesDistributionResult {
 /**
  * Type guards for runtime validation of raw SQL results
  */
-export function isDatabaseIntrospectionResult(obj: unknown): obj is DatabaseIntrospectionResult {
+export function isDatabaseIntrospectionResult(
+  obj: unknown,
+): obj is DatabaseIntrospectionResult {
   return (
     typeof obj === 'object' &&
     obj !== null &&
@@ -116,7 +118,9 @@ export function isEnumValueResult(obj: unknown): obj is EnumValueResult {
   );
 }
 
-export function isPlayerWithPositionStatsResult(obj: unknown): obj is PlayerWithPositionStatsResult {
+export function isPlayerWithPositionStatsResult(
+  obj: unknown,
+): obj is PlayerWithPositionStatsResult {
   return (
     typeof obj === 'object' &&
     obj !== null &&
@@ -160,7 +164,7 @@ export function isCountResult(obj: unknown): obj is CountResult {
  */
 export function extractTypedResults<T>(
   results: { rows: unknown[] },
-  typeGuard: (obj: unknown) => obj is T
+  typeGuard: (obj: unknown) => obj is T,
 ): T[] {
   return results.rows.filter(typeGuard);
 }
@@ -170,16 +174,16 @@ export function extractTypedResults<T>(
  */
 export function extractSingleTypedResult<T>(
   results: { rows: unknown[] },
-  typeGuard: (obj: unknown) => obj is T
+  typeGuard: (obj: unknown) => obj is T,
 ): T | null {
   if (results.rows.length === 0) {
     return null;
   }
-  
+
   const firstRow = results.rows[0];
   if (typeGuard(firstRow)) {
     return firstRow;
   }
-  
+
   throw new Error('Query result does not match expected type');
 }

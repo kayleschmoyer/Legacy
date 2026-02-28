@@ -14,7 +14,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { getDbOptions } from '@legacy-sports/utils';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import {
   DEFAULT_ROSTER_POSITIONS,
   League,
@@ -804,41 +804,15 @@ builder.mutationField('deleteAllLeagues', (t) =>
 
         const leagueIds = allLeagues.map((l) => l.id);
 
-        // Delete in correct order due to foreign key constraints
-        // 1. Delete team members first
-        for (const leagueId of leagueIds) {
-          await context.db
-            .delete(PublicSchema.teamMembers)
-            .where(eq(PublicSchema.teamMembers.leagueId, leagueId));
-        }
-
-        // 2. Delete league positions
-        for (const leagueId of leagueIds) {
-          await context.db
-            .delete(PublicSchema.leaguePosition)
-            .where(eq(PublicSchema.leaguePosition.leagueId, leagueId));
-        }
-
-        // 3. Delete league members
-        for (const leagueId of leagueIds) {
-          await context.db
-            .delete(PublicSchema.leagueMembers)
-            .where(eq(PublicSchema.leagueMembers.leagueId, leagueId));
-        }
-
-        // 4. Delete teams
-        for (const leagueId of leagueIds) {
-          await context.db
-            .delete(PublicSchema.teams)
-            .where(eq(PublicSchema.teams.leagueId, leagueId));
-        }
-
-        // 5. Finally delete leagues
-        for (const leagueId of leagueIds) {
-          await context.db
-            .delete(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.id, leagueId));
-        }
+        // Delete all leagues — CASCADE DELETE constraints handle all related data:
+        // teams, team_members, matchups, matchup_players, matchup_player_games,
+        // league_positions, league_members, drafts, waiver_claims, trade_offers,
+        // league_messages, league_scoring_profiles, roster_lock_rules,
+        // playoff_brackets, champion_trophies, tiebreaker_rules,
+        // league_week_player_seasons, league_achievement_restrictions
+        await context.db
+          .delete(PublicSchema.leagues)
+          .where(inArray(PublicSchema.leagues.id, leagueIds));
 
         return `Successfully deleted ${leagueIds.length} league(s) and all associated data`;
       } catch (error) {

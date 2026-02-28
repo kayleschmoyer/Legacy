@@ -3,19 +3,22 @@
  * These help bridge the gap between untyped database results and TypeScript types
  */
 
-import { 
-  CareerBatting, 
-  CareerPitching, 
+import {
+  CareerBatting,
+  CareerPitching,
   LeagueStatusResult,
   Player,
-  PlayerWithPositionStatsResult
+  PlayerWithPositionStatsResult,
 } from '../../types';
 
 /**
  * Validation error for when data doesn't match expected type
  */
 export class ValidationError extends Error {
-  constructor(message: string, public readonly receivedData: unknown) {
+  constructor(
+    message: string,
+    public readonly receivedData: unknown,
+  ) {
     super(message);
     this.name = 'ValidationError';
   }
@@ -81,7 +84,7 @@ export function isCareerPitching(obj: unknown): obj is CareerPitching {
 export function validateQueryResults<T>(
   results: unknown[],
   validator: (obj: unknown) => obj is T,
-  context: string
+  context: string,
 ): T[] {
   const validResults: T[] = [];
   const invalidResults: unknown[] = [];
@@ -95,9 +98,12 @@ export function validateQueryResults<T>(
   }
 
   if (invalidResults.length > 0) {
-    console.warn(`Warning: ${invalidResults.length} invalid results in ${context}`, {
-      invalidResults: invalidResults.slice(0, 3), // Log first 3 for debugging
-    });
+    console.warn(
+      `Warning: ${invalidResults.length} invalid results in ${context}`,
+      {
+        invalidResults: invalidResults.slice(0, 3), // Log first 3 for debugging
+      },
+    );
   }
 
   return validResults;
@@ -109,7 +115,7 @@ export function validateQueryResults<T>(
 export function validateSingleResult<T>(
   result: unknown,
   validator: (obj: unknown) => obj is T,
-  context: string
+  context: string,
 ): T {
   if (validator(result)) {
     return result;
@@ -117,7 +123,7 @@ export function validateSingleResult<T>(
 
   throw new ValidationError(
     `Invalid ${context} data received from database`,
-    result
+    result,
   );
 }
 
@@ -127,12 +133,14 @@ export function validateSingleResult<T>(
 export function safeExtractResults<T>(
   queryResult: { rows?: unknown[] } | unknown[],
   validator: (obj: unknown) => obj is T,
-  context: string
+  context: string,
 ): T[] {
   try {
     // Handle both direct arrays and query result objects
-    const rows = Array.isArray(queryResult) ? queryResult : queryResult.rows || [];
-    
+    const rows = Array.isArray(queryResult)
+      ? queryResult
+      : queryResult.rows || [];
+
     return validateQueryResults(rows, validator, context);
   } catch (error) {
     console.error(`Error extracting ${context} results:`, error);
@@ -170,7 +178,9 @@ export function extractCount(result: unknown): number {
 /**
  * Validate player statistics query results with proper error handling
  */
-export function validatePlayerStatsResults(results: unknown[]): PlayerWithPositionStatsResult[] {
+export function validatePlayerStatsResults(
+  results: unknown[],
+): PlayerWithPositionStatsResult[] {
   return validateQueryResults(
     results,
     (obj): obj is PlayerWithPositionStatsResult => {
@@ -187,14 +197,16 @@ export function validatePlayerStatsResults(results: unknown[]): PlayerWithPositi
         typeof (obj as PlayerWithPositionStatsResult).bref_id === 'string'
       );
     },
-    'PlayerWithPositionStats'
+    'PlayerWithPositionStats',
   );
 }
 
 /**
  * Validate league status query results
  */
-export function validateLeagueStatusResults(results: unknown[]): LeagueStatusResult[] {
+export function validateLeagueStatusResults(
+  results: unknown[],
+): LeagueStatusResult[] {
   return validateQueryResults(
     results,
     (obj): obj is LeagueStatusResult => {
@@ -211,7 +223,7 @@ export function validateLeagueStatusResults(results: unknown[]): LeagueStatusRes
         typeof (obj as LeagueStatusResult).owner === 'string'
       );
     },
-    'LeagueStatus'
+    'LeagueStatus',
   );
 }
 
@@ -220,12 +232,14 @@ export function validateLeagueStatusResults(results: unknown[]): LeagueStatusRes
  */
 export function createTypeSafeWrapper<T>(
   validator: (obj: unknown) => obj is T,
-  context: string
+  context: string,
 ) {
   return {
-    validateSingle: (result: unknown): T => validateSingleResult(result, validator, context),
-    validateArray: (results: unknown[]): T[] => validateQueryResults(results, validator, context),
-    safeExtract: (queryResult: { rows?: unknown[] } | unknown[]): T[] => 
+    validateSingle: (result: unknown): T =>
+      validateSingleResult(result, validator, context),
+    validateArray: (results: unknown[]): T[] =>
+      validateQueryResults(results, validator, context),
+    safeExtract: (queryResult: { rows?: unknown[] } | unknown[]): T[] =>
       safeExtractResults(queryResult, validator, context),
   };
 }
