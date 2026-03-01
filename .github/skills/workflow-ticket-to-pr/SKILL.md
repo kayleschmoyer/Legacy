@@ -9,6 +9,8 @@ description: 'Complete end-to-end workflow for implementing a Jira ticket: Jira 
 
 Complete workflow for implementing a Jira ticket from start to finish. **The preferred approach is to create a git worktree** so the work is fully isolated in its own directory and VS Code window. Use a simple in-place branch only for small, quick changes.
 
+> 🎯 **Definition of Done**: A ticket is not complete until **all acceptance criteria are fully implemented and validated**. If any scope remains unfinished when you open the PR, you must create follow-up Jira tickets for the remaining work (see [Common Mistake 7](#mistake-7-partial-implementation-without-follow-up-tickets)). Do not leave work half-done or silently drop scope — either finish it or track it.
+
 ## 🚨 CRITICAL RULE: NEVER COMMIT DIRECTLY TO MAIN
 
 **ALWAYS create a feature branch BEFORE making any code changes.**
@@ -116,6 +118,12 @@ acli jira workitem transition --key LS-1234 --status "In Progress"
 - Add tests
 
 **✅ Now safe to modify files - you're on a feature branch**
+
+> 🎯 **Completion requirement**: Before opening a PR, ensure the ticket is **fully implemented**.
+>
+> - If the full scope can be completed: implement it all and validate.
+> - If unforeseen complexity makes full completion impractical: implement what you can, then **create follow-up Jira tickets** for the remaining work before opening the PR. Reference the follow-up ticket keys in your PR description.
+> - **Never silently drop acceptance criteria** or leave work partially done without tracking it.
 
 ### Step 6: Commit Changes
 
@@ -246,6 +254,31 @@ git push --force-with-lease origin HEAD
 twig tree
 ```
 
+### ❌ MISTAKE 7: Partial Implementation Without Follow-Up Tickets {#mistake-7-partial-implementation-without-follow-up-tickets}
+
+Implementing only part of a ticket's scope without either finishing it or creating follow-up tickets causes scope to fall through the cracks.
+
+```powershell
+# WRONG - close ticket even though some acceptance criteria are incomplete
+git commit -m "feat(x): partial implementation"
+# ... open PR, mark ticket Done, some AC never addressed ❌
+
+# CORRECT - either finish everything, or create follow-up tickets for remaining work
+$result = acli jira workitem create `
+  --summary "Follow-up: [remaining scope from LS-####]" `
+  --project LS `
+  --type Task `
+  --json | ConvertFrom-Json
+Write-Host "Created follow-up: $($result.key)"
+# Reference $result.key in your PR description
+```
+
+**Rules:**
+
+- Every acceptance criterion in the original ticket must be either **implemented** or **tracked in a follow-up ticket**.
+- Reference all follow-up ticket keys in the PR description under a "Follow-up work" section.
+- Do not mark the original ticket as Done if meaningful scope was punted — the follow-up must exist first.
+
 ### ❌ MISTAKE 1: Committing to Main
 
 ```powershell
@@ -329,6 +362,16 @@ Before starting ANY work:
 - [ ] Open worktree in a new VS Code window (`code $wt`)
 - [ ] Update Jira to "In Progress"
 - [ ] NOW safe to make changes
+
+## Definition-of-Done Checklist
+
+Before opening the PR, confirm every item:
+
+- [ ] All acceptance criteria from the Jira ticket are implemented
+- [ ] Any unfinished scope has a **new follow-up Jira ticket** created and referenced in the PR description
+- [ ] `make pc` passes with no errors
+- [ ] Formatting changes from `make pc` are committed
+- [ ] PR title includes the ticket key (e.g. `LS-#### type(scope): description`)
 
 ## Quick Reference
 

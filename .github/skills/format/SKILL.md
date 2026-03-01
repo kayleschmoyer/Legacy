@@ -19,21 +19,23 @@ Format code files using Prettier to ensure consistent code style across the proj
 ## Command
 
 ```powershell
-pnpm exec prettier --write .
+pnpm exec nx format:write
 ```
 
+This is the same command `make pc` runs internally. Prefer it over calling Prettier directly so it respects the Nx project boundary and `.prettierignore`.
+
 ## Alternative Commands
+
+### Check formatting without writing (dry run — what CI runs)
+
+```powershell
+pnpm exec nx format:check
+```
 
 ### Format specific files/directories
 
 ```powershell
 pnpm exec prettier --write "apps/web/**/*.{ts,tsx,js,jsx}"
-```
-
-### Check formatting without writing (dry run)
-
-```powershell
-pnpm exec prettier --check .
 ```
 
 ### Format specific file
