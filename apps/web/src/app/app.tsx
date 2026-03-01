@@ -39,6 +39,7 @@ import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { AdminPage } from '../pages/admin/AdminPage';
 import ProfileSettingsPage from '../pages/profile/ProfileSettingsPage';
 import PreferencesPage from '../pages/preferences/PreferencesPage';
+import { BRAND_GOLD } from '../constants/colors';
 
 /* ────────────────────────────────────────────────────────
  * Modern Header – styled components
@@ -211,6 +212,16 @@ function Navigation() {
                 alt="Legacy Sports"
                 style={{ height: 38, width: 'auto', display: 'block' }}
               />
+              <Paragraph
+                marginBottom={0}
+                fontWeight="700"
+                fontSize={18}
+                color={BRAND_GOLD}
+                letterSpacing={0.5}
+                userSelect="none"
+              >
+                Legacy Sports
+              </Paragraph>
             </XStack>
           </Link>
 

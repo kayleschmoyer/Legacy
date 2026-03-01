@@ -32,6 +32,16 @@ exports[`App FootballScreen should match complete football page layout snapshot 
               src="/logo.png"
               style="height: 38px; width: auto; display: block;"
             />
+            <p
+              color="#C5A55A"
+              font-size="18"
+              font-weight="700"
+              letter-spacing="0.5"
+              marginbottom="0"
+              userselect="none"
+            >
+              Legacy Sports
+            </p>
           </div>
         </a>
         <div
@@ -157,6 +167,16 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
               src="/logo.png"
               style="height: 38px; width: auto; display: block;"
             />
+            <p
+              color="#C5A55A"
+              font-size="18"
+              font-weight="700"
+              letter-spacing="0.5"
+              marginbottom="0"
+              userselect="none"
+            >
+              Legacy Sports
+            </p>
           </div>
         </a>
         <div
@@ -280,6 +300,16 @@ exports[`App Navigation should render navigation with correct links 1`] = `
               src="/logo.png"
               style="height: 38px; width: auto; display: block;"
             />
+            <p
+              color="#C5A55A"
+              font-size="18"
+              font-weight="700"
+              letter-spacing="0.5"
+              marginbottom="0"
+              userselect="none"
+            >
+              Legacy Sports
+            </p>
           </div>
         </a>
         <div
