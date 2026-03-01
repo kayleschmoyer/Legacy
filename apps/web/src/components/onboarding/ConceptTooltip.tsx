@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components';
 import {
   BRAND_GOLD,
@@ -15,19 +15,53 @@ interface ConceptTooltipProps {
   children?: React.ReactNode;
 }
 
+const TOOLTIP_WIDTH = 260;
+/** Minimum gap (px) between tooltip edge and viewport edge */
+const VIEWPORT_MARGIN = 12;
+
 /**
  * Wraps a key term with an underline and shows a tooltip card on hover/focus.
  * Used throughout the app to explain historical-stats concepts inline.
+ *
+ * The tooltip is kept within the viewport by measuring the anchor element's
+ * position and computing a horizontal offset when the default centred position
+ * would overflow the left or right edge (e.g. when rendered inside a modal).
  */
 export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
   const [visible, setVisible] = useState(false);
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  /** Horizontal shift (px) applied to keep the tooltip within the viewport. */
+  const [hOffset, setHOffset] = useState(0);
+
+  useEffect(() => {
+    if (!visible || !anchorRef.current) return;
+
+    const rect = anchorRef.current.getBoundingClientRect();
+    const anchorCenterX = rect.left + rect.width / 2;
+    const tooltipLeft = anchorCenterX - TOOLTIP_WIDTH / 2;
+    const tooltipRight = anchorCenterX + TOOLTIP_WIDTH / 2;
+    const viewportWidth = window.innerWidth;
+
+    let offset = 0;
+    if (tooltipLeft < VIEWPORT_MARGIN) {
+      offset = VIEWPORT_MARGIN - tooltipLeft;
+    } else if (tooltipRight > viewportWidth - VIEWPORT_MARGIN) {
+      offset = viewportWidth - VIEWPORT_MARGIN - tooltipRight;
+    }
+    setHOffset(offset);
+  }, [visible]);
+
+  const tooltipId = `tooltip-${term.replace(/\s+/g, '-')}`;
 
   return (
-    <span style={{ position: 'relative', display: 'inline-block' }}>
+    <span
+      ref={anchorRef}
+      style={{ position: 'relative', display: 'inline-block' }}
+    >
       <span
         role="button"
         tabIndex={0}
-        aria-describedby={`tooltip-${term.replace(/\s+/g, '-')}`}
+        aria-describedby={tooltipId}
         style={{
           borderBottom: `1.5px dashed ${BRAND_GOLD_LIGHT}`,
           color: BRAND_GOLD_LIGHT,
@@ -48,15 +82,16 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
 
       {visible && (
         <YStack
-          id={`tooltip-${term.replace(/\s+/g, '-')}`}
+          id={tooltipId}
           role="tooltip"
           style={{
             position: 'absolute',
             bottom: '130%',
-            left: '50%',
+            // Apply hOffset to nudge the tooltip back into the viewport.
+            left: `calc(50% + ${hOffset}px)`,
             transform: 'translateX(-50%)',
             zIndex: 9999,
-            width: 260,
+            width: TOOLTIP_WIDTH,
             background: `linear-gradient(135deg, #0D1526 0%, ${withAlpha(BRAND_NAVY_LIGHT, 0.95)} 100%)`,
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
@@ -67,12 +102,14 @@ export function ConceptTooltip({ term, explanation }: ConceptTooltipProps) {
             boxShadow: `0 8px 32px ${withAlpha('#000', 0.5)}`,
           }}
         >
-          {/* Arrow */}
+          {/* Arrow – counter-shift so it always points at the anchor */}
           <span
             style={{
               position: 'absolute',
               top: '100%',
-              left: '50%',
+              // `left: 50%` centres the arrow on the tooltip box.  Subtract
+              // hOffset to move it back toward the anchor's centre.
+              left: `calc(50% - ${hOffset}px)`,
               transform: 'translateX(-50%)',
               width: 0,
               height: 0,
