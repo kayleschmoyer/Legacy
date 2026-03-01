@@ -26,6 +26,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | ----------------------------- | -------------------------------------------------------------------------- |
 | **Add secret / env var**      | `.github/skills/add-secret-or-env-var/SKILL.md`                            |
 | Architecture                  | `.github/skills/architecture/SKILL.md`                                     |
+| **AWS orphan cleanup**        | `.github/skills/aws-orphan-cleanup/SKILL.md`                               |
 | Branch/ticket workflow        | `.github/skills/branch-create/SKILL.md`                                    |
 | **Config reference**          | `.github/skills/config-standards/SKILL.md`                                 |
 | DB queries                    | `.github/skills/db-query/SKILL.md`                                         |
