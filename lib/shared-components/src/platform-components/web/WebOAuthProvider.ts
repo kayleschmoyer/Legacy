@@ -206,6 +206,7 @@ export class WebOAuthProvider implements OAuthProvider {
       // Create GSI configuration with FedCM handling
       const gsiConfig: ExtendedGoogleIdConfiguration = {
         client_id: this.config.googleClientId,
+        use_fedcm_for_prompt: true, // Opt-in to FedCM to avoid deprecation warning
         callback: (response: CredentialResponse) => {
           // One Tap provides ID token - send it directly to OAuth proxy
           void this.handleOneTapResponse(response)
@@ -230,7 +231,8 @@ export class WebOAuthProvider implements OAuthProvider {
         cancel_on_tap_outside: this.config.gsi?.cancelOnTapOutside ?? true,
       };
 
-      // Disable FedCM for localhost development to avoid token retrieval errors
+      // Disable FedCM for localhost/127.0.0.1 development to avoid token retrieval errors
+      // (FedCM requires HTTPS and does not work on localhost)
       if (
         window.location.hostname === 'localhost' ||
         window.location.hostname === '127.0.0.1'
