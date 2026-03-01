@@ -1,3 +1,4 @@
+export * from './models/Badges';
 export * from './models/Chat';
 export * from './models/Enums';
 export * from './models/Leagues';

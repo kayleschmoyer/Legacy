@@ -1,8 +1,12 @@
-import { PublicSchema } from '@legacy-sports/db-client';
+import { createBadgeService, PublicSchema } from '@legacy-sports/db-client';
+import { getDbOptions } from '@legacy-sports/utils';
+import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { builder } from './builder';
 import { requireAuth, verifyCommissionerAccess } from './authorization';
 import { Team } from './leagues/types';
+
+const badgeService = createBadgeService(getDbOptions());
 
 /**
  * Playoff System Schema (LS-28)
@@ -542,6 +546,32 @@ builder.mutationField('awardChampionship', (t) =>
         context.db,
         args.bracketId,
       );
+
+      // Award league_champion badge to the winning team's owner (fire-and-forget)
+      const [member] = await context.db
+        .select({ userId: PublicSchema.leagueMembers.userId })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, trophy.leagueId),
+            eq(PublicSchema.leagueMembers.teamId, trophy.teamId),
+          ),
+        )
+        .limit(1);
+      if (member?.userId) {
+        badgeService
+          .awardLeagueChampion(member.userId, trophy.teamId, trophy.leagueId, {
+            season: trophy.season,
+            finalScore: trophy.finalScore,
+          })
+          .catch((err: unknown) => {
+            LOGGER.warn(
+              '[awardChampionship] League champion badge failed (non-fatal)',
+              { err },
+            );
+          });
+      }
+
       return {
         ...trophy,
         createdAt: trophy.createdAt.toISOString(),

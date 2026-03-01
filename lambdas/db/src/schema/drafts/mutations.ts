@@ -3,6 +3,7 @@
  */
 
 import {
+  createBadgeService,
   isPlayerInPool,
   playerMeetsMinCareerGames,
   playerMeetsMinCareerSeasons,
@@ -13,6 +14,7 @@ import {
   DraftSqsService,
   type StartDraftMessage,
 } from '@legacy-sports/aws-utils';
+import { getDbOptions } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 
@@ -25,6 +27,8 @@ import {
 import { getCurrentDraftPickInfo } from './helpers';
 import { builder } from '../builder';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
+
+const badgeService = createBadgeService(getDbOptions());
 
 /**
  * Mutation: Make a draft pick
@@ -447,6 +451,16 @@ builder.mutationField('makeDraftPick', (t) =>
                   : String(matchupError),
             });
           }
+
+          // Evaluate draft badges for all participants (fire-and-forget, non-fatal)
+          badgeService
+            .evaluateDraftBadges(result.leagueId)
+            .catch((err: unknown) => {
+              LOGGER.warn('Badge evaluation after draft failed (non-fatal)', {
+                leagueId: result.leagueId,
+                err,
+              });
+            });
         }
 
         return result.draftPick;
@@ -1590,6 +1604,16 @@ builder.mutationField('commissionerPick', (t) =>
               },
             );
           }
+
+          // Evaluate draft badges for all participants (fire-and-forget, non-fatal)
+          badgeService
+            .evaluateDraftBadges(result.leagueId)
+            .catch((err: unknown) => {
+              LOGGER.warn(
+                'Badge evaluation after commissioner draft failed (non-fatal)',
+                { leagueId: result.leagueId, err },
+              );
+            });
         }
 
         return result.draftPick;

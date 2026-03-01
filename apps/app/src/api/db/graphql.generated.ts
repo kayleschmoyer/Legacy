@@ -105,6 +105,40 @@ export type AverageSeasonBatting = {
   stolenBases?: Maybe<Scalars['Float']['output']>;
 };
 
+/** Metadata for a badge that can be earned in the system */
+export type BadgeDefinition = {
+  __typename?: 'BadgeDefinition';
+  /** Category of the badge: draft | matchup | roster | league */
+  category?: Maybe<Scalars['String']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  /** Unique identifier for the badge type */
+  key?: Maybe<Scalars['String']['output']>;
+  /** Required progress count; null for instant badges */
+  progressTarget?: Maybe<Scalars['Int']['output']>;
+  /** Rarity of the badge: common | rare | legendary */
+  rarity?: Maybe<Scalars['String']['output']>;
+  /** Whether this badge can be earned multiple times */
+  repeatable?: Maybe<Scalars['Boolean']['output']>;
+  /** Whether the badge is global (cross-league) or per_league */
+  scope?: Maybe<Scalars['String']['output']>;
+  title?: Maybe<Scalars['String']['output']>;
+};
+
+/** Progress toward a not-yet-earned multi-step badge */
+export type BadgeProgress = {
+  __typename?: 'BadgeProgress';
+  badgeKey?: Maybe<Scalars['String']['output']>;
+  /** Badge definition for this progress record */
+  definition?: Maybe<BadgeDefinition>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Target required to earn the badge */
+  progressTarget?: Maybe<Scalars['Int']['output']>;
+  /** Current progress count */
+  progressValue?: Maybe<Scalars['Int']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
 export type BulkDropPlayersInput = {
   leagueId: Scalars['Int']['input'];
   reason?: InputMaybe<Scalars['String']['input']>;
@@ -420,6 +454,15 @@ export type EditMatchupScoreInput = {
   reason?: InputMaybe<Scalars['String']['input']>;
   team1Score: Scalars['Float']['input'];
   team2Score: Scalars['Float']['input'];
+};
+
+/** Result of a badge evaluation run */
+export type EvaluateBadgesResult = {
+  __typename?: 'EvaluateBadgesResult';
+  /** De-duplicated list of badge keys that were newly awarded */
+  awardedBadgeKeys?: Maybe<Array<Scalars['String']['output']>>;
+  /** Number of new badges awarded */
+  awardedCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type ForceAddPlayerInput = {
@@ -826,6 +869,10 @@ export type Mutation = {
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
   awardChampionship?: Maybe<ChampionTrophy>;
+  /** Award the League Champion badge to the winning team owner. Requires commissioner / system access. */
+  awardLeagueChampionBadge?: Maybe<Scalars['Boolean']['output']>;
+  /** Award Playoff Appearance badges to all teams that qualified for the playoffs. */
+  awardPlayoffAppearanceBadges?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: drop all players from a team (useful for inactive teams). */
   bulkDropTeamPlayers?: Maybe<CommissionerActionResult>;
   /** Cancel a pending trade offer as the team that proposed it. */
@@ -846,6 +893,10 @@ export type Mutation = {
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: edit the scores of a past or current matchup. All edits are audit-logged. */
   editMatchupScore?: Maybe<CommissionerActionResult>;
+  /** Evaluate and award all eligible draft-based badges for a league. Call when a draft completes. Requires authentication. */
+  evaluateDraftBadges?: Maybe<EvaluateBadgesResult>;
+  /** Evaluate and award all eligible matchup-based badges for a completed matchup. Call when a matchup status transitions to completed. Requires authentication. */
+  evaluateMatchupBadges?: Maybe<EvaluateBadgesResult>;
   /** Commissioner: force-add a player to a team, bypassing normal acquisition rules. */
   forceAddPlayer?: Maybe<CommissionerActionResult>;
   /** Commissioner: force-drop a player from a team. */
@@ -936,6 +987,17 @@ export type MutationAwardChampionshipArgs = {
   bracketId: Scalars['Int']['input'];
 };
 
+export type MutationAwardLeagueChampionBadgeArgs = {
+  leagueId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
+  userId: Scalars['Int']['input'];
+};
+
+export type MutationAwardPlayoffAppearanceBadgesArgs = {
+  leagueId: Scalars['Int']['input'];
+  teamIds: Array<Scalars['Int']['input']>;
+};
+
 export type MutationBulkDropTeamPlayersArgs = {
   input: BulkDropPlayersInput;
 };
@@ -1008,6 +1070,14 @@ export type MutationDisableDeviceTokenArgs = {
 
 export type MutationEditMatchupScoreArgs = {
   input: EditMatchupScoreInput;
+};
+
+export type MutationEvaluateDraftBadgesArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type MutationEvaluateMatchupBadgesArgs = {
+  matchupId: Scalars['Int']['input'];
 };
 
 export type MutationForceAddPlayerArgs = {
@@ -1450,6 +1520,8 @@ export type Query = {
   __typename?: 'Query';
   /** Return all achievement restrictions configured for a league, sorted by achievement type */
   achievementRestrictions?: Maybe<Array<AchievementRestriction>>;
+  /** List all badge definitions available in the system */
+  allBadgeDefinitions?: Maybe<Array<BadgeDefinition>>;
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
@@ -1521,11 +1593,17 @@ export type Query = {
   seasonBattingStats?: Maybe<Array<SeasonBatting>>;
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
+  /** Return earned badges for a team in a league */
+  teamBadges?: Maybe<Array<UserBadge>>;
   teamLeagueMembers?: Maybe<Array<LeagueMember>>;
   teamMembers?: Maybe<Array<TeamMember>>;
   teamTradeOffers?: Maybe<Array<TradeOffer>>;
   teamWaiverClaims?: Maybe<Array<WaiverClaim>>;
   user?: Maybe<User>;
+  /** Return progress records for in-progress multi-step badges for a user */
+  userBadgeProgress?: Maybe<Array<BadgeProgress>>;
+  /** Return earned badges for a user, optionally filtered to a specific league */
+  userBadges?: Maybe<Array<UserBadge>>;
   userByEmail?: Maybe<User>;
   userLeagues: Array<League>;
   userTeamId?: Maybe<Scalars['Int']['output']>;
@@ -1848,6 +1926,11 @@ export type QuerySeasonPitchingStatsArgs = {
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QueryTeamBadgesArgs = {
+  leagueId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
+};
+
 export type QueryTeamLeagueMembersArgs = {
   teamId: Scalars['Int']['input'];
 };
@@ -1868,6 +1951,16 @@ export type QueryTeamWaiverClaimsArgs = {
 
 export type QueryUserArgs = {
   id: Scalars['Int']['input'];
+};
+
+export type QueryUserBadgeProgressArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  userId: Scalars['Int']['input'];
+};
+
+export type QueryUserBadgesArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  userId: Scalars['Int']['input'];
 };
 
 export type QueryUserByEmailArgs = {
@@ -2281,6 +2374,24 @@ export type User = {
   email?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   username?: Maybe<Scalars['String']['output']>;
+};
+
+/** A badge earned by a user */
+export type UserBadge = {
+  __typename?: 'UserBadge';
+  /** Badge definition key */
+  badgeKey?: Maybe<Scalars['String']['output']>;
+  /** Full badge definition metadata */
+  definition?: Maybe<BadgeDefinition>;
+  /** ISO 8601 timestamp when the badge was earned */
+  earnedAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  /** League scope; null for global badges */
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  rarity?: Maybe<Scalars['String']['output']>;
+  /** Team associated with the earn event */
+  teamId?: Maybe<Scalars['Int']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
 };
 
 export type UserConsent = {

@@ -7,7 +7,12 @@
  * Pattern follows the existing `processWaiverClaims` mutation.
  */
 
-import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
+import {
+  createBadgeService,
+  type GenericDatabase,
+  PublicSchema,
+} from '@legacy-sports/db-client';
+import { getDbOptions } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
@@ -15,6 +20,8 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { builder, type Context } from '../builder';
 import { PlayoffService } from '../../services/playoff-service';
+
+const badgeService = createBadgeService(getDbOptions());
 
 type Db = GenericDatabase<typeof PublicSchema>;
 
@@ -673,6 +680,21 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
                 }
               }
 
+              // Award playoff appearance badges to all qualifying teams (fire-and-forget)
+              const qualifiedTeamIds = round1PlayoffMatchups
+                .flatMap((m) => [m.highSeedTeamId, m.lowSeedTeamId])
+                .filter((id): id is number => id !== null);
+              if (qualifiedTeamIds.length > 0) {
+                badgeService
+                  .awardPlayoffAppearances(league.id, qualifiedTeamIds)
+                  .catch((err: unknown) => {
+                    LOGGER.warn(
+                      '[autoAdvanceMatchups] Playoff badge award failed (non-fatal)',
+                      { leagueId: league.id, err },
+                    );
+                  });
+              }
+
               result.leaguesAdvanced++;
               LOGGER.info(
                 `[autoAdvanceMatchups] Successfully created playoff bracket ${bracket.id} for league ${league.id} (${league.name}), starting week ${playoffStartWeek}`,
@@ -794,7 +816,7 @@ async function advanceLeagueWeekInternal(
 
     // Complete all current week matchups
     if (currentWeek > 0) {
-      await db
+      const completedMatchups = await db
         .update(PublicSchema.matchups)
         .set({ status: 'completed' })
         .where(
@@ -802,7 +824,18 @@ async function advanceLeagueWeekInternal(
             eq(PublicSchema.matchups.leagueId, leagueId),
             eq(PublicSchema.matchups.weekNumber, currentWeek),
           ),
-        );
+        )
+        .returning({ id: PublicSchema.matchups.id });
+
+      // Evaluate badges for each completed matchup (fire-and-forget, non-fatal)
+      for (const matchup of completedMatchups) {
+        badgeService.evaluateMatchupBadges(matchup.id).catch((err: unknown) => {
+          LOGGER.warn(
+            '[advanceLeagueWeekInternal] Badge evaluation failed (non-fatal)',
+            { matchupId: matchup.id, err },
+          );
+        });
+      }
     }
 
     // Create matchups for next week (round-robin pairing)

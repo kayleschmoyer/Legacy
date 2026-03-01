@@ -85,6 +85,68 @@ type AverageSeasonBatting {
   stolenBases: Float
 }
 
+"""
+Metadata for a badge that can be earned in the system
+"""
+type BadgeDefinition {
+  """
+  Category of the badge: draft | matchup | roster | league
+  """
+  category: String
+  description: String
+
+  """
+  Unique identifier for the badge type
+  """
+  key: String
+
+  """
+  Required progress count; null for instant badges
+  """
+  progressTarget: Int
+
+  """
+  Rarity of the badge: common | rare | legendary
+  """
+  rarity: String
+
+  """
+  Whether this badge can be earned multiple times
+  """
+  repeatable: Boolean
+
+  """
+  Whether the badge is global (cross-league) or per_league
+  """
+  scope: String
+  title: String
+}
+
+"""
+Progress toward a not-yet-earned multi-step badge
+"""
+type BadgeProgress {
+  badgeKey: String
+
+  """
+  Badge definition for this progress record
+  """
+  definition: BadgeDefinition
+  id: Int
+  leagueId: Int
+
+  """
+  Target required to earn the badge
+  """
+  progressTarget: Int
+
+  """
+  Current progress count
+  """
+  progressValue: Int
+  userId: Int
+}
+
 input BulkDropPlayersInput {
   leagueId: Int!
   reason: String
@@ -430,6 +492,21 @@ input EditMatchupScoreInput {
   reason: String
   team1Score: Float!
   team2Score: Float!
+}
+
+"""
+Result of a badge evaluation run
+"""
+type EvaluateBadgesResult {
+  """
+  De-duplicated list of badge keys that were newly awarded
+  """
+  awardedBadgeKeys: [String!]
+
+  """
+  Number of new badges awarded
+  """
+  awardedCount: Int
 }
 
 input ForceAddPlayerInput {
@@ -908,6 +985,16 @@ type Mutation {
   awardChampionship(bracketId: Int!): ChampionTrophy
 
   """
+  Award the League Champion badge to the winning team owner. Requires commissioner / system access.
+  """
+  awardLeagueChampionBadge(leagueId: Int!, teamId: Int!, userId: Int!): Boolean
+
+  """
+  Award Playoff Appearance badges to all teams that qualified for the playoffs.
+  """
+  awardPlayoffAppearanceBadges(leagueId: Int!, teamIds: [Int!]!): Boolean
+
+  """
   Commissioner: drop all players from a team (useful for inactive teams).
   """
   bulkDropTeamPlayers(input: BulkDropPlayersInput!): CommissionerActionResult
@@ -960,6 +1047,16 @@ type Mutation {
   Commissioner: edit the scores of a past or current matchup. All edits are audit-logged.
   """
   editMatchupScore(input: EditMatchupScoreInput!): CommissionerActionResult
+
+  """
+  Evaluate and award all eligible draft-based badges for a league. Call when a draft completes. Requires authentication.
+  """
+  evaluateDraftBadges(leagueId: Int!): EvaluateBadgesResult
+
+  """
+  Evaluate and award all eligible matchup-based badges for a completed matchup. Call when a matchup status transitions to completed. Requires authentication.
+  """
+  evaluateMatchupBadges(matchupId: Int!): EvaluateBadgesResult
 
   """
   Commissioner: force-add a player to a team, bypassing normal acquisition rules.
@@ -1399,6 +1496,11 @@ type Query {
   Return all achievement restrictions configured for a league, sorted by achievement type
   """
   achievementRestrictions(leagueId: Int!): [AchievementRestriction!]
+
+  """
+  List all badge definitions available in the system
+  """
+  allBadgeDefinitions: [BadgeDefinition!]
   careerBattingStats(
     after: String
     first: Int
@@ -1598,11 +1700,26 @@ type Query {
     season: Int
     team: String
   ): [SeasonPitching!]
+
+  """
+  Return earned badges for a team in a league
+  """
+  teamBadges(leagueId: Int!, teamId: Int!): [UserBadge!]
   teamLeagueMembers(teamId: Int!): [LeagueMember!]
   teamMembers(teamId: Int!): [TeamMember!]
   teamTradeOffers(status: String, teamId: Int!): [TradeOffer!]
   teamWaiverClaims(status: String, teamId: Int!): [WaiverClaim!]
   user(id: Int!): User
+
+  """
+  Return progress records for in-progress multi-step badges for a user
+  """
+  userBadgeProgress(leagueId: Int, userId: Int!): [BadgeProgress!]
+
+  """
+  Return earned badges for a user, optionally filtered to a specific league
+  """
+  userBadges(leagueId: Int, userId: Int!): [UserBadge!]
   userByEmail(email: String!): User
   userLeagues: [League!]!
   userTeamId(leagueId: Int!): Int
@@ -2015,6 +2132,39 @@ type User {
   email: String
   id: Int
   username: String
+}
+
+"""
+A badge earned by a user
+"""
+type UserBadge {
+  """
+  Badge definition key
+  """
+  badgeKey: String
+
+  """
+  Full badge definition metadata
+  """
+  definition: BadgeDefinition
+
+  """
+  ISO 8601 timestamp when the badge was earned
+  """
+  earnedAt: String
+  id: Int
+
+  """
+  League scope; null for global badges
+  """
+  leagueId: Int
+  rarity: String
+
+  """
+  Team associated with the earn event
+  """
+  teamId: Int
+  userId: Int
 }
 
 type UserConsent {

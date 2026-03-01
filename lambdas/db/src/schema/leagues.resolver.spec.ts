@@ -66,6 +66,15 @@ describe('League Mutations', () => {
           leagueId: 'leagueId',
         },
       },
+      createBadgeService: jest.fn(() => ({
+        getUserBadges: jest.fn().mockResolvedValue([]),
+        getTeamBadges: jest.fn().mockResolvedValue([]),
+        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+      })),
     }));
 
     // Load the schema after mocks are set up

@@ -16,6 +16,7 @@ import './chat-and-tiebreakers';
 import './drafts';
 import './gdpr';
 import './achievements';
+import './badges';
 import './playoff-schema';
 import './commissioner-tools';
 import './on-this-day';

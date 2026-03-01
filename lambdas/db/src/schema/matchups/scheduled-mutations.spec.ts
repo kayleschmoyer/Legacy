@@ -92,6 +92,15 @@ jest.mock('@legacy-sports/db-client', () => ({
       permissionLevel: 'league_members.permission_level',
     },
   },
+  createBadgeService: jest.fn(() => ({
+    getUserBadges: jest.fn().mockResolvedValue([]),
+    getTeamBadges: jest.fn().mockResolvedValue([]),
+    getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+    evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+    evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+    awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+    awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 describe('Scheduled Mutations', () => {

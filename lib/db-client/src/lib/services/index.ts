@@ -17,6 +17,7 @@ import {
 } from './NotificationService';
 import { createLeagueService, LeagueService } from './LeagueService';
 import { createGdprService, GdprService } from './GdprService';
+import { BadgeService, createBadgeService } from './BadgeService';
 import { type GenericDatabase, getPublicDbConnection } from '../client/Helpers';
 import * as PublicSchema from '../../drizzle/public/schema';
 
@@ -28,6 +29,7 @@ export class DatabaseService {
   public readonly notifications: NotificationService;
   public readonly leagues: LeagueService;
   public readonly gdpr: GdprService;
+  public readonly badges: BadgeService;
   private _dbConnection: GenericDatabase<typeof PublicSchema> | null = null;
 
   constructor(private options: DbOptions) {
@@ -38,6 +40,7 @@ export class DatabaseService {
     this.notifications = createNotificationService(options);
     this.leagues = createLeagueService(options);
     this.gdpr = createGdprService(options);
+    this.badges = createBadgeService(options);
   }
 
   /**
@@ -83,6 +86,12 @@ export {
 } from './NotificationService';
 export { LeagueService, createLeagueService } from './LeagueService';
 export { GdprService, createGdprService } from './GdprService';
+export {
+  BadgeService,
+  createBadgeService,
+  BADGE_DEFINITIONS,
+  BADGE_DEFINITION_MAP,
+} from './BadgeService';
 
 // Re-export types
 export type { UserFilters, UserQueryOptions } from './UserService';
@@ -117,3 +126,12 @@ export type {
   RecordConsentInput,
   UserDataExport,
 } from './GdprService';
+export type {
+  BadgeDefinition,
+  BadgeRarity,
+  BadgeCategory,
+  BadgeScope,
+  UserBadge,
+  BadgeProgressRecord,
+  AwardedBadgeResult,
+} from './BadgeService';

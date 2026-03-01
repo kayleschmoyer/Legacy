@@ -85,6 +85,15 @@ describe('Matchup Queries', () => {
       getPlayoffQualifications: actualDbClient.getPlayoffQualifications,
       getRecentMatchupsForTeam: actualDbClient.getRecentMatchupsForTeam,
       queryHistoricalMatchups: actualDbClient.queryHistoricalMatchups,
+      createBadgeService: jest.fn(() => ({
+        getUserBadges: jest.fn().mockResolvedValue([]),
+        getTeamBadges: jest.fn().mockResolvedValue([]),
+        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+      })),
     }));
 
     // Mock StandingsService for all resolvers that use it
