@@ -24,6 +24,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 
 | Need                          | File                                                                       |
 | ----------------------------- | -------------------------------------------------------------------------- |
+| **Add secret / env var**      | `.github/skills/add-secret-or-env-var/SKILL.md`                            |
 | Architecture                  | `.github/skills/architecture/SKILL.md`                                     |
 | Branch/ticket workflow        | `.github/skills/branch-create/SKILL.md`                                    |
 | **Config reference**          | `.github/skills/config-standards/SKILL.md`                                 |
@@ -52,6 +53,6 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **User testing**              | `.github/skills/user-testing/SKILL.md`                                     |
 | **Rebase & conflicts**        | `.github/skills/rebase-conflicts/SKILL.md`                                 |
 | Worktree workflow             | `.github/skills/worktree-workflow/SKILL.md`                                |
-| All skills (56 guides)        | `.github/skills/`                                                          |
+| All skills (57 guides)        | `.github/skills/`                                                          |
 | CSV reference data            | `docs/agents/*.csv`                                                        |
 | Tech stack                    | React Native · Next.js · Lambda · GraphQL · PostgreSQL/Drizzle · Terraform |

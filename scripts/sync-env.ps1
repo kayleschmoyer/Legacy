@@ -109,10 +109,17 @@ $newEnvVars["CLIENT_ID"] = $terraformOutput.environment_variables_summary.value.
 $newEnvVars["VITE_GOOGLE_CLIENT_ID"] = $terraformOutput.environment_variables_summary.value.google_oauth_client_id
 $newEnvVars["GOOGLE_OAUTH_CLIENT_SECRET"] = $googleSecret
 $newEnvVars["VITE_OAUTH_PROXY_URL"] = $terraformOutput.oauth_proxy_endpoint.value
+$newEnvVars["EXPO_PUBLIC_OAUTH_PROXY"] = $terraformOutput.oauth_proxy_endpoint.value
 
 # Lambda Endpoints
 $newEnvVars["VITE_GRAPHQL_HOST"] = $terraformOutput.graphql_endpoint.value
+$newEnvVars["EXPO_PUBLIC_GRAPHQL_HOST"] = $terraformOutput.graphql_endpoint.value
 $newEnvVars["VITE_WEBSOCKET_URL"] = $terraformOutput.websocket_url.value
+$newEnvVars["EXPO_PUBLIC_WEBSOCKET_URL"] = $terraformOutput.websocket_url.value
+$newEnvVars["EXPO_PUBLIC_STATS_API_URL"] = $terraformOutput.stats_endpoint.value
+$newEnvVars["VITE_STATS_API_URL"] = $terraformOutput.stats_endpoint.value
+$newEnvVars["GAME_SELECTION_ENDPOINT"] = $terraformOutput.game_selection_endpoint.value
+$newEnvVars["VITE_JIRA_PROXY_URL"] = $terraformOutput.environment_variables_summary.value.jira_proxy_url
 $newEnvVars["INTERNAL_API_BASE_URL"] = $terraformOutput.api_gateway_url.value
 
 # Database Configuration (New Unified System)
@@ -132,6 +139,8 @@ $newEnvVars["AWS_REGION"] = $terraformOutput.environment_variables_summary.value
 $newEnvVars["RDS_PROXY_ENDPOINT"] = $terraformOutput.rds_proxy_endpoint.value
 $newEnvVars["SQS_LOAD_SEASON_STATS_URL"] = $terraformOutput.environment_variables_summary.value.sqs_load_season_stats_url
 $newEnvVars["SQS_AUTOMATIC_DRAFTS_URL"] = $terraformOutput.environment_variables_summary.value.sqs_automatic_drafts_url
+$newEnvVars["SQS_SELECT_GAME_URL"] = $terraformOutput.environment_variables_summary.value.sqs_select_game_url
+$newEnvVars["SQS_LOAD_GAME_STATS_URL"] = $terraformOutput.environment_variables_summary.value.sqs_load_game_stats_url
 # Legacy support
 $newEnvVars["SQS_QUEUE_URL"] = $terraformOutput.environment_variables_summary.value.sqs_load_season_stats_url
 

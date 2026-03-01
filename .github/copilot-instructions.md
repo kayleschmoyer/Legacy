@@ -29,6 +29,7 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 
 | Task                          | File                                     |
 | ----------------------------- | ---------------------------------------- |
+| **Add secret / env var**      | `skills/add-secret-or-env-var/SKILL.md`  |
 | Architecture                  | `skills/architecture/SKILL.md`           |
 | Branch/ticket workflow        | `skills/branch-create/SKILL.md`          |
 | **Config reference**          | `skills/config-standards/SKILL.md`       |
@@ -57,5 +58,5 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 | **User testing**              | `skills/user-testing/SKILL.md`           |
 | **Rebase & conflicts**        | `skills/rebase-conflicts/SKILL.md`       |
 | Worktree workflow             | `skills/worktree-workflow/SKILL.md`      |
-| All skills (56 guides)        | `skills/`                                |
+| All skills (57 guides)        | `skills/`                                |
 | CSV reference data            | `docs/agents/*.csv`                      |

@@ -123,6 +123,11 @@ output "game_selection_endpoint" {
   value       = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/games"
 }
 
+output "jira_proxy_endpoint" {
+  description = "Jira Proxy Lambda endpoint URL"
+  value       = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/jira"
+}
+
 
 
 # Lambda function outputs
@@ -179,7 +184,9 @@ output "environment_variables_summary" {
     sqs_load_season_stats_url       = aws_sqs_queue.load_season_stats.url
     sqs_automatic_drafts_url        = aws_sqs_queue.automatic_drafts.url
     sqs_select_game_url             = aws_sqs_queue.select_game.url
+    sqs_load_game_stats_url         = aws_sqs_queue.load_game_stats.url
     google_oauth_client_id          = var.google_oauth_client_id
+    jira_proxy_url                  = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/jira"
   }
 }
 
