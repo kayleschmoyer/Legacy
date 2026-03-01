@@ -93,7 +93,7 @@ interface Filter {
  */
 const FreeAgents: React.FC = () => {
   // State
-  const [sport] = useState<'baseball' | 'football'>('baseball'); // TODO: Get from route params
+  const [sport] = useState<'baseball' | 'football'>('baseball'); // TODO(LS-335): Get from route params
   const [searchText, setSearchText] = useState('');
   const [sortBy, setSortBy] = useState('Rank');
   const [filters, setFilters] = useState<Filter>({
@@ -163,7 +163,7 @@ const FreeAgents: React.FC = () => {
 
   const handleSubmitClaim = useCallback((claim: WaiverClaim) => {
     console.log('Waiver claim submitted:', claim);
-    // TODO: Submit to backend
+    // TODO(LS-336): Submit to backend
   }, []);
 
   const renderPlayerGrid = () => (

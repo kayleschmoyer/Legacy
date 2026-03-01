@@ -22,7 +22,7 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // TODO: Implement authentication logic here
+      // TODO(LS-330): Implement authentication logic here
       console.log('Login successful!');
       // Navigate to the main app screen after successful login
     } catch (error) {
@@ -108,7 +108,7 @@ const Login: React.FC = () => {
           backgroundColor="transparent"
           marginTop="$4"
           onPress={() => {
-            // TODO: Implement registration navigation
+            // TODO(LS-331): Implement registration navigation
           }}
         >
           <Text fontSize="$4" textAlign="center">

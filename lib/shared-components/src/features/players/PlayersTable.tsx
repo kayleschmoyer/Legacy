@@ -23,7 +23,7 @@ import {
 } from '@tamagui/lucide-icons';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
 import { formatProjection } from './usePlayerProjections';
-// TODO: Import PlayersCareerStatsTable when it's available
+// TODO(LS-326): Import PlayersCareerStatsTable when it's available
 // import { PlayersCareerStatsTable } from './PlayersCareerStatsTable';
 
 export interface PlayersTableProps {
@@ -152,7 +152,7 @@ export function PlayersTable({
 
   // If career stats mode is enabled, use the dedicated career stats table
   if (useCareerStats) {
-    // TODO: Implement PlayersCareerStatsTable component
+    // TODO(LS-326): Implement PlayersCareerStatsTable component
     return (
       <YStack p="$4" gap="$3" ai="center">
         <Text>Career stats view not implemented yet</Text>

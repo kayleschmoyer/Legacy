@@ -63,7 +63,7 @@ export default function MatchupDetailScreen() {
   }
 
   const gamesTotal = matchup.gamesPerMatchup ?? 0;
-  const gamesRemaining = 0; // TODO: Calculate from selected games
+  const gamesRemaining = 0; // TODO(LS-334): Calculate from selected games
   const gamesCompleted = gamesTotal - gamesRemaining;
 
   return (

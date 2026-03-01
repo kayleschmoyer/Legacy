@@ -1130,12 +1130,12 @@ async function processDraftMessage(
         await randomlyAssignPlayers(leagueId);
         break;
       case 'standard':
-        // TODO: Implement snake/linear draft logic
+        // TODO(LS-327): Implement snake/linear draft logic
         throw new Error(
           'Standard (pick-by-pick) draft processing not yet implemented in Lambda',
         );
       case 'auction':
-        // TODO: Implement auction draft logic
+        // TODO(LS-328): Implement auction draft logic
         throw new Error('Auction draft not yet implemented');
       default:
         throw new Error(`Unknown selection method: ${String(selectionMethod)}`);

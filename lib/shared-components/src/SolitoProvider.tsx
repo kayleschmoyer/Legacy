@@ -1,5 +1,5 @@
 import React from 'react';
-// TODO: Fix Solito imports - NavigationProvider not available in current version
+// TODO(LS-323): Fix Solito imports - NavigationProvider not available in current version
 // import { NavigationProvider, createParam } from 'solito';
 import { createParam } from 'solito';
 import { NavigationContainer } from '@react-navigation/native';
@@ -18,7 +18,7 @@ interface SolitoProviderProps {
 function SolitoProvider({ children }: SolitoProviderProps) {
   return (
     <NavigationContainer>
-      {/* TODO: Restore NavigationProvider when solito import is fixed */}
+      {/* TODO(LS-323): Restore NavigationProvider when solito import is fixed */}
       {children}
     </NavigationContainer>
   );

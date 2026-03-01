@@ -5,7 +5,7 @@ import {
   type GetAllPlayersQueryVariables,
 } from '../../api/db/graphql.generated';
 
-// Local interface definition (TODO: Import from PlayerStatsTypes when import issue is resolved)
+// Local interface definition (TODO(LS-338): Import from PlayerStatsTypes when import issue is resolved)
 interface PlayerStatsColumn {
   key: string;
   label: string;

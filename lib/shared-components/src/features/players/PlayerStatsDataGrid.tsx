@@ -395,7 +395,7 @@ export function PlayerStatsDataGrid({
    */
   const handleSearchChange = useCallback((value: string) => {
     setSearchTerm(value);
-    // TODO: Implement search using separate searchPlayers query
+    // TODO(LS-329): Implement search using separate searchPlayers query
     // For now, search is disabled as careerBattingStats doesn't support searchTerm
   }, []);
 

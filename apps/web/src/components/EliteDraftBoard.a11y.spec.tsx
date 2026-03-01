@@ -71,7 +71,11 @@ describe('EliteDraftBoardScreen a11y', () => {
   });
 
   test('watchlist toggle exposes aria-pressed', async () => {
-    const user = userEvent.setup();
+    // The component runs a 1-second setInterval pick timer. Freeze timers for
+    // this test so userEvent.click() can settle without waiting for ongoing
+    // interval state updates, which would exceed the default 5 s timeout.
+    jest.useFakeTimers();
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<EliteDraftBoardScreen />);
 
     // Find first player card and its watch button (☆)
@@ -84,5 +88,7 @@ describe('EliteDraftBoardScreen a11y', () => {
     expect(btn).toHaveAttribute('aria-pressed', 'false');
     await user.click(btn);
     expect(btn).toHaveAttribute('aria-pressed', 'true');
+
+    jest.useRealTimers();
   });
 });

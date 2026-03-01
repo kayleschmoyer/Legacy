@@ -20,6 +20,6 @@ function getMessageFromError(err: unknown): string {
 export function handleError(err: unknown): void {
   const message = getMessageFromError(err);
 
-  // TODO: Replace with better error handling solution
+  // TODO(LS-324): Replace with better error handling solution
   LOGGER.error('Error occurred:', message);
 }
