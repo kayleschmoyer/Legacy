@@ -1,0 +1,99 @@
+name: "Update Lambda Health Badge"
+description: "Updates a gist file with a lambda health-check status badge for shields.io"
+
+inputs:
+  github-token:
+    description: "GitHub token with gist write access (GIST_TOKEN)"
+    required: true
+  gist-id:
+    description: "Gist ID to update (CI_BADGES_GIST_ID)"
+    required: true
+  lambda-name:
+    description: "Human-readable lambda name, e.g. 'GraphQL Lambda'"
+    required: true
+  health-status:
+    description: "Health result: 'healthy', 'active', 'degraded', or anything else maps to offline/red"
+    required: true
+
+outputs:
+  badge-updated:
+    description: "Whether the gist update succeeded"
+    value: ${{ steps.update.outputs.success }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "💚 Update Health Badge — ${{ inputs.lambda-name }}"
+      id: update
+      shell: bash
+      run: |
+        echo "::group::💚 Updating health badge for ${{ inputs.lambda-name }}"
+
+        LAMBDA_NAME="${{ inputs.lambda-name }}"
+        STATUS="${{ inputs.health-status }}"
+        GIST_ID="${{ inputs.gist-id }}"
+
+        # Normalise status → colour + message
+        case "$STATUS" in
+          healthy|active|Active)
+            COLOR="brightgreen"
+            MESSAGE="healthy" ;;
+          degraded)
+            COLOR="orange"
+            MESSAGE="degraded" ;;
+          *)
+            COLOR="red"
+            MESSAGE="offline" ;;
+        esac
+
+        # Filename-safe key used as the gist file name
+        FILENAME="Health-$(echo "${LAMBDA_NAME}" | sed 's/ /-/g').json"
+
+        # Build the shields.io endpoint JSON
+        jq -n \
+          --arg label  "${LAMBDA_NAME}" \
+          --arg msg    "${MESSAGE}" \
+          --arg color  "${COLOR}" \
+          '{
+            schemaVersion: 1,
+            label:  $label,
+            message: $msg,
+            color:  $color,
+            cacheSeconds: 300,
+            style: "flat"
+          }' > "${FILENAME}"
+
+        echo "Badge payload:"
+        cat "${FILENAME}"
+
+        # Push to gist via GitHub API
+        PAYLOAD=$(jq -n \
+          --arg fn "${FILENAME}" \
+          --rawfile content "${FILENAME}" \
+          '{files: {($fn): {content: $content}}}')
+
+        HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/health_badge_response.json \
+          -X PATCH \
+          -H "Authorization: Bearer ${{ inputs.github-token }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/gists/${GIST_ID}" \
+          -d "${PAYLOAD}")
+
+        if [ "${HTTP_CODE}" = "200" ]; then
+          echo "✅ Health badge updated: ${FILENAME} → ${MESSAGE} (${COLOR})"
+          echo "success=true" >> "${GITHUB_OUTPUT}"
+
+          BADGE_URL="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/${{ github.repository_owner }}/${GIST_ID}/raw/${FILENAME}"
+          echo "## 💚 Health Badge Updated" >> "${GITHUB_STEP_SUMMARY}"
+          echo "- **Lambda**: ${LAMBDA_NAME}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "- **Status**: ${MESSAGE}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "- **Badge**: \`${BADGE_URL}\`" >> "${GITHUB_STEP_SUMMARY}"
+        else
+          echo "❌ Failed to update health badge (HTTP ${HTTP_CODE})"
+          cat /tmp/health_badge_response.json
+          echo "success=false" >> "${GITHUB_OUTPUT}"
+          echo "## ❌ Health Badge Update Failed — ${LAMBDA_NAME}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "HTTP status: ${HTTP_CODE}" >> "${GITHUB_STEP_SUMMARY}"
+        fi
+
+        echo "::endgroup::"

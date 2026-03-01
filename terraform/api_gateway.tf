@@ -48,6 +48,10 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_method.game_selection_options.id,
       aws_api_gateway_integration.game_selection_any.id,
       aws_api_gateway_integration.game_selection_options.id,
+      # Badge resource (shields.io health badges)
+      aws_api_gateway_resource.badge.id,
+      aws_api_gateway_method.badge_get.id,
+      aws_api_gateway_integration.badge_get.id,
     ]))
   }
 
@@ -72,6 +76,29 @@ resource "aws_api_gateway_stage" "main" {
   stage_name    = var.environment
 
   tags = local.common_tags
+}
+
+# Badge resource — GET /badge routes to GraphQL lambda and returns a shields.io health badge
+resource "aws_api_gateway_resource" "badge" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "badge"
+}
+
+resource "aws_api_gateway_method" "badge_get" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.badge.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "badge_get" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.badge.id
+  http_method             = aws_api_gateway_method.badge_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.graphql.invoke_arn
 }
 
 # GraphQL resource

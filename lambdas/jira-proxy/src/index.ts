@@ -216,6 +216,21 @@ export const baseHandler = async (
     return jsonResponse(200, { status: 'ok', service: 'jira-proxy' });
   }
 
+  if (
+    event.httpMethod === 'GET' &&
+    (path === '/jira/badge' || path === '/badge')
+  ) {
+    // shields.io endpoint badge — returns live health JSON consumed directly by the README badge
+    return jsonResponse(200, {
+      schemaVersion: 1,
+      label: 'Jira Proxy Lambda',
+      message: 'healthy',
+      color: 'brightgreen',
+      cacheSeconds: 60,
+      style: 'flat',
+    });
+  }
+
   return jsonResponse(404, {
     error: `Route ${event.httpMethod} ${event.path} not found`,
   });

@@ -69,6 +69,25 @@ export function createLambdaHandler(
       };
     }
 
+    // shields.io endpoint badge — returns live health JSON consumed directly by the README badge
+    if (event.path === '/badge' || event.path === '/dev/badge') {
+      return {
+        statusCode: 200,
+        headers: {
+          ...CORS_HEADERS,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          schemaVersion: 1,
+          label: 'GraphQL Lambda',
+          message: 'healthy',
+          color: 'brightgreen',
+          cacheSeconds: 60,
+          style: 'flat',
+        }),
+      };
+    }
+
     try {
       LOGGER.debug('Calling Apollo Server handler');
 

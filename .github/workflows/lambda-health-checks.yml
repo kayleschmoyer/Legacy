@@ -1,0 +1,128 @@
+name: Lambda Health Checks
+
+# Runs on a schedule and can be triggered manually to verify the health of
+# SQS/WebSocket lambdas that have no HTTP surface.  Results are published as
+# shields.io-compatible badge JSON files in the shared CI_BADGES_GIST.
+# HTTP lambdas (GraphQL, OAuth, Game Selection, Jira Proxy) serve their own
+# live /badge endpoint — no workflow polling needed for those.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # every 15 minutes
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  LAMBDA_PREFIX: legacy-sports-dev
+
+jobs:
+  health-check:
+    name: Check Lambda Health
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -----------------------------------------------------------------------
+      # Non-HTTP lambdas — check function state via AWS API
+      # Active   → healthy
+      # Inactive → degraded  (cold/throttled but still deployed)
+      # anything else (Pending/Failed/unknown) → offline
+      # -----------------------------------------------------------------------
+      - name: Check Stats Lambda
+        id: stats
+        run: |
+          STATE=$(aws lambda get-function-configuration \
+            --function-name "${{ env.LAMBDA_PREFIX }}-stats-lambda" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "State" --output text 2>/dev/null || echo "unknown")
+          echo "State: $STATE"
+          case "$STATE" in
+            Active)   echo "result=healthy"  >> "$GITHUB_OUTPUT" ;;
+            Inactive) echo "result=degraded" >> "$GITHUB_OUTPUT" ;;
+            *)        echo "result=offline"  >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Check Draft Processor Lambda
+        id: draft
+        run: |
+          STATE=$(aws lambda get-function-configuration \
+            --function-name "${{ env.LAMBDA_PREFIX }}-draft-processor" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "State" --output text 2>/dev/null || echo "unknown")
+          echo "State: $STATE"
+          case "$STATE" in
+            Active)   echo "result=healthy"  >> "$GITHUB_OUTPUT" ;;
+            Inactive) echo "result=degraded" >> "$GITHUB_OUTPUT" ;;
+            *)        echo "result=offline"  >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Check WebSocket Lambda
+        id: websocket
+        run: |
+          STATE=$(aws lambda get-function-configuration \
+            --function-name "${{ env.LAMBDA_PREFIX }}-websocket" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "State" --output text 2>/dev/null || echo "unknown")
+          echo "State: $STATE"
+          case "$STATE" in
+            Active)   echo "result=healthy"  >> "$GITHUB_OUTPUT" ;;
+            Inactive) echo "result=degraded" >> "$GITHUB_OUTPUT" ;;
+            *)        echo "result=offline"  >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      # -----------------------------------------------------------------------
+      # Publish badges — always runs so offline state is accurately reflected
+      # -----------------------------------------------------------------------
+      - name: Badge — Stats Lambda
+        if: always()
+        uses: ./.github/actions/update-health-badge
+        with:
+          github-token: ${{ secrets.GIST_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          lambda-name: "Stats Lambda"
+          health-status: ${{ steps.stats.outputs.result || 'offline' }}
+
+      - name: Badge — Draft Processor Lambda
+        if: always()
+        uses: ./.github/actions/update-health-badge
+        with:
+          github-token: ${{ secrets.GIST_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          lambda-name: "Draft Processor Lambda"
+          health-status: ${{ steps.draft.outputs.result || 'offline' }}
+
+      - name: Badge — WebSocket Lambda
+        if: always()
+        uses: ./.github/actions/update-health-badge
+        with:
+          github-token: ${{ secrets.GIST_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          lambda-name: "WebSocket Lambda"
+          health-status: ${{ steps.websocket.outputs.result || 'offline' }}
+
+      # -----------------------------------------------------------------------
+      # Summary
+      # -----------------------------------------------------------------------
+      - name: Health Check Summary
+        if: always()
+        run: |
+          echo "## 🏥 Lambda Health Check Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Lambda | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Stats Lambda        | ${{ steps.stats.outputs.result          || 'offline' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Draft Processor Lambda | ${{ steps.draft.outputs.result       || 'offline' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| WebSocket Lambda    | ${{ steps.websocket.outputs.result      || 'offline' }} |" >> "$GITHUB_STEP_SUMMARY"

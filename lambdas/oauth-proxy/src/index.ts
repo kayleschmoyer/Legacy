@@ -133,6 +133,22 @@ const baseOAuthHandler = async (
         });
       }
 
+      case '/oauth/badge':
+      case '/dev/oauth/badge': {
+        // shields.io endpoint badge — returns live health JSON consumed directly by the README badge
+        return addCorsHeaders({
+          statusCode: 200,
+          body: JSON.stringify({
+            schemaVersion: 1,
+            label: 'OAuth Proxy Lambda',
+            message: 'healthy',
+            color: 'brightgreen',
+            cacheSeconds: 60,
+            style: 'flat',
+          }),
+        });
+      }
+
       case '/oauth':
       case '/dev/oauth':
         // Root OAuth path - could be used for health checks or general info

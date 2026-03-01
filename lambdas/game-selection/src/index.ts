@@ -775,6 +775,21 @@ const baseGameSelectionHandler = async (
         });
       }
 
+      case '/badge': {
+        // shields.io endpoint badge — returns live health JSON consumed directly by the README badge
+        return addCorsHeaders({
+          statusCode: 200,
+          body: JSON.stringify({
+            schemaVersion: 1,
+            label: 'Game Selection Lambda',
+            message: 'healthy',
+            color: 'brightgreen',
+            cacheSeconds: 60,
+            style: 'flat',
+          }),
+        });
+      }
+
       case '/create-matchup':
         if (event.httpMethod === 'POST') {
           // Parse request body

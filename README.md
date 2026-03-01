@@ -29,7 +29,19 @@ A modern sports data management platform built with React Native CLI, Next.js we
 [![Apply Lambda Infrastructure](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Apply-Lambda-Infrastructure.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-terraform-apply.yml)
 [![Build Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)
 
-## 🌐 Live Web App
+## 🏥 Lambda Health Status
+
+HTTP lambdas serve their own live badge — shields.io fetches directly from the endpoint on every page load (60-second cache). SQS/WebSocket lambdas have no HTTP surface and are polled every 15 minutes by the [Lambda Health Checks](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-health-checks.yml) workflow.
+
+[![GraphQL Lambda](https://img.shields.io/endpoint?url=https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/badge)](https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/badge)
+[![OAuth Proxy Lambda](https://img.shields.io/endpoint?url=https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/oauth/badge)](https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/oauth/health)
+[![Game Selection Lambda](https://img.shields.io/endpoint?url=https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/games/badge)](https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/games/health)
+[![Jira Proxy Lambda](https://img.shields.io/endpoint?url=https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/jira/badge)](https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/jira/health)
+[![Stats Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Health-Stats-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-health-checks.yml)
+[![Draft Processor Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Health-Draft-Processor-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-health-checks.yml)
+[![WebSocket Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Health-WebSocket-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-health-checks.yml)
+
+## �🌐 Live Web App
 
 [![Launch Web App](https://img.shields.io/badge/Launch-Web%20App-blue?style=for-the-badge&logo=vercel)](https://bkrupa.github.io/legacy-sports/)
 
