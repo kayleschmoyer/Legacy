@@ -383,8 +383,8 @@ pnpm exec nx test <lambda-name>
 # 4. Deploy directly (if urgent)
 .\scripts\deploy-lambda.ps1 -FunctionName <lambda-name> -Environment production
 
-# 5. Create PR afterward
-twig github pr create-pr
+# 5. Create PR afterward (see create-pr skill for full template)
+gh pr create --title "LS-1234 fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 ```
 
 ## Rollback

@@ -64,13 +64,14 @@ If the branch does not contain a Jira ticket key:
 ## Command
 
 ```powershell
-# Create PR with twig (opens in browser)
-twig github pr create-pr
+# Create PR using GitHub CLI with --body-file (preferred — works for both humans and agents)
+gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 ```
 
-## Using GitHub CLI (Preferred for Agents)
+> **Alternative (human-only, opens browser):** `twig github pr create-pr`
+> Twig auto-fills the PR from Jira — convenient for humans but not usable by agents.
 
-### 🚨 CRITICAL: Always Use --body-file, Never --body
+## 🚨 CRITICAL: Always Use --body-file, Never --body
 
 PowerShell corrupts inline markdown passed via `--body`:
 

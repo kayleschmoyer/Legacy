@@ -409,8 +409,8 @@ git add .
 git commit -m "feat(scope): description (LS-1234)"
 git push origin HEAD
 
-# 4. Create PR
-twig github pr create-pr
+# 4. Create PR (see create-pr skill for full template)
+gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 ```
 
 ### If You Pushed to Main by Mistake
@@ -431,8 +431,8 @@ git push -f origin main
 git checkout LS-1234/fix
 git push origin HEAD
 
-# 5. Create PR
-twig github pr create-pr
+# 5. Create PR (see create-pr skill for full template)
+gh pr create --title "LS-1234 fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 ```
 
 **⚠️ Only use force-push if no one else has pulled your changes**

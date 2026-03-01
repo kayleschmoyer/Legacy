@@ -160,9 +160,11 @@ acli jira workitem transition --key LS-1234 --status "In Progress"
 
 ### Creating Pull Request
 
+See the [create-pr skill](../create-pr/SKILL.md) for the full PR template workflow.
+
 ```powershell
-# 1. Create PR
-twig github pr create-pr
+# 1. Create PR (use --body-file, never inline --body — see create-pr skill)
+gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
 # 2. Update ticket status
 acli jira workitem transition --key LS-1234 --status "In Review"

@@ -11,7 +11,7 @@
 5. Code: commit changes with `git commit -m "type(scope): msg"` → `git push origin HEAD`
 6. Rebase onto parent: `git fetch origin ; twig rebase` — keeps branch current with its parent (main or a stacked branch)
 7. Validate: `make pc` — must pass before opening PR
-8. Ship: `twig github pr create-pr` → Jira "In Review"
+8. Ship: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` → Jira "In Review" (see `skills/create-pr/SKILL.md`)
 9. Cleanup: `twig worktree clean` → `git branch -d LS-####/description` → Jira "Done"
 
 ## Rules
