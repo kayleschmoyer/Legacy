@@ -97,6 +97,7 @@ export type {
 export type {
   StatisticsFilters,
   StatisticsQueryOptions,
+  OnThisDayEntry,
 } from './StatisticsService';
 export type { LeagueScoringMultiplierUpdate } from './ScoringService';
 export type {

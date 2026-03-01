@@ -13,6 +13,7 @@ import { ScrollView, Separator, styled, Text, H2 as TH2 } from 'tamagui';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { PageMeta } from '../../components/PageMeta';
+import { OnThisDayFeed } from '../../features/baseball';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -503,6 +504,18 @@ export function HomePage(): React.JSX.Element {
                   </FeatureCard>
                 ))}
               </XStack>
+            </YStack>
+
+            {/* ─── On This Day ─── */}
+            <YStack gap="$5">
+              <YStack gap="$2">
+                <SectionTitle>On This Day in Baseball</SectionTitle>
+                <Paragraph fontSize="$4" color="$textMuted" maxWidth={500}>
+                  Historic performances from today's date across every season in
+                  the database — see which players you manage made history.
+                </Paragraph>
+              </YStack>
+              <OnThisDayFeed />
             </YStack>
 
             {/* ─── Stats CTA ─── */}

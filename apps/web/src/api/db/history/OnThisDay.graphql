@@ -1,0 +1,26 @@
+query GetOnThisDay($month: Int!, $day: Int!, $limit: Int) {
+  onThisDay(month: $month, day: $day, limit: $limit) {
+    entryType
+    playerId
+    firstName
+    lastName
+    brefId
+    season
+    gameIdentifier
+    homeRuns
+    rbi
+    hits
+    doubles
+    triples
+    atBats
+    baseOnBalls
+    runs
+    strikeouts
+    inningsPitched
+    earnedRuns
+    saves
+    wins
+    hitsAllowed
+    walksAllowed
+  }
+}

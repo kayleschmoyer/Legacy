@@ -1267,6 +1267,37 @@ export type NotificationPreferenceInput = {
   pushEnabled?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
+/** A historically notable game-log performance on a specific calendar date */
+export type OnThisDayEntry = {
+  __typename?: 'OnThisDayEntry';
+  atBats?: Maybe<Scalars['Int']['output']>;
+  baseOnBalls?: Maybe<Scalars['Int']['output']>;
+  /** Baseball-Reference player ID (used to build player URLs) */
+  brefId?: Maybe<Scalars['String']['output']>;
+  doubles?: Maybe<Scalars['Int']['output']>;
+  earnedRuns?: Maybe<Scalars['Int']['output']>;
+  /** "batting" or "pitching" */
+  entryType?: Maybe<Scalars['String']['output']>;
+  firstName?: Maybe<Scalars['String']['output']>;
+  /** Baseball-Reference game identifier (encodes date & team) */
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
+  hits?: Maybe<Scalars['Int']['output']>;
+  hitsAllowed?: Maybe<Scalars['Int']['output']>;
+  homeRuns?: Maybe<Scalars['Int']['output']>;
+  inningsPitched?: Maybe<Scalars['Float']['output']>;
+  lastName?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  rbi?: Maybe<Scalars['Int']['output']>;
+  runs?: Maybe<Scalars['Int']['output']>;
+  saves?: Maybe<Scalars['Int']['output']>;
+  /** Year of the game */
+  season?: Maybe<Scalars['Int']['output']>;
+  strikeouts?: Maybe<Scalars['Int']['output']>;
+  triples?: Maybe<Scalars['Int']['output']>;
+  walksAllowed?: Maybe<Scalars['Int']['output']>;
+  wins?: Maybe<Scalars['Int']['output']>;
+};
+
 export type PageInfo = {
   __typename?: 'PageInfo';
   endCursor?: Maybe<Scalars['String']['output']>;
@@ -1470,6 +1501,8 @@ export type Query = {
   myConsents?: Maybe<Array<UserConsent>>;
   /** Get all data export/deletion requests for the authenticated user */
   myDataRequests?: Maybe<Array<DataRequest>>;
+  /** Notable historical game-log performances from today's calendar date across all seasons */
+  onThisDay?: Maybe<Array<OnThisDayEntry>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
@@ -1706,6 +1739,12 @@ export type QueryLeagueTeamsArgs = {
 export type QueryLeagueTradeOffersArgs = {
   leagueId: Scalars['Int']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryOnThisDayArgs = {
+  day: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  month: Scalars['Int']['input'];
 };
 
 export type QueryPlayerArgs = {

@@ -1177,6 +1177,50 @@ input NotificationPreferenceInput {
   pushEnabled: Boolean
 }
 
+"""
+A historically notable game-log performance on a specific calendar date
+"""
+type OnThisDayEntry {
+  atBats: Int
+  baseOnBalls: Int
+
+  """
+  Baseball-Reference player ID (used to build player URLs)
+  """
+  brefId: String
+  doubles: Int
+  earnedRuns: Int
+
+  """
+  "batting" or "pitching"
+  """
+  entryType: String
+  firstName: String
+
+  """
+  Baseball-Reference game identifier (encodes date & team)
+  """
+  gameIdentifier: String
+  hits: Int
+  hitsAllowed: Int
+  homeRuns: Int
+  inningsPitched: Float
+  lastName: String
+  playerId: Int
+  rbi: Int
+  runs: Int
+  saves: Int
+
+  """
+  Year of the game
+  """
+  season: Int
+  strikeouts: Int
+  triples: Int
+  walksAllowed: Int
+  wins: Int
+}
+
 type PageInfo {
   endCursor: String
   hasNextPage: Boolean!
@@ -1463,6 +1507,26 @@ type Query {
   Get all data export/deletion requests for the authenticated user
   """
   myDataRequests: [DataRequest!]
+
+  """
+  Notable historical game-log performances from today's calendar date across all seasons
+  """
+  onThisDay(
+    """
+    Calendar day (1–31)
+    """
+    day: Int!
+
+    """
+    Maximum number of entries to return (default 15)
+    """
+    limit: Int
+
+    """
+    Calendar month (1–12)
+    """
+    month: Int!
+  ): [OnThisDayEntry!]
   player(id: Int!): Player
   playerByBrefId(brefId: String!): Player
   playerCareerBatting(playerId: Int!): CareerBatting

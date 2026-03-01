@@ -1267,6 +1267,37 @@ export type NotificationPreferenceInput = {
   pushEnabled?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
+/** A historically notable game-log performance on a specific calendar date */
+export type OnThisDayEntry = {
+  __typename?: 'OnThisDayEntry';
+  atBats?: Maybe<Scalars['Int']['output']>;
+  baseOnBalls?: Maybe<Scalars['Int']['output']>;
+  /** Baseball-Reference player ID (used to build player URLs) */
+  brefId?: Maybe<Scalars['String']['output']>;
+  doubles?: Maybe<Scalars['Int']['output']>;
+  earnedRuns?: Maybe<Scalars['Int']['output']>;
+  /** "batting" or "pitching" */
+  entryType?: Maybe<Scalars['String']['output']>;
+  firstName?: Maybe<Scalars['String']['output']>;
+  /** Baseball-Reference game identifier (encodes date & team) */
+  gameIdentifier?: Maybe<Scalars['String']['output']>;
+  hits?: Maybe<Scalars['Int']['output']>;
+  hitsAllowed?: Maybe<Scalars['Int']['output']>;
+  homeRuns?: Maybe<Scalars['Int']['output']>;
+  inningsPitched?: Maybe<Scalars['Float']['output']>;
+  lastName?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  rbi?: Maybe<Scalars['Int']['output']>;
+  runs?: Maybe<Scalars['Int']['output']>;
+  saves?: Maybe<Scalars['Int']['output']>;
+  /** Year of the game */
+  season?: Maybe<Scalars['Int']['output']>;
+  strikeouts?: Maybe<Scalars['Int']['output']>;
+  triples?: Maybe<Scalars['Int']['output']>;
+  walksAllowed?: Maybe<Scalars['Int']['output']>;
+  wins?: Maybe<Scalars['Int']['output']>;
+};
+
 export type PageInfo = {
   __typename?: 'PageInfo';
   endCursor?: Maybe<Scalars['String']['output']>;
@@ -1470,6 +1501,8 @@ export type Query = {
   myConsents?: Maybe<Array<UserConsent>>;
   /** Get all data export/deletion requests for the authenticated user */
   myDataRequests?: Maybe<Array<DataRequest>>;
+  /** Notable historical game-log performances from today's calendar date across all seasons */
+  onThisDay?: Maybe<Array<OnThisDayEntry>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
@@ -1706,6 +1739,12 @@ export type QueryLeagueTeamsArgs = {
 export type QueryLeagueTradeOffersArgs = {
   leagueId: Scalars['Int']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryOnThisDayArgs = {
+  day: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  month: Scalars['Int']['input'];
 };
 
 export type QueryPlayerArgs = {
@@ -2492,6 +2531,41 @@ export type BulkDropTeamPlayersMutation = {
     success?: boolean | null;
     message?: string | null;
   } | null;
+};
+
+export type GetOnThisDayQueryVariables = Exact<{
+  month: Scalars['Int']['input'];
+  day: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetOnThisDayQuery = {
+  __typename?: 'Query';
+  onThisDay?: Array<{
+    __typename?: 'OnThisDayEntry';
+    entryType?: string | null;
+    playerId?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    brefId?: string | null;
+    season?: number | null;
+    gameIdentifier?: string | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    hits?: number | null;
+    doubles?: number | null;
+    triples?: number | null;
+    atBats?: number | null;
+    baseOnBalls?: number | null;
+    runs?: number | null;
+    strikeouts?: number | null;
+    inningsPitched?: number | null;
+    earnedRuns?: number | null;
+    saves?: number | null;
+    wins?: number | null;
+    hitsAllowed?: number | null;
+    walksAllowed?: number | null;
+  }> | null;
 };
 
 export type GetLeagueChatMessagesQueryVariables = Exact<{
@@ -6476,6 +6550,116 @@ export type BulkDropTeamPlayersMutationResult =
 export type BulkDropTeamPlayersMutationOptions = BaseMutationOptions<
   BulkDropTeamPlayersMutation,
   BulkDropTeamPlayersMutationVariables
+>;
+export const GetOnThisDay = gql`
+  query GetOnThisDay($month: Int!, $day: Int!, $limit: Int) {
+    onThisDay(month: $month, day: $day, limit: $limit) {
+      entryType
+      playerId
+      firstName
+      lastName
+      brefId
+      season
+      gameIdentifier
+      homeRuns
+      rbi
+      hits
+      doubles
+      triples
+      atBats
+      baseOnBalls
+      runs
+      strikeouts
+      inningsPitched
+      earnedRuns
+      saves
+      wins
+      hitsAllowed
+      walksAllowed
+    }
+  }
+`;
+
+/**
+ * __useGetOnThisDayQuery__
+ *
+ * To run a query within a React component, call `useGetOnThisDayQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetOnThisDayQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetOnThisDayQuery({
+ *   variables: {
+ *      month: // value for 'month'
+ *      day: // value for 'day'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetOnThisDayQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetOnThisDayQuery,
+    GetOnThisDayQueryVariables
+  > &
+    (
+      | { variables: GetOnThisDayQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetOnThisDayQuery, GetOnThisDayQueryVariables>(
+    GetOnThisDay,
+    options,
+  );
+}
+export function useGetOnThisDayLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetOnThisDayQuery,
+    GetOnThisDayQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetOnThisDayQuery, GetOnThisDayQueryVariables>(
+    GetOnThisDay,
+    options,
+  );
+}
+export function useGetOnThisDaySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetOnThisDayQuery,
+        GetOnThisDayQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<GetOnThisDayQuery, GetOnThisDayQueryVariables>(
+    GetOnThisDay,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetOnThisDayQuery,
+          GetOnThisDayQueryVariables
+        >,
+  );
+}
+export type GetOnThisDayQueryHookResult = ReturnType<
+  typeof useGetOnThisDayQuery
+>;
+export type GetOnThisDayLazyQueryHookResult = ReturnType<
+  typeof useGetOnThisDayLazyQuery
+>;
+export type GetOnThisDaySuspenseQueryHookResult = ReturnType<
+  typeof useGetOnThisDaySuspenseQuery
+>;
+export type GetOnThisDayQueryResult = Apollo.QueryResult<
+  GetOnThisDayQuery,
+  GetOnThisDayQueryVariables
 >;
 export const GetLeagueChatMessages = gql`
   query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {

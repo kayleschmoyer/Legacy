@@ -18,6 +18,7 @@ import './gdpr';
 import './achievements';
 import './playoff-schema';
 import './commissioner-tools';
+import './on-this-day';
 
 // Export the final schema
 export const schema = builder.toSchema();
