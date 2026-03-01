@@ -323,6 +323,9 @@ jobs:
                 
                 // Re-target any dependent PRs that used this branch as their base
                 await retargetDependentPRs(pr);
+
+                // Delete the source branch after a successful merge
+                await deleteBranch(pr);
                 
                 // Post success comment (reuse existing comment if available)
                 const successComment = "## 🎉 Successfully Merged!\n\n" +
@@ -495,5 +498,27 @@ jobs:
                 } catch (error) {
                   console.error(`   ❌ Failed to re-target PR #${dependentPR.number}: ${error.message}`);
                 }
+              }
+            }
+
+            async function deleteBranch(pr) {
+              const branchName = pr.head.ref;
+
+              // Never delete protected branches
+              if (branchName === 'main' || branchName === 'master' || branchName === 'develop') {
+                console.log(`🛡️ Skipping deletion of protected branch '${branchName}'`);
+                return;
+              }
+
+              try {
+                await github.rest.git.deleteRef({
+                  owner,
+                  repo,
+                  ref: `heads/${branchName}`
+                });
+                console.log(`🗑️ Deleted branch '${branchName}' after merge`);
+              } catch (error) {
+                // Branch deletion is best-effort — do not fail the merge over it
+                console.warn(`⚠️ Could not delete branch '${branchName}': ${error.message}`);
               }
             }
