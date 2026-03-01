@@ -3,6 +3,7 @@ import {
   HeadToHeadRecord,
   LeagueAnalytics,
   MatchupResult,
+  MatchupWinProbability,
   PowerRanking,
   TeamStats,
   TeamTrend,
@@ -430,6 +431,67 @@ export function generateLeagueAnalytics(
     averagePointsPerMatchup,
     highestScoringTeam: teamStats[0] || null,
     lowestScoringTeam: teamStats[teamStats.length - 1] || null,
+  };
+}
+
+/**
+ * Calculate win probability for a head-to-head matchup using Monte Carlo
+ * simulation. Samples each team's final score from a normal distribution
+ * centred on their projected total, then counts outcomes across many runs.
+ *
+ * @param team1ProjectedScore - Team 1's estimated final score
+ * @param team2ProjectedScore - Team 2's estimated final score
+ * @param options.simulationCount - Number of simulations (default 5 000)
+ * @param options.varianceFactor  - Std-dev as a fraction of projected score
+ *                                  (default 0.15 → ±15 %)
+ */
+export function calculateMatchupWinProbability(
+  team1ProjectedScore: number,
+  team2ProjectedScore: number,
+  options: {
+    simulationCount?: number;
+    varianceFactor?: number;
+  } = {},
+): MatchupWinProbability {
+  const { simulationCount = 5000, varianceFactor = 0.15 } = options;
+
+  // Box-Muller transform: sample from N(mean, stdDev)
+  const sampleNormal = (mean: number, stdDev: number): number => {
+    let u = 0;
+    let v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    return Math.max(0, mean + stdDev * z);
+  };
+
+  const team1StdDev = Math.max(1, team1ProjectedScore * varianceFactor);
+  const team2StdDev = Math.max(1, team2ProjectedScore * varianceFactor);
+
+  let team1Wins = 0;
+  let team2Wins = 0;
+  let ties = 0;
+
+  for (let i = 0; i < simulationCount; i++) {
+    const sim1 = sampleNormal(team1ProjectedScore, team1StdDev);
+    const sim2 = sampleNormal(team2ProjectedScore, team2StdDev);
+    const diff = sim1 - sim2;
+    if (Math.abs(diff) < 0.005) {
+      ties += 1;
+    } else if (diff > 0) {
+      team1Wins += 1;
+    } else {
+      team2Wins += 1;
+    }
+  }
+
+  return {
+    team1WinProbability: team1Wins / simulationCount,
+    team2WinProbability: team2Wins / simulationCount,
+    tiesProbability: ties / simulationCount,
+    team1ProjectedScore,
+    team2ProjectedScore,
+    simulationCount,
   };
 }
 

@@ -120,6 +120,21 @@ export interface ExportFormat {
   filename: string;
 }
 
+export interface MatchupWinProbability {
+  /** Win probability for team 1 (0–1) */
+  team1WinProbability: number;
+  /** Win probability for team 2 (0–1) */
+  team2WinProbability: number;
+  /** Probability the matchup ends in a tie (0–1) */
+  tiesProbability: number;
+  /** Projected final score for team 1 */
+  team1ProjectedScore: number;
+  /** Projected final score for team 2 */
+  team2ProjectedScore: number;
+  /** Number of Monte Carlo simulations used */
+  simulationCount: number;
+}
+
 /**
  * Input types for analytics functions
  */

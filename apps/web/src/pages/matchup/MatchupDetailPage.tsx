@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
+import { MatchupWinProbabilityPanel } from '../../features/matchup/MatchupWinProbabilityPanel';
 import { GamesRemaining } from '../../features/matchup/GamesRemaining';
 import { MatchupNavigationControls } from '../../features/matchup/MatchupNavigationControls';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
@@ -161,6 +162,9 @@ export function MatchupDetailPage() {
 
       {/* Scoreboard */}
       <MatchupScoreboard matchup={matchup} gamesRemaining={gamesRemaining} />
+
+      {/* Win Probability & Projections */}
+      <MatchupWinProbabilityPanel matchup={matchup} />
 
       {/* Games Progress */}
       {matchup.gamesPerMatchup && (
