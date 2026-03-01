@@ -28,21 +28,35 @@ Rebasing replays your branch's commits on top of another branch (usually `main`)
 
 ## Quick Reference
 
-| Situation                             | Command                                          |
-| ------------------------------------- | ------------------------------------------------ |
-| Simple rebase onto main               | `git fetch origin ; git rebase origin/main`      |
-| Rebase entire branch tree             | `make rebase-tree`                               |
-| Auto-rebase tree (no prompts)         | `make rebase-tree-auto`                          |
-| Rebase tree skipping commits          | `make rebase-tree-skip SKIP_COMMITS=hash1,hash2` |
-| See conflicted files                  | `git diff --name-only --diff-filter=U`           |
-| Accept **your** version of a file     | `git checkout --ours <file>`                     |
-| Accept **incoming** version of a file | `git checkout --theirs <file>`                   |
-| Mark file as resolved after editing   | `git add <file>`                                 |
-| Continue rebase after resolving       | `git rebase --continue`                          |
-| Skip current commit entirely          | `git rebase --skip`                              |
-| Abort and return to pre-rebase state  | `git rebase --abort`                             |
-| Resolve generated file conflicts      | `.\scripts\resolve-generated-conflicts.ps1`      |
-| Skip duplicate migration commits      | `.\scripts\skip-migration-conflict.ps1`          |
+| Situation                                | Command                                                                                |
+| ---------------------------------------- | -------------------------------------------------------------------------------------- |
+| Simple rebase onto main                  | `git fetch origin ; git rebase origin/main`                                            |
+| Rebase entire branch tree                | `make rebase-tree`                                                                     |
+| Auto-rebase tree (no prompts)            | `make rebase-tree-auto`                                                                |
+| Rebase tree skipping commits             | `make rebase-tree-skip SKIP_COMMITS=hash1,hash2`                                       |
+| See conflicted files                     | `git diff --name-only --diff-filter=U`                                                 |
+| Accept **your** version of a file        | `git checkout --ours <file>`                                                           |
+| Accept **incoming** version of a file    | `git checkout --theirs <file>`                                                         |
+| Mark file as resolved after editing      | `git add <file>`                                                                       |
+| Continue rebase after resolving          | `git rebase --continue`                                                                |
+| Continue rebase (no editor / agent-safe) | `$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue` |
+| Skip current commit entirely             | `git rebase --skip`                                                                    |
+| Abort and return to pre-rebase state     | `git rebase --abort`                                                                   |
+| Resolve generated file conflicts         | `.\scripts\resolve-generated-conflicts.ps1`                                            |
+| Skip duplicate migration commits         | `.\scripts\skip-migration-conflict.ps1`                                                |
+
+---
+
+## ⚠️ Avoid Editor Blocking (Agent / CI Use)
+
+When Git needs to open a text editor during rebase (e.g. to edit a commit message on `--continue`), it will **block indefinitely** in non-interactive environments. Always set these env vars before any rebase operation in automated or agent-driven workflows:
+
+```powershell
+$env:GIT_EDITOR = "true"
+$env:GIT_SEQUENCE_EDITOR = "true"
+```
+
+This makes Git accept the default commit message without opening an editor. The `scripts/rebase-branch-tree.ps1` script already does this automatically.
 
 ---
 
@@ -113,7 +127,8 @@ const MAX_TEAMS = 16;
 ```powershell
 git add <resolved-file>
 # After ALL conflicts in this commit are resolved:
-git rebase --continue
+# Use GIT_EDITOR=true to prevent Git from blocking on a commit-message editor
+$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
 ```
 
 If more commits have conflicts, Git will pause again. Repeat Steps 3–5 for each commit.
@@ -208,7 +223,8 @@ For each conflicted source file, Copilot should:
 #### 2e. Continue Through All Commits
 
 ```powershell
-git rebase --continue
+# Set GIT_EDITOR=true to avoid blocking on commit-message prompts
+$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
 ```
 
 Repeat 2b–2d for each commit that conflicts.
@@ -280,7 +296,7 @@ The lockfile should never be manually merged. Regenerate it:
 # Accept either side first to clear the conflict
 git checkout --theirs pnpm-lock.yaml
 git add pnpm-lock.yaml
-git rebase --continue
+$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
 
 # After rebase completes, regenerate the lockfile
 pnpm install --no-frozen-lockfile
@@ -324,7 +340,7 @@ In the editor, change `pick` to:
 After saving, resolve any conflicts that arise (same process as above), then:
 
 ```powershell
-git rebase --continue
+$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
 ```
 
 ---
@@ -353,7 +369,7 @@ if (Test-Path .git/rebase-merge) {
 
    ```powershell
    git diff --name-only --diff-filter=U   # should be empty
-   git rebase --continue
+   $env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
    ```
 
 2. **Skip this commit** (if it's a duplicate or no longer needed):
@@ -537,7 +553,7 @@ git reset --hard <hash>
 Select-String -Path "*.ts","*.tsx" -Pattern "^(<<<<<<<|=======|>>>>>>>)" -Recurse
 # If found: edit the files to remove markers, then:
 git add <file>
-git rebase --continue
+$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
 ```
 
 ## Related Skills
