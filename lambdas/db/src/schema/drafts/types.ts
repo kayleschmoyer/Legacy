@@ -177,6 +177,12 @@ export const UpdateDraftSettingsInput = builder.inputType(
       draftOrder: t.string({ required: false }), // 'snake' | 'linear'
       playerPool: t.string({ required: false }), // 'all' | 'nl' | 'al'
       pickTimeLimitSeconds: t.int({ required: false }), // seconds per pick (default 120)
+      // Era-based league settings (LS-295)
+      eraFilter: t.string({ required: false }), // 'all' | 'dead_ball' | 'golden_age' | 'expansion' | 'free_agency' | 'steroid_era' | 'modern' | 'custom'
+      hofOnly: t.boolean({ required: false }), // restrict draft board to Hall of Famers only
+      customEraStartYear: t.int({ required: false }), // commissioner-defined era start year
+      customEraEndYear: t.int({ required: false }), // commissioner-defined era end year
+      decadeChallenge: t.boolean({ required: false }), // rotating decade player pool each week
     }),
   },
 );

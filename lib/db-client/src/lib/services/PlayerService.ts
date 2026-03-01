@@ -45,6 +45,26 @@ export interface PlayerFilters {
   minCareerGames?: number;
   /** Minimum distinct MLB seasons in which the player appeared */
   minCareerSeasons?: number;
+  /**
+   * Restrict the pool to players whose careers overlapped with the given
+   * baseball era. 'all' (default) imposes no restriction.
+   *
+   * dead_ball   : seasons before 1920
+   * golden_age  : 1920-1960
+   * expansion   : 1961-1976
+   * free_agency : 1977-1993
+   * steroid_era : 1994-2005
+   * modern      : 2006+
+   * custom      : uses customEraStartYear / customEraEndYear
+   * all         : no restriction
+   */
+  eraFilter?: string;
+  /** Start year for custom era (only used when eraFilter = 'custom') */
+  customEraStartYear?: number | null;
+  /** End year for custom era (only used when eraFilter = 'custom') */
+  customEraEndYear?: number | null;
+  /** When true, only include Hall of Fame inductees */
+  hofOnly?: boolean;
 }
 
 /** Sort options that require a join to career_batting */
@@ -301,6 +321,11 @@ export class PlayerService {
       }
     }
 
+    // Hall of Fame only filter
+    if (filters.hofOnly) {
+      conditions.push(eq(PublicSchema.players.hallOfFame, true));
+    }
+
     return conditions;
   }
 
@@ -430,6 +455,17 @@ export class PlayerService {
           }
         }
 
+        // Hall of Fame only
+        if (queryOptions.filters?.hofOnly) {
+          rawConditions.push(sql`p.hall_of_fame = true`);
+        }
+
+        // Era-based player pool filter
+        const eraCondition = this.buildRawEraFilter(queryOptions.filters);
+        if (eraCondition) {
+          rawConditions.push(eraCondition);
+        }
+
         const whereClause =
           rawConditions.length > 0
             ? sql`WHERE ${sql.join(rawConditions, sql` AND `)}`
@@ -502,6 +538,58 @@ export class PlayerService {
         }));
       },
     );
+  }
+
+  /**
+   * Build a raw SQL era filter condition.
+   *
+   * A player "belongs" to an era when they have played at least one qualifying
+   * batting or pitching season (AL/NL) within the era's year range. This is an
+   * inclusive overlap — a player whose career spans multiple eras will appear in
+   * all applicable era pools.
+   *
+   * Returns null when no era restriction should be applied ('all' or no filter).
+   */
+  private buildRawEraFilter(filters?: PlayerFilters): SQL | null {
+    const eraFilter = filters?.eraFilter;
+    if (!eraFilter || eraFilter === 'all') return null;
+
+    // Map preset era names to year ranges
+    const eraRanges: Record<string, [number, number]> = {
+      dead_ball: [1871, 1919],
+      golden_age: [1920, 1960],
+      expansion: [1961, 1976],
+      free_agency: [1977, 1993],
+      steroid_era: [1994, 2005],
+      modern: [2006, 9999],
+    };
+
+    let startYear: number;
+    let endYear: number;
+
+    if (eraFilter === 'custom') {
+      if (!filters?.customEraStartYear || !filters?.customEraEndYear)
+        return null;
+      startYear = filters.customEraStartYear;
+      endYear = filters.customEraEndYear;
+    } else {
+      const range = eraRanges[eraFilter];
+      if (!range) return null;
+      [startYear, endYear] = range;
+    }
+
+    // Include a player if they have ANY AL/NL batting or pitching season within [startYear, endYear]
+    return sql`p.id IN (
+      SELECT DISTINCT player_id FROM public.season_batting
+      WHERE lg_id IN ('AL', 'NL')
+        AND season >= ${startYear}
+        AND season <= ${endYear}
+      UNION
+      SELECT DISTINCT player_id FROM public.season_pitching
+      WHERE lg_id IN ('AL', 'NL')
+        AND season >= ${startYear}
+        AND season <= ${endYear}
+    )`;
   }
 
   /**

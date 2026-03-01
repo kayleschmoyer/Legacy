@@ -198,6 +198,61 @@ builder.mutationField('makeDraftPick', (t) =>
             );
           }
 
+          // Validate Hall of Fame eligibility (LS-295)
+          if (league.hofOnly && !player.hallOfFame) {
+            throw new Error(
+              'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
+            );
+          }
+
+          // Validate era eligibility (LS-295)
+          if (league.eraFilter && league.eraFilter !== 'all') {
+            const ERA_RANGES: Record<string, [number, number]> = {
+              dead_ball: [1871, 1919],
+              golden_age: [1920, 1960],
+              expansion: [1961, 1976],
+              free_agency: [1977, 1993],
+              steroid_era: [1994, 2005],
+              modern: [2006, 9999],
+            };
+            let eraStart: number | null = null;
+            let eraEnd: number | null = null;
+            if (league.eraFilter === 'custom') {
+              eraStart = league.customEraStartYear ?? null;
+              eraEnd = league.customEraEndYear ?? null;
+            } else {
+              const range = ERA_RANGES[league.eraFilter];
+              if (range) {
+                [eraStart, eraEnd] = range;
+              }
+            }
+            if (eraStart != null && eraEnd != null) {
+              const eraCheckResult = await tx.execute(
+                sql`SELECT 1 FROM (
+                  SELECT player_id FROM season_batting
+                    WHERE player_id = ${playerId}
+                      AND lg_id IN ('AL', 'NL')
+                      AND season >= ${eraStart}
+                      AND season <= ${eraEnd}
+                  UNION
+                  SELECT player_id FROM season_pitching
+                    WHERE player_id = ${playerId}
+                      AND lg_id IN ('AL', 'NL')
+                      AND season >= ${eraStart}
+                      AND season <= ${eraEnd}
+                ) era_check LIMIT 1`,
+              );
+              if (!eraCheckResult.rows[0]) {
+                const eraLabel = league.eraFilter
+                  .replace(/_/g, ' ')
+                  .replace(/\b\w/g, (c: string) => c.toUpperCase());
+                throw new Error(
+                  `Player has no recorded seasons in the ${eraLabel} era and is not eligible for this league.`,
+                );
+              }
+            }
+          }
+
           // Validate player meets minimum career games requirement
           if (
             !(await playerMeetsMinCareerGames(
@@ -709,6 +764,11 @@ builder.mutationField('updateDraftSettings', (t) =>
         draftOrder,
         playerPool,
         pickTimeLimitSeconds,
+        eraFilter,
+        hofOnly,
+        customEraStartYear,
+        customEraEndYear,
+        decadeChallenge,
       } = args.input;
       const userId = context.user.id;
 
@@ -720,6 +780,11 @@ builder.mutationField('updateDraftSettings', (t) =>
             owner: PublicSchema.leagues.owner,
             draftStatus: PublicSchema.leagues.draftStatus,
             playerPool: PublicSchema.leagues.playerPool,
+            eraFilter: PublicSchema.leagues.eraFilter,
+            hofOnly: PublicSchema.leagues.hofOnly,
+            customEraStartYear: PublicSchema.leagues.customEraStartYear,
+            customEraEndYear: PublicSchema.leagues.customEraEndYear,
+            decadeChallenge: PublicSchema.leagues.decadeChallenge,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -772,6 +837,32 @@ builder.mutationField('updateDraftSettings', (t) =>
           );
         }
 
+        const validEraFilters = [
+          'all',
+          'dead_ball',
+          'golden_age',
+          'expansion',
+          'free_agency',
+          'steroid_era',
+          'modern',
+          'custom',
+        ];
+        if (eraFilter && !validEraFilters.includes(eraFilter)) {
+          throw new Error(
+            `Invalid era filter: ${eraFilter}. Must be one of: ${validEraFilters.join(', ')}`,
+          );
+        }
+        if (
+          eraFilter === 'custom' &&
+          customEraStartYear != null &&
+          customEraEndYear != null &&
+          customEraStartYear > customEraEndYear
+        ) {
+          throw new Error(
+            'Custom era start year must be less than or equal to end year',
+          );
+        }
+
         if (
           pickTimeLimitSeconds !== undefined &&
           pickTimeLimitSeconds !== null
@@ -783,15 +874,35 @@ builder.mutationField('updateDraftSettings', (t) =>
           }
         }
 
-        // Update playerPool on the league if provided
+        // Update player-eligibility fields on the league if any provided
         let updatedPlayerPool = league.playerPool;
+        const leagueEligibilityUpdates: Record<string, unknown> = {};
         if (playerPool) {
+          leagueEligibilityUpdates['playerPool'] = playerPool as
+            | 'all'
+            | 'nl'
+            | 'al';
+        }
+        if (eraFilter != null) {
+          leagueEligibilityUpdates['eraFilter'] = eraFilter;
+        }
+        if (hofOnly != null) {
+          leagueEligibilityUpdates['hofOnly'] = hofOnly;
+        }
+        if (decadeChallenge != null) {
+          leagueEligibilityUpdates['decadeChallenge'] = decadeChallenge;
+        }
+        if (customEraStartYear !== undefined) {
+          leagueEligibilityUpdates['customEraStartYear'] = customEraStartYear;
+        }
+        if (customEraEndYear !== undefined) {
+          leagueEligibilityUpdates['customEraEndYear'] = customEraEndYear;
+        }
+        if (Object.keys(leagueEligibilityUpdates).length > 0) {
+          leagueEligibilityUpdates['updatedAt'] = new Date();
           const [updatedLeague] = await context.db
             .update(PublicSchema.leagues)
-            .set({
-              playerPool: playerPool as 'all' | 'nl' | 'al',
-              updatedAt: new Date(),
-            })
+            .set(leagueEligibilityUpdates)
             .where(eq(PublicSchema.leagues.id, leagueId))
             .returning({ playerPool: PublicSchema.leagues.playerPool });
           updatedPlayerPool = updatedLeague.playerPool;
@@ -880,6 +991,13 @@ builder.mutationField('updateDraftSettings', (t) =>
           changedFields.push(`selection → ${selectionMethod}`);
         if (draftOrder) changedFields.push(`order → ${draftOrder}`);
         if (playerPool) changedFields.push(`player pool → ${playerPool}`);
+        if (eraFilter) changedFields.push(`era filter → ${eraFilter}`);
+        if (hofOnly != null)
+          changedFields.push(`HOF only → ${hofOnly ? 'on' : 'off'}`);
+        if (decadeChallenge != null)
+          changedFields.push(
+            `decade challenge → ${decadeChallenge ? 'on' : 'off'}`,
+          );
         if (pickTimeLimitSeconds)
           changedFields.push(`pick timer → ${pickTimeLimitSeconds}s`);
         const changesSummary =
@@ -1253,6 +1371,61 @@ builder.mutationField('commissionerPick', (t) =>
             throw new Error(
               `Player is not in the ${league.playerPool.toUpperCase()} player pool`,
             );
+          }
+
+          // Validate Hall of Fame eligibility (LS-295)
+          if (league.hofOnly && !player.hallOfFame) {
+            throw new Error(
+              'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
+            );
+          }
+
+          // Validate era eligibility (LS-295)
+          if (league.eraFilter && league.eraFilter !== 'all') {
+            const ERA_RANGES: Record<string, [number, number]> = {
+              dead_ball: [1871, 1919],
+              golden_age: [1920, 1960],
+              expansion: [1961, 1976],
+              free_agency: [1977, 1993],
+              steroid_era: [1994, 2005],
+              modern: [2006, 9999],
+            };
+            let eraStart: number | null = null;
+            let eraEnd: number | null = null;
+            if (league.eraFilter === 'custom') {
+              eraStart = league.customEraStartYear ?? null;
+              eraEnd = league.customEraEndYear ?? null;
+            } else {
+              const range = ERA_RANGES[league.eraFilter];
+              if (range) {
+                [eraStart, eraEnd] = range;
+              }
+            }
+            if (eraStart != null && eraEnd != null) {
+              const eraCheckResult = await tx.execute(
+                sql`SELECT 1 FROM (
+                  SELECT player_id FROM season_batting
+                    WHERE player_id = ${playerId}
+                      AND lg_id IN ('AL', 'NL')
+                      AND season >= ${eraStart}
+                      AND season <= ${eraEnd}
+                  UNION
+                  SELECT player_id FROM season_pitching
+                    WHERE player_id = ${playerId}
+                      AND lg_id IN ('AL', 'NL')
+                      AND season >= ${eraStart}
+                      AND season <= ${eraEnd}
+                ) era_check LIMIT 1`,
+              );
+              if (!eraCheckResult.rows[0]) {
+                const eraLabel = league.eraFilter
+                  .replace(/_/g, ' ')
+                  .replace(/\b\w/g, (c: string) => c.toUpperCase());
+                throw new Error(
+                  `Player has no recorded seasons in the ${eraLabel} era and is not eligible for this league.`,
+                );
+              }
+            }
           }
 
           if (

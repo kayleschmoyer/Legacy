@@ -48,6 +48,16 @@ const DEFAULT_TEAM_NAMES = [
   'Team Omicron',
 ];
 
+export type EraFilterValue =
+  | 'all'
+  | 'dead_ball'
+  | 'golden_age'
+  | 'expansion'
+  | 'free_agency'
+  | 'steroid_era'
+  | 'modern'
+  | 'custom';
+
 export interface CreateLeagueOptions {
   name: string;
   ownerId: number;
@@ -57,6 +67,16 @@ export interface CreateLeagueOptions {
   numberOfDivisions?: number;
   schedulingStrategy?: 'round-robin' | 'divisional' | 'random';
   playerPool?: 'all' | 'nl' | 'al';
+  /** Era-based player pool filter. Default 'all' (no restriction). */
+  eraFilter?: EraFilterValue;
+  /** When true, only Hall of Fame inductees appear in the draft pool. */
+  hofOnly?: boolean;
+  /** Start year for a custom era (only used when eraFilter = 'custom'). */
+  customEraStartYear?: number | null;
+  /** End year for a custom era (only used when eraFilter = 'custom'). */
+  customEraEndYear?: number | null;
+  /** When true, the active player pool rotates by decade each matchup week. */
+  decadeChallenge?: boolean;
   draftMode?: DraftMode;
   selectionMethod?: SelectionMethod;
   draftOrder?: DraftOrder;
@@ -80,6 +100,11 @@ export interface CreateLeagueResult {
       | 'completed';
     inviteCode: string;
     playerPool: 'all' | 'nl' | 'al';
+    eraFilter?: EraFilterValue;
+    hofOnly?: boolean;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    decadeChallenge?: boolean;
     waiverType?: 'standard' | 'faab';
     waiverEnabled?: boolean;
     faabBudgetDefault?: number;
@@ -124,6 +149,11 @@ export class LeagueService {
       numberOfDivisions = 2,
       schedulingStrategy = 'divisional',
       playerPool = 'all',
+      eraFilter = 'all',
+      hofOnly = false,
+      customEraStartYear = null,
+      customEraEndYear = null,
+      decadeChallenge = false,
       draftMode = 'live',
       selectionMethod = 'standard',
       draftOrder = 'snake',
@@ -146,6 +176,11 @@ export class LeagueService {
           currentMatchup: null,
           inviteCode,
           playerPool,
+          eraFilter,
+          hofOnly,
+          customEraStartYear,
+          customEraEndYear,
+          decadeChallenge,
           waiverType,
           waiverEnabled,
           faabBudgetDefault,
@@ -161,6 +196,11 @@ export class LeagueService {
           draftStatus: PublicSchema.leagues.draftStatus,
           inviteCode: PublicSchema.leagues.inviteCode,
           playerPool: PublicSchema.leagues.playerPool,
+          eraFilter: PublicSchema.leagues.eraFilter,
+          hofOnly: PublicSchema.leagues.hofOnly,
+          customEraStartYear: PublicSchema.leagues.customEraStartYear,
+          customEraEndYear: PublicSchema.leagues.customEraEndYear,
+          decadeChallenge: PublicSchema.leagues.decadeChallenge,
           waiverType: PublicSchema.leagues.waiverType,
           waiverEnabled: PublicSchema.leagues.waiverEnabled,
           faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,

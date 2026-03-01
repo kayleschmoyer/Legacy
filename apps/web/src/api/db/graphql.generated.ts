@@ -272,9 +272,14 @@ export enum ConsentType {
 }
 
 export type CreateLeagueAndTeamsInput = {
+  customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
+  customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
+  decadeChallenge?: InputMaybe<Scalars['Boolean']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
+  eraFilter?: InputMaybe<Scalars['String']['input']>;
   faabBudgetDefault?: InputMaybe<Scalars['Int']['input']>;
+  hofOnly?: InputMaybe<Scalars['Boolean']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
   leagueName: Scalars['String']['input'];
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
@@ -546,9 +551,14 @@ export type League = {
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   /** The week number of the current matchup (resolved from the matchup record) */
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
+  customEraEndYear?: Maybe<Scalars['Int']['output']>;
+  customEraStartYear?: Maybe<Scalars['Int']['output']>;
+  decadeChallenge?: Maybe<Scalars['Boolean']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
+  eraFilter?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
+  hofOnly?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
@@ -1273,6 +1283,8 @@ export type Player = {
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+  /** The player's primary historical baseball era, derived from the midpoint of their MLB career. Values: Dead Ball Era | Golden Age | Expansion Era | Free Agency Era | Steroid Era | Modern Era */
+  primaryEra?: Maybe<Scalars['String']['output']>;
   /** Fantasy scoring data (only populated when using scoring-based sort) */
   scoring?: Maybe<PlayerScoring>;
   /** Number of distinct MLB seasons the player has batting stats for (AL/NL only) */
@@ -2137,8 +2149,13 @@ export type UpdateCommissionerNoteInput = {
 };
 
 export type UpdateDraftSettingsInput = {
+  customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
+  customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
+  decadeChallenge?: InputMaybe<Scalars['Boolean']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
+  eraFilter?: InputMaybe<Scalars['String']['input']>;
+  hofOnly?: InputMaybe<Scalars['Boolean']['input']>;
   leagueId: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
@@ -4296,6 +4313,7 @@ export type GetPlayersWithStatsQuery = {
     lastName?: string | null;
     brefId?: string | null;
     eligiblePositions?: Array<string> | null;
+    primaryEra?: string | null;
     scoring?: {
       __typename?: 'PlayerScoring';
       battingScore?: number | null;
@@ -9819,6 +9837,7 @@ export const GetPlayersWithStats = gql`
         hallOfFame
         rookieOfTheYear
       }
+      primaryEra
     }
   }
 `;

@@ -9,6 +9,31 @@ export const selectionMethod = pgEnum('selection_method', [
   'random',
 ]);
 export const playerPool = pgEnum('player_pool', ['all', 'nl', 'al']);
+
+/**
+ * Era filter — restricts the available player pool to players whose careers
+ * overlapped with the selected historical baseball era.
+ *
+ * Dead Ball   : pre-1920
+ * Golden Age  : 1920-1960
+ * Expansion   : 1961-1976
+ * Free Agency : 1977-1993
+ * Steroid Era : 1994-2005
+ * Modern      : 2006+
+ * Custom      : commissioner-defined start/end years
+ * All         : no restriction (default)
+ */
+export const eraFilter = pgEnum('era_filter', [
+  'all',
+  'dead_ball',
+  'golden_age',
+  'expansion',
+  'free_agency',
+  'steroid_era',
+  'modern',
+  'custom',
+]);
+
 export const draftStatus = pgEnum('draft_status', [
   'not-started',
   'queued',

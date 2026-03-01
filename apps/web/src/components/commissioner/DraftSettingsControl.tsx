@@ -4,6 +4,7 @@ import { Check, Lock, Settings } from '@tamagui/lucide-icons';
 import {
   DRAFT_MODES,
   DRAFT_ORDERS,
+  ERA_FILTERS,
   PLAYER_POOLS,
   SELECTION_METHODS,
 } from '@legacy-sports/shared-components';
@@ -17,6 +18,10 @@ export interface DraftSettingsControlProps {
   leagueId: number;
   draftStatus: string | null | undefined;
   playerPool: string | null | undefined;
+  /** Current era filter for the league (editable before draft starts). */
+  eraFilter?: string | null | undefined;
+  hofOnly?: boolean | null | undefined;
+  decadeChallenge?: boolean | null | undefined;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
 }
@@ -107,6 +112,9 @@ export function DraftSettingsControl({
   leagueId,
   draftStatus,
   playerPool: leaguePlayerPool,
+  eraFilter,
+  hofOnly,
+  decadeChallenge,
   onSuccess,
   onError,
 }: DraftSettingsControlProps) {
@@ -130,6 +138,9 @@ export function DraftSettingsControl({
   const [selectionMethod, setSelectionMethod] = useState('standard');
   const [draftOrder, setDraftOrder] = useState('snake');
   const [playerPool, setPlayerPool] = useState('all');
+  const [eraFilterLocal, setEraFilterLocal] = useState('all');
+  const [hofOnlyLocal, setHofOnlyLocal] = useState(false);
+  const [decadeChallengeLocal, setDecadeChallengeLocal] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
   // Sync local state from server data
@@ -148,9 +159,29 @@ export function DraftSettingsControl({
     }
   }, [leaguePlayerPool]);
 
+  useEffect(() => {
+    setEraFilterLocal(eraFilter ?? 'all');
+  }, [eraFilter]);
+
+  useEffect(() => {
+    setHofOnlyLocal(hofOnly ?? false);
+  }, [hofOnly]);
+
+  useEffect(() => {
+    setDecadeChallengeLocal(decadeChallenge ?? false);
+  }, [decadeChallenge]);
+
   // Track changes
   const checkChanges = useCallback(
-    (dm: string, sm: string, dor: string, pp: string) => {
+    (
+      dm: string,
+      sm: string,
+      dor: string,
+      pp: string,
+      ef: string,
+      hof: boolean,
+      dc: boolean,
+    ) => {
       const originalDraftMode = String(
         draftData?.getLeagueDraft?.draftMode ?? 'live',
       );
@@ -161,15 +192,21 @@ export function DraftSettingsControl({
         draftData?.getLeagueDraft?.draftOrder ?? 'snake',
       );
       const originalPlayerPool = String(leaguePlayerPool ?? 'all');
+      const originalEraFilter = String(eraFilter ?? 'all');
+      const originalHofOnly = hofOnly ?? false;
+      const originalDecadeChallenge = decadeChallenge ?? false;
 
       setHasChanges(
         dm !== originalDraftMode ||
           sm !== originalSelectionMethod ||
           dor !== originalDraftOrder ||
-          pp !== originalPlayerPool,
+          pp !== originalPlayerPool ||
+          ef !== originalEraFilter ||
+          hof !== originalHofOnly ||
+          dc !== originalDecadeChallenge,
       );
     },
-    [draftData, leaguePlayerPool],
+    [draftData, leaguePlayerPool, eraFilter, hofOnly, decadeChallenge],
   );
 
   const handleDraftModeChange = (value: string) => {
@@ -177,25 +214,104 @@ export function DraftSettingsControl({
     // Automated drafts only support 'random' selection method
     if (value === 'automated') {
       setSelectionMethod('random');
-      checkChanges(value, 'random', draftOrder, playerPool);
+      checkChanges(
+        value,
+        'random',
+        draftOrder,
+        playerPool,
+        eraFilterLocal,
+        hofOnlyLocal,
+        decadeChallengeLocal,
+      );
     } else {
-      checkChanges(value, selectionMethod, draftOrder, playerPool);
+      checkChanges(
+        value,
+        selectionMethod,
+        draftOrder,
+        playerPool,
+        eraFilterLocal,
+        hofOnlyLocal,
+        decadeChallengeLocal,
+      );
     }
   };
 
   const handleSelectionMethodChange = (value: string) => {
     setSelectionMethod(value);
-    checkChanges(draftMode, value, draftOrder, playerPool);
+    checkChanges(
+      draftMode,
+      value,
+      draftOrder,
+      playerPool,
+      eraFilterLocal,
+      hofOnlyLocal,
+      decadeChallengeLocal,
+    );
   };
 
   const handleDraftOrderChange = (value: string) => {
     setDraftOrder(value);
-    checkChanges(draftMode, selectionMethod, value, playerPool);
+    checkChanges(
+      draftMode,
+      selectionMethod,
+      value,
+      playerPool,
+      eraFilterLocal,
+      hofOnlyLocal,
+      decadeChallengeLocal,
+    );
   };
 
   const handlePlayerPoolChange = (value: string) => {
     setPlayerPool(value);
-    checkChanges(draftMode, selectionMethod, draftOrder, value);
+    checkChanges(
+      draftMode,
+      selectionMethod,
+      draftOrder,
+      value,
+      eraFilterLocal,
+      hofOnlyLocal,
+      decadeChallengeLocal,
+    );
+  };
+
+  const handleEraFilterChange = (value: string) => {
+    setEraFilterLocal(value);
+    checkChanges(
+      draftMode,
+      selectionMethod,
+      draftOrder,
+      playerPool,
+      value,
+      hofOnlyLocal,
+      decadeChallengeLocal,
+    );
+  };
+
+  const handleHofOnlyChange = (value: boolean) => {
+    setHofOnlyLocal(value);
+    checkChanges(
+      draftMode,
+      selectionMethod,
+      draftOrder,
+      playerPool,
+      eraFilterLocal,
+      value,
+      decadeChallengeLocal,
+    );
+  };
+
+  const handleDecadeChallengeChange = (value: boolean) => {
+    setDecadeChallengeLocal(value);
+    checkChanges(
+      draftMode,
+      selectionMethod,
+      draftOrder,
+      playerPool,
+      eraFilterLocal,
+      hofOnlyLocal,
+      value,
+    );
   };
 
   const handleSave = async () => {
@@ -208,6 +324,9 @@ export function DraftSettingsControl({
             selectionMethod,
             draftOrder,
             playerPool,
+            eraFilter: eraFilterLocal,
+            hofOnly: hofOnlyLocal,
+            decadeChallenge: decadeChallengeLocal,
           },
         },
         refetchQueries: ['GetLeagueById', 'GetLeagueDraft'],
@@ -240,6 +359,9 @@ export function DraftSettingsControl({
     setSelectionMethod(originalSelectionMethod);
     setDraftOrder(originalDraftOrder);
     setPlayerPool(originalPlayerPool);
+    setEraFilterLocal(eraFilter ?? 'all');
+    setHofOnlyLocal(hofOnly ?? false);
+    setDecadeChallengeLocal(decadeChallenge ?? false);
     setHasChanges(false);
   };
 
@@ -339,6 +461,108 @@ export function DraftSettingsControl({
               onChange={handlePlayerPoolChange}
               disabled={isDraftLocked || saving}
             />
+
+            {/* Era Filter */}
+            <OptionSelector
+              label="Historical Era Filter"
+              description="Restrict the draft pool to players from a specific baseball era. Change before the draft starts."
+              options={ERA_FILTERS}
+              value={eraFilterLocal}
+              onChange={handleEraFilterChange}
+              disabled={isDraftLocked || saving}
+            />
+
+            {/* Hall of Fame Only */}
+            <YStack gap="$2">
+              <YStack gap="$1">
+                <Text fontSize="$3" fontWeight="600" color="$color">
+                  Hall of Fame Only
+                </Text>
+                <Text fontSize="$2" color="$gray10">
+                  When enabled, only Baseball Hall of Fame inductees can be
+                  drafted.
+                </Text>
+              </YStack>
+              <XStack gap="$2">
+                {[
+                  { label: 'Off', value: false },
+                  { label: 'On', value: true },
+                ].map((opt) => {
+                  const isSelected = hofOnlyLocal === opt.value;
+                  return (
+                    <Button
+                      key={String(opt.value)}
+                      size="$3"
+                      theme={isSelected ? 'active' : 'alt2'}
+                      backgroundColor={
+                        isSelected
+                          ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                          : '$gray3'
+                      }
+                      borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                      borderWidth={1}
+                      onPress={() => {
+                        handleHofOnlyChange(opt.value);
+                      }}
+                      disabled={isDraftLocked || saving}
+                    >
+                      <Text
+                        fontWeight={isSelected ? '600' : '400'}
+                        color={isSelected ? '$color' : '$gray10'}
+                      >
+                        {opt.label}
+                      </Text>
+                    </Button>
+                  );
+                })}
+              </XStack>
+            </YStack>
+
+            {/* Decade Challenge */}
+            <YStack gap="$2">
+              <YStack gap="$1">
+                <Text fontSize="$3" fontWeight="600" color="$color">
+                  Decade Challenge
+                </Text>
+                <Text fontSize="$2" color="$gray10">
+                  When enabled, the available player pool rotates to a different
+                  decade each week.
+                </Text>
+              </YStack>
+              <XStack gap="$2">
+                {[
+                  { label: 'Off', value: false },
+                  { label: 'On', value: true },
+                ].map((opt) => {
+                  const isSelected = decadeChallengeLocal === opt.value;
+                  return (
+                    <Button
+                      key={String(opt.value)}
+                      size="$3"
+                      theme={isSelected ? 'active' : 'alt2'}
+                      backgroundColor={
+                        isSelected
+                          ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                          : '$gray3'
+                      }
+                      borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                      borderWidth={1}
+                      onPress={() => {
+                        handleDecadeChallengeChange(opt.value);
+                      }}
+                      disabled={isDraftLocked || saving}
+                    >
+                      <Text
+                        fontWeight={isSelected ? '600' : '400'}
+                        color={isSelected ? '$color' : '$gray10'}
+                      >
+                        {opt.label}
+                      </Text>
+                    </Button>
+                  );
+                })}
+              </XStack>
+            </YStack>
 
             {/* Action buttons */}
             {!isDraftLocked && (

@@ -879,7 +879,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                         });
                       if (a.rookieOfTheYear)
                         chips.push({ label: 'ROY', value: '' });
-                      if (chips.length === 0) return null;
+                      if (chips.length === 0 && !player.primaryEra) return null;
                       return (
                         <XStack flexWrap="wrap" gap="$1" paddingTop="$0.5">
                           {chips.map((chip) => (
@@ -896,6 +896,27 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                               </Text>
                             </AccoladeChip>
                           ))}
+                          {player.primaryEra != null && (
+                            <XStack
+                              backgroundColor="$orange3"
+                              borderColor="$orange7"
+                              borderWidth={1}
+                              borderRadius={4}
+                              paddingHorizontal={4}
+                              paddingVertical={2}
+                              alignItems="center"
+                              gap={3}
+                            >
+                              <Text
+                                fontSize={9}
+                                fontWeight="700"
+                                color="$orange11"
+                                letterSpacing={0.5}
+                              >
+                                {player.primaryEra}
+                              </Text>
+                            </XStack>
+                          )}
                         </XStack>
                       );
                     })()}

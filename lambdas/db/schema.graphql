@@ -280,9 +280,14 @@ enum ConsentType {
 }
 
 input CreateLeagueAndTeamsInput {
+  customEraEndYear: Int
+  customEraStartYear: Int
+  decadeChallenge: Boolean
   draftMode: String
   draftOrder: String
+  eraFilter: String
   faabBudgetDefault: Int
+  hofOnly: Boolean
   isPublic: Boolean
   leagueName: String!
   maxBatters: Int
@@ -555,9 +560,14 @@ type League {
   The week number of the current matchup (resolved from the matchup record)
   """
   currentWeekNumber: Int
+  customEraEndYear: Int
+  customEraStartYear: Int
+  decadeChallenge: Boolean
   draftStatus: String
+  eraFilter: String
   faabBudgetDefault: Int
   gamesPerMatchup: Int
+  hofOnly: Boolean
   id: Int
   inviteCode: String
   lmNotes: String
@@ -1198,6 +1208,11 @@ type Player {
   firstName: String
   id: Int
   lastName: String
+
+  """
+  The player's primary historical baseball era, derived from the midpoint of their MLB career. Values: Dead Ball Era | Golden Age | Expansion Era | Free Agency Era | Steroid Era | Modern Era
+  """
+  primaryEra: String
 
   """
   Fantasy scoring data (only populated when using scoring-based sort)
@@ -1849,8 +1864,13 @@ input UpdateCommissionerNoteInput {
 }
 
 input UpdateDraftSettingsInput {
+  customEraEndYear: Int
+  customEraStartYear: Int
+  decadeChallenge: Boolean
   draftMode: String
   draftOrder: String
+  eraFilter: String
+  hofOnly: Boolean
   leagueId: Int!
   pickTimeLimitSeconds: Int
   playerPool: String

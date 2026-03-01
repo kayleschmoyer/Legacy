@@ -42,6 +42,12 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       draftMode: t.string({ required: false }), // 'live' | 'automated' (optional, defaults to 'live')
       selectionMethod: t.string({ required: false }), // 'standard' | 'auction' | 'random' (optional, defaults to 'standard')
       draftOrder: t.string({ required: false }), // 'snake' | 'linear' (optional, defaults to 'snake')
+      // Era-based league settings (LS-295)
+      eraFilter: t.string({ required: false }), // 'all' | 'dead_ball' | 'golden_age' | 'expansion' | 'free_agency' | 'steroid_era' | 'modern' | 'custom'
+      hofOnly: t.boolean({ required: false }), // restrict draft board to Hall of Famers
+      customEraStartYear: t.int({ required: false }), // commissioner-defined era start
+      customEraEndYear: t.int({ required: false }), // commissioner-defined era end
+      decadeChallenge: t.boolean({ required: false }), // rotating decade player pool
       isPublic: t.boolean({ required: false }),
       maxBatters: t.int({ required: false }),
       maxPitchers: t.int({ required: false }),
@@ -157,6 +163,11 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         waiverEnabled: inputWaiverEnabled,
         waiverType: inputWaiverType,
         faabBudgetDefault: inputFaabBudgetDefault,
+        eraFilter: inputEraFilter,
+        hofOnly: inputHofOnly,
+        customEraStartYear: inputCustomEraStartYear,
+        customEraEndYear: inputCustomEraEndYear,
+        decadeChallenge: inputDecadeChallenge,
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
@@ -177,6 +188,22 @@ builder.mutationField('createLeagueAndTeams', (t) =>
               | null
               | undefined) ?? 'divisional',
           playerPool: playerPool as 'all' | 'nl' | 'al',
+          eraFilter:
+            (inputEraFilter as
+              | 'all'
+              | 'dead_ball'
+              | 'golden_age'
+              | 'expansion'
+              | 'free_agency'
+              | 'steroid_era'
+              | 'modern'
+              | 'custom'
+              | null
+              | undefined) ?? 'all',
+          hofOnly: inputHofOnly ?? false,
+          customEraStartYear: inputCustomEraStartYear ?? null,
+          customEraEndYear: inputCustomEraEndYear ?? null,
+          decadeChallenge: inputDecadeChallenge ?? false,
           draftMode: draftMode as 'live' | 'automated',
           selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',
           draftOrder: draftOrder as 'snake' | 'linear',

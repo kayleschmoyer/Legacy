@@ -83,6 +83,16 @@ export interface League {
   numberOfTeams: number;
   draftDate: Date;
   playerPool: PlayerPool;
+  /** Era-based player pool filter */
+  eraFilter?: EraFilter | string;
+  /** When true, only Hall of Fame inductees are in the draft pool */
+  hofOnly?: boolean;
+  /** Custom commissioner-defined era start year */
+  customEraStartYear?: number | null;
+  /** Custom commissioner-defined era end year */
+  customEraEndYear?: number | null;
+  /** Rotating decade player pool mode */
+  decadeChallenge?: boolean;
   ownerId: string;
   teams?: TeamType[];
 }
@@ -107,6 +117,21 @@ export enum PlayerPool {
   ALL = 'all',
   NL = 'nl',
   AL = 'al',
+}
+
+/**
+ * Era filter enum — matches the `era_filter` PostgreSQL enum.
+ * Controls which historical baseball era the player pool is restricted to.
+ */
+export enum EraFilter {
+  ALL = 'all',
+  DEAD_BALL = 'dead_ball',
+  GOLDEN_AGE = 'golden_age',
+  EXPANSION = 'expansion',
+  FREE_AGENCY = 'free_agency',
+  STEROID_ERA = 'steroid_era',
+  MODERN = 'modern',
+  CUSTOM = 'custom',
 }
 
 export interface DropdownItem {

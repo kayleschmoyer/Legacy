@@ -113,6 +113,72 @@ export const PLAYER_POOLS = Object.freeze([
   { label: 'American League', value: 'al' },
 ]);
 
+/**
+ * Era filter options for league creation.
+ * Maps to the `era_filter` database enum.
+ *
+ * Year ranges:
+ *   Dead Ball   : 1871-1919
+ *   Golden Age  : 1920-1960
+ *   Expansion   : 1961-1976
+ *   Free Agency : 1977-1993
+ *   Steroid Era : 1994-2005
+ *   Modern      : 2006+
+ *   Custom      : commissioner-defined
+ *   All         : no restriction (default)
+ */
+export const ERA_FILTERS = Object.freeze([
+  { label: 'All Eras', value: 'all' },
+  { label: 'Dead Ball Era (pre-1920)', value: 'dead_ball' },
+  { label: 'Golden Age (1920-1960)', value: 'golden_age' },
+  { label: 'Expansion Era (1961-1976)', value: 'expansion' },
+  { label: 'Free Agency Era (1977-1993)', value: 'free_agency' },
+  { label: 'Steroid Era (1994-2005)', value: 'steroid_era' },
+  { label: 'Modern Era (2006+)', value: 'modern' },
+  { label: 'Custom Era', value: 'custom' },
+]);
+
+/** Year boundaries for each pre-defined era */
+export const ERA_YEAR_RANGES: Record<
+  string,
+  { start: number; end: number; label: string }
+> = {
+  dead_ball: { start: 1871, end: 1919, label: 'Dead Ball Era' },
+  golden_age: { start: 1920, end: 1960, label: 'Golden Age' },
+  expansion: { start: 1961, end: 1976, label: 'Expansion Era' },
+  free_agency: { start: 1977, end: 1993, label: 'Free Agency Era' },
+  steroid_era: { start: 1994, end: 2005, label: 'Steroid Era' },
+  modern: { start: 2006, end: 9999, label: 'Modern Era' },
+};
+
+/**
+ * Derive the primary baseball era name from a career midpoint year.
+ *
+ * @param midpointYear - The year at the midpoint of a player's career
+ *   (or any representative year, e.g. peak year)
+ * @returns Human-readable era label, e.g. "Golden Age"
+ */
+export function getEraFromYear(midpointYear: number): string {
+  for (const [, range] of Object.entries(ERA_YEAR_RANGES)) {
+    if (midpointYear >= range.start && midpointYear <= range.end) {
+      return range.label;
+    }
+  }
+  return 'All Eras';
+}
+
+/**
+ * Derive the primary era value (DB enum string) from a career midpoint year.
+ */
+export function getEraValueFromYear(midpointYear: number): string {
+  for (const [key, range] of Object.entries(ERA_YEAR_RANGES)) {
+    if (midpointYear >= range.start && midpointYear <= range.end) {
+      return key;
+    }
+  }
+  return 'all';
+}
+
 export const SORT_DIRECTIONS = ['ASC', 'DESC'] as const;
 export type SortDirection = (typeof SORT_DIRECTIONS)[number];
 

@@ -22,6 +22,12 @@ interface CreateLeagueFormData {
   draftOrder: 'snake' | 'linear';
   maxRosterSize: number;
   draftDate?: Date;
+  // Era-based league settings (LS-295)
+  eraFilter: string;
+  hofOnly: boolean;
+  customEraStartYear?: number;
+  customEraEndYear?: number;
+  decadeChallenge: boolean;
 }
 
 // Team count options
@@ -35,6 +41,18 @@ const PLAYER_POOL_OPTIONS = [
   { label: 'All MLB', value: 'all' },
   { label: 'National League', value: 'nl' },
   { label: 'American League', value: 'al' },
+] as const;
+
+// Era filter options (matches era_filter DB enum)
+const ERA_FILTER_OPTIONS = [
+  { label: 'All Eras', value: 'all' },
+  { label: 'Dead Ball (pre-1920)', value: 'dead_ball' },
+  { label: 'Golden Age (1920-1960)', value: 'golden_age' },
+  { label: 'Expansion (1961-1976)', value: 'expansion' },
+  { label: 'Free Agency (1977-1993)', value: 'free_agency' },
+  { label: 'Steroid Era (1994-2005)', value: 'steroid_era' },
+  { label: 'Modern (2006+)', value: 'modern' },
+  { label: 'Custom Era', value: 'custom' },
 ] as const;
 
 // Draft mode options
@@ -79,6 +97,10 @@ export function LeagueCreatePage(): React.JSX.Element {
     draftOrder: 'snake',
     maxRosterSize: 25,
     draftDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    // Era settings — default to no restriction
+    eraFilter: 'all',
+    hofOnly: false,
+    decadeChallenge: false,
   });
 
   const [createLeagueAndTeams, { loading, error }] =
@@ -191,6 +213,18 @@ export function LeagueCreatePage(): React.JSX.Element {
             isPublic: false,
             tradingEnabled: true,
             waiverEnabled: true,
+            // Era-based settings
+            eraFilter: formData.eraFilter,
+            hofOnly: formData.hofOnly,
+            customEraStartYear:
+              formData.eraFilter === 'custom'
+                ? formData.customEraStartYear
+                : undefined,
+            customEraEndYear:
+              formData.eraFilter === 'custom'
+                ? formData.customEraEndYear
+                : undefined,
+            decadeChallenge: formData.decadeChallenge,
           },
         },
       });
@@ -610,6 +644,203 @@ export function LeagueCreatePage(): React.JSX.Element {
                 </XStack>
                 <Text size="$2" color="$gray10">
                   Which players can be drafted in this league
+                </Text>
+              </YStack>
+
+              {/* Era Filter — Era-Based Leagues (LS-295) */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Historical Era Filter
+                </Text>
+                <Text size="$2" color="$gray10">
+                  Restrict your league's player pool to a specific baseball era
+                  — a unique differentiator no live-stats platform can offer.
+                </Text>
+                <XStack space="$2" flexWrap="wrap">
+                  {ERA_FILTER_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      size="$3"
+                      onPress={() => {
+                        handleInputChange('eraFilter', option.value);
+                      }}
+                      disabled={loading}
+                      backgroundColor={
+                        formData.eraFilter === option.value
+                          ? '$orange8'
+                          : '$color2'
+                      }
+                      borderColor={
+                        formData.eraFilter === option.value
+                          ? '$orange8'
+                          : '$borderColor'
+                      }
+                      borderWidth={formData.eraFilter === option.value ? 2 : 1}
+                      hoverStyle={{
+                        backgroundColor:
+                          formData.eraFilter === option.value
+                            ? '$orange9'
+                            : '$color3',
+                      }}
+                      pressStyle={{ scale: 0.95 }}
+                    >
+                      <Text
+                        color={
+                          formData.eraFilter === option.value
+                            ? '$orange12'
+                            : '$color'
+                        }
+                        fontWeight={
+                          formData.eraFilter === option.value ? '600' : '400'
+                        }
+                        fontSize="$2"
+                      >
+                        {option.label}
+                      </Text>
+                    </Button>
+                  ))}
+                </XStack>
+
+                {/* Custom era year range */}
+                {formData.eraFilter === 'custom' && (
+                  <XStack space="$3" alignItems="center" flexWrap="wrap">
+                    <YStack flex={1} space="$1">
+                      <Text fontSize="$2" color="$gray10">
+                        Start Year
+                      </Text>
+                      <Input
+                        size="$3"
+                        placeholder="e.g. 1940"
+                        value={
+                          formData.customEraStartYear !== undefined
+                            ? String(formData.customEraStartYear)
+                            : ''
+                        }
+                        onChangeText={(text: string) => {
+                          const year = parseInt(text, 10);
+                          handleInputChange(
+                            'customEraStartYear',
+                            isNaN(year) ? '' : year,
+                          );
+                        }}
+                        keyboardType="numeric"
+                        disabled={loading}
+                        borderColor="$orange8"
+                      />
+                    </YStack>
+                    <Text color="$gray10" marginTop="$4">
+                      –
+                    </Text>
+                    <YStack flex={1} space="$1">
+                      <Text fontSize="$2" color="$gray10">
+                        End Year
+                      </Text>
+                      <Input
+                        size="$3"
+                        placeholder="e.g. 1960"
+                        value={
+                          formData.customEraEndYear !== undefined
+                            ? String(formData.customEraEndYear)
+                            : ''
+                        }
+                        onChangeText={(text: string) => {
+                          const year = parseInt(text, 10);
+                          handleInputChange(
+                            'customEraEndYear',
+                            isNaN(year) ? '' : year,
+                          );
+                        }}
+                        keyboardType="numeric"
+                        disabled={loading}
+                        borderColor="$orange8"
+                      />
+                    </YStack>
+                  </XStack>
+                )}
+              </YStack>
+
+              {/* Hall of Fame Only Toggle */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Hall of Fame Draft Mode
+                </Text>
+                <XStack space="$3" alignItems="center">
+                  <Button
+                    size="$3"
+                    onPress={() => {
+                      handleInputChange('hofOnly', !formData.hofOnly);
+                    }}
+                    disabled={loading}
+                    flex={1}
+                    backgroundColor={formData.hofOnly ? '$yellow8' : '$color2'}
+                    borderColor={formData.hofOnly ? '$yellow8' : '$borderColor'}
+                    borderWidth={formData.hofOnly ? 2 : 1}
+                    hoverStyle={{
+                      backgroundColor: formData.hofOnly
+                        ? '$yellow9'
+                        : '$color3',
+                    }}
+                    pressStyle={{ scale: 0.95 }}
+                  >
+                    <Text
+                      color={formData.hofOnly ? '$yellow12' : '$color'}
+                      fontWeight={formData.hofOnly ? '600' : '400'}
+                    >
+                      {formData.hofOnly
+                        ? '🏆 Hall of Famers Only — ON'
+                        : '🏆 Hall of Famers Only — OFF'}
+                    </Text>
+                  </Button>
+                </XStack>
+                <Text size="$2" color="$gray10">
+                  Restrict the draft pool to Baseball Hall of Fame inductees
+                  only. Creates a prestigious, high-stakes draft experience.
+                </Text>
+              </YStack>
+
+              {/* Decade Challenge Mode */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Decade Challenge Mode
+                </Text>
+                <XStack space="$3" alignItems="center">
+                  <Button
+                    size="$3"
+                    onPress={() => {
+                      handleInputChange(
+                        'decadeChallenge',
+                        !formData.decadeChallenge,
+                      );
+                    }}
+                    disabled={loading}
+                    flex={1}
+                    backgroundColor={
+                      formData.decadeChallenge ? '$purple8' : '$color2'
+                    }
+                    borderColor={
+                      formData.decadeChallenge ? '$purple8' : '$borderColor'
+                    }
+                    borderWidth={formData.decadeChallenge ? 2 : 1}
+                    hoverStyle={{
+                      backgroundColor: formData.decadeChallenge
+                        ? '$purple9'
+                        : '$color3',
+                    }}
+                    pressStyle={{ scale: 0.95 }}
+                  >
+                    <Text
+                      color={formData.decadeChallenge ? '$purple12' : '$color'}
+                      fontWeight={formData.decadeChallenge ? '600' : '400'}
+                    >
+                      {formData.decadeChallenge
+                        ? '📅 Decade Challenge — ON'
+                        : '📅 Decade Challenge — OFF'}
+                    </Text>
+                  </Button>
+                </XStack>
+                <Text size="$2" color="$gray10">
+                  Each week, the available player pool rotates to a different
+                  decade. Tests your knowledge across all eras of baseball.
                 </Text>
               </YStack>
 

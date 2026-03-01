@@ -55,6 +55,8 @@ export type {
 
 // Export all shared components and types
 export * from './config/sports';
+// EraFilter enum and other common types
+export { EraFilter } from './types/index';
 
 // Stats components
 export * from './features/stats/StatsTable';

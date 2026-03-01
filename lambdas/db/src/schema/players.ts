@@ -9,6 +9,16 @@ import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
 import { CareerBattingRef, CareerPitchingRef } from './statistics';
 
+/** Map a career midpoint year to a human-readable baseball era label. */
+function getEraFromYear(midpointYear: number): string {
+  if (midpointYear < 1920) return 'Dead Ball Era';
+  if (midpointYear <= 1960) return 'Golden Age';
+  if (midpointYear <= 1976) return 'Expansion Era';
+  if (midpointYear <= 1993) return 'Free Agency Era';
+  if (midpointYear <= 2005) return 'Steroid Era';
+  return 'Modern Era';
+}
+
 // Create a single database service instance to reuse across all resolvers
 const dbService = createDatabaseService(getDbOptions());
 
@@ -243,6 +253,20 @@ PlayerRef.implement({
         };
       },
     }),
+    primaryEra: t.string({
+      description:
+        "The player's primary historical baseball era, derived from the midpoint of their MLB career. " +
+        'Values: Dead Ball Era | Golden Age | Expansion Era | Free Agency Era | Steroid Era | Modern Era',
+      nullable: true,
+      resolve: async (parent, _args, context) => {
+        const yearRange = await context.loaders.careerYearRange.load(parent.id);
+        if (!yearRange) return null;
+        const midpoint = Math.round(
+          (yearRange.minYear + yearRange.maxYear) / 2,
+        );
+        return getEraFromYear(midpoint);
+      },
+    }),
   }),
 });
 
@@ -273,6 +297,10 @@ builder.queryField('players', (t) =>
 
       let minCareerGames: number | undefined;
       let minCareerSeasons: number | undefined;
+      let leagueEraFilter: string | undefined;
+      let leagueHofOnly: boolean | undefined;
+      let leagueCustomEraStartYear: number | undefined;
+      let leagueCustomEraEndYear: number | undefined;
 
       // When a leagueId is provided, fetch the league's career minimums
       if (args.leagueId != null) {
@@ -280,6 +308,10 @@ builder.queryField('players', (t) =>
           .select({
             minCareerGames: PublicSchema.leagues.minCareerGames,
             minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+            eraFilter: PublicSchema.leagues.eraFilter,
+            hofOnly: PublicSchema.leagues.hofOnly,
+            customEraStartYear: PublicSchema.leagues.customEraStartYear,
+            customEraEndYear: PublicSchema.leagues.customEraEndYear,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, args.leagueId))
@@ -288,6 +320,11 @@ builder.queryField('players', (t) =>
         if (leagueSettings) {
           minCareerGames = leagueSettings.minCareerGames ?? 50;
           minCareerSeasons = leagueSettings.minCareerSeasons ?? 3;
+          leagueEraFilter = leagueSettings.eraFilter ?? 'all';
+          leagueHofOnly = leagueSettings.hofOnly ?? false;
+          leagueCustomEraStartYear =
+            leagueSettings.customEraStartYear ?? undefined;
+          leagueCustomEraEndYear = leagueSettings.customEraEndYear ?? undefined;
         }
       }
 
@@ -303,6 +340,10 @@ builder.queryField('players', (t) =>
           fullNameLike: args.search || undefined,
           minCareerGames,
           minCareerSeasons,
+          eraFilter: leagueEraFilter,
+          hofOnly: leagueHofOnly,
+          customEraStartYear: leagueCustomEraStartYear,
+          customEraEndYear: leagueCustomEraEndYear,
         },
       });
     },

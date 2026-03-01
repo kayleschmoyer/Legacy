@@ -74,6 +74,43 @@ export const createBattingSeasonsPlayedLoader = (
   });
 
 /**
+ * DataLoader for player career year range (min/max season year across AL/NL batting).
+ *
+ * Used to compute a player's "primary era" for display on player cards and the
+ * draft board. The primary era is derived from the midpoint of the career window.
+ *
+ * Key: playerId (number)
+ * Returns: { minYear: number; maxYear: number } | null
+ */
+export const createCareerYearRangeLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, { minYear: number; maxYear: number } | null>(
+    async (keys) => {
+      const idList = (keys as number[]).join(',');
+      const result = await db.execute(sql`
+        SELECT player_id, MIN(season)::int AS min_year, MAX(season)::int AS max_year
+        FROM public.season_batting
+        WHERE player_id IN (${sql.raw(idList)})
+          AND lg_id IN ('AL', 'NL')
+        GROUP BY player_id
+      `);
+      const rows = result.rows as {
+        player_id: number;
+        min_year: number;
+        max_year: number;
+      }[];
+      const map = new Map(
+        rows.map((r) => [
+          Number(r.player_id),
+          { minYear: Number(r.min_year), maxYear: Number(r.max_year) },
+        ]),
+      );
+      return (keys as number[]).map((key) => map.get(key) ?? null);
+    },
+  );
+
+/**
  * DataLoader for career fielding stats
  * Key: playerId (number)
  * Returns: career fielding record with positionsPlayed JSON

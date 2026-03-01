@@ -52,6 +52,11 @@ export const League = builder.objectRef<{
     | 'completed';
   inviteCode: string;
   playerPool: 'all' | 'nl' | 'al';
+  eraFilter?: string | null;
+  hofOnly?: boolean | null;
+  customEraStartYear?: number | null;
+  customEraEndYear?: number | null;
+  decadeChallenge?: boolean | null;
   weekAdvanceStatus?: 'idle' | 'queued' | 'processing' | 'success' | 'failed';
   waiverType?: 'standard' | 'faab';
   waiverEnabled?: boolean;
@@ -84,6 +89,11 @@ League.implement({
     draftStatus: t.exposeString('draftStatus'),
     inviteCode: t.exposeString('inviteCode'),
     playerPool: t.exposeString('playerPool'),
+    eraFilter: t.exposeString('eraFilter', { nullable: true }),
+    hofOnly: t.exposeBoolean('hofOnly', { nullable: true }),
+    customEraStartYear: t.exposeInt('customEraStartYear', { nullable: true }),
+    customEraEndYear: t.exposeInt('customEraEndYear', { nullable: true }),
+    decadeChallenge: t.exposeBoolean('decadeChallenge', { nullable: true }),
     weekAdvanceStatus: t.exposeString('weekAdvanceStatus', { nullable: true }),
     waiverType: t.exposeString('waiverType', { nullable: true }),
     waiverEnabled: t.exposeBoolean('waiverEnabled', { nullable: true }),
