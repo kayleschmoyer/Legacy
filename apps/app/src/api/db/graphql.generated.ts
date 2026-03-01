@@ -591,21 +591,18 @@ export type JoinLeaguePayload = {
 /** A fantasy sports league */
 export type League = {
   __typename?: 'League';
+  bannerUrl?: Maybe<Scalars['String']['output']>;
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   /** The week number of the current matchup (resolved from the matchup record) */
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
-  customEraEndYear?: Maybe<Scalars['Int']['output']>;
-  customEraStartYear?: Maybe<Scalars['Int']['output']>;
-  decadeChallenge?: Maybe<Scalars['Boolean']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
-  eraFilter?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
-  hofOnly?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
+  logoUrl?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
   minCareerSeasons?: Maybe<Scalars['Int']['output']>;
@@ -615,7 +612,9 @@ export type League = {
   playoffEnabled?: Maybe<Scalars['Boolean']['output']>;
   playoffFormat?: Maybe<Scalars['String']['output']>;
   playoffMultiWeek?: Maybe<Scalars['Boolean']['output']>;
+  primaryColor?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
+  secondaryColor?: Maybe<Scalars['String']['output']>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
   userMembership?: Maybe<LeagueMember>;
@@ -950,7 +949,10 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updatePlayoffMatchup?: Maybe<PlayoffMatchup>;
+  updateTeamBranding?: Maybe<Team>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
+  /** Update the avatar URL for the currently authenticated user. */
+  updateUserAvatar?: Maybe<User>;
   /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
   updateUserRole?: Maybe<User>;
   /** Create or update a single achievement restriction for a league. Commissioner / General Manager access required. */
@@ -1273,9 +1275,21 @@ export type MutationUpdatePlayoffMatchupArgs = {
   status?: InputMaybe<PlayoffMatchupStatus>;
 };
 
+export type MutationUpdateTeamBrandingArgs = {
+  leagueId: Scalars['Int']['input'];
+  logoUrl?: InputMaybe<Scalars['String']['input']>;
+  primaryColor?: InputMaybe<Scalars['String']['input']>;
+  secondaryColor?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
+};
+
+export type MutationUpdateUserAvatarArgs = {
+  avatarUrl?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationUpdateUserRoleArgs = {
@@ -2205,7 +2219,10 @@ export type Team = {
   id?: Maybe<Scalars['Int']['output']>;
   isLocked?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  logoUrl?: Maybe<Scalars['String']['output']>;
   name?: Maybe<Scalars['String']['output']>;
+  primaryColor?: Maybe<Scalars['String']['output']>;
+  secondaryColor?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   waiverOrder?: Maybe<Scalars['Int']['output']>;
 };
@@ -2348,13 +2365,17 @@ export type UpdateLeagueScoringMultiplierInput = {
 };
 
 export type UpdateLeagueSettingsInput = {
+  bannerUrl?: InputMaybe<Scalars['String']['input']>;
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
+  logoUrl?: InputMaybe<Scalars['String']['input']>;
   minCareerGames?: InputMaybe<Scalars['Int']['input']>;
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
   playoffEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   playoffFormat?: InputMaybe<Scalars['String']['input']>;
   playoffMultiWeek?: InputMaybe<Scalars['Boolean']['input']>;
+  primaryColor?: InputMaybe<Scalars['String']['input']>;
+  secondaryColor?: InputMaybe<Scalars['String']['input']>;
   spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -2371,6 +2392,7 @@ export type UpsertAchievementRestrictionInput = {
 export type User = {
   __typename?: 'User';
   accessLevel?: Maybe<Scalars['String']['output']>;
+  avatarUrl?: Maybe<Scalars['String']['output']>;
   email?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   username?: Maybe<Scalars['String']['output']>;

@@ -81,6 +81,10 @@ export const leagues = pgTable(
     lmNotes: text('lm_notes'),
     // League visibility
     isPublic: boolean('is_public').notNull().default(false),
+    logoUrl: text('logo_url'),
+    bannerUrl: text('banner_url'),
+    primaryColor: varchar('primary_color', { length: 7 }),
+    secondaryColor: varchar('secondary_color', { length: 7 }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -110,6 +114,9 @@ export const teams = pgTable(
     faabBudget: integer('faab_budget'),
     /** Commissioner can lock a team to prevent roster moves */
     isLocked: boolean('is_locked').notNull().default(false),
+    logoUrl: text('logo_url'),
+    primaryColor: varchar('primary_color', { length: 7 }),
+    secondaryColor: varchar('secondary_color', { length: 7 }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -625,7 +632,7 @@ export const leagueAchievementRestrictions = pgTable(
   },
 );
 
-// ── Commissioner Audit Log ─────────────────────────────────────────────────
+// ─── Commissioner Audit Log ─────────────────────────────────────────────────
 
 /**
  * Audit trail for all commissioner actions.

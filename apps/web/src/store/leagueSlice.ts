@@ -27,6 +27,10 @@ interface LeagueState {
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
     playoffMultiWeek?: boolean | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
   } | null;
   positions: LeaguePositionFragment[];
   teamMembers: TeamMemberFragment[];

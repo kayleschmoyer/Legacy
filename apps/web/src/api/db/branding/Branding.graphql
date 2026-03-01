@@ -1,0 +1,41 @@
+mutation UpdateUserAvatar($avatarUrl: String) {
+  updateUserAvatar(avatarUrl: $avatarUrl) {
+    id
+    username
+    avatarUrl
+  }
+}
+
+mutation UpdateTeamBranding(
+  $teamId: Int!
+  $leagueId: Int!
+  $logoUrl: String
+  $primaryColor: String
+  $secondaryColor: String
+) {
+  updateTeamBranding(
+    teamId: $teamId
+    leagueId: $leagueId
+    logoUrl: $logoUrl
+    primaryColor: $primaryColor
+    secondaryColor: $secondaryColor
+  ) {
+    id
+    name
+    leagueId
+    logoUrl
+    primaryColor
+    secondaryColor
+  }
+}
+
+mutation UpdateLeagueBranding($input: UpdateLeagueSettingsInput!) {
+  updateLeagueSettings(input: $input) {
+    id
+    name
+    logoUrl
+    bannerUrl
+    primaryColor
+    secondaryColor
+  }
+}

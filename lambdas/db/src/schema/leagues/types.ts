@@ -52,11 +52,6 @@ export const League = builder.objectRef<{
     | 'completed';
   inviteCode: string;
   playerPool: 'all' | 'nl' | 'al';
-  eraFilter?: string | null;
-  hofOnly?: boolean | null;
-  customEraStartYear?: number | null;
-  customEraEndYear?: number | null;
-  decadeChallenge?: boolean | null;
   weekAdvanceStatus?: 'idle' | 'queued' | 'processing' | 'success' | 'failed';
   waiverType?: 'standard' | 'faab';
   waiverEnabled?: boolean;
@@ -71,6 +66,10 @@ export const League = builder.objectRef<{
   playoffMultiWeek?: boolean;
   lmNotes?: string | null;
   isPublic?: boolean;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -90,11 +89,6 @@ League.implement({
     draftStatus: t.exposeString('draftStatus'),
     inviteCode: t.exposeString('inviteCode'),
     playerPool: t.exposeString('playerPool'),
-    eraFilter: t.exposeString('eraFilter', { nullable: true }),
-    hofOnly: t.exposeBoolean('hofOnly', { nullable: true }),
-    customEraStartYear: t.exposeInt('customEraStartYear', { nullable: true }),
-    customEraEndYear: t.exposeInt('customEraEndYear', { nullable: true }),
-    decadeChallenge: t.exposeBoolean('decadeChallenge', { nullable: true }),
     weekAdvanceStatus: t.exposeString('weekAdvanceStatus', { nullable: true }),
     waiverType: t.exposeString('waiverType', { nullable: true }),
     waiverEnabled: t.exposeBoolean('waiverEnabled', { nullable: true }),
@@ -109,6 +103,10 @@ League.implement({
     playoffMultiWeek: t.exposeBoolean('playoffMultiWeek', { nullable: true }),
     lmNotes: t.exposeString('lmNotes', { nullable: true }),
     isPublic: t.exposeBoolean('isPublic', { nullable: true }),
+    logoUrl: t.exposeString('logoUrl', { nullable: true }),
+    bannerUrl: t.exposeString('bannerUrl', { nullable: true }),
+    primaryColor: t.exposeString('primaryColor', { nullable: true }),
+    secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,
       description:
@@ -143,11 +141,8 @@ League.implement({
   }),
 });
 
-// Team type — isLocked is optional in the parent since legacy resolvers use
-// explicit column selections that may omit it; the field resolver defaults to false.
-export const Team = builder.objectRef<
-  Omit<DbTeam, 'isLocked'> & { isLocked?: boolean | null }
->('Team');
+// Team type
+export const Team = builder.objectRef<DbTeam>('Team');
 
 Team.implement({
   description: 'A team in a league',
@@ -162,6 +157,9 @@ Team.implement({
       resolve: (parent) =>
         (parent as { isLocked?: boolean | null }).isLocked ?? false,
     }),
+    logoUrl: t.exposeString('logoUrl', { nullable: true }),
+    primaryColor: t.exposeString('primaryColor', { nullable: true }),
+    secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
     createdAt: t.string({
       resolve: (team) => team.createdAt.toISOString(),
     }),
@@ -239,9 +237,6 @@ TeamMember.implement({
     }),
   }),
 });
-
-// ── Commissioner Audit Log Type ──────────────────────────────────────────────
-
 export const CommissionerAuditLog = builder.objectRef<{
   id: number;
   leagueId: number;

@@ -54,6 +54,7 @@ export const usersInAppInternal = appInternal.table(
     privacyPolicyAcceptedAt: timestamp('privacy_policy_accepted_at', {
       withTimezone: true,
     }),
+    avatarUrl: text('avatar_url'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

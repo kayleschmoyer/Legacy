@@ -13,6 +13,7 @@ import {
   SURFACE_SUBTLE,
   withAlpha,
 } from '../../constants/colors';
+import { AvatarImage } from '../../components/common';
 
 interface Team {
   id: number;
@@ -20,6 +21,9 @@ interface Team {
   leagueId: number;
   waiverOrder?: number | null;
   faabBudget?: number | null;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
 }
 
 export interface LeagueStandingsProps {
@@ -77,6 +81,9 @@ export function LeagueStandings({
       // No standings data yet — show teams in their original order
       return teams.map((t) => ({
         ...t,
+        logoUrl: t.logoUrl ?? null,
+        primaryColor: t.primaryColor ?? null,
+        secondaryColor: t.secondaryColor ?? null,
         wins: null as number | null,
         losses: null as number | null,
         ties: null as number | null,
@@ -98,6 +105,9 @@ export function LeagueStandings({
         leagueId: team?.leagueId ?? leagueId,
         waiverOrder: team?.waiverOrder ?? null,
         faabBudget: team?.faabBudget ?? null,
+        logoUrl: team?.logoUrl ?? null,
+        primaryColor: team?.primaryColor ?? null,
+        secondaryColor: team?.secondaryColor ?? null,
         wins: s.wins ?? null,
         losses: s.losses ?? null,
         ties: s.ties ?? null,
@@ -114,6 +124,9 @@ export function LeagueStandings({
           ...team,
           waiverOrder: team.waiverOrder ?? null,
           faabBudget: team.faabBudget ?? null,
+          logoUrl: team.logoUrl ?? null,
+          primaryColor: team.primaryColor ?? null,
+          secondaryColor: team.secondaryColor ?? null,
           wins: null,
           losses: null,
           ties: null,
@@ -353,6 +366,12 @@ export function LeagueStandings({
                 {/* Team info */}
                 <YStack flex={2} gap="$0.5">
                   <XStack alignItems="center" gap="$2">
+                    <AvatarImage
+                      url={team.logoUrl}
+                      username={team.name}
+                      size={24}
+                      borderRadius={4}
+                    />
                     <Text
                       fontSize="$3"
                       fontWeight={isUserTeam ? '700' : '500'}

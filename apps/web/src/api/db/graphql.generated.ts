@@ -591,21 +591,18 @@ export type JoinLeaguePayload = {
 /** A fantasy sports league */
 export type League = {
   __typename?: 'League';
+  bannerUrl?: Maybe<Scalars['String']['output']>;
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   /** The week number of the current matchup (resolved from the matchup record) */
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
-  customEraEndYear?: Maybe<Scalars['Int']['output']>;
-  customEraStartYear?: Maybe<Scalars['Int']['output']>;
-  decadeChallenge?: Maybe<Scalars['Boolean']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
-  eraFilter?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
-  hofOnly?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
+  logoUrl?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
   minCareerSeasons?: Maybe<Scalars['Int']['output']>;
@@ -615,7 +612,9 @@ export type League = {
   playoffEnabled?: Maybe<Scalars['Boolean']['output']>;
   playoffFormat?: Maybe<Scalars['String']['output']>;
   playoffMultiWeek?: Maybe<Scalars['Boolean']['output']>;
+  primaryColor?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
+  secondaryColor?: Maybe<Scalars['String']['output']>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
   userMembership?: Maybe<LeagueMember>;
@@ -950,7 +949,10 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updatePlayoffMatchup?: Maybe<PlayoffMatchup>;
+  updateTeamBranding?: Maybe<Team>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
+  /** Update the avatar URL for the currently authenticated user. */
+  updateUserAvatar?: Maybe<User>;
   /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
   updateUserRole?: Maybe<User>;
   /** Create or update a single achievement restriction for a league. Commissioner / General Manager access required. */
@@ -1273,9 +1275,21 @@ export type MutationUpdatePlayoffMatchupArgs = {
   status?: InputMaybe<PlayoffMatchupStatus>;
 };
 
+export type MutationUpdateTeamBrandingArgs = {
+  leagueId: Scalars['Int']['input'];
+  logoUrl?: InputMaybe<Scalars['String']['input']>;
+  primaryColor?: InputMaybe<Scalars['String']['input']>;
+  secondaryColor?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
 export type MutationUpdateTeamMemberPositionArgs = {
   positionId?: InputMaybe<Scalars['Int']['input']>;
   teamMemberId: Scalars['Int']['input'];
+};
+
+export type MutationUpdateUserAvatarArgs = {
+  avatarUrl?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationUpdateUserRoleArgs = {
@@ -2205,7 +2219,10 @@ export type Team = {
   id?: Maybe<Scalars['Int']['output']>;
   isLocked?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  logoUrl?: Maybe<Scalars['String']['output']>;
   name?: Maybe<Scalars['String']['output']>;
+  primaryColor?: Maybe<Scalars['String']['output']>;
+  secondaryColor?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   waiverOrder?: Maybe<Scalars['Int']['output']>;
 };
@@ -2348,13 +2365,17 @@ export type UpdateLeagueScoringMultiplierInput = {
 };
 
 export type UpdateLeagueSettingsInput = {
+  bannerUrl?: InputMaybe<Scalars['String']['input']>;
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
+  logoUrl?: InputMaybe<Scalars['String']['input']>;
   minCareerGames?: InputMaybe<Scalars['Int']['input']>;
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
   playoffEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   playoffFormat?: InputMaybe<Scalars['String']['input']>;
   playoffMultiWeek?: InputMaybe<Scalars['Boolean']['input']>;
+  primaryColor?: InputMaybe<Scalars['String']['input']>;
+  secondaryColor?: InputMaybe<Scalars['String']['input']>;
   spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -2371,6 +2392,7 @@ export type UpsertAchievementRestrictionInput = {
 export type User = {
   __typename?: 'User';
   accessLevel?: Maybe<Scalars['String']['output']>;
+  avatarUrl?: Maybe<Scalars['String']['output']>;
   email?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   username?: Maybe<Scalars['String']['output']>;
@@ -2513,6 +2535,58 @@ export type DeleteAchievementRestrictionMutationVariables = Exact<{
 export type DeleteAchievementRestrictionMutation = {
   __typename?: 'Mutation';
   deleteAchievementRestriction?: boolean | null;
+};
+
+export type UpdateUserAvatarMutationVariables = Exact<{
+  avatarUrl?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type UpdateUserAvatarMutation = {
+  __typename?: 'Mutation';
+  updateUserAvatar?: {
+    __typename?: 'User';
+    id?: number | null;
+    username?: string | null;
+    avatarUrl?: string | null;
+  } | null;
+};
+
+export type UpdateTeamBrandingMutationVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
+  logoUrl?: InputMaybe<Scalars['String']['input']>;
+  primaryColor?: InputMaybe<Scalars['String']['input']>;
+  secondaryColor?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type UpdateTeamBrandingMutation = {
+  __typename?: 'Mutation';
+  updateTeamBranding?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+    leagueId?: number | null;
+    logoUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+  } | null;
+};
+
+export type UpdateLeagueBrandingMutationVariables = Exact<{
+  input: UpdateLeagueSettingsInput;
+}>;
+
+export type UpdateLeagueBrandingMutation = {
+  __typename?: 'Mutation';
+  updateLeagueSettings?: {
+    __typename?: 'League';
+    id?: number | null;
+    name?: string | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+  } | null;
 };
 
 export type CommissionerActionResultFragment = {
@@ -2695,7 +2769,11 @@ export type GetLeagueChatMessagesQuery = {
     messageType?: string | null;
     gifUrl?: string | null;
     metadata?: string | null;
-    sender?: { __typename?: 'User'; username?: string | null } | null;
+    sender?: {
+      __typename?: 'User';
+      username?: string | null;
+      avatarUrl?: string | null;
+    } | null;
   }> | null;
 };
 
@@ -2716,7 +2794,11 @@ export type SendLeagueChatMessageMutation = {
     messageType?: string | null;
     gifUrl?: string | null;
     metadata?: string | null;
-    sender?: { __typename?: 'User'; username?: string | null } | null;
+    sender?: {
+      __typename?: 'User';
+      username?: string | null;
+      avatarUrl?: string | null;
+    } | null;
   } | null;
 };
 
@@ -2780,6 +2862,10 @@ export type LeagueFragment = {
   playoffMultiWeek?: boolean | null;
   lmNotes?: string | null;
   isPublic?: boolean | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -2835,6 +2921,10 @@ export type GetLeagueByIdQuery = {
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
     isPublic?: boolean | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2878,6 +2968,10 @@ export type CreateLeagueAndTeamsMutation = {
       playoffMultiWeek?: boolean | null;
       lmNotes?: string | null;
       isPublic?: boolean | null;
+      logoUrl?: string | null;
+      bannerUrl?: string | null;
+      primaryColor?: string | null;
+      secondaryColor?: string | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -2918,6 +3012,10 @@ export type GetUserLeaguesQuery = {
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
     isPublic?: boolean | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2990,6 +3088,10 @@ export type StartDraftMutation = {
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
     isPublic?: boolean | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3067,7 +3169,9 @@ export type GetLeagueTeamsQuery = {
     leagueId?: number | null;
     waiverOrder?: number | null;
     faabBudget?: number | null;
-    isLocked?: boolean | null;
+    logoUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
   }> | null;
 };
 
@@ -3157,6 +3261,10 @@ export type UpdateLeagueSettingsMutation = {
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
     isPublic?: boolean | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -5486,6 +5594,7 @@ export type UserFragment = {
   email?: string | null;
   username?: string | null;
   accessLevel?: string | null;
+  avatarUrl?: string | null;
 };
 
 export type AdminUserFragment = {
@@ -5508,6 +5617,7 @@ export type GetUserByIdQuery = {
     email?: string | null;
     username?: string | null;
     accessLevel?: string | null;
+    avatarUrl?: string | null;
   } | null;
 };
 
@@ -5524,6 +5634,7 @@ export type GetAllUsersQuery = {
     email?: string | null;
     username?: string | null;
     accessLevel?: string | null;
+    avatarUrl?: string | null;
   }> | null;
 };
 
@@ -5540,6 +5651,7 @@ export type UpdateUserRoleMutation = {
     email?: string | null;
     username?: string | null;
     accessLevel?: string | null;
+    avatarUrl?: string | null;
   } | null;
 };
 
@@ -5636,6 +5748,10 @@ export const LeagueFragmentDoc = gql`
     playoffMultiWeek
     lmNotes
     isPublic
+    logoUrl
+    bannerUrl
+    primaryColor
+    secondaryColor
     userMembership {
       ...LeagueMember
     }
@@ -6004,6 +6120,7 @@ export const UserFragmentDoc = gql`
     email
     username
     accessLevel
+    avatarUrl
   }
 `;
 export const AdminUserFragmentDoc = gql`
@@ -6212,6 +6329,184 @@ export type DeleteAchievementRestrictionMutationResult =
 export type DeleteAchievementRestrictionMutationOptions = BaseMutationOptions<
   DeleteAchievementRestrictionMutation,
   DeleteAchievementRestrictionMutationVariables
+>;
+export const UpdateUserAvatar = gql`
+  mutation UpdateUserAvatar($avatarUrl: String) {
+    updateUserAvatar(avatarUrl: $avatarUrl) {
+      id
+      username
+      avatarUrl
+    }
+  }
+`;
+export type UpdateUserAvatarMutationFn = MutationFunction<
+  UpdateUserAvatarMutation,
+  UpdateUserAvatarMutationVariables
+>;
+
+/**
+ * __useUpdateUserAvatarMutation__
+ *
+ * To run a mutation, you first call `useUpdateUserAvatarMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateUserAvatarMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateUserAvatarMutation, { data, loading, error }] = useUpdateUserAvatarMutation({
+ *   variables: {
+ *      avatarUrl: // value for 'avatarUrl'
+ *   },
+ * });
+ */
+export function useUpdateUserAvatarMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateUserAvatarMutation,
+    UpdateUserAvatarMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateUserAvatarMutation,
+    UpdateUserAvatarMutationVariables
+  >(UpdateUserAvatar, options);
+}
+export type UpdateUserAvatarMutationHookResult = ReturnType<
+  typeof useUpdateUserAvatarMutation
+>;
+export type UpdateUserAvatarMutationResult =
+  Apollo.MutationResult<UpdateUserAvatarMutation>;
+export type UpdateUserAvatarMutationOptions = BaseMutationOptions<
+  UpdateUserAvatarMutation,
+  UpdateUserAvatarMutationVariables
+>;
+export const UpdateTeamBranding = gql`
+  mutation UpdateTeamBranding(
+    $teamId: Int!
+    $leagueId: Int!
+    $logoUrl: String
+    $primaryColor: String
+    $secondaryColor: String
+  ) {
+    updateTeamBranding(
+      teamId: $teamId
+      leagueId: $leagueId
+      logoUrl: $logoUrl
+      primaryColor: $primaryColor
+      secondaryColor: $secondaryColor
+    ) {
+      id
+      name
+      leagueId
+      logoUrl
+      primaryColor
+      secondaryColor
+    }
+  }
+`;
+export type UpdateTeamBrandingMutationFn = MutationFunction<
+  UpdateTeamBrandingMutation,
+  UpdateTeamBrandingMutationVariables
+>;
+
+/**
+ * __useUpdateTeamBrandingMutation__
+ *
+ * To run a mutation, you first call `useUpdateTeamBrandingMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateTeamBrandingMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateTeamBrandingMutation, { data, loading, error }] = useUpdateTeamBrandingMutation({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *      leagueId: // value for 'leagueId'
+ *      logoUrl: // value for 'logoUrl'
+ *      primaryColor: // value for 'primaryColor'
+ *      secondaryColor: // value for 'secondaryColor'
+ *   },
+ * });
+ */
+export function useUpdateTeamBrandingMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateTeamBrandingMutation,
+    UpdateTeamBrandingMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateTeamBrandingMutation,
+    UpdateTeamBrandingMutationVariables
+  >(UpdateTeamBranding, options);
+}
+export type UpdateTeamBrandingMutationHookResult = ReturnType<
+  typeof useUpdateTeamBrandingMutation
+>;
+export type UpdateTeamBrandingMutationResult =
+  Apollo.MutationResult<UpdateTeamBrandingMutation>;
+export type UpdateTeamBrandingMutationOptions = BaseMutationOptions<
+  UpdateTeamBrandingMutation,
+  UpdateTeamBrandingMutationVariables
+>;
+export const UpdateLeagueBranding = gql`
+  mutation UpdateLeagueBranding($input: UpdateLeagueSettingsInput!) {
+    updateLeagueSettings(input: $input) {
+      id
+      name
+      logoUrl
+      bannerUrl
+      primaryColor
+      secondaryColor
+    }
+  }
+`;
+export type UpdateLeagueBrandingMutationFn = MutationFunction<
+  UpdateLeagueBrandingMutation,
+  UpdateLeagueBrandingMutationVariables
+>;
+
+/**
+ * __useUpdateLeagueBrandingMutation__
+ *
+ * To run a mutation, you first call `useUpdateLeagueBrandingMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateLeagueBrandingMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateLeagueBrandingMutation, { data, loading, error }] = useUpdateLeagueBrandingMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateLeagueBrandingMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateLeagueBrandingMutation,
+    UpdateLeagueBrandingMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateLeagueBrandingMutation,
+    UpdateLeagueBrandingMutationVariables
+  >(UpdateLeagueBranding, options);
+}
+export type UpdateLeagueBrandingMutationHookResult = ReturnType<
+  typeof useUpdateLeagueBrandingMutation
+>;
+export type UpdateLeagueBrandingMutationResult =
+  Apollo.MutationResult<UpdateLeagueBrandingMutation>;
+export type UpdateLeagueBrandingMutationOptions = BaseMutationOptions<
+  UpdateLeagueBrandingMutation,
+  UpdateLeagueBrandingMutationVariables
 >;
 export const GetCommissionerAuditLogs = gql`
   query GetCommissionerAuditLogs($leagueId: Int!, $limit: Int) {
@@ -6784,6 +7079,7 @@ export const GetLeagueChatMessages = gql`
       metadata
       sender {
         username
+        avatarUrl
       }
     }
   }
@@ -6892,6 +7188,7 @@ export const SendLeagueChatMessage = gql`
       metadata
       sender {
         username
+        avatarUrl
       }
     }
   }
@@ -7790,7 +8087,9 @@ export const GetLeagueTeams = gql`
       leagueId
       waiverOrder
       faabBudget
-      isLocked
+      logoUrl
+      primaryColor
+      secondaryColor
     }
   }
 `;

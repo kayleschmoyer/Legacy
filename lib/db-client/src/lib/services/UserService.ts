@@ -189,6 +189,24 @@ export class UserService {
   }
 
   /**
+   * Update a user's avatar URL in the internal schema.
+   * Returns the updated user record from the public view, or null if not found.
+   */
+  async updateUserAvatar(
+    userId: number,
+    avatarUrl: string | null,
+  ): Promise<User | null> {
+    await runWithInternalClient(this.options, async (db) => {
+      await db
+        .update(InternalSchema.usersInAppInternal)
+        .set({ avatarUrl })
+        .where(eq(InternalSchema.usersInAppInternal.id, userId));
+    });
+
+    return this.getUserById(userId);
+  }
+
+  /**
    * Build WHERE conditions from user filters
    */
   private buildUserFilters(filters: UserFilters): SQL[] {

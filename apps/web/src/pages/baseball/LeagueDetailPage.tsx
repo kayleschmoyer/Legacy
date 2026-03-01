@@ -12,7 +12,16 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { Card, H1, Separator, Spinner, styled, Text } from 'tamagui';
+import {
+  Card,
+  H1,
+  Input,
+  Label,
+  Separator,
+  Spinner,
+  styled,
+  Text,
+} from 'tamagui';
 import {
   ArrowLeftRight,
   Check,
@@ -65,6 +74,7 @@ import {
   useJoinPublicLeagueMutation,
   useRenameTeamMutation,
   useSwapTeamMemberPositionsMutation,
+  useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
 } from '../../api/db/graphql.generated';
 import {
@@ -90,6 +100,7 @@ import {
   mapPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
+import { AvatarPicker } from '../../components/common';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
@@ -726,6 +737,10 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
 
   const [renameTeamMutation, { loading: renaming }] = useRenameTeamMutation();
+  const [updateTeamBranding, { loading: teamBrandingLoading }] =
+    useUpdateTeamBrandingMutation();
+  const [teamPrimaryColor, setTeamPrimaryColor] = useState('');
+  const [teamSecondaryColor, setTeamSecondaryColor] = useState('');
 
   const {
     settings: scoringSettings,
@@ -2015,6 +2030,149 @@ export function LeagueDetailPage(): React.JSX.Element {
                 </XStack>
               )}
             </YStack>
+          </YStack>
+        </Card>
+
+        {/* ── Team Branding ── */}
+        <Card
+          bordered
+          padding="$4"
+          borderRadius="$5"
+          gap="$4"
+          backgroundColor="$surface2"
+        >
+          <YStack gap="$1">
+            <Text fontSize="$5" fontWeight="700" color={BRAND_GOLD_LIGHT}>
+              Team Branding
+            </Text>
+            <Text fontSize="$2" color="$gray10">
+              Set a logo and team colors that appear in standings and matchups.
+            </Text>
+          </YStack>
+
+          <Separator />
+
+          {/* Logo */}
+          <YStack gap="$2">
+            <Text fontSize="$3" fontWeight="600">
+              Team Logo
+            </Text>
+            <AvatarPicker
+              variant="team"
+              currentUrl={
+                leagueTeamsData?.leagueTeams?.find((t) => t.id === userTeamId)
+                  ?.logoUrl ?? null
+              }
+              username={leagueTeams.find((t) => t.id === userTeamId)?.name}
+              onSelect={(url) => {
+                if (!userTeamId) return;
+                void updateTeamBranding({
+                  variables: { teamId: userTeamId, leagueId, logoUrl: url },
+                });
+              }}
+              loading={teamBrandingLoading}
+            />
+          </YStack>
+
+          <Separator />
+
+          {/* Colors */}
+          <YStack gap="$3">
+            <Text fontSize="$3" fontWeight="600">
+              Team Colors
+            </Text>
+            <XStack gap="$4" flexWrap="wrap">
+              <YStack gap="$1" flex={1} minWidth={160}>
+                <Label
+                  htmlFor="team-primary-color"
+                  fontSize="$2"
+                  fontWeight="600"
+                >
+                  Primary Color
+                </Label>
+                <XStack gap="$2" alignItems="center">
+                  <YStack
+                    width={32}
+                    height={32}
+                    borderRadius="$2"
+                    borderWidth={1}
+                    borderColor="$gray6"
+                    backgroundColor={
+                      /^#[0-9a-fA-F]{6}$/.test(teamPrimaryColor)
+                        ? teamPrimaryColor
+                        : '$gray4'
+                    }
+                    flexShrink={0}
+                  />
+                  <Input
+                    id="team-primary-color"
+                    flex={1}
+                    placeholder="#1A2B3C"
+                    value={teamPrimaryColor}
+                    onChangeText={setTeamPrimaryColor}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={7}
+                  />
+                </XStack>
+              </YStack>
+              <YStack gap="$1" flex={1} minWidth={160}>
+                <Label
+                  htmlFor="team-secondary-color"
+                  fontSize="$2"
+                  fontWeight="600"
+                >
+                  Secondary Color
+                </Label>
+                <XStack gap="$2" alignItems="center">
+                  <YStack
+                    width={32}
+                    height={32}
+                    borderRadius="$2"
+                    borderWidth={1}
+                    borderColor="$gray6"
+                    backgroundColor={
+                      /^#[0-9a-fA-F]{6}$/.test(teamSecondaryColor)
+                        ? teamSecondaryColor
+                        : '$gray4'
+                    }
+                    flexShrink={0}
+                  />
+                  <Input
+                    id="team-secondary-color"
+                    flex={1}
+                    placeholder="#FFFFFF"
+                    value={teamSecondaryColor}
+                    onChangeText={setTeamSecondaryColor}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={7}
+                  />
+                </XStack>
+              </YStack>
+            </XStack>
+            <Button
+              size="$3"
+              backgroundColor={BRAND_NAVY_LIGHT}
+              color={WHITE}
+              borderRadius="$3"
+              alignSelf="flex-start"
+              disabled={teamBrandingLoading}
+              opacity={teamBrandingLoading ? 0.6 : 1}
+              onPress={() => {
+                if (!userTeamId) return;
+                void updateTeamBranding({
+                  variables: {
+                    teamId: userTeamId,
+                    leagueId,
+                    primaryColor: teamPrimaryColor || null,
+                    secondaryColor: teamSecondaryColor || null,
+                  },
+                });
+              }}
+            >
+              {teamBrandingLoading ? 'Saving…' : 'Save Colors'}
+            </Button>
           </YStack>
         </Card>
       </YStack>

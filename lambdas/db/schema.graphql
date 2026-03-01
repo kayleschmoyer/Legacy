@@ -631,24 +631,21 @@ type JoinLeaguePayload {
 A fantasy sports league
 """
 type League {
+  bannerUrl: String
   currentMatchup: Int
 
   """
   The week number of the current matchup (resolved from the matchup record)
   """
   currentWeekNumber: Int
-  customEraEndYear: Int
-  customEraStartYear: Int
-  decadeChallenge: Boolean
   draftStatus: String
-  eraFilter: String
   faabBudgetDefault: Int
   gamesPerMatchup: Int
-  hofOnly: Boolean
   id: Int
   inviteCode: String
   isPublic: Boolean
   lmNotes: String
+  logoUrl: String
   maxRosterSize: Int
   minCareerGames: Int
   minCareerSeasons: Int
@@ -658,7 +655,9 @@ type League {
   playoffEnabled: Boolean
   playoffFormat: String
   playoffMultiWeek: Boolean
+  primaryColor: String
   scoringProfile: ScoringConfig
+  secondaryColor: String
   spStartsPerMatchup: Int
   totalMatchups: Int
   userMembership: LeagueMember
@@ -1210,7 +1209,19 @@ type Mutation {
     matchupId: Int!
     status: PlayoffMatchupStatus
   ): PlayoffMatchup
+  updateTeamBranding(
+    leagueId: Int!
+    logoUrl: String
+    primaryColor: String
+    secondaryColor: String
+    teamId: Int!
+  ): Team
   updateTeamMemberPosition(positionId: Int, teamMemberId: Int!): TeamMember
+
+  """
+  Update the avatar URL for the currently authenticated user.
+  """
+  updateUserAvatar(avatarUrl: String): User
 
   """
   Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them.
@@ -1955,7 +1966,10 @@ type Team {
   id: Int
   isLocked: Boolean
   leagueId: Int
+  logoUrl: String
   name: String
+  primaryColor: String
+  secondaryColor: String
   updatedAt: String
   waiverOrder: Int
 }
@@ -2107,13 +2121,17 @@ input UpdateLeagueScoringMultiplierInput {
 }
 
 input UpdateLeagueSettingsInput {
+  bannerUrl: String
   gamesPerMatchup: Int
   leagueId: Int!
+  logoUrl: String
   minCareerGames: Int
   minCareerSeasons: Int
   playoffEnabled: Boolean
   playoffFormat: String
   playoffMultiWeek: Boolean
+  primaryColor: String
+  secondaryColor: String
   spStartsPerMatchup: Int
   totalMatchups: Int
 }
@@ -2129,6 +2147,7 @@ input UpsertAchievementRestrictionInput {
 
 type User {
   accessLevel: String
+  avatarUrl: String
   email: String
   id: Int
   username: String

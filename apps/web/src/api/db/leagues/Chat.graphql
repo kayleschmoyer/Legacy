@@ -9,6 +9,7 @@ query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {
     metadata
     sender {
       username
+      avatarUrl
     }
   }
 }
@@ -32,6 +33,7 @@ mutation SendLeagueChatMessage(
     metadata
     sender {
       username
+      avatarUrl
     }
   }
 }

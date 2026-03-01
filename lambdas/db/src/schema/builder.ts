@@ -38,6 +38,7 @@ export const builder = new SchemaBuilder<{
       email?: string | null;
       username?: string | null;
       accessLevel?: string | null;
+      avatarUrl?: string | null;
     };
     ImpersonateUserResult: {
       token: string;

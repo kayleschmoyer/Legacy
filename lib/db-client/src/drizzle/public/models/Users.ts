@@ -25,8 +25,10 @@ export const users = pgView('users', {
   email: varchar('email', { length: 100 }),
   username: varchar('username', { length: 50 }),
   accessLevel: accessLevel('access_level'),
+  avatarUrl: text('avatar_url'),
 }).as(sql`SELECT id,
        email,
        username,
-       access_level::character varying::access_level AS access_level
+       access_level::character varying::access_level AS access_level,
+       avatar_url
 FROM app_internal.users`);

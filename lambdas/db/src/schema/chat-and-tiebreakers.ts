@@ -450,6 +450,10 @@ builder.objectType(TiebreakerHistory, {
             updatedAt: PublicSchema.teams.updatedAt,
             waiverOrder: PublicSchema.teams.waiverOrder,
             faabBudget: PublicSchema.teams.faabBudget,
+            logoUrl: PublicSchema.teams.logoUrl,
+            primaryColor: PublicSchema.teams.primaryColor,
+            secondaryColor: PublicSchema.teams.secondaryColor,
+            isLocked: PublicSchema.teams.isLocked,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.id, history.winnerId))

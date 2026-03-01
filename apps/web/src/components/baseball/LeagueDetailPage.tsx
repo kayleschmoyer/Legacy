@@ -51,6 +51,7 @@ import { NextStepControl } from '../commissioner/NextStepControl';
 import { DeleteLeagueControl } from '../commissioner/DeleteLeagueControl';
 import { DraftSettingsControl } from '../commissioner/DraftSettingsControl';
 import { LeagueSettingsControl } from '../commissioner/LeagueSettingsControl';
+import { LeagueBrandingControl } from '../commissioner/LeagueBrandingControl';
 import { AchievementRestrictionsControl } from '../commissioner/AchievementRestrictionsControl';
 import { CommissionerToolsControl } from '../commissioner/CommissionerToolsControl';
 import { useCurrentMatchup } from '../../hooks/useMatchup';
@@ -1178,6 +1179,22 @@ export function LeagueDetailPage(): React.JSX.Element {
         leagueId={leagueId}
         draftStatus={league.draftStatus}
         playerPool={league.playerPool}
+        onSuccess={(message) => {
+          setMatchupSuccessMessage(message);
+          setTimeout(() => setMatchupSuccessMessage(null), 5000);
+        }}
+        onError={(err) => {
+          setMatchupErrorMessage(err.message);
+        }}
+      />
+
+      <LeagueBrandingControl
+        leagueId={leagueId}
+        leagueName={league.name}
+        currentLogoUrl={league.logoUrl}
+        currentBannerUrl={league.bannerUrl}
+        currentPrimaryColor={league.primaryColor}
+        currentSecondaryColor={league.secondaryColor}
         onSuccess={(message) => {
           setMatchupSuccessMessage(message);
           setTimeout(() => setMatchupSuccessMessage(null), 5000);

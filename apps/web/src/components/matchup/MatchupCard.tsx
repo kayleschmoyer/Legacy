@@ -11,6 +11,7 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
+import { AvatarImage } from '../common';
 
 export interface MatchupCardProps {
   matchup: MatchupFragment | null | undefined;
@@ -81,6 +82,20 @@ export function MatchupCard({
       'Team 2'
     );
   }, [matchup?.team2Id, teamsData]);
+
+  const team1Logo = useMemo(
+    () =>
+      teamsData?.leagueTeams?.find((t) => t.id === matchup?.team1Id)?.logoUrl ??
+      null,
+    [matchup?.team1Id, teamsData],
+  );
+
+  const team2Logo = useMemo(
+    () =>
+      teamsData?.leagueTeams?.find((t) => t.id === matchup?.team2Id)?.logoUrl ??
+      null,
+    [matchup?.team2Id, teamsData],
+  );
 
   if (!matchup) {
     return null;
@@ -165,6 +180,12 @@ export function MatchupCard({
         <XStack justifyContent="space-between" alignItems="center">
           <XStack alignItems="center" gap="$2" flex={1}>
             {team1Wins && <StatusDot backgroundColor="$green9" />}
+            <AvatarImage
+              url={team1Logo}
+              username={team1Name}
+              size={24}
+              borderRadius={3}
+            />
             <Text
               fontSize="$4"
               fontWeight={team1Wins ? '700' : '500'}
@@ -186,6 +207,12 @@ export function MatchupCard({
         <XStack justifyContent="space-between" alignItems="center">
           <XStack alignItems="center" gap="$2" flex={1}>
             {team2Wins && <StatusDot backgroundColor="$green9" />}
+            <AvatarImage
+              url={team2Logo}
+              username={team2Name}
+              size={24}
+              borderRadius={3}
+            />
             <Text
               fontSize="$4"
               fontWeight={team2Wins ? '700' : '500'}

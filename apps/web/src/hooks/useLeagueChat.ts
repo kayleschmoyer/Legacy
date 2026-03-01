@@ -19,6 +19,8 @@ export interface ChatMessage {
   id: number;
   userId: number | null;
   username: string;
+  /** Avatar URL for the sender (null when unknown or not set). */
+  avatarUrl: string | null;
   messageText: string;
   gifUrl: string | null;
   createdAt: string;
@@ -78,6 +80,7 @@ export function useLeagueChat(leagueId: number): {
         username:
           msg.sender?.username ??
           (msg.userId != null ? `user_${msg.userId}` : 'System'),
+        avatarUrl: msg.sender?.avatarUrl ?? null,
         messageText: msg.messageText ?? '',
         gifUrl: msg.gifUrl ?? null,
         createdAt: msg.timestamp ?? '',
@@ -142,6 +145,7 @@ export function useLeagueChat(leagueId: number): {
             username:
               raw.sender?.username ??
               (raw.userId != null ? `user_${raw.userId}` : 'System'),
+            avatarUrl: raw.sender?.avatarUrl ?? null,
             messageText: raw.messageText ?? '',
             gifUrl: raw.gifUrl ?? null,
             createdAt: raw.timestamp ?? '',
@@ -199,6 +203,7 @@ export function useLeagueChat(leagueId: number): {
             id: numericId,
             userId: n.senderId != null ? Number(n.senderId) : null,
             username: n.senderUsername,
+            avatarUrl: null, // WS events don't carry avatar URLs
             messageText: n.messageText,
             gifUrl: n.gifUrl ?? null,
             createdAt: n.timestamp,

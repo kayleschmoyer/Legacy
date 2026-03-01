@@ -14,6 +14,7 @@ const UserRef = builder.objectRef<{
   email?: string | null;
   username?: string | null;
   accessLevel?: string | null;
+  avatarUrl?: string | null;
 }>('User');
 
 UserRef.implement({
@@ -22,6 +23,7 @@ UserRef.implement({
     email: t.exposeString('email', { nullable: true }),
     username: t.exposeString('username', { nullable: true }),
     accessLevel: t.exposeString('accessLevel', { nullable: true }),
+    avatarUrl: t.exposeString('avatarUrl', { nullable: true }),
   }),
 });
 
@@ -57,6 +59,7 @@ builder.queryField('users', (t) =>
         email: u.email,
         username: u.username,
         accessLevel: u.accessLevel,
+        avatarUrl: u.avatarUrl ?? null,
       }));
     },
   }),
@@ -81,6 +84,7 @@ builder.queryField('user', (t) =>
         email: user.email,
         username: user.username,
         accessLevel: user.accessLevel,
+        avatarUrl: user.avatarUrl ?? null,
       };
     },
   }),
@@ -111,6 +115,7 @@ builder.queryField('userByEmail', (t) =>
         email: foundUser.email,
         username: foundUser.username,
         accessLevel: foundUser.accessLevel,
+        avatarUrl: foundUser.avatarUrl ?? null,
       };
     },
   }),
@@ -139,6 +144,7 @@ builder.queryField('searchUsers', (t) =>
         email: user.email,
         username: user.username,
         accessLevel: user.accessLevel,
+        avatarUrl: user.avatarUrl ?? null,
       }));
     },
   }),
@@ -174,6 +180,43 @@ builder.mutationField('updateUserRole', (t) =>
         email: updated.email,
         username: updated.username,
         accessLevel: updated.accessLevel,
+        avatarUrl: updated.avatarUrl ?? null,
+      };
+    },
+  }),
+);
+
+builder.mutationField('updateUserAvatar', (t) =>
+  t.field({
+    type: UserRef,
+    nullable: true,
+    description: 'Update the avatar URL for the currently authenticated user.',
+    args: {
+      avatarUrl: t.arg.string({ required: false }),
+    },
+    resolve: async (parent, { avatarUrl }, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const url = avatarUrl ?? null;
+      if (url !== null && url.length > 2048) {
+        throw new Error('Avatar URL cannot exceed 2048 characters');
+      }
+
+      const updated = await dbService.users.updateUserAvatar(
+        context.user.id,
+        url,
+      );
+
+      if (!updated) return null;
+
+      return {
+        id: Number(updated.id),
+        email: updated.email,
+        username: updated.username,
+        accessLevel: updated.accessLevel,
+        avatarUrl: updated.avatarUrl ?? null,
       };
     },
   }),

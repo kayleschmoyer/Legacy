@@ -102,7 +102,8 @@ CreateLeagueAndTeamsPayload.implement({
     teams: t.field({
       type: [Team],
       nullable: true,
-      resolve: (parent) => parent.teams || [],
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+      resolve: (parent) => (parent.teams || []) as any,
     }),
     leagueMembers: t.field({
       type: [LeagueMember],
@@ -189,6 +190,15 @@ builder.mutationField('createLeagueAndTeams', (t) =>
               | null
               | undefined) ?? 'divisional',
           playerPool: playerPool as 'all' | 'nl' | 'al',
+          draftMode: draftMode as 'live' | 'automated',
+          selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',
+          draftOrder: draftOrder as 'snake' | 'linear',
+          waiverType:
+            inputWaiverType === 'faab'
+              ? ('faab' as const)
+              : ('standard' as const),
+          waiverEnabled: inputWaiverEnabled ?? true,
+          faabBudgetDefault: inputFaabBudgetDefault ?? 100,
           eraFilter:
             (inputEraFilter as
               | 'all'
@@ -205,15 +215,6 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           customEraStartYear: inputCustomEraStartYear ?? null,
           customEraEndYear: inputCustomEraEndYear ?? null,
           decadeChallenge: inputDecadeChallenge ?? false,
-          draftMode: draftMode as 'live' | 'automated',
-          selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',
-          draftOrder: draftOrder as 'snake' | 'linear',
-          waiverType:
-            inputWaiverType === 'faab'
-              ? ('faab' as const)
-              : ('standard' as const),
-          waiverEnabled: inputWaiverEnabled ?? true,
-          faabBudgetDefault: inputFaabBudgetDefault ?? 100,
           isPublic: inputIsPublic ?? false,
         });
 
@@ -490,6 +491,10 @@ builder.mutationField('joinLeagueByCode', (t) =>
             faabBudget: PublicSchema.teams.faabBudget,
             createdAt: PublicSchema.teams.createdAt,
             updatedAt: PublicSchema.teams.updatedAt,
+            logoUrl: PublicSchema.teams.logoUrl,
+            primaryColor: PublicSchema.teams.primaryColor,
+            secondaryColor: PublicSchema.teams.secondaryColor,
+            isLocked: PublicSchema.teams.isLocked,
           })
           .from(PublicSchema.teams)
           .leftJoin(
@@ -526,6 +531,9 @@ builder.mutationField('joinLeagueByCode', (t) =>
             updatedAt: PublicSchema.teams.updatedAt,
             waiverOrder: PublicSchema.teams.waiverOrder,
             faabBudget: PublicSchema.teams.faabBudget,
+            logoUrl: PublicSchema.teams.logoUrl,
+            primaryColor: PublicSchema.teams.primaryColor,
+            secondaryColor: PublicSchema.teams.secondaryColor,
             isLocked: PublicSchema.teams.isLocked,
           });
 
@@ -876,6 +884,10 @@ const UpdateLeagueSettingsInput = builder.inputType(
       playoffEnabled: t.boolean({ required: false }),
       playoffFormat: t.string({ required: false }),
       playoffMultiWeek: t.boolean({ required: false }),
+      logoUrl: t.string({ required: false }),
+      bannerUrl: t.string({ required: false }),
+      primaryColor: t.string({ required: false }),
+      secondaryColor: t.string({ required: false }),
     }),
   },
 );
@@ -904,6 +916,10 @@ builder.mutationField('updateLeagueSettings', (t) =>
         playoffEnabled,
         playoffFormat,
         playoffMultiWeek,
+        logoUrl,
+        bannerUrl,
+        primaryColor,
+        secondaryColor,
       } = args.input;
       const userId = context.user.id;
 
@@ -940,6 +956,10 @@ builder.mutationField('updateLeagueSettings', (t) =>
         playoffEnabled?: boolean;
         playoffFormat?: string;
         playoffMultiWeek?: boolean;
+        logoUrl?: string | null;
+        bannerUrl?: string | null;
+        primaryColor?: string | null;
+        secondaryColor?: string | null;
       } = {};
 
       if (spStartsPerMatchup !== null && spStartsPerMatchup !== undefined) {
@@ -1119,6 +1139,33 @@ builder.mutationField('updateLeagueSettings', (t) =>
         );
       }
 
+      // Branding fields — set directly (no description logged for silent updates)
+      if (logoUrl !== undefined) {
+        leagueUpdate.logoUrl = logoUrl ?? null;
+      }
+      if (bannerUrl !== undefined) {
+        leagueUpdate.bannerUrl = bannerUrl ?? null;
+      }
+      if (primaryColor !== undefined) {
+        if (primaryColor !== null && !/^#[0-9A-Fa-f]{6}$/.test(primaryColor)) {
+          throw new Error(
+            'primaryColor must be a valid hex color (e.g. #FF0000)',
+          );
+        }
+        leagueUpdate.primaryColor = primaryColor ?? null;
+      }
+      if (secondaryColor !== undefined) {
+        if (
+          secondaryColor !== null &&
+          !/^#[0-9A-Fa-f]{6}$/.test(secondaryColor)
+        ) {
+          throw new Error(
+            'secondaryColor must be a valid hex color (e.g. #FF0000)',
+          );
+        }
+        leagueUpdate.secondaryColor = secondaryColor ?? null;
+      }
+
       if (Object.keys(leagueUpdate).length === 0) {
         // No changes — just return the current league
         const [league] = await context.db
@@ -1190,36 +1237,39 @@ builder.mutationField('updateLeagueSettings', (t) =>
         });
       }
 
-      // 3. Send league chat notification
+      // 3. Send league chat notification (only for non-branding setting changes)
       const senderUsername = context.user.username ?? `user_${context.user.id}`;
       const changeSummary = changeDescriptions.join(', ');
-      const notificationText = `⚙️ ${senderUsername} updated league settings: ${changeSummary}`;
 
-      const [chatMsg] = await context.db
-        .insert(PublicSchema.leagueMessages)
-        .values({
-          leagueId,
-          userId,
-          messageText: notificationText,
-        })
-        .returning();
+      if (changeSummary) {
+        const notificationText = `⚙️ ${senderUsername} updated league settings: ${changeSummary}`;
 
-      const notificationService = createNotificationService();
-      if (notificationService) {
-        try {
-          await notificationService.notifyLeagueChatMessage(leagueId, {
+        const [chatMsg] = await context.db
+          .insert(PublicSchema.leagueMessages)
+          .values({
             leagueId,
-            messageId: chatMsg.id,
-            senderId: userId,
-            senderUsername,
+            userId,
             messageText: notificationText,
-            timestamp: chatMsg.timestamp ?? new Date().toISOString(),
-          });
-        } catch (err: unknown) {
-          LOGGER.warn(
-            'Failed to send league chat WS notification for settings update',
-            { err },
-          );
+          })
+          .returning();
+
+        const notificationService = createNotificationService();
+        if (notificationService) {
+          try {
+            await notificationService.notifyLeagueChatMessage(leagueId, {
+              leagueId,
+              messageId: chatMsg.id,
+              senderId: userId,
+              senderUsername,
+              messageText: notificationText,
+              timestamp: chatMsg.timestamp ?? new Date().toISOString(),
+            });
+          } catch (err: unknown) {
+            LOGGER.warn(
+              'Failed to send league chat WS notification for settings update',
+              { err },
+            );
+          }
         }
       }
 

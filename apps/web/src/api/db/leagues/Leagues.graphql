@@ -22,6 +22,10 @@ fragment League on League {
   playoffMultiWeek
   lmNotes
   isPublic
+  logoUrl
+  bannerUrl
+  primaryColor
+  secondaryColor
   userMembership {
     ...LeagueMember
   }
@@ -135,7 +139,9 @@ query GetLeagueTeams($leagueId: Int!) {
     leagueId
     waiverOrder
     faabBudget
-    isLocked
+    logoUrl
+    primaryColor
+    secondaryColor
   }
 }
 

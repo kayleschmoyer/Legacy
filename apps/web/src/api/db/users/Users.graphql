@@ -3,6 +3,7 @@ fragment User on User {
   email
   username
   accessLevel
+  avatarUrl
 }
 
 fragment AdminUser on User {

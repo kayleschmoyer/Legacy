@@ -5,6 +5,7 @@ import { SystemMessageCard } from './SystemMessageCard';
 import { GifPicker } from './GifPicker';
 import { useLeagueChat } from '../../hooks/useLeagueChat';
 import { BRAND_NAVY_LIGHT, GRAY_50 } from '../../constants/colors';
+import { AvatarImage } from '../../components/common';
 
 // ---------------------------------------------------------------------------
 // Styled helpers
@@ -161,14 +162,16 @@ export function LeagueChatTab({
                 paddingHorizontal="$4"
               >
                 {!isMe && (
-                  <Text
-                    fontSize="$2"
-                    color="$textMuted"
-                    fontWeight="600"
-                    marginBottom="$1"
-                  >
-                    {msg.username}
-                  </Text>
+                  <XStack gap="$2" alignItems="center" marginBottom="$1">
+                    <AvatarImage
+                      url={msg.avatarUrl}
+                      username={msg.username}
+                      size={20}
+                    />
+                    <Text fontSize="$2" color="$textMuted" fontWeight="600">
+                      {msg.username}
+                    </Text>
+                  </XStack>
                 )}
                 {msg.messageType === 'gif' && msg.gifUrl ? (
                   <YStack

@@ -10,6 +10,11 @@ import {
 import { ScrollView, styled } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import {
+  useGetUserByIdQuery,
+  useUpdateUserAvatarMutation,
+} from '../../api/db/graphql.generated';
+import { AvatarPicker } from '../../components/common';
+import {
   BG_DARK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -197,11 +202,26 @@ const ProfileSettingsPage: React.FC = () => {
   const auth = useAuth();
   const user = auth?.user;
   const [imageError, setImageError] = useState(false);
-
   const userName = user?.username ?? '';
   const userEmail = user?.email ?? '';
   const userImage = user?.picture ?? null;
   const accessLevel = user?.accessLevel ?? 'none';
+
+  const { data: userData, refetch: refetchUser } = useGetUserByIdQuery({
+    variables: { id: user?.id ?? 0 },
+    skip: !user?.id,
+  });
+  const [updateUserAvatar, { loading: avatarLoading }] =
+    useUpdateUserAvatarMutation();
+
+  const currentAvatarUrl = userData?.user?.avatarUrl ?? null;
+
+  const handleAvatarSelect = (url: string | null) => {
+    void updateUserAvatar({
+      variables: { avatarUrl: url },
+      onCompleted: () => void refetchUser(),
+    });
+  };
 
   if (!user) {
     return null;
@@ -364,6 +384,42 @@ const ProfileSettingsPage: React.FC = () => {
                   settings.
                 </Paragraph>
               </InfoBanner>
+            </SectionBody>
+          </SectionCard>
+
+          {/* ── App Avatar ── */}
+          <SectionCard
+            style={{
+              background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.25)} 100%)`,
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+            }}
+          >
+            <SectionHeader>
+              <SectionIconBox>
+                <Paragraph fontSize={16} lineHeight={18}>
+                  <span role="img" aria-label="avatar">
+                    🏅
+                  </span>
+                </Paragraph>
+              </SectionIconBox>
+              <YStack flex={1}>
+                <Paragraph size="$4" color="$color" fontWeight="600">
+                  App Avatar
+                </Paragraph>
+                <Paragraph size="$2" color="$colorPress">
+                  Choose a custom avatar displayed in chat and league views
+                </Paragraph>
+              </YStack>
+            </SectionHeader>
+            <SectionBody>
+              <AvatarPicker
+                variant="user"
+                currentUrl={currentAvatarUrl}
+                username={userName}
+                onSelect={handleAvatarSelect}
+                loading={avatarLoading}
+              />
             </SectionBody>
           </SectionCard>
 

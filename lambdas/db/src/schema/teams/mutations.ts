@@ -237,6 +237,9 @@ builder.mutationField('renameTeam', (t) =>
           faabBudget: PublicSchema.teams.faabBudget,
           createdAt: PublicSchema.teams.createdAt,
           updatedAt: PublicSchema.teams.updatedAt,
+          logoUrl: PublicSchema.teams.logoUrl,
+          primaryColor: PublicSchema.teams.primaryColor,
+          secondaryColor: PublicSchema.teams.secondaryColor,
           isLocked: PublicSchema.teams.isLocked,
         });
 
@@ -621,6 +624,114 @@ builder.mutationField('removeAssistantManager', (t) =>
       }
 
       return true;
+    },
+  }),
+);
+
+// Mutation: updateTeamBranding — set a team's logo URL and brand colors
+builder.mutationField('updateTeamBranding', (t) =>
+  t.field({
+    type: Team,
+    args: {
+      teamId: t.arg.int({ required: true }),
+      leagueId: t.arg.int({ required: true }),
+      logoUrl: t.arg.string({ required: false }),
+      primaryColor: t.arg.string({ required: false }),
+      secondaryColor: t.arg.string({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { teamId, leagueId, logoUrl, primaryColor, secondaryColor } = args;
+      const userId = context.user.id;
+      const db = context.db;
+
+      // Validate hex colors
+      const hexPattern = /^#[0-9A-Fa-f]{6}$/;
+      if (
+        primaryColor !== null &&
+        primaryColor !== undefined &&
+        !hexPattern.test(primaryColor)
+      ) {
+        throw new Error(
+          'primaryColor must be a valid hex color (e.g. #FF0000)',
+        );
+      }
+      if (
+        secondaryColor !== null &&
+        secondaryColor !== undefined &&
+        !hexPattern.test(secondaryColor)
+      ) {
+        throw new Error(
+          'secondaryColor must be a valid hex color (e.g. #FF0000)',
+        );
+      }
+
+      // Verify user is a member of this league and owns the team OR is commissioner
+      const membership = await db
+        .select({
+          teamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw new Error('Not a member of this league');
+      }
+
+      const mem = membership[0];
+      const isCommish = mem.permissionLevel === 'commissioner';
+      const ownsTeam = mem.teamId === teamId;
+
+      if (!isCommish && !ownsTeam) {
+        throw new Error('You can only update branding for your own team');
+      }
+
+      const updates: {
+        logoUrl?: string | null;
+        primaryColor?: string | null;
+        secondaryColor?: string | null;
+      } = {};
+
+      if (logoUrl !== undefined) updates.logoUrl = logoUrl ?? null;
+      if (primaryColor !== undefined)
+        updates.primaryColor = primaryColor ?? null;
+      if (secondaryColor !== undefined)
+        updates.secondaryColor = secondaryColor ?? null;
+
+      if (Object.keys(updates).length === 0) {
+        // Nothing to update — just return the current team
+        const [team] = await db
+          .select()
+          .from(PublicSchema.teams)
+          .where(eq(PublicSchema.teams.id, teamId))
+          .limit(1);
+        if (!team) throw new Error('Team not found');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+        return team as any;
+      }
+
+      const [updated] = await db
+        .update(PublicSchema.teams)
+        .set(updates)
+        .where(eq(PublicSchema.teams.id, teamId))
+        .returning();
+
+      if (!updated) throw new Error('Team not found');
+
+      LOGGER.info('Team branding updated', { teamId, leagueId, userId });
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+      return updated as any;
     },
   }),
 );
