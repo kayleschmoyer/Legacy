@@ -36,7 +36,14 @@ export function WebHomeScreen(): React.JSX.Element {
 
   return (
     <ScrollView flex={1}>
-      <YStack padding="$6" space="$6" maxWidth={1200} alignSelf="center">
+      <YStack
+        padding="$6"
+        $sm={{ padding: '$3', gap: '$4' }}
+        space="$6"
+        maxWidth={1200}
+        alignSelf="center"
+        width="100%"
+      >
         {/* Header */}
         <YStack alignItems="center" space="$3">
           <H1 size="$10" color="$color" textAlign="center">
@@ -61,7 +68,7 @@ export function WebHomeScreen(): React.JSX.Element {
               size="$5"
               onPress={() => handleQuickAction('draft')}
               flex={1}
-              minWidth={200}
+              minWidth={150}
             >
               <span role="img" aria-label="lightning">
                 ⚡
@@ -73,7 +80,7 @@ export function WebHomeScreen(): React.JSX.Element {
               size="$5"
               onPress={() => handleQuickAction('teams')}
               flex={1}
-              minWidth={200}
+              minWidth={150}
             >
               <span role="img" aria-label="people">
                 👥
@@ -85,7 +92,7 @@ export function WebHomeScreen(): React.JSX.Element {
               size="$5"
               onPress={() => navigate('/players/stats')}
               flex={1}
-              minWidth={200}
+              minWidth={150}
             >
               <span role="img" aria-label="chart">
                 📊
@@ -107,7 +114,7 @@ export function WebHomeScreen(): React.JSX.Element {
               size="$4"
               bordered
               flex={1}
-              minWidth={250}
+              minWidth={160}
               backgroundColor="$color2"
               borderColor="$borderColor"
               hoverStyle={{ backgroundColor: '$color3' }}
@@ -136,7 +143,7 @@ export function WebHomeScreen(): React.JSX.Element {
               size="$4"
               bordered
               flex={1}
-              minWidth={250}
+              minWidth={160}
               backgroundColor="$color2"
               borderColor="$borderColor"
               hoverStyle={{ backgroundColor: '$color3' }}
@@ -165,7 +172,7 @@ export function WebHomeScreen(): React.JSX.Element {
               size="$4"
               bordered
               flex={1}
-              minWidth={250}
+              minWidth={160}
               backgroundColor="$color2"
               borderColor="$borderColor"
               hoverStyle={{ backgroundColor: '$color3' }}
@@ -198,7 +205,7 @@ export function WebHomeScreen(): React.JSX.Element {
           <XStack space="$4" flexWrap="wrap">
             <YStack
               flex={1}
-              minWidth={200}
+              minWidth={140}
               padding="$4"
               space="$2"
               backgroundColor="$color1"
@@ -221,7 +228,7 @@ export function WebHomeScreen(): React.JSX.Element {
 
             <YStack
               flex={1}
-              minWidth={200}
+              minWidth={140}
               padding="$4"
               space="$2"
               backgroundColor="$color1"
@@ -244,7 +251,7 @@ export function WebHomeScreen(): React.JSX.Element {
 
             <YStack
               flex={1}
-              minWidth={200}
+              minWidth={140}
               padding="$4"
               space="$2"
               backgroundColor="$color1"

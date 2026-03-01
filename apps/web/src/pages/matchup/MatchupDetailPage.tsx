@@ -122,6 +122,7 @@ export function MatchupDetailPage() {
       maxWidth={1200}
       alignSelf="center"
       padding="$4"
+      $sm={{ padding: '$2' }}
       space="$4"
     >
       <PageMeta
@@ -138,6 +139,7 @@ export function MatchupDetailPage() {
         alignItems="center"
         flexWrap="wrap"
         gap="$2"
+        $sm={{ flexDirection: 'column', alignItems: 'flex-start' }}
       >
         <H2>Matchup Details</H2>
         <Button

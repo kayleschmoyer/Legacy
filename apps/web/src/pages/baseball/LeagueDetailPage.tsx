@@ -1270,7 +1270,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       {/* Two-column layout */}
       <XStack gap="$5" flexWrap="wrap" alignItems="flex-start">
         {/* Main column */}
-        <YStack flex={2} minWidth={360} gap="$5">
+        <YStack flex={2} minWidth={260} gap="$5">
           {/* Matchup Preview */}
           {currentMatchup && !matchupLoading && (
             <Card
@@ -1334,7 +1334,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         </YStack>
 
         {/* Sidebar */}
-        <YStack flex={1} minWidth={280} maxWidth={380} gap="$5">
+        <YStack flex={1} minWidth={240} maxWidth={380} gap="$5">
           {/* League Details */}
           <Card
             backgroundColor="$surfacePanel"

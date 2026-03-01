@@ -17,6 +17,10 @@ const Container = styled(YStack, {
   margin: '0 auto',
   padding: '$6',
   gap: '$4',
+  $sm: {
+    padding: '$3',
+    gap: '$3',
+  },
 });
 
 const InfoCard = styled(YStack, {

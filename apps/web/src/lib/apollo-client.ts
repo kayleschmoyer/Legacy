@@ -1,4 +1,9 @@
-import { ApolloClient, createHttpLink, from, InMemoryCache } from '@apollo/client';
+import {
+  ApolloClient,
+  createHttpLink,
+  from,
+  InMemoryCache,
+} from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { env } from '../config/environment';
 
@@ -17,13 +22,13 @@ const httpLink = createHttpLink({
 const authLink = setContext((_, { headers }) => {
   // Get the authentication token from local storage if it exists
   const token = localStorage.getItem('auth_jwt');
-  
+
   // Return the headers to the context so httpLink can read them
   return {
     headers: {
       ...headers,
       ...(token ? { authorization: `Bearer ${token}` } : {}),
-    }
+    },
   };
 });
 

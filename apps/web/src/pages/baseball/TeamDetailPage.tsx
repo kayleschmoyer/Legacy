@@ -74,15 +74,24 @@ export function TeamDetailPage() {
   const teamMembers = membersData.teamMembers;
 
   return (
-    <YStack padding="$4" gap="$4">
+    <YStack
+      padding="$4"
+      $sm={{ padding: '$3' }}
+      gap="$4"
+      maxWidth={900}
+      width="100%"
+      alignSelf="center"
+    >
       <PageMeta
         title={team?.name ? `${team.name} Team` : 'Team Roster'}
         description={`View and manage the ${team?.name ?? 'team'} fantasy baseball roster on Legacy Sports.`}
       />
-      <Button onPress={() => navigate(-1)}>Back</Button>
+      <Button onPress={() => navigate(-1)} alignSelf="flex-start">
+        Back
+      </Button>
 
       <YStack gap="$2">
-        <Text fontSize="$8" fontWeight="bold">
+        <Text fontSize="$8" fontWeight="bold" $sm={{ fontSize: '$6' }}>
           {team?.name || 'Team'}
         </Text>
         {leagueId && <Text fontSize="$4">League ID: {leagueId}</Text>}

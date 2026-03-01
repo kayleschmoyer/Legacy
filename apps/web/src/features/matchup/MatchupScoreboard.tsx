@@ -50,6 +50,12 @@ const TopBar = styled(XStack, {
   backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.12),
   borderBottomWidth: 1,
   borderBottomColor: withAlpha(BRAND_NAVY_LIGHT, 0.35),
+  flexWrap: 'wrap',
+  gap: '$2',
+  $sm: {
+    paddingHorizontal: '$3',
+    paddingVertical: '$2',
+  },
 });
 
 const StatusChip = styled(XStack, {
@@ -68,6 +74,10 @@ const TeamPanel = styled(YStack, {
   paddingVertical: '$5',
   paddingHorizontal: '$4',
   gap: '$2',
+  $sm: {
+    paddingVertical: '$3',
+    paddingHorizontal: '$2',
+  },
 });
 
 const ScoreDisplay = styled(Text, {
@@ -75,6 +85,9 @@ const ScoreDisplay = styled(Text, {
   fontVariant: ['tabular-nums'],
   letterSpacing: -1.5,
   lineHeight: 52,
+  $sm: {
+    lineHeight: 40,
+  },
 });
 
 const VsBadge = styled(YStack, {
@@ -458,6 +471,7 @@ export function MatchupScoreboard({
           </Text>
           <ScoreDisplay
             fontSize={48}
+            $sm={{ fontSize: 32 }}
             color={team1Leading && !isTied ? BRAND_GOLD_LIGHT : '$textMuted'}
           >
             {team1Score?.toFixed(2) ?? '0.00'}
@@ -550,6 +564,7 @@ export function MatchupScoreboard({
           </Text>
           <ScoreDisplay
             fontSize={48}
+            $sm={{ fontSize: 32 }}
             color={team2Leading && !isTied ? BRAND_GOLD_LIGHT : '$textMuted'}
           >
             {team2Score?.toFixed(2) ?? '0.00'}

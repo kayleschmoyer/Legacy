@@ -93,6 +93,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
     <YStack
       flex={1}
       padding="$6"
+      $sm={{ padding: '$3' }}
       space="$4"
       maxWidth={600}
       margin="auto"

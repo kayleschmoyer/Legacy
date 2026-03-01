@@ -212,3 +212,56 @@ body {
   opacity: 0;
   transform: translateY(20px);
 }
+
+/* ────────────────────────────────────────────────────────
+ * Responsive utilities
+ * ──────────────────────────────────────────────────────── */
+
+/* Scrollable tables on narrow screens */
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent text overflow on small screens */
+.text-truncate-mobile {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Ensure no horizontal overflow escapes the viewport */
+@media (max-width: 800px) {
+  /* Force tables inside Tamagui components to scroll */
+  table {
+    min-width: max-content;
+  }
+
+  /* Prevent large images from breaking layout */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Make tab bars scrollable when they overflow */
+  [role='tablist'] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+  }
+
+  [role='tablist']::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+}
+
+/* Touch-friendly tap target minimum size */
+@media (pointer: coarse) {
+  /* Increase touch targets for interactive elements on touch devices */
+  button,
+  [role='button'],
+  a {
+    min-height: 44px;
+  }
+}

@@ -411,7 +411,13 @@ function App() {
       {/* Admin impersonation banner — shown only while impersonating */}
       <ImpersonationBanner />
       <Navigation />
-      <YStack flex={1} padding="$4" id="main-content" tabIndex={-1}>
+      <YStack
+        flex={1}
+        padding="$4"
+        $sm={{ padding: '$2' }}
+        id="main-content"
+        tabIndex={-1}
+      >
         <Routes>
           {/* All routes are now authenticated by default */}
           <Route path="/" element={<NavigableHomeScreen />} />

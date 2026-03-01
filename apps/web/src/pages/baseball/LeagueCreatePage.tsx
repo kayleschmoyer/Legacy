@@ -235,7 +235,14 @@ export function LeagueCreatePage(): React.JSX.Element {
         title="Create a League"
         description="Start your own fantasy baseball league on Legacy Sports. Customize draft settings, roster rules, and invite friends to compete."
       />
-      <YStack padding="$6" space="$6" maxWidth={600} alignSelf="center">
+      <YStack
+        padding="$6"
+        $sm={{ padding: '$3', paddingBottom: '$6' }}
+        space="$6"
+        maxWidth={600}
+        alignSelf="center"
+        width="100%"
+      >
         {/* Header */}
         <YStack alignItems="center" space="$3">
           <H1 size="$8" color="$color" textAlign="center">

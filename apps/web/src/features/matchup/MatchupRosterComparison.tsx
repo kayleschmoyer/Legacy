@@ -60,6 +60,7 @@ const RosterCard = styled(Card, {
   borderWidth: 1,
   borderColor: '$surfacePanelBorder',
   backgroundColor: '$background',
+  minWidth: 500,
 });
 
 const SectionHeader = styled(XStack, {
@@ -1768,274 +1769,67 @@ export function MatchupRosterComparison({
   const playerCount = data?.getMatchupPlayers?.length ?? 0;
 
   return (
-    <RosterCard>
-      {/* Card Header */}
-      <XStack
-        padding="$4"
-        justifyContent="space-between"
-        alignItems="center"
-        borderBottomWidth={1}
-        borderBottomColor="$surfacePanelBorder"
-      >
-        <XStack alignItems="center" gap="$2">
-          <Users size={18} color="var(--color)" />
-          <H4 color="$color">Player Matchups</H4>
-        </XStack>
+    <div
+      style={{
+        width: '100%',
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+      }}
+    >
+      <RosterCard>
+        {/* Card Header */}
         <XStack
+          padding="$4"
+          justifyContent="space-between"
           alignItems="center"
-          gap="$1.5"
-          paddingHorizontal="$3"
-          paddingVertical="$1"
-          borderRadius="$10"
-          backgroundColor="$surfacePanel"
-          borderWidth={1}
-          borderColor="$surfacePanelBorder"
-        >
-          <Text fontSize="$2" fontWeight="600" color="$textMuted">
-            {team1Starters.length + team1Bench.length} vs{' '}
-            {team2Starters.length + team2Bench.length}
-          </Text>
-        </XStack>
-      </XStack>
-
-      {/* Warning if season stats are missing */}
-      {seasonStatsMap.size === 0 && playerCount > 0 && (
-        <XStack
-          backgroundColor="$yellow2"
-          padding="$3"
           borderBottomWidth={1}
-          borderBottomColor="$yellow6"
-          gap="$2"
-          alignItems="flex-start"
+          borderBottomColor="$surfacePanelBorder"
         >
-          <YStack gap="$1">
-            <Text fontSize="$2" color="$yellow11" fontWeight="600">
-              Season statistics not available
-            </Text>
-            <Text fontSize="$1" color="$yellow10">
-              Projections are based on games played in this matchup only.
-            </Text>
-          </YStack>
-        </XStack>
-      )}
-
-      {/* Hitters Section Table */}
-      <SectionTable>
-        {/* Starters Section Header */}
-        <SectionHeader backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}>
-          <YStack
-            width={4}
-            height={16}
-            borderRadius={2}
-            backgroundColor={BRAND_NAVY_LIGHT}
-          />
-          <Text
-            fontSize="$3"
-            fontWeight="700"
-            color={BRAND_GOLD_LIGHT}
-            letterSpacing={0.3}
+          <XStack alignItems="center" gap="$2">
+            <Users size={18} color="var(--color)" />
+            <H4 color="$color">Player Matchups</H4>
+          </XStack>
+          <XStack
+            alignItems="center"
+            gap="$1.5"
+            paddingHorizontal="$3"
+            paddingVertical="$1"
+            borderRadius="$10"
+            backgroundColor="$surfacePanel"
+            borderWidth={1}
+            borderColor="$surfacePanelBorder"
           >
-            STARTING LINEUP
-          </Text>
-        </SectionHeader>
+            <Text fontSize="$2" fontWeight="600" color="$textMuted">
+              {team1Starters.length + team1Bench.length} vs{' '}
+              {team2Starters.length + team2Bench.length}
+            </Text>
+          </XStack>
+        </XStack>
 
-        {/* Header Row for Starters */}
-        <ColumnHeader>
-          {/* Team 1 Side - 47% */}
-          <XStack width="47%" alignItems="center" gap="$2">
-            <YStack width={40} flexShrink={0}>
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Pos
+        {/* Warning if season stats are missing */}
+        {seasonStatsMap.size === 0 && playerCount > 0 && (
+          <XStack
+            backgroundColor="$yellow2"
+            padding="$3"
+            borderBottomWidth={1}
+            borderBottomColor="$yellow6"
+            gap="$2"
+            alignItems="flex-start"
+          >
+            <YStack gap="$1">
+              <Text fontSize="$2" color="$yellow11" fontWeight="600">
+                Season statistics not available
               </Text>
-            </YStack>
-            <YStack flex={1} minWidth={0}>
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                {team1Name}
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Proj
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color={BRAND_GOLD_LIGHT}
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Actual
+              <Text fontSize="$1" color="$yellow10">
+                Projections are based on games played in this matchup only.
               </Text>
             </YStack>
           </XStack>
-          <Separator vertical height="100%" borderColor="$surfacePanelBorder" />
-          {/* Team 2 Side - 47% */}
-          <XStack width="47%" alignItems="center" gap="$2">
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color={BRAND_GOLD_LIGHT}
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Actual
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Proj
-              </Text>
-            </YStack>
-            <YStack flex={1} alignItems="flex-end" minWidth={0}>
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                {team2Name}
-              </Text>
-            </YStack>
-            <YStack width={40} flexShrink={0} alignItems="flex-end">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Pos
-              </Text>
-            </YStack>
-          </XStack>
-        </ColumnHeader>
-
-        {/* Batters Section */}
-        {(team1Batters.length > 0 || team2Batters.length > 0) && (
-          <>
-            <SectionHeader backgroundColor="$green2">
-              <YStack
-                width={4}
-                height={16}
-                borderRadius={2}
-                backgroundColor="$green9"
-              />
-              <Text
-                fontSize="$2"
-                fontWeight="700"
-                color="$green11"
-                letterSpacing={0.3}
-              >
-                BATTERS
-              </Text>
-            </SectionHeader>
-            <YStack>
-              {Array.from({ length: maxBatterRows }).map((_, index) =>
-                renderPlayerRow(
-                  team1Batters[index],
-                  team2Batters[index],
-                  `batter-${index}`,
-                  index,
-                ),
-              )}
-            </YStack>
-          </>
         )}
 
-        {/* Totals Row - Hitters */}
-        <TotalsRow>
-          {/* Team 1 Side - 47% */}
-          <XStack width="47%" alignItems="center" gap="$2">
-            <YStack flex={1} minWidth={0}>
-              <Text fontSize="$4" fontWeight="800" color="$color">
-                Hitters Total
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text fontSize="$2" fontWeight="600" color="$textMuted">
-                {team1BatterTotals.projected.toFixed(1)}
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$5"
-                fontWeight="900"
-                color={
-                  team1BatterTotals.actual >= team2BatterTotals.actual
-                    ? '$green10'
-                    : '$red10'
-                }
-              >
-                {team1BatterTotals.actual.toFixed(1)}
-              </Text>
-            </YStack>
-          </XStack>
-          <Separator
-            vertical
-            height="100%"
-            borderColor="$surfacePanelBorder"
-            borderWidth={2}
-          />
-          {/* Team 2 Side - 47% */}
-          <XStack width="47%" alignItems="center" gap="$2">
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$5"
-                fontWeight="900"
-                color={
-                  team2BatterTotals.actual >= team1BatterTotals.actual
-                    ? '$green10'
-                    : '$red10'
-                }
-              >
-                {team2BatterTotals.actual.toFixed(1)}
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text fontSize="$2" fontWeight="600" color="$textMuted">
-                {team2BatterTotals.projected.toFixed(1)}
-              </Text>
-            </YStack>
-            <YStack flex={1} alignItems="flex-end" minWidth={0}>
-              <Text fontSize="$4" fontWeight="800" color="$color">
-                Hitters Total
-              </Text>
-            </YStack>
-          </XStack>
-        </TotalsRow>
-      </SectionTable>
-
-      {/* Pitchers Section Table */}
-      {(team1Pitchers.length > 0 || team2Pitchers.length > 0) && (
-        <SectionTable marginTop="$4">
+        {/* Hitters Section Table */}
+        <SectionTable>
+          {/* Starters Section Header */}
           <SectionHeader backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}>
             <YStack
               width={4}
@@ -2044,37 +1838,162 @@ export function MatchupRosterComparison({
               backgroundColor={BRAND_NAVY_LIGHT}
             />
             <Text
-              fontSize="$2"
+              fontSize="$3"
               fontWeight="700"
               color={BRAND_GOLD_LIGHT}
               letterSpacing={0.3}
             >
-              PITCHERS
+              STARTING LINEUP
             </Text>
           </SectionHeader>
-          <YStack>
-            {Array.from({ length: maxPitcherRows }).map((_, index) =>
-              renderPlayerRow(
-                team1Pitchers[index],
-                team2Pitchers[index],
-                `pitcher-${index}`,
-                index,
-              ),
-            )}
-          </YStack>
 
-          {/* Totals Row - Pitchers */}
+          {/* Header Row for Starters */}
+          <ColumnHeader>
+            {/* Team 1 Side - 47% */}
+            <XStack width="47%" alignItems="center" gap="$2">
+              <YStack width={40} flexShrink={0}>
+                <Text
+                  fontSize="$1"
+                  fontWeight="700"
+                  color="$textMuted"
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  Pos
+                </Text>
+              </YStack>
+              <YStack flex={1} minWidth={0}>
+                <Text
+                  fontSize="$1"
+                  fontWeight="700"
+                  color="$textMuted"
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  {team1Name}
+                </Text>
+              </YStack>
+              <YStack width={60} flexShrink={0} alignItems="center">
+                <Text
+                  fontSize="$1"
+                  fontWeight="700"
+                  color="$textMuted"
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  Proj
+                </Text>
+              </YStack>
+              <YStack width={60} flexShrink={0} alignItems="center">
+                <Text
+                  fontSize="$1"
+                  fontWeight="700"
+                  color={BRAND_GOLD_LIGHT}
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  Actual
+                </Text>
+              </YStack>
+            </XStack>
+            <Separator
+              vertical
+              height="100%"
+              borderColor="$surfacePanelBorder"
+            />
+            {/* Team 2 Side - 47% */}
+            <XStack width="47%" alignItems="center" gap="$2">
+              <YStack width={60} flexShrink={0} alignItems="center">
+                <Text
+                  fontSize="$1"
+                  fontWeight="700"
+                  color={BRAND_GOLD_LIGHT}
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  Actual
+                </Text>
+              </YStack>
+              <YStack width={60} flexShrink={0} alignItems="center">
+                <Text
+                  fontSize="$1"
+                  fontWeight="700"
+                  color="$textMuted"
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  Proj
+                </Text>
+              </YStack>
+              <YStack flex={1} alignItems="flex-end" minWidth={0}>
+                <Text
+                  fontSize="$1"
+                  fontWeight="700"
+                  color="$textMuted"
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  {team2Name}
+                </Text>
+              </YStack>
+              <YStack width={40} flexShrink={0} alignItems="flex-end">
+                <Text
+                  fontSize="$1"
+                  fontWeight="700"
+                  color="$textMuted"
+                  textTransform="uppercase"
+                  letterSpacing={0.5}
+                >
+                  Pos
+                </Text>
+              </YStack>
+            </XStack>
+          </ColumnHeader>
+
+          {/* Batters Section */}
+          {(team1Batters.length > 0 || team2Batters.length > 0) && (
+            <>
+              <SectionHeader backgroundColor="$green2">
+                <YStack
+                  width={4}
+                  height={16}
+                  borderRadius={2}
+                  backgroundColor="$green9"
+                />
+                <Text
+                  fontSize="$2"
+                  fontWeight="700"
+                  color="$green11"
+                  letterSpacing={0.3}
+                >
+                  BATTERS
+                </Text>
+              </SectionHeader>
+              <YStack>
+                {Array.from({ length: maxBatterRows }).map((_, index) =>
+                  renderPlayerRow(
+                    team1Batters[index],
+                    team2Batters[index],
+                    `batter-${index}`,
+                    index,
+                  ),
+                )}
+              </YStack>
+            </>
+          )}
+
+          {/* Totals Row - Hitters */}
           <TotalsRow>
             {/* Team 1 Side - 47% */}
             <XStack width="47%" alignItems="center" gap="$2">
               <YStack flex={1} minWidth={0}>
                 <Text fontSize="$4" fontWeight="800" color="$color">
-                  Pitchers Total
+                  Hitters Total
                 </Text>
               </YStack>
               <YStack width={60} flexShrink={0} alignItems="center">
                 <Text fontSize="$2" fontWeight="600" color="$textMuted">
-                  {team1PitcherTotals.projected.toFixed(1)}
+                  {team1BatterTotals.projected.toFixed(1)}
                 </Text>
               </YStack>
               <YStack width={60} flexShrink={0} alignItems="center">
@@ -2082,12 +2001,12 @@ export function MatchupRosterComparison({
                   fontSize="$5"
                   fontWeight="900"
                   color={
-                    team1PitcherTotals.actual >= team2PitcherTotals.actual
+                    team1BatterTotals.actual >= team2BatterTotals.actual
                       ? '$green10'
                       : '$red10'
                   }
                 >
-                  {team1PitcherTotals.actual.toFixed(1)}
+                  {team1BatterTotals.actual.toFixed(1)}
                 </Text>
               </YStack>
             </XStack>
@@ -2104,323 +2023,417 @@ export function MatchupRosterComparison({
                   fontSize="$5"
                   fontWeight="900"
                   color={
-                    team2PitcherTotals.actual >= team1PitcherTotals.actual
+                    team2BatterTotals.actual >= team1BatterTotals.actual
                       ? '$green10'
                       : '$red10'
                   }
                 >
-                  {team2PitcherTotals.actual.toFixed(1)}
+                  {team2BatterTotals.actual.toFixed(1)}
                 </Text>
               </YStack>
               <YStack width={60} flexShrink={0} alignItems="center">
                 <Text fontSize="$2" fontWeight="600" color="$textMuted">
-                  {team2PitcherTotals.projected.toFixed(1)}
+                  {team2BatterTotals.projected.toFixed(1)}
                 </Text>
               </YStack>
               <YStack flex={1} alignItems="flex-end" minWidth={0}>
                 <Text fontSize="$4" fontWeight="800" color="$color">
-                  Pitchers Total
+                  Hitters Total
                 </Text>
               </YStack>
             </XStack>
           </TotalsRow>
         </SectionTable>
-      )}
 
-      {/* Bench Section Table */}
-      {(team1Bench.length > 0 || team2Bench.length > 0) && (
-        <SectionTable marginTop="$4">
-          <BenchToggle onPress={() => setShowBench(!showBench)}>
-            <XStack
-              style={{
-                transition: 'transform 250ms ease',
-                transform: showBench ? 'rotate(90deg)' : 'rotate(0deg)',
-              }}
-            >
-              <ChevronRight size={16} color="var(--textMuted)" />
-            </XStack>
-            <Text fontSize="$3" fontWeight="600" color="$textMuted">
-              {showBench ? 'Hide' : 'Show'} Bench
-            </Text>
-            <XStack
-              paddingHorizontal="$2"
-              paddingVertical="$0.5"
-              borderRadius="$10"
-              backgroundColor="$gray3"
-            >
-              <Text fontSize="$1" fontWeight="600" color="$textMuted">
-                {team1Bench.length + team2Bench.length}
+        {/* Pitchers Section Table */}
+        {(team1Pitchers.length > 0 || team2Pitchers.length > 0) && (
+          <SectionTable marginTop="$4">
+            <SectionHeader backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}>
+              <YStack
+                width={4}
+                height={16}
+                borderRadius={2}
+                backgroundColor={BRAND_NAVY_LIGHT}
+              />
+              <Text
+                fontSize="$2"
+                fontWeight="700"
+                color={BRAND_GOLD_LIGHT}
+                letterSpacing={0.3}
+              >
+                PITCHERS
               </Text>
-            </XStack>
-          </BenchToggle>
-
-          {/* Animated bench content wrapper */}
-          <YStack
-            style={{
-              display: 'grid',
-              gridTemplateRows: showBench ? '1fr' : '0fr',
-              transition: 'grid-template-rows 300ms ease-in-out',
-            }}
-          >
-            <YStack overflow="hidden">
-              {/* Bullpen Section (bench pitchers) */}
-              {(team1Bullpen.length > 0 || team2Bullpen.length > 0) && (
-                <>
-                  {/* Bullpen Section Header */}
-                  <SectionHeader
-                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
-                  >
-                    <YStack
-                      width={4}
-                      height={16}
-                      borderRadius={2}
-                      backgroundColor={BRAND_NAVY_LIGHT}
-                    />
-                    <Text
-                      fontSize="$2"
-                      fontWeight="700"
-                      color={BRAND_GOLD_LIGHT}
-                      letterSpacing={0.3}
-                    >
-                      BULLPEN
-                    </Text>
-                  </SectionHeader>
-
-                  {/* Header Row for Bullpen */}
-                  <XStack
-                    width="100%"
-                    paddingVertical="$2.5"
-                    paddingLeft="$3"
-                    paddingRight="$3"
-                    backgroundColor="$gray2"
-                    borderBottomWidth={2}
-                    borderBottomColor="$gray7"
-                    justifyContent="space-between"
-                    alignItems="center"
-                  >
-                    {/* Team 1 Side - 47% */}
-                    <XStack width="47%" alignItems="center" gap="$2">
-                      <YStack flex={1} minWidth={0}>
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color={BRAND_GOLD_LIGHT}
-                          textTransform="uppercase"
-                        >
-                          Team 1 Bullpen
-                        </Text>
-                      </YStack>
-                      <YStack width={60} flexShrink={0} alignItems="center">
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color="$gray9"
-                          textTransform="uppercase"
-                        >
-                          Proj
-                        </Text>
-                      </YStack>
-                      <YStack width={60} flexShrink={0} alignItems="center">
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color="$gray10"
-                          textTransform="uppercase"
-                        >
-                          Actual
-                        </Text>
-                      </YStack>
-                    </XStack>
-                    <Separator
-                      vertical
-                      height="100%"
-                      borderColor="$gray8"
-                      borderWidth={2}
-                    />
-                    {/* Team 2 Side - 47% */}
-                    <XStack width="47%" alignItems="center" gap="$2">
-                      <YStack width={60} flexShrink={0} alignItems="center">
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color="$gray10"
-                          textTransform="uppercase"
-                        >
-                          Actual
-                        </Text>
-                      </YStack>
-                      <YStack width={60} flexShrink={0} alignItems="center">
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color="$gray9"
-                          textTransform="uppercase"
-                        >
-                          Proj
-                        </Text>
-                      </YStack>
-                      <YStack flex={1} alignItems="flex-end" minWidth={0}>
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color={BRAND_GOLD_LIGHT}
-                          textTransform="uppercase"
-                        >
-                          Team 2 Bullpen
-                        </Text>
-                      </YStack>
-                    </XStack>
-                  </XStack>
-
-                  {/* Bullpen Rows */}
-                  <YStack>
-                    {Array.from({ length: maxBullpenRows }).map((_, index) =>
-                      renderPlayerRow(
-                        team1Bullpen[index],
-                        team2Bullpen[index],
-                        `bullpen-${index}`,
-                        index,
-                      ),
-                    )}
-                  </YStack>
-                </>
-              )}
-
-              {/* Bench Section (fielders) */}
-              {(team1BenchFielders.length > 0 ||
-                team2BenchFielders.length > 0) && (
-                <>
-                  {/* Bench Section Header */}
-                  <SectionHeader
-                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
-                  >
-                    <YStack
-                      width={4}
-                      height={16}
-                      borderRadius={2}
-                      backgroundColor={BRAND_NAVY_LIGHT}
-                    />
-                    <Text
-                      fontSize="$2"
-                      fontWeight="700"
-                      color={BRAND_GOLD_LIGHT}
-                      letterSpacing={0.3}
-                    >
-                      BENCH
-                    </Text>
-                  </SectionHeader>
-
-                  {/* Header Row for Bench */}
-                  <ColumnHeader>
-                    {/* Team 1 Side - 47% */}
-                    <XStack width="47%" alignItems="center" gap="$2">
-                      <YStack flex={1} minWidth={0}>
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color={BRAND_GOLD_LIGHT}
-                          textTransform="uppercase"
-                        >
-                          Team 1 Bench
-                        </Text>
-                      </YStack>
-                      <YStack width={60} flexShrink={0} alignItems="center">
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color="$gray9"
-                          textTransform="uppercase"
-                        >
-                          Proj
-                        </Text>
-                      </YStack>
-                      <YStack width={60} flexShrink={0} alignItems="center">
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color="$gray10"
-                          textTransform="uppercase"
-                        >
-                          Actual
-                        </Text>
-                      </YStack>
-                    </XStack>
-                    <Separator
-                      vertical
-                      height="100%"
-                      borderColor="$gray8"
-                      borderWidth={2}
-                    />
-                    {/* Team 2 Side - 47% */}
-                    <XStack width="47%" alignItems="center" gap="$2">
-                      <YStack width={60} flexShrink={0} alignItems="center">
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color="$gray10"
-                          textTransform="uppercase"
-                        >
-                          Actual
-                        </Text>
-                      </YStack>
-                      <YStack width={60} flexShrink={0} alignItems="center">
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color="$gray9"
-                          textTransform="uppercase"
-                        >
-                          Proj
-                        </Text>
-                      </YStack>
-                      <YStack flex={1} alignItems="flex-end" minWidth={0}>
-                        <Text
-                          fontSize="$2"
-                          fontWeight="bold"
-                          color={BRAND_GOLD_LIGHT}
-                          textTransform="uppercase"
-                        >
-                          Team 2 Bench
-                        </Text>
-                      </YStack>
-                    </XStack>
-                  </ColumnHeader>
-
-                  {/* Bench Rows */}
-                  <YStack>
-                    {Array.from({ length: maxBenchFielderRows }).map(
-                      (_, index) =>
-                        renderPlayerRow(
-                          team1BenchFielders[index],
-                          team2BenchFielders[index],
-                          `bench-${index}`,
-                          index,
-                        ),
-                    )}
-                  </YStack>
-                </>
+            </SectionHeader>
+            <YStack>
+              {Array.from({ length: maxPitcherRows }).map((_, index) =>
+                renderPlayerRow(
+                  team1Pitchers[index],
+                  team2Pitchers[index],
+                  `pitcher-${index}`,
+                  index,
+                ),
               )}
             </YStack>
-          </YStack>
-        </SectionTable>
-      )}
 
-      {/* Player Season Stats Modal (for player name clicks) */}
-      <PlayerSeasonStatsModal
-        open={seasonStatsModalOpen}
-        onOpenChange={setSeasonStatsModalOpen}
-        playerId={selectedPlayer?.id ?? null}
-        playerName={selectedPlayer?.name ?? ''}
-      />
+            {/* Totals Row - Pitchers */}
+            <TotalsRow>
+              {/* Team 1 Side - 47% */}
+              <XStack width="47%" alignItems="center" gap="$2">
+                <YStack flex={1} minWidth={0}>
+                  <Text fontSize="$4" fontWeight="800" color="$color">
+                    Pitchers Total
+                  </Text>
+                </YStack>
+                <YStack width={60} flexShrink={0} alignItems="center">
+                  <Text fontSize="$2" fontWeight="600" color="$textMuted">
+                    {team1PitcherTotals.projected.toFixed(1)}
+                  </Text>
+                </YStack>
+                <YStack width={60} flexShrink={0} alignItems="center">
+                  <Text
+                    fontSize="$5"
+                    fontWeight="900"
+                    color={
+                      team1PitcherTotals.actual >= team2PitcherTotals.actual
+                        ? '$green10'
+                        : '$red10'
+                    }
+                  >
+                    {team1PitcherTotals.actual.toFixed(1)}
+                  </Text>
+                </YStack>
+              </XStack>
+              <Separator
+                vertical
+                height="100%"
+                borderColor="$surfacePanelBorder"
+                borderWidth={2}
+              />
+              {/* Team 2 Side - 47% */}
+              <XStack width="47%" alignItems="center" gap="$2">
+                <YStack width={60} flexShrink={0} alignItems="center">
+                  <Text
+                    fontSize="$5"
+                    fontWeight="900"
+                    color={
+                      team2PitcherTotals.actual >= team1PitcherTotals.actual
+                        ? '$green10'
+                        : '$red10'
+                    }
+                  >
+                    {team2PitcherTotals.actual.toFixed(1)}
+                  </Text>
+                </YStack>
+                <YStack width={60} flexShrink={0} alignItems="center">
+                  <Text fontSize="$2" fontWeight="600" color="$textMuted">
+                    {team2PitcherTotals.projected.toFixed(1)}
+                  </Text>
+                </YStack>
+                <YStack flex={1} alignItems="flex-end" minWidth={0}>
+                  <Text fontSize="$4" fontWeight="800" color="$color">
+                    Pitchers Total
+                  </Text>
+                </YStack>
+              </XStack>
+            </TotalsRow>
+          </SectionTable>
+        )}
 
-      {/* Player Matchup Stats Modal (for score clicks) */}
-      <PlayerMatchupStatsModal
-        open={matchupStatsModalOpen}
-        onOpenChange={setMatchupStatsModalOpen}
-        player={selectedMatchupPlayer}
-        playerName={selectedMatchupPlayerName}
-        scoringSettings={scoringSettings}
-      />
-    </RosterCard>
+        {/* Bench Section Table */}
+        {(team1Bench.length > 0 || team2Bench.length > 0) && (
+          <SectionTable marginTop="$4">
+            <BenchToggle onPress={() => setShowBench(!showBench)}>
+              <XStack
+                style={{
+                  transition: 'transform 250ms ease',
+                  transform: showBench ? 'rotate(90deg)' : 'rotate(0deg)',
+                }}
+              >
+                <ChevronRight size={16} color="var(--textMuted)" />
+              </XStack>
+              <Text fontSize="$3" fontWeight="600" color="$textMuted">
+                {showBench ? 'Hide' : 'Show'} Bench
+              </Text>
+              <XStack
+                paddingHorizontal="$2"
+                paddingVertical="$0.5"
+                borderRadius="$10"
+                backgroundColor="$gray3"
+              >
+                <Text fontSize="$1" fontWeight="600" color="$textMuted">
+                  {team1Bench.length + team2Bench.length}
+                </Text>
+              </XStack>
+            </BenchToggle>
+
+            {/* Animated bench content wrapper */}
+            <YStack
+              style={{
+                display: 'grid',
+                gridTemplateRows: showBench ? '1fr' : '0fr',
+                transition: 'grid-template-rows 300ms ease-in-out',
+              }}
+            >
+              <YStack overflow="hidden">
+                {/* Bullpen Section (bench pitchers) */}
+                {(team1Bullpen.length > 0 || team2Bullpen.length > 0) && (
+                  <>
+                    {/* Bullpen Section Header */}
+                    <SectionHeader
+                      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+                    >
+                      <YStack
+                        width={4}
+                        height={16}
+                        borderRadius={2}
+                        backgroundColor={BRAND_NAVY_LIGHT}
+                      />
+                      <Text
+                        fontSize="$2"
+                        fontWeight="700"
+                        color={BRAND_GOLD_LIGHT}
+                        letterSpacing={0.3}
+                      >
+                        BULLPEN
+                      </Text>
+                    </SectionHeader>
+
+                    {/* Header Row for Bullpen */}
+                    <XStack
+                      width="100%"
+                      paddingVertical="$2.5"
+                      paddingLeft="$3"
+                      paddingRight="$3"
+                      backgroundColor="$gray2"
+                      borderBottomWidth={2}
+                      borderBottomColor="$gray7"
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      {/* Team 1 Side - 47% */}
+                      <XStack width="47%" alignItems="center" gap="$2">
+                        <YStack flex={1} minWidth={0}>
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color={BRAND_GOLD_LIGHT}
+                            textTransform="uppercase"
+                          >
+                            Team 1 Bullpen
+                          </Text>
+                        </YStack>
+                        <YStack width={60} flexShrink={0} alignItems="center">
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color="$gray9"
+                            textTransform="uppercase"
+                          >
+                            Proj
+                          </Text>
+                        </YStack>
+                        <YStack width={60} flexShrink={0} alignItems="center">
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color="$gray10"
+                            textTransform="uppercase"
+                          >
+                            Actual
+                          </Text>
+                        </YStack>
+                      </XStack>
+                      <Separator
+                        vertical
+                        height="100%"
+                        borderColor="$gray8"
+                        borderWidth={2}
+                      />
+                      {/* Team 2 Side - 47% */}
+                      <XStack width="47%" alignItems="center" gap="$2">
+                        <YStack width={60} flexShrink={0} alignItems="center">
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color="$gray10"
+                            textTransform="uppercase"
+                          >
+                            Actual
+                          </Text>
+                        </YStack>
+                        <YStack width={60} flexShrink={0} alignItems="center">
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color="$gray9"
+                            textTransform="uppercase"
+                          >
+                            Proj
+                          </Text>
+                        </YStack>
+                        <YStack flex={1} alignItems="flex-end" minWidth={0}>
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color={BRAND_GOLD_LIGHT}
+                            textTransform="uppercase"
+                          >
+                            Team 2 Bullpen
+                          </Text>
+                        </YStack>
+                      </XStack>
+                    </XStack>
+
+                    {/* Bullpen Rows */}
+                    <YStack>
+                      {Array.from({ length: maxBullpenRows }).map((_, index) =>
+                        renderPlayerRow(
+                          team1Bullpen[index],
+                          team2Bullpen[index],
+                          `bullpen-${index}`,
+                          index,
+                        ),
+                      )}
+                    </YStack>
+                  </>
+                )}
+
+                {/* Bench Section (fielders) */}
+                {(team1BenchFielders.length > 0 ||
+                  team2BenchFielders.length > 0) && (
+                  <>
+                    {/* Bench Section Header */}
+                    <SectionHeader
+                      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+                    >
+                      <YStack
+                        width={4}
+                        height={16}
+                        borderRadius={2}
+                        backgroundColor={BRAND_NAVY_LIGHT}
+                      />
+                      <Text
+                        fontSize="$2"
+                        fontWeight="700"
+                        color={BRAND_GOLD_LIGHT}
+                        letterSpacing={0.3}
+                      >
+                        BENCH
+                      </Text>
+                    </SectionHeader>
+
+                    {/* Header Row for Bench */}
+                    <ColumnHeader>
+                      {/* Team 1 Side - 47% */}
+                      <XStack width="47%" alignItems="center" gap="$2">
+                        <YStack flex={1} minWidth={0}>
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color={BRAND_GOLD_LIGHT}
+                            textTransform="uppercase"
+                          >
+                            Team 1 Bench
+                          </Text>
+                        </YStack>
+                        <YStack width={60} flexShrink={0} alignItems="center">
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color="$gray9"
+                            textTransform="uppercase"
+                          >
+                            Proj
+                          </Text>
+                        </YStack>
+                        <YStack width={60} flexShrink={0} alignItems="center">
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color="$gray10"
+                            textTransform="uppercase"
+                          >
+                            Actual
+                          </Text>
+                        </YStack>
+                      </XStack>
+                      <Separator
+                        vertical
+                        height="100%"
+                        borderColor="$gray8"
+                        borderWidth={2}
+                      />
+                      {/* Team 2 Side - 47% */}
+                      <XStack width="47%" alignItems="center" gap="$2">
+                        <YStack width={60} flexShrink={0} alignItems="center">
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color="$gray10"
+                            textTransform="uppercase"
+                          >
+                            Actual
+                          </Text>
+                        </YStack>
+                        <YStack width={60} flexShrink={0} alignItems="center">
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color="$gray9"
+                            textTransform="uppercase"
+                          >
+                            Proj
+                          </Text>
+                        </YStack>
+                        <YStack flex={1} alignItems="flex-end" minWidth={0}>
+                          <Text
+                            fontSize="$2"
+                            fontWeight="bold"
+                            color={BRAND_GOLD_LIGHT}
+                            textTransform="uppercase"
+                          >
+                            Team 2 Bench
+                          </Text>
+                        </YStack>
+                      </XStack>
+                    </ColumnHeader>
+
+                    {/* Bench Rows */}
+                    <YStack>
+                      {Array.from({ length: maxBenchFielderRows }).map(
+                        (_, index) =>
+                          renderPlayerRow(
+                            team1BenchFielders[index],
+                            team2BenchFielders[index],
+                            `bench-${index}`,
+                            index,
+                          ),
+                      )}
+                    </YStack>
+                  </>
+                )}
+              </YStack>
+            </YStack>
+          </SectionTable>
+        )}
+
+        {/* Player Season Stats Modal (for player name clicks) */}
+        <PlayerSeasonStatsModal
+          open={seasonStatsModalOpen}
+          onOpenChange={setSeasonStatsModalOpen}
+          playerId={selectedPlayer?.id ?? null}
+          playerName={selectedPlayer?.name ?? ''}
+        />
+
+        {/* Player Matchup Stats Modal (for score clicks) */}
+        <PlayerMatchupStatsModal
+          open={matchupStatsModalOpen}
+          onOpenChange={setMatchupStatsModalOpen}
+          player={selectedMatchupPlayer}
+          playerName={selectedMatchupPlayerName}
+          scoringSettings={scoringSettings}
+        />
+      </RosterCard>
+    </div>
   );
 }

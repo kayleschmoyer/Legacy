@@ -18,7 +18,11 @@ export function GlobalAnnouncer() {
       setMessage(String(detail));
     };
     window.addEventListener('app-announce-polite', handler as EventListener);
-    return () => window.removeEventListener('app-announce-polite', handler as EventListener);
+    return () =>
+      window.removeEventListener(
+        'app-announce-polite',
+        handler as EventListener,
+      );
   }, []);
 
   return (
