@@ -1,4 +1,5 @@
-import type { APIGatewayEvent } from 'aws-lambda';
+﻿import type { APIGatewayEvent } from 'aws-lambda';
+import { sign } from 'jsonwebtoken';
 import { createJiraBug } from './JiraClient';
 import { baseHandler } from './index';
 
@@ -19,12 +20,23 @@ const mockCreateJiraBug = createJiraBug as jest.MockedFunction<
   typeof createJiraBug
 >;
 
+const TEST_JWT_SECRET = 'test-secret';
+
+function makeValidAuthHeader(overrides: Record<string, unknown> = {}): string {
+  const token = sign(
+    { id: 1, email: 'user@example.com', username: 'testuser', ...overrides },
+    TEST_JWT_SECRET,
+    { algorithm: 'HS256', expiresIn: '1h' },
+  );
+  return `Bearer ${token}`;
+}
+
 function makeEvent(overrides: Partial<APIGatewayEvent> = {}): APIGatewayEvent {
   return {
     httpMethod: 'POST',
     path: '/jira/bug',
     body: JSON.stringify({ summary: 'Test bug' }),
-    headers: {},
+    headers: { Authorization: makeValidAuthHeader() },
     multiValueHeaders: {},
     isBase64Encoded: false,
     pathParameters: null,
@@ -42,11 +54,13 @@ describe('Jira Proxy Handler', () => {
     jest.clearAllMocks();
     process.env['JIRA_SECRET_NAME'] = 'test-secret';
     process.env['JIRA_PROJECT_KEY'] = 'LS';
+    process.env['JWT_SECRET'] = TEST_JWT_SECRET;
   });
 
   afterEach(() => {
     delete process.env['JIRA_SECRET_NAME'];
     delete process.env['JIRA_PROJECT_KEY'];
+    delete process.env['JWT_SECRET'];
   });
 
   it('returns 200 for OPTIONS (CORS preflight)', async () => {
@@ -76,6 +90,47 @@ describe('Jira Proxy Handler', () => {
     });
     const result = await baseHandler(event);
     expect(result.statusCode).toBe(404);
+  });
+
+  describe('POST /jira/bug â€” authentication', () => {
+    it('returns 401 when Authorization header is missing', async () => {
+      const event = makeEvent({ headers: {} });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(401);
+      const body = JSON.parse(result.body) as { error: string };
+      expect(body.error).toContain('Unauthorized');
+    });
+
+    it('returns 401 when token is not a Bearer token', async () => {
+      const event = makeEvent({
+        headers: { Authorization: 'Basic dXNlcjpwYXNz' },
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(401);
+    });
+
+    it('returns 401 when token signature is invalid', async () => {
+      const token = sign({ id: 1, username: 'hacker' }, 'wrong-secret', {
+        algorithm: 'HS256',
+      });
+      const event = makeEvent({
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(401);
+    });
+
+    it('returns 401 when token is expired', async () => {
+      const token = sign({ id: 1, username: 'testuser' }, TEST_JWT_SECRET, {
+        algorithm: 'HS256',
+        expiresIn: '-1s',
+      });
+      const event = makeEvent({
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(401);
+    });
   });
 
   describe('POST /jira/bug', () => {
@@ -176,19 +231,13 @@ describe('Jira Proxy Handler', () => {
         issueUrl: 'https://test.atlassian.net/browse/LS-100',
       });
 
-      // Build a real-ish JWT with the payload we want (signature doesn't matter)
-      const payload = {
-        email: 'auth@example.com',
-        username: 'authuser',
-        id: 42,
-      };
-      const encoded = Buffer.from(JSON.stringify(payload)).toString(
-        'base64url',
-      );
-      const fakeJwt = `header.${encoded}.signature`;
-
       const event = makeEvent({
-        headers: { Authorization: `Bearer ${fakeJwt}` },
+        headers: {
+          Authorization: makeValidAuthHeader({
+            email: 'auth@example.com',
+            username: 'authuser',
+          }),
+        },
         body: JSON.stringify({
           summary: 'JWT auth test',
           reporterEmail: 'body@example.com', // should be overridden
@@ -202,31 +251,6 @@ describe('Jira Proxy Handler', () => {
         expect.objectContaining({
           reporterEmail: 'auth@example.com',
           reporterUsername: 'authuser',
-        }),
-        'LS',
-        'test-secret',
-      );
-    });
-
-    it('falls back to body reporterEmail when no Authorization header', async () => {
-      mockCreateJiraBug.mockResolvedValueOnce({
-        issueKey: 'LS-101',
-        issueUrl: 'https://test.atlassian.net/browse/LS-101',
-      });
-
-      const event = makeEvent({
-        body: JSON.stringify({
-          summary: 'No auth header test',
-          reporterEmail: 'body@example.com',
-        }),
-      });
-
-      const result = await baseHandler(event);
-      expect(result.statusCode).toBe(201);
-
-      expect(mockCreateJiraBug).toHaveBeenCalledWith(
-        expect.objectContaining({
-          reporterEmail: 'body@example.com',
         }),
         'LS',
         'test-secret',

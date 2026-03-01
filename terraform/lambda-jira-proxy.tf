@@ -43,7 +43,8 @@ resource "aws_iam_policy" "jira_proxy_lambda_secrets" {
           "secretsmanager:DescribeSecret"
         ]
         Resource = [
-          aws_secretsmanager_secret.jira_credentials.arn
+          aws_secretsmanager_secret.jira_credentials.arn,
+          aws_secretsmanager_secret.jwt_secret.arn
         ]
       }
     ]
@@ -87,6 +88,7 @@ resource "aws_lambda_function" "jira_proxy" {
     variables = {
       JIRA_SECRET_NAME              = aws_secretsmanager_secret.jira_credentials.name
       JIRA_PROJECT_KEY               = "LS"
+      JWT_SECRET_NAME                = aws_secretsmanager_secret.jwt_secret.name
       NODE_ENV                       = var.environment
       LOG_LEVEL                      = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"

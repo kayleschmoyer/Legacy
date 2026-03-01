@@ -13,18 +13,21 @@
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "*",
+    "@legacy-sports/aws-utils": "workspace:*",
     "@legacy-sports/env-utilities": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/sentry": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "aws-lambda": "*",
     "cors": "*",
-    "express": "*"
+    "express": "*",
+    "jsonwebtoken": "*"
   },
   "devDependencies": {
     "@types/aws-lambda": "*",
     "@types/cors": "*",
     "@types/express": "*",
+    "@types/jsonwebtoken": "*",
     "@types/node": "*",
     "jest": "*",
     "tsx": "*",

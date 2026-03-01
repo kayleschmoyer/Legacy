@@ -888,6 +888,9 @@ importers:
       '@aws-sdk/client-secrets-manager':
         specifier: '*'
         version: 3.990.0
+      '@legacy-sports/aws-utils':
+        specifier: workspace:*
+        version: link:../../lib/aws-utils
       '@legacy-sports/env-utilities':
         specifier: workspace:*
         version: link:../../lib/env-utilities
@@ -909,6 +912,9 @@ importers:
       express:
         specifier: '*'
         version: 4.21.2
+      jsonwebtoken:
+        specifier: '*'
+        version: 9.0.3
     devDependencies:
       '@types/aws-lambda':
         specifier: '*'
@@ -919,6 +925,9 @@ importers:
       '@types/express':
         specifier: '*'
         version: 5.0.6
+      '@types/jsonwebtoken':
+        specifier: '*'
+        version: 9.0.10
       '@types/node':
         specifier: '*'
         version: 24.10.0

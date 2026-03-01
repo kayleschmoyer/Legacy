@@ -1,5 +1,7 @@
 import type { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { verify } from 'jsonwebtoken';
 import { LOGGER } from '@legacy-sports/logging';
+import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 import {
   captureError,
   getSentryConfigFromEnv,
@@ -9,43 +11,48 @@ import {
 import type { CreateIssueInput } from './JiraClient';
 import { createJiraBug } from './JiraClient';
 
-/** Minimal JWT payload we care about for attribution. */
+/** Verified JWT payload fields used for attribution. */
 interface JwtUserPayload {
   email?: string;
   username?: string;
   id?: number;
 }
 
-/**
- * Decode a JWT's payload section without verifying the signature.
- * We only use this for attribution (bug report metadata), not for access control.
- */
-function decodeJwtPayload(token: string): JwtUserPayload | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = parts[1];
-    // Add padding so atob doesn't throw on short payloads
-    const padded = payload + '='.repeat((4 - (payload.length % 4)) % 4);
-    const decoded = Buffer.from(padded, 'base64').toString('utf-8');
-    return JSON.parse(decoded) as JwtUserPayload;
-  } catch {
-    return null;
+const JWT_SECRET_NAME = process.env['JWT_SECRET_NAME'] ?? '';
+let jwtSecretPromise: Promise<string> | null = null;
+
+/** Fetch the JWT signing secret from Secrets Manager (cached). Local dev uses JWT_SECRET env var. */
+async function getJwtSecret(): Promise<string> {
+  // Read JWT_SECRET dynamically so local dev / tests can override it at any time
+  const localSecret = process.env['JWT_SECRET'] ?? '';
+  if (localSecret) return localSecret;
+  if (!JWT_SECRET_NAME) throw new Error('JWT_SECRET_NAME is not set');
+  if (!jwtSecretPromise) {
+    jwtSecretPromise = retrieveSecretParameterValue(JWT_SECRET_NAME);
   }
+  return jwtSecretPromise;
 }
 
 /**
- * Extract user info from the Authorization header (Bearer token).
- * Returns null if the header is absent or the token cannot be decoded.
+ * Verify the Bearer token in the Authorization header against the JWT secret.
+ * Returns the decoded payload on success, or null if the token is absent or invalid.
  */
-function extractAuthUser(
+async function verifyAuthToken(
   headers: APIGatewayEvent['headers'],
-): JwtUserPayload | null {
+): Promise<JwtUserPayload | null> {
   const authHeader =
     headers?.['Authorization'] ?? headers?.['authorization'] ?? null;
   if (!authHeader?.startsWith('Bearer ')) return null;
   const token = authHeader.slice(7);
-  return decodeJwtPayload(token);
+  try {
+    const secret = await getJwtSecret();
+    const decoded = verify(token, secret, {
+      algorithms: ['HS256'],
+    }) as JwtUserPayload;
+    return decoded;
+  } catch {
+    return null;
+  }
 }
 
 // Initialize Sentry
@@ -252,9 +259,13 @@ async function handleCreateBug(
     return jsonResponse(500, { error: 'Server configuration error' });
   }
 
-  // Extract authenticated user from JWT in Authorization header (if present).
-  // We decode without verifying — this is attribution only, not access control.
-  const authUser = extractAuthUser(event.headers ?? {});
+  // Verify the JWT — reject unauthenticated / tampered tokens.
+  const authUser = await verifyAuthToken(event.headers ?? {});
+  if (!authUser) {
+    return jsonResponse(401, {
+      error: 'Unauthorized: valid authentication token required',
+    });
+  }
 
   let input: CreateIssueInput;
   try {
