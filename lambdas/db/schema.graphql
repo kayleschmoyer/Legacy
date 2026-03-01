@@ -85,6 +85,12 @@ type AverageSeasonBatting {
   stolenBases: Float
 }
 
+input BulkDropPlayersInput {
+  leagueId: Int!
+  reason: String
+  teamId: Int!
+}
+
 """
 Career honours and awards sourced from Baseball Reference
 """
@@ -244,6 +250,28 @@ type ChampionTrophy {
   updatedAt: String
 }
 
+"""
+Result of a commissioner action
+"""
+type CommissionerActionResult {
+  message: String
+  success: Boolean
+}
+
+"""
+An audit-trail entry for a commissioner action
+"""
+type CommissionerAuditLog {
+  action: String
+  createdAt: String
+  id: Int
+  leagueId: Int
+  reason: String
+  targetId: Int
+  targetType: String
+  userId: Int
+}
+
 enum ConsentType {
   analytics
   data_processing
@@ -392,6 +420,27 @@ type DraftPlayer {
   lastName: String
 }
 
+input EditMatchupScoreInput {
+  matchupId: Int!
+  reason: String
+  team1Score: Float!
+  team2Score: Float!
+}
+
+input ForceAddPlayerInput {
+  leagueId: Int!
+  playerId: Int!
+  reason: String
+  teamId: Int!
+}
+
+input ForceDropPlayerInput {
+  leagueId: Int!
+  playerId: Int!
+  reason: String
+  teamId: Int!
+}
+
 type GameBatting {
   atBats: Int
   baseOnBalls: Int
@@ -511,6 +560,7 @@ type League {
   gamesPerMatchup: Int
   id: Int
   inviteCode: String
+  lmNotes: String
   maxRosterSize: Int
   minCareerGames: Int
   minCareerSeasons: Int
@@ -847,6 +897,11 @@ type Mutation {
   awardChampionship(bracketId: Int!): ChampionTrophy
 
   """
+  Commissioner: drop all players from a team (useful for inactive teams).
+  """
+  bulkDropTeamPlayers(input: BulkDropPlayersInput!): CommissionerActionResult
+
+  """
   Cancel a pending trade offer as the team that proposed it.
   """
   cancelTrade(tradeId: Int!): TradeOffer
@@ -889,6 +944,21 @@ type Mutation {
   deleteAllLeagues: String
   deleteLeague(leagueId: Int!): String
   disableDeviceToken(deviceToken: String!): Boolean
+
+  """
+  Commissioner: edit the scores of a past or current matchup. All edits are audit-logged.
+  """
+  editMatchupScore(input: EditMatchupScoreInput!): CommissionerActionResult
+
+  """
+  Commissioner: force-add a player to a team, bypassing normal acquisition rules.
+  """
+  forceAddPlayer(input: ForceAddPlayerInput!): CommissionerActionResult
+
+  """
+  Commissioner: force-drop a player from a team.
+  """
+  forceDropPlayer(input: ForceDropPlayerInput!): CommissionerActionResult
 
   """
   Admin only: generate a JWT that authenticates as the specified user for debugging purposes.
@@ -969,6 +1039,11 @@ type Mutation {
     message: String!
     replyToMessageId: Int
   ): MatchupMessage
+
+  """
+  Commissioner: lock or unlock a team to prevent/allow roster moves.
+  """
+  setTeamLock(input: SetTeamLockInput!): CommissionerActionResult
   startDraft(
     draftMode: String
     draftOrder: String
@@ -981,12 +1056,24 @@ type Mutation {
     positionIdA: Int
     positionIdB: Int
   ): [MatchupPlayer!]
+
+  """
+  Commissioner: swap the team assignments between two matchups in the same league.
+  """
+  swapMatchupTeams(input: SwapMatchupTeamsInput!): CommissionerActionResult
   swapTeamMemberPositions(
     positionIdA: Int
     positionIdB: Int
     teamMemberIdA: Int!
     teamMemberIdB: Int!
   ): [TeamMember!]
+
+  """
+  Commissioner: update the persistent LM note for a league.
+  """
+  updateCommissionerNote(
+    input: UpdateCommissionerNoteInput!
+  ): CommissionerActionResult
   updateDraftSettings(
     input: UpdateDraftSettingsInput!
   ): UpdateDraftSettingsPayload
@@ -1261,6 +1348,14 @@ type Query {
     orderBy: String
     orderDirection: String
   ): [CareerPitching!]
+
+  """
+  Commissioner: fetch the audit log for all commissioner actions in a league.
+  """
+  commissionerAuditLogs(
+    leagueId: Int!
+    limit: Int = 50
+  ): [CommissionerAuditLog!]
   defaultScoringProfile: ScoringConfig
 
   """
@@ -1606,6 +1701,13 @@ type SeasonResults {
   totalMatchups: Int
 }
 
+input SetTeamLockInput {
+  leagueId: Int!
+  locked: Boolean!
+  reason: String
+  teamId: Int!
+}
+
 enum StatsLoadingStatus {
   completed
   failed
@@ -1613,6 +1715,12 @@ enum StatsLoadingStatus {
   not_started
   queued
   retry
+}
+
+input SwapMatchupTeamsInput {
+  matchupId1: Int!
+  matchupId2: Int!
+  reason: String
 }
 
 """
@@ -1623,6 +1731,7 @@ type Team {
   divisionId: Int
   faabBudget: Int
   id: Int
+  isLocked: Boolean
   leagueId: Int
   name: String
   updatedAt: String
@@ -1732,6 +1841,11 @@ type TradeOfferPlayer {
   playerName: String
   playerPosition: String
   tradeOfferId: Int
+}
+
+input UpdateCommissionerNoteInput {
+  leagueId: Int!
+  note: String
 }
 
 input UpdateDraftSettingsInput {

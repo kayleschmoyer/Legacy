@@ -15,4 +15,4 @@ import './queries';
 import './mutations';
 
 // Re-export types that other schema modules need
-export { Team } from './types';
+export { Team, CommissionerAuditLog } from './types';

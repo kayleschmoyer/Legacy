@@ -497,6 +497,7 @@ builder.mutationField('joinLeagueByCode', (t) =>
             updatedAt: PublicSchema.teams.updatedAt,
             waiverOrder: PublicSchema.teams.waiverOrder,
             faabBudget: PublicSchema.teams.faabBudget,
+            isLocked: PublicSchema.teams.isLocked,
           });
 
         const team = updatedTeams[0];

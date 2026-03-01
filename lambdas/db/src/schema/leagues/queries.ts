@@ -413,6 +413,7 @@ builder.queryField('leagueTeams', (t) =>
             updatedAt: PublicSchema.teams.updatedAt,
             waiverOrder: PublicSchema.teams.waiverOrder,
             faabBudget: PublicSchema.teams.faabBudget,
+            isLocked: PublicSchema.teams.isLocked,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.leagueId, leagueId))

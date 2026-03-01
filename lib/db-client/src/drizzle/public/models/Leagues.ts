@@ -70,6 +70,8 @@ export const leagues = pgTable(
       .notNull()
       .default('4-team'),
     playoffMultiWeek: boolean('playoff_multi_week').notNull().default(false),
+    /** Persistent commissioner notes visible to all league members */
+    lmNotes: text('lm_notes'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -97,6 +99,8 @@ export const teams = pgTable(
     divisionId: integer('division_id'),
     waiverOrder: integer('waiver_order'),
     faabBudget: integer('faab_budget'),
+    /** Commissioner can lock a team to prevent roster moves */
+    isLocked: boolean('is_locked').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -608,6 +612,47 @@ export const leagueAchievementRestrictions = pgTable(
         table.achievementType,
       ),
       larLeagueIdIdx: index('lar_league_id_idx').on(table.leagueId),
+    };
+  },
+);
+
+// ── Commissioner Audit Log ─────────────────────────────────────────────────
+
+/**
+ * Audit trail for all commissioner actions.
+ * Every force move, score edit, schedule change, etc. is recorded here.
+ */
+export const commissionerAuditLog = pgTable(
+  'commissioner_audit_log',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    userId: integer('user_id').notNull(),
+    /** Action performed, e.g. 'force_add', 'force_drop', 'edit_score' */
+    action: varchar('action', { length: 100 }).notNull(),
+    /** Type of entity acted on: 'team', 'matchup', 'player', 'league' */
+    targetType: varchar('target_type', { length: 50 }),
+    targetId: integer('target_id'),
+    /** JSON payload with before/after values or other context */
+    details: jsonb('details').$type<Record<string, unknown>>(),
+    reason: text('reason'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      calLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'commissioner_audit_log_league_fk',
+      }).onDelete('cascade'),
+      calLeagueIdIdx: index('commissioner_audit_log_league_id_idx').on(
+        table.leagueId,
+      ),
+      calCreatedAtIdx: index('commissioner_audit_log_created_at_idx').on(
+        table.createdAt,
+      ),
     };
   },
 );

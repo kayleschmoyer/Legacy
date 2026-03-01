@@ -4,6 +4,7 @@ fragment Team on Team {
   name
   waiverOrder
   faabBudget
+  isLocked
 }
 
 fragment TeamMember on TeamMember {

@@ -237,6 +237,7 @@ builder.mutationField('renameTeam', (t) =>
           faabBudget: PublicSchema.teams.faabBudget,
           createdAt: PublicSchema.teams.createdAt,
           updatedAt: PublicSchema.teams.updatedAt,
+          isLocked: PublicSchema.teams.isLocked,
         });
 
       if (updated.length === 0) {

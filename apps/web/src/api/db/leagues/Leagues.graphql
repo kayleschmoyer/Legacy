@@ -20,6 +20,7 @@ fragment League on League {
   playoffEnabled
   playoffFormat
   playoffMultiWeek
+  lmNotes
   userMembership {
     ...LeagueMember
   }
@@ -133,6 +134,7 @@ query GetLeagueTeams($leagueId: Int!) {
     leagueId
     waiverOrder
     faabBudget
+    isLocked
   }
 }
 

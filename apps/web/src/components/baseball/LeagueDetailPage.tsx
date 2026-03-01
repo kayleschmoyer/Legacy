@@ -52,6 +52,7 @@ import { DeleteLeagueControl } from '../commissioner/DeleteLeagueControl';
 import { DraftSettingsControl } from '../commissioner/DraftSettingsControl';
 import { LeagueSettingsControl } from '../commissioner/LeagueSettingsControl';
 import { AchievementRestrictionsControl } from '../commissioner/AchievementRestrictionsControl';
+import { CommissionerToolsControl } from '../commissioner/CommissionerToolsControl';
 import { useCurrentMatchup } from '../../hooks/useMatchup';
 import { MatchupScoreboard } from '../matchup/MatchupScoreboard';
 import { GamesRemaining } from '../matchup/GamesRemaining';
@@ -1221,6 +1222,18 @@ export function LeagueDetailPage(): React.JSX.Element {
         error={scoringError}
         onRefetch={async () => {
           await refetchScoringProfile({ leagueId });
+        }}
+      />
+
+      <CommissionerToolsControl
+        leagueId={leagueId}
+        currentLmNotes={data?.league?.lmNotes}
+        onSuccess={(message) => {
+          setMatchupSuccessMessage(message);
+          setTimeout(() => setMatchupSuccessMessage(null), 5000);
+        }}
+        onError={(err) => {
+          setMatchupErrorMessage(err.message);
         }}
       />
 

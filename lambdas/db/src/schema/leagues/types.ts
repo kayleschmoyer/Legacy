@@ -64,6 +64,7 @@ export const League = builder.objectRef<{
   playoffEnabled?: boolean;
   playoffFormat?: string;
   playoffMultiWeek?: boolean;
+  lmNotes?: string | null;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -95,6 +96,7 @@ League.implement({
     playoffEnabled: t.exposeBoolean('playoffEnabled', { nullable: true }),
     playoffFormat: t.exposeString('playoffFormat', { nullable: true }),
     playoffMultiWeek: t.exposeBoolean('playoffMultiWeek', { nullable: true }),
+    lmNotes: t.exposeString('lmNotes', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,
       description:
@@ -129,8 +131,11 @@ League.implement({
   }),
 });
 
-// Team type
-export const Team = builder.objectRef<DbTeam>('Team');
+// Team type — isLocked is optional in the parent since legacy resolvers use
+// explicit column selections that may omit it; the field resolver defaults to false.
+export const Team = builder.objectRef<
+  Omit<DbTeam, 'isLocked'> & { isLocked?: boolean | null }
+>('Team');
 
 Team.implement({
   description: 'A team in a league',
@@ -141,6 +146,10 @@ Team.implement({
     divisionId: t.exposeInt('divisionId', { nullable: true }),
     waiverOrder: t.exposeInt('waiverOrder', { nullable: true }),
     faabBudget: t.exposeInt('faabBudget', { nullable: true }),
+    isLocked: t.boolean({
+      resolve: (parent) =>
+        (parent as { isLocked?: boolean | null }).isLocked ?? false,
+    }),
     createdAt: t.string({
       resolve: (team) => team.createdAt.toISOString(),
     }),
@@ -215,6 +224,36 @@ TeamMember.implement({
       resolve: async (parent, _args, context) => {
         return context.loaders.players.load(parent.playerId);
       },
+    }),
+  }),
+});
+
+// ── Commissioner Audit Log Type ──────────────────────────────────────────────
+
+export const CommissionerAuditLog = builder.objectRef<{
+  id: number;
+  leagueId: number;
+  userId: number;
+  action: string;
+  targetType: string | null;
+  targetId: number | null;
+  details: Record<string, unknown> | null;
+  reason: string | null;
+  createdAt: Date;
+}>('CommissionerAuditLog');
+
+CommissionerAuditLog.implement({
+  description: 'An audit-trail entry for a commissioner action',
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    leagueId: t.exposeInt('leagueId'),
+    userId: t.exposeInt('userId'),
+    action: t.exposeString('action'),
+    targetType: t.exposeString('targetType', { nullable: true }),
+    targetId: t.exposeInt('targetId', { nullable: true }),
+    reason: t.exposeString('reason', { nullable: true }),
+    createdAt: t.string({
+      resolve: (log) => log.createdAt.toISOString(),
     }),
   }),
 });

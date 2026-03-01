@@ -105,6 +105,12 @@ export type AverageSeasonBatting = {
   stolenBases?: Maybe<Scalars['Float']['output']>;
 };
 
+export type BulkDropPlayersInput = {
+  leagueId: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
 /** Career honours and awards sourced from Baseball Reference */
 export type CareerAchievements = {
   __typename?: 'CareerAchievements';
@@ -236,6 +242,26 @@ export type ChampionTrophy = {
   season?: Maybe<Scalars['Int']['output']>;
   teamId?: Maybe<Scalars['Int']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Result of a commissioner action */
+export type CommissionerActionResult = {
+  __typename?: 'CommissionerActionResult';
+  message?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+};
+
+/** An audit-trail entry for a commissioner action */
+export type CommissionerAuditLog = {
+  __typename?: 'CommissionerAuditLog';
+  action?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  targetId?: Maybe<Scalars['Int']['output']>;
+  targetType?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
 };
 
 export enum ConsentType {
@@ -384,6 +410,27 @@ export type DraftPlayer = {
   lastName?: Maybe<Scalars['String']['output']>;
 };
 
+export type EditMatchupScoreInput = {
+  matchupId: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  team1Score: Scalars['Float']['input'];
+  team2Score: Scalars['Float']['input'];
+};
+
+export type ForceAddPlayerInput = {
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
+export type ForceDropPlayerInput = {
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
 export type GameBatting = {
   __typename?: 'GameBatting';
   atBats?: Maybe<Scalars['Int']['output']>;
@@ -504,6 +551,7 @@ export type League = {
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
+  lmNotes?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
   minCareerSeasons?: Maybe<Scalars['Int']['output']>;
@@ -767,6 +815,8 @@ export type Mutation = {
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
   awardChampionship?: Maybe<ChampionTrophy>;
+  /** Commissioner: drop all players from a team (useful for inactive teams). */
+  bulkDropTeamPlayers?: Maybe<CommissionerActionResult>;
   /** Cancel a pending trade offer as the team that proposed it. */
   cancelTrade?: Maybe<TradeOffer>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
@@ -783,6 +833,12 @@ export type Mutation = {
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
+  /** Commissioner: edit the scores of a past or current matchup. All edits are audit-logged. */
+  editMatchupScore?: Maybe<CommissionerActionResult>;
+  /** Commissioner: force-add a player to a team, bypassing normal acquisition rules. */
+  forceAddPlayer?: Maybe<CommissionerActionResult>;
+  /** Commissioner: force-drop a player from a team. */
+  forceDropPlayer?: Maybe<CommissionerActionResult>;
   /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
   impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
@@ -814,9 +870,15 @@ export type Mutation = {
   sendDirectMessage?: Maybe<DirectMessage>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
+  /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
+  setTeamLock?: Maybe<CommissionerActionResult>;
   startDraft?: Maybe<League>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
+  /** Commissioner: swap the team assignments between two matchups in the same league. */
+  swapMatchupTeams?: Maybe<CommissionerActionResult>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
+  /** Commissioner: update the persistent LM note for a league. */
+  updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
@@ -860,6 +922,10 @@ export type MutationAutoSelectGamesArgs = {
 
 export type MutationAwardChampionshipArgs = {
   bracketId: Scalars['Int']['input'];
+};
+
+export type MutationBulkDropTeamPlayersArgs = {
+  input: BulkDropPlayersInput;
 };
 
 export type MutationCancelTradeArgs = {
@@ -926,6 +992,18 @@ export type MutationDeleteLeagueArgs = {
 
 export type MutationDisableDeviceTokenArgs = {
   deviceToken: Scalars['String']['input'];
+};
+
+export type MutationEditMatchupScoreArgs = {
+  input: EditMatchupScoreInput;
+};
+
+export type MutationForceAddPlayerArgs = {
+  input: ForceAddPlayerInput;
+};
+
+export type MutationForceDropPlayerArgs = {
+  input: ForceDropPlayerInput;
 };
 
 export type MutationImpersonateUserArgs = {
@@ -1035,6 +1113,10 @@ export type MutationSendMatchupMessageArgs = {
   replyToMessageId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationSetTeamLockArgs = {
+  input: SetTeamLockInput;
+};
+
 export type MutationStartDraftArgs = {
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
@@ -1049,11 +1131,19 @@ export type MutationSwapMatchupPlayerPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationSwapMatchupTeamsArgs = {
+  input: SwapMatchupTeamsInput;
+};
+
 export type MutationSwapTeamMemberPositionsArgs = {
   positionIdA?: InputMaybe<Scalars['Int']['input']>;
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
+};
+
+export type MutationUpdateCommissionerNoteArgs = {
+  input: UpdateCommissionerNoteInput;
 };
 
 export type MutationUpdateDraftSettingsArgs = {
@@ -1297,6 +1387,8 @@ export type Query = {
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
+  /** Commissioner: fetch the audit log for all commissioner actions in a league. */
+  commissionerAuditLogs?: Maybe<Array<CommissionerAuditLog>>;
   defaultScoringProfile?: Maybe<ScoringConfig>;
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
@@ -1406,6 +1498,11 @@ export type QueryCareerPitchingStatsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryCommissionerAuditLogsArgs = {
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryGetAvailableDraftPlayersArgs = {
@@ -1901,6 +1998,13 @@ export type SeasonResults = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+export type SetTeamLockInput = {
+  leagueId: Scalars['Int']['input'];
+  locked: Scalars['Boolean']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
 export enum StatsLoadingStatus {
   Completed = 'completed',
   Failed = 'failed',
@@ -1910,6 +2014,12 @@ export enum StatsLoadingStatus {
   Retry = 'retry',
 }
 
+export type SwapMatchupTeamsInput = {
+  matchupId1: Scalars['Int']['input'];
+  matchupId2: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+};
+
 /** A team in a league */
 export type Team = {
   __typename?: 'Team';
@@ -1917,6 +2027,7 @@ export type Team = {
   divisionId?: Maybe<Scalars['Int']['output']>;
   faabBudget?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  isLocked?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
@@ -2018,6 +2129,11 @@ export type TradeOfferPlayer = {
   playerName?: Maybe<Scalars['String']['output']>;
   playerPosition?: Maybe<Scalars['String']['output']>;
   tradeOfferId?: Maybe<Scalars['Int']['output']>;
+};
+
+export type UpdateCommissionerNoteInput = {
+  leagueId: Scalars['Int']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateDraftSettingsInput = {
@@ -2200,6 +2316,135 @@ export type DeleteAchievementRestrictionMutation = {
   deleteAchievementRestriction?: boolean | null;
 };
 
+export type CommissionerActionResultFragment = {
+  __typename?: 'CommissionerActionResult';
+  success?: boolean | null;
+  message?: string | null;
+};
+
+export type CommissionerAuditLogFragment = {
+  __typename?: 'CommissionerAuditLog';
+  id?: number | null;
+  leagueId?: number | null;
+  userId?: number | null;
+  action?: string | null;
+  targetType?: string | null;
+  targetId?: number | null;
+  reason?: string | null;
+  createdAt?: string | null;
+};
+
+export type GetCommissionerAuditLogsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetCommissionerAuditLogsQuery = {
+  __typename?: 'Query';
+  commissionerAuditLogs?: Array<{
+    __typename?: 'CommissionerAuditLog';
+    id?: number | null;
+    leagueId?: number | null;
+    userId?: number | null;
+    action?: string | null;
+    targetType?: string | null;
+    targetId?: number | null;
+    reason?: string | null;
+    createdAt?: string | null;
+  }> | null;
+};
+
+export type ForceAddPlayerMutationVariables = Exact<{
+  input: ForceAddPlayerInput;
+}>;
+
+export type ForceAddPlayerMutation = {
+  __typename?: 'Mutation';
+  forceAddPlayer?: {
+    __typename?: 'CommissionerActionResult';
+    success?: boolean | null;
+    message?: string | null;
+  } | null;
+};
+
+export type ForceDropPlayerMutationVariables = Exact<{
+  input: ForceDropPlayerInput;
+}>;
+
+export type ForceDropPlayerMutation = {
+  __typename?: 'Mutation';
+  forceDropPlayer?: {
+    __typename?: 'CommissionerActionResult';
+    success?: boolean | null;
+    message?: string | null;
+  } | null;
+};
+
+export type EditMatchupScoreMutationVariables = Exact<{
+  input: EditMatchupScoreInput;
+}>;
+
+export type EditMatchupScoreMutation = {
+  __typename?: 'Mutation';
+  editMatchupScore?: {
+    __typename?: 'CommissionerActionResult';
+    success?: boolean | null;
+    message?: string | null;
+  } | null;
+};
+
+export type SwapMatchupTeamsMutationVariables = Exact<{
+  input: SwapMatchupTeamsInput;
+}>;
+
+export type SwapMatchupTeamsMutation = {
+  __typename?: 'Mutation';
+  swapMatchupTeams?: {
+    __typename?: 'CommissionerActionResult';
+    success?: boolean | null;
+    message?: string | null;
+  } | null;
+};
+
+export type UpdateCommissionerNoteMutationVariables = Exact<{
+  input: UpdateCommissionerNoteInput;
+}>;
+
+export type UpdateCommissionerNoteMutation = {
+  __typename?: 'Mutation';
+  updateCommissionerNote?: {
+    __typename?: 'CommissionerActionResult';
+    success?: boolean | null;
+    message?: string | null;
+  } | null;
+};
+
+export type SetTeamLockMutationVariables = Exact<{
+  input: SetTeamLockInput;
+}>;
+
+export type SetTeamLockMutation = {
+  __typename?: 'Mutation';
+  setTeamLock?: {
+    __typename?: 'CommissionerActionResult';
+    success?: boolean | null;
+    message?: string | null;
+  } | null;
+};
+
+export type BulkDropTeamPlayersMutationVariables = Exact<{
+  input: BulkDropPlayersInput;
+}>;
+
+export type BulkDropTeamPlayersMutation = {
+  __typename?: 'Mutation';
+  bulkDropTeamPlayers?: {
+    __typename?: 'CommissionerActionResult';
+    success?: boolean | null;
+    message?: string | null;
+  } | null;
+};
+
 export type GetLeagueChatMessagesQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -2299,6 +2544,7 @@ export type LeagueFragment = {
   playoffEnabled?: boolean | null;
   playoffFormat?: string | null;
   playoffMultiWeek?: boolean | null;
+  lmNotes?: string | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -2352,6 +2598,7 @@ export type GetLeagueByIdQuery = {
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
     playoffMultiWeek?: boolean | null;
+    lmNotes?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2393,6 +2640,7 @@ export type CreateLeagueAndTeamsMutation = {
       playoffEnabled?: boolean | null;
       playoffFormat?: string | null;
       playoffMultiWeek?: boolean | null;
+      lmNotes?: string | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -2431,6 +2679,7 @@ export type GetUserLeaguesQuery = {
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
     playoffMultiWeek?: boolean | null;
+    lmNotes?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2501,6 +2750,7 @@ export type StartDraftMutation = {
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
     playoffMultiWeek?: boolean | null;
+    lmNotes?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2578,6 +2828,7 @@ export type GetLeagueTeamsQuery = {
     leagueId?: number | null;
     waiverOrder?: number | null;
     faabBudget?: number | null;
+    isLocked?: boolean | null;
   }> | null;
 };
 
@@ -2665,6 +2916,7 @@ export type UpdateLeagueSettingsMutation = {
     playoffEnabled?: boolean | null;
     playoffFormat?: string | null;
     playoffMultiWeek?: boolean | null;
+    lmNotes?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -4438,6 +4690,7 @@ export type TeamFragment = {
   name?: string | null;
   waiverOrder?: number | null;
   faabBudget?: number | null;
+  isLocked?: boolean | null;
 };
 
 export type TeamMemberFragment = {
@@ -5049,6 +5302,24 @@ export const AchievementRestrictionFragmentDoc = gql`
     updatedAt
   }
 `;
+export const CommissionerActionResultFragmentDoc = gql`
+  fragment CommissionerActionResult on CommissionerActionResult {
+    success
+    message
+  }
+`;
+export const CommissionerAuditLogFragmentDoc = gql`
+  fragment CommissionerAuditLog on CommissionerAuditLog {
+    id
+    leagueId
+    userId
+    action
+    targetType
+    targetId
+    reason
+    createdAt
+  }
+`;
 export const LeagueMemberFragmentDoc = gql`
   fragment LeagueMember on LeagueMember {
     leagueId
@@ -5080,6 +5351,7 @@ export const LeagueFragmentDoc = gql`
     playoffEnabled
     playoffFormat
     playoffMultiWeek
+    lmNotes
     userMembership {
       ...LeagueMember
     }
@@ -5388,6 +5660,7 @@ export const TeamFragmentDoc = gql`
     name
     waiverOrder
     faabBudget
+    isLocked
   }
 `;
 export const TeamMemberFragmentDoc = gql`
@@ -5655,6 +5928,455 @@ export type DeleteAchievementRestrictionMutationResult =
 export type DeleteAchievementRestrictionMutationOptions = BaseMutationOptions<
   DeleteAchievementRestrictionMutation,
   DeleteAchievementRestrictionMutationVariables
+>;
+export const GetCommissionerAuditLogs = gql`
+  query GetCommissionerAuditLogs($leagueId: Int!, $limit: Int) {
+    commissionerAuditLogs(leagueId: $leagueId, limit: $limit) {
+      ...CommissionerAuditLog
+    }
+  }
+  ${CommissionerAuditLogFragmentDoc}
+`;
+
+/**
+ * __useGetCommissionerAuditLogsQuery__
+ *
+ * To run a query within a React component, call `useGetCommissionerAuditLogsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetCommissionerAuditLogsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetCommissionerAuditLogsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetCommissionerAuditLogsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetCommissionerAuditLogsQuery,
+    GetCommissionerAuditLogsQueryVariables
+  > &
+    (
+      | { variables: GetCommissionerAuditLogsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetCommissionerAuditLogsQuery,
+    GetCommissionerAuditLogsQueryVariables
+  >(GetCommissionerAuditLogs, options);
+}
+export function useGetCommissionerAuditLogsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetCommissionerAuditLogsQuery,
+    GetCommissionerAuditLogsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetCommissionerAuditLogsQuery,
+    GetCommissionerAuditLogsQueryVariables
+  >(GetCommissionerAuditLogs, options);
+}
+export function useGetCommissionerAuditLogsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetCommissionerAuditLogsQuery,
+        GetCommissionerAuditLogsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetCommissionerAuditLogsQuery,
+    GetCommissionerAuditLogsQueryVariables
+  >(
+    GetCommissionerAuditLogs,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetCommissionerAuditLogsQuery,
+          GetCommissionerAuditLogsQueryVariables
+        >,
+  );
+}
+export type GetCommissionerAuditLogsQueryHookResult = ReturnType<
+  typeof useGetCommissionerAuditLogsQuery
+>;
+export type GetCommissionerAuditLogsLazyQueryHookResult = ReturnType<
+  typeof useGetCommissionerAuditLogsLazyQuery
+>;
+export type GetCommissionerAuditLogsSuspenseQueryHookResult = ReturnType<
+  typeof useGetCommissionerAuditLogsSuspenseQuery
+>;
+export type GetCommissionerAuditLogsQueryResult = Apollo.QueryResult<
+  GetCommissionerAuditLogsQuery,
+  GetCommissionerAuditLogsQueryVariables
+>;
+export const ForceAddPlayer = gql`
+  mutation ForceAddPlayer($input: ForceAddPlayerInput!) {
+    forceAddPlayer(input: $input) {
+      ...CommissionerActionResult
+    }
+  }
+  ${CommissionerActionResultFragmentDoc}
+`;
+export type ForceAddPlayerMutationFn = MutationFunction<
+  ForceAddPlayerMutation,
+  ForceAddPlayerMutationVariables
+>;
+
+/**
+ * __useForceAddPlayerMutation__
+ *
+ * To run a mutation, you first call `useForceAddPlayerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useForceAddPlayerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [forceAddPlayerMutation, { data, loading, error }] = useForceAddPlayerMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useForceAddPlayerMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ForceAddPlayerMutation,
+    ForceAddPlayerMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ForceAddPlayerMutation,
+    ForceAddPlayerMutationVariables
+  >(ForceAddPlayer, options);
+}
+export type ForceAddPlayerMutationHookResult = ReturnType<
+  typeof useForceAddPlayerMutation
+>;
+export type ForceAddPlayerMutationResult =
+  Apollo.MutationResult<ForceAddPlayerMutation>;
+export type ForceAddPlayerMutationOptions = BaseMutationOptions<
+  ForceAddPlayerMutation,
+  ForceAddPlayerMutationVariables
+>;
+export const ForceDropPlayer = gql`
+  mutation ForceDropPlayer($input: ForceDropPlayerInput!) {
+    forceDropPlayer(input: $input) {
+      ...CommissionerActionResult
+    }
+  }
+  ${CommissionerActionResultFragmentDoc}
+`;
+export type ForceDropPlayerMutationFn = MutationFunction<
+  ForceDropPlayerMutation,
+  ForceDropPlayerMutationVariables
+>;
+
+/**
+ * __useForceDropPlayerMutation__
+ *
+ * To run a mutation, you first call `useForceDropPlayerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useForceDropPlayerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [forceDropPlayerMutation, { data, loading, error }] = useForceDropPlayerMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useForceDropPlayerMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ForceDropPlayerMutation,
+    ForceDropPlayerMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ForceDropPlayerMutation,
+    ForceDropPlayerMutationVariables
+  >(ForceDropPlayer, options);
+}
+export type ForceDropPlayerMutationHookResult = ReturnType<
+  typeof useForceDropPlayerMutation
+>;
+export type ForceDropPlayerMutationResult =
+  Apollo.MutationResult<ForceDropPlayerMutation>;
+export type ForceDropPlayerMutationOptions = BaseMutationOptions<
+  ForceDropPlayerMutation,
+  ForceDropPlayerMutationVariables
+>;
+export const EditMatchupScore = gql`
+  mutation EditMatchupScore($input: EditMatchupScoreInput!) {
+    editMatchupScore(input: $input) {
+      ...CommissionerActionResult
+    }
+  }
+  ${CommissionerActionResultFragmentDoc}
+`;
+export type EditMatchupScoreMutationFn = MutationFunction<
+  EditMatchupScoreMutation,
+  EditMatchupScoreMutationVariables
+>;
+
+/**
+ * __useEditMatchupScoreMutation__
+ *
+ * To run a mutation, you first call `useEditMatchupScoreMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useEditMatchupScoreMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [editMatchupScoreMutation, { data, loading, error }] = useEditMatchupScoreMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useEditMatchupScoreMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    EditMatchupScoreMutation,
+    EditMatchupScoreMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    EditMatchupScoreMutation,
+    EditMatchupScoreMutationVariables
+  >(EditMatchupScore, options);
+}
+export type EditMatchupScoreMutationHookResult = ReturnType<
+  typeof useEditMatchupScoreMutation
+>;
+export type EditMatchupScoreMutationResult =
+  Apollo.MutationResult<EditMatchupScoreMutation>;
+export type EditMatchupScoreMutationOptions = BaseMutationOptions<
+  EditMatchupScoreMutation,
+  EditMatchupScoreMutationVariables
+>;
+export const SwapMatchupTeams = gql`
+  mutation SwapMatchupTeams($input: SwapMatchupTeamsInput!) {
+    swapMatchupTeams(input: $input) {
+      ...CommissionerActionResult
+    }
+  }
+  ${CommissionerActionResultFragmentDoc}
+`;
+export type SwapMatchupTeamsMutationFn = MutationFunction<
+  SwapMatchupTeamsMutation,
+  SwapMatchupTeamsMutationVariables
+>;
+
+/**
+ * __useSwapMatchupTeamsMutation__
+ *
+ * To run a mutation, you first call `useSwapMatchupTeamsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSwapMatchupTeamsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [swapMatchupTeamsMutation, { data, loading, error }] = useSwapMatchupTeamsMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useSwapMatchupTeamsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SwapMatchupTeamsMutation,
+    SwapMatchupTeamsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SwapMatchupTeamsMutation,
+    SwapMatchupTeamsMutationVariables
+  >(SwapMatchupTeams, options);
+}
+export type SwapMatchupTeamsMutationHookResult = ReturnType<
+  typeof useSwapMatchupTeamsMutation
+>;
+export type SwapMatchupTeamsMutationResult =
+  Apollo.MutationResult<SwapMatchupTeamsMutation>;
+export type SwapMatchupTeamsMutationOptions = BaseMutationOptions<
+  SwapMatchupTeamsMutation,
+  SwapMatchupTeamsMutationVariables
+>;
+export const UpdateCommissionerNote = gql`
+  mutation UpdateCommissionerNote($input: UpdateCommissionerNoteInput!) {
+    updateCommissionerNote(input: $input) {
+      ...CommissionerActionResult
+    }
+  }
+  ${CommissionerActionResultFragmentDoc}
+`;
+export type UpdateCommissionerNoteMutationFn = MutationFunction<
+  UpdateCommissionerNoteMutation,
+  UpdateCommissionerNoteMutationVariables
+>;
+
+/**
+ * __useUpdateCommissionerNoteMutation__
+ *
+ * To run a mutation, you first call `useUpdateCommissionerNoteMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateCommissionerNoteMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateCommissionerNoteMutation, { data, loading, error }] = useUpdateCommissionerNoteMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateCommissionerNoteMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateCommissionerNoteMutation,
+    UpdateCommissionerNoteMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateCommissionerNoteMutation,
+    UpdateCommissionerNoteMutationVariables
+  >(UpdateCommissionerNote, options);
+}
+export type UpdateCommissionerNoteMutationHookResult = ReturnType<
+  typeof useUpdateCommissionerNoteMutation
+>;
+export type UpdateCommissionerNoteMutationResult =
+  Apollo.MutationResult<UpdateCommissionerNoteMutation>;
+export type UpdateCommissionerNoteMutationOptions = BaseMutationOptions<
+  UpdateCommissionerNoteMutation,
+  UpdateCommissionerNoteMutationVariables
+>;
+export const SetTeamLock = gql`
+  mutation SetTeamLock($input: SetTeamLockInput!) {
+    setTeamLock(input: $input) {
+      ...CommissionerActionResult
+    }
+  }
+  ${CommissionerActionResultFragmentDoc}
+`;
+export type SetTeamLockMutationFn = MutationFunction<
+  SetTeamLockMutation,
+  SetTeamLockMutationVariables
+>;
+
+/**
+ * __useSetTeamLockMutation__
+ *
+ * To run a mutation, you first call `useSetTeamLockMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetTeamLockMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setTeamLockMutation, { data, loading, error }] = useSetTeamLockMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useSetTeamLockMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SetTeamLockMutation,
+    SetTeamLockMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<SetTeamLockMutation, SetTeamLockMutationVariables>(
+    SetTeamLock,
+    options,
+  );
+}
+export type SetTeamLockMutationHookResult = ReturnType<
+  typeof useSetTeamLockMutation
+>;
+export type SetTeamLockMutationResult =
+  Apollo.MutationResult<SetTeamLockMutation>;
+export type SetTeamLockMutationOptions = BaseMutationOptions<
+  SetTeamLockMutation,
+  SetTeamLockMutationVariables
+>;
+export const BulkDropTeamPlayers = gql`
+  mutation BulkDropTeamPlayers($input: BulkDropPlayersInput!) {
+    bulkDropTeamPlayers(input: $input) {
+      ...CommissionerActionResult
+    }
+  }
+  ${CommissionerActionResultFragmentDoc}
+`;
+export type BulkDropTeamPlayersMutationFn = MutationFunction<
+  BulkDropTeamPlayersMutation,
+  BulkDropTeamPlayersMutationVariables
+>;
+
+/**
+ * __useBulkDropTeamPlayersMutation__
+ *
+ * To run a mutation, you first call `useBulkDropTeamPlayersMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useBulkDropTeamPlayersMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [bulkDropTeamPlayersMutation, { data, loading, error }] = useBulkDropTeamPlayersMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useBulkDropTeamPlayersMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    BulkDropTeamPlayersMutation,
+    BulkDropTeamPlayersMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    BulkDropTeamPlayersMutation,
+    BulkDropTeamPlayersMutationVariables
+  >(BulkDropTeamPlayers, options);
+}
+export type BulkDropTeamPlayersMutationHookResult = ReturnType<
+  typeof useBulkDropTeamPlayersMutation
+>;
+export type BulkDropTeamPlayersMutationResult =
+  Apollo.MutationResult<BulkDropTeamPlayersMutation>;
+export type BulkDropTeamPlayersMutationOptions = BaseMutationOptions<
+  BulkDropTeamPlayersMutation,
+  BulkDropTeamPlayersMutationVariables
 >;
 export const GetLeagueChatMessages = gql`
   query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {
@@ -6674,6 +7396,7 @@ export const GetLeagueTeams = gql`
       leagueId
       waiverOrder
       faabBudget
+      isLocked
     }
   }
 `;

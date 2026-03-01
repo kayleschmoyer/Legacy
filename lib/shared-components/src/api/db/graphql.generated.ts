@@ -111,6 +111,12 @@ export type AverageSeasonBatting = {
   stolenBases?: Maybe<Scalars['Float']['output']>;
 };
 
+export type BulkDropPlayersInput = {
+  leagueId: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
 /** Career honours and awards sourced from Baseball Reference */
 export type CareerAchievements = {
   __typename?: 'CareerAchievements';
@@ -242,6 +248,26 @@ export type ChampionTrophy = {
   season?: Maybe<Scalars['Int']['output']>;
   teamId?: Maybe<Scalars['Int']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Result of a commissioner action */
+export type CommissionerActionResult = {
+  __typename?: 'CommissionerActionResult';
+  message?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+};
+
+/** An audit-trail entry for a commissioner action */
+export type CommissionerAuditLog = {
+  __typename?: 'CommissionerAuditLog';
+  action?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  targetId?: Maybe<Scalars['Int']['output']>;
+  targetType?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
 };
 
 export enum ConsentType {
@@ -390,6 +416,27 @@ export type DraftPlayer = {
   lastName?: Maybe<Scalars['String']['output']>;
 };
 
+export type EditMatchupScoreInput = {
+  matchupId: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  team1Score: Scalars['Float']['input'];
+  team2Score: Scalars['Float']['input'];
+};
+
+export type ForceAddPlayerInput = {
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
+export type ForceDropPlayerInput = {
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
 export type GameBatting = {
   __typename?: 'GameBatting';
   atBats?: Maybe<Scalars['Int']['output']>;
@@ -510,6 +557,7 @@ export type League = {
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
+  lmNotes?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
   minCareerSeasons?: Maybe<Scalars['Int']['output']>;
@@ -773,6 +821,8 @@ export type Mutation = {
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
   awardChampionship?: Maybe<ChampionTrophy>;
+  /** Commissioner: drop all players from a team (useful for inactive teams). */
+  bulkDropTeamPlayers?: Maybe<CommissionerActionResult>;
   /** Cancel a pending trade offer as the team that proposed it. */
   cancelTrade?: Maybe<TradeOffer>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
@@ -789,6 +839,12 @@ export type Mutation = {
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
+  /** Commissioner: edit the scores of a past or current matchup. All edits are audit-logged. */
+  editMatchupScore?: Maybe<CommissionerActionResult>;
+  /** Commissioner: force-add a player to a team, bypassing normal acquisition rules. */
+  forceAddPlayer?: Maybe<CommissionerActionResult>;
+  /** Commissioner: force-drop a player from a team. */
+  forceDropPlayer?: Maybe<CommissionerActionResult>;
   /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
   impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
@@ -819,9 +875,15 @@ export type Mutation = {
   sendDirectMessage?: Maybe<DirectMessage>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
+  /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
+  setTeamLock?: Maybe<CommissionerActionResult>;
   startDraft?: Maybe<League>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
+  /** Commissioner: swap the team assignments between two matchups in the same league. */
+  swapMatchupTeams?: Maybe<CommissionerActionResult>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
+  /** Commissioner: update the persistent LM note for a league. */
+  updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
@@ -865,6 +927,10 @@ export type MutationAutoSelectGamesArgs = {
 
 export type MutationAwardChampionshipArgs = {
   bracketId: Scalars['Int']['input'];
+};
+
+export type MutationBulkDropTeamPlayersArgs = {
+  input: BulkDropPlayersInput;
 };
 
 export type MutationCancelTradeArgs = {
@@ -931,6 +997,18 @@ export type MutationDeleteLeagueArgs = {
 
 export type MutationDisableDeviceTokenArgs = {
   deviceToken: Scalars['String']['input'];
+};
+
+export type MutationEditMatchupScoreArgs = {
+  input: EditMatchupScoreInput;
+};
+
+export type MutationForceAddPlayerArgs = {
+  input: ForceAddPlayerInput;
+};
+
+export type MutationForceDropPlayerArgs = {
+  input: ForceDropPlayerInput;
 };
 
 export type MutationImpersonateUserArgs = {
@@ -1035,6 +1113,10 @@ export type MutationSendMatchupMessageArgs = {
   replyToMessageId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationSetTeamLockArgs = {
+  input: SetTeamLockInput;
+};
+
 export type MutationStartDraftArgs = {
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
@@ -1049,11 +1131,19 @@ export type MutationSwapMatchupPlayerPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationSwapMatchupTeamsArgs = {
+  input: SwapMatchupTeamsInput;
+};
+
 export type MutationSwapTeamMemberPositionsArgs = {
   positionIdA?: InputMaybe<Scalars['Int']['input']>;
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
+};
+
+export type MutationUpdateCommissionerNoteArgs = {
+  input: UpdateCommissionerNoteInput;
 };
 
 export type MutationUpdateDraftSettingsArgs = {
@@ -1297,6 +1387,8 @@ export type Query = {
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
+  /** Commissioner: fetch the audit log for all commissioner actions in a league. */
+  commissionerAuditLogs?: Maybe<Array<CommissionerAuditLog>>;
   defaultScoringProfile?: Maybe<ScoringConfig>;
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
@@ -1405,6 +1497,11 @@ export type QueryCareerPitchingStatsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryCommissionerAuditLogsArgs = {
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryGetAvailableDraftPlayersArgs = {
@@ -1896,6 +1993,13 @@ export type SeasonResults = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+export type SetTeamLockInput = {
+  leagueId: Scalars['Int']['input'];
+  locked: Scalars['Boolean']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
 export enum StatsLoadingStatus {
   Completed = 'completed',
   Failed = 'failed',
@@ -1905,6 +2009,12 @@ export enum StatsLoadingStatus {
   Retry = 'retry',
 }
 
+export type SwapMatchupTeamsInput = {
+  matchupId1: Scalars['Int']['input'];
+  matchupId2: Scalars['Int']['input'];
+  reason?: InputMaybe<Scalars['String']['input']>;
+};
+
 /** A team in a league */
 export type Team = {
   __typename?: 'Team';
@@ -1912,6 +2022,7 @@ export type Team = {
   divisionId?: Maybe<Scalars['Int']['output']>;
   faabBudget?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  isLocked?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
@@ -2013,6 +2124,11 @@ export type TradeOfferPlayer = {
   playerName?: Maybe<Scalars['String']['output']>;
   playerPosition?: Maybe<Scalars['String']['output']>;
   tradeOfferId?: Maybe<Scalars['Int']['output']>;
+};
+
+export type UpdateCommissionerNoteInput = {
+  leagueId: Scalars['Int']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateDraftSettingsInput = {

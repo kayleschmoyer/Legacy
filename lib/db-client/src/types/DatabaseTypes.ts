@@ -8,6 +8,7 @@ import {
   careerBatting,
   careerFielding,
   careerPitching,
+  commissionerAuditLog,
   gameBatting,
   gameFielding,
   gamePitching,
@@ -76,6 +77,7 @@ export type LeagueScoringProfile = typeof leagueScoringProfiles.$inferSelect;
 export type LeagueScoringProfileEntry =
   typeof leagueScoringProfileEntries.$inferSelect;
 export type LeagueScoringChangeLog = typeof leagueScoringChangeLog.$inferSelect;
+export type CommissionerAuditLog = typeof commissionerAuditLog.$inferSelect;
 
 export type CreatePlayerInput = typeof players.$inferInsert;
 export type CreateMatchupPlayer = typeof matchupPlayers.$inferInsert;
