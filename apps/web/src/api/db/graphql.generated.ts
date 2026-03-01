@@ -561,6 +561,7 @@ export type League = {
   hofOnly?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
+  isPublic?: Maybe<Scalars['Boolean']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
@@ -855,6 +856,7 @@ export type Mutation = {
   inviteAssistantManager?: Maybe<LeagueMember>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
+  joinPublicLeague?: Maybe<JoinLeaguePayload>;
   makeDraftPick?: Maybe<DraftPick>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
@@ -1039,6 +1041,11 @@ export type MutationJoinLeagueArgs = {
 
 export type MutationJoinLeagueByCodeArgs = {
   inviteCode: Scalars['String']['input'];
+  teamName: Scalars['String']['input'];
+};
+
+export type MutationJoinPublicLeagueArgs = {
+  leagueId: Scalars['Int']['input'];
   teamName: Scalars['String']['input'];
 };
 
@@ -1392,6 +1399,22 @@ export type ProcessWaiverClaimsResult = {
   succeeded?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A public league available for discovery and joining */
+export type PublicLeagueInfo = {
+  __typename?: 'PublicLeagueInfo';
+  availableSpots?: Maybe<Scalars['Int']['output']>;
+  draftStatus?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isAlreadyMember?: Maybe<Scalars['Boolean']['output']>;
+  isFull?: Maybe<Scalars['Boolean']['output']>;
+  isPublic?: Maybe<Scalars['Boolean']['output']>;
+  maxRosterSize?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  owner?: Maybe<Scalars['Int']['output']>;
+  playerPool?: Maybe<Scalars['String']['output']>;
+  totalSpots?: Maybe<Scalars['Int']['output']>;
+};
+
 export type Query = {
   __typename?: 'Query';
   /** Return all achievement restrictions configured for a league, sorted by achievement type */
@@ -1458,6 +1481,7 @@ export type Query = {
   players?: Maybe<Array<Player>>;
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
+  publicLeagues: Array<PublicLeagueInfo>;
   scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
@@ -1727,6 +1751,14 @@ export type QueryPlayersArgs = {
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryPublicLeaguesArgs = {
+  draftStatus?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -2562,6 +2594,7 @@ export type LeagueFragment = {
   playoffFormat?: string | null;
   playoffMultiWeek?: boolean | null;
   lmNotes?: string | null;
+  isPublic?: boolean | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -2616,6 +2649,7 @@ export type GetLeagueByIdQuery = {
     playoffFormat?: string | null;
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
+    isPublic?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2658,6 +2692,7 @@ export type CreateLeagueAndTeamsMutation = {
       playoffFormat?: string | null;
       playoffMultiWeek?: boolean | null;
       lmNotes?: string | null;
+      isPublic?: boolean | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -2697,6 +2732,7 @@ export type GetUserLeaguesQuery = {
     playoffFormat?: string | null;
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
+    isPublic?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2768,6 +2804,7 @@ export type StartDraftMutation = {
     playoffFormat?: string | null;
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
+    isPublic?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2934,6 +2971,7 @@ export type UpdateLeagueSettingsMutation = {
     playoffFormat?: string | null;
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
+    isPublic?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -2941,6 +2979,48 @@ export type UpdateLeagueSettingsMutation = {
       teamId?: number | null;
       permissionLevel?: string | null;
     } | null;
+  } | null;
+};
+
+export type GetPublicLeaguesQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  draftStatus?: InputMaybe<Scalars['String']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetPublicLeaguesQuery = {
+  __typename?: 'Query';
+  publicLeagues: Array<{
+    __typename?: 'PublicLeagueInfo';
+    id?: number | null;
+    name?: string | null;
+    owner?: number | null;
+    maxRosterSize?: number | null;
+    draftStatus?: string | null;
+    playerPool?: string | null;
+    isPublic?: boolean | null;
+    totalSpots?: number | null;
+    availableSpots?: number | null;
+    isFull?: boolean | null;
+    isAlreadyMember?: boolean | null;
+  }>;
+};
+
+export type JoinPublicLeagueMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  teamName: Scalars['String']['input'];
+}>;
+
+export type JoinPublicLeagueMutation = {
+  __typename?: 'Mutation';
+  joinPublicLeague?: {
+    __typename?: 'JoinLeaguePayload';
+    success?: boolean | null;
+    message?: string | null;
+    leagueId?: number | null;
+    teamId?: number | null;
   } | null;
 };
 
@@ -5370,6 +5450,7 @@ export const LeagueFragmentDoc = gql`
     playoffFormat
     playoffMultiWeek
     lmNotes
+    isPublic
     userMembership {
       ...LeagueMember
     }
@@ -7760,6 +7841,172 @@ export type UpdateLeagueSettingsMutationResult =
 export type UpdateLeagueSettingsMutationOptions = BaseMutationOptions<
   UpdateLeagueSettingsMutation,
   UpdateLeagueSettingsMutationVariables
+>;
+export const GetPublicLeagues = gql`
+  query GetPublicLeagues(
+    $search: String
+    $draftStatus: String
+    $playerPool: String
+    $limit: Int
+    $offset: Int
+  ) {
+    publicLeagues(
+      search: $search
+      draftStatus: $draftStatus
+      playerPool: $playerPool
+      limit: $limit
+      offset: $offset
+    ) {
+      id
+      name
+      owner
+      maxRosterSize
+      draftStatus
+      playerPool
+      isPublic
+      totalSpots
+      availableSpots
+      isFull
+      isAlreadyMember
+    }
+  }
+`;
+
+/**
+ * __useGetPublicLeaguesQuery__
+ *
+ * To run a query within a React component, call `useGetPublicLeaguesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPublicLeaguesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPublicLeaguesQuery({
+ *   variables: {
+ *      search: // value for 'search'
+ *      draftStatus: // value for 'draftStatus'
+ *      playerPool: // value for 'playerPool'
+ *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
+ *   },
+ * });
+ */
+export function useGetPublicLeaguesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetPublicLeaguesQuery,
+    GetPublicLeaguesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetPublicLeaguesQuery, GetPublicLeaguesQueryVariables>(
+    GetPublicLeagues,
+    options,
+  );
+}
+export function useGetPublicLeaguesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPublicLeaguesQuery,
+    GetPublicLeaguesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPublicLeaguesQuery,
+    GetPublicLeaguesQueryVariables
+  >(GetPublicLeagues, options);
+}
+export function useGetPublicLeaguesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPublicLeaguesQuery,
+        GetPublicLeaguesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPublicLeaguesQuery,
+    GetPublicLeaguesQueryVariables
+  >(
+    GetPublicLeagues,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPublicLeaguesQuery,
+          GetPublicLeaguesQueryVariables
+        >,
+  );
+}
+export type GetPublicLeaguesQueryHookResult = ReturnType<
+  typeof useGetPublicLeaguesQuery
+>;
+export type GetPublicLeaguesLazyQueryHookResult = ReturnType<
+  typeof useGetPublicLeaguesLazyQuery
+>;
+export type GetPublicLeaguesSuspenseQueryHookResult = ReturnType<
+  typeof useGetPublicLeaguesSuspenseQuery
+>;
+export type GetPublicLeaguesQueryResult = Apollo.QueryResult<
+  GetPublicLeaguesQuery,
+  GetPublicLeaguesQueryVariables
+>;
+export const JoinPublicLeague = gql`
+  mutation JoinPublicLeague($leagueId: Int!, $teamName: String!) {
+    joinPublicLeague(leagueId: $leagueId, teamName: $teamName) {
+      success
+      message
+      leagueId
+      teamId
+    }
+  }
+`;
+export type JoinPublicLeagueMutationFn = MutationFunction<
+  JoinPublicLeagueMutation,
+  JoinPublicLeagueMutationVariables
+>;
+
+/**
+ * __useJoinPublicLeagueMutation__
+ *
+ * To run a mutation, you first call `useJoinPublicLeagueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useJoinPublicLeagueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [joinPublicLeagueMutation, { data, loading, error }] = useJoinPublicLeagueMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      teamName: // value for 'teamName'
+ *   },
+ * });
+ */
+export function useJoinPublicLeagueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    JoinPublicLeagueMutation,
+    JoinPublicLeagueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    JoinPublicLeagueMutation,
+    JoinPublicLeagueMutationVariables
+  >(JoinPublicLeague, options);
+}
+export type JoinPublicLeagueMutationHookResult = ReturnType<
+  typeof useJoinPublicLeagueMutation
+>;
+export type JoinPublicLeagueMutationResult =
+  Apollo.MutationResult<JoinPublicLeagueMutation>;
+export type JoinPublicLeagueMutationOptions = BaseMutationOptions<
+  JoinPublicLeagueMutation,
+  JoinPublicLeagueMutationVariables
 >;
 export const GetUserTeamId = gql`
   query GetUserTeamId($leagueId: Int!) {

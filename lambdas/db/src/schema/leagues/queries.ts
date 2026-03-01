@@ -2,11 +2,12 @@
  * League domain — Query resolvers
  *
  * Queries: league, userLeagues, leaguePositions, leagueTeams,
- *          userTeamId, validateInviteCode, teamLeagueMembers
+ *          userTeamId, validateInviteCode, teamLeagueMembers,
+ *          publicLeagues
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, eq, ilike, sql, SQL } from 'drizzle-orm';
 import {
   League,
   LeagueMember,
@@ -34,26 +35,7 @@ builder.queryField('league', (t) =>
       const userId = context.user.id;
 
       try {
-        // Query the database for the specific league
-        // First check if user has access to this league
-        const memberCheck = await context.db
-          .select({
-            leagueId: PublicSchema.leagueMembers.leagueId,
-          })
-          .from(PublicSchema.leagueMembers)
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, leagueId),
-              eq(PublicSchema.leagueMembers.userId, userId),
-            ),
-          )
-          .limit(1);
-
-        if (memberCheck.length === 0) {
-          throw new Error('Access denied: You are not a member of this league');
-        }
-
-        // Get the league details
+        // Get the league details first (needed to check isPublic for access control)
         const results = await context.db
           .select({
             id: PublicSchema.leagues.id,
@@ -68,6 +50,7 @@ builder.queryField('league', (t) =>
             waiverType: PublicSchema.leagues.waiverType,
             waiverEnabled: PublicSchema.leagues.waiverEnabled,
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
+            isPublic: PublicSchema.leagues.isPublic,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -99,6 +82,14 @@ builder.queryField('league', (t) =>
         const userMembership =
           membershipResults.length > 0 ? membershipResults[0] : null;
 
+        // Access control: members always have access; non-members can only view public leagues (spectator mode)
+        if (!userMembership && !league.isPublic) {
+          throw new Error('Access denied: You are not a member of this league');
+        }
+
+        // Non-members (spectators) do not receive the invite code; use empty string since the field is non-nullable
+        const inviteCode = userMembership ? (league.inviteCode ?? '') : '';
+
         return {
           id: league.id,
           name: league.name,
@@ -106,12 +97,13 @@ builder.queryField('league', (t) =>
           maxRosterSize: league.maxRosterSize,
           currentMatchup: league.currentMatchup,
           draftStatus: league.draftStatus,
-          inviteCode: league.inviteCode,
+          inviteCode,
           playerPool: league.playerPool,
           weekAdvanceStatus: league.weekAdvanceStatus,
           waiverType: league.waiverType,
           waiverEnabled: league.waiverEnabled,
           faabBudgetDefault: league.faabBudgetDefault,
+          isPublic: league.isPublic,
           userMembership,
         };
       } catch (error) {
@@ -154,6 +146,7 @@ builder.queryField('userLeagues', (t) =>
             waiverType: PublicSchema.leagues.waiverType,
             waiverEnabled: PublicSchema.leagues.waiverEnabled,
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
+            isPublic: PublicSchema.leagues.isPublic,
           })
           .from(PublicSchema.leagues)
           .innerJoin(
@@ -176,6 +169,7 @@ builder.queryField('userLeagues', (t) =>
           waiverType: league.waiverType,
           waiverEnabled: league.waiverEnabled,
           faabBudgetDefault: league.faabBudgetDefault,
+          isPublic: league.isPublic,
         }));
       } catch (error) {
         LOGGER.error('Failed to fetch user leagues', {
@@ -575,6 +569,154 @@ builder.queryField('teamLeagueMembers', (t) =>
         );
 
       return members;
+    },
+  }),
+);
+
+// ── Public League Discovery ───────────────────────────────────────────────
+
+/**
+ * PublicLeagueInfo — extended league info for the discovery browse page.
+ * Includes team-slot counts so the UI can show "X of Y spots available".
+ */
+const PublicLeagueInfo = builder.objectRef<{
+  id: number;
+  name: string;
+  owner: number;
+  maxRosterSize: number;
+  draftStatus: string;
+  playerPool: string;
+  isPublic: boolean;
+  totalSpots: number;
+  availableSpots: number;
+  isFull: boolean;
+  isAlreadyMember: boolean;
+}>('PublicLeagueInfo');
+
+PublicLeagueInfo.implement({
+  description: 'A public league available for discovery and joining',
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    name: t.exposeString('name'),
+    owner: t.exposeInt('owner'),
+    maxRosterSize: t.exposeInt('maxRosterSize'),
+    draftStatus: t.exposeString('draftStatus'),
+    playerPool: t.exposeString('playerPool'),
+    isPublic: t.exposeBoolean('isPublic'),
+    totalSpots: t.exposeInt('totalSpots'),
+    availableSpots: t.exposeInt('availableSpots'),
+    isFull: t.exposeBoolean('isFull'),
+    isAlreadyMember: t.exposeBoolean('isAlreadyMember'),
+  }),
+});
+
+/**
+ * Query: publicLeagues
+ *
+ * Browse open leagues that are visible to all authenticated users.
+ * Supports search by name, and filters by draftStatus and playerPool.
+ */
+builder.queryField('publicLeagues', (t) =>
+  t.field({
+    type: [PublicLeagueInfo],
+    nullable: false,
+    args: {
+      search: t.arg.string({ required: false }),
+      draftStatus: t.arg.string({ required: false }),
+      playerPool: t.arg.string({ required: false }),
+      limit: t.arg.int({ required: false }),
+      offset: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required to browse public leagues');
+      }
+
+      const userId = context.user.id;
+      const limitVal = args.limit ?? 20;
+      const offsetVal = args.offset ?? 0;
+
+      try {
+        // Build WHERE conditions
+        const conditions: SQL[] = [eq(PublicSchema.leagues.isPublic, true)];
+
+        if (args.draftStatus) {
+          conditions.push(
+            eq(
+              PublicSchema.leagues.draftStatus,
+              args.draftStatus as
+                | 'not-started'
+                | 'queued'
+                | 'in-progress'
+                | 'paused'
+                | 'completed',
+            ),
+          );
+        }
+
+        if (args.playerPool) {
+          conditions.push(
+            eq(
+              PublicSchema.leagues.playerPool,
+              args.playerPool as 'all' | 'nl' | 'al',
+            ),
+          );
+        }
+
+        if (args.search) {
+          conditions.push(ilike(PublicSchema.leagues.name, `%${args.search}%`));
+        }
+
+        const rows = await context.db
+          .select({
+            id: PublicSchema.leagues.id,
+            name: PublicSchema.leagues.name,
+            owner: PublicSchema.leagues.owner,
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            draftStatus: PublicSchema.leagues.draftStatus,
+            playerPool: PublicSchema.leagues.playerPool,
+            isPublic: PublicSchema.leagues.isPublic,
+            totalSpots: sql<number>`(
+              SELECT COUNT(*)::int FROM teams WHERE teams.league_id = ${PublicSchema.leagues.id}
+            )`,
+            claimedSpots: sql<number>`(
+              SELECT COUNT(*)::int FROM league_members WHERE league_members.league_id = ${PublicSchema.leagues.id}
+            )`,
+            isAlreadyMember: sql<boolean>`EXISTS (
+              SELECT 1 FROM league_members
+              WHERE league_members.league_id = ${PublicSchema.leagues.id}
+                AND league_members.user_id = ${userId}
+            )`,
+          })
+          .from(PublicSchema.leagues)
+          .where(and(...conditions))
+          .orderBy(PublicSchema.leagues.id)
+          .limit(limitVal)
+          .offset(offsetVal);
+
+        return rows.map((row) => {
+          const availableSpots = Math.max(0, row.totalSpots - row.claimedSpots);
+          return {
+            id: row.id,
+            name: row.name,
+            owner: row.owner,
+            maxRosterSize: row.maxRosterSize,
+            draftStatus: row.draftStatus,
+            playerPool: row.playerPool,
+            isPublic: row.isPublic,
+            totalSpots: row.totalSpots,
+            availableSpots,
+            isFull: availableSpots === 0,
+            isAlreadyMember: Boolean(row.isAlreadyMember),
+          };
+        });
+      } catch (error) {
+        LOGGER.error('Error fetching public leagues', {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new Error('Failed to fetch public leagues');
+      }
     },
   }),
 );

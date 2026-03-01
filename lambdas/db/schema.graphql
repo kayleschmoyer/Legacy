@@ -570,6 +570,7 @@ type League {
   hofOnly: Boolean
   id: Int
   inviteCode: String
+  isPublic: Boolean
   lmNotes: String
   maxRosterSize: Int
   minCareerGames: Int
@@ -983,6 +984,7 @@ type Mutation {
   inviteAssistantManager(teamId: Int!, username: String!): LeagueMember
   joinLeague(inviteCode: String!, teamName: String!): JoinLeaguePayload
   joinLeagueByCode(inviteCode: String!, teamName: String!): Team
+  joinPublicLeague(leagueId: Int!, teamName: String!): JoinLeaguePayload
   makeDraftPick(draftId: Int!, playerId: Int!): DraftPick
   markAllNotificationsAsRead: Boolean
   markNotificationAsRead(notificationId: Int!): Boolean
@@ -1331,6 +1333,23 @@ type ProcessWaiverClaimsResult {
   succeeded: Int
 }
 
+"""
+A public league available for discovery and joining
+"""
+type PublicLeagueInfo {
+  availableSpots: Int
+  draftStatus: String
+  id: Int
+  isAlreadyMember: Boolean
+  isFull: Boolean
+  isPublic: Boolean
+  maxRosterSize: Int
+  name: String
+  owner: Int
+  playerPool: String
+  totalSpots: Int
+}
+
 type Query {
   """
   Return all achievement restrictions configured for a league, sorted by achievement type
@@ -1471,6 +1490,13 @@ type Query {
   Check if the authenticated user has accepted the privacy policy
   """
   privacyPolicyStatus: PrivacyPolicyStatus
+  publicLeagues(
+    draftStatus: String
+    limit: Int
+    offset: Int
+    playerPool: String
+    search: String
+  ): [PublicLeagueInfo!]!
   scoringDefinitions: [ScoringStatDefinition!]
   searchPlayers(limit: Int, searchTerm: String!): [Player!]
   searchUsers(limit: Int, searchTerm: String!): [User!]

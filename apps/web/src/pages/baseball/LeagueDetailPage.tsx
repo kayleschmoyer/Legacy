@@ -62,6 +62,7 @@ import {
   useGetTeamMembersLazyQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdLazyQuery,
+  useJoinPublicLeagueMutation,
   useRenameTeamMutation,
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
@@ -605,6 +606,40 @@ export function LeagueDetailPage(): React.JSX.Element {
         }));
 
   const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
+
+  // Spectator mode: authenticated user viewing a public league they are not a member of
+  const isSpectator = !!(
+    data?.league?.isPublic && !data?.league?.userMembership
+  );
+
+  // ── Spectator join flow ──────────────────────────────────────────────────
+  const [spectatorTeamName, setSpectatorTeamName] = useState('');
+  const [spectatorJoinError, setSpectatorJoinError] = useState<string | null>(
+    null,
+  );
+  const [spectatorJoinSuccess, setSpectatorJoinSuccess] = useState(false);
+  const [showSpectatorJoin, setShowSpectatorJoin] = useState(false);
+
+  const [joinPublicLeague, { loading: joiningLeague }] =
+    useJoinPublicLeagueMutation();
+
+  const handleSpectatorJoin = useCallback(async () => {
+    if (!spectatorTeamName.trim()) {
+      setSpectatorJoinError('Please enter a team name');
+      return;
+    }
+    setSpectatorJoinError(null);
+    try {
+      await joinPublicLeague({
+        variables: { leagueId, teamName: spectatorTeamName.trim() },
+      });
+      setSpectatorJoinSuccess(true);
+      void refetchLeague();
+      setTimeout(() => navigate(`/baseball/league/${leagueId}/overview`), 1200);
+    } catch (err) {
+      setSpectatorJoinError((err as Error).message || 'Failed to join league');
+    }
+  }, [spectatorTeamName, joinPublicLeague, leagueId, refetchLeague, navigate]);
 
   const {
     data: teamMembersData,
@@ -2236,6 +2271,118 @@ export function LeagueDetailPage(): React.JSX.Element {
             </Button>
           </XStack>
         </HeroBar>
+
+        {/* Spectator Banner — shown when viewing a public league without membership */}
+        {isSpectator && (
+          <YStack
+            backgroundColor={withAlpha(BRAND_NAVY, 0.08)}
+            borderBottomWidth={1}
+            borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)}
+            paddingHorizontal="$5"
+            paddingVertical="$3"
+          >
+            <XStack
+              alignItems="center"
+              justifyContent="space-between"
+              flexWrap="wrap"
+              gap="$3"
+            >
+              <XStack alignItems="center" gap="$2">
+                <Eye size={16} color={BRAND_NAVY_LIGHT} />
+                <Text fontSize="$3" color={BRAND_NAVY_LIGHT} fontWeight="600">
+                  Spectator Mode — you are viewing this public league without a
+                  team
+                </Text>
+              </XStack>
+              {!showSpectatorJoin && !spectatorJoinSuccess && (
+                <Button
+                  size="$3"
+                  backgroundColor={BRAND_NAVY_LIGHT}
+                  color="white"
+                  borderRadius="$4"
+                  onPress={() => setShowSpectatorJoin(true)}
+                  pressStyle={{ scale: 0.97 }}
+                  aria-label="Join this league"
+                >
+                  <XStack gap="$2" alignItems="center">
+                    <UserPlus size={14} color="white" />
+                    <Text color="white" fontWeight="700" fontSize="$3">
+                      Join League
+                    </Text>
+                  </XStack>
+                </Button>
+              )}
+              {spectatorJoinSuccess && (
+                <XStack alignItems="center" gap="$2">
+                  <Check size={16} color="$green9" />
+                  <Text fontSize="$3" color="$green9" fontWeight="600">
+                    Joined!
+                  </Text>
+                </XStack>
+              )}
+            </XStack>
+            {showSpectatorJoin && !spectatorJoinSuccess && (
+              <YStack marginTop="$3" gap="$2">
+                <XStack gap="$2" alignItems="center" flexWrap="wrap">
+                  <input
+                    placeholder="Enter your team name"
+                    value={spectatorTeamName}
+                    onChange={(e) => setSpectatorTeamName(e.target.value)}
+                    style={{
+                      flex: 1,
+                      minWidth: 200,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.4)}`,
+                      fontSize: 14,
+                      background: 'rgba(255,255,255,0.06)',
+                      color: 'inherit',
+                      outline: 'none',
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleSpectatorJoin();
+                    }}
+                    aria-label="Team name"
+                  />
+                  <Button
+                    size="$3"
+                    backgroundColor={BRAND_NAVY_LIGHT}
+                    color="white"
+                    borderRadius="$4"
+                    onPress={() => void handleSpectatorJoin()}
+                    disabled={joiningLeague}
+                    pressStyle={{ scale: 0.97 }}
+                    aria-label="Confirm join"
+                  >
+                    {joiningLeague ? (
+                      <Spinner size="small" color="white" />
+                    ) : (
+                      <Text color="white" fontWeight="700" fontSize="$3">
+                        Confirm
+                      </Text>
+                    )}
+                  </Button>
+                  <Button
+                    size="$3"
+                    chromeless
+                    onPress={() => {
+                      setShowSpectatorJoin(false);
+                      setSpectatorJoinError(null);
+                    }}
+                    aria-label="Cancel"
+                  >
+                    <X size={16} />
+                  </Button>
+                </XStack>
+                {spectatorJoinError && (
+                  <Text fontSize="$3" color="$red10">
+                    {spectatorJoinError}
+                  </Text>
+                )}
+              </YStack>
+            )}
+          </YStack>
+        )}
 
         {/* Tab Navigation */}
         <TabBar role="tablist" aria-label="League sections">

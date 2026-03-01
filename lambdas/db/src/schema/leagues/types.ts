@@ -70,6 +70,7 @@ export const League = builder.objectRef<{
   playoffFormat?: string;
   playoffMultiWeek?: boolean;
   lmNotes?: string | null;
+  isPublic?: boolean;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -107,6 +108,7 @@ League.implement({
     playoffFormat: t.exposeString('playoffFormat', { nullable: true }),
     playoffMultiWeek: t.exposeBoolean('playoffMultiWeek', { nullable: true }),
     lmNotes: t.exposeString('lmNotes', { nullable: true }),
+    isPublic: t.exposeBoolean('isPublic', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,
       description:

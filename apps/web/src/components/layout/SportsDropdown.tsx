@@ -217,6 +217,40 @@ export const SportsDropdown: React.FC = () => {
               </XStack>
             </MenuItem>
           </Link>
+
+          <Link to="/baseball/leagues" style={{ textDecoration: 'none' }}>
+            <MenuItem
+              onPress={() => setIsOpen(false)}
+              role="menuitem"
+              active={location.pathname === '/baseball/leagues'}
+            >
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <Paragraph fontSize={18} lineHeight={20}>
+                    <span role="img" aria-label="globe">
+                      🌐
+                    </span>
+                  </Paragraph>
+                </MenuIconBox>
+                <YStack flex={1} gap="$1">
+                  <Paragraph size="$4" color="$color" fontWeight="500">
+                    Browse Leagues
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Join a public league
+                  </Paragraph>
+                </YStack>
+                {location.pathname === '/baseball/leagues' && (
+                  <YStack
+                    width={6}
+                    height={6}
+                    borderRadius={3}
+                    backgroundColor={BRAND_NAVY_LIGHT}
+                  />
+                )}
+              </XStack>
+            </MenuItem>
+          </Link>
         </DropdownContent>
       )}
     </YStack>

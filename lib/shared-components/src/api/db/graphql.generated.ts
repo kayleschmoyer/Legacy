@@ -567,6 +567,7 @@ export type League = {
   hofOnly?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
+  isPublic?: Maybe<Scalars['Boolean']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
@@ -861,6 +862,7 @@ export type Mutation = {
   inviteAssistantManager?: Maybe<LeagueMember>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
+  joinPublicLeague?: Maybe<JoinLeaguePayload>;
   makeDraftPick?: Maybe<DraftPick>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
@@ -1045,6 +1047,11 @@ export type MutationJoinLeagueArgs = {
 
 export type MutationJoinLeagueByCodeArgs = {
   inviteCode: Scalars['String']['input'];
+  teamName: Scalars['String']['input'];
+};
+
+export type MutationJoinPublicLeagueArgs = {
+  leagueId: Scalars['Int']['input'];
   teamName: Scalars['String']['input'];
 };
 
@@ -1398,6 +1405,22 @@ export type ProcessWaiverClaimsResult = {
   succeeded?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A public league available for discovery and joining */
+export type PublicLeagueInfo = {
+  __typename?: 'PublicLeagueInfo';
+  availableSpots?: Maybe<Scalars['Int']['output']>;
+  draftStatus?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isAlreadyMember?: Maybe<Scalars['Boolean']['output']>;
+  isFull?: Maybe<Scalars['Boolean']['output']>;
+  isPublic?: Maybe<Scalars['Boolean']['output']>;
+  maxRosterSize?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  owner?: Maybe<Scalars['Int']['output']>;
+  playerPool?: Maybe<Scalars['String']['output']>;
+  totalSpots?: Maybe<Scalars['Int']['output']>;
+};
+
 export type Query = {
   __typename?: 'Query';
   /** Return all achievement restrictions configured for a league, sorted by achievement type */
@@ -1464,6 +1487,7 @@ export type Query = {
   players?: Maybe<Array<Player>>;
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
+  publicLeagues: Array<PublicLeagueInfo>;
   scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
@@ -1733,6 +1757,14 @@ export type QueryPlayersArgs = {
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryPublicLeaguesArgs = {
+  draftStatus?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 

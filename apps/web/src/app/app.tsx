@@ -27,6 +27,7 @@ import LeagueCreatePage from '../pages/baseball/LeagueCreatePage';
 import LeagueDetailPage from '../pages/baseball/LeagueDetailPage';
 import { TeamDetailPage } from '../pages/baseball/TeamDetailPage';
 import JoinLeagueByCodePage from '../pages/baseball/JoinLeagueByCodePage';
+import { LeagueDiscoveryPage } from '../pages/baseball/LeagueDiscoveryPage';
 import ManagementPage from '../pages/management/ManagementPage';
 import AboutPage from '../pages/about/AboutPage';
 import HelpPage from '../pages/help/HelpPage';
@@ -311,6 +312,17 @@ function Navigation() {
               Baseball
             </MobileNavLink>
           </Link>
+          <Link to="/baseball/leagues" style={{ textDecoration: 'none' }}>
+            <MobileNavLink
+              active={isActive('/baseball/leagues')}
+              onPress={() => setMobileOpen(false)}
+            >
+              <span role="img" aria-label="globe">
+                🌐
+              </span>{' '}
+              Browse Leagues
+            </MobileNavLink>
+          </Link>
           <Link to="/players" style={{ textDecoration: 'none' }}>
             <MobileNavLink
               active={isActive('/players')}
@@ -440,6 +452,7 @@ function App() {
             path="/baseball/league/join/:inviteCode"
             element={<JoinLeagueByCodePage />}
           />
+          <Route path="/baseball/leagues" element={<LeagueDiscoveryPage />} />
           <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
           <Route
             path="/baseball/league/:id/:tab"

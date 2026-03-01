@@ -21,6 +21,7 @@ fragment League on League {
   playoffFormat
   playoffMultiWeek
   lmNotes
+  isPublic
   userMembership {
     ...LeagueMember
   }
@@ -176,5 +177,44 @@ mutation RenameTeam($teamId: Int!, $leagueId: Int!, $newName: String!) {
 mutation UpdateLeagueSettings($input: UpdateLeagueSettingsInput!) {
   updateLeagueSettings(input: $input) {
     ...League
+  }
+}
+
+# ── Public League Discovery ──────────────────────────────────────────────
+
+query GetPublicLeagues(
+  $search: String
+  $draftStatus: String
+  $playerPool: String
+  $limit: Int
+  $offset: Int
+) {
+  publicLeagues(
+    search: $search
+    draftStatus: $draftStatus
+    playerPool: $playerPool
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    name
+    owner
+    maxRosterSize
+    draftStatus
+    playerPool
+    isPublic
+    totalSpots
+    availableSpots
+    isFull
+    isAlreadyMember
+  }
+}
+
+mutation JoinPublicLeague($leagueId: Int!, $teamName: String!) {
+  joinPublicLeague(leagueId: $leagueId, teamName: $teamName) {
+    success
+    message
+    leagueId
+    teamId
   }
 }

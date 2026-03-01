@@ -168,6 +168,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         customEraStartYear: inputCustomEraStartYear,
         customEraEndYear: inputCustomEraEndYear,
         decadeChallenge: inputDecadeChallenge,
+        isPublic: inputIsPublic,
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
@@ -213,6 +214,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
               : ('standard' as const),
           waiverEnabled: inputWaiverEnabled ?? true,
           faabBudgetDefault: inputFaabBudgetDefault ?? 100,
+          isPublic: inputIsPublic ?? false,
         });
 
         return result;
@@ -1229,6 +1231,135 @@ builder.mutationField('updateLeagueSettings', (t) =>
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
       return updatedLeague as any;
+    },
+  }),
+);
+
+// ── Join Public League ────────────────────────────────────────────────────
+
+/**
+ * Mutation: joinPublicLeague
+ *
+ * Auto-join a public/open league without requiring an invite code.
+ * Claims the next unassigned team slot and renames it to the user's chosen name.
+ * The league must have isPublic=true and an available team slot.
+ */
+builder.mutationField('joinPublicLeague', (t) =>
+  t.field({
+    type: JoinLeaguePayload,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      teamName: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required to join a league');
+      }
+
+      const { leagueId, teamName } = args;
+      const userId = context.user.id;
+
+      try {
+        // Verify the league is public
+        const leagueRows = await context.db
+          .select({
+            id: PublicSchema.leagues.id,
+            name: PublicSchema.leagues.name,
+            isPublic: PublicSchema.leagues.isPublic,
+            faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        if (leagueRows.length === 0) {
+          throw new Error('League not found');
+        }
+
+        const league = leagueRows[0];
+
+        if (!league.isPublic) {
+          throw new Error(
+            'This league is private. Use an invite code to join.',
+          );
+        }
+
+        // Check if user is already a member
+        const existingMembership = await context.db
+          .select()
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
+
+        if (existingMembership.length > 0) {
+          throw new Error('You are already a member of this league');
+        }
+
+        // Find an unassigned team slot
+        const unassignedTeams = await context.db
+          .select({
+            id: PublicSchema.teams.id,
+          })
+          .from(PublicSchema.teams)
+          .leftJoin(
+            PublicSchema.leagueMembers,
+            and(
+              eq(PublicSchema.leagueMembers.teamId, PublicSchema.teams.id),
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            ),
+          )
+          .where(
+            and(
+              eq(PublicSchema.teams.leagueId, leagueId),
+              isNull(PublicSchema.leagueMembers.userId),
+            ),
+          )
+          .orderBy(PublicSchema.teams.id)
+          .limit(1);
+
+        if (unassignedTeams.length === 0) {
+          throw new Error('This league is full. All teams have been claimed.');
+        }
+
+        const teamId = unassignedTeams[0].id;
+
+        // Rename the claimed team
+        await context.db
+          .update(PublicSchema.teams)
+          .set({ name: teamName.trim(), updatedAt: new Date() })
+          .where(eq(PublicSchema.teams.id, teamId));
+
+        // Create league membership
+        await context.db.insert(PublicSchema.leagueMembers).values({
+          leagueId,
+          userId,
+          teamId,
+          permissionLevel: 'general_manager',
+        });
+
+        LOGGER.info('User joined public league', { userId, leagueId, teamId });
+
+        return {
+          success: true,
+          message: `You have joined "${league.name}" successfully!`,
+          leagueId,
+          teamId,
+        };
+      } catch (error) {
+        LOGGER.error('Error joining public league', {
+          userId,
+          leagueId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new Error(
+          `Failed to join league: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
     },
   }),
 );

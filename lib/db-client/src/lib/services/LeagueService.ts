@@ -83,6 +83,7 @@ export interface CreateLeagueOptions {
   waiverType?: 'standard' | 'faab';
   waiverEnabled?: boolean;
   faabBudgetDefault?: number;
+  isPublic?: boolean;
 }
 
 export interface CreateLeagueResult {
@@ -108,6 +109,7 @@ export interface CreateLeagueResult {
     waiverType?: 'standard' | 'faab';
     waiverEnabled?: boolean;
     faabBudgetDefault?: number;
+    isPublic: boolean;
   };
   teams: {
     id: number;
@@ -160,6 +162,7 @@ export class LeagueService {
       waiverType = 'standard',
       waiverEnabled = true,
       faabBudgetDefault = 100,
+      isPublic = false,
     } = input;
 
     return runWithPublicClient(this.options, async (db) => {
@@ -186,6 +189,7 @@ export class LeagueService {
           faabBudgetDefault,
           schedulingStrategy,
           numberOfDivisions,
+          isPublic,
         })
         .returning({
           id: PublicSchema.leagues.id,
@@ -204,6 +208,7 @@ export class LeagueService {
           waiverType: PublicSchema.leagues.waiverType,
           waiverEnabled: PublicSchema.leagues.waiverEnabled,
           faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
+          isPublic: PublicSchema.leagues.isPublic,
         });
 
       // 2. Create teams — assign each team to a division (block-assign evenly across divisions)

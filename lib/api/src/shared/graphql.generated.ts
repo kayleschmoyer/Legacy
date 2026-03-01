@@ -266,9 +266,14 @@ export enum ConsentType {
 }
 
 export type CreateLeagueAndTeamsInput = {
+  customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
+  customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
+  decadeChallenge?: InputMaybe<Scalars['Boolean']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
+  eraFilter?: InputMaybe<Scalars['String']['input']>;
   faabBudgetDefault?: InputMaybe<Scalars['Int']['input']>;
+  hofOnly?: InputMaybe<Scalars['Boolean']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
   leagueName: Scalars['String']['input'];
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
@@ -540,11 +545,17 @@ export type League = {
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   /** The week number of the current matchup (resolved from the matchup record) */
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
+  customEraEndYear?: Maybe<Scalars['Int']['output']>;
+  customEraStartYear?: Maybe<Scalars['Int']['output']>;
+  decadeChallenge?: Maybe<Scalars['Boolean']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
+  eraFilter?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
+  hofOnly?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
+  isPublic?: Maybe<Scalars['Boolean']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
@@ -839,10 +850,12 @@ export type Mutation = {
   inviteAssistantManager?: Maybe<LeagueMember>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
+  joinPublicLeague?: Maybe<JoinLeaguePayload>;
   makeDraftPick?: Maybe<DraftPick>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   pauseDraft?: Maybe<Draft>;
+  postLeagueAnnouncement?: Maybe<LeagueChatMessage>;
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
@@ -1025,6 +1038,11 @@ export type MutationJoinLeagueByCodeArgs = {
   teamName: Scalars['String']['input'];
 };
 
+export type MutationJoinPublicLeagueArgs = {
+  leagueId: Scalars['Int']['input'];
+  teamName: Scalars['String']['input'];
+};
+
 export type MutationMakeDraftPickArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
@@ -1036,6 +1054,11 @@ export type MutationMarkNotificationAsReadArgs = {
 
 export type MutationPauseDraftArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationPostLeagueAnnouncementArgs = {
+  leagueId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
 };
 
 export type MutationProcessWaiverClaimsArgs = {
@@ -1261,6 +1284,8 @@ export type Player = {
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+  /** The player's primary historical baseball era, derived from the midpoint of their MLB career. Values: Dead Ball Era | Golden Age | Expansion Era | Free Agency Era | Steroid Era | Modern Era */
+  primaryEra?: Maybe<Scalars['String']['output']>;
   /** Fantasy scoring data (only populated when using scoring-based sort) */
   scoring?: Maybe<PlayerScoring>;
   /** Number of distinct MLB seasons the player has batting stats for (AL/NL only) */
@@ -1368,6 +1393,22 @@ export type ProcessWaiverClaimsResult = {
   succeeded?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A public league available for discovery and joining */
+export type PublicLeagueInfo = {
+  __typename?: 'PublicLeagueInfo';
+  availableSpots?: Maybe<Scalars['Int']['output']>;
+  draftStatus?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isAlreadyMember?: Maybe<Scalars['Boolean']['output']>;
+  isFull?: Maybe<Scalars['Boolean']['output']>;
+  isPublic?: Maybe<Scalars['Boolean']['output']>;
+  maxRosterSize?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  owner?: Maybe<Scalars['Int']['output']>;
+  playerPool?: Maybe<Scalars['String']['output']>;
+  totalSpots?: Maybe<Scalars['Int']['output']>;
+};
+
 export type Query = {
   __typename?: 'Query';
   /** Return all achievement restrictions configured for a league, sorted by achievement type */
@@ -1388,6 +1429,7 @@ export type Query = {
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
+  getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
   getLeagueDraft?: Maybe<Draft>;
   getLeagueMessages?: Maybe<Array<LeagueChatMessage>>;
   getLeagueStandings?: Maybe<Array<TeamStanding>>;
@@ -1433,6 +1475,7 @@ export type Query = {
   players?: Maybe<Array<Player>>;
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
+  publicLeagues: Array<PublicLeagueInfo>;
   scoringDefinitions?: Maybe<Array<ScoringStatDefinition>>;
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
@@ -1527,6 +1570,10 @@ export type QueryGetHeadToHeadRecordArgs = {
   leagueId: Scalars['Int']['input'];
   team1Id: Scalars['Int']['input'];
   team2Id: Scalars['Int']['input'];
+};
+
+export type QueryGetLeagueAnnouncementsArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type QueryGetLeagueDraftArgs = {
@@ -1698,6 +1745,14 @@ export type QueryPlayersArgs = {
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryPublicLeaguesArgs = {
+  draftStatus?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -2120,8 +2175,13 @@ export type UpdateCommissionerNoteInput = {
 };
 
 export type UpdateDraftSettingsInput = {
+  customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
+  customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
+  decadeChallenge?: InputMaybe<Scalars['Boolean']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
+  eraFilter?: InputMaybe<Scalars['String']['input']>;
+  hofOnly?: InputMaybe<Scalars['Boolean']['input']>;
   leagueId: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;

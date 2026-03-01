@@ -30,6 +30,7 @@ interface CreateLeagueFormData {
   draftDate?: Date;
   waiverType: 'standard' | 'faab';
   faabBudgetDefault: number;
+  isPublic: boolean;
 }
 
 // Team count options
@@ -94,6 +95,7 @@ export function LeagueCreatePage(): React.JSX.Element {
     draftDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     waiverType: 'standard',
     faabBudgetDefault: 100,
+    isPublic: false,
   });
 
   const [createLeagueAndTeams, { loading, error }] =
@@ -205,7 +207,7 @@ export function LeagueCreatePage(): React.JSX.Element {
             startDate: formData.draftDate
               ? formData.draftDate.toISOString().split('T')[0]
               : undefined,
-            isPublic: false,
+            isPublic: formData.isPublic,
             tradingEnabled: true,
             waiverEnabled: true,
             waiverType: formData.waiverType,
@@ -899,6 +901,86 @@ export function LeagueCreatePage(): React.JSX.Element {
                   </Text>
                 </Card>
               )}
+
+              {/* League Visibility */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  League Visibility
+                </Text>
+                <XStack space="$3">
+                  <Button
+                    size="$3"
+                    variant={!formData.isPublic ? 'primary' : 'outlined'}
+                    onPress={() => handleInputChange('isPublic', false)}
+                    disabled={loading}
+                    flex={1}
+                    backgroundColor={
+                      !formData.isPublic ? BRAND_NAVY_LIGHT : '$color2'
+                    }
+                    borderColor={
+                      !formData.isPublic ? BRAND_NAVY_LIGHT : '$borderColor'
+                    }
+                    borderWidth={!formData.isPublic ? 2 : 1}
+                    hoverStyle={{
+                      backgroundColor: !formData.isPublic
+                        ? BRAND_NAVY
+                        : '$color3',
+                      borderColor: !formData.isPublic
+                        ? BRAND_NAVY
+                        : '$borderColorHover',
+                    }}
+                    pressStyle={{ scale: 0.95 }}
+                  >
+                    <Text
+                      color={!formData.isPublic ? BRAND_GOLD : '$color'}
+                      fontWeight={!formData.isPublic ? '600' : '400'}
+                    >
+                      <span role="img" aria-label="private">
+                        🔒
+                      </span>{' '}
+                      Private
+                    </Text>
+                  </Button>
+                  <Button
+                    size="$3"
+                    variant={formData.isPublic ? 'primary' : 'outlined'}
+                    onPress={() => handleInputChange('isPublic', true)}
+                    disabled={loading}
+                    flex={1}
+                    backgroundColor={
+                      formData.isPublic ? BRAND_NAVY_LIGHT : '$color2'
+                    }
+                    borderColor={
+                      formData.isPublic ? BRAND_NAVY_LIGHT : '$borderColor'
+                    }
+                    borderWidth={formData.isPublic ? 2 : 1}
+                    hoverStyle={{
+                      backgroundColor: formData.isPublic
+                        ? BRAND_NAVY
+                        : '$color3',
+                      borderColor: formData.isPublic
+                        ? BRAND_NAVY
+                        : '$borderColorHover',
+                    }}
+                    pressStyle={{ scale: 0.95 }}
+                  >
+                    <Text
+                      color={formData.isPublic ? BRAND_GOLD : '$color'}
+                      fontWeight={formData.isPublic ? '600' : '400'}
+                    >
+                      <span role="img" aria-label="public">
+                        🌐
+                      </span>{' '}
+                      Public
+                    </Text>
+                  </Button>
+                </XStack>
+                <Text size="$2" color="$gray10">
+                  {formData.isPublic
+                    ? 'Anyone can browse and join this league without an invite code'
+                    : 'Only people with your invite code can join this league'}
+                </Text>
+              </YStack>
 
               {/* Action Buttons */}
               <XStack space="$3" justifyContent="flex-end" marginTop="$4">

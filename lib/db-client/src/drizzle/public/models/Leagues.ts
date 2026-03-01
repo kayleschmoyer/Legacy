@@ -79,6 +79,8 @@ export const leagues = pgTable(
     playoffMultiWeek: boolean('playoff_multi_week').notNull().default(false),
     /** Persistent commissioner notes visible to all league members */
     lmNotes: text('lm_notes'),
+    // League visibility
+    isPublic: boolean('is_public').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
