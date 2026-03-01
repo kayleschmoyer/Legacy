@@ -77,8 +77,9 @@ const STEPS: TutorialStep[] = [
             Why does this matter?
           </Paragraph>
           <Paragraph color="$colorPress" fontSize="$3" lineHeight={22}>
-            You draft players knowing exactly how good their season was. Deep
-            knowledge of MLB history becomes your competitive edge.
+            Build rosters that span generations—imagine Babe Ruth batting
+            alongside Ken Griffey Jr. The fun is mixing legends from different
+            eras and seeing how history&apos;s greatest players stack up.
           </Paragraph>
         </YStack>
       </YStack>
