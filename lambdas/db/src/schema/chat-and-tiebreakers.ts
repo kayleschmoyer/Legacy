@@ -882,6 +882,149 @@ builder.mutationField('sendLeagueMessage', (t) =>
   }),
 );
 
+// ============================================================================
+// COMMISSIONER ANNOUNCEMENTS (LS-291)
+// ============================================================================
+
+// Query: getLeagueAnnouncements — fetch commissioner announcements for a league.
+// Returns all league_messages with messageType = 'announcement', newest first.
+builder.queryField('getLeagueAnnouncements', (t) =>
+  t.field({
+    type: [LeagueChatMessage],
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      // Verify caller is a member of the league
+      const membership = await context.db
+        .select()
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, args.leagueId),
+            eq(PublicSchema.leagueMembers.userId, context.user.id),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw new Error('Not a member of this league');
+      }
+
+      const results = await context.db
+        .select()
+        .from(PublicSchema.leagueMessages)
+        .where(
+          and(
+            eq(PublicSchema.leagueMessages.leagueId, args.leagueId),
+            eq(PublicSchema.leagueMessages.messageType, 'announcement'),
+          ),
+        )
+        .orderBy(desc(PublicSchema.leagueMessages.timestamp));
+
+      return results.map((msg) => ({
+        id: msg.id,
+        leagueId: msg.leagueId,
+        userId: msg.userId,
+        messageText: msg.messageText,
+        timestamp: msg.timestamp ?? null,
+        messageType: msg.messageType ?? 'announcement',
+        gifUrl: msg.gifUrl ?? null,
+        metadata: msg.metadata ?? null,
+      }));
+    },
+  }),
+);
+
+// Mutation: postLeagueAnnouncement — commissioner-only mutation to post a
+// league-wide announcement.  The message is persisted with messageType =
+// 'announcement' so it can be queried separately from regular chat.
+builder.mutationField('postLeagueAnnouncement', (t) =>
+  t.field({
+    type: LeagueChatMessage,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      messageText: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const text = args.messageText.trim();
+      if (text.length === 0) {
+        throw new Error('Announcement cannot be empty');
+      }
+      if (text.length > 2000) {
+        throw new Error('Announcement cannot exceed 2000 characters');
+      }
+
+      // Verify caller is the commissioner of the league
+      const leagueRows = await context.db
+        .select({ owner: PublicSchema.leagues.owner })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, args.leagueId))
+        .limit(1);
+
+      if (leagueRows.length === 0) {
+        throw new Error('League not found');
+      }
+
+      if (leagueRows[0].owner !== context.user.id) {
+        throw new Error('Only the commissioner can post announcements');
+      }
+
+      // Persist the announcement
+      const rows = await context.db
+        .insert(PublicSchema.leagueMessages)
+        .values({
+          leagueId: args.leagueId,
+          userId: context.user.id,
+          messageText: text,
+          messageType: 'announcement',
+          gifUrl: null,
+        })
+        .returning();
+
+      const msg = rows[0];
+
+      // Notify all league members via WebSocket
+      const notificationService = createNotificationService();
+      if (notificationService) {
+        try {
+          await notificationService.notifyLeagueChatMessage(args.leagueId, {
+            leagueId: args.leagueId,
+            messageId: msg.id,
+            senderId: context.user.id,
+            senderUsername: context.user.username ?? `user_${context.user.id}`,
+            messageText: text,
+            timestamp: msg.timestamp ?? new Date().toISOString(),
+            messageType: 'announcement',
+            gifUrl: null,
+          });
+        } catch (err: unknown) {
+          LOGGER.warn('Failed to send announcement WS notification', { err });
+        }
+      }
+
+      return {
+        id: msg.id,
+        leagueId: msg.leagueId,
+        userId: msg.userId,
+        messageText: msg.messageText,
+        timestamp: msg.timestamp ?? null,
+        messageType: 'announcement',
+        gifUrl: null,
+        metadata: null,
+      };
+    },
+  }),
+);
+
 // Mutation: sendDirectMessage
 // Delivers a private message between two players, persists it to
 // `direct_messages`, and pushes a WebSocket notification to the recipient's

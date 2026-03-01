@@ -793,6 +793,7 @@ export type Mutation = {
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   pauseDraft?: Maybe<Draft>;
+  postLeagueAnnouncement?: Maybe<LeagueChatMessage>;
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
@@ -964,6 +965,11 @@ export type MutationMarkNotificationAsReadArgs = {
 
 export type MutationPauseDraftArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationPostLeagueAnnouncementArgs = {
+  leagueId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
 };
 
 export type MutationProcessWaiverClaimsArgs = {
@@ -1302,6 +1308,7 @@ export type Query = {
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
+  getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
   getLeagueDraft?: Maybe<Draft>;
   getLeagueMessages?: Maybe<Array<LeagueChatMessage>>;
   getLeagueStandings?: Maybe<Array<TeamStanding>>;
@@ -1436,6 +1443,10 @@ export type QueryGetHeadToHeadRecordArgs = {
   leagueId: Scalars['Int']['input'];
   team1Id: Scalars['Int']['input'];
   team2Id: Scalars['Int']['input'];
+};
+
+export type QueryGetLeagueAnnouncementsArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type QueryGetLeagueDraftArgs = {
@@ -2226,6 +2237,41 @@ export type SendLeagueChatMessageMutation = {
     messageType?: string | null;
     gifUrl?: string | null;
     metadata?: string | null;
+    sender?: { __typename?: 'User'; username?: string | null } | null;
+  } | null;
+};
+
+export type GetLeagueAnnouncementsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetLeagueAnnouncementsQuery = {
+  __typename?: 'Query';
+  getLeagueAnnouncements?: Array<{
+    __typename?: 'LeagueChatMessage';
+    id?: string | null;
+    userId?: number | null;
+    messageText?: string | null;
+    timestamp?: string | null;
+    messageType?: string | null;
+    sender?: { __typename?: 'User'; username?: string | null } | null;
+  }> | null;
+};
+
+export type PostLeagueAnnouncementMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
+}>;
+
+export type PostLeagueAnnouncementMutation = {
+  __typename?: 'Mutation';
+  postLeagueAnnouncement?: {
+    __typename?: 'LeagueChatMessage';
+    id?: string | null;
+    userId?: number | null;
+    messageText?: string | null;
+    timestamp?: string | null;
+    messageType?: string | null;
     sender?: { __typename?: 'User'; username?: string | null } | null;
   } | null;
 };
@@ -5778,6 +5824,161 @@ export type SendLeagueChatMessageMutationResult =
 export type SendLeagueChatMessageMutationOptions = BaseMutationOptions<
   SendLeagueChatMessageMutation,
   SendLeagueChatMessageMutationVariables
+>;
+export const GetLeagueAnnouncements = gql`
+  query GetLeagueAnnouncements($leagueId: Int!) {
+    getLeagueAnnouncements(leagueId: $leagueId) {
+      id
+      userId
+      messageText
+      timestamp
+      messageType
+      sender {
+        username
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetLeagueAnnouncementsQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueAnnouncementsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueAnnouncementsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueAnnouncementsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeagueAnnouncementsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueAnnouncementsQuery,
+    GetLeagueAnnouncementsQueryVariables
+  > &
+    (
+      | { variables: GetLeagueAnnouncementsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueAnnouncementsQuery,
+    GetLeagueAnnouncementsQueryVariables
+  >(GetLeagueAnnouncements, options);
+}
+export function useGetLeagueAnnouncementsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueAnnouncementsQuery,
+    GetLeagueAnnouncementsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueAnnouncementsQuery,
+    GetLeagueAnnouncementsQueryVariables
+  >(GetLeagueAnnouncements, options);
+}
+export function useGetLeagueAnnouncementsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueAnnouncementsQuery,
+        GetLeagueAnnouncementsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueAnnouncementsQuery,
+    GetLeagueAnnouncementsQueryVariables
+  >(
+    GetLeagueAnnouncements,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueAnnouncementsQuery,
+          GetLeagueAnnouncementsQueryVariables
+        >,
+  );
+}
+export type GetLeagueAnnouncementsQueryHookResult = ReturnType<
+  typeof useGetLeagueAnnouncementsQuery
+>;
+export type GetLeagueAnnouncementsLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueAnnouncementsLazyQuery
+>;
+export type GetLeagueAnnouncementsSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueAnnouncementsSuspenseQuery
+>;
+export type GetLeagueAnnouncementsQueryResult = Apollo.QueryResult<
+  GetLeagueAnnouncementsQuery,
+  GetLeagueAnnouncementsQueryVariables
+>;
+export const PostLeagueAnnouncement = gql`
+  mutation PostLeagueAnnouncement($leagueId: Int!, $messageText: String!) {
+    postLeagueAnnouncement(leagueId: $leagueId, messageText: $messageText) {
+      id
+      userId
+      messageText
+      timestamp
+      messageType
+      sender {
+        username
+      }
+    }
+  }
+`;
+export type PostLeagueAnnouncementMutationFn = MutationFunction<
+  PostLeagueAnnouncementMutation,
+  PostLeagueAnnouncementMutationVariables
+>;
+
+/**
+ * __usePostLeagueAnnouncementMutation__
+ *
+ * To run a mutation, you first call `usePostLeagueAnnouncementMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `usePostLeagueAnnouncementMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [postLeagueAnnouncementMutation, { data, loading, error }] = usePostLeagueAnnouncementMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      messageText: // value for 'messageText'
+ *   },
+ * });
+ */
+export function usePostLeagueAnnouncementMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    PostLeagueAnnouncementMutation,
+    PostLeagueAnnouncementMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    PostLeagueAnnouncementMutation,
+    PostLeagueAnnouncementMutationVariables
+  >(PostLeagueAnnouncement, options);
+}
+export type PostLeagueAnnouncementMutationHookResult = ReturnType<
+  typeof usePostLeagueAnnouncementMutation
+>;
+export type PostLeagueAnnouncementMutationResult =
+  Apollo.MutationResult<PostLeagueAnnouncementMutation>;
+export type PostLeagueAnnouncementMutationOptions = BaseMutationOptions<
+  PostLeagueAnnouncementMutation,
+  PostLeagueAnnouncementMutationVariables
 >;
 export const GetLeagueById = gql`
   query GetLeagueById($id: Int!) {

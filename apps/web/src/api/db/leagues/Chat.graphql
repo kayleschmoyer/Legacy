@@ -35,3 +35,29 @@ mutation SendLeagueChatMessage(
     }
   }
 }
+
+query GetLeagueAnnouncements($leagueId: Int!) {
+  getLeagueAnnouncements(leagueId: $leagueId) {
+    id
+    userId
+    messageText
+    timestamp
+    messageType
+    sender {
+      username
+    }
+  }
+}
+
+mutation PostLeagueAnnouncement($leagueId: Int!, $messageText: String!) {
+  postLeagueAnnouncement(leagueId: $leagueId, messageText: $messageText) {
+    id
+    userId
+    messageText
+    timestamp
+    messageType
+    sender {
+      username
+    }
+  }
+}

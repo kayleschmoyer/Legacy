@@ -907,6 +907,10 @@ type Mutation {
   markAllNotificationsAsRead: Boolean
   markNotificationAsRead(notificationId: Int!): Boolean
   pauseDraft(leagueId: Int!): Draft
+  postLeagueAnnouncement(
+    leagueId: Int!
+    messageText: String!
+  ): LeagueChatMessage
   processWaiverClaims(leagueId: Int): ProcessWaiverClaimsResult
 
   """
@@ -1279,6 +1283,7 @@ type Query {
     team1Id: Int!
     team2Id: Int!
   ): HeadToHeadRecord
+  getLeagueAnnouncements(leagueId: Int!): [LeagueChatMessage!]
   getLeagueDraft(leagueId: Int!): Draft
   getLeagueMessages(leagueId: Int!, limit: Int): [LeagueChatMessage!]
   getLeagueStandings(leagueId: Int!, season: Int): [TeamStanding!]

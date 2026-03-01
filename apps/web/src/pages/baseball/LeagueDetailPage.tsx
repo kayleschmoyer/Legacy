@@ -80,6 +80,7 @@ import { PendingWaiverClaims } from '../../features/roster/PendingWaiverClaims';
 import { PendingTradeOffers } from '../../features/roster/PendingTradeOffers';
 import { LeagueStandings } from '../../features/roster/LeagueStandings';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
+import { CommissionerAnnouncementsPanel } from '../../features/baseball/CommissionerAnnouncementsPanel';
 import { LeagueFreeAgents } from '../../features/baseball/LeagueFreeAgents';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import {
@@ -1190,6 +1191,12 @@ export function LeagueDetailPage(): React.JSX.Element {
           </XStack>
         </DraftBanner>
       )}
+
+      {/* Commissioner Announcements (LS-291) — pinned at top of overview */}
+      <CommissionerAnnouncementsPanel
+        leagueId={leagueId}
+        isCommissioner={isCommissioner}
+      />
 
       {/* Quick Stats */}
       <XStack gap="$3" flexWrap="wrap">
