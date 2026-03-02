@@ -60,7 +60,9 @@ function ThemeAwareApp() {
 
   return (
     <ReduxProvider store={store}>
-      <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+      <BrowserRouter
+        future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+      >
         <AppProvider
           apolloClient={apolloClient}
           colorScheme={resolvedTheme}
