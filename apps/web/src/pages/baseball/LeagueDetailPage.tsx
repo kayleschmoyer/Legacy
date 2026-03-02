@@ -375,6 +375,10 @@ export function LeagueDetailPage(): React.JSX.Element {
     (() => void | Promise<unknown>) | undefined
   >(undefined);
 
+  // Ref that always holds the latest draftStatus so the WS reconnect effect
+  // can read it without adding it to the dependency array.
+  const leagueDraftStatusRef = useRef<string | null | undefined>(undefined);
+
   // ── Effects ──
 
   useEffect(() => {
@@ -594,10 +598,23 @@ export function LeagueDetailPage(): React.JSX.Element {
     console.log('[LeagueDetailPage] WebSocket connected:', wsConnected);
   }, [wsConnected]);
 
+  // One-time catch-up refetch: when the WebSocket (re)connects while a draft
+  // is still in-progress or queued, fetch the league once in case the
+  // DRAFT_COMPLETED notification was broadcast while the client was offline.
+  useEffect(() => {
+    if (!wsConnected) return;
+    const status = leagueDraftStatusRef.current;
+    if (status === 'in-progress' || status === 'queued') {
+      void refetchLeague();
+    }
+  }, [wsConnected, refetchLeague]);
+
   // ── Derived Data ──
 
   const userTeamId = reduxUserTeamId ?? userTeamData?.userTeamId ?? null;
   const league = reduxLeagueData ?? data?.league;
+  // Keep the ref in sync with the latest derived draftStatus on every render.
+  leagueDraftStatusRef.current = league?.draftStatus;
   const positions = useMemo(
     () =>
       reduxPositions.length > 0
