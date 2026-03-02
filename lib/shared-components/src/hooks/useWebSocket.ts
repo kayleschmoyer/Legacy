@@ -122,8 +122,10 @@ export function useWebSocket({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get WebSocket URL from environment or passed prop
-  const wsUrl = url || process.env.NX_WEBSOCKET_URL;
+  // Get WebSocket URL from environment or passed prop.
+  // In Vite (web), callers should pass `url={import.meta.env.VITE_WEBSOCKET_URL}`.
+  // In Node/CLI contexts this falls back to process.env.VITE_WEBSOCKET_URL.
+  const wsUrl = url || process.env.VITE_WEBSOCKET_URL;
 
   // Log connection parameters on mount for debugging
   useEffect(() => {

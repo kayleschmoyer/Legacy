@@ -27,7 +27,7 @@ async function connectWebSocket(
 ): Promise<WebSocketClient> {
   const wsUrl =
     process.env.WEBSOCKET_URL ||
-    process.env.NX_WEBSOCKET_URL ||
+    process.env.VITE_WEBSOCKET_URL ||
     'wss://nx7q8petpg.execute-api.us-east-1.amazonaws.com/dev';
 
   LOGGER.info(`🔌 Connecting to WebSocket: ${wsUrl}`);

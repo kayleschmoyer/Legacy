@@ -15,6 +15,7 @@ import {
   type DraftStartedNotification,
   useWebSocket,
 } from '@legacy-sports/shared-components';
+import { env } from '../config/environment';
 import {
   CommissionerPick as COMMISSIONER_PICK,
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
@@ -1891,6 +1892,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   );
 
   const { connected: wsConnected } = useWebSocket({
+    url: env.websocketUrl,
     leagueId: leagueId ?? undefined,
     token: token ?? undefined,
     viewContext: 'league',
