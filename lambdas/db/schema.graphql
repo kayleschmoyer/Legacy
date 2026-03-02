@@ -1002,11 +1002,11 @@ type Mutation {
   ): AutoAdvanceMatchupsResult
 
   """
-  Automatically make draft picks for teams that have exceeded their pick deadline. Triggered every minute by EventBridge.
+  Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback.
   """
   autoProcessDraftPicks(
     """
-    Optional: restrict to a single league. Required for commissioner-level access.
+    Optional: restrict to a single league. Required for non-system callers (any league member can nudge).
     """
     leagueId: Int
   ): AutoProcessDraftPicksResult

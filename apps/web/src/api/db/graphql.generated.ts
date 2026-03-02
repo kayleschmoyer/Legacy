@@ -893,7 +893,7 @@ export type Mutation = {
   advancePlayoffBracket?: Maybe<PlayoffBracket>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
-  /** Automatically make draft picks for teams that have exceeded their pick deadline. Triggered every minute by EventBridge. */
+  /** Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback. */
   autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
@@ -3492,6 +3492,19 @@ export type CommissionerPickMutation = {
     pickNumber?: number | null;
     overallPick?: number | null;
     pickedAt?: string | null;
+  } | null;
+};
+
+export type NudgeExpiredDraftPickMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type NudgeExpiredDraftPickMutation = {
+  __typename?: 'Mutation';
+  autoProcessDraftPicks?: {
+    __typename?: 'AutoProcessDraftPicksResult';
+    draftsProcessed?: number | null;
+    picksAutoMade?: number | null;
   } | null;
 };
 
@@ -9399,6 +9412,57 @@ export type CommissionerPickMutationResult =
 export type CommissionerPickMutationOptions = BaseMutationOptions<
   CommissionerPickMutation,
   CommissionerPickMutationVariables
+>;
+export const NudgeExpiredDraftPick = gql`
+  mutation NudgeExpiredDraftPick($leagueId: Int!) {
+    autoProcessDraftPicks(leagueId: $leagueId) {
+      draftsProcessed
+      picksAutoMade
+    }
+  }
+`;
+export type NudgeExpiredDraftPickMutationFn = MutationFunction<
+  NudgeExpiredDraftPickMutation,
+  NudgeExpiredDraftPickMutationVariables
+>;
+
+/**
+ * __useNudgeExpiredDraftPickMutation__
+ *
+ * To run a mutation, you first call `useNudgeExpiredDraftPickMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useNudgeExpiredDraftPickMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [nudgeExpiredDraftPickMutation, { data, loading, error }] = useNudgeExpiredDraftPickMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useNudgeExpiredDraftPickMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    NudgeExpiredDraftPickMutation,
+    NudgeExpiredDraftPickMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    NudgeExpiredDraftPickMutation,
+    NudgeExpiredDraftPickMutationVariables
+  >(NudgeExpiredDraftPick, options);
+}
+export type NudgeExpiredDraftPickMutationHookResult = ReturnType<
+  typeof useNudgeExpiredDraftPickMutation
+>;
+export type NudgeExpiredDraftPickMutationResult =
+  Apollo.MutationResult<NudgeExpiredDraftPickMutation>;
+export type NudgeExpiredDraftPickMutationOptions = BaseMutationOptions<
+  NudgeExpiredDraftPickMutation,
+  NudgeExpiredDraftPickMutationVariables
 >;
 export const GetLiveDraftLeagueDraft = gql`
   query GetLiveDraftLeagueDraft($leagueId: Int!) {

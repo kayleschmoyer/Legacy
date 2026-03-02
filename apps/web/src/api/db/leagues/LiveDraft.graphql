@@ -63,6 +63,13 @@ mutation CommissionerPick($draftId: Int!, $playerId: Int!) {
   }
 }
 
+mutation NudgeExpiredDraftPick($leagueId: Int!) {
+  autoProcessDraftPicks(leagueId: $leagueId) {
+    draftsProcessed
+    picksAutoMade
+  }
+}
+
 query GetLiveDraftLeagueDraft($leagueId: Int!) {
   getLeagueDraft(leagueId: $leagueId) {
     id

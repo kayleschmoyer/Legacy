@@ -6,11 +6,13 @@ The draft system includes a **deadline-based pick timer** that automatically pic
 
 ## How It Works
 
-1. **Pick Timer**: Each draft has a configurable `pickTimeLimitSeconds` (default: 120s, range: 10–3600s)
+1. **Pick Timer**: Each draft has a configurable `pickTimeLimitSeconds` (default: 120s, range: 30–3600s)
 2. **Deadline Tracking**: When a pick starts, `currentPickDeadline` is set to `NOW() + pickTimeLimitSeconds`
 3. **EventBridge Polling**: A 1-minute EventBridge cron checks all in-progress drafts for expired deadlines
-4. **Auto-Pick**: When deadline expires, the system auto-picks the first available player (by player ID)
-5. **Notifications**: All picks (manual and auto) include `wasAutoPick` and `currentPickDeadline` in WebSocket notifications
+4. **Auto-Pick**: When deadline expires, the system auto-picks the best available player (position-aware, with eligibility filtering)
+5. **Deadline Chaining**: The next deadline is computed from the *expired* deadline (`expiredDeadline + pickTimeLimitSeconds`), not from wall-clock time, so the intended cadence is preserved when EventBridge fires late
+6. **Inner Retry Loop**: If the chained deadline is already expired (e.g. consecutive AFK teams with a 30s timer), the mutation keeps picking in the same invocation (up to 100 picks per draft) without waiting for the next poll
+7. **Notifications**: All picks (manual and auto) include `wasAutoPick` and `currentPickDeadline` in WebSocket notifications
 
 ## Database Schema
 
@@ -26,7 +28,8 @@ The draft system includes a **deadline-based pick timer** that automatically pic
 | Event | `currentPickDeadline` Value |
 |-------|----------------------------|
 | Draft initialized | `NOW() + pickTimeLimitSeconds` |
-| Pick made (manual or auto) | `NOW() + pickTimeLimitSeconds` (next pick) |
+| Pick made (manual) | `NOW() + pickTimeLimitSeconds` (next pick) |
+| Pick made (auto/missed) | `expiredDeadline + pickTimeLimitSeconds` (chained) |
 | Draft paused | `NULL` |
 | Draft resumed | `NOW() + pickTimeLimitSeconds` |
 | Draft completed | `NULL` |
@@ -206,16 +209,17 @@ mutation UpdatePickTimer {
 }
 ```
 
-Valid range: 10–3600 seconds. Default: 120 seconds (2 minutes).
+Valid range: 30–3600 seconds. Default: 120 seconds (2 minutes).
 
 ## Infrastructure
 
 ### EventBridge Rule
 
-- **Schedule**: `rate(1 minute)`
+- **Schedule**: `rate(1 minute)` (minimum supported by EventBridge)
 - **Target**: GraphQL Lambda (same as all other scheduled mutations)
 - **Auth**: System API key (same pattern as waivers, game selection, matchup advancement)
 - **Cost**: ~$0.04/month (short-circuits when no expired drafts exist)
+- **Inner Retry Loop**: The mutation chains through all consecutively-expired deadlines per draft in a single invocation, so short timers (30s–60s) are not bottlenecked by the 1-minute poll interval. Cap: 100 auto-picks per draft per invocation.
 
 ### Authorization
 

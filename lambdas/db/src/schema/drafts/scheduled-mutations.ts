@@ -1,10 +1,14 @@
 /**
  * Draft domain — scheduled (system) mutation for auto-picking expired draft picks.
  *
- * Triggered every minute by EventBridge. Finds all in-progress drafts where
- * `current_pick_deadline` has passed, then auto-picks the best available
- * player for the timed-out team, preferring players that fill still-open
- * league roster position slots (minimum requirements).
+ * Triggered every minute by EventBridge. Each invocation chains through all
+ * consecutively-expired deadlines per draft (inner retry loop) so short pick
+ * timers (e.g. 30s) aren't bottlenecked by the 1-minute polling interval.
+ *
+ * Finds all in-progress drafts where `current_pick_deadline` has passed,
+ * then auto-picks the best available player for the timed-out team,
+ * preferring players that fill still-open league roster position slots
+ * (minimum requirements).
  *
  * Uses the same 3-tier auth pattern as other scheduled mutations:
  *   - System API key (EventBridge) → allowed for ALL leagues
@@ -18,9 +22,51 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
 
 import { getCurrentDraftPickInfo } from './helpers';
-import { builder } from '../builder';
-import { assertAuthorized } from '../matchups/scheduled-mutations';
+import { builder, type Context } from '../builder';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
+
+/**
+ * Lighter auth check for the draft auto-pick nudge.
+ * ANY authenticated league member can trigger this, not just commissioners/GMs.
+ * The mutation itself is fully idempotent — it only processes picks whose
+ * deadline has actually passed, so there is no abuse vector.
+ */
+async function assertLeagueMemberOrSystem(
+  context: Context,
+  leagueId: number | null | undefined,
+): Promise<void> {
+  // System requests (EventBridge) can always operate on all leagues
+  if (context.isSystemRequest) return;
+
+  // Admin users can always operate on all leagues
+  if (context.user?.isAdmin) return;
+
+  if (!context.user) {
+    throw new Error('Unauthorized: authentication required.');
+  }
+
+  if (!leagueId) {
+    throw new Error(
+      'Unauthorized: only system processes can trigger for all leagues. Provide a leagueId.',
+    );
+  }
+
+  // Any league member can nudge the auto-pick (the mutation is idempotent)
+  const membership = await context.db
+    .select({ leagueId: PublicSchema.leagueMembers.leagueId })
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
+        eq(PublicSchema.leagueMembers.userId, context.user.id),
+      ),
+    )
+    .limit(1);
+
+  if (membership.length === 0) {
+    throw new Error('Unauthorized: you are not a member of this league.');
+  }
+}
 
 // ── Position eligibility for auto-pick (mirrors draft-processor ALLOWED_POSITIONS) ──
 // Maps each league roster slot type to the player stat position keys that qualify for it.
@@ -175,12 +221,14 @@ builder.objectType(AutoProcessDraftPicksResult, {
 });
 
 // ── Mutation: autoProcessDraftPicks ──────────────────────────────────────────
-// Triggered every minute by EventBridge.
-// Finds in-progress drafts with expired currentPickDeadline, auto-picks the
-// best available player that passes league eligibility (playerPool,
-// minCareerGames, minCareerSeasons) and fills an open league position slot
-// first (minimum requirements), then falls back to any eligible player.
-// Advances the draft after each pick.
+// Triggered every minute by EventBridge. Each invocation chains through ALL
+// consecutively-expired deadlines per draft so short pick timers (e.g. 30s)
+// don't bottleneck at the 1-minute EventBridge polling interval.
+//
+// For each expired draft, auto-picks the best available player that passes
+// league eligibility (playerPool, minCareerGames, minCareerSeasons) and fills
+// an open league position slot first (minimum requirements), then falls back
+// to any eligible player. Advances the draft after each pick.
 
 builder.mutationField('autoProcessDraftPicks', (t) =>
   t.field({
@@ -189,14 +237,14 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
       leagueId: t.arg.int({
         required: false,
         description:
-          'Optional: restrict to a single league. Required for commissioner-level access.',
+          'Optional: restrict to a single league. Required for non-system callers (any league member can nudge).',
       }),
     },
     description:
-      'Automatically make draft picks for teams that have exceeded their pick deadline. Triggered every minute by EventBridge.',
+      'Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback.',
     resolve: async (_parent, args, context) => {
       const leagueId = args.leagueId ?? null;
-      await assertAuthorized(context, leagueId);
+      await assertLeagueMemberOrSystem(context, leagueId);
 
       LOGGER.info('[autoProcessDraftPicks] Starting expired draft pick scan');
 
@@ -243,87 +291,102 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
           try {
             result.draftsProcessed++;
 
-            // Process the expired pick inside a serializable transaction
-            const pickResult = await context.db.transaction(async (tx) => {
-              // Lock the draft row
-              const draftRows = await tx.execute(
-                sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
-              );
-              const draft = draftRows.rows[0] as
-                | {
-                    id: number;
-                    league_id: number;
-                    current_pick: number;
-                    current_pick_deadline: Date | null;
-                  }
-                | undefined;
+            // Inner loop: chain through consecutive expired deadlines.
+            // When pickTimeLimitSeconds < the EventBridge interval, multiple
+            // deadlines may have expired. Process them all in one invocation,
+            // capped to stay within Lambda timeout limits.
+            const MAX_AUTO_PICKS_PER_DRAFT = 100;
+            let picksThisDraft = 0;
 
-              if (!draft) {
-                throw new Error(`Draft ${draftId} not found`);
-              }
-
-              // Re-check deadline inside transaction (may have been picked by user)
-              if (
-                !draft.current_pick_deadline ||
-                new Date(draft.current_pick_deadline) > now
-              ) {
-                LOGGER.info(
-                  `[autoProcessDraftPicks] Draft ${draftId} deadline no longer expired (pick was made), skipping`,
+            while (picksThisDraft < MAX_AUTO_PICKS_PER_DRAFT) {
+              // Process the expired pick inside a transaction
+              const pickResult = await context.db.transaction(async (tx) => {
+                // Lock the draft row
+                const draftRows = await tx.execute(
+                  sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
                 );
-                return null;
-              }
+                const draft = draftRows.rows[0] as
+                  | {
+                      id: number;
+                      league_id: number;
+                      current_pick: number;
+                      current_pick_deadline: Date | null;
+                    }
+                  | undefined;
 
-              // Verify league still in-progress
-              const [league] = await tx
-                .select()
-                .from(PublicSchema.leagues)
-                .where(eq(PublicSchema.leagues.id, draftLeagueId))
-                .limit(1);
+                if (!draft) {
+                  throw new Error(`Draft ${draftId} not found`);
+                }
 
-              if (!league || league.draftStatus !== 'in-progress') {
-                LOGGER.info(
-                  `[autoProcessDraftPicks] League ${draftLeagueId} is not in-progress, skipping draft ${draftId}`,
+                // Re-check deadline inside transaction — may have been picked
+                // by a user, or the chained deadline may still be in the future.
+                const checkNow = new Date();
+                if (
+                  !draft.current_pick_deadline ||
+                  new Date(draft.current_pick_deadline) > checkNow
+                ) {
+                  LOGGER.info(
+                    `[autoProcessDraftPicks] Draft ${draftId} deadline no longer expired (pick was made), skipping`,
+                  );
+                  return null;
+                }
+
+                // Capture the expired deadline for chaining — the NEXT deadline
+                // is computed from this value (not from wall-clock now) so the
+                // intended cadence is preserved when EventBridge fires late.
+                const expiredDeadline = new Date(draft.current_pick_deadline);
+
+                // Verify league still in-progress
+                const [league] = await tx
+                  .select()
+                  .from(PublicSchema.leagues)
+                  .where(eq(PublicSchema.leagues.id, draftLeagueId))
+                  .limit(1);
+
+                if (!league || league.draftStatus !== 'in-progress') {
+                  LOGGER.info(
+                    `[autoProcessDraftPicks] League ${draftLeagueId} is not in-progress, skipping draft ${draftId}`,
+                  );
+                  return null;
+                }
+
+                // Get current pick info
+                const currentPickInfo = await getCurrentDraftPickInfo(
+                  tx,
+                  draftId,
                 );
-                return null;
-              }
 
-              // Get current pick info
-              const currentPickInfo = await getCurrentDraftPickInfo(
-                tx,
-                draftId,
-              );
+                if (!currentPickInfo || currentPickInfo.isComplete) {
+                  LOGGER.info(
+                    `[autoProcessDraftPicks] Draft ${draftId} is already complete`,
+                  );
+                  return null;
+                }
 
-              if (!currentPickInfo || currentPickInfo.isComplete) {
-                LOGGER.info(
-                  `[autoProcessDraftPicks] Draft ${draftId} is already complete`,
-                );
-                return null;
-              }
+                // Find the best available player (not yet drafted).
+                // Prefer players that can fill a still-open league roster position
+                // slot (minimum requirements), falling back to any available player.
 
-              // Find the best available player (not yet drafted).
-              // Prefer players that can fill a still-open league roster position
-              // slot (minimum requirements), falling back to any available player.
-
-              // ── Eligibility predicates (same logic as DraftUtils.filterPlayerIdsByLeagueEligibility) ──
-              const playerPoolCondition =
-                league.playerPool !== 'all'
-                  ? sql`AND p.id IN (
+                // ── Eligibility predicates (same logic as DraftUtils.filterPlayerIdsByLeagueEligibility) ──
+                const playerPoolCondition =
+                  league.playerPool !== 'all'
+                    ? sql`AND p.id IN (
                       SELECT sb.player_id FROM season_batting sb
                       WHERE sb.lg_id = ${league.playerPool.toUpperCase()}
                     )`
-                  : sql``;
+                    : sql``;
 
-              const minCareerGamesCondition =
-                (league.minCareerGames ?? 0) > 0
-                  ? sql`AND (
+                const minCareerGamesCondition =
+                  (league.minCareerGames ?? 0) > 0
+                    ? sql`AND (
                       COALESCE((SELECT g FROM career_batting  cb WHERE cb.player_id = p.id LIMIT 1), 0) +
                       COALESCE((SELECT g FROM career_pitching cp WHERE cp.player_id = p.id LIMIT 1), 0)
                     ) >= ${league.minCareerGames}`
-                  : sql``;
+                    : sql``;
 
-              const minCareerSeasonsCondition =
-                (league.minCareerSeasons ?? 0) > 0
-                  ? sql`AND (
+                const minCareerSeasonsCondition =
+                  (league.minCareerSeasons ?? 0) > 0
+                    ? sql`AND (
                       SELECT COUNT(DISTINCT season)
                       FROM (
                         SELECT season FROM season_batting  WHERE player_id = p.id
@@ -331,51 +394,51 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                         SELECT season FROM season_pitching WHERE player_id = p.id
                       ) s
                     ) >= ${league.minCareerSeasons}`
-                  : sql``;
+                    : sql``;
 
-              // Determine which position slot types the team still needs to fill
-              const unfilledPositionTypes = await getUnfilledPositionTypes(
-                tx,
-                draftId,
-                currentPickInfo.teamId,
-                draftLeagueId,
-              );
-
-              LOGGER.info(
-                '[autoProcessDraftPicks] Unfilled position types for team',
-                {
+                // Determine which position slot types the team still needs to fill
+                const unfilledPositionTypes = await getUnfilledPositionTypes(
+                  tx,
                   draftId,
-                  teamId: currentPickInfo.teamId,
-                  unfilledPositionTypes,
-                  eligibilityFilters: {
-                    playerPool: league.playerPool,
-                    minCareerGames: league.minCareerGames,
-                    minCareerSeasons: league.minCareerSeasons,
+                  currentPickInfo.teamId,
+                  draftLeagueId,
+                );
+
+                LOGGER.info(
+                  '[autoProcessDraftPicks] Unfilled position types for team',
+                  {
+                    draftId,
+                    teamId: currentPickInfo.teamId,
+                    unfilledPositionTypes,
+                    eligibilityFilters: {
+                      playerPool: league.playerPool,
+                      minCareerGames: league.minCareerGames,
+                      minCareerSeasons: league.minCareerSeasons,
+                    },
                   },
-                },
-              );
+                );
 
-              let autoPlayerId: number | undefined;
+                let autoPlayerId: number | undefined;
 
-              // Try to find a player eligible for one of the unfilled positions
-              if (unfilledPositionTypes.length > 0) {
-                // Expand each unfilled slot type to its allowed stat-position keys,
-                // then check whether the player has any of those keys in
-                // career_fielding.positions_played (JSONB ? operator).
-                const allowedStatPositions = [
-                  ...new Set(
-                    unfilledPositionTypes.flatMap(
-                      (pt) => ALLOWED_POSITIONS_FOR_AUTO_PICK[pt] ?? [pt],
+                // Try to find a player eligible for one of the unfilled positions
+                if (unfilledPositionTypes.length > 0) {
+                  // Expand each unfilled slot type to its allowed stat-position keys,
+                  // then check whether the player has any of those keys in
+                  // career_fielding.positions_played (JSONB ? operator).
+                  const allowedStatPositions = [
+                    ...new Set(
+                      unfilledPositionTypes.flatMap(
+                        (pt) => ALLOWED_POSITIONS_FOR_AUTO_PICK[pt] ?? [pt],
+                      ),
                     ),
-                  ),
-                ];
+                  ];
 
-                // Build a chain of JSONB key-exists conditions (OR)
-                const jsonConditions = allowedStatPositions
-                  .map((pos) => sql`cf.positions_played ? ${pos}`)
-                  .reduce((acc, cond) => sql`${acc} OR ${cond}`);
+                  // Build a chain of JSONB key-exists conditions (OR)
+                  const jsonConditions = allowedStatPositions
+                    .map((pos) => sql`cf.positions_played ? ${pos}`)
+                    .reduce((acc, cond) => sql`${acc} OR ${cond}`);
 
-                const positionAwarePlayers = await tx.execute(sql`
+                  const positionAwarePlayers = await tx.execute(sql`
                   SELECT p.id
                   FROM players p
                   JOIN career_fielding cf ON cf.player_id = p.id
@@ -391,18 +454,22 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   LIMIT 1
                 `);
 
-                if (positionAwarePlayers.rows.length > 0) {
-                  autoPlayerId = positionAwarePlayers.rows[0].id as number;
-                  LOGGER.info(
-                    '[autoProcessDraftPicks] Selected position-aware auto-pick',
-                    { draftId, playerId: autoPlayerId, unfilledPositionTypes },
-                  );
+                  if (positionAwarePlayers.rows.length > 0) {
+                    autoPlayerId = positionAwarePlayers.rows[0].id as number;
+                    LOGGER.info(
+                      '[autoProcessDraftPicks] Selected position-aware auto-pick',
+                      {
+                        draftId,
+                        playerId: autoPlayerId,
+                        unfilledPositionTypes,
+                      },
+                    );
+                  }
                 }
-              }
 
-              // Fallback: pick any available player by ID (deterministic)
-              if (autoPlayerId === undefined) {
-                const fallbackPlayers = await tx.execute(sql`
+                // Fallback: pick any available player by ID (deterministic)
+                if (autoPlayerId === undefined) {
+                  const fallbackPlayers = await tx.execute(sql`
                   SELECT p.id
                   FROM players p
                   WHERE p.id NOT IN (
@@ -415,193 +482,228 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   LIMIT 1
                 `);
 
-                if (fallbackPlayers.rows.length === 0) {
-                  throw new Error(`No available players for draft ${draftId}`);
+                  if (fallbackPlayers.rows.length === 0) {
+                    throw new Error(
+                      `No available players for draft ${draftId}`,
+                    );
+                  }
+
+                  autoPlayerId = fallbackPlayers.rows[0].id as number;
+                  LOGGER.info(
+                    '[autoProcessDraftPicks] Using fallback auto-pick (no position match)',
+                    {
+                      draftId,
+                      playerId: autoPlayerId,
+                    },
+                  );
                 }
 
-                autoPlayerId = fallbackPlayers.rows[0].id as number;
-                LOGGER.info(
-                  '[autoProcessDraftPicks] Using fallback auto-pick (no position match)',
-                  {
+                // Validate roster limit
+                const [rosterCount] = await tx
+                  .select({ count: count() })
+                  .from(PublicSchema.teamMembers)
+                  .where(
+                    and(
+                      eq(
+                        PublicSchema.teamMembers.teamId,
+                        currentPickInfo.teamId,
+                      ),
+                      eq(PublicSchema.teamMembers.leagueId, draftLeagueId),
+                    ),
+                  );
+
+                if (
+                  rosterCount &&
+                  Number(rosterCount.count) >= league.maxRosterSize
+                ) {
+                  throw new Error(
+                    `Team ${currentPickInfo.teamId} roster is full in draft ${draftId}`,
+                  );
+                }
+
+                const pickNow = new Date();
+
+                // Create the auto pick
+                const [draftPick] = await tx
+                  .insert(PublicSchema.draftPicks)
+                  .values({
                     draftId,
+                    teamId: currentPickInfo.teamId,
                     playerId: autoPlayerId,
-                  },
-                );
-              }
+                    round: currentPickInfo.round,
+                    pickNumber: currentPickInfo.pickNumber,
+                    overallPick: currentPickInfo.overallPick,
+                    pickedAt: pickNow,
+                  })
+                  .returning();
 
-              // Validate roster limit
-              const [rosterCount] = await tx
-                .select({ count: count() })
-                .from(PublicSchema.teamMembers)
-                .where(
-                  and(
-                    eq(PublicSchema.teamMembers.teamId, currentPickInfo.teamId),
-                    eq(PublicSchema.teamMembers.leagueId, draftLeagueId),
-                  ),
-                );
+                // Calculate if draft is complete
+                const numTeams = (
+                  await tx
+                    .select()
+                    .from(PublicSchema.draftTeams)
+                    .where(eq(PublicSchema.draftTeams.draftId, draftId))
+                ).length;
+                const totalPicks = numTeams * league.maxRosterSize;
+                const isDraftComplete =
+                  currentPickInfo.overallPick >= totalPicks;
 
-              if (
-                rosterCount &&
-                Number(rosterCount.count) >= league.maxRosterSize
-              ) {
-                throw new Error(
-                  `Team ${currentPickInfo.teamId} roster is full in draft ${draftId}`,
-                );
-              }
+                // Chain from the expired deadline (not from wall-clock now)
+                // so the next team gets their full timer window.
+                const nextDeadline = isDraftComplete
+                  ? null
+                  : new Date(
+                      expiredDeadline.getTime() + pickTimeLimitSeconds * 1000,
+                    );
 
-              const pickNow = new Date();
+                await tx
+                  .update(PublicSchema.drafts)
+                  .set({
+                    currentPick: currentPickInfo.overallPick,
+                    currentPickDeadline: nextDeadline,
+                    updatedAt: pickNow,
+                    ...(isDraftComplete ? { draftCompletedAt: pickNow } : {}),
+                  })
+                  .where(eq(PublicSchema.drafts.id, draftId));
 
-              // Create the auto pick
-              const [draftPick] = await tx
-                .insert(PublicSchema.draftPicks)
-                .values({
-                  draftId,
+                if (isDraftComplete) {
+                  await tx
+                    .update(PublicSchema.leagues)
+                    .set({ draftStatus: 'completed' })
+                    .where(eq(PublicSchema.leagues.id, draftLeagueId));
+                }
+
+                // Add player to team roster
+                await tx.insert(PublicSchema.teamMembers).values({
                   teamId: currentPickInfo.teamId,
+                  leagueId: draftLeagueId,
                   playerId: autoPlayerId,
-                  round: currentPickInfo.round,
-                  pickNumber: currentPickInfo.pickNumber,
-                  overallPick: currentPickInfo.overallPick,
-                  pickedAt: pickNow,
-                })
-                .returning();
+                  draftRound: currentPickInfo.round,
+                  draftPick: currentPickInfo.pickNumber,
+                  acquisitionType: 'draft',
+                });
 
-              // Calculate if draft is complete
-              const numTeams = (
-                await tx
-                  .select()
-                  .from(PublicSchema.draftTeams)
-                  .where(eq(PublicSchema.draftTeams.draftId, draftId))
-              ).length;
-              const totalPicks = numTeams * league.maxRosterSize;
-              const isDraftComplete = currentPickInfo.overallPick >= totalPicks;
+                // Calculate next pick info for notification
+                let nextPickInfo: Awaited<
+                  ReturnType<typeof getCurrentDraftPickInfo>
+                > = null;
+                if (!isDraftComplete) {
+                  nextPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+                }
 
-              // Set next deadline or clear if complete
-              const nextDeadline = isDraftComplete
-                ? null
-                : new Date(pickNow.getTime() + pickTimeLimitSeconds * 1000);
-
-              await tx
-                .update(PublicSchema.drafts)
-                .set({
-                  currentPick: currentPickInfo.overallPick,
-                  currentPickDeadline: nextDeadline,
-                  updatedAt: pickNow,
-                  ...(isDraftComplete ? { draftCompletedAt: pickNow } : {}),
-                })
-                .where(eq(PublicSchema.drafts.id, draftId));
-
-              if (isDraftComplete) {
-                await tx
-                  .update(PublicSchema.leagues)
-                  .set({ draftStatus: 'completed' })
-                  .where(eq(PublicSchema.leagues.id, draftLeagueId));
-              }
-
-              // Add player to team roster
-              await tx.insert(PublicSchema.teamMembers).values({
-                teamId: currentPickInfo.teamId,
-                leagueId: draftLeagueId,
-                playerId: autoPlayerId,
-                draftRound: currentPickInfo.round,
-                draftPick: currentPickInfo.pickNumber,
-                acquisitionType: 'draft',
+                return {
+                  draftPick,
+                  autoPlayerId,
+                  isDraftComplete,
+                  currentPickInfo,
+                  nextPickInfo,
+                  nextDeadline,
+                };
               });
 
-              // Calculate next pick info for notification
-              let nextPickInfo: Awaited<
-                ReturnType<typeof getCurrentDraftPickInfo>
-              > = null;
-              if (!isDraftComplete) {
-                nextPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+              if (!pickResult) {
+                break; // Deadline not expired or cleared — exit inner loop
               }
 
-              return {
-                draftPick,
-                autoPlayerId,
-                isDraftComplete,
-                currentPickInfo,
-                nextPickInfo,
-                nextDeadline,
-              };
-            });
+              result.picksAutoMade++;
+              picksThisDraft++;
 
-            if (!pickResult) {
-              continue; // Deadline was cleared by another process
-            }
-
-            result.picksAutoMade++;
-
-            LOGGER.info('[autoProcessDraftPicks] Auto-pick made', {
-              draftId,
-              leagueId: draftLeagueId,
-              playerId: pickResult.autoPlayerId,
-              teamId: pickResult.currentPickInfo.teamId,
-              overallPick: pickResult.currentPickInfo.overallPick,
-              isDraftComplete: pickResult.isDraftComplete,
-            });
-
-            // Send WebSocket notifications (outside transaction)
-            if (notificationService) {
-              await notificationService.notifyDraftPickMade(
-                draftLeagueId,
+              LOGGER.info('[autoProcessDraftPicks] Auto-pick made', {
                 draftId,
-                pickResult.draftPick.id,
-                pickResult.currentPickInfo.teamId,
-                pickResult.autoPlayerId,
-                pickResult.currentPickInfo.round,
-                pickResult.currentPickInfo.pickNumber,
-                pickResult.currentPickInfo.overallPick,
-                pickResult.nextPickInfo
-                  ? {
-                      teamId: pickResult.nextPickInfo.teamId,
-                      round: pickResult.nextPickInfo.round,
-                      pickNumber: pickResult.nextPickInfo.pickNumber,
-                      overallPick: pickResult.nextPickInfo.overallPick,
-                    }
-                  : undefined,
-                {
-                  wasAutoPick: true,
-                  currentPickDeadline:
-                    pickResult.nextDeadline?.toISOString() ?? null,
-                },
-              );
+                leagueId: draftLeagueId,
+                playerId: pickResult.autoPlayerId,
+                teamId: pickResult.currentPickInfo.teamId,
+                overallPick: pickResult.currentPickInfo.overallPick,
+                isDraftComplete: pickResult.isDraftComplete,
+              });
 
+              // Send WebSocket notifications (outside transaction)
+              if (notificationService) {
+                await notificationService.notifyDraftPickMade(
+                  draftLeagueId,
+                  draftId,
+                  pickResult.draftPick.id,
+                  pickResult.currentPickInfo.teamId,
+                  pickResult.autoPlayerId,
+                  pickResult.currentPickInfo.round,
+                  pickResult.currentPickInfo.pickNumber,
+                  pickResult.currentPickInfo.overallPick,
+                  pickResult.nextPickInfo
+                    ? {
+                        teamId: pickResult.nextPickInfo.teamId,
+                        round: pickResult.nextPickInfo.round,
+                        pickNumber: pickResult.nextPickInfo.pickNumber,
+                        overallPick: pickResult.nextPickInfo.overallPick,
+                      }
+                    : undefined,
+                  {
+                    wasAutoPick: true,
+                    currentPickDeadline:
+                      pickResult.nextDeadline?.toISOString() ?? null,
+                  },
+                );
+
+                if (pickResult.isDraftComplete) {
+                  result.draftsCompleted++;
+                  await notificationService.notifyDraftCompleted(
+                    draftLeagueId,
+                    (row.selection_method as string) ?? 'standard',
+                  );
+                }
+              }
+
+              // Auto-create matchups when draft completes
               if (pickResult.isDraftComplete) {
-                result.draftsCompleted++;
-                await notificationService.notifyDraftCompleted(
-                  draftLeagueId,
-                  (row.selection_method as string) ?? 'standard',
-                );
+                try {
+                  const matchupResult = await createAllMatchupsForLeague(
+                    context.db,
+                    draftLeagueId,
+                  );
+                  LOGGER.info(
+                    '[autoProcessDraftPicks] Auto-created matchups after draft completion',
+                    {
+                      leagueId: draftLeagueId,
+                      matchupCount: matchupResult.matchupCount,
+                    },
+                  );
+                } catch (matchupError) {
+                  LOGGER.error(
+                    '[autoProcessDraftPicks] Failed to auto-create matchups',
+                    {
+                      leagueId: draftLeagueId,
+                      error:
+                        matchupError instanceof Error
+                          ? matchupError.message
+                          : String(matchupError),
+                    },
+                  );
+                }
               }
-            }
 
-            // Auto-create matchups when draft completes
-            if (pickResult.isDraftComplete) {
-              try {
-                const matchupResult = await createAllMatchupsForLeague(
-                  context.db,
-                  draftLeagueId,
-                );
-                LOGGER.info(
-                  '[autoProcessDraftPicks] Auto-created matchups after draft completion',
-                  {
-                    leagueId: draftLeagueId,
-                    matchupCount: matchupResult.matchupCount,
-                  },
-                );
-              } catch (matchupError) {
-                LOGGER.error(
-                  '[autoProcessDraftPicks] Failed to auto-create matchups',
-                  {
-                    leagueId: draftLeagueId,
-                    error:
-                      matchupError instanceof Error
-                        ? matchupError.message
-                        : String(matchupError),
-                  },
-                );
+              // ── Inner-loop control ──────────────────────────────────
+              if (pickResult.isDraftComplete) {
+                break; // Draft finished
               }
-            }
+
+              // If the chained deadline is already expired, pick again now
+              // instead of waiting for the next EventBridge invocation.
+              if (
+                pickResult.nextDeadline &&
+                pickResult.nextDeadline <= new Date()
+              ) {
+                LOGGER.info(
+                  '[autoProcessDraftPicks] Chained deadline already expired, continuing',
+                  {
+                    draftId,
+                    nextDeadline: pickResult.nextDeadline.toISOString(),
+                    picksThisDraft,
+                  },
+                );
+                continue;
+              }
+
+              break; // Next deadline is in the future
+            } // end while (auto-pick chaining)
           } catch (draftError) {
             const errMsg =
               draftError instanceof Error

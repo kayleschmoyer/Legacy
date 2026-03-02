@@ -33,6 +33,7 @@ import {
   type GetDraftPicksQueryVariables,
   InitializeLiveDraft as INITIALIZE_LIVE_DRAFT,
   MakeDraftPick as MAKE_DRAFT_PICK,
+  NudgeExpiredDraftPick as NUDGE_EXPIRED_DRAFT_PICK,
   PauseDraft as PAUSE_DRAFT,
   ResumeDraft as RESUME_DRAFT,
 } from '../api/db/graphql.generated';
@@ -1798,6 +1799,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     useMutation(RESUME_DRAFT);
   const [commissionerPickMutation, { loading: commPickLoading }] =
     useMutation(COMMISSIONER_PICK);
+  const [nudgeExpiredDraftPick] = useMutation(NUDGE_EXPIRED_DRAFT_PICK);
 
   // ---- WebSocket ----
   const handleDraftStarted = useCallback(
@@ -2162,39 +2164,45 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     pickDeadline,
   ]);
 
-  const autoPickAttemptRef = useRef<number | null>(null);
+  // ---- Server-side auto-pick nudge (any connected client) ----
+  // When the timer expires, nudge the server to process the expired deadline.
+  // The mutation is idempotent — concurrent calls from multiple clients are
+  // harmless (FOR UPDATE + deadline re-check guards against duplicates).
+  // A 2-second grace period avoids needlessly nudging when a WS notification
+  // for a just-completed pick is already in-flight.
+  const nudgeAttemptRef = useRef<number | null>(null);
   useEffect(() => {
-    autoPickAttemptRef.current = null;
+    nudgeAttemptRef.current = null;
   }, [currentPickInfo?.overallPick]);
 
   useEffect(() => {
-    if (!draftId || !isMyPick || draftComplete || draftPaused || pickLoading)
-      return;
+    if (!leagueId || !draftId || draftComplete || draftPaused) return;
     if (timeRemaining > 0) return;
 
     const pickNumber = currentPickInfo?.overallPick ?? null;
-    if (pickNumber === null || autoPickAttemptRef.current === pickNumber)
-      return;
+    if (pickNumber === null || nudgeAttemptRef.current === pickNumber) return;
 
-    const topAvailablePlayer = enrichedPlayers[0];
-    if (!topAvailablePlayer) {
-      setUrgentMessage('Auto-pick failed: no available players for this turn.');
-      autoPickAttemptRef.current = pickNumber;
-      return;
-    }
+    // Wait a short grace period before nudging (the active drafter's client
+    // or a just-in-time manual pick may resolve it first).
+    const timer = setTimeout(() => {
+      // Double-check the pick hasn't advanced while we waited
+      if (nudgeAttemptRef.current === pickNumber) return;
+      nudgeAttemptRef.current = pickNumber;
+      void nudgeExpiredDraftPick({ variables: { leagueId } }).catch(() => {
+        // Swallow errors — the nudge is best-effort; EventBridge is the
+        // fallback and the server is the source of truth.
+      });
+    }, 2000);
 
-    autoPickAttemptRef.current = pickNumber;
-    void handleMakePick(topAvailablePlayer.id, true);
+    return () => clearTimeout(timer);
   }, [
+    leagueId,
     draftId,
-    isMyPick,
     draftComplete,
     draftPaused,
-    pickLoading,
     timeRemaining,
     currentPickInfo?.overallPick,
-    enrichedPlayers,
-    handleMakePick,
+    nudgeExpiredDraftPick,
   ]);
 
   // ---- A11y announcements ----

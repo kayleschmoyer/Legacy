@@ -135,8 +135,12 @@ resource "aws_lambda_permission" "auto_advance_matchups_eventbridge" {
 
 # ── Draft Pick Deadline Processing ──────────────────────────────────────────
 # Auto-picks for teams that exceed their pick deadline during live drafts.
-# Runs every minute. Short-circuits immediately if no drafts have expired
-# deadlines, so cost is negligible (~$0.04/month).
+# Runs every minute (the minimum EventBridge rate). The mutation contains an
+# inner retry loop that chains through ALL consecutively-expired deadlines
+# per draft, so short pick timers (e.g. 30s) are processed back-to-back in
+# a single invocation without waiting for the next poll.
+# Short-circuits immediately if no drafts have expired deadlines, so cost
+# is negligible (~$0.04/month).
 
 resource "aws_cloudwatch_event_rule" "auto_process_draft_picks" {
   name                = "${local.name_prefix}-auto-process-draft-picks"
