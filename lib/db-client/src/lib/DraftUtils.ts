@@ -281,6 +281,17 @@ export async function validateDraftRequest(
 // League-level player eligibility filtering
 // ---------------------------------------------------------------------------
 
+// Era ranges shared between filtering logic — exported so callers can resolve
+// a named era to a [start, end] year pair without redeclaring the constant.
+export const ERA_RANGES: Record<string, [number, number]> = {
+  dead_ball: [1871, 1919],
+  golden_age: [1920, 1960],
+  expansion: [1961, 1976],
+  free_agency: [1977, 1993],
+  steroid_era: [1994, 2005],
+  modern: [2006, 9999],
+};
+
 export interface LeagueEligibilitySettings {
   /** 'all' | 'nl' | 'al' — restricts to players who appeared in that league */
   playerPool: string;
@@ -288,6 +299,14 @@ export interface LeagueEligibilitySettings {
   minCareerGames: number;
   /** Minimum distinct seasons a player must have appeared in */
   minCareerSeasons: number;
+  /** When true, restrict to Hall of Fame players only */
+  hofOnly?: boolean;
+  /** Era filter ('all' or named era or 'custom') */
+  eraFilter?: string;
+  /** Start year for custom era filter */
+  customEraStartYear?: number | null;
+  /** End year for custom era filter */
+  customEraEndYear?: number | null;
 }
 
 export interface EligibilityFilterResult {
@@ -297,6 +316,8 @@ export interface EligibilityFilterResult {
   excludedByPool: number;
   excludedByCareerGames: number;
   excludedByCareerSeasons: number;
+  excludedByHofOnly: number;
+  excludedByEraFilter: number;
 }
 
 /**
@@ -380,6 +401,8 @@ export async function filterPlayerIdsByLeagueEligibility(
   let excludedByPool = 0;
   let excludedByCareerGames = 0;
   let excludedByCareerSeasons = 0;
+  let excludedByHofOnly = 0;
+  let excludedByEraFilter = 0;
 
   // 1. Player pool (AL / NL restriction)
   if (settings.playerPool !== 'all' && currentIds.length > 0) {
@@ -470,10 +493,75 @@ export async function filterPlayerIdsByLeagueEligibility(
     );
   }
 
+  // 4. Hall of Fame filter
+  if (settings.hofOnly && currentIds.length > 0) {
+    const rows = await db.execute(
+      sql`
+        SELECT id FROM players
+        WHERE id = ANY(${sql.param(currentIds)}::integer[])
+          AND hall_of_fame = TRUE
+      `,
+    );
+    const eligible = new Set(
+      rows.rows.map((r: Record<string, unknown>) => Number(r.id)),
+    );
+    const before = currentIds.length;
+    currentIds = currentIds.filter((id) => eligible.has(id));
+    excludedByHofOnly = before - currentIds.length;
+    LOGGER.info(
+      `HoF filter: ${before} → ${currentIds.length} (excluded ${excludedByHofOnly})`,
+    );
+  }
+
+  // 5. Era filter
+  const eraFilter = settings.eraFilter;
+  if (eraFilter && eraFilter !== 'all' && currentIds.length > 0) {
+    let eraStart: number | null = null;
+    let eraEnd: number | null = null;
+    if (eraFilter === 'custom') {
+      eraStart = settings.customEraStartYear ?? null;
+      eraEnd = settings.customEraEndYear ?? null;
+    } else {
+      const range = ERA_RANGES[eraFilter];
+      if (range) {
+        [eraStart, eraEnd] = range;
+      }
+    }
+    if (eraStart != null && eraEnd != null) {
+      const rows = await db.execute(
+        sql`
+          SELECT DISTINCT player_id
+          FROM (
+            SELECT player_id FROM season_batting
+              WHERE player_id = ANY(${sql.param(currentIds)}::integer[])
+                AND lg_id IN ('AL', 'NL')
+                AND season >= ${eraStart} AND season <= ${eraEnd}
+            UNION
+            SELECT player_id FROM season_pitching
+              WHERE player_id = ANY(${sql.param(currentIds)}::integer[])
+                AND lg_id IN ('AL', 'NL')
+                AND season >= ${eraStart} AND season <= ${eraEnd}
+          ) era_players
+        `,
+      );
+      const eligible = new Set(
+        rows.rows.map((r: Record<string, unknown>) => Number(r.player_id)),
+      );
+      const before = currentIds.length;
+      currentIds = currentIds.filter((id) => eligible.has(id));
+      excludedByEraFilter = before - currentIds.length;
+      LOGGER.info(
+        `Era filter (${eraFilter} ${eraStart}-${eraEnd}): ${before} → ${currentIds.length} (excluded ${excludedByEraFilter})`,
+      );
+    }
+  }
+
   return {
     eligibleIds: new Set(currentIds),
     excludedByPool,
     excludedByCareerGames,
     excludedByCareerSeasons,
+    excludedByHofOnly,
+    excludedByEraFilter,
   };
 }

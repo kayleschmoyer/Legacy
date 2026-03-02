@@ -500,6 +500,10 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
             playerPool: PublicSchema.leagues.playerPool,
             minCareerGames: PublicSchema.leagues.minCareerGames,
             minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+            hofOnly: PublicSchema.leagues.hofOnly,
+            eraFilter: PublicSchema.leagues.eraFilter,
+            customEraStartYear: PublicSchema.leagues.customEraStartYear,
+            customEraEndYear: PublicSchema.leagues.customEraEndYear,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -514,6 +518,10 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
       const playerPool = leagueConfig[0]?.playerPool ?? 'all';
       const minCareerGames = leagueConfig[0]?.minCareerGames ?? 50;
       const minCareerSeasons = leagueConfig[0]?.minCareerSeasons ?? 3;
+      const hofOnly = leagueConfig[0]?.hofOnly ?? false;
+      const eraFilter = leagueConfig[0]?.eraFilter ?? 'all';
+      const customEraStartYear = leagueConfig[0]?.customEraStartYear ?? null;
+      const customEraEndYear = leagueConfig[0]?.customEraEndYear ?? null;
 
       LOGGER.info('Draft season requirements', {
         gamesPerMatchup,
@@ -521,6 +529,8 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
         playerPool,
         minCareerGames,
         minCareerSeasons,
+        hofOnly,
+        eraFilter,
         leagueId,
       });
 
@@ -660,12 +670,20 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
         `Excluded ${candidatePlayers.length - players.length} players without valid seasons`,
       );
 
-      // Step 1.7: Apply league eligibility settings (playerPool, minCareerGames, minCareerSeasons)
+      // Step 1.7: Apply league eligibility settings (playerPool, minCareerGames, minCareerSeasons, hofOnly, eraFilter)
       const preEligibilityCount = players.length;
       const eligibilityResult = await filterPlayerIdsByLeagueEligibility(
         tx,
         players.map((p) => p.id),
-        { playerPool, minCareerGames, minCareerSeasons },
+        {
+          playerPool,
+          minCareerGames,
+          minCareerSeasons,
+          hofOnly,
+          eraFilter,
+          customEraStartYear,
+          customEraEndYear,
+        },
       );
       players = players.filter((p) => eligibilityResult.eligibleIds.has(p.id));
 
@@ -673,7 +691,9 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
         `League eligibility filters: ${preEligibilityCount} → ${players.length} players ` +
           `(pool: -${eligibilityResult.excludedByPool}, ` +
           `career games: -${eligibilityResult.excludedByCareerGames}, ` +
-          `career seasons: -${eligibilityResult.excludedByCareerSeasons})`,
+          `career seasons: -${eligibilityResult.excludedByCareerSeasons}, ` +
+          `hof: -${eligibilityResult.excludedByHofOnly}, ` +
+          `era: -${eligibilityResult.excludedByEraFilter})`,
       );
 
       if (teams.length === 0) {
