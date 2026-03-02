@@ -75,7 +75,12 @@
     },
     "gh": true,
     "make": true,
-    "acli": true
+    "acli": true,
+    "Out-File": true,
+    "ForEach-Object": true,
+    "ConvertFrom-Json": true,
+    "git add": true,
+    "git commit": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {
