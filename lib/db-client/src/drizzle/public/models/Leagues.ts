@@ -377,6 +377,7 @@ export const teamMembers = pgTable(
     acquisitionType: varchar('acquisition_type', { length: 20 }).default(
       'draft',
     ),
+    onTradeBlock: boolean('on_trade_block').notNull().default(false),
   },
   (table) => {
     return {

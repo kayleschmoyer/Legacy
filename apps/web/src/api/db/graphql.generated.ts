@@ -960,6 +960,8 @@ export type Mutation = {
   sendMatchupMessage?: Maybe<MatchupMessage>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
+  /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
+  setTradeBlock?: Maybe<TeamMember>;
   startDraft?: Maybe<League>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
   /** Commissioner: swap the team assignments between two matchups in the same league. */
@@ -1230,6 +1232,11 @@ export type MutationSendMatchupMessageArgs = {
 
 export type MutationSetTeamLockArgs = {
   input: SetTeamLockInput;
+};
+
+export type MutationSetTradeBlockArgs = {
+  onTradeBlock: Scalars['Boolean']['input'];
+  teamMemberId: Scalars['Int']['input'];
 };
 
 export type MutationStartDraftArgs = {
@@ -1612,6 +1619,8 @@ export type Query = {
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
   leagueTeams?: Maybe<Array<Team>>;
+  /** Returns all roster entries explicitly listed on the trade block for the given league. */
+  leagueTradeBlock?: Maybe<Array<TeamMember>>;
   leagueTradeOffers?: Maybe<Array<TradeOffer>>;
   /** Get all consent records for the authenticated user */
   myConsents?: Maybe<Array<UserConsent>>;
@@ -1861,6 +1870,10 @@ export type QueryLeagueScoringProfileArgs = {
 };
 
 export type QueryLeagueTeamsArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type QueryLeagueTradeBlockArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
@@ -2270,6 +2283,7 @@ export type TeamMember = {
   __typename?: 'TeamMember';
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  onTradeBlock?: Maybe<Scalars['Boolean']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   positionId?: Maybe<Scalars['Int']['output']>;
@@ -5167,6 +5181,7 @@ export type TeamMemberFragment = {
   positionId?: number | null;
   teamId?: number | null;
   leagueId?: number | null;
+  onTradeBlock?: boolean | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -5195,6 +5210,7 @@ export type GetTeamMembersQuery = {
     positionId?: number | null;
     teamId?: number | null;
     leagueId?: number | null;
+    onTradeBlock?: boolean | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -5225,6 +5241,7 @@ export type UpdateTeamMemberPositionMutation = {
     positionId?: number | null;
     teamId?: number | null;
     leagueId?: number | null;
+    onTradeBlock?: boolean | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -5257,6 +5274,7 @@ export type SwapTeamMemberPositionsMutation = {
     positionId?: number | null;
     teamId?: number | null;
     leagueId?: number | null;
+    onTradeBlock?: boolean | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -5388,6 +5406,67 @@ export type RemoveAssistantManagerMutationVariables = Exact<{
 export type RemoveAssistantManagerMutation = {
   __typename?: 'Mutation';
   removeAssistantManager?: boolean | null;
+};
+
+export type SetTradeBlockMutationVariables = Exact<{
+  teamMemberId: Scalars['Int']['input'];
+  onTradeBlock: Scalars['Boolean']['input'];
+}>;
+
+export type SetTradeBlockMutation = {
+  __typename?: 'Mutation';
+  setTradeBlock?: {
+    __typename?: 'TeamMember';
+    id?: number | null;
+    playerId?: number | null;
+    positionId?: number | null;
+    teamId?: number | null;
+    leagueId?: number | null;
+    onTradeBlock?: boolean | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      brefId?: string | null;
+      eligiblePositions?: Array<string> | null;
+      seasonsPlayed?: number | null;
+      careerBatting?: {
+        __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
+    } | null;
+  } | null;
+};
+
+export type GetLeagueTradeBlockQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetLeagueTradeBlockQuery = {
+  __typename?: 'Query';
+  leagueTradeBlock?: Array<{
+    __typename?: 'TeamMember';
+    id?: number | null;
+    playerId?: number | null;
+    positionId?: number | null;
+    teamId?: number | null;
+    leagueId?: number | null;
+    onTradeBlock?: boolean | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      brefId?: string | null;
+      eligiblePositions?: Array<string> | null;
+      seasonsPlayed?: number | null;
+      careerBatting?: {
+        __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
+    } | null;
+  }> | null;
 };
 
 export type TradeOfferPlayerFragment = {
@@ -6151,6 +6230,7 @@ export const TeamMemberFragmentDoc = gql`
     positionId
     teamId
     leagueId
+    onTradeBlock
     player {
       id
       firstName
@@ -12149,6 +12229,149 @@ export type RemoveAssistantManagerMutationResult =
 export type RemoveAssistantManagerMutationOptions = BaseMutationOptions<
   RemoveAssistantManagerMutation,
   RemoveAssistantManagerMutationVariables
+>;
+export const SetTradeBlock = gql`
+  mutation SetTradeBlock($teamMemberId: Int!, $onTradeBlock: Boolean!) {
+    setTradeBlock(teamMemberId: $teamMemberId, onTradeBlock: $onTradeBlock) {
+      ...TeamMember
+    }
+  }
+  ${TeamMemberFragmentDoc}
+`;
+export type SetTradeBlockMutationFn = MutationFunction<
+  SetTradeBlockMutation,
+  SetTradeBlockMutationVariables
+>;
+
+/**
+ * __useSetTradeBlockMutation__
+ *
+ * To run a mutation, you first call `useSetTradeBlockMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetTradeBlockMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setTradeBlockMutation, { data, loading, error }] = useSetTradeBlockMutation({
+ *   variables: {
+ *      teamMemberId: // value for 'teamMemberId'
+ *      onTradeBlock: // value for 'onTradeBlock'
+ *   },
+ * });
+ */
+export function useSetTradeBlockMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SetTradeBlockMutation,
+    SetTradeBlockMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SetTradeBlockMutation,
+    SetTradeBlockMutationVariables
+  >(SetTradeBlock, options);
+}
+export type SetTradeBlockMutationHookResult = ReturnType<
+  typeof useSetTradeBlockMutation
+>;
+export type SetTradeBlockMutationResult =
+  Apollo.MutationResult<SetTradeBlockMutation>;
+export type SetTradeBlockMutationOptions = BaseMutationOptions<
+  SetTradeBlockMutation,
+  SetTradeBlockMutationVariables
+>;
+export const GetLeagueTradeBlock = gql`
+  query GetLeagueTradeBlock($leagueId: Int!) {
+    leagueTradeBlock(leagueId: $leagueId) {
+      ...TeamMember
+    }
+  }
+  ${TeamMemberFragmentDoc}
+`;
+
+/**
+ * __useGetLeagueTradeBlockQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueTradeBlockQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueTradeBlockQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueTradeBlockQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeagueTradeBlockQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueTradeBlockQuery,
+    GetLeagueTradeBlockQueryVariables
+  > &
+    (
+      | { variables: GetLeagueTradeBlockQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueTradeBlockQuery,
+    GetLeagueTradeBlockQueryVariables
+  >(GetLeagueTradeBlock, options);
+}
+export function useGetLeagueTradeBlockLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueTradeBlockQuery,
+    GetLeagueTradeBlockQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueTradeBlockQuery,
+    GetLeagueTradeBlockQueryVariables
+  >(GetLeagueTradeBlock, options);
+}
+export function useGetLeagueTradeBlockSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueTradeBlockQuery,
+        GetLeagueTradeBlockQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueTradeBlockQuery,
+    GetLeagueTradeBlockQueryVariables
+  >(
+    GetLeagueTradeBlock,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueTradeBlockQuery,
+          GetLeagueTradeBlockQueryVariables
+        >,
+  );
+}
+export type GetLeagueTradeBlockQueryHookResult = ReturnType<
+  typeof useGetLeagueTradeBlockQuery
+>;
+export type GetLeagueTradeBlockLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueTradeBlockLazyQuery
+>;
+export type GetLeagueTradeBlockSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueTradeBlockSuspenseQuery
+>;
+export type GetLeagueTradeBlockQueryResult = Apollo.QueryResult<
+  GetLeagueTradeBlockQuery,
+  GetLeagueTradeBlockQueryVariables
 >;
 export const GetTeamTradeOffers = gql`
   query GetTeamTradeOffers($teamId: Int!, $status: String) {

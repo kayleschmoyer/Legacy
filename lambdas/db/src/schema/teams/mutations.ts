@@ -40,6 +40,7 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
               leagueId: PublicSchema.teamMembers.leagueId,
               playerId: PublicSchema.teamMembers.playerId,
               positionId: PublicSchema.teamMembers.positionId,
+              onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
             });
 
           if (updated.length === 0) {
@@ -106,6 +107,7 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
                 leagueId: PublicSchema.teamMembers.leagueId,
                 playerId: PublicSchema.teamMembers.playerId,
                 positionId: PublicSchema.teamMembers.positionId,
+                onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
               });
 
             const updatedB = await tx
@@ -118,6 +120,7 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
                 leagueId: PublicSchema.teamMembers.leagueId,
                 playerId: PublicSchema.teamMembers.playerId,
                 positionId: PublicSchema.teamMembers.positionId,
+                onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
               });
 
             if (updatedA.length === 0 || updatedB.length === 0) {
@@ -800,5 +803,50 @@ builder.mutationField('updateTeamBranding', (t) =>
 
       return updated[0];
     },
+  }),
+);
+
+// ── setTradeBlock ─────────────────────────────────────────────────────────────
+
+builder.mutationField('setTradeBlock', (t) =>
+  t.field({
+    type: TeamMember,
+    description:
+      'Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this.',
+    args: {
+      teamMemberId: t.arg.int({ required: true }),
+      onTradeBlock: t.arg.boolean({ required: true }),
+    },
+    resolve: authorized(
+      { teamMembers: (args) => [args.teamMemberId] },
+      async (_parent, args, _context) => {
+        const { teamMemberId, onTradeBlock } = args;
+        const db = _context.db;
+
+        const updated = await db
+          .update(PublicSchema.teamMembers)
+          .set({ onTradeBlock })
+          .where(eq(PublicSchema.teamMembers.id, teamMemberId))
+          .returning({
+            id: PublicSchema.teamMembers.id,
+            teamId: PublicSchema.teamMembers.teamId,
+            leagueId: PublicSchema.teamMembers.leagueId,
+            playerId: PublicSchema.teamMembers.playerId,
+            positionId: PublicSchema.teamMembers.positionId,
+            onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+          });
+
+        if (updated.length === 0) {
+          throw new Error('Team member not found');
+        }
+
+        LOGGER.info('Updated trade block status', {
+          teamMemberId,
+          onTradeBlock,
+        });
+
+        return updated[0];
+      },
+    ),
   }),
 );

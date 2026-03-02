@@ -960,6 +960,8 @@ export type Mutation = {
   sendMatchupMessage?: Maybe<MatchupMessage>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
+  /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
+  setTradeBlock?: Maybe<TeamMember>;
   startDraft?: Maybe<League>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
   /** Commissioner: swap the team assignments between two matchups in the same league. */
@@ -1230,6 +1232,11 @@ export type MutationSendMatchupMessageArgs = {
 
 export type MutationSetTeamLockArgs = {
   input: SetTeamLockInput;
+};
+
+export type MutationSetTradeBlockArgs = {
+  onTradeBlock: Scalars['Boolean']['input'];
+  teamMemberId: Scalars['Int']['input'];
 };
 
 export type MutationStartDraftArgs = {
@@ -1612,6 +1619,8 @@ export type Query = {
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
   leagueTeams?: Maybe<Array<Team>>;
+  /** Returns all roster entries explicitly listed on the trade block for the given league. */
+  leagueTradeBlock?: Maybe<Array<TeamMember>>;
   leagueTradeOffers?: Maybe<Array<TradeOffer>>;
   /** Get all consent records for the authenticated user */
   myConsents?: Maybe<Array<UserConsent>>;
@@ -1861,6 +1870,10 @@ export type QueryLeagueScoringProfileArgs = {
 };
 
 export type QueryLeagueTeamsArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type QueryLeagueTradeBlockArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
@@ -2270,6 +2283,7 @@ export type TeamMember = {
   __typename?: 'TeamMember';
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  onTradeBlock?: Maybe<Scalars['Boolean']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   positionId?: Maybe<Scalars['Int']['output']>;

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Card, Separator, Text, XStack, YStack } from 'tamagui';
+import React, { useState } from 'react';
+import { Card, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Button } from '@legacy-sports/shared-components';
 import { ArrowLeftRight, ChevronDown, ChevronUp } from '@tamagui/lucide-icons';
 import {
@@ -7,44 +7,71 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
-
-interface TeamMember {
-  id?: number | null;
-  playerId?: number | null;
-  playerName?: string | null;
-  positionId?: number | null;
-  teamId?: number | null;
-}
+import {
+  useGetLeagueTradeBlockQuery,
+  useSetTradeBlockMutation,
+} from '../../api/db/graphql.generated';
 
 export interface LeagueTradeBlockProps {
   leagueId: number;
-  teamMembers: readonly TeamMember[];
+  /** The current user's team ID -- used to determine which toggle buttons to show. */
+  userTeamId: number | null | undefined;
 }
 
 /**
- * LeagueTradeBlock — A sidebar widget showing players available for trade.
- *
- * In a full implementation this would connect to a trade-block API where
- * managers list players they're willing to move. For now it shows bench
- * players as potential trade candidates since those are the most likely
- * pieces managers would deal.
+ * LeagueTradeBlock -- Displays all players listed on the trade block across
+ * every team in the league. GMs and assistant managers can toggle their own
+ * players on/off the trade block directly from this widget.
  */
 export function LeagueTradeBlock({
   leagueId,
-  teamMembers,
+  userTeamId,
 }: LeagueTradeBlockProps): React.JSX.Element {
   const [expanded, setExpanded] = useState(false);
 
-  // Bench players = no positionId assigned (most likely trade candidates)
-  const benchPlayers = useMemo(
-    () => teamMembers.filter((m) => !m.positionId && m.playerName),
-    [teamMembers],
+  const { data, loading, error } = useGetLeagueTradeBlockQuery({
+    variables: { leagueId },
+    skip: !leagueId,
+  });
+
+  const [setTradeBlock, { loading: mutating }] = useSetTradeBlockMutation({
+    refetchQueries: ['GetLeagueTradeBlock'],
+  });
+
+  const players = data?.leagueTradeBlock ?? [];
+  const displayList = expanded ? players : players.slice(0, 5);
+  const hasMore = players.length > 5;
+
+  const header = (
+    <XStack
+      alignItems="center"
+      justifyContent="space-between"
+      marginBottom="$3"
+    >
+      <XStack alignItems="center" gap="$2">
+        <ArrowLeftRight size={18} color="var(--color)" />
+        <Text fontSize="$5" fontWeight="700" color="$color">
+          Trade Block
+        </Text>
+      </XStack>
+      {players.length > 0 && (
+        <XStack
+          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+          borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
+          borderWidth={1}
+          borderRadius="$10"
+          paddingHorizontal="$2"
+          paddingVertical="$1"
+        >
+          <Text fontSize="$1" fontWeight="700" color={BRAND_GOLD_LIGHT}>
+            {players.length} available
+          </Text>
+        </XStack>
+      )}
+    </XStack>
   );
 
-  const displayList = expanded ? benchPlayers : benchPlayers.slice(0, 4);
-  const hasMore = benchPlayers.length > 4;
-
-  if (benchPlayers.length === 0) {
+  if (loading) {
     return (
       <Card
         backgroundColor="$surfacePanel"
@@ -53,18 +80,52 @@ export function LeagueTradeBlock({
         borderRadius="$6"
         padding="$5"
       >
-        <XStack alignItems="center" gap="$2" marginBottom="$3">
-          <ArrowLeftRight size={18} color="var(--color)" />
-          <Text fontSize="$5" fontWeight="700" color="$color">
-            Trade Block
-          </Text>
-        </XStack>
+        {header}
+        <YStack alignItems="center" paddingVertical="$4">
+          <Spinner size="small" color={BRAND_GOLD_LIGHT} />
+        </YStack>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$surfacePanelBorder"
+        borderWidth={1}
+        borderRadius="$6"
+        padding="$5"
+      >
+        {header}
+        <Text
+          color="$red10"
+          fontSize="$3"
+          textAlign="center"
+          paddingVertical="$3"
+        >
+          Failed to load trade block.
+        </Text>
+      </Card>
+    );
+  }
+
+  if (players.length === 0) {
+    return (
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$surfacePanelBorder"
+        borderWidth={1}
+        borderRadius="$6"
+        padding="$5"
+      >
+        {header}
         <YStack alignItems="center" gap="$2" paddingVertical="$4">
           <Text color="$textMuted" fontSize="$3" textAlign="center">
-            No bench players available for trade.
+            No players on the trade block.
           </Text>
           <Text color="$textMuted" fontSize="$2" textAlign="center">
-            Add players to your bench to start shopping them around.
+            Use the roster page to list players for trade.
           </Text>
         </YStack>
       </Card>
@@ -79,79 +140,98 @@ export function LeagueTradeBlock({
       borderRadius="$6"
       padding="$5"
     >
-      <XStack
-        alignItems="center"
-        justifyContent="space-between"
-        marginBottom="$3"
-      >
-        <XStack alignItems="center" gap="$2">
-          <ArrowLeftRight size={18} color="var(--color)" />
-          <Text fontSize="$5" fontWeight="700" color="$color">
-            Trade Block
-          </Text>
-        </XStack>
-        <XStack
-          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
-          borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
-          borderWidth={1}
-          borderRadius="$10"
-          paddingHorizontal="$2"
-          paddingVertical="$1"
-        >
-          <Text fontSize="$1" fontWeight="700" color={BRAND_GOLD_LIGHT}>
-            {benchPlayers.length} available
-          </Text>
-        </XStack>
-      </XStack>
-
-      <Text fontSize="$2" color="$textMuted" marginBottom="$3">
-        Bench players you could offer in a trade:
-      </Text>
+      {header}
 
       <YStack gap="$1">
-        {displayList.map((player, idx) => (
-          <React.Fragment key={player.id ?? idx}>
-            <XStack
-              justifyContent="space-between"
-              alignItems="center"
-              paddingVertical="$2"
-              paddingHorizontal="$2"
-              borderRadius="$3"
-              hoverStyle={{ backgroundColor: '$surfaceSubtle' }}
-            >
-              <XStack alignItems="center" gap="$2" flex={1}>
-                <YStack
-                  width={28}
-                  height={28}
-                  borderRadius={14}
-                  backgroundColor="$surfaceSubtle"
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  <Text fontSize="$2" fontWeight="700" color="$textMuted">
-                    {(player.playerName ?? '?')[0]}
-                  </Text>
-                </YStack>
-                <Text fontSize="$3" color="$color" fontWeight="500">
-                  {player.playerName ?? 'Unknown Player'}
-                </Text>
-              </XStack>
+        {displayList.map((member, idx) => {
+          const isOwnTeam = userTeamId != null && member.teamId === userTeamId;
+          const playerName = member.player
+            ? `${member.player.firstName ?? ''} ${member.player.lastName ?? ''}`.trim()
+            : `Player #${member.playerId}`;
+          const initial = playerName[0] ?? '?';
+
+          return (
+            <React.Fragment key={member.id ?? idx}>
               <XStack
-                backgroundColor="$amber3"
-                borderRadius="$2"
+                justifyContent="space-between"
+                alignItems="center"
+                paddingVertical="$2"
                 paddingHorizontal="$2"
-                paddingVertical="$0.5"
+                borderRadius="$3"
+                hoverStyle={{ backgroundColor: '$surfaceSubtle' }}
               >
-                <Text fontSize="$1" fontWeight="600" color="$amber11">
-                  BENCH
-                </Text>
+                <XStack alignItems="center" gap="$2" flex={1}>
+                  <YStack
+                    width={28}
+                    height={28}
+                    borderRadius={14}
+                    backgroundColor="$surfaceSubtle"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Text fontSize="$2" fontWeight="700" color="$textMuted">
+                      {initial}
+                    </Text>
+                  </YStack>
+                  <YStack flex={1}>
+                    <Text
+                      fontSize="$3"
+                      color="$color"
+                      fontWeight="500"
+                      numberOfLines={1}
+                    >
+                      {playerName}
+                    </Text>
+                  </YStack>
+                </XStack>
+
+                {isOwnTeam ? (
+                  <Button
+                    size="$2"
+                    backgroundColor="$red3"
+                    borderColor="$red7"
+                    borderWidth={1}
+                    borderRadius="$2"
+                    paddingHorizontal="$2"
+                    disabled={mutating}
+                    onPress={() =>
+                      void setTradeBlock({
+                        variables: {
+                          teamMemberId: member.id!,
+                          onTradeBlock: false,
+                        },
+                      })
+                    }
+                  >
+                    <Text fontSize="$1" fontWeight="600" color="$red11">
+                      Remove
+                    </Text>
+                  </Button>
+                ) : (
+                  <XStack
+                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                    borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.4)}
+                    borderWidth={1}
+                    borderRadius="$2"
+                    paddingHorizontal="$2"
+                    paddingVertical="$0.5"
+                  >
+                    <Text
+                      fontSize="$1"
+                      fontWeight="600"
+                      color={BRAND_GOLD_LIGHT}
+                    >
+                      AVAILABLE
+                    </Text>
+                  </XStack>
+                )}
               </XStack>
-            </XStack>
-            {idx < displayList.length - 1 && (
-              <Separator borderColor="$outlineSubtle" />
-            )}
-          </React.Fragment>
-        ))}
+              {idx < displayList.length - 1 && (
+                <Separator borderColor="$outlineSubtle" />
+              )}
+            </React.Fragment>
+          );
+        })}
       </YStack>
 
       {hasMore && (
@@ -171,7 +251,7 @@ export function LeagueTradeBlock({
           }
         >
           <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
-            {expanded ? 'Show fewer' : `Show ${benchPlayers.length - 4} more`}
+            {expanded ? 'Show fewer' : `Show ${players.length - 5} more`}
           </Text>
         </Button>
       )}

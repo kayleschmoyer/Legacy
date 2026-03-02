@@ -18,6 +18,7 @@ fragment TeamMember on TeamMember {
   positionId
   teamId
   leagueId
+  onTradeBlock
   player {
     id
     firstName
@@ -136,4 +137,16 @@ mutation InviteAssistantManager($teamId: Int!, $username: String!) {
 
 mutation RemoveAssistantManager($teamId: Int!, $userId: Int!) {
   removeAssistantManager(teamId: $teamId, userId: $userId)
+}
+
+mutation SetTradeBlock($teamMemberId: Int!, $onTradeBlock: Boolean!) {
+  setTradeBlock(teamMemberId: $teamMemberId, onTradeBlock: $onTradeBlock) {
+    ...TeamMember
+  }
+}
+
+query GetLeagueTradeBlock($leagueId: Int!) {
+  leagueTradeBlock(leagueId: $leagueId) {
+    ...TeamMember
+  }
 }

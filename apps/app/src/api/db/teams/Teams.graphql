@@ -15,6 +15,7 @@ fragment TeamMember on TeamMember {
   positionId
   teamId
   leagueId
+  onTradeBlock
   player {
     id
     firstName
@@ -35,6 +36,18 @@ mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
     teamMemberId: $teamMemberId
     positionId: $positionId
   ) {
+    ...TeamMember
+  }
+}
+
+mutation SetTradeBlock($teamMemberId: Int!, $onTradeBlock: Boolean!) {
+  setTradeBlock(teamMemberId: $teamMemberId, onTradeBlock: $onTradeBlock) {
+    ...TeamMember
+  }
+}
+
+query GetLeagueTradeBlock($leagueId: Int!) {
+  leagueTradeBlock(leagueId: $leagueId) {
     ...TeamMember
   }
 }

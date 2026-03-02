@@ -1181,6 +1181,11 @@ type Mutation {
   Commissioner: lock or unlock a team to prevent/allow roster moves.
   """
   setTeamLock(input: SetTeamLockInput!): CommissionerActionResult
+
+  """
+  Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this.
+  """
+  setTradeBlock(onTradeBlock: Boolean!, teamMemberId: Int!): TeamMember
   startDraft(
     draftMode: String
     draftOrder: String
@@ -1649,6 +1654,11 @@ type Query {
   leaguePositions(leagueId: Int!): [LeaguePosition!]
   leagueScoringProfile(leagueId: Int!): ScoringConfig
   leagueTeams(leagueId: Int!): [Team!]
+
+  """
+  Returns all roster entries explicitly listed on the trade block for the given league.
+  """
+  leagueTradeBlock(leagueId: Int!): [TeamMember!]
   leagueTradeOffers(leagueId: Int!, status: String): [TradeOffer!]
 
   """
@@ -2022,6 +2032,7 @@ A member of a team
 type TeamMember {
   id: Int
   leagueId: Int
+  onTradeBlock: Boolean
   player: Player
   playerId: Int
   positionId: Int

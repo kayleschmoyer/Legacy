@@ -1078,7 +1078,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           </InviteCard>
 
           {/* Trade Block */}
-          <LeagueTradeBlock leagueId={leagueId} teamMembers={teamMembers} />
+          <LeagueTradeBlock leagueId={leagueId} userTeamId={reduxUserTeamId} />
         </YStack>
       </XStack>
     </YStack>

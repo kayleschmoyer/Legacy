@@ -297,6 +297,7 @@ builder.queryField('teamMembers', (t) =>
             leagueId: PublicSchema.teamMembers.leagueId,
             playerId: PublicSchema.teamMembers.playerId,
             positionId: PublicSchema.teamMembers.positionId,
+            onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
           })
           .from(PublicSchema.teamMembers)
           .where(eq(PublicSchema.teamMembers.teamId, teamId))
@@ -721,6 +722,72 @@ builder.queryField('publicLeagues', (t) =>
           error: error instanceof Error ? error.message : String(error),
         });
         throw new Error('Failed to fetch public leagues');
+      }
+    },
+  }),
+);
+
+// Query to get all players currently on the trade block in a league
+builder.queryField('leagueTradeBlock', (t) =>
+  t.field({
+    type: [TeamMember],
+    description:
+      'Returns all roster entries explicitly listed on the trade block for the given league.',
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { leagueId } = args;
+      const userId = context.user.id;
+      const db = context.db;
+
+      // Verify the user is a member of this league
+      const membership = await db
+        .select({ teamId: PublicSchema.leagueMembers.teamId })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw new Error('Not a member of this league');
+      }
+
+      try {
+        const members = await db
+          .select({
+            id: PublicSchema.teamMembers.id,
+            teamId: PublicSchema.teamMembers.teamId,
+            leagueId: PublicSchema.teamMembers.leagueId,
+            playerId: PublicSchema.teamMembers.playerId,
+            positionId: PublicSchema.teamMembers.positionId,
+            onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+          })
+          .from(PublicSchema.teamMembers)
+          .where(
+            and(
+              eq(PublicSchema.teamMembers.leagueId, leagueId),
+              eq(PublicSchema.teamMembers.onTradeBlock, true),
+            ),
+          )
+          .orderBy(PublicSchema.teamMembers.teamId);
+
+        return members;
+      } catch (error) {
+        LOGGER.error('Error fetching league trade block', {
+          leagueId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new Error('Failed to fetch league trade block');
       }
     },
   }),

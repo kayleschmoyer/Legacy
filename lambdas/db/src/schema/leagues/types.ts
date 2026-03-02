@@ -254,6 +254,7 @@ export const TeamMember = builder.objectRef<{
   leagueId: number;
   playerId: number;
   positionId: number | null;
+  onTradeBlock: boolean;
 }>('TeamMember');
 
 TeamMember.implement({
@@ -264,6 +265,7 @@ TeamMember.implement({
     leagueId: t.exposeInt('leagueId'),
     playerId: t.exposeInt('playerId'),
     positionId: t.exposeInt('positionId', { nullable: true }),
+    onTradeBlock: t.exposeBoolean('onTradeBlock'),
     player: t.field({
       type: 'Player',
       nullable: true,
