@@ -7,7 +7,7 @@ description: 'Complete end-to-end workflow for implementing a Jira ticket: Jira 
 
 ## Overview
 
-Complete workflow for implementing a Jira ticket from start to finish. **The preferred approach is to create a git worktree** so the work is fully isolated in its own directory and VS Code window. Use a simple in-place branch only for small, quick changes.
+Complete workflow for implementing a Jira ticket from start to finish. **Always create a git worktree** so the work is fully isolated in its own directory and VS Code window.
 
 > 🎯 **Definition of Done**: A ticket is not complete until **all acceptance criteria are fully implemented and validated**. If any scope remains unfinished when you open the PR, you must create follow-up Jira tickets for the remaining work (see [Common Mistake 7](#mistake-7-partial-implementation-without-follow-up-tickets)). Do not leave work half-done or silently drop scope — either finish it or track it.
 
@@ -57,8 +57,6 @@ git pull
 
 ### Step 3: Create Branch + Worktree
 
-**Preferred — worktree (full isolation):**
-
 ```powershell
 cd "D:\code\legacy-sports"
 twig worktree create LS-1234/short-description
@@ -78,6 +76,10 @@ cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
 code $wt   # open in a new VS Code window; do all work there
 ```
 
+> **⚠️ CRITICAL — switch your working context now.** From this point forward, every file
+> edit, terminal command, and git operation must happen inside `$wt`. Never edit files
+> under `D:\code\legacy-sports` when working on a ticket.
+
 > For tickets that depend on an unmerged parent ticket, create the branch first so twig tracks the dependency, then add the worktree:
 >
 > ```powershell
@@ -87,17 +89,21 @@ code $wt   # open in a new VS Code window; do all work there
 > twig worktree create LS-1234/short-description
 > ```
 
-**Lightweight alternative (in-place, no separate window):**
-
-```powershell
-# For new independent ticket
-git checkout main ; git pull
-twig switch LS-1234 -p=main
-
-# For ticket dependent on an in-progress branch
-git checkout LS-XXXX/parent-branch-name
-twig switch LS-1234 -p=current
-```
+> **In-place branching (without a worktree) is only allowed when the user explicitly
+> requests it** (e.g., "no worktree" or "in-place"). If the user does not specify,
+> always default to a worktree.
+>
+> In-place (if explicitly requested):
+>
+> ```powershell
+> # For new independent ticket
+> git checkout main ; git pull
+> twig switch LS-1234 -p=main
+>
+> # For ticket dependent on an in-progress branch
+> git checkout LS-XXXX/parent-branch-name
+> twig switch LS-1234 -p=current
+> ```
 
 > **⚠️ DEPENDENCY CHECK**: Before branching, check the Jira ticket for linked issues
 > or descriptions that indicate a dependency on another in-progress ticket.
@@ -360,6 +366,7 @@ Before starting ANY work:
 - [ ] Run `twig worktree create LS-####/description` from main repo
 - [ ] Run `make install`, copy `.env`, junction `.twig` in the new worktree
 - [ ] Open worktree in a new VS Code window (`code $wt`)
+- [ ] **All file edits and terminal commands will target `$wt`, NOT the main repo**
 - [ ] Update Jira to "In Progress"
 - [ ] NOW safe to make changes
 
@@ -380,13 +387,13 @@ Before opening the PR, confirm every item:
 $result = acli jira workitem create --summary "Description" --project LS --type Task --json | ConvertFrom-Json
 $key = $result.key   # e.g. LS-225
 
-# 1. Create branch + worktree (preferred)
+# 1. Create branch + worktree
 cd "D:\code\legacy-sports"
 git checkout main ; git pull
 twig worktree create "$key/description"
 twig worktree list   # note $wt path
 
-# 1b. Set up worktree environment
+# 1b. Set up worktree environment — ALL remaining steps happen here
 $wt = "<path-from-twig-worktree-list>"
 cd $wt ; make install
 Copy-Item "D:\code\legacy-sports\.env" .env

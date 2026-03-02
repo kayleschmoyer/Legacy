@@ -5,6 +5,10 @@ description: 'Create feature branches with automatic Jira ticket integration usi
 
 # Skill: Branch Creation
 
+> **⚠️ Prefer the [worktree workflow](../worktree-workflow/SKILL.md) for all ticket work.**
+> This skill covers in-place branching only. Use it when the user explicitly asks
+> to work without a worktree (e.g., "no worktree" or "in-place").
+
 ## Overview
 
 Create feature branches with automatic Jira integration using the branch-create script or twig.

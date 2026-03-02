@@ -1,6 +1,6 @@
 ---
 name: worktree-workflow
-description: 'Implement a Jira ticket using a git worktree so multiple tickets can be worked in parallel without switching branches; covers setup, directory structure, VS Code window, validation, PR creation, and cleanup. Use whenever the user says "worktree" or wants to work on a ticket in isolation.'
+description: 'Implement a Jira ticket using a git worktree so multiple tickets can be worked in parallel without switching branches; covers setup, directory structure, VS Code window, validation, PR creation, and cleanup. Use whenever starting work on any Jira ticket — worktrees are the default workflow, not an alternative.'
 ---
 
 # Skill: Implementing Tickets via Git Worktrees
@@ -24,10 +24,13 @@ D:\code\
 
 ## When to Use
 
-- Starting a new ticket while another is already in progress
+- **Starting work on any Jira ticket** (this is the default workflow)
 - Working on multiple tickets in parallel without stashing
 - Wanting full isolation between ticket branches
-- User explicitly asks to use a worktree
+
+> **In-place branching (without a worktree) is only allowed when the user explicitly
+> requests it** (e.g., "no worktree" or "in-place"). If the user does not specify,
+> always default to a worktree.
 
 ## Prerequisites
 
@@ -37,7 +40,20 @@ D:\code\
 
 ## Complete Workflow
 
+### Step 0: Check for Parent Dependencies
+
+Before creating the worktree, **inspect the Jira ticket** for linked issues or descriptions that reference another in-progress (unmerged) ticket. This determines which branch the worktree should be based on:
+
+| Situation                                    | Parent               | How                              |
+| -------------------------------------------- | -------------------- | -------------------------------- |
+| Independent ticket (no dependency)           | `main`               | Use the default path in Step 1   |
+| Depends on an unmerged ticket (e.g. LS-XXXX) | That ticket's branch | Use the dependent path in Step 1 |
+
+> **⚠️ Getting this wrong creates sibling branches that will conflict when both merge to main.** Always check before proceeding.
+
 ### Step 1: Create the Branch + Worktree
+
+**Independent ticket (parent = main):**
 
 From the main repo, use `twig worktree create` — it creates the branch if it doesn't exist and creates the worktree in one command:
 
@@ -50,6 +66,25 @@ twig worktree create LS-####/short-description
 twig branch depend LS-####/short-description main
 
 # Verify — note the path twig chose
+twig worktree list
+```
+
+**Dependent ticket (parent = another in-progress branch):**
+
+Create the branch from the parent first so twig tracks the dependency, then create the worktree:
+
+```powershell
+cd "D:\code\legacy-sports"
+git checkout LS-XXXX/parent-branch-name
+twig switch LS-#### -p=current
+git checkout main
+twig worktree create LS-####/short-description
+
+# Register the branch under the correct parent (NOT main)
+twig branch depend LS-####/short-description LS-XXXX/parent-branch-name
+
+# Verify — branch must appear under the parent, not under main
+twig tree
 twig worktree list
 ```
 
@@ -249,10 +284,13 @@ make install
 ## Quick Reference
 
 ```powershell
-# 1. Create branch + worktree
+# 0. Check Jira ticket for dependencies on unmerged branches
+#    If dependent: use the dependent-ticket path in Step 1 of the full workflow
+
+# 1. Create branch + worktree (independent ticket — parent = main)
 cd "D:\code\legacy-sports"
 twig worktree create LS-####/description
-twig branch depend LS-####/description main  # register parentage in twig tree
+twig branch depend LS-####/description main  # register parentage — use actual parent branch if dependent
 twig worktree list   # note the path twig chose
 
 # 2. Jira
