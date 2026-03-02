@@ -202,7 +202,30 @@ export const down = async ({ db }: { db: PgDatabase<any> }) => {
 The tagged `sql`template from Drizzle wraps the statement, which can cause issues with
 complex function bodies using`$fn$` delimiters.
 
-### 4. Update Schema Models
+### 4. Run and Verify Migration Locally 🚨 Required Before Commit
+
+**Always run the migration against your local Docker database before committing.**
+A migration that fails to apply is a broken commit — catch it here first.
+
+```powershell
+# From the repo root or lib/db-client directory
+cd lib/db-client
+
+# Check current status (confirms new migration is pending)
+pnpm run db:status
+
+# Apply pending migrations
+pnpm run db:up
+
+# Verify the schema changes landed correctly
+pnpm run db:psql
+# Inside psql: \d table_name
+# Or for enum: SELECT enumlabel FROM pg_enum WHERE enumtypid = 'enum_name'::regtype;
+```
+
+If `db:up` throws an error, **fix the migration SQL before proceeding**. Do not commit a broken migration.
+
+### 5. Update Schema Models
 
 After creating migration, update the corresponding Drizzle schema model:
 
@@ -220,7 +243,7 @@ export const statsLoadingStatus = pgEnum('stats_loading_status', [
 ]);
 ```
 
-### 5. Update GraphQL Schema (if applicable)
+### 6. Update GraphQL Schema (if applicable)
 
 **Location**: `lambdas/db/src/schema/`
 
@@ -245,19 +268,7 @@ export const myNewTable = pgTable('my_new_table', {
 ```typescript
 const StatsLoadingStatus = builder.enumType('StatsLoadingStatus', {
   values: ['not_started', 'queued', 'loading', 'completed', 'failed'] as const,
-})**ALWAYS add timestamps** (`created_at`, `updated_at`) to new tables
-✅ **ALWAYS create trigger** for `updated_at` auto-updates
-✅ Use `IF NOT EXISTS` / `IF EXISTS` for idempotent operations
-✅ Add detailed comments explaining purpose
-✅ Test migration on local database first
-✅ Provide rollback (`down`) when possible
-✅ Use transactions implicitly (each migration runs in transaction)
-✅ Include data migrations with schema changes
-
-### Don'ts
-
-❌ **Don't create tables without timestamps** (except lookup/junction tables)    | 'failed';
-}
+});
 ```
 
 ## Migration Best Practices
@@ -266,13 +277,15 @@ const StatsLoadingStatus = builder.enumType('StatsLoadingStatus', {
 
 ✅ Use `IF NOT EXISTS` / `IF EXISTS` for idempotent operations
 ✅ Add detailed comments explaining purpose
-✅ Test migration on local database first
+✅ **Run `pnpm run db:up` locally and confirm it succeeds before committing**
+✅ Verify schema changes with `pnpm run db:psql` after applying
 ✅ Provide rollback (`down`) when possible
 ✅ Use transactions implicitly (each migration runs in transaction)
 ✅ Include data migrations with schema changes
 
 ### Don'ts
 
+❌ Don't commit a migration without first successfully running it locally
 ❌ Don't run migrations directly in production without testing
 ❌ Don't delete data without backup strategy
 ❌ Don't modify applied migrations (create new one instead)
@@ -280,6 +293,8 @@ const StatsLoadingStatus = builder.enumType('StatsLoadingStatus', {
 ❌ Don't forget to update corresponding ORM models
 
 ## Testing Migration Locally
+
+See **Step 4** above — running the migration locally is a required part of the authoring workflow, not an optional follow-up.
 
 ```powershell
 # Check migration status
