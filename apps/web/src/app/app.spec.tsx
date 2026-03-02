@@ -111,8 +111,8 @@ jest.mock('../pages/management/ManagementPage', () => () => (
 jest.mock('../pages/home/HomePage', () => () => <div>Home Page</div>);
 
 // Mock draft components
-jest.mock('../pages/draft/DraftBoardPage', () => ({
-  DraftBoardPage: () => <div>Draft Board Page</div>,
+jest.mock('../components/EliteDraftBoard', () => ({
+  EliteDraftBoardScreen: () => <div>Elite Draft Board Page</div>,
 }));
 
 // Mock baseball components

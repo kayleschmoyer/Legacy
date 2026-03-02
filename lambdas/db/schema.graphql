@@ -482,6 +482,16 @@ A player in the context of a draft
 """
 type DraftPlayer {
   brefId: String
+
+  """
+  Career batting statistics for the player
+  """
+  careerBatting: CareerBatting
+
+  """
+  List of positions this player is eligible to play (e.g. SP, RP, 1B, SS)
+  """
+  eligiblePositions: [String!]
   firstName: String
   id: Int
   lastName: String

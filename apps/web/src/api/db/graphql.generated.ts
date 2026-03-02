@@ -444,6 +444,10 @@ export type DraftPick = {
 export type DraftPlayer = {
   __typename?: 'DraftPlayer';
   brefId?: Maybe<Scalars['String']['output']>;
+  /** Career batting statistics for the player */
+  careerBatting?: Maybe<CareerBatting>;
+  /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
+  eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
@@ -3399,6 +3403,225 @@ export type JoinPublicLeagueMutation = {
     message?: string | null;
     leagueId?: number | null;
     teamId?: number | null;
+  } | null;
+};
+
+export type InitializeLiveDraftMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  draftOrder?: InputMaybe<Scalars['String']['input']>;
+  draftMode?: InputMaybe<Scalars['String']['input']>;
+  selectionMethod?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type InitializeLiveDraftMutation = {
+  __typename?: 'Mutation';
+  initializeDraft?: {
+    __typename?: 'Draft';
+    id?: number | null;
+    leagueId?: number | null;
+    draftMode?: string | null;
+    selectionMethod?: string | null;
+    draftOrder?: string | null;
+    currentPick?: number | null;
+    draftStartedAt?: string | null;
+    createdAt?: string | null;
+  } | null;
+};
+
+export type MakeDraftPickMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type MakeDraftPickMutation = {
+  __typename?: 'Mutation';
+  makeDraftPick?: {
+    __typename?: 'DraftPick';
+    id?: number | null;
+    draftId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    round?: number | null;
+    pickNumber?: number | null;
+    overallPick?: number | null;
+    pickedAt?: string | null;
+  } | null;
+};
+
+export type PauseDraftMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type PauseDraftMutation = {
+  __typename?: 'Mutation';
+  pauseDraft?: {
+    __typename?: 'Draft';
+    id?: number | null;
+    currentPick?: number | null;
+  } | null;
+};
+
+export type ResumeDraftMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type ResumeDraftMutation = {
+  __typename?: 'Mutation';
+  resumeDraft?: {
+    __typename?: 'Draft';
+    id?: number | null;
+    currentPick?: number | null;
+  } | null;
+};
+
+export type CommissionerPickMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type CommissionerPickMutation = {
+  __typename?: 'Mutation';
+  commissionerPick?: {
+    __typename?: 'DraftPick';
+    id?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    round?: number | null;
+    pickNumber?: number | null;
+    overallPick?: number | null;
+    pickedAt?: string | null;
+  } | null;
+};
+
+export type GetLiveDraftLeagueDraftQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetLiveDraftLeagueDraftQuery = {
+  __typename?: 'Query';
+  getLeagueDraft?: {
+    __typename?: 'Draft';
+    id?: number | null;
+    leagueId?: number | null;
+    draftMode?: string | null;
+    selectionMethod?: string | null;
+    draftOrder?: string | null;
+    currentPick?: number | null;
+    draftStartedAt?: string | null;
+    draftCompletedAt?: string | null;
+    createdAt?: string | null;
+  } | null;
+};
+
+export type GetDraftQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type GetDraftQuery = {
+  __typename?: 'Query';
+  getDraft?: {
+    __typename?: 'Draft';
+    id?: number | null;
+    leagueId?: number | null;
+    draftMode?: string | null;
+    selectionMethod?: string | null;
+    draftOrder?: string | null;
+    currentPick?: number | null;
+    draftStartedAt?: string | null;
+    draftCompletedAt?: string | null;
+    createdAt?: string | null;
+  } | null;
+};
+
+export type GetCurrentDraftPickQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type GetCurrentDraftPickQuery = {
+  __typename?: 'Query';
+  getCurrentDraftPick?: {
+    __typename?: 'CurrentDraftPick';
+    draftId?: number | null;
+    teamId?: number | null;
+    round?: number | null;
+    pickNumber?: number | null;
+    overallPick?: number | null;
+    isComplete?: boolean | null;
+  } | null;
+};
+
+export type GetDraftPicksQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type GetDraftPicksQuery = {
+  __typename?: 'Query';
+  getDraftPicks?: Array<{
+    __typename?: 'DraftPick';
+    id?: number | null;
+    draftId?: number | null;
+    round?: number | null;
+    pickNumber?: number | null;
+    overallPick?: number | null;
+    pickedAt?: string | null;
+    teamId?: number | null;
+    playerId?: number | null;
+  }> | null;
+};
+
+export type GetAvailableDraftPlayersQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetAvailableDraftPlayersQuery = {
+  __typename?: 'Query';
+  getAvailableDraftPlayers?: Array<{
+    __typename?: 'DraftPlayer';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    brefId?: string | null;
+  }> | null;
+};
+
+export type GetDraftPlayerStatsQueryVariables = Exact<{
+  first?: InputMaybe<Scalars['Int']['input']>;
+  searchTerm?: InputMaybe<Scalars['String']['input']>;
+  minGames?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetDraftPlayerStatsQuery = {
+  __typename?: 'Query';
+  careerBattingStats?: {
+    __typename?: 'CareerBattingConnection';
+    totalCount?: number | null;
+    edges?: Array<{
+      __typename?: 'CareerBattingEdge';
+      node?: {
+        __typename?: 'CareerBatting';
+        playerId?: number | null;
+        primaryPosition?: string | null;
+        games?: number | null;
+        atBats?: number | null;
+        hits?: number | null;
+        homeRuns?: number | null;
+        rbi?: number | null;
+        runs?: number | null;
+        stolenBases?: number | null;
+        battingAverage?: number | null;
+        onBasePercentage?: number | null;
+        sluggingPercentage?: number | null;
+        offensiveWAR?: number | null;
+        player?: {
+          __typename?: 'Player';
+          id?: number | null;
+          firstName?: string | null;
+          lastName?: string | null;
+        } | null;
+      } | null;
+    } | null> | null;
   } | null;
 };
 
@@ -8883,6 +9106,877 @@ export type JoinPublicLeagueMutationResult =
 export type JoinPublicLeagueMutationOptions = BaseMutationOptions<
   JoinPublicLeagueMutation,
   JoinPublicLeagueMutationVariables
+>;
+export const InitializeLiveDraft = gql`
+  mutation InitializeLiveDraft(
+    $leagueId: Int!
+    $draftOrder: String
+    $draftMode: String
+    $selectionMethod: String
+  ) {
+    initializeDraft(
+      leagueId: $leagueId
+      draftOrder: $draftOrder
+      draftMode: $draftMode
+      selectionMethod: $selectionMethod
+    ) {
+      id
+      leagueId
+      draftMode
+      selectionMethod
+      draftOrder
+      currentPick
+      draftStartedAt
+      createdAt
+    }
+  }
+`;
+export type InitializeLiveDraftMutationFn = MutationFunction<
+  InitializeLiveDraftMutation,
+  InitializeLiveDraftMutationVariables
+>;
+
+/**
+ * __useInitializeLiveDraftMutation__
+ *
+ * To run a mutation, you first call `useInitializeLiveDraftMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useInitializeLiveDraftMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [initializeLiveDraftMutation, { data, loading, error }] = useInitializeLiveDraftMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      draftOrder: // value for 'draftOrder'
+ *      draftMode: // value for 'draftMode'
+ *      selectionMethod: // value for 'selectionMethod'
+ *   },
+ * });
+ */
+export function useInitializeLiveDraftMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    InitializeLiveDraftMutation,
+    InitializeLiveDraftMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    InitializeLiveDraftMutation,
+    InitializeLiveDraftMutationVariables
+  >(InitializeLiveDraft, options);
+}
+export type InitializeLiveDraftMutationHookResult = ReturnType<
+  typeof useInitializeLiveDraftMutation
+>;
+export type InitializeLiveDraftMutationResult =
+  Apollo.MutationResult<InitializeLiveDraftMutation>;
+export type InitializeLiveDraftMutationOptions = BaseMutationOptions<
+  InitializeLiveDraftMutation,
+  InitializeLiveDraftMutationVariables
+>;
+export const MakeDraftPick = gql`
+  mutation MakeDraftPick($draftId: Int!, $playerId: Int!) {
+    makeDraftPick(draftId: $draftId, playerId: $playerId) {
+      id
+      draftId
+      teamId
+      playerId
+      round
+      pickNumber
+      overallPick
+      pickedAt
+    }
+  }
+`;
+export type MakeDraftPickMutationFn = MutationFunction<
+  MakeDraftPickMutation,
+  MakeDraftPickMutationVariables
+>;
+
+/**
+ * __useMakeDraftPickMutation__
+ *
+ * To run a mutation, you first call `useMakeDraftPickMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useMakeDraftPickMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [makeDraftPickMutation, { data, loading, error }] = useMakeDraftPickMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useMakeDraftPickMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    MakeDraftPickMutation,
+    MakeDraftPickMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    MakeDraftPickMutation,
+    MakeDraftPickMutationVariables
+  >(MakeDraftPick, options);
+}
+export type MakeDraftPickMutationHookResult = ReturnType<
+  typeof useMakeDraftPickMutation
+>;
+export type MakeDraftPickMutationResult =
+  Apollo.MutationResult<MakeDraftPickMutation>;
+export type MakeDraftPickMutationOptions = BaseMutationOptions<
+  MakeDraftPickMutation,
+  MakeDraftPickMutationVariables
+>;
+export const PauseDraft = gql`
+  mutation PauseDraft($leagueId: Int!) {
+    pauseDraft(leagueId: $leagueId) {
+      id
+      currentPick
+    }
+  }
+`;
+export type PauseDraftMutationFn = MutationFunction<
+  PauseDraftMutation,
+  PauseDraftMutationVariables
+>;
+
+/**
+ * __usePauseDraftMutation__
+ *
+ * To run a mutation, you first call `usePauseDraftMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `usePauseDraftMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [pauseDraftMutation, { data, loading, error }] = usePauseDraftMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function usePauseDraftMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    PauseDraftMutation,
+    PauseDraftMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<PauseDraftMutation, PauseDraftMutationVariables>(
+    PauseDraft,
+    options,
+  );
+}
+export type PauseDraftMutationHookResult = ReturnType<
+  typeof usePauseDraftMutation
+>;
+export type PauseDraftMutationResult =
+  Apollo.MutationResult<PauseDraftMutation>;
+export type PauseDraftMutationOptions = BaseMutationOptions<
+  PauseDraftMutation,
+  PauseDraftMutationVariables
+>;
+export const ResumeDraft = gql`
+  mutation ResumeDraft($leagueId: Int!) {
+    resumeDraft(leagueId: $leagueId) {
+      id
+      currentPick
+    }
+  }
+`;
+export type ResumeDraftMutationFn = MutationFunction<
+  ResumeDraftMutation,
+  ResumeDraftMutationVariables
+>;
+
+/**
+ * __useResumeDraftMutation__
+ *
+ * To run a mutation, you first call `useResumeDraftMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useResumeDraftMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [resumeDraftMutation, { data, loading, error }] = useResumeDraftMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useResumeDraftMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ResumeDraftMutation,
+    ResumeDraftMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<ResumeDraftMutation, ResumeDraftMutationVariables>(
+    ResumeDraft,
+    options,
+  );
+}
+export type ResumeDraftMutationHookResult = ReturnType<
+  typeof useResumeDraftMutation
+>;
+export type ResumeDraftMutationResult =
+  Apollo.MutationResult<ResumeDraftMutation>;
+export type ResumeDraftMutationOptions = BaseMutationOptions<
+  ResumeDraftMutation,
+  ResumeDraftMutationVariables
+>;
+export const CommissionerPick = gql`
+  mutation CommissionerPick($draftId: Int!, $playerId: Int!) {
+    commissionerPick(draftId: $draftId, playerId: $playerId) {
+      id
+      teamId
+      playerId
+      round
+      pickNumber
+      overallPick
+      pickedAt
+    }
+  }
+`;
+export type CommissionerPickMutationFn = MutationFunction<
+  CommissionerPickMutation,
+  CommissionerPickMutationVariables
+>;
+
+/**
+ * __useCommissionerPickMutation__
+ *
+ * To run a mutation, you first call `useCommissionerPickMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCommissionerPickMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [commissionerPickMutation, { data, loading, error }] = useCommissionerPickMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useCommissionerPickMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CommissionerPickMutation,
+    CommissionerPickMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CommissionerPickMutation,
+    CommissionerPickMutationVariables
+  >(CommissionerPick, options);
+}
+export type CommissionerPickMutationHookResult = ReturnType<
+  typeof useCommissionerPickMutation
+>;
+export type CommissionerPickMutationResult =
+  Apollo.MutationResult<CommissionerPickMutation>;
+export type CommissionerPickMutationOptions = BaseMutationOptions<
+  CommissionerPickMutation,
+  CommissionerPickMutationVariables
+>;
+export const GetLiveDraftLeagueDraft = gql`
+  query GetLiveDraftLeagueDraft($leagueId: Int!) {
+    getLeagueDraft(leagueId: $leagueId) {
+      id
+      leagueId
+      draftMode
+      selectionMethod
+      draftOrder
+      currentPick
+      draftStartedAt
+      draftCompletedAt
+      createdAt
+    }
+  }
+`;
+
+/**
+ * __useGetLiveDraftLeagueDraftQuery__
+ *
+ * To run a query within a React component, call `useGetLiveDraftLeagueDraftQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLiveDraftLeagueDraftQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLiveDraftLeagueDraftQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLiveDraftLeagueDraftQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLiveDraftLeagueDraftQuery,
+    GetLiveDraftLeagueDraftQueryVariables
+  > &
+    (
+      | { variables: GetLiveDraftLeagueDraftQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLiveDraftLeagueDraftQuery,
+    GetLiveDraftLeagueDraftQueryVariables
+  >(GetLiveDraftLeagueDraft, options);
+}
+export function useGetLiveDraftLeagueDraftLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLiveDraftLeagueDraftQuery,
+    GetLiveDraftLeagueDraftQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLiveDraftLeagueDraftQuery,
+    GetLiveDraftLeagueDraftQueryVariables
+  >(GetLiveDraftLeagueDraft, options);
+}
+export function useGetLiveDraftLeagueDraftSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLiveDraftLeagueDraftQuery,
+        GetLiveDraftLeagueDraftQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLiveDraftLeagueDraftQuery,
+    GetLiveDraftLeagueDraftQueryVariables
+  >(
+    GetLiveDraftLeagueDraft,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLiveDraftLeagueDraftQuery,
+          GetLiveDraftLeagueDraftQueryVariables
+        >,
+  );
+}
+export type GetLiveDraftLeagueDraftQueryHookResult = ReturnType<
+  typeof useGetLiveDraftLeagueDraftQuery
+>;
+export type GetLiveDraftLeagueDraftLazyQueryHookResult = ReturnType<
+  typeof useGetLiveDraftLeagueDraftLazyQuery
+>;
+export type GetLiveDraftLeagueDraftSuspenseQueryHookResult = ReturnType<
+  typeof useGetLiveDraftLeagueDraftSuspenseQuery
+>;
+export type GetLiveDraftLeagueDraftQueryResult = Apollo.QueryResult<
+  GetLiveDraftLeagueDraftQuery,
+  GetLiveDraftLeagueDraftQueryVariables
+>;
+export const GetDraft = gql`
+  query GetDraft($draftId: Int!) {
+    getDraft(draftId: $draftId) {
+      id
+      leagueId
+      draftMode
+      selectionMethod
+      draftOrder
+      currentPick
+      draftStartedAt
+      draftCompletedAt
+      createdAt
+    }
+  }
+`;
+
+/**
+ * __useGetDraftQuery__
+ *
+ * To run a query within a React component, call `useGetDraftQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useGetDraftQuery(
+  baseOptions: Apollo.QueryHookOptions<GetDraftQuery, GetDraftQueryVariables> &
+    ({ variables: GetDraftQueryVariables; skip?: boolean } | { skip: boolean }),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetDraftQuery, GetDraftQueryVariables>(
+    GetDraft,
+    options,
+  );
+}
+export function useGetDraftLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftQuery,
+    GetDraftQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetDraftQuery, GetDraftQueryVariables>(
+    GetDraft,
+    options,
+  );
+}
+export function useGetDraftSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<GetDraftQuery, GetDraftQueryVariables>,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<GetDraftQuery, GetDraftQueryVariables>(
+    GetDraft,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<GetDraftQuery, GetDraftQueryVariables>,
+  );
+}
+export type GetDraftQueryHookResult = ReturnType<typeof useGetDraftQuery>;
+export type GetDraftLazyQueryHookResult = ReturnType<
+  typeof useGetDraftLazyQuery
+>;
+export type GetDraftSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftSuspenseQuery
+>;
+export type GetDraftQueryResult = Apollo.QueryResult<
+  GetDraftQuery,
+  GetDraftQueryVariables
+>;
+export const GetCurrentDraftPick = gql`
+  query GetCurrentDraftPick($draftId: Int!) {
+    getCurrentDraftPick(draftId: $draftId) {
+      draftId
+      teamId
+      round
+      pickNumber
+      overallPick
+      isComplete
+    }
+  }
+`;
+
+/**
+ * __useGetCurrentDraftPickQuery__
+ *
+ * To run a query within a React component, call `useGetCurrentDraftPickQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetCurrentDraftPickQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetCurrentDraftPickQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useGetCurrentDraftPickQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetCurrentDraftPickQuery,
+    GetCurrentDraftPickQueryVariables
+  > &
+    (
+      | { variables: GetCurrentDraftPickQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetCurrentDraftPickQuery,
+    GetCurrentDraftPickQueryVariables
+  >(GetCurrentDraftPick, options);
+}
+export function useGetCurrentDraftPickLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetCurrentDraftPickQuery,
+    GetCurrentDraftPickQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetCurrentDraftPickQuery,
+    GetCurrentDraftPickQueryVariables
+  >(GetCurrentDraftPick, options);
+}
+export function useGetCurrentDraftPickSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetCurrentDraftPickQuery,
+        GetCurrentDraftPickQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetCurrentDraftPickQuery,
+    GetCurrentDraftPickQueryVariables
+  >(
+    GetCurrentDraftPick,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetCurrentDraftPickQuery,
+          GetCurrentDraftPickQueryVariables
+        >,
+  );
+}
+export type GetCurrentDraftPickQueryHookResult = ReturnType<
+  typeof useGetCurrentDraftPickQuery
+>;
+export type GetCurrentDraftPickLazyQueryHookResult = ReturnType<
+  typeof useGetCurrentDraftPickLazyQuery
+>;
+export type GetCurrentDraftPickSuspenseQueryHookResult = ReturnType<
+  typeof useGetCurrentDraftPickSuspenseQuery
+>;
+export type GetCurrentDraftPickQueryResult = Apollo.QueryResult<
+  GetCurrentDraftPickQuery,
+  GetCurrentDraftPickQueryVariables
+>;
+export const GetDraftPicks = gql`
+  query GetDraftPicks($draftId: Int!) {
+    getDraftPicks(draftId: $draftId) {
+      id
+      draftId
+      round
+      pickNumber
+      overallPick
+      pickedAt
+      teamId
+      playerId
+    }
+  }
+`;
+
+/**
+ * __useGetDraftPicksQuery__
+ *
+ * To run a query within a React component, call `useGetDraftPicksQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftPicksQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftPicksQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useGetDraftPicksQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetDraftPicksQuery,
+    GetDraftPicksQueryVariables
+  > &
+    (
+      | { variables: GetDraftPicksQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetDraftPicksQuery, GetDraftPicksQueryVariables>(
+    GetDraftPicks,
+    options,
+  );
+}
+export function useGetDraftPicksLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftPicksQuery,
+    GetDraftPicksQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetDraftPicksQuery, GetDraftPicksQueryVariables>(
+    GetDraftPicks,
+    options,
+  );
+}
+export function useGetDraftPicksSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDraftPicksQuery,
+        GetDraftPicksQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDraftPicksQuery,
+    GetDraftPicksQueryVariables
+  >(
+    GetDraftPicks,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDraftPicksQuery,
+          GetDraftPicksQueryVariables
+        >,
+  );
+}
+export type GetDraftPicksQueryHookResult = ReturnType<
+  typeof useGetDraftPicksQuery
+>;
+export type GetDraftPicksLazyQueryHookResult = ReturnType<
+  typeof useGetDraftPicksLazyQuery
+>;
+export type GetDraftPicksSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftPicksSuspenseQuery
+>;
+export type GetDraftPicksQueryResult = Apollo.QueryResult<
+  GetDraftPicksQuery,
+  GetDraftPicksQueryVariables
+>;
+export const GetAvailableDraftPlayers = gql`
+  query GetAvailableDraftPlayers($draftId: Int!, $search: String, $limit: Int) {
+    getAvailableDraftPlayers(
+      draftId: $draftId
+      search: $search
+      limit: $limit
+    ) {
+      id
+      firstName
+      lastName
+      brefId
+    }
+  }
+`;
+
+/**
+ * __useGetAvailableDraftPlayersQuery__
+ *
+ * To run a query within a React component, call `useGetAvailableDraftPlayersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAvailableDraftPlayersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAvailableDraftPlayersQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      search: // value for 'search'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetAvailableDraftPlayersQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetAvailableDraftPlayersQuery,
+    GetAvailableDraftPlayersQueryVariables
+  > &
+    (
+      | { variables: GetAvailableDraftPlayersQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetAvailableDraftPlayersQuery,
+    GetAvailableDraftPlayersQueryVariables
+  >(GetAvailableDraftPlayers, options);
+}
+export function useGetAvailableDraftPlayersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetAvailableDraftPlayersQuery,
+    GetAvailableDraftPlayersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetAvailableDraftPlayersQuery,
+    GetAvailableDraftPlayersQueryVariables
+  >(GetAvailableDraftPlayers, options);
+}
+export function useGetAvailableDraftPlayersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAvailableDraftPlayersQuery,
+        GetAvailableDraftPlayersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetAvailableDraftPlayersQuery,
+    GetAvailableDraftPlayersQueryVariables
+  >(
+    GetAvailableDraftPlayers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetAvailableDraftPlayersQuery,
+          GetAvailableDraftPlayersQueryVariables
+        >,
+  );
+}
+export type GetAvailableDraftPlayersQueryHookResult = ReturnType<
+  typeof useGetAvailableDraftPlayersQuery
+>;
+export type GetAvailableDraftPlayersLazyQueryHookResult = ReturnType<
+  typeof useGetAvailableDraftPlayersLazyQuery
+>;
+export type GetAvailableDraftPlayersSuspenseQueryHookResult = ReturnType<
+  typeof useGetAvailableDraftPlayersSuspenseQuery
+>;
+export type GetAvailableDraftPlayersQueryResult = Apollo.QueryResult<
+  GetAvailableDraftPlayersQuery,
+  GetAvailableDraftPlayersQueryVariables
+>;
+export const GetDraftPlayerStats = gql`
+  query GetDraftPlayerStats($first: Int, $searchTerm: String, $minGames: Int) {
+    careerBattingStats(
+      first: $first
+      searchTerm: $searchTerm
+      minGames: $minGames
+    ) {
+      edges {
+        node {
+          playerId
+          primaryPosition
+          games
+          atBats
+          hits
+          homeRuns
+          rbi
+          runs
+          stolenBases
+          battingAverage
+          onBasePercentage
+          sluggingPercentage
+          offensiveWAR
+          player {
+            id
+            firstName
+            lastName
+          }
+        }
+      }
+      totalCount
+    }
+  }
+`;
+
+/**
+ * __useGetDraftPlayerStatsQuery__
+ *
+ * To run a query within a React component, call `useGetDraftPlayerStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftPlayerStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftPlayerStatsQuery({
+ *   variables: {
+ *      first: // value for 'first'
+ *      searchTerm: // value for 'searchTerm'
+ *      minGames: // value for 'minGames'
+ *   },
+ * });
+ */
+export function useGetDraftPlayerStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetDraftPlayerStatsQuery,
+    GetDraftPlayerStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDraftPlayerStatsQuery,
+    GetDraftPlayerStatsQueryVariables
+  >(GetDraftPlayerStats, options);
+}
+export function useGetDraftPlayerStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftPlayerStatsQuery,
+    GetDraftPlayerStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDraftPlayerStatsQuery,
+    GetDraftPlayerStatsQueryVariables
+  >(GetDraftPlayerStats, options);
+}
+export function useGetDraftPlayerStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDraftPlayerStatsQuery,
+        GetDraftPlayerStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDraftPlayerStatsQuery,
+    GetDraftPlayerStatsQueryVariables
+  >(
+    GetDraftPlayerStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDraftPlayerStatsQuery,
+          GetDraftPlayerStatsQueryVariables
+        >,
+  );
+}
+export type GetDraftPlayerStatsQueryHookResult = ReturnType<
+  typeof useGetDraftPlayerStatsQuery
+>;
+export type GetDraftPlayerStatsLazyQueryHookResult = ReturnType<
+  typeof useGetDraftPlayerStatsLazyQuery
+>;
+export type GetDraftPlayerStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftPlayerStatsSuspenseQuery
+>;
+export type GetDraftPlayerStatsQueryResult = Apollo.QueryResult<
+  GetDraftPlayerStatsQuery,
+  GetDraftPlayerStatsQueryVariables
 >;
 export const GetUserTeamId = gql`
   query GetUserTeamId($leagueId: Int!) {

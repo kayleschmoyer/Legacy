@@ -4,9 +4,7 @@
  * This module defines the core GraphQL types used across league,
  * team, and waiver resolvers.
  */
-import { PublicSchema } from '@legacy-sports/db-client';
 import type { Team as DbTeam } from '@legacy-sports/db-client';
-import { eq } from 'drizzle-orm';
 import { builder } from '../builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from '../scoring';
 
@@ -113,14 +111,10 @@ League.implement({
         'The week number of the current matchup (resolved from the matchup record)',
       resolve: async (parent, _args, context) => {
         if (!parent.currentMatchup) return null;
-        const rows = await context.db
-          .select({
-            weekNumber: PublicSchema.matchups.weekNumber,
-          })
-          .from(PublicSchema.matchups)
-          .where(eq(PublicSchema.matchups.id, parent.currentMatchup))
-          .limit(1);
-        return rows[0]?.weekNumber ?? null;
+        const matchup = await context.loaders.matchupsById.load(
+          parent.currentMatchup,
+        );
+        return matchup?.weekNumber ?? null;
       },
     }),
     scoringProfile: t.field({

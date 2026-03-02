@@ -552,30 +552,45 @@ builder.mutationField('acceptTrade', (t) =>
       }
 
       // 4. Atomically swap players and mark trade accepted
-      //    For each leg: change the player's teamId to the opposite team.
+      //    Group legs by destination team and bulk-update each direction.
       const proposingTeamId = trade.proposingTeamId;
+      const toReceiving = playerLegs
+        .filter((leg) => leg.fromTeamId === proposingTeamId)
+        .map((leg) => leg.playerId);
+      const toProposing = playerLegs
+        .filter((leg) => leg.fromTeamId !== proposingTeamId)
+        .map((leg) => leg.playerId);
 
-      for (const leg of playerLegs) {
-        const toTeamId =
-          leg.fromTeamId === proposingTeamId
-            ? receivingTeamId
-            : proposingTeamId;
-
-        await db
-          .update(PublicSchema.teamMembers)
-          .set({
-            teamId: toTeamId,
-            // Clear position assignment — positions may not be valid on new team
-            positionId: null,
-          })
-          .where(
-            and(
-              eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
-              eq(PublicSchema.teamMembers.playerId, leg.playerId),
-              eq(PublicSchema.teamMembers.teamId, leg.fromTeamId),
-            ),
-          );
-      }
+      await Promise.all([
+        ...(toReceiving.length > 0
+          ? [
+              db
+                .update(PublicSchema.teamMembers)
+                .set({ teamId: receivingTeamId, positionId: null })
+                .where(
+                  and(
+                    eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
+                    inArray(PublicSchema.teamMembers.playerId, toReceiving),
+                    eq(PublicSchema.teamMembers.teamId, proposingTeamId),
+                  ),
+                ),
+            ]
+          : []),
+        ...(toProposing.length > 0
+          ? [
+              db
+                .update(PublicSchema.teamMembers)
+                .set({ teamId: proposingTeamId, positionId: null })
+                .where(
+                  and(
+                    eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
+                    inArray(PublicSchema.teamMembers.playerId, toProposing),
+                    eq(PublicSchema.teamMembers.teamId, receivingTeamId),
+                  ),
+                ),
+            ]
+          : []),
+      ]);
 
       // 5. Mark the trade as accepted
       await db
@@ -822,24 +837,34 @@ builder.mutationField('vetoTrade', (t) =>
         );
       }
 
-      // Reverse the player swap
+      // Reverse the player swap: group legs by their original fromTeamId and
+      // bulk-update each group in one query.
       const playerLegs = await db
         .select()
         .from(PublicSchema.tradeOfferPlayers)
         .where(eq(PublicSchema.tradeOfferPlayers.tradeOfferId, args.tradeId));
 
+      const legsByFromTeam = new Map<number, number[]>();
       for (const leg of playerLegs) {
-        // Return each player to the original `from_team_id`
-        await db
-          .update(PublicSchema.teamMembers)
-          .set({ teamId: leg.fromTeamId, positionId: null })
-          .where(
-            and(
-              eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
-              eq(PublicSchema.teamMembers.playerId, leg.playerId),
-            ),
-          );
+        if (!legsByFromTeam.has(leg.fromTeamId)) {
+          legsByFromTeam.set(leg.fromTeamId, []);
+        }
+        legsByFromTeam.get(leg.fromTeamId)!.push(leg.playerId);
       }
+
+      await Promise.all(
+        [...legsByFromTeam.entries()].map(([fromTeamId, playerIds]) =>
+          db
+            .update(PublicSchema.teamMembers)
+            .set({ teamId: fromTeamId, positionId: null })
+            .where(
+              and(
+                eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
+                inArray(PublicSchema.teamMembers.playerId, playerIds),
+              ),
+            ),
+        ),
+      );
 
       await db
         .update(PublicSchema.tradeOffers)

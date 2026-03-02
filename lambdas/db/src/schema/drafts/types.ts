@@ -2,10 +2,9 @@
  * Draft domain — GraphQL type definitions
  */
 
-import { PublicSchema } from '@legacy-sports/db-client';
-import { eq } from 'drizzle-orm';
 import { builder } from '../builder';
 import { Team } from '../leagues/types';
+import { CareerBattingRef } from '../statistics';
 
 /**
  * DraftPick - Represents a single draft pick
@@ -36,18 +35,11 @@ DraftPick.implement({
     }),
     team: t.field({
       type: Team,
-      resolve: async (parent, args, context) => {
-        const teams = await context.db
-          .select()
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, parent.teamId))
-          .limit(1);
-
-        if (!teams[0]) {
-          throw new Error(`Team ${parent.teamId} not found`);
-        }
-
-        return teams[0];
+      resolve: (parent, _args, context) => {
+        return context.loaders.teams.load(parent.teamId).then((team) => {
+          if (!team) throw new Error(`Team ${parent.teamId} not found`);
+          return team;
+        });
       },
     }),
   }),
@@ -127,18 +119,11 @@ CurrentDraftPick.implement({
     isComplete: t.exposeBoolean('isComplete'),
     team: t.field({
       type: Team,
-      resolve: async (parent, args, context) => {
-        const teams = await context.db
-          .select()
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, parent.teamId))
-          .limit(1);
-
-        if (!teams[0]) {
-          throw new Error(`Team ${parent.teamId} not found`);
-        }
-
-        return teams[0];
+      resolve: (parent, _args, context) => {
+        return context.loaders.teams.load(parent.teamId).then((team) => {
+          if (!team) throw new Error(`Team ${parent.teamId} not found`);
+          return team;
+        });
       },
     }),
   }),
@@ -161,6 +146,21 @@ DraftPlayer.implement({
     firstName: t.exposeString('firstName'),
     lastName: t.exposeString('lastName'),
     brefId: t.exposeString('brefId'),
+    eligiblePositions: t.stringList({
+      description:
+        'List of positions this player is eligible to play (e.g. SP, RP, 1B, SS)',
+      resolve: async (parent, _args, context) => {
+        return context.loaders.eligiblePositions.load(parent.id);
+      },
+    }),
+    careerBatting: t.field({
+      description: 'Career batting statistics for the player',
+      type: CareerBattingRef,
+      nullable: true,
+      resolve: async (parent, _args, context) => {
+        return context.loaders.careerBatting.load(parent.id);
+      },
+    }),
   }),
 });
 

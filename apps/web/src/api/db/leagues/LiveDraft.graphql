@@ -1,0 +1,158 @@
+# Live Draft GraphQL Operations
+# Used by the EliteDraftBoard component for pick-by-pick live drafting
+
+mutation InitializeLiveDraft(
+  $leagueId: Int!
+  $draftOrder: String
+  $draftMode: String
+  $selectionMethod: String
+) {
+  initializeDraft(
+    leagueId: $leagueId
+    draftOrder: $draftOrder
+    draftMode: $draftMode
+    selectionMethod: $selectionMethod
+  ) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    draftStartedAt
+    createdAt
+  }
+}
+
+mutation MakeDraftPick($draftId: Int!, $playerId: Int!) {
+  makeDraftPick(draftId: $draftId, playerId: $playerId) {
+    id
+    draftId
+    teamId
+    playerId
+    round
+    pickNumber
+    overallPick
+    pickedAt
+  }
+}
+
+mutation PauseDraft($leagueId: Int!) {
+  pauseDraft(leagueId: $leagueId) {
+    id
+    currentPick
+  }
+}
+
+mutation ResumeDraft($leagueId: Int!) {
+  resumeDraft(leagueId: $leagueId) {
+    id
+    currentPick
+  }
+}
+
+mutation CommissionerPick($draftId: Int!, $playerId: Int!) {
+  commissionerPick(draftId: $draftId, playerId: $playerId) {
+    id
+    teamId
+    playerId
+    round
+    pickNumber
+    overallPick
+    pickedAt
+  }
+}
+
+query GetLiveDraftLeagueDraft($leagueId: Int!) {
+  getLeagueDraft(leagueId: $leagueId) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    draftStartedAt
+    draftCompletedAt
+    createdAt
+  }
+}
+
+query GetDraft($draftId: Int!) {
+  getDraft(draftId: $draftId) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    draftStartedAt
+    draftCompletedAt
+    createdAt
+  }
+}
+
+query GetCurrentDraftPick($draftId: Int!) {
+  getCurrentDraftPick(draftId: $draftId) {
+    draftId
+    teamId
+    round
+    pickNumber
+    overallPick
+    isComplete
+  }
+}
+
+query GetDraftPicks($draftId: Int!) {
+  getDraftPicks(draftId: $draftId) {
+    id
+    draftId
+    round
+    pickNumber
+    overallPick
+    pickedAt
+    teamId
+    playerId
+  }
+}
+
+query GetAvailableDraftPlayers($draftId: Int!, $search: String, $limit: Int) {
+  getAvailableDraftPlayers(draftId: $draftId, search: $search, limit: $limit) {
+    id
+    firstName
+    lastName
+    brefId
+  }
+}
+
+# Fetch career batting stats for player cards (uses existing connection that works on deployed server)
+query GetDraftPlayerStats($first: Int, $searchTerm: String, $minGames: Int) {
+  careerBattingStats(
+    first: $first
+    searchTerm: $searchTerm
+    minGames: $minGames
+  ) {
+    edges {
+      node {
+        playerId
+        primaryPosition
+        games
+        atBats
+        hits
+        homeRuns
+        rbi
+        runs
+        stolenBases
+        battingAverage
+        onBasePercentage
+        sluggingPercentage
+        offensiveWAR
+        player {
+          id
+          firstName
+          lastName
+        }
+      }
+    }
+    totalCount
+  }
+}

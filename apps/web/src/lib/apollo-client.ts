@@ -16,6 +16,9 @@ console.log('GraphQL URL from env config:', GRAPHQL_URL);
 
 const httpLink = createHttpLink({
   uri: (operation) => `${GRAPHQL_URL}?ref=${operation.operationName}`,
+  headers: {
+    'apollo-require-preflight': 'true',
+  },
 });
 
 // Authentication link to add JWT token to requests

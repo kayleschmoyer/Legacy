@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type DraftCompletedNotification,
+  type DraftPausedNotification,
   type DraftPickNotification,
+  type DraftResumedNotification,
   type DraftStartedNotification,
   type LeagueChatMessageNotification,
   type MatchupStatsCompleteNotification,
@@ -44,7 +46,9 @@ const noop = () => {
 // Re-export types for backward compatibility
 export type {
   DraftCompletedNotification,
+  DraftPausedNotification,
   DraftPickNotification,
+  DraftResumedNotification,
   DraftStartedNotification,
   LeagueChatMessageNotification,
   PlayerStatsLoadingNotification,
@@ -64,6 +68,8 @@ interface UseWebSocketOptions {
   onDraftStarted?: (notification: DraftStartedNotification) => void;
   onDraftCompleted?: (notification: DraftCompletedNotification) => void;
   onDraftPickMade?: (notification: DraftPickNotification) => void;
+  onDraftPaused?: (notification: DraftPausedNotification) => void;
+  onDraftResumed?: (notification: DraftResumedNotification) => void;
   onPlayerStatsLoading?: (notification: PlayerStatsLoadingNotification) => void;
   onPlayerStatsUpdated?: (notification: PlayerStatsUpdatedNotification) => void;
   onMatchupStatsComplete?: (
@@ -102,6 +108,8 @@ export function useWebSocket({
   onDraftStarted,
   onDraftCompleted,
   onDraftPickMade,
+  onDraftPaused,
+  onDraftResumed,
   onPlayerStatsLoading,
   onPlayerStatsUpdated,
   onMatchupStatsComplete,
@@ -294,6 +302,24 @@ export function useWebSocket({
         )
       : noop;
 
+    const unsubscribeDraftPaused = onDraftPaused
+      ? client.on(
+          ClientNotificationType.DRAFT_PAUSED,
+          (notification: NotificationData) => {
+            onDraftPaused(notification as DraftPausedNotification);
+          },
+        )
+      : noop;
+
+    const unsubscribeDraftResumed = onDraftResumed
+      ? client.on(
+          ClientNotificationType.DRAFT_RESUMED,
+          (notification: NotificationData) => {
+            onDraftResumed(notification as DraftResumedNotification);
+          },
+        )
+      : noop;
+
     const unsubscribePlayerStatsLoading = onPlayerStatsLoading
       ? client.on(
           ClientNotificationType.PLAYER_STATS_LOADING,
@@ -364,6 +390,8 @@ export function useWebSocket({
       unsubscribeDraftCompleted();
       unsubscribeDraftStarted();
       unsubscribeDraftPickMade();
+      unsubscribeDraftPaused();
+      unsubscribeDraftResumed();
       unsubscribePlayerStatsLoading();
       unsubscribePlayerStatsUpdated();
       unsubscribeMatchupStatsComplete();
@@ -381,6 +409,8 @@ export function useWebSocket({
     onDraftStarted,
     onDraftCompleted,
     onDraftPickMade,
+    onDraftPaused,
+    onDraftResumed,
     onPlayerStatsLoading,
     onPlayerStatsUpdated,
     onMatchupStatsComplete,

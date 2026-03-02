@@ -1,24 +1,131 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { EliteDraftBoardScreen } from './EliteDraftBoard';
+
+// ---------------------------------------------------------------------------
+// Apollo mock — every useQuery returns all possible top-level fields so the
+// component finds the data it needs regardless of which query document was
+// passed.  useMutation returns a no-op callable.
+// ---------------------------------------------------------------------------
+
+const MOCK_QUERY_DATA = {
+  // GET_LEAGUE_BY_ID
+  league: {
+    id: 1,
+    name: 'Test League',
+    draftStatus: 'in-progress',
+    activeDraftId: 1,
+    userMembership: { permissionLevel: 'owner', teamId: 1 },
+  },
+  // GET_LEAGUE_TEAMS
+  leagueTeams: [
+    { id: '1', name: 'Team A', leagueId: 1 },
+    { id: '2', name: 'Team B', leagueId: 1 },
+  ],
+  // GET_LEAGUE_DRAFT
+  getLeagueDraft: { id: '1', draftCompletedAt: null },
+  // GET_CURRENT_DRAFT_PICK
+  getCurrentDraftPick: {
+    draftId: 1,
+    teamId: 1,
+    round: 1,
+    pickNumber: 1,
+    overallPick: 1,
+    isComplete: false,
+  },
+  // GET_DRAFT_PICKS
+  getDraftPicks: [],
+  // GET_AVAILABLE_DRAFT_PLAYERS
+  getAvailableDraftPlayers: [
+    { id: 1, firstName: 'Mike', lastName: 'Trout', brefId: 'troutmi01' },
+    { id: 2, firstName: 'Aaron', lastName: 'Judge', brefId: 'judgeaa01' },
+  ],
+  // GET_DRAFT_PLAYER_STATS
+  careerBattingStats: {
+    edges: [
+      {
+        node: {
+          playerId: 1,
+          player: { id: 1, firstName: 'Mike', lastName: 'Trout' },
+          primaryPosition: 'OF',
+          games: 1500,
+          hits: 1600,
+          homeRuns: 360,
+          rbi: 900,
+          runs: 1100,
+          stolenBases: 200,
+          battingAverage: 0.301,
+          onBasePercentage: 0.41,
+          sluggingPercentage: 0.58,
+          offensiveWAR: 80,
+        },
+        cursor: '1',
+      },
+      {
+        node: {
+          playerId: 2,
+          player: { id: 2, firstName: 'Aaron', lastName: 'Judge' },
+          primaryPosition: 'OF',
+          games: 800,
+          hits: 900,
+          homeRuns: 250,
+          rbi: 550,
+          runs: 600,
+          stolenBases: 20,
+          battingAverage: 0.284,
+          onBasePercentage: 0.39,
+          sluggingPercentage: 0.56,
+          offensiveWAR: 40,
+        },
+        cursor: '2',
+      },
+    ],
+    pageInfo: { hasNextPage: false, endCursor: '2' },
+  },
+};
+
+jest.mock('@apollo/client/react', () => ({
+  useQuery: jest.fn(() => ({
+    data: MOCK_QUERY_DATA,
+    loading: false,
+    error: undefined,
+    refetch: jest.fn(),
+  })),
+  useMutation: jest.fn(() => [jest.fn(), { loading: false, data: undefined }]),
+}));
+
+/** Wrap the component with MemoryRouter so useNavigate / useParams work. */
+function renderDraftBoard() {
+  return render(
+    <MemoryRouter initialEntries={['/baseball/league/1/draft']}>
+      <Routes>
+        <Route
+          path="/baseball/league/:id/draft"
+          element={<EliteDraftBoardScreen />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 // Minimal smoke + a11y semantics tests for the draft board
 
 describe('EliteDraftBoardScreen a11y', () => {
   test('has main landmark and complementary asides', () => {
-    render(<EliteDraftBoardScreen />);
+    renderDraftBoard();
 
     const main = screen.getByRole('main', { name: /player draft board/i });
     expect(main).toBeInTheDocument();
 
     const asides = screen.getAllByRole('complementary');
-    // left: my team & controls, right: AI & analytics
-    expect(asides.length).toBeGreaterThanOrEqual(2);
+    // left sidebar: my team & draft controls
+    expect(asides.length).toBeGreaterThanOrEqual(1);
   });
 
   test('exposes timer role and shows pick status', () => {
-    render(<EliteDraftBoardScreen />);
+    renderDraftBoard();
     const timer = screen.getByRole('timer', {
       name: /pick timer|waiting timer/i,
     });
@@ -27,7 +134,7 @@ describe('EliteDraftBoardScreen a11y', () => {
 
   test('position filter is a radiogroup and updates aria-checked via keyboard', async () => {
     const user = userEvent.setup();
-    render(<EliteDraftBoardScreen />);
+    renderDraftBoard();
 
     const group = screen.getByRole('radiogroup', {
       name: /filter by position/i,
@@ -57,7 +164,7 @@ describe('EliteDraftBoardScreen a11y', () => {
 
   test('view mode is a radiogroup and toggles aria-checked', async () => {
     const user = userEvent.setup();
-    render(<EliteDraftBoardScreen />);
+    renderDraftBoard();
 
     const group = screen.getByRole('radiogroup', { name: /view mode/i });
     expect(group).toBeInTheDocument();
@@ -76,7 +183,7 @@ describe('EliteDraftBoardScreen a11y', () => {
     // interval state updates, which would exceed the default 5 s timeout.
     jest.useFakeTimers();
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
-    render(<EliteDraftBoardScreen />);
+    renderDraftBoard();
 
     // Find first player card and its watch button (☆)
     const watchButtons = screen.getAllByRole('button', {

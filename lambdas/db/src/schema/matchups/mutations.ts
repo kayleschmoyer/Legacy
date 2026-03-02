@@ -693,38 +693,29 @@ export async function createAllMatchupsForLeague(
   }
 
   // 3. Insert all matchups
-  const insertedMatchups: Array<{
-    id: number;
-    weekNumber: number;
-    team1Id: number | null;
-    team2Id: number | null;
-  }> = [];
-
-  for (const matchup of scheduleResult.matchups) {
-    const result = await db
-      .insert(PublicSchema.matchups)
-      .values({
+  const insertedMatchups = await db
+    .insert(PublicSchema.matchups)
+    .values(
+      scheduleResult.matchups.map((matchup) => ({
         leagueId,
         weekNumber: matchup.weekNumber,
         team1Id: matchup.team1Id,
         team2Id: matchup.team2Id,
         gamesPerMatchup,
         spStartsPerMatchup,
-        status: 'scheduled',
+        status: 'scheduled' as const,
         team1Score: null,
         team2Score: null,
         startTime: null,
         endTime: null,
-      })
-      .returning({
-        id: PublicSchema.matchups.id,
-        weekNumber: PublicSchema.matchups.weekNumber,
-        team1Id: PublicSchema.matchups.team1Id,
-        team2Id: PublicSchema.matchups.team2Id,
-      });
-
-    insertedMatchups.push(result[0]);
-  }
+      })),
+    )
+    .returning({
+      id: PublicSchema.matchups.id,
+      weekNumber: PublicSchema.matchups.weekNumber,
+      team1Id: PublicSchema.matchups.team1Id,
+      team2Id: PublicSchema.matchups.team2Id,
+    });
 
   // 4. Populate matchup_players and assign seasons
   await populateMatchupPlayersAndSeasons(
@@ -821,39 +812,29 @@ export async function adjustMatchupsForNewTotal(
     });
 
     // Remap week numbers: generated schedule starts at 1, we need highestWeek+1
-    const insertedMatchups: Array<{
-      id: number;
-      weekNumber: number;
-      team1Id: number | null;
-      team2Id: number | null;
-    }> = [];
-
-    for (const matchup of scheduleResult.matchups) {
-      const actualWeek = highestWeek + matchup.weekNumber;
-      const result = await db
-        .insert(PublicSchema.matchups)
-        .values({
+    const insertedMatchups = await db
+      .insert(PublicSchema.matchups)
+      .values(
+        scheduleResult.matchups.map((matchup) => ({
           leagueId,
-          weekNumber: actualWeek,
+          weekNumber: highestWeek + matchup.weekNumber,
           team1Id: matchup.team1Id,
           team2Id: matchup.team2Id,
           gamesPerMatchup,
           spStartsPerMatchup,
-          status: 'scheduled',
+          status: 'scheduled' as const,
           team1Score: null,
           team2Score: null,
           startTime: null,
           endTime: null,
-        })
-        .returning({
-          id: PublicSchema.matchups.id,
-          weekNumber: PublicSchema.matchups.weekNumber,
-          team1Id: PublicSchema.matchups.team1Id,
-          team2Id: PublicSchema.matchups.team2Id,
-        });
-
-      insertedMatchups.push(result[0]);
-    }
+        })),
+      )
+      .returning({
+        id: PublicSchema.matchups.id,
+        weekNumber: PublicSchema.matchups.weekNumber,
+        team1Id: PublicSchema.matchups.team1Id,
+        team2Id: PublicSchema.matchups.team2Id,
+      });
 
     // Populate matchup_players and seasons for the new weeks
     if (insertedMatchups.length > 0) {
@@ -910,16 +891,17 @@ export async function adjustMatchupsForNewTotal(
         );
 
       // Delete league_week_player_seasons for these weeks
-      for (const weekNum of removableWeeks) {
-        await db
-          .delete(PublicSchema.leagueWeekPlayerSeasons)
-          .where(
-            and(
-              eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
-              eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, weekNum),
+      await db
+        .delete(PublicSchema.leagueWeekPlayerSeasons)
+        .where(
+          and(
+            eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
+            inArray(
+              PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+              removableWeeks,
             ),
-          );
-      }
+          ),
+        );
 
       // Delete the matchups
       await db

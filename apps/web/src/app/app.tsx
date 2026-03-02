@@ -31,8 +31,8 @@ import { LeagueDiscoveryPage } from '../pages/baseball/LeagueDiscoveryPage';
 import ManagementPage from '../pages/management/ManagementPage';
 import AboutPage from '../pages/about/AboutPage';
 import HelpPage from '../pages/help/HelpPage';
-import { DraftBoardPage } from '../pages/draft/DraftBoardPage';
 import { MockDraftPage } from '../pages/draft/MockDraftPage';
+import { EliteDraftBoardScreen } from '../components/EliteDraftBoard';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
@@ -437,7 +437,7 @@ function App() {
           <Route path="/baseball" element={<BaseballScreen />} />
           <Route
             path="/baseball/league/:id/draft"
-            element={<DraftBoardPage />}
+            element={<EliteDraftBoardScreen />}
           />
           <Route path="/baseball/mock-draft" element={<MockDraftPage />} />
           <Route

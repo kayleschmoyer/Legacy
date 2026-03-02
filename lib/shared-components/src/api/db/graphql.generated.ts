@@ -450,6 +450,10 @@ export type DraftPick = {
 export type DraftPlayer = {
   __typename?: 'DraftPlayer';
   brefId?: Maybe<Scalars['String']['output']>;
+  /** Career batting statistics for the player */
+  careerBatting?: Maybe<CareerBatting>;
+  /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
+  eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;

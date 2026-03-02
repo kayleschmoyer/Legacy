@@ -210,23 +210,56 @@ builder.mutationField('autoSelectGames', (t) =>
           `[autoSelectGames] Found ${activeLeagues.length} active leagues`,
         );
 
+        // 2. Bulk-fetch all in-progress matchups for all active leagues (1 query)
+        const activeLeagueIds = activeLeagues.map((l) => l.id);
+        const allInProgressMatchups =
+          activeLeagueIds.length > 0
+            ? await context.db
+                .select({
+                  id: PublicSchema.matchups.id,
+                  leagueId: PublicSchema.matchups.leagueId,
+                  weekNumber: PublicSchema.matchups.weekNumber,
+                  gamesPerMatchup: PublicSchema.matchups.gamesPerMatchup,
+                  status: PublicSchema.matchups.status,
+                })
+                .from(PublicSchema.matchups)
+                .where(
+                  and(
+                    inArray(PublicSchema.matchups.leagueId, activeLeagueIds),
+                    eq(PublicSchema.matchups.status, 'in_progress'),
+                  ),
+                )
+            : [];
+
+        const matchupsByLeague = new Map<
+          number,
+          typeof allInProgressMatchups
+        >();
+        for (const m of allInProgressMatchups) {
+          if (!matchupsByLeague.has(m.leagueId)) {
+            matchupsByLeague.set(m.leagueId, []);
+          }
+          matchupsByLeague.get(m.leagueId)!.push(m);
+        }
+
+        // 3. Batch selectedGamesCount for all reference matchups in parallel
+        const referenceMatchupIds = activeLeagueIds
+          .map((id) => matchupsByLeague.get(id)?.[0]?.id)
+          .filter((id): id is number => id !== undefined);
+        const selectedCountEntries = await Promise.all(
+          referenceMatchupIds.map(
+            async (id) =>
+              [id, await getSelectedGamesCount(context.db, id)] as const,
+          ),
+        );
+        const selectedCountByMatchup = new Map<number, number>(
+          selectedCountEntries,
+        );
+
         for (const league of activeLeagues) {
           try {
-            // 2. Find current in-progress matchups for this league
-            const currentMatchups = await context.db
-              .select({
-                id: PublicSchema.matchups.id,
-                weekNumber: PublicSchema.matchups.weekNumber,
-                gamesPerMatchup: PublicSchema.matchups.gamesPerMatchup,
-                status: PublicSchema.matchups.status,
-              })
-              .from(PublicSchema.matchups)
-              .where(
-                and(
-                  eq(PublicSchema.matchups.leagueId, league.id),
-                  eq(PublicSchema.matchups.status, 'in_progress'),
-                ),
-              );
+            // Use pre-fetched matchups for this league
+            const currentMatchups = matchupsByLeague.get(league.id) ?? [];
 
             if (currentMatchups.length === 0) {
               LOGGER.debug(
@@ -237,15 +270,13 @@ builder.mutationField('autoSelectGames', (t) =>
 
             result.leaguesProcessed++;
 
-            // 3. Determine the next game number from the first matchup
+            // Determine the next game number from the reference matchup
             //    (all matchups in the same week share the same game progression)
             const referenceMatchup = currentMatchups[0];
             const gamesPerMatchup =
               referenceMatchup.gamesPerMatchup ?? league.gamesPerMatchup ?? 5;
-            const selectedCount = await getSelectedGamesCount(
-              context.db,
-              referenceMatchup.id,
-            );
+            const selectedCount =
+              selectedCountByMatchup.get(referenceMatchup.id) ?? 0;
             const nextGameNumber = selectedCount + 1;
 
             if (nextGameNumber > gamesPerMatchup) {
@@ -427,12 +458,17 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
             const gamesPerMatchup =
               currentMatchups[0].gamesPerMatchup ?? league.gamesPerMatchup ?? 5;
 
+            // Batch all selected-game counts in parallel — one DB round-trip total
+            const selectedCounts = await Promise.all(
+              currentMatchups.map((m) =>
+                getSelectedGamesCount(context.db, m.id),
+              ),
+            );
+
             let allGamesComplete = true;
-            for (const matchup of currentMatchups) {
-              const selectedCount = await getSelectedGamesCount(
-                context.db,
-                matchup.id,
-              );
+            for (let i = 0; i < currentMatchups.length; i++) {
+              const selectedCount = selectedCounts[i];
+              const matchup = currentMatchups[i];
 
               if (selectedCount < gamesPerMatchup) {
                 LOGGER.info(
@@ -590,6 +626,45 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
                   .set(mp.playerId, mp.positionId);
               }
 
+              // Bulk-fetch all team members for all playoff teams (one query instead of 2×N)
+              const allPlayoffTeamIds = round1PlayoffMatchups
+                .flatMap((pm) => [pm.highSeedTeamId, pm.lowSeedTeamId])
+                .filter((id): id is number => id !== null);
+
+              const allPlayoffTeamMembers =
+                allPlayoffTeamIds.length > 0
+                  ? await context.db
+                      .select({
+                        teamId: PublicSchema.teamMembers.teamId,
+                        playerId: PublicSchema.teamMembers.playerId,
+                        positionId: PublicSchema.teamMembers.positionId,
+                      })
+                      .from(PublicSchema.teamMembers)
+                      .where(
+                        and(
+                          eq(PublicSchema.teamMembers.leagueId, league.id),
+                          inArray(
+                            PublicSchema.teamMembers.teamId,
+                            allPlayoffTeamIds,
+                          ),
+                        ),
+                      )
+                  : [];
+
+              const playoffMembersByTeam = new Map<
+                number,
+                Array<{ playerId: number; positionId: number | null }>
+              >();
+              for (const m of allPlayoffTeamMembers) {
+                if (m.teamId === null || m.playerId === null) continue;
+                if (!playoffMembersByTeam.has(m.teamId)) {
+                  playoffMembersByTeam.set(m.teamId, []);
+                }
+                playoffMembersByTeam
+                  .get(m.teamId)!
+                  .push({ playerId: m.playerId, positionId: m.positionId });
+              }
+
               let firstMatchupId: number | null = null;
               for (const pm of round1PlayoffMatchups) {
                 if (pm.highSeedTeamId === null || pm.lowSeedTeamId === null) {
@@ -619,19 +694,7 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
 
                 // Populate matchup players with position carry-forward
                 for (const teamId of [pm.highSeedTeamId, pm.lowSeedTeamId]) {
-                  const teamMembers = await context.db
-                    .select({
-                      playerId: PublicSchema.teamMembers.playerId,
-                      positionId: PublicSchema.teamMembers.positionId,
-                    })
-                    .from(PublicSchema.teamMembers)
-                    .where(
-                      and(
-                        eq(PublicSchema.teamMembers.leagueId, league.id),
-                        eq(PublicSchema.teamMembers.teamId, teamId),
-                      ),
-                    );
-
+                  const teamMembers = playoffMembersByTeam.get(teamId) ?? [];
                   if (teamMembers.length > 0) {
                     const priorPositions = priorPositionsByTeam.get(teamId);
                     await context.db.insert(PublicSchema.matchupPlayers).values(
@@ -857,29 +920,27 @@ async function advanceLeagueWeekInternal(
       }
     }
 
-    // Insert matchups for the new week
-    const newMatchups: Array<{ id: number; teamIndex: number }> = [];
-    for (let i = 0; i < teamPairs.length; i++) {
-      const pair = teamPairs[i];
-      const insertResult = await db
-        .insert(PublicSchema.matchups)
-        .values({
+    // Insert matchups for the new week (bulk insert)
+    const insertedIds = await db
+      .insert(PublicSchema.matchups)
+      .values(
+        teamPairs.map((pair) => ({
           leagueId,
           weekNumber: nextWeek,
           team1Id: pair.team1Id,
           team2Id: pair.team2Id,
           gamesPerMatchup,
           spStartsPerMatchup,
-          status: 'scheduled',
+          status: 'scheduled' as const,
           team1Score: null,
           team2Score: null,
           startTime: null,
           endTime: null,
-        })
-        .returning({ id: PublicSchema.matchups.id });
+        })),
+      )
+      .returning({ id: PublicSchema.matchups.id });
 
-      newMatchups.push({ id: insertResult[0].id, teamIndex: i });
-    }
+    const newMatchups = insertedIds.map((r, i) => ({ id: r.id, teamIndex: i }));
 
     // Auto-populate matchup players with position carry-forward
     const priorPositionsByTeam = new Map<number, Map<number, number | null>>();
@@ -914,46 +975,58 @@ async function advanceLeagueWeekInternal(
       }
     }
 
+    // Bulk-fetch all team members for all teams in the new week (one query instead of 2×N)
+    const allTeamIds = [
+      ...new Set(teamPairs.flatMap((p) => [p.team1Id, p.team2Id])),
+    ];
+    const allTeamMembersForWeek =
+      allTeamIds.length > 0
+        ? await db
+            .select({
+              teamId: PublicSchema.teamMembers.teamId,
+              playerId: PublicSchema.teamMembers.playerId,
+              positionId: PublicSchema.teamMembers.positionId,
+            })
+            .from(PublicSchema.teamMembers)
+            .where(
+              and(
+                eq(PublicSchema.teamMembers.leagueId, leagueId),
+                inArray(PublicSchema.teamMembers.teamId, allTeamIds),
+              ),
+            )
+        : [];
+
+    const membersByTeamId = new Map<
+      number,
+      Array<{ playerId: number; positionId: number | null }>
+    >();
+    for (const m of allTeamMembersForWeek) {
+      if (m.teamId === null || m.playerId === null) continue;
+      if (!membersByTeamId.has(m.teamId)) {
+        membersByTeamId.set(m.teamId, []);
+      }
+      membersByTeamId
+        .get(m.teamId)!
+        .push({ playerId: m.playerId, positionId: m.positionId });
+    }
+
+    const resolvePosition = (
+      teamId: number,
+      playerId: number,
+      teamMembersPositionId: number | null,
+    ): number | null => {
+      const priorPositions = priorPositionsByTeam.get(teamId);
+      if (priorPositions?.has(playerId)) {
+        return priorPositions.get(playerId) ?? null;
+      }
+      return teamMembersPositionId;
+    };
+
     for (const matchup of newMatchups) {
       const pair = teamPairs[matchup.teamIndex];
 
-      const team1Players = await db
-        .select({
-          playerId: PublicSchema.teamMembers.playerId,
-          positionId: PublicSchema.teamMembers.positionId,
-        })
-        .from(PublicSchema.teamMembers)
-        .where(
-          and(
-            eq(PublicSchema.teamMembers.leagueId, leagueId),
-            eq(PublicSchema.teamMembers.teamId, pair.team1Id),
-          ),
-        );
-
-      const team2Players = await db
-        .select({
-          playerId: PublicSchema.teamMembers.playerId,
-          positionId: PublicSchema.teamMembers.positionId,
-        })
-        .from(PublicSchema.teamMembers)
-        .where(
-          and(
-            eq(PublicSchema.teamMembers.leagueId, leagueId),
-            eq(PublicSchema.teamMembers.teamId, pair.team2Id),
-          ),
-        );
-
-      const resolvePosition = (
-        teamId: number,
-        playerId: number,
-        teamMembersPositionId: number | null,
-      ): number | null => {
-        const priorPositions = priorPositionsByTeam.get(teamId);
-        if (priorPositions?.has(playerId)) {
-          return priorPositions.get(playerId) ?? null;
-        }
-        return teamMembersPositionId;
-      };
+      const team1Players = membersByTeamId.get(pair.team1Id) ?? [];
+      const team2Players = membersByTeamId.get(pair.team2Id) ?? [];
 
       const allPlayers = [
         ...team1Players.map((p) => ({

@@ -1,7 +1,7 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, asc, desc, eq, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues/types';
 import { insertActivityLog } from '../services/activity-log';
@@ -439,29 +439,9 @@ builder.objectType(TiebreakerHistory, {
     winner: t.field({
       type: Team,
       nullable: true,
-      resolve: async (history, _args, context) => {
+      resolve: (history, _args, context) => {
         if (!history.winnerId) return null;
-        const results = await context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-            leagueId: PublicSchema.teams.leagueId,
-            divisionId: PublicSchema.teams.divisionId,
-            createdAt: PublicSchema.teams.createdAt,
-            updatedAt: PublicSchema.teams.updatedAt,
-            waiverOrder: PublicSchema.teams.waiverOrder,
-            faabBudget: PublicSchema.teams.faabBudget,
-            isLocked: PublicSchema.teams.isLocked,
-            logoUrl: PublicSchema.teams.logoUrl,
-            primaryColor: PublicSchema.teams.primaryColor,
-            secondaryColor: PublicSchema.teams.secondaryColor,
-            avatarUrl: PublicSchema.teams.avatarUrl,
-            bannerUrl: PublicSchema.teams.bannerUrl,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, history.winnerId))
-          .limit(1);
-        return results[0] || null;
+        return context.loaders.teams.load(history.winnerId);
       },
     }),
   }),
@@ -578,13 +558,7 @@ builder.queryField('getTiebreakerHistory', (t) =>
       const results = await context.db
         .select()
         .from(PublicSchema.tiebreakerHistory)
-        .where(
-          and(
-            ...matchupIds.map((id) =>
-              eq(PublicSchema.tiebreakerHistory.matchupId, id),
-            ),
-          ),
-        )
+        .where(inArray(PublicSchema.tiebreakerHistory.matchupId, matchupIds))
         .orderBy(desc(PublicSchema.tiebreakerHistory.resolvedAt));
       return results.map((history) => ({
         ...history,

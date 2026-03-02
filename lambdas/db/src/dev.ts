@@ -62,6 +62,7 @@ async function startServer() {
   const server = new ApolloServer({
     schema,
     introspection: true,
+    csrfPrevention: false,
     formatError: (formattedError, error) => {
       // Log all errors with full context
       LOGGER.error('GraphQL Error', {
