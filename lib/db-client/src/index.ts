@@ -13,6 +13,9 @@ export * from './lib/services';
 export * from './lib/DraftUtils';
 export * from './lib/DraftService';
 
+// Matchup utilities (shared between lambdas)
+export * from './lib/matchup-utils';
+
 // Type-safe query utilities
 export * from './lib/query-builders/TypeSafeQueryBuilder';
 export * from './lib/prepared-statements/PreparedStatements';

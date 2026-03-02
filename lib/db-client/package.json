@@ -34,6 +34,8 @@
   },
   "dependencies": {
     "@drepkovsky/drizzle-migrations": "^0.6.0",
+    "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/utils": "workspace:*",
     "dotenv": "*",
     "postgres": "^3.4.7"
   }

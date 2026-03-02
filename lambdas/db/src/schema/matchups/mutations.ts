@@ -1,11 +1,15 @@
-/**
- * Matchups domain — mutation fields
+﻿/**
+ * Matchups domain â€” mutation fields
  */
 
-import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
+import {
+  createAllMatchupsForLeague,
+  type GenericDatabase,
+  populateMatchupPlayersAndSeasons,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { isNegroLeague } from '@legacy-sports/utils';
-import { and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import {
   AdvanceLeagueWeekResponse,
@@ -16,8 +20,9 @@ import {
 } from './types';
 import { builder, Context } from '../builder';
 import { verifyCommissionerAccess } from '../authorization';
-import { selectSeasonsForPlayers } from '../../services/season-selector';
 import { MatchupService } from '../../services/matchup-service';
+
+export { createAllMatchupsForLeague };
 
 // Mutation: createMatchup
 builder.mutationField('createMatchup', (t) =>
@@ -160,7 +165,7 @@ builder.mutationField('updateMatchupStatus', (t) =>
   }),
 );
 
-// ── Matchup Roster Mutations ───────────────────────────────────────────────
+// â”€â”€ Matchup Roster Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Helper: Verify that the calling user owns the team in this matchup.
@@ -450,310 +455,12 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
   }),
 );
 
-// ── Create All Matchups ────────────────────────────────────────────────────
+// â”€â”€ Create All Matchups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/**
- * Populate matchup_players and assign seasons for a set of matchups.
- *
- * For each matchup in a given week:
- * 1. Copies team_members into matchup_players (with their positions)
- * 2. Assigns random historical seasons per player per week
- */
-async function populateMatchupPlayersAndSeasons(
-  db: GenericDatabase<typeof PublicSchema>,
-  leagueId: number,
-  matchupRows: Array<{
-    id: number;
-    weekNumber: number;
-    team1Id: number | null;
-    team2Id: number | null;
-  }>,
-  gamesPerMatchup: number,
-): Promise<void> {
-  // Group matchups by week
-  const matchupsByWeek = new Map<number, typeof matchupRows>();
-  for (const m of matchupRows) {
-    if (!matchupsByWeek.has(m.weekNumber)) {
-      matchupsByWeek.set(m.weekNumber, []);
-    }
-    const weekList = matchupsByWeek.get(m.weekNumber);
-    if (weekList) weekList.push(m);
-  }
+// populateMatchupPlayersAndSeasons and createAllMatchupsForLeague are now
+// implemented in @legacy-sports/db-client (lib/db-client/src/lib/matchup-utils.ts)
+// and re-exported above.
 
-  // Get all teams and their members for the league
-  const allTeamMembers = await db
-    .select({
-      teamId: PublicSchema.teamMembers.teamId,
-      playerId: PublicSchema.teamMembers.playerId,
-      positionId: PublicSchema.teamMembers.positionId,
-    })
-    .from(PublicSchema.teamMembers)
-    .where(eq(PublicSchema.teamMembers.leagueId, leagueId));
-
-  // Build team → players map
-  const teamPlayersMap = new Map<
-    number,
-    Array<{ playerId: number; positionId: number | null }>
-  >();
-  for (const tm of allTeamMembers) {
-    if (!tm.teamId) continue;
-    if (!teamPlayersMap.has(tm.teamId)) {
-      teamPlayersMap.set(tm.teamId, []);
-    }
-    const teamList = teamPlayersMap.get(tm.teamId);
-    if (teamList)
-      teamList.push({
-        playerId: tm.playerId,
-        positionId: tm.positionId,
-      });
-  }
-
-  // Collect all player IDs for season queries
-  const allPlayerIds = Array.from(
-    new Set(allTeamMembers.map((tm) => tm.playerId)),
-  );
-
-  if (allPlayerIds.length === 0) return;
-
-  // Fetch all season stats upfront (shared across all weeks)
-  const minGames = gamesPerMatchup * 2;
-  const [allBattingSeasons, allPitchingSeasons, allFieldingSeasons] =
-    await Promise.all([
-      db
-        .select({
-          playerId: PublicSchema.seasonBatting.playerId,
-          season: PublicSchema.seasonBatting.season,
-          g: PublicSchema.seasonBatting.g,
-          lgId: PublicSchema.seasonBatting.lgId,
-        })
-        .from(PublicSchema.seasonBatting)
-        .where(
-          and(
-            inArray(PublicSchema.seasonBatting.playerId, allPlayerIds),
-            isNotNull(PublicSchema.seasonBatting.g),
-          ),
-        )
-        .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
-      db
-        .select({
-          playerId: PublicSchema.seasonPitching.playerId,
-          season: PublicSchema.seasonPitching.season,
-          g: PublicSchema.seasonPitching.g,
-          lgId: PublicSchema.seasonPitching.lgId,
-        })
-        .from(PublicSchema.seasonPitching)
-        .where(
-          and(
-            inArray(PublicSchema.seasonPitching.playerId, allPlayerIds),
-            isNotNull(PublicSchema.seasonPitching.g),
-          ),
-        )
-        .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
-      db
-        .select({
-          playerId: PublicSchema.seasonFielding.playerId,
-          season: PublicSchema.seasonFielding.season,
-          g: PublicSchema.seasonFielding.g,
-          lgId: PublicSchema.seasonFielding.lgId,
-        })
-        .from(PublicSchema.seasonFielding)
-        .where(
-          and(
-            inArray(PublicSchema.seasonFielding.playerId, allPlayerIds),
-            isNotNull(PublicSchema.seasonFielding.g),
-          ),
-        )
-        .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
-    ]);
-
-  // Process each week
-  const sortedWeeks = Array.from(matchupsByWeek.keys()).sort((a, b) => a - b);
-
-  for (const weekNumber of sortedWeeks) {
-    const weekMatchups = matchupsByWeek.get(weekNumber) ?? [];
-
-    // Insert matchup_players for each matchup in this week
-    for (const matchup of weekMatchups) {
-      const playersToInsert: Array<{
-        matchupId: number;
-        playerId: number;
-        teamId: number;
-        positionId: number | null;
-      }> = [];
-
-      for (const teamId of [matchup.team1Id, matchup.team2Id]) {
-        if (!teamId) continue;
-        const players = teamPlayersMap.get(teamId) ?? [];
-        for (const p of players) {
-          playersToInsert.push({
-            matchupId: matchup.id,
-            playerId: p.playerId,
-            teamId,
-            positionId: p.positionId,
-          });
-        }
-      }
-
-      if (playersToInsert.length > 0) {
-        await db.insert(PublicSchema.matchupPlayers).values(playersToInsert);
-      }
-    }
-
-    // Assign seasons for this week's players
-    const weekPlayerIds = new Set<number>();
-    for (const matchup of weekMatchups) {
-      for (const teamId of [matchup.team1Id, matchup.team2Id]) {
-        if (!teamId) continue;
-        const players = teamPlayersMap.get(teamId) ?? [];
-        for (const p of players) {
-          weekPlayerIds.add(p.playerId);
-        }
-      }
-    }
-
-    const playerIdsForWeek = Array.from(weekPlayerIds);
-    if (playerIdsForWeek.length === 0) continue;
-
-    const selectionResult = selectSeasonsForPlayers(
-      playerIdsForWeek,
-      allBattingSeasons,
-      allPitchingSeasons,
-      allFieldingSeasons,
-      minGames,
-      leagueId,
-      weekNumber,
-    );
-
-    if (selectionResult.selections.length > 0) {
-      await db
-        .insert(PublicSchema.leagueWeekPlayerSeasons)
-        .values(selectionResult.selections);
-    }
-
-    if (selectionResult.skippedPlayers.length > 0) {
-      LOGGER.warn('Some players could not be assigned seasons', {
-        leagueId,
-        weekNumber,
-        skippedCount: selectionResult.skippedPlayers.length,
-      });
-    }
-  }
-}
-
-/**
- * Create all matchups for a league at once.
- *
- * Uses the scheduling library to generate a full round-robin schedule,
- * inserts all matchups, populates matchup_players, and assigns seasons.
- * Sets the league's currentMatchup to the first week 1 matchup.
- *
- * Exported for use by draft completion flow.
- */
-export async function createAllMatchupsForLeague(
-  db: GenericDatabase<typeof PublicSchema>,
-  leagueId: number,
-): Promise<{ matchupCount: number; currentMatchupId: number | null }> {
-  // 1. Get league configuration
-  const leagueResult = await db
-    .select({
-      id: PublicSchema.leagues.id,
-      totalMatchups: PublicSchema.leagues.totalMatchups,
-      gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
-      spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
-      schedulingStrategy: PublicSchema.leagues.schedulingStrategy,
-    })
-    .from(PublicSchema.leagues)
-    .where(eq(PublicSchema.leagues.id, leagueId))
-    .limit(1);
-
-  if (!leagueResult[0]) {
-    throw new Error('League not found');
-  }
-
-  const league = leagueResult[0];
-  const totalMatchups = league.totalMatchups ?? 10;
-  const gamesPerMatchup = league.gamesPerMatchup ?? 5;
-  const spStartsPerMatchup = league.spStartsPerMatchup ?? 1;
-  const strategyType = league.schedulingStrategy ?? 'round-robin';
-
-  // 2. Generate the schedule using the scheduling library
-  const scheduleResult = await MatchupService.generateSchedule(db, {
-    leagueId,
-    numberOfWeeks: totalMatchups,
-    strategyType,
-  });
-
-  if (scheduleResult.matchups.length === 0) {
-    LOGGER.warn('No matchups generated', {
-      leagueId,
-      totalMatchups,
-      warnings: scheduleResult.warnings,
-    });
-    return { matchupCount: 0, currentMatchupId: null };
-  }
-
-  // 3. Insert all matchups
-  const insertedMatchups = await db
-    .insert(PublicSchema.matchups)
-    .values(
-      scheduleResult.matchups.map((matchup) => ({
-        leagueId,
-        weekNumber: matchup.weekNumber,
-        team1Id: matchup.team1Id,
-        team2Id: matchup.team2Id,
-        gamesPerMatchup,
-        spStartsPerMatchup,
-        status: 'scheduled' as const,
-        team1Score: null,
-        team2Score: null,
-        startTime: null,
-        endTime: null,
-      })),
-    )
-    .returning({
-      id: PublicSchema.matchups.id,
-      weekNumber: PublicSchema.matchups.weekNumber,
-      team1Id: PublicSchema.matchups.team1Id,
-      team2Id: PublicSchema.matchups.team2Id,
-    });
-
-  // 4. Populate matchup_players and assign seasons
-  await populateMatchupPlayersAndSeasons(
-    db,
-    leagueId,
-    insertedMatchups,
-    gamesPerMatchup,
-  );
-
-  // 5. Set currentMatchup to the first week-1 matchup
-  const week1Matchup = insertedMatchups.find((m) => m.weekNumber === 1);
-  const currentMatchupId = week1Matchup?.id ?? insertedMatchups[0]?.id ?? null;
-
-  await db
-    .update(PublicSchema.leagues)
-    .set({
-      currentMatchup: currentMatchupId ?? undefined,
-      weekAdvanceStatus: 'success',
-    })
-    .where(eq(PublicSchema.leagues.id, leagueId));
-
-  LOGGER.info('Created all matchups for league', {
-    leagueId,
-    totalMatchups,
-    matchupCount: insertedMatchups.length,
-    currentMatchupId,
-  });
-
-  return { matchupCount: insertedMatchups.length, currentMatchupId };
-}
-
-/**
- * Adjust the number of matchups when totalMatchups setting changes.
- *
- * If the new total is higher, creates additional weeks using the scheduling library.
- * If the new total is lower, removes 'scheduled' matchups starting from the highest weeks.
- * Refuses to remove completed or in-progress matchups.
- */
 export async function adjustMatchupsForNewTotal(
   db: GenericDatabase<typeof PublicSchema>,
   leagueId: number,
@@ -775,7 +482,7 @@ export async function adjustMatchupsForNewTotal(
   );
 
   if (highestWeek === 0 && existingMatchups.length === 0) {
-    // No matchups exist yet — nothing to adjust
+    // No matchups exist yet â€” nothing to adjust
     return { added: 0, removed: 0 };
   }
 
@@ -855,7 +562,7 @@ export async function adjustMatchupsForNewTotal(
     return { added: insertedMatchups.length, removed: 0 };
   } else {
     // Need to remove weeks from the top
-    // Only remove 'scheduled' matchups — refuse to delete completed/in-progress
+    // Only remove 'scheduled' matchups â€” refuse to delete completed/in-progress
 
     // Find weeks that can be removed (only scheduled, from highest down)
     const removableWeeks: number[] = [];
@@ -868,7 +575,7 @@ export async function adjustMatchupsForNewTotal(
           leagueId,
           weekNumber: w,
         });
-        break; // Stop removing — can't skip completed weeks
+        break; // Stop removing â€” can't skip completed weeks
       }
       removableWeeks.push(w);
     }

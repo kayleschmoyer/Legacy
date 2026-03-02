@@ -20,6 +20,7 @@ import {
   withSentry,
 } from '@legacy-sports/sentry';
 import {
+  createAllMatchupsForLeague,
   filterPlayerIdsByLeagueEligibility,
   PublicDb,
   PublicSchema,
@@ -1069,6 +1070,41 @@ async function updateDraftStatus(
 }
 
 /**
+ * Create all matchups (schedule) for the league after an automated draft completes.
+ * This runs the same matchup-generation logic that the pick-by-pick GraphQL path uses.
+ */
+async function createLeagueMatchupsAfterDraft(leagueId: number): Promise<void> {
+  await runWithPublicClient(getDbOptions(), async (db) => {
+    addBreadcrumb('Creating league matchups after automated draft', {
+      leagueId,
+    });
+
+    const result = await createAllMatchupsForLeague(db, leagueId);
+
+    LOGGER.info('League matchups created successfully', {
+      leagueId,
+      matchupCount: result.matchupCount,
+      currentMatchupId: result.currentMatchupId,
+    });
+  });
+}
+
+/**
+ * Stamp the league's draft_completed_at timestamp.
+ * Called after matchup creation so the frontend knows the league is fully ready.
+ */
+async function setDraftCompletedAt(leagueId: number): Promise<void> {
+  await runWithPublicClient(getDbOptions(), async (db) => {
+    await db
+      .update(PublicSchema.leagues)
+      .set({ draftCompletedAt: new Date() })
+      .where(eq(PublicSchema.leagues.id, leagueId));
+
+    LOGGER.info('Set draftCompletedAt on league', { leagueId });
+  });
+}
+
+/**
  * Process a single draft message with comprehensive error handling
  */
 async function processDraftMessage(
@@ -1140,6 +1176,19 @@ async function processDraftMessage(
       default:
         throw new Error(`Unknown selection method: ${String(selectionMethod)}`);
     }
+
+    // Step 3.5: Create all matchups (schedule) for the league.
+    // The pick-by-pick GraphQL path does this inline; we must do it here
+    // for automated drafts since the Lambda bypasses the GraphQL layer.
+    addBreadcrumb('Creating league matchups after draft', {
+      leagueId,
+      selectionMethod,
+    });
+    await createLeagueMatchupsAfterDraft(leagueId);
+    addBreadcrumb('League matchups created', { leagueId });
+
+    // Step 3.6: Stamp draft_completed_at so the frontend knows the league is ready.
+    await setDraftCompletedAt(leagueId);
 
     addBreadcrumb('Draft processing completed successfully', {
       selectionMethod,
