@@ -98,6 +98,17 @@ jest.mock('../../api/db/graphql.generated', () => ({
 }));
 
 describe('BaseballLandingPage', () => {
+  beforeEach(() => {
+    // Reset the mock to the default (no leagues) before each test
+    const {
+      useGetUserLeaguesQuery,
+    }: any = require('../../api/db/graphql.generated');
+    useGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: [] },
+      loading: false,
+    });
+  });
+
   it('shows empty state when user has no leagues', () => {
     render(
       <MemoryRouter>
@@ -151,5 +162,51 @@ describe('BaseballLandingPage', () => {
 
     fireEvent.click(screen.getByText(/Create League/i));
     expect(screen.getByText(/Create a new league/i)).toBeInTheDocument();
+  });
+
+  it('shows compact hero (not full hero) when user has leagues', () => {
+    const {
+      useGetUserLeaguesQuery,
+    }: any = require('../../api/db/graphql.generated');
+    useGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [{ id: 1, name: 'Test League' }],
+      },
+      loading: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    // Compact hero shows abbreviated create button
+    expect(screen.getByText(/\+ Create/)).toBeInTheDocument();
+    // Full hero title with large subtitle should NOT be present
+    expect(screen.queryByText(/Season Hub/)).not.toBeInTheDocument();
+    // Leagues list is rendered
+    expect(screen.getByText('Test League')).toBeInTheDocument();
+  });
+
+  it('shows full hero when user has no leagues', () => {
+    const {
+      useGetUserLeaguesQuery,
+    }: any = require('../../api/db/graphql.generated');
+    useGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: [] },
+      loading: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    // Full hero with season hub badge should be visible
+    expect(screen.getByText(/Season Hub/)).toBeInTheDocument();
+    // Compact "+" button should NOT be present
+    expect(screen.queryByText(/\+ Create/)).not.toBeInTheDocument();
   });
 });

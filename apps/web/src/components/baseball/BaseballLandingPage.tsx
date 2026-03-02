@@ -489,6 +489,94 @@ const NoticeCard = styled(YStack, {
   enterStyle: { opacity: 0, y: 10 },
 });
 
+/* ─── Compact Hero (returning users) ─── */
+
+const CompactHeroBanner = styled(XStack, {
+  position: 'relative',
+  overflow: 'hidden',
+  borderRadius: '$7',
+  borderWidth: 1,
+  borderColor: '$glassBorder',
+  padding: '$5',
+  paddingHorizontal: '$6',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '$5',
+  backgroundColor: '$glassSurface',
+  animation: 'medium',
+  enterStyle: { opacity: 0, y: 12 },
+  $md: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: '$4',
+  },
+  $sm: {
+    padding: '$4',
+  },
+});
+
+const CompactHeroLeft = styled(XStack, {
+  alignItems: 'center',
+  gap: '$4',
+  flex: 1,
+  minWidth: 0,
+  $sm: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: '$2',
+  },
+});
+
+const CompactTitle = styled(TH2, {
+  fontSize: '$8',
+  fontWeight: '800',
+  color: '$color',
+  letterSpacing: -0.3,
+  whiteSpace: 'nowrap',
+  $sm: {
+    fontSize: '$7',
+  },
+});
+
+const CompactWelcome = styled(TParagraph, {
+  fontSize: '$3',
+  color: '$glassTextSubdued',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  $sm: {
+    whiteSpace: 'normal',
+  },
+});
+
+const CompactActions = styled(XStack, {
+  gap: '$2',
+  flexShrink: 0,
+  flexWrap: 'wrap',
+});
+
+const CompactButton = styled(Button, {
+  borderRadius: '$5',
+  height: '$4',
+  fontSize: '$2',
+  fontWeight: '700',
+  paddingHorizontal: '$4',
+  backgroundColor: withAlpha(BRAND_NAVY, 0.14),
+  borderColor: withAlpha(BRAND_NAVY, 0.42),
+  borderWidth: 1,
+  color: BRAND_GOLD_LIGHT,
+  animation: 'quick',
+  hoverStyle: {
+    backgroundColor: withAlpha(BRAND_NAVY, 0.24),
+    borderColor: withAlpha(BRAND_NAVY, 0.6),
+    transform: 'translateY(-1px)',
+  },
+  pressStyle: {
+    backgroundColor: withAlpha(BRAND_NAVY, 0.28),
+    scale: 0.98,
+  },
+});
+
 export function BaseballLandingPage() {
   const navigate = useNavigate();
   const auth = useAuth();
@@ -675,6 +763,179 @@ export function BaseballLandingPage() {
     (l?.name || '').toLowerCase().includes(search.toLowerCase()),
   );
 
+  /* ─── Helper: full hero for first-time users ─── */
+  const fullHero = (
+    <HeroSection
+      role="region"
+      aria-labelledby="baseball-hero-title"
+      style={{
+        background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.9)} 0%, ${withAlpha(BRAND_NAVY, 0.55)} 50%, ${withAlpha(BRAND_SEAM_RED, 0.2)} 100%)`,
+        backdropFilter: 'blur(28px)',
+        WebkitBackdropFilter: 'blur(28px)',
+        boxShadow: `0 8px 32px ${withAlpha(BRAND_NAVY, 0.18)}, inset 0 1px 0 ${withAlpha(WHITE, 0.05)}`,
+      }}
+    >
+      <HeroContent>
+        <HeroBadge>
+          <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
+            <span role="img" aria-label="baseball">
+              ⚾
+            </span>{' '}
+            {currentYear} Season Hub
+          </Text>
+        </HeroBadge>
+        <HeroTitle id="baseball-hero-title">Baseball Fantasy</HeroTitle>
+        <HeroSubtitle>
+          {`Welcome back, ${userName}. ${heroSubtitleCopy}`}
+        </HeroSubtitle>
+        <ActionButtonsRow marginTop="$3">
+          <PrimaryButton
+            onPress={handleCreateLeague}
+            accessibilityLabel="Create a new baseball league"
+          >
+            <Text fontWeight="700">Create League</Text>
+          </PrimaryButton>
+          <SecondaryButton
+            onPress={handleJoinLeague}
+            accessibilityLabel="Join an existing baseball league"
+          >
+            <Text fontWeight="700">Join League</Text>
+          </SecondaryButton>
+          <SecondaryButton
+            onPress={handleMockDraft}
+            accessibilityLabel="Practice with a mock draft simulator"
+          >
+            <Text fontWeight="700">
+              <span role="img" aria-label="baseball">
+                ⚾
+              </span>{' '}
+              Mock Draft
+            </Text>
+          </SecondaryButton>
+        </ActionButtonsRow>
+        <Paragraph fontSize="$3" color="$glassTextMuted" maxWidth={440}>
+          Draft-ready controls, transparent roster limits, and secure
+          invitations built for competitive fantasy managers.
+        </Paragraph>
+      </HeroContent>
+
+      <HeroSidePanel>
+        <StatsCard
+          style={{
+            background: `linear-gradient(160deg, ${withAlpha(BG_DARK, 0.95)} 0%, ${withAlpha(SURFACE_PANEL, 0.88)} 100%)`,
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+          }}
+        >
+          <StatsHeader>
+            <Paragraph
+              fontSize="$3"
+              color="$glassTextMuted"
+              textTransform="uppercase"
+              letterSpacing={1}
+            >
+              Season Snapshot
+            </Paragraph>
+            <H3 size="$7" color="$color">
+              Stay ahead of every matchup
+            </H3>
+          </StatsHeader>
+          <Separator backgroundColor="$glassBorder" />
+          <StatsGrid>
+            <StatItem>
+              <StatValue>{leaguesCount}</StatValue>
+              <StatLabel>Active Leagues</StatLabel>
+            </StatItem>
+            <StatItem>
+              <StatValue>{safeCurrentWeek}</StatValue>
+              <StatLabel>Current Week</StatLabel>
+            </StatItem>
+            <StatItem>
+              <StatValue>{averageRosterSize}</StatValue>
+              <StatLabel>Avg Roster Size</StatLabel>
+            </StatItem>
+            <StatItem>
+              <StatValue>{upcomingDrafts}</StatValue>
+              <StatLabel>Upcoming Drafts</StatLabel>
+            </StatItem>
+          </StatsGrid>
+        </StatsCard>
+
+        <QuickGlanceCard
+          style={{
+            background: `linear-gradient(160deg, ${withAlpha(SURFACE_PANEL, 0.8)} 0%, ${withAlpha(BG_DARK, 0.65)} 100%)`,
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+          }}
+        >
+          <Paragraph
+            fontSize="$3"
+            color="$glassTextMuted"
+            textTransform="uppercase"
+            letterSpacing={1}
+          >
+            Quick Wins
+          </Paragraph>
+          <Paragraph fontSize="$4" color="$color">
+            Make sure your league is ready before first pitch.
+          </Paragraph>
+          {quickWins.map((item, index) => (
+            <QuickGlanceRow key={index}>
+              <QuickGlanceDot />
+              <Paragraph fontSize="$3" color="$glassTextSubdued">
+                {item}
+              </Paragraph>
+            </QuickGlanceRow>
+          ))}
+        </QuickGlanceCard>
+      </HeroSidePanel>
+    </HeroSection>
+  );
+
+  /* ─── Helper: compact hero bar for returning users ─── */
+  const compactHero = (
+    <CompactHeroBanner
+      role="region"
+      aria-labelledby="baseball-hero-title"
+      style={{
+        background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.88)} 0%, ${withAlpha(BRAND_NAVY, 0.45)} 50%, ${withAlpha(BRAND_SEAM_RED, 0.12)} 100%)`,
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        boxShadow: `0 4px 20px ${withAlpha(BRAND_NAVY, 0.14)}, inset 0 1px 0 ${withAlpha(WHITE, 0.04)}`,
+      }}
+    >
+      <CompactHeroLeft>
+        <CompactTitle id="baseball-hero-title">
+          <span role="img" aria-label="baseball">
+            ⚾
+          </span>{' '}
+          Baseball Fantasy
+        </CompactTitle>
+        <CompactWelcome>Welcome back, {userName}</CompactWelcome>
+      </CompactHeroLeft>
+      <CompactActions>
+        <CompactButton
+          onPress={handleCreateLeague}
+          accessibilityLabel="Create a new baseball league"
+        >
+          <Text fontWeight="700">+ Create</Text>
+        </CompactButton>
+        <CompactButton
+          onPress={handleJoinLeague}
+          accessibilityLabel="Join an existing baseball league"
+        >
+          <Text fontWeight="700">Join</Text>
+        </CompactButton>
+        <CompactButton
+          onPress={handleMockDraft}
+          accessibilityLabel="Practice with a mock draft simulator"
+        >
+          <Text fontWeight="700">Mock Draft</Text>
+        </CompactButton>
+      </CompactActions>
+    </CompactHeroBanner>
+  );
+
   return (
     <PageContainer
       role="main"
@@ -682,131 +943,9 @@ export function BaseballLandingPage() {
       style={pageBackgroundStyle}
     >
       <ContentContainer>
-        <HeroSection
-          role="region"
-          aria-labelledby="baseball-hero-title"
-          style={{
-            background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.9)} 0%, ${withAlpha(BRAND_NAVY, 0.55)} 50%, ${withAlpha(BRAND_SEAM_RED, 0.2)} 100%)`,
-            backdropFilter: 'blur(28px)',
-            WebkitBackdropFilter: 'blur(28px)',
-            boxShadow: `0 8px 32px ${withAlpha(BRAND_NAVY, 0.18)}, inset 0 1px 0 ${withAlpha(WHITE, 0.05)}`,
-          }}
-        >
-          <HeroContent>
-            <HeroBadge>
-              <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
-                <span role="img" aria-label="baseball">
-                  ⚾
-                </span>{' '}
-                {currentYear} Season Hub
-              </Text>
-            </HeroBadge>
-            <HeroTitle id="baseball-hero-title">Baseball Fantasy</HeroTitle>
-            <HeroSubtitle>
-              {`Welcome back, ${userName}. ${heroSubtitleCopy}`}
-            </HeroSubtitle>
-            <ActionButtonsRow marginTop="$3">
-              <PrimaryButton
-                onPress={handleCreateLeague}
-                accessibilityLabel="Create a new baseball league"
-              >
-                <Text fontWeight="700">Create League</Text>
-              </PrimaryButton>
-              <SecondaryButton
-                onPress={handleJoinLeague}
-                accessibilityLabel="Join an existing baseball league"
-              >
-                <Text fontWeight="700">Join League</Text>
-              </SecondaryButton>
-              <SecondaryButton
-                onPress={handleMockDraft}
-                accessibilityLabel="Practice with a mock draft simulator"
-              >
-                <Text fontWeight="700">
-                  <span role="img" aria-label="baseball">
-                    ⚾
-                  </span>{' '}
-                  Mock Draft
-                </Text>
-              </SecondaryButton>
-            </ActionButtonsRow>
-            <Paragraph fontSize="$3" color="$glassTextMuted" maxWidth={440}>
-              Draft-ready controls, transparent roster limits, and secure
-              invitations built for competitive fantasy managers.
-            </Paragraph>
-          </HeroContent>
-
-          <HeroSidePanel>
-            <StatsCard
-              style={{
-                background: `linear-gradient(160deg, ${withAlpha(BG_DARK, 0.95)} 0%, ${withAlpha(SURFACE_PANEL, 0.88)} 100%)`,
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-              }}
-            >
-              <StatsHeader>
-                <Paragraph
-                  fontSize="$3"
-                  color="$glassTextMuted"
-                  textTransform="uppercase"
-                  letterSpacing={1}
-                >
-                  Season Snapshot
-                </Paragraph>
-                <H3 size="$7" color="$color">
-                  Stay ahead of every matchup
-                </H3>
-              </StatsHeader>
-              <Separator backgroundColor="$glassBorder" />
-              <StatsGrid>
-                <StatItem>
-                  <StatValue>{leaguesCount}</StatValue>
-                  <StatLabel>Active Leagues</StatLabel>
-                </StatItem>
-                <StatItem>
-                  <StatValue>{safeCurrentWeek}</StatValue>
-                  <StatLabel>Current Week</StatLabel>
-                </StatItem>
-                <StatItem>
-                  <StatValue>{averageRosterSize}</StatValue>
-                  <StatLabel>Avg Roster Size</StatLabel>
-                </StatItem>
-                <StatItem>
-                  <StatValue>{upcomingDrafts}</StatValue>
-                  <StatLabel>Upcoming Drafts</StatLabel>
-                </StatItem>
-              </StatsGrid>
-            </StatsCard>
-
-            <QuickGlanceCard
-              style={{
-                background: `linear-gradient(160deg, ${withAlpha(SURFACE_PANEL, 0.8)} 0%, ${withAlpha(BG_DARK, 0.65)} 100%)`,
-                backdropFilter: 'blur(14px)',
-                WebkitBackdropFilter: 'blur(14px)',
-              }}
-            >
-              <Paragraph
-                fontSize="$3"
-                color="$glassTextMuted"
-                textTransform="uppercase"
-                letterSpacing={1}
-              >
-                Quick Wins
-              </Paragraph>
-              <Paragraph fontSize="$4" color="$color">
-                Make sure your league is ready before first pitch.
-              </Paragraph>
-              {quickWins.map((item, index) => (
-                <QuickGlanceRow key={index}>
-                  <QuickGlanceDot />
-                  <Paragraph fontSize="$3" color="$glassTextSubdued">
-                    {item}
-                  </Paragraph>
-                </QuickGlanceRow>
-              ))}
-            </QuickGlanceCard>
-          </HeroSidePanel>
-        </HeroSection>
+        {/* Returning users: compact hero → leagues list (zero-scroll) */}
+        {/* New users: full hero → empty state CTA */}
+        {hasLeagues ? compactHero : fullHero}
 
         {!auth?.user && (
           <NoticeCard>
