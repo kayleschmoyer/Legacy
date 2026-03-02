@@ -667,6 +667,35 @@ type League {
 }
 
 """
+A single activity event in a league's timeline
+"""
+type LeagueActivityEvent {
+  actorUserId: Int
+  actorUsername: String
+  eventType: LeagueActivityEventType
+  id: ID
+  leagueId: Int
+  occurredAt: String
+  payload: String
+  teamId: Int
+}
+
+"""
+Type of activity event in a league
+"""
+enum LeagueActivityEventType {
+  draft_pick_made
+  league_announcement
+  trade_accepted
+  trade_cancelled
+  trade_proposed
+  trade_rejected
+  trade_vetoed
+  waiver_cancelled
+  waiver_claimed
+}
+
+"""
 A message posted to the league-wide chat room
 """
 type LeagueChatMessage {
@@ -1606,6 +1635,15 @@ type Query {
   getUserNotificationPreferences: NotificationPreference
   hello: String
   league(id: Int!): League
+
+  """
+  Paginated activity timeline for a league, newest first. Optionally filter by one or more event types.
+  """
+  leagueActivity(
+    eventTypes: [LeagueActivityEventType!]
+    leagueId: Int!
+    limit: Int = 20
+  ): [LeagueActivityEvent!]
   leaguePositions(leagueId: Int!): [LeaguePosition!]
   leagueScoringProfile(leagueId: Int!): ScoringConfig
   leagueTeams(leagueId: Int!): [Team!]

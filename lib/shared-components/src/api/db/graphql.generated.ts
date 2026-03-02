@@ -629,6 +629,32 @@ export type League = {
   weekAdvanceStatus?: Maybe<Scalars['String']['output']>;
 };
 
+/** A single activity event in a league's timeline */
+export type LeagueActivityEvent = {
+  __typename?: 'LeagueActivityEvent';
+  actorUserId?: Maybe<Scalars['Int']['output']>;
+  actorUsername?: Maybe<Scalars['String']['output']>;
+  eventType?: Maybe<LeagueActivityEventType>;
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  occurredAt?: Maybe<Scalars['String']['output']>;
+  payload?: Maybe<Scalars['String']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Type of activity event in a league */
+export enum LeagueActivityEventType {
+  DraftPickMade = 'draft_pick_made',
+  LeagueAnnouncement = 'league_announcement',
+  TradeAccepted = 'trade_accepted',
+  TradeCancelled = 'trade_cancelled',
+  TradeProposed = 'trade_proposed',
+  TradeRejected = 'trade_rejected',
+  TradeVetoed = 'trade_vetoed',
+  WaiverCancelled = 'waiver_cancelled',
+  WaiverClaimed = 'waiver_claimed',
+}
+
 /** A message posted to the league-wide chat room */
 export type LeagueChatMessage = {
   __typename?: 'LeagueChatMessage';
@@ -1585,6 +1611,8 @@ export type Query = {
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
   hello?: Maybe<Scalars['String']['output']>;
   league?: Maybe<League>;
+  /** Paginated activity timeline for a league, newest first. Optionally filter by one or more event types. */
+  leagueActivity?: Maybe<Array<LeagueActivityEvent>>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
   leagueTeams?: Maybe<Array<Team>>;
@@ -1820,6 +1848,12 @@ export type QueryGetTiebreakerRulesArgs = {
 
 export type QueryLeagueArgs = {
   id: Scalars['Int']['input'];
+};
+
+export type QueryLeagueActivityArgs = {
+  eventTypes?: InputMaybe<Array<LeagueActivityEventType>>;
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryLeaguePositionsArgs = {

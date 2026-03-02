@@ -14,6 +14,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
 import { builder, type Context } from '../builder';
+import { insertActivityLog } from '../../services/activity-log';
 
 // ── Helper: fetch and enrich a single trade ────────────────────────────────
 
@@ -200,6 +201,30 @@ async function postTradeSystemMessage(
           });
         });
     }
+
+    // Record event in the structured activity log
+    const activityEventType = (
+      {
+        proposed: 'trade_proposed',
+        accepted: 'trade_accepted',
+        rejected: 'trade_rejected',
+        cancelled: 'trade_cancelled',
+        vetoed: 'trade_vetoed',
+      } as const
+    )[action];
+    await insertActivityLog(context, {
+      leagueId,
+      teamId: action === 'proposed' ? proposingTeamId : receivingTeamId,
+      actorUserId: opts.actingUserId,
+      eventType: activityEventType,
+      payload: {
+        tradeId,
+        proposingTeamId,
+        receivingTeamId,
+        proposingTeamName,
+        receivingTeamName,
+      },
+    });
   } catch (err) {
     LOGGER.warn('postTradeSystemMessage failed (non-fatal)', { err });
   }

@@ -11,6 +11,7 @@ import { ProcessWaiverClaimsResult, WaiverClaim } from './types';
 import { WaiverClaimProcessor } from '../../services/waiver-processor';
 import { assertAuthorized } from '../matchups/scheduled-mutations';
 import { builder } from '../builder';
+import { insertActivityLog } from '../../services/activity-log';
 
 // ── Mutation resolvers ─────────────────────────────────────────────────────
 
@@ -80,6 +81,14 @@ builder.mutationField('cancelWaiverClaim', (t) =>
         userId,
         leagueId: claim.leagueId,
         playerId: claim.playerId,
+      });
+
+      void insertActivityLog(context, {
+        leagueId: claim.leagueId,
+        teamId: claim.teamId,
+        actorUserId: userId,
+        eventType: 'waiver_cancelled',
+        payload: { claimId: args.claimId, playerId: claim.playerId },
       });
 
       return updated[0];
@@ -298,6 +307,19 @@ builder.mutationField('claimFreeAgent', (t) =>
         dropPlayerId: dropPlayerId ?? null,
         faabBid: resolvedFaabBid,
         userId,
+      });
+
+      void insertActivityLog(context, {
+        leagueId,
+        teamId,
+        actorUserId: userId,
+        eventType: 'waiver_claimed',
+        payload: {
+          claimId: inserted[0].id,
+          playerId,
+          dropPlayerId: dropPlayerId ?? null,
+          faabBid: resolvedFaabBid,
+        },
       });
 
       return inserted[0];

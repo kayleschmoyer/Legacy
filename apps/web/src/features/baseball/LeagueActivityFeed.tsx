@@ -4,24 +4,20 @@ import {
   Card,
   ScrollView,
   Separator,
+  Spinner,
   Text,
   XStack,
   YStack,
 } from 'tamagui';
 import {
   ArrowLeftRight,
-  CalendarCheck,
   ChevronRight,
   Clock,
   Filter,
-  Play,
   Shield,
   Trophy,
   UserCheck,
   UserMinus,
-  UserPlus,
-  Users,
-  Zap,
 } from '@tamagui/lucide-icons';
 import {
   BRAND_GOLD,
@@ -29,6 +25,10 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
+import {
+  LeagueActivityEventType,
+  useGetLeagueActivityQuery,
+} from '../../api/db/graphql.generated';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -85,9 +85,154 @@ function formatRelativeDate(isoDate: string): string {
   return `${Math.floor(diffDays / 30)}mo ago`;
 }
 
-/** Returns an ISO string for `hoursAgo` hours in the past */
-function hoursAgo(h: number): string {
-  return new Date(Date.now() - h * 3_600_000).toISOString();
+function eventToActivityItem(event: {
+  id?: string | null;
+  leagueId?: number | null;
+  eventType?: LeagueActivityEventType | null;
+  payload?: string | null;
+  occurredAt?: string | null;
+  actorUsername?: string | null;
+}): ActivityItem | null {
+  if (!event.eventType || !event.id) return null;
+
+  const payload = event.payload
+    ? (JSON.parse(event.payload) as Record<string, unknown>)
+    : {};
+  const isoDate = event.occurredAt ?? new Date().toISOString();
+  const actor = event.actorUsername ?? 'A manager';
+  const lid = event.leagueId ?? 0;
+
+  switch (event.eventType) {
+    case LeagueActivityEventType.TradeProposed:
+      return {
+        id: String(event.id),
+        type: 'trade',
+        icon: <ArrowLeftRight size={16} color={BRAND_GOLD_LIGHT} />,
+        title: 'Trade proposed',
+        detail: `${actor} proposed a trade with another team.`,
+        isoDate,
+        accentColor: BRAND_GOLD_LIGHT,
+        linkTo: `/leagues/${lid}/trades`,
+      };
+
+    case LeagueActivityEventType.TradeAccepted:
+      return {
+        id: String(event.id),
+        type: 'trade',
+        icon: <ArrowLeftRight size={16} color="rgb(34, 197, 94)" />,
+        title: 'Trade accepted',
+        detail:
+          typeof payload['teamAName'] === 'string' &&
+          typeof payload['teamBName'] === 'string'
+            ? `${payload['teamAName']} and ${payload['teamBName']} completed a trade.`
+            : `${actor} accepted a trade offer.`,
+        isoDate,
+        accentColor: '$green11',
+        linkTo: `/leagues/${lid}/trades`,
+      };
+
+    case LeagueActivityEventType.TradeRejected:
+      return {
+        id: String(event.id),
+        type: 'trade',
+        icon: <ArrowLeftRight size={16} color="rgb(239, 68, 68)" />,
+        title: 'Trade rejected',
+        detail: `${actor} rejected a trade offer.`,
+        isoDate,
+        accentColor: '$red11',
+        linkTo: `/leagues/${lid}/trades`,
+      };
+
+    case LeagueActivityEventType.TradeCancelled:
+      return {
+        id: String(event.id),
+        type: 'trade',
+        icon: <ArrowLeftRight size={16} color="rgb(148, 163, 184)" />,
+        title: 'Trade cancelled',
+        detail: `${actor} cancelled a pending trade.`,
+        isoDate,
+        accentColor: '$gray11',
+        linkTo: `/leagues/${lid}/trades`,
+      };
+
+    case LeagueActivityEventType.TradeVetoed:
+      return {
+        id: String(event.id),
+        type: 'trade',
+        icon: <Shield size={16} color="rgb(239, 68, 68)" />,
+        title: 'Trade vetoed',
+        detail: 'The league voted to veto a trade.',
+        isoDate,
+        accentColor: '$red11',
+        linkTo: `/leagues/${lid}/trades`,
+      };
+
+    case LeagueActivityEventType.WaiverClaimed: {
+      const playerName =
+        typeof payload['playerId'] === 'number'
+          ? `Player #${payload['playerId']}`
+          : 'a player';
+      return {
+        id: String(event.id),
+        type: 'waiver',
+        icon: <UserCheck size={16} color="rgb(168, 85, 247)" />,
+        title: 'Waiver claim processed',
+        detail: `${actor} claimed ${playerName} off waivers.`,
+        isoDate,
+        accentColor: '$purple11',
+        linkTo: `/leagues/${lid}/waivers`,
+      };
+    }
+
+    case LeagueActivityEventType.WaiverCancelled:
+      return {
+        id: String(event.id),
+        type: 'waiver',
+        icon: <UserMinus size={16} color="rgb(148, 163, 184)" />,
+        title: 'Waiver claim cancelled',
+        detail: `${actor} cancelled a waiver claim.`,
+        isoDate,
+        accentColor: '$gray11',
+        linkTo: `/leagues/${lid}/waivers`,
+      };
+
+    case LeagueActivityEventType.DraftPickMade: {
+      const round =
+        typeof payload['round'] === 'number' ? payload['round'] : '?';
+      const pick =
+        typeof payload['pickNumber'] === 'number' ? payload['pickNumber'] : '?';
+      return {
+        id: String(event.id),
+        type: 'draft_pick',
+        icon: <Trophy size={16} color={BRAND_GOLD} />,
+        title: `Round ${round}, Pick ${pick}`,
+        detail: `${actor} made their draft selection.`,
+        isoDate,
+        accentColor: BRAND_GOLD,
+        linkTo: `/leagues/${lid}/draft`,
+      };
+    }
+
+    case LeagueActivityEventType.LeagueAnnouncement: {
+      const msgText =
+        typeof payload['messageText'] === 'string'
+          ? payload['messageText'].slice(0, 80) +
+            (payload['messageText'].length > 80 ? '…' : '')
+          : 'New announcement from the commissioner.';
+      return {
+        id: String(event.id),
+        type: 'commissioner',
+        icon: <Shield size={16} color={BRAND_GOLD_LIGHT} />,
+        title: 'League announcement',
+        detail: msgText,
+        isoDate,
+        accentColor: BRAND_GOLD_LIGHT,
+      };
+    }
+
+    default:
+      return null;
+  }
 }
 
 const TYPE_LABELS: Record<Exclude<ActivityType, 'all'>, string> = {
@@ -105,8 +250,6 @@ const FILTER_TABS: { type: ActivityType; label: string }[] = [
   { type: 'trade', label: 'Trades' },
   { type: 'waiver', label: 'Waivers' },
   { type: 'draft_pick', label: 'Draft' },
-  { type: 'lineup_change', label: 'Lineup' },
-  { type: 'roster_move', label: 'Roster' },
   { type: 'commissioner', label: 'Commissioner' },
 ];
 
@@ -116,268 +259,26 @@ const FILTER_TABS: { type: ActivityType; label: string }[] = [
 
 /**
  * LeagueActivityFeed — Comprehensive league activity timeline showing trades,
- * waiver claims, draft picks, lineup changes, roster moves, and commissioner
- * actions. Filterable by activity type with relative timestamps.
- *
- * Activities are synthesized from league state. A future iteration will consume
- * a real league transaction log API (see LS-293).
+ * waiver claims, draft picks, and commissioner announcements.
+ * Wired to the real `leagueActivity` GraphQL query (LS-356).
  */
 export function LeagueActivityFeed({
   leagueId,
-  draftStatus,
-  currentMatchup,
-  teamCount,
 }: LeagueActivityFeedProps): React.JSX.Element {
   const [activeFilter, setActiveFilter] = useState<ActivityType>('all');
 
-  // Build a comprehensive list of activities that reflect the current league
-  // state. In production these will come from the transaction log API.
-  const activities: ActivityItem[] = useMemo(() => {
-    const items: ActivityItem[] = [];
-    const isDraftDone = draftStatus === 'completed';
-    const isDraftLive = draftStatus === 'in-progress';
-    const isDraftQueued = draftStatus === 'queued';
-    const week = currentMatchup ?? 0;
+  const { data, loading, error } = useGetLeagueActivityQuery({
+    variables: { leagueId, limit: 50 },
+    errorPolicy: 'all',
+  });
 
-    // ── Commissioner actions ────────────────────────────────────────────────
-    items.push({
-      id: 'comm-league-created',
-      type: 'commissioner',
-      icon: <Shield size={16} color={BRAND_GOLD_LIGHT} />,
-      title: 'League created',
-      detail: `Commissioner set up the league with ${teamCount} teams.`,
-      isoDate: hoursAgo(168 + teamCount * 2),
-      accentColor: BRAND_GOLD_LIGHT,
-      linkTo: `/leagues/${leagueId}/settings`,
-    });
-
-    items.push({
-      id: 'comm-teams-joined',
-      type: 'commissioner',
-      icon: <Users size={16} color={BRAND_GOLD_LIGHT} />,
-      title: `${teamCount} manager${teamCount !== 1 ? 's' : ''} joined`,
-      detail:
-        teamCount < 6
-          ? 'Still waiting on managers — share your invite link!'
-          : 'Full complement of managers are ready to compete.',
-      isoDate: hoursAgo(150),
-      accentColor: BRAND_GOLD_LIGHT,
-      linkTo: `/leagues/${leagueId}/settings`,
-    });
-
-    if (isDraftQueued || isDraftLive || isDraftDone) {
-      items.push({
-        id: 'comm-draft-scheduled',
-        type: 'commissioner',
-        icon: <Shield size={16} color={BRAND_GOLD_LIGHT} />,
-        title: 'Draft scheduled',
-        detail: 'Commissioner locked the draft settings and set a start time.',
-        isoDate: hoursAgo(96),
-        accentColor: BRAND_GOLD_LIGHT,
-        linkTo: `/leagues/${leagueId}/draft`,
-      });
-    }
-
-    // ── Draft status ────────────────────────────────────────────────────────
-    if (isDraftLive) {
-      items.push({
-        id: 'draft-live',
-        type: 'draft_pick',
-        icon: <Zap size={16} color={BRAND_NAVY_LIGHT} />,
-        title: 'Draft is live!',
-        detail: 'Managers are making their picks right now.',
-        isoDate: hoursAgo(0.1),
-        accentColor: BRAND_NAVY_LIGHT,
-        linkTo: `/leagues/${leagueId}/draft`,
-      });
-    } else if (isDraftQueued) {
-      items.push({
-        id: 'draft-queued',
-        type: 'draft_pick',
-        icon: <CalendarCheck size={16} color="rgb(245, 158, 11)" />,
-        title: 'Draft queued',
-        detail: 'The draft is scheduled and ready to start — check your queue.',
-        isoDate: hoursAgo(80),
-        accentColor: '$amber11',
-        linkTo: `/leagues/${leagueId}/draft`,
-      });
-    } else if (!isDraftDone) {
-      items.push({
-        id: 'draft-pending',
-        type: 'draft_pick',
-        icon: <CalendarCheck size={16} color="rgb(148, 163, 184)" />,
-        title: 'Waiting for draft',
-        detail:
-          'Commissioner needs to start the draft before the season begins.',
-        isoDate: hoursAgo(120),
-        accentColor: '$gray11',
-        linkTo: `/leagues/${leagueId}/draft`,
-      });
-    }
-
-    if (isDraftDone) {
-      items.push({
-        id: 'draft-complete',
-        type: 'draft_pick',
-        icon: <Trophy size={16} color={BRAND_GOLD} />,
-        title: 'Draft completed',
-        detail: `All ${teamCount} teams filled their rosters. Season is underway!`,
-        isoDate: hoursAgo(72),
-        accentColor: BRAND_GOLD,
-        linkTo: `/leagues/${leagueId}/draft`,
-      });
-
-      // Simulate notable draft picks
-      items.push({
-        id: 'draft-pick-1',
-        type: 'draft_pick',
-        icon: <Trophy size={16} color={BRAND_GOLD_LIGHT} />,
-        title: 'Round 1, Pick 1 · Shohei Ohtani',
-        detail:
-          'The Sluggers selected Shohei Ohtani with the 1st overall pick.',
-        isoDate: hoursAgo(73),
-        accentColor: BRAND_GOLD_LIGHT,
-        linkTo: `/leagues/${leagueId}/draft`,
-      });
-      items.push({
-        id: 'draft-pick-2',
-        type: 'draft_pick',
-        icon: <Trophy size={16} color={BRAND_GOLD_LIGHT} />,
-        title: 'Round 1, Pick 2 · Mookie Betts',
-        detail: 'The Bats selected Mookie Betts with the 2nd overall pick.',
-        isoDate: hoursAgo(73.1),
-        accentColor: BRAND_GOLD_LIGHT,
-        linkTo: `/leagues/${leagueId}/draft`,
-      });
-    }
-
-    // ── Matchup events ──────────────────────────────────────────────────────
-    if (week > 0 && isDraftDone) {
-      items.push({
-        id: 'matchup-active',
-        type: 'matchup',
-        icon: <Play size={16} color="rgb(34, 197, 94)" />,
-        title: `Week ${week} matchups are live`,
-        detail: 'Check your lineup — scoring is in progress.',
-        isoDate: hoursAgo(2),
-        accentColor: '$green11',
-        linkTo: `/leagues/${leagueId}/matchups`,
-      });
-
-      if (week > 1) {
-        items.push({
-          id: 'matchup-last-week',
-          type: 'matchup',
-          icon: <CalendarCheck size={16} color="rgb(34, 197, 94)" />,
-          title: `Week ${week - 1} results finalized`,
-          detail: 'Final scores have been locked and standings updated.',
-          isoDate: hoursAgo(14 * 24),
-          accentColor: '$green11',
-          linkTo: `/leagues/${leagueId}/standings`,
-        });
-      }
-    }
-
-    // ── Trades ──────────────────────────────────────────────────────────────
-    if (isDraftDone && week >= 2) {
-      items.push({
-        id: 'trade-accepted-1',
-        type: 'trade',
-        icon: <ArrowLeftRight size={16} color={BRAND_GOLD_LIGHT} />,
-        title: 'Trade accepted · Week 2',
-        detail:
-          'The Sluggers traded Paul Goldschmidt to The Bats for Yordan Alvarez.',
-        isoDate: hoursAgo(10 * 24),
-        accentColor: BRAND_GOLD_LIGHT,
-        linkTo: `/leagues/${leagueId}/trades`,
-      });
-    }
-    if (isDraftDone && week >= 3) {
-      items.push({
-        id: 'trade-accepted-2',
-        type: 'trade',
-        icon: <ArrowLeftRight size={16} color={BRAND_GOLD_LIGHT} />,
-        title: 'Trade accepted · Week 3',
-        detail:
-          'Rockets traded two players to Aces in exchange for Max Fried and a waiver priority.',
-        isoDate: hoursAgo(3 * 24),
-        accentColor: BRAND_GOLD_LIGHT,
-        linkTo: `/leagues/${leagueId}/trades`,
-      });
-    }
-
-    // ── Waiver claims ───────────────────────────────────────────────────────
-    if (isDraftDone && week >= 1) {
-      items.push({
-        id: 'waiver-claim-1',
-        type: 'waiver',
-        icon: <UserCheck size={16} color="rgb(168, 85, 247)" />,
-        title: 'Waiver claim processed',
-        detail: 'The Aces claimed Luis Castillo (SP) — dropped Marcus Stroman.',
-        isoDate: hoursAgo(5 * 24),
-        accentColor: '$purple11',
-        linkTo: `/leagues/${leagueId}/waivers`,
-      });
-    }
-    if (isDraftDone && week >= 2) {
-      items.push({
-        id: 'waiver-claim-2',
-        type: 'waiver',
-        icon: <UserCheck size={16} color="rgb(168, 85, 247)" />,
-        title: 'Waiver claim processed',
-        detail: 'The Rockets claimed Jazz Chisholm Jr. (2B/OF) off waivers.',
-        isoDate: hoursAgo(12 * 24),
-        accentColor: '$purple11',
-        linkTo: `/leagues/${leagueId}/waivers`,
-      });
-    }
-
-    // ── Roster moves ────────────────────────────────────────────────────────
-    if (isDraftDone && week >= 1) {
-      items.push({
-        id: 'roster-add-1',
-        type: 'roster_move',
-        icon: <UserPlus size={16} color="rgb(34, 197, 94)" />,
-        title: 'Free agent pickup',
-        detail:
-          'The Sluggers added Ryan Pressly (RP) from the free agent pool.',
-        isoDate: hoursAgo(7 * 24),
-        accentColor: '$green11',
-        linkTo: `/leagues/${leagueId}/roster`,
-      });
-      items.push({
-        id: 'roster-drop-1',
-        type: 'roster_move',
-        icon: <UserMinus size={16} color="rgb(239, 68, 68)" />,
-        title: 'Player dropped',
-        detail:
-          'The Sluggers dropped Lucas Giolito (SP) — placed on injured list.',
-        isoDate: hoursAgo(7 * 24 + 1),
-        accentColor: '$red11',
-        linkTo: `/leagues/${leagueId}/roster`,
-      });
-    }
-
-    // ── Lineup changes ──────────────────────────────────────────────────────
-    if (isDraftDone && week >= 1) {
-      items.push({
-        id: 'lineup-1',
-        type: 'lineup_change',
-        icon: <Users size={16} color="rgb(100, 116, 139)" />,
-        title: `Lineups set for Week ${week > 0 ? week : 1}`,
-        detail:
-          'Multiple managers updated their active rosters before the deadline.',
-        isoDate: hoursAgo(48),
-        accentColor: '$gray11',
-        linkTo: `/leagues/${leagueId}/lineup`,
-      });
-    }
-
-    // Sort newest first
-    return items.sort(
-      (a, b) => new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime(),
-    );
-  }, [draftStatus, currentMatchup, teamCount, leagueId]);
+  const activities: ActivityItem[] = useMemo(
+    () =>
+      (data?.leagueActivity ?? [])
+        .map(eventToActivityItem)
+        .filter((item): item is ActivityItem => item !== null),
+    [data?.leagueActivity],
+  );
 
   const filtered = useMemo(
     () =>
@@ -451,7 +352,17 @@ export function LeagueActivityFeed({
 
       {/* Activity list */}
       <YStack gap="$1">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <YStack paddingVertical="$5" alignItems="center">
+            <Spinner size="small" color="$textMuted" />
+          </YStack>
+        ) : error ? (
+          <YStack paddingVertical="$4" alignItems="center">
+            <Text fontSize="$3" color="$red10">
+              Could not load activity. Please refresh.
+            </Text>
+          </YStack>
+        ) : filtered.length === 0 ? (
           <YStack paddingVertical="$4" alignItems="center">
             <Text fontSize="$3" color="$textMuted">
               No{' '}

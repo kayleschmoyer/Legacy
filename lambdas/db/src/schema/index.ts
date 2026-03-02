@@ -20,6 +20,7 @@ import './badges';
 import './playoff-schema';
 import './commissioner-tools';
 import './on-this-day';
+import './activity-log';
 
 // Export the final schema
 export const schema = builder.toSchema();

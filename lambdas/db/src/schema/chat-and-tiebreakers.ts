@@ -4,6 +4,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, desc, eq, or } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues/types';
+import { insertActivityLog } from '../services/activity-log';
 
 /**
  * Chat System & Tiebreaker Rules Schema (LS-90)
@@ -1014,6 +1015,14 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
           LOGGER.warn('Failed to send announcement WS notification', { err });
         }
       }
+
+      // Record announcement in the activity log (fire-and-forget, non-fatal)
+      void insertActivityLog(context, {
+        leagueId: args.leagueId,
+        actorUserId: context.user.id,
+        eventType: 'league_announcement',
+        payload: { messageId: msg.id, messageText: text },
+      });
 
       return {
         id: msg.id,

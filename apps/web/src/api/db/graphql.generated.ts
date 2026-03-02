@@ -623,6 +623,32 @@ export type League = {
   weekAdvanceStatus?: Maybe<Scalars['String']['output']>;
 };
 
+/** A single activity event in a league's timeline */
+export type LeagueActivityEvent = {
+  __typename?: 'LeagueActivityEvent';
+  actorUserId?: Maybe<Scalars['Int']['output']>;
+  actorUsername?: Maybe<Scalars['String']['output']>;
+  eventType?: Maybe<LeagueActivityEventType>;
+  id?: Maybe<Scalars['ID']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  occurredAt?: Maybe<Scalars['String']['output']>;
+  payload?: Maybe<Scalars['String']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Type of activity event in a league */
+export enum LeagueActivityEventType {
+  DraftPickMade = 'draft_pick_made',
+  LeagueAnnouncement = 'league_announcement',
+  TradeAccepted = 'trade_accepted',
+  TradeCancelled = 'trade_cancelled',
+  TradeProposed = 'trade_proposed',
+  TradeRejected = 'trade_rejected',
+  TradeVetoed = 'trade_vetoed',
+  WaiverCancelled = 'waiver_cancelled',
+  WaiverClaimed = 'waiver_claimed',
+}
+
 /** A message posted to the league-wide chat room */
 export type LeagueChatMessage = {
   __typename?: 'LeagueChatMessage';
@@ -1579,6 +1605,8 @@ export type Query = {
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
   hello?: Maybe<Scalars['String']['output']>;
   league?: Maybe<League>;
+  /** Paginated activity timeline for a league, newest first. Optionally filter by one or more event types. */
+  leagueActivity?: Maybe<Array<LeagueActivityEvent>>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
   leagueTeams?: Maybe<Array<Team>>;
@@ -1814,6 +1842,12 @@ export type QueryGetTiebreakerRulesArgs = {
 
 export type QueryLeagueArgs = {
   id: Scalars['Int']['input'];
+};
+
+export type QueryLeagueActivityArgs = {
+  eventTypes?: InputMaybe<Array<LeagueActivityEventType>>;
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryLeaguePositionsArgs = {
@@ -2750,6 +2784,29 @@ export type GetOnThisDayQuery = {
     wins?: number | null;
     hitsAllowed?: number | null;
     walksAllowed?: number | null;
+  }> | null;
+};
+
+export type GetLeagueActivityQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  eventTypes?: InputMaybe<
+    Array<LeagueActivityEventType> | LeagueActivityEventType
+  >;
+}>;
+
+export type GetLeagueActivityQuery = {
+  __typename?: 'Query';
+  leagueActivity?: Array<{
+    __typename?: 'LeagueActivityEvent';
+    id?: string | null;
+    leagueId?: number | null;
+    teamId?: number | null;
+    actorUserId?: number | null;
+    actorUsername?: string | null;
+    eventType?: LeagueActivityEventType | null;
+    payload?: string | null;
+    occurredAt?: string | null;
   }> | null;
 };
 
@@ -7066,6 +7123,113 @@ export type GetOnThisDaySuspenseQueryHookResult = ReturnType<
 export type GetOnThisDayQueryResult = Apollo.QueryResult<
   GetOnThisDayQuery,
   GetOnThisDayQueryVariables
+>;
+export const GetLeagueActivity = gql`
+  query GetLeagueActivity(
+    $leagueId: Int!
+    $limit: Int
+    $eventTypes: [LeagueActivityEventType!]
+  ) {
+    leagueActivity(
+      leagueId: $leagueId
+      limit: $limit
+      eventTypes: $eventTypes
+    ) {
+      id
+      leagueId
+      teamId
+      actorUserId
+      actorUsername
+      eventType
+      payload
+      occurredAt
+    }
+  }
+`;
+
+/**
+ * __useGetLeagueActivityQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueActivityQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueActivityQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueActivityQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      limit: // value for 'limit'
+ *      eventTypes: // value for 'eventTypes'
+ *   },
+ * });
+ */
+export function useGetLeagueActivityQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueActivityQuery,
+    GetLeagueActivityQueryVariables
+  > &
+    (
+      | { variables: GetLeagueActivityQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueActivityQuery,
+    GetLeagueActivityQueryVariables
+  >(GetLeagueActivity, options);
+}
+export function useGetLeagueActivityLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueActivityQuery,
+    GetLeagueActivityQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueActivityQuery,
+    GetLeagueActivityQueryVariables
+  >(GetLeagueActivity, options);
+}
+export function useGetLeagueActivitySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueActivityQuery,
+        GetLeagueActivityQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueActivityQuery,
+    GetLeagueActivityQueryVariables
+  >(
+    GetLeagueActivity,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueActivityQuery,
+          GetLeagueActivityQueryVariables
+        >,
+  );
+}
+export type GetLeagueActivityQueryHookResult = ReturnType<
+  typeof useGetLeagueActivityQuery
+>;
+export type GetLeagueActivityLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueActivityLazyQuery
+>;
+export type GetLeagueActivitySuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueActivitySuspenseQuery
+>;
+export type GetLeagueActivityQueryResult = Apollo.QueryResult<
+  GetLeagueActivityQuery,
+  GetLeagueActivityQueryVariables
 >;
 export const GetLeagueChatMessages = gql`
   query GetLeagueChatMessages($leagueId: Int!, $limit: Int) {

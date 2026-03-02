@@ -27,6 +27,7 @@ import {
 import { getCurrentDraftPickInfo } from './helpers';
 import { builder } from '../builder';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
+import { insertActivityLog } from '../../services/activity-log';
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -462,6 +463,20 @@ builder.mutationField('makeDraftPick', (t) =>
               });
             });
         }
+
+        // Record draft pick in the activity log (fire-and-forget, non-fatal)
+        void insertActivityLog(context, {
+          leagueId: result.leagueId,
+          teamId: result.currentPickInfo?.teamId ?? null,
+          actorUserId: userId,
+          eventType: 'draft_pick_made',
+          payload: {
+            playerId,
+            round: result.currentPickInfo?.round,
+            pickNumber: result.currentPickInfo?.pickNumber,
+            overallPick: result.currentPickInfo?.overallPick,
+          },
+        });
 
         return result.draftPick;
       } catch (error) {
