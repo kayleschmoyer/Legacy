@@ -4,6 +4,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import {
   getPlayerByBrefId,
+  refreshPlayerEligiblePositions,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
@@ -61,6 +62,11 @@ export async function handleLoadSinglePlayerStats(
       } else {
         await loadCareerStats(db, player.brefId);
         LOGGER.info(`Successfully loaded career stats for ${player.brefId}`);
+        // Refresh the materialized view so the draft picker reflects updated eligibility
+        await refreshPlayerEligiblePositions(db);
+        LOGGER.info(
+          `player_eligible_positions materialized view refreshed for ${player.brefId}`,
+        );
       }
     } catch (err) {
       LOGGER.error(`Error processing player ${player.brefId}: ${String(err)}`);

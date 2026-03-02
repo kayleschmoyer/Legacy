@@ -12,6 +12,7 @@ import {
 import {
   getPlayerByBrefId,
   PublicDb,
+  refreshPlayerEligiblePositions,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 
@@ -122,6 +123,27 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         });
 
         batchItemFailures.push({ itemIdentifier: record.messageId });
+      }
+    }
+
+    // Refresh the materialized view once per SQS batch so the draft picker
+    // sees up-to-date eligibility data without forcing a per-player refresh.
+    const successCount = event.Records.length - batchItemFailures.length;
+    if (successCount > 0) {
+      try {
+        addBreadcrumb('Refreshing player_eligible_positions materialized view');
+        await refreshPlayerEligiblePositions(db);
+        LOGGER.debug('player_eligible_positions materialized view refreshed');
+      } catch (refreshError) {
+        // Non-fatal: log and continue — stale eligibility data is better than
+        // losing the batch result.
+        LOGGER.error(
+          'Failed to refresh player_eligible_positions:',
+          refreshError as Error,
+        );
+        captureError(refreshError as Error, {
+          tags: { operation: 'refresh_player_eligible_positions' },
+        });
       }
     }
 

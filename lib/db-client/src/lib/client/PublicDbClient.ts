@@ -1,4 +1,4 @@
-import { and, eq, inArray, not } from 'drizzle-orm';
+import { and, eq, inArray, not, sql } from 'drizzle-orm';
 import { conflictUpdateAllExcept } from './utils/ConflictUpdateAllExcept';
 import { TakeUniqueOrNull } from './utils/TakeUniqueOrThrow';
 import { GenericDatabase } from './abstract/BaseDbClient';
@@ -180,6 +180,23 @@ export async function bulkUpsertPitchingSeason(
       ],
     })
     .returning();
+}
+
+/**
+ * Refresh the player_eligible_positions materialized view.
+ *
+ * Should be called once after a bulk stats-load run (not per-player) so the
+ * draft picker always sees up-to-date eligibility data.
+ *
+ * CONCURRENTLY allows reads to continue during the refresh; it requires the
+ * unique index created by migration 20260302_120000 to already exist.
+ */
+export async function refreshPlayerEligiblePositions(
+  db: PublicDb,
+): Promise<void> {
+  await db.execute(
+    sql`REFRESH MATERIALIZED VIEW CONCURRENTLY public.player_eligible_positions`,
+  );
 }
 
 export async function bulkCreatePlayers(

@@ -9,6 +9,7 @@ import {
   getStatsRefreshSummary,
   PublicDb,
   PublicSchema,
+  refreshPlayerEligiblePositions,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 import type { Player } from '@legacy-sports/db-client';
@@ -178,6 +179,25 @@ export async function handleLoadCareerStats(
       LOGGER.debug(`Error details: ${JSON.stringify(errors)}`);
     } else {
       LOGGER.info('All players processed successfully! 🎉');
+    }
+    // Refresh the materialized eligibility view once after all local stats are
+    // written. Skip for remote mode (the lambda does its own refresh per batch).
+    if (!args.remote) {
+      const successCount = players.length - errors.length;
+      if (successCount > 0) {
+        try {
+          LOGGER.info(
+            'Refreshing player_eligible_positions materialized view...',
+          );
+          await refreshPlayerEligiblePositions(db);
+          LOGGER.info('player_eligible_positions materialized view refreshed.');
+        } catch (refreshError) {
+          LOGGER.error(
+            'Failed to refresh player_eligible_positions:',
+            String(refreshError),
+          );
+        }
+      }
     }
   });
 }

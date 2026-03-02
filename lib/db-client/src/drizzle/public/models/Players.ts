@@ -7,7 +7,7 @@ import {
   integer,
   primaryKey,
   foreignKey,
-  pgView,
+  pgMaterializedView,
   timestamp,
   bigint,
   boolean,
@@ -40,11 +40,17 @@ export const players = pgTable(
   },
 );
 
-export const playerEligiblePositions = pgView('player_eligible_positions', {
-  playerId: integer('player_id').notNull(),
-  position: playerPosition('position').notNull(),
-  games: bigint('games', { mode: 'number' }).notNull(),
-}).as(sql`
+// NOTE: This is a MATERIALIZED VIEW (not a plain view) as of migration
+// 20260302_120000_materialize_player_eligible_positions. Drizzle schema
+// reflects the materialized variant so introspection stays accurate.
+export const playerEligiblePositions = pgMaterializedView(
+  'player_eligible_positions',
+  {
+    playerId: integer('player_id').notNull(),
+    position: playerPosition('position').notNull(),
+    games: bigint('games', { mode: 'number' }).notNull(),
+  },
+).as(sql`
 SELECT cfbp.player_id,
        cfbp.pos AS position,
        cfbp.g AS games
@@ -64,5 +70,5 @@ SELECT player_id,
        (g - gs) AS games
 FROM career_pitching
 WHERE (g - gs) >= 100 OR (g > 0 AND (g - gs) * 10 >= g)
-ORDER BY player_id, games DESC;
+ORDER BY player_id, games DESC
 `);

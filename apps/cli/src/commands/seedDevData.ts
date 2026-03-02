@@ -4,6 +4,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import {
   bulkCreatePlayers,
+  refreshPlayerEligiblePositions,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 
@@ -145,6 +146,20 @@ export async function handleSeedDevData(args: SeedDevDataArgs): Promise<void> {
     LOGGER.info(
       `✅ Stats loaded: ${statsOk} succeeded, ${statsFail} failed out of ${toLoad.length}`,
     );
+    // Refresh materialized view once all player stats have been seeded
+    if (statsOk > 0) {
+      try {
+        LOGGER.info(
+          'Refreshing player_eligible_positions materialized view...',
+        );
+        await refreshPlayerEligiblePositions(db);
+        LOGGER.info('player_eligible_positions materialized view refreshed.');
+      } catch (refreshError) {
+        LOGGER.warn(
+          `Failed to refresh player_eligible_positions: ${String(refreshError)}`,
+        );
+      }
+    }
   });
 
   LOGGER.info('');
