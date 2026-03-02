@@ -34,7 +34,8 @@ try {
     if (stagedFiles) {
       const yamlFiles = stagedFiles
         .split('\n')
-        .filter(file => file.match(/\.(ya?ml)$/i));
+        .filter(file => file.match(/\.(ya?ml)$/i))
+        .filter(file => !file.endsWith('pnpm-lock.yaml'));
       
       if (yamlFiles.length > 0) {
         console.log(`Found ${yamlFiles.length} YAML file(s) to validate:`);
