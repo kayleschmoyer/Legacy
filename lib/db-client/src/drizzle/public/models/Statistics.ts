@@ -121,6 +121,17 @@ export const seasonBatting = pgTable(
     return {
       hrIdx: index().using('btree', table.hr.asc().nullsLast()),
       playerIdIdx: index().using('btree', table.playerId.asc().nullsLast()),
+      // Composite indexes for WAR/wSB/GIDP CTE analytical queries (LS-368)
+      lgidSeasonIdx: index('idx_season_batting_lgid_season').using(
+        'btree',
+        table.lgId.asc().nullsLast(),
+        table.season.asc().nullsLast(),
+      ),
+      playerLgidIdx: index('idx_season_batting_player_lgid').using(
+        'btree',
+        table.playerId.asc().nullsLast(),
+        table.lgId.asc().nullsLast(),
+      ),
       seasonBattingPlayersIdFk: foreignKey({
         columns: [table.playerId],
         foreignColumns: [players.id],
@@ -715,25 +726,35 @@ export const aggregateSeasonBatting = pgView('aggregate_season_batting', {
  * Season-level linear weights used by the lWAR calculation.
  * Source: https://www.fangraphs.com/guts.aspx?type=cn
  */
-export const wobaSeasonWeights = pgTable('woba_season_weights', {
-  season: integer('season').primaryKey().notNull(),
-  lgWoba: numeric('lg_woba', { precision: 5, scale: 3 }).notNull(),
-  wobaScale: numeric('woba_scale', { precision: 5, scale: 3 }).notNull(),
-  wBb: numeric('w_bb', { precision: 5, scale: 3 }).notNull(),
-  wHbp: numeric('w_hbp', { precision: 5, scale: 3 }).notNull(),
-  w1b: numeric('w_1b', { precision: 5, scale: 3 }).notNull(),
-  w2b: numeric('w_2b', { precision: 5, scale: 3 }).notNull(),
-  w3b: numeric('w_3b', { precision: 5, scale: 3 }).notNull(),
-  wHr: numeric('w_hr', { precision: 5, scale: 3 }).notNull(),
-  runSb: numeric('run_sb', { precision: 5, scale: 3 }).notNull(),
-  runCs: numeric('run_cs', { precision: 6, scale: 3 }).notNull(),
-  rPa: numeric('r_pa', { precision: 5, scale: 3 }).notNull(),
-  rpw: numeric('rpw', { precision: 6, scale: 3 }).notNull(),
-  cFip: numeric('c_fip', { precision: 5, scale: 3 }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
-    .defaultNow()
-    .notNull(),
-});
+export const wobaSeasonWeights = pgTable(
+  'woba_season_weights',
+  {
+    season: integer('season').primaryKey().notNull(),
+    lgWoba: numeric('lg_woba', { precision: 5, scale: 3 }).notNull(),
+    wobaScale: numeric('woba_scale', { precision: 5, scale: 3 }).notNull(),
+    wBb: numeric('w_bb', { precision: 5, scale: 3 }).notNull(),
+    wHbp: numeric('w_hbp', { precision: 5, scale: 3 }).notNull(),
+    w1b: numeric('w_1b', { precision: 5, scale: 3 }).notNull(),
+    w2b: numeric('w_2b', { precision: 5, scale: 3 }).notNull(),
+    w3b: numeric('w_3b', { precision: 5, scale: 3 }).notNull(),
+    wHr: numeric('w_hr', { precision: 5, scale: 3 }).notNull(),
+    runSb: numeric('run_sb', { precision: 5, scale: 3 }).notNull(),
+    runCs: numeric('run_cs', { precision: 6, scale: 3 }).notNull(),
+    rPa: numeric('r_pa', { precision: 5, scale: 3 }).notNull(),
+    rpw: numeric('rpw', { precision: 6, scale: 3 }).notNull(),
+    cFip: numeric('c_fip', { precision: 5, scale: 3 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    // Index to support join path from season_batting to woba_season_weights (LS-368)
+    seasonIdx: index('idx_woba_season_weights_season').using(
+      'btree',
+      table.season.asc().nullsLast(),
+    ),
+  }),
+);
 
 /**
  * Park Factors (FanGraphs Guts!)
