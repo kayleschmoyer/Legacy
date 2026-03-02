@@ -28,22 +28,24 @@ Rebasing replays your branch's commits on top of another branch (usually `main`)
 
 ## Quick Reference
 
-| Situation                                | Command                                                                                |
-| ---------------------------------------- | -------------------------------------------------------------------------------------- |
-| Simple rebase onto main                  | `git fetch origin ; git rebase origin/main`                                            |
-| Rebase entire branch tree                | `make rebase-tree`                                                                     |
-| Auto-rebase tree (no prompts)            | `make rebase-tree-auto`                                                                |
-| Rebase tree skipping commits             | `make rebase-tree-skip SKIP_COMMITS=hash1,hash2`                                       |
-| See conflicted files                     | `git diff --name-only --diff-filter=U`                                                 |
-| Accept **your** version of a file        | `git checkout --ours <file>`                                                           |
-| Accept **incoming** version of a file    | `git checkout --theirs <file>`                                                         |
-| Mark file as resolved after editing      | `git add <file>`                                                                       |
-| Continue rebase after resolving          | `git rebase --continue`                                                                |
-| Continue rebase (no editor / agent-safe) | `$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue` |
-| Skip current commit entirely             | `git rebase --skip`                                                                    |
-| Abort and return to pre-rebase state     | `git rebase --abort`                                                                   |
-| Resolve generated file conflicts         | `.\scripts\resolve-generated-conflicts.ps1`                                            |
-| Skip duplicate migration commits         | `.\scripts\skip-migration-conflict.ps1`                                                |
+| Situation                                | Command                                                                                                                    |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Simple rebase onto main                  | `git fetch origin ; git rebase origin/main`                                                                                |
+| Rebase entire branch tree                | `make rebase-tree`                                                                                                         |
+| Auto-rebase tree (no prompts)            | `make rebase-tree-auto`                                                                                                    |
+| Rebase tree skipping commits             | `make rebase-tree-skip SKIP_COMMITS=hash1,hash2`                                                                           |
+| See conflicted files                     | `git diff --name-only --diff-filter=U`                                                                                     |
+| Accept **your** version of a file        | `git checkout --ours <file>`                                                                                               |
+| Accept **incoming** version of a file    | `git checkout --theirs <file>`                                                                                             |
+| Mark file as resolved after editing      | `git add <file>`                                                                                                           |
+| Continue rebase after resolving          | `git rebase --continue`                                                                                                    |
+| Continue rebase (no editor / agent-safe) | `$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue`                                     |
+| Skip current commit entirely             | `git rebase --skip`                                                                                                        |
+| Abort and return to pre-rebase state     | `git rebase --abort`                                                                                                       |
+| Resolve generated file conflicts         | `.\scripts\resolve-generated-conflicts.ps1`                                                                                |
+| Skip duplicate migration commits         | `.\scripts\skip-migration-conflict.ps1`                                                                                    |
+| **Watch CI checks after push**           | `gh pr checks --watch`                                                                                                     |
+| **Fix CI formatting failure**            | `pnpm exec nx format:write ; git add -A ; git commit -m "style: fix formatting" ; git push --force-with-lease origin HEAD` |
 
 ---
 
@@ -146,6 +148,35 @@ git push --force-with-lease origin HEAD
 ```
 
 > **Always use `--force-with-lease`** instead of `--force`. It prevents overwriting someone else's commits if they pushed to the same branch.
+
+### Step 8: Verify CI Passes
+
+After pushing, check that CI is green. The most common post-rebase failure is **formatting** — `nx format:write` silently rewrites files during `make pc` and those changes must be committed.
+
+```powershell
+# Watch CI checks until they complete
+gh pr checks --watch
+
+# Or see the latest run status
+gh run list --branch (git branch --show-current) --limit 1
+```
+
+If **Quality Gates** fails with a formatting error:
+
+```powershell
+# Fix formatting
+pnpm exec nx format:write
+
+# Check what changed
+git status
+
+# Commit and push
+git add -A
+git commit -m "style: fix Prettier formatting after rebase"
+git push --force-with-lease origin HEAD
+```
+
+If **Quality Gates** fails with lint or type errors, see the [fix-lint](../fix-lint/SKILL.md) and [fix-types](../fix-types/SKILL.md) skills.
 
 ---
 
@@ -414,6 +445,13 @@ git push --force-with-lease origin HEAD
 
 > **Important**: Never rebase from the main repo directory if the branch is checked out in a worktree. Always `cd` into the worktree first.
 
+After pushing from a worktree, always verify CI:
+
+```powershell
+# From inside the worktree
+gh pr checks --watch
+```
+
 ---
 
 ## Branch Tree Rebase (Stacked Branches)
@@ -496,6 +534,15 @@ git add .
 git commit --amend --no-edit
 git push --force-with-lease origin HEAD
 ```
+
+Then **verify CI passes** after the push — formatting issues in particular are silent until CI runs:
+
+```powershell
+# Watch all checks for the PR
+gh pr checks --watch
+```
+
+If CI fails with a formatting error, run `pnpm exec nx format:write`, commit the changes, and push again. See Step 8 above.
 
 ---
 
