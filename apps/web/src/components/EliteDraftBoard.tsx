@@ -24,6 +24,12 @@ import {
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
+  type GetAvailableDraftPlayersQuery,
+  type GetAvailableDraftPlayersQueryVariables,
+  type GetCurrentDraftPickQuery,
+  type GetCurrentDraftPickQueryVariables,
+  type GetDraftPicksQuery,
+  type GetDraftPicksQueryVariables,
   InitializeLiveDraft as INITIALIZE_LIVE_DRAFT,
   MakeDraftPick as MAKE_DRAFT_PICK,
   PauseDraft as PAUSE_DRAFT,
@@ -1539,16 +1545,19 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     data: currentPickData,
     error: currentPickError,
     refetch: refetchCurrentPick,
-  } = useQuery(GET_CURRENT_DRAFT_PICK, {
-    variables: { draftId },
-    skip: !draftId,
-    pollInterval: !draftId || draftOrderMissing ? 0 : 5000, // Poll every 5s as a fallback to WebSocket
-    errorPolicy: 'all',
-  });
+  } = useQuery<GetCurrentDraftPickQuery, GetCurrentDraftPickQueryVariables>(
+    GET_CURRENT_DRAFT_PICK,
+    {
+      variables: { draftId: draftId ?? 0 },
+      skip: !draftId,
+      pollInterval: !draftId || draftOrderMissing ? 0 : 5000, // Poll every 5s as a fallback to WebSocket
+      errorPolicy: 'all',
+    },
+  );
 
   const currentPickInfo: CurrentDraftPickInfo | null =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (currentPickData as any)?.getCurrentDraftPick ?? null;
+    (currentPickData?.getCurrentDraftPick ??
+      null) as unknown as CurrentDraftPickInfo | null;
   const currentPickTeamId = normalizeTeamId(currentPickInfo?.teamId);
   const isMyPick = Boolean(
     currentPickInfo &&
@@ -1586,17 +1595,16 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   }, [currentPickInfo]);
 
   // ---- Pick History ----
-  const { data: picksData, refetch: refetchPickHistory } = useQuery(
-    GET_DRAFT_PICKS,
-    {
-      variables: { draftId },
-      skip: !draftId,
-    },
-  );
+  const { data: picksData, refetch: refetchPickHistory } = useQuery<
+    GetDraftPicksQuery,
+    GetDraftPicksQueryVariables
+  >(GET_DRAFT_PICKS, {
+    variables: { draftId: draftId ?? 0 },
+    skip: !draftId,
+  });
 
-  const pickHistory: DraftPickRecord[] =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (picksData as any)?.getDraftPicks ?? [];
+  const pickHistory: DraftPickRecord[] = (picksData?.getDraftPicks ??
+    []) as unknown as DraftPickRecord[];
 
   // ---- Available Players (server-side search) ----
   const [playerSearch, setPlayerSearch] = useState('');
@@ -1605,7 +1613,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     loading: availablePlayersLoading,
     error: availablePlayersError,
     refetch: refetchAvailablePlayers,
-  } = useQuery(GET_AVAILABLE_DRAFT_PLAYERS, {
+  } = useQuery<
+    GetAvailableDraftPlayersQuery,
+    GetAvailableDraftPlayersQueryVariables
+  >(GET_AVAILABLE_DRAFT_PLAYERS, {
     variables: {
       draftId: draftId ?? 0,
       search: playerSearch || null,
@@ -1616,8 +1627,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   });
 
   const availablePlayers: AvailableDraftPlayer[] =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (availablePlayersData as any)?.getAvailableDraftPlayers ?? [];
+    (availablePlayersData?.getAvailableDraftPlayers ??
+      []) as unknown as AvailableDraftPlayer[];
 
   // ---- Career Batting Stats (uses existing careerBattingStats connection) ----
   const { data: statsData } = useQuery(GET_DRAFT_PLAYER_STATS, {
