@@ -60,14 +60,11 @@ export class DivisionalStrategy implements SchedulingStrategy {
     let interDivisionalGamesScheduled = 0;
     let currentWeek = 1;
 
-    // Track pairings to avoid duplicates within same week
-    const weekPairings = new Map<number, Set<string>>();
-
     while (currentWeek <= numberOfWeeks) {
-      weekPairings.set(currentWeek, new Set());
       const teamsAvailableThisWeek = new Set(teams.map((t) => t.id));
 
-      // Schedule divisional games first if we need more
+      // Bug fix 1: Schedule divisional games — pair ALL available teams within
+      // each division (not just shuffled[0] vs shuffled[1]).
       if (divisionalGamesScheduled < divisionalGames) {
         for (const [, divTeams] of divisions) {
           if (divTeams.length < 2) continue;
@@ -78,43 +75,11 @@ export class DivisionalStrategy implements SchedulingStrategy {
 
           if (availableInDiv.length >= 2) {
             const shuffled = shuffleArray(availableInDiv);
-            const team1 = shuffled[0];
-            const team2 = shuffled[1];
 
-            pairings.push({
-              team1Id: team1.id,
-              team2Id: team2.id,
-              weekNumber: currentWeek,
-              gamesPerMatchup: 0,
-            });
+            for (let i = 0; i + 1 < shuffled.length; i += 2) {
+              const team1 = shuffled[i];
+              const team2 = shuffled[i + 1];
 
-            teamsAvailableThisWeek.delete(team1.id);
-            teamsAvailableThisWeek.delete(team2.id);
-            const weekPairingsSet = weekPairings.get(currentWeek);
-            if (weekPairingsSet) {
-              weekPairingsSet.add(`${team1.id}-${team2.id}`);
-            }
-            divisionalGamesScheduled++;
-
-            if (divisionalGamesScheduled >= divisionalGames) break;
-          }
-        }
-      }
-
-      // Schedule inter-divisional games
-      if (interDivisionalGamesScheduled < interDivisionalGames) {
-        const available = teams.filter((t) => teamsAvailableThisWeek.has(t.id));
-
-        if (available.length >= 2) {
-          // Pair teams from different divisions
-          const shuffled = shuffleArray(available);
-
-          for (let i = 0; i < shuffled.length - 1; i += 2) {
-            const team1 = shuffled[i];
-            const team2 = shuffled[i + 1];
-
-            // Prefer different divisions
-            if (team1.divisionId !== team2.divisionId || divisions.size === 1) {
               pairings.push({
                 team1Id: team1.id,
                 team2Id: team2.id,
@@ -124,15 +89,46 @@ export class DivisionalStrategy implements SchedulingStrategy {
 
               teamsAvailableThisWeek.delete(team1.id);
               teamsAvailableThisWeek.delete(team2.id);
-              const weekPairingsSet = weekPairings.get(currentWeek);
-              if (weekPairingsSet) {
-                weekPairingsSet.add(`${team1.id}-${team2.id}`);
-              }
-              interDivisionalGamesScheduled++;
+              divisionalGamesScheduled++;
 
-              if (interDivisionalGamesScheduled >= interDivisionalGames) break;
+              if (divisionalGamesScheduled >= divisionalGames) break;
             }
           }
+
+          if (divisionalGamesScheduled >= divisionalGames) break;
+        }
+      }
+
+      // Bug fix 2: Schedule inter-divisional games for remaining teams.
+      // Instead of skipping same-division consecutive pairs, actively seek a
+      // cross-division partner and fall back to any available partner.
+      if (interDivisionalGamesScheduled < interDivisionalGames) {
+        const available = shuffleArray(
+          teams.filter((t) => teamsAvailableThisWeek.has(t.id)),
+        );
+
+        while (available.length >= 2) {
+          const team1 = available.shift()!;
+
+          // Prefer a partner from a different division
+          const crossDivIdx = available.findIndex(
+            (t) => t.divisionId !== team1.divisionId,
+          );
+          const partnerIdx = crossDivIdx !== -1 ? crossDivIdx : 0;
+          const [team2] = available.splice(partnerIdx, 1);
+
+          pairings.push({
+            team1Id: team1.id,
+            team2Id: team2.id,
+            weekNumber: currentWeek,
+            gamesPerMatchup: 0,
+          });
+
+          teamsAvailableThisWeek.delete(team1.id);
+          teamsAvailableThisWeek.delete(team2.id);
+          interDivisionalGamesScheduled++;
+
+          if (interDivisionalGamesScheduled >= interDivisionalGames) break;
         }
       }
 
