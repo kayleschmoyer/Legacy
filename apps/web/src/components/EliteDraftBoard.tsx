@@ -1626,9 +1626,29 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     errorPolicy: 'all',
   });
 
-  const availablePlayers: AvailableDraftPlayer[] =
-    (availablePlayersData?.getAvailableDraftPlayers ??
-      []) as unknown as AvailableDraftPlayer[];
+  const availablePlayers: AvailableDraftPlayer[] = (
+    availablePlayersData?.getAvailableDraftPlayers ?? []
+  )
+    .filter(
+      (
+        p,
+      ): p is {
+        id: number;
+        firstName: string;
+        lastName: string;
+        brefId: string;
+      } =>
+        p.id != null &&
+        p.firstName != null &&
+        p.lastName != null &&
+        p.brefId != null,
+    )
+    .map((p) => ({
+      id: p.id,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      brefId: p.brefId,
+    }));
 
   // ---- Career Batting Stats (uses existing careerBattingStats connection) ----
   const { data: statsData } = useQuery(GET_DRAFT_PLAYER_STATS, {
@@ -2699,7 +2719,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                     lineHeight: 1.4,
                   }}
                 >
-                  <span role="img" aria-label="warning">
+                  <span role="img" aria-label="Warning">
                     ⚠️
                   </span>{' '}
                   Your league membership has no team assigned. Commissioner Pick

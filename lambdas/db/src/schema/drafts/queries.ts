@@ -3,7 +3,7 @@
  */
 
 import { PublicSchema } from '@legacy-sports/db-client';
-import { and, asc, desc, eq, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
 import { getCurrentDraftPickInfo, verifyLeagueMembership } from './helpers';
 import { CurrentDraftPick, Draft, DraftPick, DraftPlayer } from './types';
@@ -184,19 +184,17 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         .where(eq(PublicSchema.leagues.id, draft.leagueId))
         .limit(1);
 
-      // Get already-drafted player IDs for this draft
-      const drafted = await context.db
-        .select({ playerId: PublicSchema.draftPicks.playerId })
-        .from(PublicSchema.draftPicks)
-        .where(eq(PublicSchema.draftPicks.draftId, draftId));
-
-      const draftedIds = drafted.map((d) => d.playerId);
-
-      // Build base query for available players
-      const baseConditions =
-        draftedIds.length > 0
-          ? [notInArray(PublicSchema.players.id, draftedIds)]
-          : [];
+      // Build base query for available players.
+      // Use NOT EXISTS against draft_picks instead of fetching all drafted IDs
+      // and passing as NOT IN (...). The unique index draft_picks_uk_draft_player
+      // on (draft_id, player_id) makes this an efficient index seek per candidate row.
+      const baseConditions = [
+        sql`NOT EXISTS (
+          SELECT 1 FROM public.draft_picks dp
+          WHERE dp.draft_id = ${draftId}
+            AND dp.player_id = ${PublicSchema.players.id}
+        )`,
+      ];
 
       // Apply player pool filter (AL/NL restriction)
       // Uses the most recent season_batting record's lg_id to determine league affiliation
@@ -218,30 +216,39 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         );
       }
 
-      // Apply career games minimum (defaults to 50 if the league has no setting)
+      // Apply career games minimum (defaults to 50 if the league has no setting).
+      // Rewritten as NOT EXISTS / EXISTS so the planner can use the composite
+      // index idx_career_batting_player_g (player_id, g) via index seeks.
       const minCareerGames = league?.minCareerGames ?? 50;
       if (minCareerGames > 0) {
         baseConditions.push(
           sql`(
-            NOT EXISTS (SELECT 1 FROM public.career_batting WHERE player_id = ${PublicSchema.players.id})
-            OR ${PublicSchema.players.id} IN (
-              SELECT player_id FROM public.career_batting WHERE g >= ${minCareerGames}
+            NOT EXISTS (SELECT 1 FROM public.career_batting cb WHERE cb.player_id = ${PublicSchema.players.id})
+            OR EXISTS (
+              SELECT 1 FROM public.career_batting cb WHERE cb.player_id = ${PublicSchema.players.id} AND cb.g >= ${minCareerGames}
             )
           )`,
         );
       }
 
-      // Apply career seasons minimum (defaults to 3 if the league has no setting)
+      // Apply career seasons minimum (defaults to 3 if the league has no setting).
+      // Rewritten as NOT EXISTS / EXISTS so the planner can use the composite
+      // index idx_season_batting_player_lgid_season (player_id, lg_id, season).
       const minCareerSeasons = league?.minCareerSeasons ?? 3;
       if (minCareerSeasons > 0) {
         baseConditions.push(
           sql`(
-            NOT EXISTS (SELECT 1 FROM public.season_batting WHERE player_id = ${PublicSchema.players.id} AND lg_id IN ('AL', 'NL'))
-            OR ${PublicSchema.players.id} IN (
-              SELECT player_id FROM public.season_batting
-              WHERE lg_id IN ('AL', 'NL')
-              GROUP BY player_id
-              HAVING COUNT(DISTINCT season) >= ${minCareerSeasons}
+            NOT EXISTS (
+              SELECT 1 FROM public.season_batting sb
+              WHERE sb.player_id = ${PublicSchema.players.id}
+                AND sb.lg_id IN ('AL', 'NL')
+            )
+            OR EXISTS (
+              SELECT 1 FROM public.season_batting sb
+              WHERE sb.player_id = ${PublicSchema.players.id}
+                AND sb.lg_id IN ('AL', 'NL')
+              GROUP BY sb.player_id
+              HAVING COUNT(DISTINCT sb.season) >= ${minCareerSeasons}
             )
           )`,
         );
@@ -250,7 +257,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       const query = context.db
         .select()
         .from(PublicSchema.players)
-        .where(baseConditions.length > 0 ? and(...baseConditions) : undefined)
+        .where(and(...baseConditions))
         .orderBy(
           asc(PublicSchema.players.lastName),
           asc(PublicSchema.players.firstName),
