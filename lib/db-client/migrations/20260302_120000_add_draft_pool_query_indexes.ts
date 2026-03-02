@@ -9,9 +9,13 @@ import type { PgDatabase } from 'drizzle-orm/pg-core';
  *   these resolve to sequential scans that grow expensive as player counts
  *   increase.
  *
+ * Note: career_batting is a VIEW — indexes must be placed on the underlying
+ * season_batting table.
+ *
  * Changes:
- * - idx_career_batting_player_g: composite index on (player_id, g) so the
- *   "g >= minCareerGames" filter can be satisfied with an index-only scan.
+ * - idx_season_batting_player_g: composite index on season_batting (player_id, g)
+ *   so the aggregated "SUM(g) >= minCareerGames" filter can be satisfied with
+ *   an index-aided scan.
  * - idx_season_batting_player_lgid_season: composite index on
  *   (player_id, lg_id, season) so COUNT(DISTINCT season) group-bys used in
  *   the minCareerSeasons filter can be resolved via index without a full
@@ -21,8 +25,8 @@ import type { PgDatabase } from 'drizzle-orm/pg-core';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const up = async ({ db }: { db: PgDatabase<any> }) => {
   await db.execute(`
-    CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_career_batting_player_g
-      ON public.career_batting (player_id, g);
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_season_batting_player_g
+      ON public.season_batting (player_id, g);
   `);
 
   await db.execute(`
@@ -34,7 +38,7 @@ export const up = async ({ db }: { db: PgDatabase<any> }) => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const down = async ({ db }: { db: PgDatabase<any> }) => {
   await db.execute(`
-    DROP INDEX CONCURRENTLY IF EXISTS public.idx_career_batting_player_g;
+    DROP INDEX CONCURRENTLY IF EXISTS public.idx_season_batting_player_g;
   `);
 
   await db.execute(`
