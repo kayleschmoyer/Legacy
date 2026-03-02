@@ -80,7 +80,8 @@
     "ForEach-Object": true,
     "ConvertFrom-Json": true,
     "git add": true,
-    "git commit": true
+    "git commit": true,
+    "git fetch": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {

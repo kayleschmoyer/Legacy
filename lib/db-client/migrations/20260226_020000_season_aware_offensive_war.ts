@@ -1,14 +1,14 @@
 import type { PgDatabase } from 'drizzle-orm/pg-core';
 
 /**
- * Migration: Season-aware oWAR using woba_season_weights
+ * Migration: Season-aware lWAR using woba_season_weights
  *
  * Purpose:
- * - Replaces the fixed-constant oWAR formula with season-specific linear weights
+ * - Replaces the fixed-constant lWAR formula with season-specific linear weights
  * - Each season's wRAA, BsR, and RPW come from the woba_season_weights table
  *   (FanGraphs Guts! data)
  * - Positional adjustment is computed per-season from season_fielding
- * - Per-season oWAR is summed to produce career oWAR
+ * - Per-season lWAR is summed to produce career lWAR
  *
  * Key fix:
  * - Previous formula used fixed RPW = 10.0; actual RPW varies 8.1–19.0 by season
@@ -167,7 +167,7 @@ export const up = async ({ db }: { db: PgDatabase<any> }) => {
 };
 
 /**
- * Down migration: restore the previous fixed-constant oWAR formula
+ * Down migration: restore the previous fixed-constant lWAR formula
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const down = async ({ db }: { db: PgDatabase<any> }) => {

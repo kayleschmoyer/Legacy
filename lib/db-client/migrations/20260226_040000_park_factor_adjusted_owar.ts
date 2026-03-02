@@ -1,10 +1,10 @@
 import type { PgDatabase } from 'drizzle-orm/pg-core';
 
 /**
- * Migration: Park-factor-adjusted oWAR
+ * Migration: Park-factor-adjusted lWAR
  *
  * Purpose:
- * - Adds park factor adjustment to the oWAR formula
+ * - Adds park factor adjustment to the lWAR formula
  * - Uses "Basic (5yr)" multi-year park factor from the park_factors table
  *   (100 = neutral; >100 = hitter-friendly; <100 = pitcher-friendly)
  * - The park adjustment reduces batting runs for hitter-friendly parks

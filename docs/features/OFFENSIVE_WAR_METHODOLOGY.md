@@ -1,4 +1,4 @@
-# Offensive WAR (oWAR) Methodology
+# Offensive WAR (lWAR) Methodology
 
 Our offensive WAR calculation closely follows
 [Baseball Reference's oWAR methodology](https://www.baseball-reference.com/about/war_explained_position.shtml),
@@ -7,7 +7,7 @@ with a few documented deviations where play-by-play data is unavailable.
 ## Formula
 
 ```
-oWAR = (wRAA + ParkAdj + LeagueAdj + wSB + PosAdj + Rrep) / RPW
+lWAR = (wRAA + ParkAdj + LeagueAdj + wSB + PosAdj + Rrep) / RPW
 ```
 
 Each component is computed **per player per season**, then summed across the
@@ -147,7 +147,7 @@ league_rpa → combined_rpa → league_sb → team_season_batting → season_tot
 3. **league_sb** — League-average wSB rate (lgwSB) by season/league
 4. **team_season_batting** — Player stats grouped by team/season (for park factor weighting)
 5. **season_totals** — Player season totals with PA-weighted park factor and league adjustment
-6. **season_war** — Per-season oWAR for each player
+6. **season_war** — Per-season lWAR for each player
 7. **career_batting** — Career aggregates with `offensive_war` column
 
 ---

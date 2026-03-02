@@ -9,7 +9,7 @@ import { sql } from 'drizzle-orm';
  * - Adds Baseball Reference columns: bpf (Batter Park Factor), ppf (Pitcher Park Factor)
  * - BR uses a 3-year rolling average with IPC/OPC corrections and iterative BPF/PPF separation
  *   (see https://www.baseball-reference.com/about/parkadjust.shtml)
- * - These are the exact park factors BR uses in their oWAR calculation
+ * - These are the exact park factors BR uses in their lWAR calculation
  *
  * Also updates the career_batting view to use bpf instead of basic_5yr
  */

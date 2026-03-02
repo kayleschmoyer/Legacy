@@ -7,7 +7,7 @@ import type { PgDatabase } from 'drizzle-orm/pg-core';
  * - Stores FanGraphs park factors per team per season
  * - The "basic_5yr" field is the 5-year average park factor (runs, 100 = neutral)
  *   which is the standard park factor used in WAR calculations
- * - Used by the oWAR formula to park-adjust batting runs
+ * - Used by the lWAR formula to park-adjust batting runs
  *
  * Source: https://www.fangraphs.com/tools/guts?type=pf
  *

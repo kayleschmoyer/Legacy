@@ -4,7 +4,7 @@ import type { PgDatabase } from 'drizzle-orm/pg-core';
  * Migration: Add offensive_war computed column to career_batting view
  *
  * Purpose:
- * - Computes oWAR at the database level so it can be used for server-side sorting
+ * - Computes lWAR at the database level so it can be used for server-side sorting
  * - Uses wOBA linear weights + baserunning + positional adjustment + replacement level
  * - Positional adjustment is derived from a correlated subquery on career_fielding_by_position
  *
@@ -12,7 +12,7 @@ import type { PgDatabase } from 'drizzle-orm/pg-core';
  * - Recreates career_batting as a CTE-based view with an offensive_war column
  *
  * Formula:
- *   oWAR = (wRAA + BsR + posAdj + replRuns) / 10
+ *   lWAR = (wRAA + BsR + posAdj + replRuns) / 10
  *   wRAA  = ((wOBA - 0.320) / 1.24) * PA
  *   BsR   = SB * 0.20 - CS * 0.40
  *   posAdj = weightedPosAdj * (G / 162)  [weighted average across positions played]

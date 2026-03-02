@@ -3,7 +3,7 @@
  *
  * Loads FanGraphs Guts! season-level wOBA linear weights into the
  * woba_season_weights table.  These constants power the season-aware
- * oWAR calculation.
+ * lWAR calculation.
  *
  * Source: https://www.fangraphs.com/guts.aspx?type=cn
  *

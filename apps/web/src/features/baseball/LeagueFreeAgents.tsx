@@ -92,7 +92,7 @@ const HITTING_STAT_COLUMNS: {
   },
   {
     key: 'offensiveWAR',
-    label: 'oWAR',
+    label: 'lWAR',
     sortKey: 'careerOffensiveWAR',
     width: 56,
     description: 'Offensive WAR (batting + baserunning + positional)',

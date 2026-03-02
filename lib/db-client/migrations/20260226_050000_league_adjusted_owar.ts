@@ -1,10 +1,10 @@
 import type { PgDatabase } from 'drizzle-orm/pg-core';
 
 /**
- * Migration: League-adjusted oWAR
+ * Migration: League-adjusted lWAR
  *
  * Purpose:
- * - Adds league adjustment to the oWAR formula, on top of park factors
+ * - Adds league adjustment to the lWAR formula, on top of park factors
  * - Accounts for differences in run-scoring environment between AL and NL
  *   (e.g., the AL was generally higher-scoring in the 1920s-1930s)
  * - Formula: league_adj = (MLB_R/PA - league_R/PA) * PA

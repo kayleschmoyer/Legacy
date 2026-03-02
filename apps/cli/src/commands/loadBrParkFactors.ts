@@ -13,7 +13,7 @@
  * and iterative batter/pitcher park effect separation.
  * See: https://www.baseball-reference.com/about/parkadjust.shtml
  *
- * These are the exact park factors BR uses in their own oWAR calculations,
+ * These are the exact park factors BR uses in their own lWAR calculations,
  * making them the best match for reproducing BR's WAR values.
  *
  * Usage:

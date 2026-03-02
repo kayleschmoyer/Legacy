@@ -6,7 +6,7 @@ import type { PgDatabase } from 'drizzle-orm/pg-core';
  * Purpose:
  * - Stores FanGraphs Guts! season-level wOBA linear weights, league wOBA,
  *   wOBA scale, and Runs Per Win (RPW) constants.
- * - Used by the oWAR (offensive WAR) calculation to apply season-specific
+ * - Used by the lWAR (Legacy WAR) calculation to apply season-specific
  *   weights instead of fixed constants, matching Baseball Reference methodology.
  *
  * Source: https://www.fangraphs.com/guts.aspx?type=cn

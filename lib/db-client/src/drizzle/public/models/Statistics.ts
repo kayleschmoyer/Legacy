@@ -712,7 +712,7 @@ export const aggregateSeasonBatting = pgView('aggregate_season_batting', {
 /**
  * wOBA Season Weights (FanGraphs Guts!)
  *
- * Season-level linear weights used by the oWAR calculation.
+ * Season-level linear weights used by the lWAR calculation.
  * Source: https://www.fangraphs.com/guts.aspx?type=cn
  */
 export const wobaSeasonWeights = pgTable('woba_season_weights', {
@@ -738,7 +738,7 @@ export const wobaSeasonWeights = pgTable('woba_season_weights', {
 /**
  * Park Factors (FanGraphs Guts!)
  *
- * Per-team per-season park factors used by the oWAR calculation.
+ * Per-team per-season park factors used by the lWAR calculation.
  * BPF = Batters' Park Factor, PPF = Pitchers' Park Factor.
  * 3-year rolling average with IPC/OPC corrections (100 = neutral).
  * Source: https://www.baseball-reference.com/leagues/{lg}/{year}-misc.shtml

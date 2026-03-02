@@ -102,7 +102,7 @@ export interface PlayerCareerStats {
   readonly formattedOnBasePercentage: string;
   readonly formattedSluggingPercentage: string;
   readonly formattedOPS: string;
-  /** Approximate offensive WAR (oWAR) — computed server-side from counting stats */
+  /** Approximate offensive WAR (lWAR) — computed server-side from counting stats */
   readonly offensiveWAR: number | null;
   // Fielding statistics
   readonly fieldingGames?: number;
