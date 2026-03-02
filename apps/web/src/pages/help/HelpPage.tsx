@@ -321,7 +321,7 @@ const HISTORICAL_FAQ_ITEMS: FaqItemProps[] = [
   {
     question: "Why did my player's stats change after the week ended?",
     answer:
-      'Our system processes archived games in batches. Scores may take a short time to fully settle after the matchup window closes. Once all games in the window are processed, scores are final and will not change.',
+      'Our system processes archived games in batches. Scores may take a short time to fully settle after the matchup period ends. Once all selected games are processed, scores are final and will not change.',
   },
 ];
 

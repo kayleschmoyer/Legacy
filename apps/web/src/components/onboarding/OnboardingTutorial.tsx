@@ -152,14 +152,16 @@ const STEPS: TutorialStep[] = [
         <Paragraph color="$colorPress" fontSize="$4" lineHeight={26}>
           <ConceptTooltip
             term="game selection"
-            explanation="The process of choosing which individual games from the assigned MLB season contribute to each weekly matchup. Commissioners can configure this per-week."
+            explanation="The automatic process of picking which games from the assigned MLB season are used to score each weekly matchup. Each matchup has a configured number of game slots, and one random game is chosen per slot."
           />{' '}
           determines which games from the assigned season count toward each
-          weekly matchup period.
+          weekly matchup.
         </Paragraph>
         <Paragraph color="$colorPress" fontSize="$4" lineHeight={26}>
-          Think of it as choosing a "window" of real games from history. Your
-          players' stats across those games accumulate into your matchup score.
+          Each matchup has a set number of game slots. One random game from the
+          assigned season is picked for each slot — one game per matchup day.
+          Your players' stats from those individual games accumulate into your
+          matchup score.
         </Paragraph>
 
         {/* Visual example */}
@@ -177,32 +179,44 @@ const STEPS: TutorialStep[] = [
             style={{ background: withAlpha(BRAND_NAVY_LIGHT, 0.15) }}
           >
             <Paragraph fontWeight="700" color={BRAND_GOLD} fontSize="$3">
-              Example — Week 7 Game Window
+              Example — Week 7 Game Slots (5 games)
             </Paragraph>
           </XStack>
           <YStack padding="$3" gap="$2">
             {[
-              { date: 'Mon Aug 5, 2019', games: 14, counted: true },
-              { date: 'Tue Aug 6, 2019', games: 15, counted: true },
-              { date: 'Wed Aug 7, 2019', games: 12, counted: true },
-            ].map(({ date, games }) => (
+              { slot: 'Game 1', matchup: 'PHI @ NYM', date: 'Aug 5, 2019' },
+              { slot: 'Game 2', matchup: 'CHC @ STL', date: 'Aug 7, 2019' },
+              { slot: 'Game 3', matchup: 'BOS @ NYY', date: 'Aug 9, 2019' },
+              { slot: 'Game 4', matchup: 'LAD @ SF', date: 'Aug 12, 2019' },
+              { slot: 'Game 5', matchup: 'HOU @ OAK', date: 'Aug 14, 2019' },
+            ].map(({ slot, matchup, date }) => (
               <XStack
-                key={date}
+                key={slot}
                 justifyContent="space-between"
                 alignItems="center"
                 padding="$2"
                 borderRadius="$3"
                 style={{ background: withAlpha(BRAND_NAVY_LIGHT, 0.08) }}
               >
-                <Paragraph color="$colorPress" fontSize="$3">
-                  {date}
-                </Paragraph>
+                <XStack gap="$2" alignItems="center">
+                  <Paragraph
+                    color={BRAND_GOLD}
+                    fontSize="$2"
+                    fontWeight="700"
+                    style={{ minWidth: 52 }}
+                  >
+                    {slot}
+                  </Paragraph>
+                  <Paragraph color="$colorPress" fontSize="$3">
+                    {matchup}
+                  </Paragraph>
+                </XStack>
                 <Paragraph
                   color={BRAND_GOLD_LIGHT}
-                  fontSize="$3"
+                  fontSize="$2"
                   fontWeight="700"
                 >
-                  {games} games ✓
+                  {date} ✓
                 </Paragraph>
               </XStack>
             ))}
@@ -425,7 +439,7 @@ const STEPS: TutorialStep[] = [
 
         <Paragraph color="$colorPress" fontSize="$3" lineHeight={22}>
           Live matchup scores update as our system processes each archived game
-          from the assigned season window.
+          from the assigned season.
         </Paragraph>
       </YStack>
     ),
