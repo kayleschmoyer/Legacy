@@ -411,6 +411,8 @@ builder.queryField('leagueTeams', (t) =>
             primaryColor: PublicSchema.teams.primaryColor,
             secondaryColor: PublicSchema.teams.secondaryColor,
             isLocked: PublicSchema.teams.isLocked,
+            avatarUrl: PublicSchema.teams.avatarUrl,
+            bannerUrl: PublicSchema.teams.bannerUrl,
           })
           .from(PublicSchema.teams)
           .where(eq(PublicSchema.teams.leagueId, leagueId))

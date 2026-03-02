@@ -141,8 +141,27 @@ League.implement({
   }),
 });
 
-// Team type
-export const Team = builder.objectRef<DbTeam>('Team');
+// Team type — several branding fields are optional in the parent since legacy
+// resolvers use explicit column selections that may omit them; field resolvers
+// default to null/false.
+export const Team = builder.objectRef<
+  Omit<
+    DbTeam,
+    | 'isLocked'
+    | 'logoUrl'
+    | 'primaryColor'
+    | 'secondaryColor'
+    | 'avatarUrl'
+    | 'bannerUrl'
+  > & {
+    isLocked?: boolean | null;
+    logoUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    avatarUrl?: string | null;
+    bannerUrl?: string | null;
+  }
+>('Team');
 
 Team.implement({
   description: 'A team in a league',
@@ -157,9 +176,26 @@ Team.implement({
       resolve: (parent) =>
         (parent as { isLocked?: boolean | null }).isLocked ?? false,
     }),
-    logoUrl: t.exposeString('logoUrl', { nullable: true }),
-    primaryColor: t.exposeString('primaryColor', { nullable: true }),
-    secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
+    logoUrl: t.string({
+      nullable: true,
+      resolve: (parent) => parent.logoUrl ?? null,
+    }),
+    primaryColor: t.string({
+      nullable: true,
+      resolve: (parent) => parent.primaryColor ?? null,
+    }),
+    secondaryColor: t.string({
+      nullable: true,
+      resolve: (parent) => parent.secondaryColor ?? null,
+    }),
+    avatarUrl: t.string({
+      nullable: true,
+      resolve: (parent) => parent.avatarUrl ?? null,
+    }),
+    bannerUrl: t.string({
+      nullable: true,
+      resolve: (parent) => parent.bannerUrl ?? null,
+    }),
     createdAt: t.string({
       resolve: (team) => team.createdAt.toISOString(),
     }),

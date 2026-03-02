@@ -1302,6 +1302,8 @@ export type MutationUpdatePlayoffMatchupArgs = {
 };
 
 export type MutationUpdateTeamBrandingArgs = {
+  avatarUrl?: InputMaybe<Scalars['String']['input']>;
+  bannerUrl?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
   logoUrl?: InputMaybe<Scalars['String']['input']>;
   primaryColor?: InputMaybe<Scalars['String']['input']>;
@@ -2247,6 +2249,8 @@ export type SwapMatchupTeamsInput = {
 /** A team in a league */
 export type Team = {
   __typename?: 'Team';
+  avatarUrl?: Maybe<Scalars['String']['output']>;
+  bannerUrl?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   divisionId?: Maybe<Scalars['Int']['output']>;
   faabBudget?: Maybe<Scalars['Int']['output']>;

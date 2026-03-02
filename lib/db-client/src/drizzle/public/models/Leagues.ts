@@ -117,6 +117,10 @@ export const teams = pgTable(
     logoUrl: text('logo_url'),
     primaryColor: varchar('primary_color', { length: 7 }),
     secondaryColor: varchar('secondary_color', { length: 7 }),
+    /** Team logo / avatar image URL — editable by the GM from the My Team page */
+    avatarUrl: text('avatar_url'),
+    /** Team banner / header image URL — editable by the GM from the My Team page */
+    bannerUrl: text('banner_url'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

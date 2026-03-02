@@ -5,6 +5,11 @@ fragment Team on Team {
   waiverOrder
   faabBudget
   isLocked
+  logoUrl
+  primaryColor
+  secondaryColor
+  avatarUrl
+  bannerUrl
 }
 
 fragment TeamMember on TeamMember {

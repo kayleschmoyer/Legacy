@@ -12,6 +12,8 @@ mutation UpdateTeamBranding(
   $logoUrl: String
   $primaryColor: String
   $secondaryColor: String
+  $avatarUrl: String
+  $bannerUrl: String
 ) {
   updateTeamBranding(
     teamId: $teamId
@@ -19,13 +21,20 @@ mutation UpdateTeamBranding(
     logoUrl: $logoUrl
     primaryColor: $primaryColor
     secondaryColor: $secondaryColor
+    avatarUrl: $avatarUrl
+    bannerUrl: $bannerUrl
   ) {
     id
     name
     leagueId
+    isLocked
+    waiverOrder
+    faabBudget
     logoUrl
     primaryColor
     secondaryColor
+    avatarUrl
+    bannerUrl
   }
 }
 

@@ -1239,6 +1239,8 @@ type Mutation {
     status: PlayoffMatchupStatus
   ): PlayoffMatchup
   updateTeamBranding(
+    avatarUrl: String
+    bannerUrl: String
     leagueId: Int!
     logoUrl: String
     primaryColor: String
@@ -1998,6 +2000,8 @@ input SwapMatchupTeamsInput {
 A team in a league
 """
 type Team {
+  avatarUrl: String
+  bannerUrl: String
   createdAt: String
   divisionId: Int
   faabBudget: Int

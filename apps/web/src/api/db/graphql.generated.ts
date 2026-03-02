@@ -1302,6 +1302,8 @@ export type MutationUpdatePlayoffMatchupArgs = {
 };
 
 export type MutationUpdateTeamBrandingArgs = {
+  avatarUrl?: InputMaybe<Scalars['String']['input']>;
+  bannerUrl?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
   logoUrl?: InputMaybe<Scalars['String']['input']>;
   primaryColor?: InputMaybe<Scalars['String']['input']>;
@@ -2247,6 +2249,8 @@ export type SwapMatchupTeamsInput = {
 /** A team in a league */
 export type Team = {
   __typename?: 'Team';
+  avatarUrl?: Maybe<Scalars['String']['output']>;
+  bannerUrl?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   divisionId?: Maybe<Scalars['Int']['output']>;
   faabBudget?: Maybe<Scalars['Int']['output']>;
@@ -2591,6 +2595,8 @@ export type UpdateTeamBrandingMutationVariables = Exact<{
   logoUrl?: InputMaybe<Scalars['String']['input']>;
   primaryColor?: InputMaybe<Scalars['String']['input']>;
   secondaryColor?: InputMaybe<Scalars['String']['input']>;
+  avatarUrl?: InputMaybe<Scalars['String']['input']>;
+  bannerUrl?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type UpdateTeamBrandingMutation = {
@@ -2600,9 +2606,14 @@ export type UpdateTeamBrandingMutation = {
     id?: number | null;
     name?: string | null;
     leagueId?: number | null;
+    isLocked?: boolean | null;
+    waiverOrder?: number | null;
+    faabBudget?: number | null;
     logoUrl?: string | null;
     primaryColor?: string | null;
     secondaryColor?: string | null;
+    avatarUrl?: string | null;
+    bannerUrl?: string | null;
   } | null;
 };
 
@@ -3226,9 +3237,12 @@ export type GetLeagueTeamsQuery = {
     leagueId?: number | null;
     waiverOrder?: number | null;
     faabBudget?: number | null;
+    isLocked?: boolean | null;
     logoUrl?: string | null;
     primaryColor?: string | null;
     secondaryColor?: string | null;
+    avatarUrl?: string | null;
+    bannerUrl?: string | null;
   }> | null;
 };
 
@@ -5139,6 +5153,11 @@ export type TeamFragment = {
   waiverOrder?: number | null;
   faabBudget?: number | null;
   isLocked?: boolean | null;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
 };
 
 export type TeamMemberFragment = {
@@ -6118,6 +6137,11 @@ export const TeamFragmentDoc = gql`
     waiverOrder
     faabBudget
     isLocked
+    logoUrl
+    primaryColor
+    secondaryColor
+    avatarUrl
+    bannerUrl
   }
 `;
 export const TeamMemberFragmentDoc = gql`
@@ -6446,6 +6470,8 @@ export const UpdateTeamBranding = gql`
     $logoUrl: String
     $primaryColor: String
     $secondaryColor: String
+    $avatarUrl: String
+    $bannerUrl: String
   ) {
     updateTeamBranding(
       teamId: $teamId
@@ -6453,13 +6479,20 @@ export const UpdateTeamBranding = gql`
       logoUrl: $logoUrl
       primaryColor: $primaryColor
       secondaryColor: $secondaryColor
+      avatarUrl: $avatarUrl
+      bannerUrl: $bannerUrl
     ) {
       id
       name
       leagueId
+      isLocked
+      waiverOrder
+      faabBudget
       logoUrl
       primaryColor
       secondaryColor
+      avatarUrl
+      bannerUrl
     }
   }
 `;
@@ -6486,6 +6519,8 @@ export type UpdateTeamBrandingMutationFn = MutationFunction<
  *      logoUrl: // value for 'logoUrl'
  *      primaryColor: // value for 'primaryColor'
  *      secondaryColor: // value for 'secondaryColor'
+ *      avatarUrl: // value for 'avatarUrl'
+ *      bannerUrl: // value for 'bannerUrl'
  *   },
  * });
  */
@@ -8251,9 +8286,12 @@ export const GetLeagueTeams = gql`
       leagueId
       waiverOrder
       faabBudget
+      isLocked
       logoUrl
       primaryColor
       secondaryColor
+      avatarUrl
+      bannerUrl
     }
   }
 `;

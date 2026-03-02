@@ -241,6 +241,8 @@ builder.mutationField('renameTeam', (t) =>
           primaryColor: PublicSchema.teams.primaryColor,
           secondaryColor: PublicSchema.teams.secondaryColor,
           isLocked: PublicSchema.teams.isLocked,
+          avatarUrl: PublicSchema.teams.avatarUrl,
+          bannerUrl: PublicSchema.teams.bannerUrl,
         });
 
       if (updated.length === 0) {
@@ -628,7 +630,20 @@ builder.mutationField('removeAssistantManager', (t) =>
   }),
 );
 
-// Mutation: updateTeamBranding — set a team's logo URL and brand colors
+// ── Update Team Branding ────────────────────────────────────────────────────
+
+/**
+ * Mutation: updateTeamBranding
+ *
+ * Allows a team's General Manager (or commissioner) to set or clear team
+ * branding fields:
+ *   - logoUrl: team logo image URL (must be HTTPS)
+ *   - primaryColor / secondaryColor: brand hex colours (e.g. #FF0000)
+ *   - avatarUrl: team avatar image URL (must be HTTPS)
+ *   - bannerUrl: team header/banner image URL (must be HTTPS)
+ *
+ * Each field is optional; omit to leave unchanged, pass empty string to clear.
+ */
 builder.mutationField('updateTeamBranding', (t) =>
   t.field({
     type: Team,
@@ -638,17 +653,21 @@ builder.mutationField('updateTeamBranding', (t) =>
       logoUrl: t.arg.string({ required: false }),
       primaryColor: t.arg.string({ required: false }),
       secondaryColor: t.arg.string({ required: false }),
+      /** New avatar URL, or empty string to clear. Omit to leave unchanged. */
+      avatarUrl: t.arg.string({ required: false }),
+      /** New banner URL, or empty string to clear. Omit to leave unchanged. */
+      bannerUrl: t.arg.string({ required: false }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
         throw new Error('Authentication required');
       }
 
-      const { teamId, leagueId, logoUrl, primaryColor, secondaryColor } = args;
+      const { teamId, leagueId, primaryColor, secondaryColor } = args;
       const userId = context.user.id;
       const db = context.db;
 
-      // Validate hex colors
+      // ── Validate hex colors ────────────────────────────────────────────────
       const hexPattern = /^#[0-9A-Fa-f]{6}$/;
       if (
         primaryColor !== null &&
@@ -669,7 +688,28 @@ builder.mutationField('updateTeamBranding', (t) =>
         );
       }
 
-      // Verify user is a member of this league and owns the team OR is commissioner
+      // ── Validate URL fields ────────────────────────────────────────────────
+      const validateUrl = (
+        raw: string | null | undefined,
+        fieldName: string,
+      ): string | null => {
+        if (raw === undefined) return undefined as unknown as null; // sentinel: skip this field
+        if (raw === null || raw.trim() === '') return null; // clear the field
+        const trimmed = raw.trim();
+        if (!/^https:\/\//i.test(trimmed)) {
+          throw new Error(`${fieldName} must be an HTTPS URL`);
+        }
+        if (trimmed.length > 2048) {
+          throw new Error(`${fieldName} URL is too long (max 2048 chars)`);
+        }
+        return trimmed;
+      };
+
+      const newLogoUrl = validateUrl(args.logoUrl, 'logoUrl');
+      const newAvatarUrl = validateUrl(args.avatarUrl, 'avatarUrl');
+      const newBannerUrl = validateUrl(args.bannerUrl, 'bannerUrl');
+
+      // ── Verify GM / commissioner ownership ────────────────────────────────
       const membership = await db
         .select({
           teamId: PublicSchema.leagueMembers.teamId,
@@ -688,50 +728,77 @@ builder.mutationField('updateTeamBranding', (t) =>
         throw new Error('Not a member of this league');
       }
 
-      const mem = membership[0];
-      const isCommish = mem.permissionLevel === 'commissioner';
-      const ownsTeam = mem.teamId === teamId;
+      const { permissionLevel, teamId: memberTeamId } = membership[0];
 
-      if (!isCommish && !ownsTeam) {
-        throw new Error('You can only update branding for your own team');
+      const isCommissioner = permissionLevel === 'commissioner';
+      const isOwner = memberTeamId === teamId;
+      const isGM =
+        isOwner &&
+        (permissionLevel === 'general_manager' ||
+          permissionLevel === 'assistant_manager');
+
+      if (!isCommissioner && !isGM) {
+        throw new Error(
+          'Only the team General Manager can update team branding',
+        );
       }
 
-      const updates: {
-        logoUrl?: string | null;
-        primaryColor?: string | null;
-        secondaryColor?: string | null;
-      } = {};
+      // ── Build update set ───────────────────────────────────────────────────
+      const updateSet: Partial<{
+        logoUrl: string | null;
+        primaryColor: string | null;
+        secondaryColor: string | null;
+        avatarUrl: string | null;
+        bannerUrl: string | null;
+        updatedAt: Date;
+      }> = { updatedAt: new Date() };
 
-      if (logoUrl !== undefined) updates.logoUrl = logoUrl ?? null;
+      if (newLogoUrl !== undefined) updateSet.logoUrl = newLogoUrl;
       if (primaryColor !== undefined)
-        updates.primaryColor = primaryColor ?? null;
+        updateSet.primaryColor = primaryColor ?? null;
       if (secondaryColor !== undefined)
-        updates.secondaryColor = secondaryColor ?? null;
+        updateSet.secondaryColor = secondaryColor ?? null;
+      if (newAvatarUrl !== undefined) updateSet.avatarUrl = newAvatarUrl;
+      if (newBannerUrl !== undefined) updateSet.bannerUrl = newBannerUrl;
 
-      if (Object.keys(updates).length === 0) {
-        // Nothing to update — just return the current team
-        const [team] = await db
-          .select()
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, teamId))
-          .limit(1);
-        if (!team) throw new Error('Team not found');
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
-        return team as any;
+      // ── Persist ────────────────────────────────────────────────────────────
+      const updated = await db
+        .update(PublicSchema.teams)
+        .set(updateSet)
+        .where(
+          and(
+            eq(PublicSchema.teams.id, teamId),
+            eq(PublicSchema.teams.leagueId, leagueId),
+          ),
+        )
+        .returning({
+          id: PublicSchema.teams.id,
+          name: PublicSchema.teams.name,
+          leagueId: PublicSchema.teams.leagueId,
+          divisionId: PublicSchema.teams.divisionId,
+          waiverOrder: PublicSchema.teams.waiverOrder,
+          faabBudget: PublicSchema.teams.faabBudget,
+          isLocked: PublicSchema.teams.isLocked,
+          logoUrl: PublicSchema.teams.logoUrl,
+          primaryColor: PublicSchema.teams.primaryColor,
+          secondaryColor: PublicSchema.teams.secondaryColor,
+          avatarUrl: PublicSchema.teams.avatarUrl,
+          bannerUrl: PublicSchema.teams.bannerUrl,
+          createdAt: PublicSchema.teams.createdAt,
+          updatedAt: PublicSchema.teams.updatedAt,
+        });
+
+      if (updated.length === 0) {
+        throw new Error('Team not found');
       }
 
-      const [updated] = await db
-        .update(PublicSchema.teams)
-        .set(updates)
-        .where(eq(PublicSchema.teams.id, teamId))
-        .returning();
+      LOGGER.info('Updated team branding', {
+        teamId,
+        leagueId,
+        userId,
+      });
 
-      if (!updated) throw new Error('Team not found');
-
-      LOGGER.info('Team branding updated', { teamId, leagueId, userId });
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
-      return updated as any;
+      return updated[0];
     },
   }),
 );

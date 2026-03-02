@@ -139,9 +139,12 @@ query GetLeagueTeams($leagueId: Int!) {
     leagueId
     waiverOrder
     faabBudget
+    isLocked
     logoUrl
     primaryColor
     secondaryColor
+    avatarUrl
+    bannerUrl
   }
 }
 

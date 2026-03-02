@@ -1302,6 +1302,8 @@ export type MutationUpdatePlayoffMatchupArgs = {
 };
 
 export type MutationUpdateTeamBrandingArgs = {
+  avatarUrl?: InputMaybe<Scalars['String']['input']>;
+  bannerUrl?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
   logoUrl?: InputMaybe<Scalars['String']['input']>;
   primaryColor?: InputMaybe<Scalars['String']['input']>;
@@ -2247,6 +2249,8 @@ export type SwapMatchupTeamsInput = {
 /** A team in a league */
 export type Team = {
   __typename?: 'Team';
+  avatarUrl?: Maybe<Scalars['String']['output']>;
+  bannerUrl?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   divisionId?: Maybe<Scalars['Int']['output']>;
   faabBudget?: Maybe<Scalars['Int']['output']>;
@@ -3594,6 +3598,11 @@ export type TeamFragment = {
   id?: number | null;
   leagueId?: number | null;
   name?: string | null;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
 };
 
 export type TeamMemberFragment = {
@@ -3928,6 +3937,11 @@ export const TeamFragmentDoc = gql`
     id
     leagueId
     name
+    logoUrl
+    primaryColor
+    secondaryColor
+    avatarUrl
+    bannerUrl
   }
 `;
 export const TeamMemberFragmentDoc = gql`

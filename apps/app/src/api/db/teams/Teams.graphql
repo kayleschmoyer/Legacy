@@ -2,6 +2,11 @@ fragment Team on Team {
   id
   leagueId
   name
+  logoUrl
+  primaryColor
+  secondaryColor
+  avatarUrl
+  bannerUrl
 }
 
 fragment TeamMember on TeamMember {
