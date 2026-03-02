@@ -872,16 +872,18 @@ const CSS = `
 
 const TIMER_RADIUS = 50;
 const TIMER_CIRCUMFERENCE = 2 * Math.PI * TIMER_RADIUS;
-const MAX_TIME = 90;
+const DEFAULT_PICK_TIME = 120; // matches server default
 
 function CircularTimer({
   seconds,
   isMyPick,
+  pickTimeLimitSeconds,
 }: {
   seconds: number;
   isMyPick: boolean;
+  pickTimeLimitSeconds: number;
 }) {
-  const progress = seconds / MAX_TIME;
+  const progress = seconds / pickTimeLimitSeconds;
   const offset = TIMER_CIRCUMFERENCE * (1 - progress);
   const stroke =
     seconds <= 10
@@ -1385,6 +1387,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const [draftComplete, setDraftComplete] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [draftPaused, setDraftPaused] = useState(false);
+  // Authoritative pick deadline and time limit synced from server (WS + query)
+  const [pickDeadline, setPickDeadline] = useState<Date | null>(null);
+  const [pickTimeLimitSeconds, setPickTimeLimitSeconds] =
+    useState(DEFAULT_PICK_TIME);
   const [commPickMode, setCommPickMode] = useState(false);
   const [toastMessage, setToastMessage] = useState<{
     text: string;
@@ -1797,6 +1803,12 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const handleDraftStarted = useCallback(
     (notification: DraftStartedNotification) => {
       setLiveMessage('Draft has started!');
+      if (notification.pickTimeLimitSeconds) {
+        setPickTimeLimitSeconds(notification.pickTimeLimitSeconds);
+      }
+      if (notification.currentPickDeadline) {
+        setPickDeadline(new Date(notification.currentPickDeadline));
+      }
       void refetchDraft();
       void refetchCurrentPick({ draftId: notification.draftId });
     },
@@ -1837,6 +1849,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       } else if (!notification.nextPick) {
         // No nextPick means draft may be complete
         setDraftComplete(true);
+      }
+
+      // Sync deadline for the next pick's timer
+      if (notification.currentPickDeadline) {
+        setPickDeadline(new Date(notification.currentPickDeadline));
       }
 
       void refetchCurrentPick({ draftId: notification.draftId });
@@ -1880,6 +1897,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const handleDraftResumed = useCallback(
     (notification?: DraftResumedNotification) => {
       setDraftPaused(false);
+      if (notification?.currentPickDeadline) {
+        setPickDeadline(new Date(notification.currentPickDeadline));
+      }
       setLiveMessage(
         notification?.resumedAt
           ? `Draft resumed at ${new Date(notification.resumedAt).toLocaleTimeString()}`
@@ -2094,15 +2114,21 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   );
 
   // ---- Timer (client-side countdown for UX, not authoritative) ----
-  const [timeRemaining, setTimeRemaining] = useState(MAX_TIME);
+  // timeRemaining is computed from the server-assigned pickDeadline so it
+  // stays accurate even after WS reconnects or page refresh.
+  const [timeRemaining, setTimeRemaining] = useState(0);
+
+  // Sync deadline + time-limit from query result whenever the draft updates.
+  // leagueDraft.currentPickDeadline is authoritative and is updated on the
+  // server each time a new pick begins (or after resume).
   useEffect(() => {
-    // Reset timer when the current pick changes
-    setTimeRemaining(MAX_TIME);
-  }, [
-    currentPickInfo?.overallPick,
-    currentPickInfo?.teamId,
-    draftOrderMissing,
-  ]);
+    if (leagueDraft?.pickTimeLimitSeconds != null) {
+      setPickTimeLimitSeconds(leagueDraft.pickTimeLimitSeconds as number);
+    }
+    if (leagueDraft?.currentPickDeadline) {
+      setPickDeadline(new Date(leagueDraft.currentPickDeadline as string));
+    }
+  }, [leagueDraft?.currentPickDeadline, leagueDraft?.pickTimeLimitSeconds]);
 
   useEffect(() => {
     if (
@@ -2115,11 +2141,26 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     ) {
       return;
     }
-    const timer = setInterval(() => {
-      setTimeRemaining((prev) => (prev <= 0 ? 0 : prev - 1));
-    }, 1000);
+    const tick = () => {
+      if (pickDeadline) {
+        const secs = Math.max(
+          0,
+          Math.round((pickDeadline.getTime() - Date.now()) / 1000),
+        );
+        setTimeRemaining(secs);
+      }
+    };
+    tick(); // run immediately so the display is correct before the first interval
+    const timer = setInterval(tick, 500);
     return () => clearInterval(timer);
-  }, [draftId, draftComplete, draftOrderMissing, currentPickInfo, draftPaused]);
+  }, [
+    draftId,
+    draftComplete,
+    draftOrderMissing,
+    currentPickInfo,
+    draftPaused,
+    pickDeadline,
+  ]);
 
   const autoPickAttemptRef = useRef<number | null>(null);
   useEffect(() => {
@@ -2596,7 +2637,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
           {/* Timer */}
           {!draftPaused && (
-            <CircularTimer seconds={timeRemaining} isMyPick={isMyPick} />
+            <CircularTimer
+              seconds={timeRemaining}
+              isMyPick={isMyPick}
+              pickTimeLimitSeconds={pickTimeLimitSeconds}
+            />
           )}
           {draftPaused && (
             <div

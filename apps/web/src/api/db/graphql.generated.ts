@@ -3509,6 +3509,8 @@ export type GetLiveDraftLeagueDraftQuery = {
     selectionMethod?: string | null;
     draftOrder?: string | null;
     currentPick?: number | null;
+    pickTimeLimitSeconds?: number | null;
+    currentPickDeadline?: string | null;
     draftStartedAt?: string | null;
     draftCompletedAt?: string | null;
     createdAt?: string | null;
@@ -9407,6 +9409,8 @@ export const GetLiveDraftLeagueDraft = gql`
       selectionMethod
       draftOrder
       currentPick
+      pickTimeLimitSeconds
+      currentPickDeadline
       draftStartedAt
       draftCompletedAt
       createdAt

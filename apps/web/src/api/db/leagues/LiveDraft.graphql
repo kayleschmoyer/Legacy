@@ -71,6 +71,8 @@ query GetLiveDraftLeagueDraft($leagueId: Int!) {
     selectionMethod
     draftOrder
     currentPick
+    pickTimeLimitSeconds
+    currentPickDeadline
     draftStartedAt
     draftCompletedAt
     createdAt
