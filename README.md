@@ -29,6 +29,12 @@ A modern sports data management platform built with React Native CLI, Next.js we
 [![Apply Lambda Infrastructure](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Apply-Lambda-Infrastructure.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-terraform-apply.yml)
 [![Build Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)
 
+## 🗄️ Database
+
+[![DB Migrations](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/DB-Migrations.json)](https://github.com/bkrupa/legacy-sports/tree/main/lib/db-client/migrations)
+
+Badge updates automatically whenever a migration is committed to `main`. It shows the total count and the date of the latest migration file in the repo. Run `pnpm run db:migrate` (or `npm run db:migrate` from the root) to apply any pending migrations to your local database.
+
 ## 🏥 Lambda Health Status
 
 HTTP lambdas serve their own live badge — shields.io fetches directly from the endpoint on every page load (60-second cache). SQS/WebSocket lambdas have no HTTP surface and are polled every 15 minutes by the [Lambda Health Checks](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-health-checks.yml) workflow.

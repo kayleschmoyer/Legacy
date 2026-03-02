@@ -1,0 +1,82 @@
+name: Update Migration Badge
+
+# Runs only when a migration file is added/changed on main.
+# Counts total migration files and records the latest migration date,
+# then writes a shields.io endpoint JSON to the CI badges Gist.
+# No database connection required — reads the filesystem only.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lib/db-client/migrations/*.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update-badge:
+    name: Update Migration Count Badge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build and push badge
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.CI_BADGES_GIST_ID }}
+        run: |
+          # Count migration files, excluding spec files
+          TOTAL=$(ls lib/db-client/migrations/*.ts 2>/dev/null \
+            | grep -v '\.spec\.' \
+            | wc -l \
+            | tr -d ' ')
+
+          # Derive date of the latest migration from its filename (YYYYMMDD prefix)
+          LATEST_FILE=$(ls lib/db-client/migrations/*.ts 2>/dev/null \
+            | grep -v '\.spec\.' \
+            | sort \
+            | tail -1 \
+            | xargs basename)
+          LATEST_RAW="${LATEST_FILE:0:8}"   # e.g. 20260301
+          LATEST="${LATEST_RAW:0:4}-${LATEST_RAW:4:2}-${LATEST_RAW:6:2}"
+
+          MESSAGE="${TOTAL} total · latest ${LATEST}"
+          echo "Badge message: $MESSAGE"
+
+          jq -n \
+            --arg message "$MESSAGE" \
+            '{
+              schemaVersion: 1,
+              label: "DB migrations",
+              message: $message,
+              color: "blue",
+              style: "flat",
+              cacheSeconds: 3600
+            }' > DB-Migrations.json
+
+          PAYLOAD=$(jq -n \
+            --rawfile content "DB-Migrations.json" \
+            '{"files": {"DB-Migrations.json": {"content": $content}}}')
+
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/gist_response.json \
+            -X PATCH \
+            -H "Authorization: Bearer $GIST_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/gists/$GIST_ID" \
+            -d "$PAYLOAD")
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Migration badge updated: $MESSAGE"
+            echo "## ✅ Migration Badge Updated" >> $GITHUB_STEP_SUMMARY
+            echo "- **Migrations**: ${TOTAL} total" >> $GITHUB_STEP_SUMMARY
+            echo "- **Latest**: ${LATEST}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Badge update failed (HTTP $HTTP_CODE)"
+            cat /tmp/gist_response.json
+            exit 1
+          fi
