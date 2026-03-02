@@ -6,7 +6,7 @@ REM - Prompts for page number
 REM - Starts backend/web only if not already running
 REM - Opens only the selected page
 
-set "ROOT=%~dp0"
+for %%i in ("%~dp0..") do set "ROOT=%%~fi\"
 set "API_HEALTH_URL=http://localhost:5000/health"
 set "WEB_URL=http://localhost:4200"
 set "BASEBALL_URL=http://localhost:4200/baseball"
