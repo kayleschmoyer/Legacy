@@ -94,24 +94,25 @@ const STEPS: TutorialStep[] = [
     body: (
       <YStack gap="$3">
         <Paragraph color="$colorPress" fontSize="$4" lineHeight={26}>
-          When you join a league, the commissioner selects a{' '}
+          When you draft a player, the system automatically assigns them a{' '}
           <ConceptTooltip
             term="season assignment"
-            explanation="The specific MLB calendar year (e.g. 2019) whose statistics will power your league's matchups. All scoring is drawn from that year's games."
+            explanation="The specific MLB calendar year automatically chosen for a player when they are drafted. The system picks a year from that player's career where they played enough games to fill a full matchup schedule."
           />{' '}
-          — a specific MLB year (e.g. 2019) whose statistics power every matchup
-          in the league.
+          — an MLB year from that player's career whose stats will power their
+          contribution to every matchup.
         </Paragraph>
         <Paragraph color="$colorPress" fontSize="$4" lineHeight={26}>
-          Player statistics are locked to that season, so drafting a player
-          means their performance from that particular year counts toward your
-          team score.
+          Each player on your roster can come from a{' '}
+          <strong style={{ color: BRAND_GOLD_LIGHT }}>different era</strong> —
+          your 1927 Babe Ruth plays alongside a 2019 Mike Trout. Your knowledge
+          of great historical seasons across all eras is your edge.
         </Paragraph>
         <YStack gap="$2">
           {[
             {
-              icon: '📖',
-              text: 'All teams in a league share the same assigned season.',
+              icon: '🎲',
+              text: 'Each player is automatically assigned an eligible season from their MLB career when drafted.',
             },
             {
               icon: '🔒',
@@ -119,7 +120,7 @@ const STEPS: TutorialStep[] = [
             },
             {
               icon: '🏟️',
-              text: 'Box scores from the assigned year serve as the source of truth.',
+              text: 'Rosters can span multiple eras — any combination of MLB history is possible.',
             },
           ].map(({ icon, text }) => (
             <XStack key={text} gap="$3" alignItems="flex-start">
@@ -447,14 +448,14 @@ const STEPS: TutorialStep[] = [
             {
               step: '1',
               title: 'Create or join a league',
-              desc: 'Head to Baseball and set up a league with friends, choosing your assigned MLB season.',
+              desc: 'Head to Baseball and set up a league with friends. Player season assignments are handled automatically — just draft and compete.',
               link: '/baseball/league/create',
               linkText: 'Create League →',
             },
             {
               step: '2',
               title: 'Draft your roster',
-              desc: 'Pick players from the assigned season. Deep MLB history knowledge wins here.',
+              desc: 'Pick any MLB player from history. Each player is automatically assigned an eligible season from their career — deep knowledge across all eras wins here.',
               link: null,
               linkText: null,
             },
