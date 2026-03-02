@@ -130,7 +130,7 @@ const DraftBadge = styled(XStack, {
 
 const QuickStatCard = styled(YStack, {
   flex: 1,
-  minWidth: 140,
+  minWidth: 120,
   backgroundColor: '$surfaceCard',
   borderColor: '$surfacePanelBorder',
   borderWidth: 1,
@@ -605,79 +605,79 @@ export function LeagueDetailPage(): React.JSX.Element {
       id="panel-overview"
       aria-labelledby="tab-overview"
     >
-      {/* Quick Stats */}
-      <XStack gap="$3" flexWrap="wrap">
-        <QuickStatCard>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={0.8}
-          >
-            Teams
-          </Text>
-          <Text fontSize="$8" fontWeight="800" color="$blue11">
-            {teamCount}
-          </Text>
-        </QuickStatCard>
-        <QuickStatCard>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={0.8}
-          >
-            Roster Size
-          </Text>
-          <Text fontSize="$8" fontWeight="800" color="$color">
-            {league.maxRosterSize}
-          </Text>
-        </QuickStatCard>
-        <QuickStatCard>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={0.8}
-          >
-            My Starters
-          </Text>
-          <Text fontSize="$8" fontWeight="800" color="$green11">
-            {assignedCount}
-          </Text>
-        </QuickStatCard>
-        <QuickStatCard>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={0.8}
-          >
-            On Bench
-          </Text>
-          <Text fontSize="$8" fontWeight="800" color="$amber11">
-            {benchCount}
-          </Text>
-        </QuickStatCard>
-        <QuickStatCard>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={0.8}
-          >
-            Week
-          </Text>
-          <Text fontSize="$8" fontWeight="800" color="$color">
-            {currentMatchup?.weekNumber || '\u2014'}
-          </Text>
-        </QuickStatCard>
-      </XStack>
-
-      {/* Two-column layout */}
+      {/* Two-column dashboard layout */}
       <XStack gap="$5" flexWrap="wrap" alignItems="flex-start">
         {/* Main column */}
         <YStack flex={2} minWidth={360} gap="$5">
+          {/* Quick Stats — 2-col mini-grid */}
+          <XStack gap="$3" flexWrap="wrap">
+            <QuickStatCard>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                Teams
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color="$blue11">
+                {teamCount}
+              </Text>
+            </QuickStatCard>
+            <QuickStatCard>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                Roster Size
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color="$color">
+                {league.maxRosterSize}
+              </Text>
+            </QuickStatCard>
+            <QuickStatCard>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                My Starters
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color="$green11">
+                {assignedCount}
+              </Text>
+            </QuickStatCard>
+            <QuickStatCard>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                On Bench
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color="$amber11">
+                {benchCount}
+              </Text>
+            </QuickStatCard>
+            <QuickStatCard>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                Week
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color="$color">
+                {currentMatchup?.weekNumber || '\u2014'}
+              </Text>
+            </QuickStatCard>
+          </XStack>
+
           {/* Matchup Preview */}
           {currentMatchup && !matchupLoading && (
             <Card

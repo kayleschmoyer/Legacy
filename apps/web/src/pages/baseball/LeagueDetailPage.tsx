@@ -203,7 +203,7 @@ const DraftBadge = styled(XStack, {
 
 const QuickStatCard = styled(YStack, {
   flex: 1,
-  minWidth: 140,
+  minWidth: 120,
   backgroundColor: '$surfaceCard',
   borderColor: '$surfacePanelBorder',
   borderWidth: 1,
@@ -1248,79 +1248,79 @@ export function LeagueDetailPage(): React.JSX.Element {
         isCommissioner={isCommissioner}
       />
 
-      {/* Quick Stats */}
-      <XStack gap="$3" flexWrap="wrap">
-        <QuickStatCard>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={0.8}
-          >
-            Teams
-          </Text>
-          <Text fontSize="$8" fontWeight="800" color={BRAND_GOLD_LIGHT}>
-            {teamCount}
-          </Text>
-        </QuickStatCard>
-        <QuickStatCard>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={0.8}
-          >
-            Roster Size
-          </Text>
-          <Text fontSize="$8" fontWeight="800" color="$color">
-            {league.maxRosterSize}
-          </Text>
-        </QuickStatCard>
-        <QuickStatCard>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={0.8}
-          >
-            My Starters
-          </Text>
-          <Text fontSize="$8" fontWeight="800" color="$green11">
-            {assignedCount}
-          </Text>
-        </QuickStatCard>
-        <QuickStatCard>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={0.8}
-          >
-            On Bench
-          </Text>
-          <Text fontSize="$8" fontWeight="800" color="$amber11">
-            {benchCount}
-          </Text>
-        </QuickStatCard>
-        <QuickStatCard>
-          <Text
-            fontSize="$2"
-            color="$textMuted"
-            textTransform="uppercase"
-            letterSpacing={0.8}
-          >
-            Week
-          </Text>
-          <Text fontSize="$8" fontWeight="800" color="$color">
-            {currentMatchup?.weekNumber || '\u2014'}
-          </Text>
-        </QuickStatCard>
-      </XStack>
-
-      {/* Two-column layout */}
+      {/* Two-column dashboard layout */}
       <XStack gap="$5" flexWrap="wrap" alignItems="flex-start">
         {/* Main column */}
         <YStack flex={2} minWidth={260} gap="$5">
+          {/* Quick Stats — 2-col mini-grid */}
+          <XStack gap="$3" flexWrap="wrap">
+            <QuickStatCard>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                Teams
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color={BRAND_GOLD_LIGHT}>
+                {teamCount}
+              </Text>
+            </QuickStatCard>
+            <QuickStatCard>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                Roster Size
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color="$color">
+                {league.maxRosterSize}
+              </Text>
+            </QuickStatCard>
+            <QuickStatCard>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                My Starters
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color="$green11">
+                {assignedCount}
+              </Text>
+            </QuickStatCard>
+            <QuickStatCard>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                On Bench
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color="$amber11">
+                {benchCount}
+              </Text>
+            </QuickStatCard>
+            <QuickStatCard>
+              <Text
+                fontSize="$2"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
+              >
+                Week
+              </Text>
+              <Text fontSize="$8" fontWeight="800" color="$color">
+                {currentMatchup?.weekNumber || '\u2014'}
+              </Text>
+            </QuickStatCard>
+          </XStack>
+
           {/* Matchup Preview */}
           {currentMatchup && !matchupLoading && (
             <Card
@@ -1381,6 +1381,34 @@ export function LeagueDetailPage(): React.JSX.Element {
             profileName={scoringProfileName}
             settings={scoringSettings}
           />
+
+          {/* League Chat */}
+          <Card
+            backgroundColor="$surfacePanel"
+            borderColor="$surfacePanelBorder"
+            borderWidth={1}
+            borderRadius="$6"
+            overflow="hidden"
+          >
+            <XStack
+              alignItems="center"
+              gap="$2"
+              padding="$5"
+              paddingBottom="$3"
+            >
+              <MessageSquare size={18} color={BRAND_GOLD_LIGHT} />
+              <Text fontSize="$5" fontWeight="700" color="$color">
+                League Chat
+              </Text>
+            </XStack>
+            <YStack height={420}>
+              <LeagueChatTab
+                leagueId={leagueId}
+                userId={user?.id ?? 0}
+                onNavigate={(tabId) => setActiveTab(tabId as TabId)}
+              />
+            </YStack>
+          </Card>
         </YStack>
 
         {/* Sidebar */}
@@ -1750,29 +1778,6 @@ export function LeagueDetailPage(): React.JSX.Element {
           <LeagueTradeBlock leagueId={leagueId} userTeamId={reduxUserTeamId} />
         </YStack>
       </XStack>
-
-      {/* League Chat */}
-      <Card
-        backgroundColor="$surfacePanel"
-        borderColor="$surfacePanelBorder"
-        borderWidth={1}
-        borderRadius="$6"
-        overflow="hidden"
-      >
-        <XStack alignItems="center" gap="$2" padding="$5" paddingBottom="$3">
-          <MessageSquare size={18} color={BRAND_GOLD_LIGHT} />
-          <Text fontSize="$5" fontWeight="700" color="$color">
-            League Chat
-          </Text>
-        </XStack>
-        <YStack height={420}>
-          <LeagueChatTab
-            leagueId={leagueId}
-            userId={user?.id ?? 0}
-            onNavigate={(tabId) => setActiveTab(tabId as TabId)}
-          />
-        </YStack>
-      </Card>
     </YStack>
   );
 
