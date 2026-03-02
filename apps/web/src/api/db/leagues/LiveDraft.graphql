@@ -115,8 +115,20 @@ query GetDraftPicks($draftId: Int!) {
   }
 }
 
-query GetAvailableDraftPlayers($draftId: Int!, $search: String, $limit: Int) {
-  getAvailableDraftPlayers(draftId: $draftId, search: $search, limit: $limit) {
+query GetAvailableDraftPlayers(
+  $draftId: Int!
+  $search: String
+  $position: String
+  $orderBy: String
+  $limit: Int
+) {
+  getAvailableDraftPlayers(
+    draftId: $draftId
+    search: $search
+    position: $position
+    orderBy: $orderBy
+    limit: $limit
+  ) {
     id
     firstName
     lastName

@@ -1620,6 +1620,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     variables: {
       draftId: draftId ?? 0,
       search: playerSearch || null,
+      position: selectedPosition !== 'ALL' ? selectedPosition : null,
+      orderBy:
+        selectedPosition === 'P'
+          ? 'pitchingAvgPointsPerGame'
+          : 'hitterAvgPointsPerGame',
       limit: 200,
     },
     skip: !draftId,
@@ -1770,16 +1775,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     });
   }, [availablePlayers, playerStatsMap]);
 
-  // Apply client-side position filter
-  const filteredPlayers = useMemo(
-    () =>
-      enrichedPlayers.filter((p) => {
-        const posMatch =
-          selectedPosition === 'ALL' || p.position === selectedPosition;
-        return posMatch;
-      }),
-    [enrichedPlayers, selectedPosition],
-  );
+  // Position filtering is handled server-side via the position query variable.
+  // enrichedPlayers already contains only the players matching the selected position.
+  const filteredPlayers = enrichedPlayers;
 
   // ---- Mutations ----
   const [initializeLiveDraft, { loading: initDraftLoading }] = useMutation(

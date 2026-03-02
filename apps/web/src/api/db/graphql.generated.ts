@@ -1712,6 +1712,8 @@ export type QueryCommissionerAuditLogsArgs = {
 export type QueryGetAvailableDraftPlayersArgs = {
   draftId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -3572,6 +3574,8 @@ export type GetDraftPicksQuery = {
 export type GetAvailableDraftPlayersQueryVariables = Exact<{
   draftId: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
+  orderBy?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
@@ -9766,10 +9770,18 @@ export type GetDraftPicksQueryResult = Apollo.QueryResult<
   GetDraftPicksQueryVariables
 >;
 export const GetAvailableDraftPlayers = gql`
-  query GetAvailableDraftPlayers($draftId: Int!, $search: String, $limit: Int) {
+  query GetAvailableDraftPlayers(
+    $draftId: Int!
+    $search: String
+    $position: String
+    $orderBy: String
+    $limit: Int
+  ) {
     getAvailableDraftPlayers(
       draftId: $draftId
       search: $search
+      position: $position
+      orderBy: $orderBy
       limit: $limit
     ) {
       id
@@ -9794,6 +9806,8 @@ export const GetAvailableDraftPlayers = gql`
  *   variables: {
  *      draftId: // value for 'draftId'
  *      search: // value for 'search'
+ *      position: // value for 'position'
+ *      orderBy: // value for 'orderBy'
  *      limit: // value for 'limit'
  *   },
  * });
