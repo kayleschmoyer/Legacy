@@ -261,17 +261,17 @@ const FAQ_ITEMS: FaqItemProps[] = [
   {
     question: 'How does the draft work?',
     answer:
-      'When the league commissioner starts the draft, all team managers join the Draft Board. Players are listed in order of their projected value. Each team picks in snake-draft order — the order reverses each round. The draft board live-updates so you can see picks in real time.',
+      'When the league commissioner starts the draft, all team managers join the Draft Board. Players are listed in order of their projected value. Each team picks in snake-draft order by default (the order reverses each round), though commissioners can also choose linear order. The draft board live-updates so you can see picks in real time.',
   },
   {
     question: 'How is my team score calculated?',
     answer:
-      "Scores are calculated from real MLB statistics pulled nightly. Each stat category (HR, RBI, AVG, etc.) is worth a set number of points defined by your league settings. You can view the exact scoring breakdown in your league's Settings tab.",
+      "Scores are calculated from archived MLB box-score statistics loaded when games are selected for your matchup. Each counting stat (H, HR, RBI, R, SB, etc.) is multiplied by a configurable point value defined in your league's scoring profile. You can view the exact scoring breakdown in your league's Settings tab.",
   },
   {
     question: 'How do I add or drop players?',
     answer:
-      'Go to your team page and click Manage Roster. You can drop a current player and pick up a free agent in one transaction. Waiver rules (if enabled) may delay your pickup by 24–48 hours.',
+      'Go to your team page and click Manage Roster. You can drop a current player and pick up a free agent in one transaction. Waiver rules (if enabled) queue your claim for nightly processing at 2 AM EST, so your pickup may be delayed up to 24 hours.',
   },
   {
     question: 'How do I view matchup results?',
@@ -281,7 +281,7 @@ const FAQ_ITEMS: FaqItemProps[] = [
   {
     question: 'Why are my player statistics not updating?',
     answer:
-      'Stats are refreshed from official MLB data sources on a schedule. During an active game day, scores typically update every 15–30 minutes. If stats appear stale after a game has ended, try refreshing the page. If the issue persists more than 24 hours, please contact support.',
+      'Player statistics come from archived historical box scores and are loaded when games are selected for your matchup. If stats appear missing after a game has been selected, the system may still be loading data from our historical data source. This usually completes within minutes. If stats are still missing after an hour, try refreshing the page or contact support.',
   },
   {
     question: 'How do I change my display name or avatar?',
@@ -296,17 +296,17 @@ const HISTORICAL_FAQ_ITEMS: FaqItemProps[] = [
   {
     question: 'What makes Legacy Sports different from live fantasy leagues?',
     answer:
-      'Legacy Sports uses archived MLB box scores from a specific historical season rather than live games. Every stat is final, verified, and drawn from real history — no weather cancellations, no injury luck mid-game. Pure historical knowledge is your edge.',
+      'Legacy Sports uses archived MLB box scores from historical seasons rather than live games. Each player is assigned a season from their own career, so your roster can span multiple eras. Every stat is final, verified, and drawn from real history — no weather cancellations, no injury luck mid-game. Pure historical knowledge is your edge.',
   },
   {
     question: 'What is a "season assignment"?',
     answer:
-      'When a commissioner creates a league they choose an MLB calendar year (e.g. 2019) called the season assignment. All player statistics for that league are pulled exclusively from that year — so drafting Mike Trout means his actual 2019 numbers count toward your score.',
+      'When you draft a player, the system automatically assigns them a season from their MLB career — a year when they played enough games to fill a full matchup schedule. Each player on your roster can come from a different era, so your 1927 Babe Ruth plays alongside a 2019 Mike Trout. Your knowledge of great historical seasons across all eras is your competitive edge.',
   },
   {
     question: 'How does game selection work?',
     answer:
-      'Each weekly matchup has a defined game window — specific dates in the assigned season. Every official MLB game played in that window contributes stats. Commissioners can configure which window maps to each week in the league settings.',
+      "Each matchup consists of a set number of randomly selected historical games per player (default 5). The system automatically selects one game per day for all active matchups. Games are drawn randomly from each player's assigned season, excluding previously selected games, so no game is repeated within a matchup. Commissioners can configure how many games occur per matchup in league settings.",
   },
   {
     question: 'What is an archived box score?',
@@ -316,7 +316,7 @@ const HISTORICAL_FAQ_ITEMS: FaqItemProps[] = [
   {
     question: 'Can I use the same player in multiple leagues?',
     answer:
-      'Yes! Each league has its own draft and assigned season. You can own the same player in different leagues, potentially across different historical seasons, so your total score per player will differ between leagues.',
+      'Yes! Each league has its own draft, and seasons are assigned per player. You can own the same player in different leagues — their stats may come from different historical seasons, so your scores will differ between leagues.',
   },
   {
     question: "Why did my player's stats change after the week ended?",
