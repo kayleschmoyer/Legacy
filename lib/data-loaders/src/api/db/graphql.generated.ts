@@ -893,7 +893,7 @@ export type Mutation = {
   advancePlayoffBracket?: Maybe<PlayoffBracket>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
-  /** Automatically make draft picks for teams that have exceeded their pick deadline. Triggered every minute by EventBridge. */
+  /** Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback. */
   autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
