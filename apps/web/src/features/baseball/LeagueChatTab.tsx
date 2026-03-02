@@ -260,7 +260,7 @@ export function LeagueChatTab({
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Message the league\u2026 (Ctrl+Enter to send)"
+          placeholder="Message the league… (Ctrl+Enter to send)"
           maxLength={2000}
           rows={2}
           style={{

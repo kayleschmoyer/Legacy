@@ -269,11 +269,11 @@ export function GifPicker({
       <div
         style={{
           overflowY: 'auto',
-          maxHeight: 240,
+          maxHeight: 300,
           padding: '8px',
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 4,
+          gap: 6,
         }}
       >
         {loading && (
@@ -318,9 +318,9 @@ export function GifPicker({
                   borderRadius: 4,
                   padding: 0,
                   cursor: 'pointer',
-                  background: 'transparent',
+                  background: 'rgba(0,0,0,0.15)',
                   overflow: 'hidden',
-                  aspectRatio: '1',
+                  aspectRatio: '16/9',
                   outline: 'none',
                   boxShadow: isSelected
                     ? `0 0 0 2px ${withAlpha(BRAND_NAVY_LIGHT, 0.4)}`
@@ -336,7 +336,7 @@ export function GifPicker({
                   style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: 'cover',
+                    objectFit: 'contain',
                   }}
                 />
               </button>
