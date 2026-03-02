@@ -148,7 +148,7 @@ export const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   formattedOnBasePercentage: 'onBasePercentage',
   formattedSluggingPercentage: 'sluggingPercentage',
   formattedOPS: 'ops',
-  offensiveWAR: 'careerOffensiveWAR',
+  offensiveWAR: 'offensiveWAR',
 
   // Raw percentage fields (in case they're used directly)
   battingAverage: 'battingAverage',

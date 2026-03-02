@@ -56,6 +56,8 @@ export interface QueryOptions {
     | 'totalBases'
     | 'groundedIntoDoublePlays'
     | 'sacrificeHits'
+    // Advanced metrics
+    | 'offensiveWAR'
     // Pitching statistics
     | 'wins'
     | 'losses'
@@ -281,6 +283,10 @@ export class CareerBattingQueryBuilder {
         return sql`${PublicSchema.careerBatting.gidp} ${sql.raw(dir)} NULLS LAST`;
       case 'sacrificeHits':
         return sql`${PublicSchema.careerBatting.sh} ${sql.raw(dir)} NULLS LAST`;
+
+      // Advanced metrics
+      case 'offensiveWAR':
+        return sql`${PublicSchema.careerBatting.offensiveWar} ${sql.raw(dir)} NULLS LAST`;
 
       // Note: Calculated percentages (battingAverage, onBasePercentage, etc.)
       // are computed in the GraphQL layer, not in the database view,
