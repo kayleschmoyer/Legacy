@@ -1345,6 +1345,7 @@ function PlayerCard({
       style={{ animationDelay: `${index * 0.04}s` }}
       role="group"
       aria-labelledby={`pn-${player.id}`}
+      tabIndex={0}
     >
       <div className="d-card-accent" style={{ background: posColor }} />
       <div className="d-card-body">
@@ -3371,6 +3372,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   onClick={() => setViewMode(mode)}
                   role="radio"
                   aria-checked={viewMode === mode}
+                  tabIndex={viewMode === mode ? 0 : -1}
                 >
                   {mode === 'grid'
                     ? '⊞'

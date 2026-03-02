@@ -116,7 +116,35 @@ export const PlayersDropdown: React.FC = () => {
   }, [isOpen]);
 
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
-    if (e.key === 'Escape') setIsOpen(false);
+    if (e.key === 'Escape') {
+      setIsOpen(false);
+      // Return focus to the trigger button
+      const btn = document.getElementById(buttonId);
+      btn?.focus();
+      return;
+    }
+    if (!isOpen) return;
+    // Arrow key navigation within menu items
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const menu = document.getElementById(menuId);
+      if (!menu) return;
+      const items = Array.from(
+        menu.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+      );
+      if (items.length === 0) return;
+      const currentIndex = items.findIndex(
+        (el) =>
+          el === document.activeElement || el.contains(document.activeElement),
+      );
+      let nextIndex: number;
+      if (e.key === 'ArrowDown') {
+        nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+      } else {
+        nextIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+      }
+      items[nextIndex]?.focus();
+    }
   };
 
   return (

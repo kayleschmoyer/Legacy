@@ -122,6 +122,7 @@ exports[`App FootballScreen should match complete football page layout snapshot 
     flex="1"
     id="main-content"
     padding="$4"
+    role="main"
     tabindex="-1"
   >
     <div>
@@ -257,6 +258,7 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
     flex="1"
     id="main-content"
     padding="$4"
+    role="main"
     tabindex="-1"
   >
     <div>
@@ -390,6 +392,7 @@ exports[`App Navigation should render navigation with correct links 1`] = `
     flex="1"
     id="main-content"
     padding="$4"
+    role="main"
     tabindex="-1"
   >
     <div>

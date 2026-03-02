@@ -130,6 +130,10 @@ export function DeleteLeagueControl({
             bordered
             elevate
             key="content"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-league-title"
+            aria-describedby="delete-league-description"
             animateOnly={['transform', 'opacity']}
             animation={[
               'quick',
@@ -145,10 +149,10 @@ export function DeleteLeagueControl({
             padding="$4"
             width={500}
           >
-            <Dialog.Title color="$red11">
+            <Dialog.Title id="delete-league-title" color="$red11">
               Delete League "{leagueName}"?
             </Dialog.Title>
-            <Dialog.Description>
+            <Dialog.Description id="delete-league-description">
               This action is permanent and cannot be undone. All teams,
               matchups, drafts, and member data will be deleted.
             </Dialog.Description>

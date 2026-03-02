@@ -444,6 +444,9 @@ export function PlayerDetailModal({
           bordered
           elevate
           key="content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="player-detail-title"
           animateOnly={['transform', 'opacity']}
           animation={['quick', { opacity: { overshootClamping: true } }]}
           enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
@@ -469,7 +472,13 @@ export function PlayerDetailModal({
           >
             <YStack gap="$1">
               <XStack gap="$2" alignItems="center">
-                <H3 color={WHITE} fontSize="$7" fontWeight="bold" margin={0}>
+                <H3
+                  id="player-detail-title"
+                  color={WHITE}
+                  fontSize="$7"
+                  fontWeight="bold"
+                  margin={0}
+                >
                   {playerName}
                 </H3>
                 {position && (
@@ -499,6 +508,7 @@ export function PlayerDetailModal({
                 size="$3"
                 circular
                 icon={X}
+                aria-label="Close"
                 backgroundColor={withAlpha(WHITE, 0.15)}
                 color={WHITE}
                 hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.25) }}

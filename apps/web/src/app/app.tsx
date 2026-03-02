@@ -36,6 +36,7 @@ import { EliteDraftBoardScreen } from '../components/EliteDraftBoard';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
+import { useRouteAnnouncer } from '../hooks/useRouteAnnouncer';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { AdminPage } from '../pages/admin/AdminPage';
 import ProfileSettingsPage from '../pages/profile/ProfileSettingsPage';
@@ -182,6 +183,18 @@ function Navigation() {
       document.addEventListener('mousedown', handler);
       return () => document.removeEventListener('mousedown', handler);
     }
+  }, [mobileOpen]);
+
+  // Handle Escape key to close mobile nav
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileOpen(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
   }, [mobileOpen]);
 
   return (
@@ -398,6 +411,8 @@ const MainLayout = styled(YStack, {
 function App() {
   // Track page views automatically on route changes
   usePageTracking();
+  // Announce page title to screen readers on route change
+  useRouteAnnouncer();
 
   console.log('Rendering authenticated app content...');
 
@@ -428,6 +443,7 @@ function App() {
         padding="$4"
         $sm={{ padding: '$2' }}
         id="main-content"
+        role="main"
         tabIndex={-1}
       >
         <Routes>

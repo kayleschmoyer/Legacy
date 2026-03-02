@@ -117,6 +117,11 @@ const FaqAnswer = styled(YStack, {
 
 function FaqItem({ question, answer }: FaqItemProps) {
   const [open, setOpen] = useState(false);
+  // Generate a stable ID from the question text for aria-controls
+  const faqId = `faq-${question
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 40)}`;
 
   return (
     <FaqRow>
@@ -124,6 +129,7 @@ function FaqItem({ question, answer }: FaqItemProps) {
         onPress={() => setOpen((v) => !v)}
         role="button"
         aria-expanded={open}
+        aria-controls={faqId}
       >
         <Paragraph fontWeight="600" color="$color" flex={1}>
           {question}
@@ -143,7 +149,7 @@ function FaqItem({ question, answer }: FaqItemProps) {
         </Paragraph>
       </FaqQuestion>
       {open && (
-        <FaqAnswer>
+        <FaqAnswer id={faqId} role="region" aria-label={question}>
           <Paragraph color="$colorPress" lineHeight={24}>
             {answer}
           </Paragraph>

@@ -110,6 +110,9 @@ export function LeagueChatTab({
       {/* Message list */}
       <div
         ref={listRef}
+        role="log"
+        aria-label="Chat messages"
+        aria-live="polite"
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -185,7 +188,7 @@ export function LeagueChatTab({
                   >
                     <img
                       src={msg.gifUrl}
-                      alt="GIF"
+                      alt={`GIF sent by ${msg.username}`}
                       style={{
                         maxWidth: 240,
                         borderRadius: 8,
@@ -261,6 +264,7 @@ export function LeagueChatTab({
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Message the league… (Ctrl+Enter to send)"
+          aria-label="Message the league"
           maxLength={2000}
           rows={2}
           style={{

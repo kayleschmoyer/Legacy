@@ -292,6 +292,9 @@ export function PlayerSeasonStatsModal({
           bordered
           elevate
           key="content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="player-season-stats-title"
           animateOnly={['transform', 'opacity']}
           animation={[
             'quick',
@@ -321,7 +324,12 @@ export function PlayerSeasonStatsModal({
               <Text fontSize="$2" color="white" opacity={0.9}>
                 Player Stats
               </Text>
-              <H3 color="white" fontSize="$7" fontWeight="bold">
+              <H3
+                id="player-season-stats-title"
+                color="white"
+                fontSize="$7"
+                fontWeight="bold"
+              >
                 {playerName}
               </H3>
             </YStack>
@@ -330,6 +338,7 @@ export function PlayerSeasonStatsModal({
                 size="$3"
                 circular
                 icon={X}
+                aria-label="Close"
                 backgroundColor={withAlpha(WHITE, 0.2)}
                 color="white"
                 hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.3) }}

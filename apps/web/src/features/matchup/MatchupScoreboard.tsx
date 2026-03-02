@@ -405,7 +405,10 @@ export function MatchupScoreboard({
         };
 
   return (
-    <ScoreboardCard>
+    <ScoreboardCard
+      role="region"
+      aria-label={`Week ${weekNumber} scoreboard: ${team1Name} vs ${team2Name}`}
+    >
       {/* Top Bar */}
       <TopBar>
         <XStack alignItems="center" gap="$2">

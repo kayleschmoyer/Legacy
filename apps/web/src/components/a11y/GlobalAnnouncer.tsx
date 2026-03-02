@@ -2,39 +2,67 @@ import React from 'react';
 
 /**
  * GlobalAnnouncer
- * A single, app-wide aria-live region for screen reader announcements.
- * Use the `announcePolite` helper to dispatch messages.
+ * App-wide aria-live regions for screen reader announcements.
+ * Use `announcePolite` for non-urgent updates and `announceAssertive` for urgent ones.
  */
 export function GlobalAnnouncer() {
-  const [message, setMessage] = React.useState<string>('');
-  const [seq, setSeq] = React.useState(0);
+  const [politeMessage, setPoliteMessage] = React.useState<string>('');
+  const [politeSeq, setPoliteSeq] = React.useState(0);
+  const [assertiveMessage, setAssertiveMessage] = React.useState<string>('');
+  const [assertiveSeq, setAssertiveSeq] = React.useState(0);
 
   React.useEffect(() => {
-    const handler = (e: Event) => {
+    const politeHandler = (e: Event) => {
       const custom = e as CustomEvent<string>;
       const detail = custom.detail ?? '';
-      // Toggle key to ensure SR reads repeated messages
-      setSeq((s) => s + 1);
-      setMessage(String(detail));
+      setPoliteSeq((s) => s + 1);
+      setPoliteMessage(String(detail));
     };
-    window.addEventListener('app-announce-polite', handler as EventListener);
-    return () =>
+    const assertiveHandler = (e: Event) => {
+      const custom = e as CustomEvent<string>;
+      const detail = custom.detail ?? '';
+      setAssertiveSeq((s) => s + 1);
+      setAssertiveMessage(String(detail));
+    };
+    window.addEventListener(
+      'app-announce-polite',
+      politeHandler as EventListener,
+    );
+    window.addEventListener(
+      'app-announce-assertive',
+      assertiveHandler as EventListener,
+    );
+    return () => {
       window.removeEventListener(
         'app-announce-polite',
-        handler as EventListener,
+        politeHandler as EventListener,
       );
+      window.removeEventListener(
+        'app-announce-assertive',
+        assertiveHandler as EventListener,
+      );
+    };
   }, []);
 
   return (
-    <div
-      aria-live="polite"
-      aria-atomic="true"
-      // Use sr-only class from global CSS
-      className="sr-only"
-      data-announcer-seq={seq}
-    >
-      {message}
-    </div>
+    <>
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        data-announcer-seq={politeSeq}
+      >
+        {politeMessage}
+      </div>
+      <div
+        aria-live="assertive"
+        aria-atomic="true"
+        className="sr-only"
+        data-announcer-seq={assertiveSeq}
+      >
+        {assertiveMessage}
+      </div>
+    </>
   );
 }
 

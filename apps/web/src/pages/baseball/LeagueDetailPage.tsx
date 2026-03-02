@@ -2563,6 +2563,10 @@ export function LeagueDetailPage(): React.JSX.Element {
               ) : (
                 tab.icon
               );
+            // Get visible tabs for keyboard navigation
+            const visibleTabs = TABS.filter(
+              (t) => !t.commissionerOnly || isCommissioner,
+            );
             return (
               <Button
                 key={tab.id}
@@ -2573,12 +2577,41 @@ export function LeagueDetailPage(): React.JSX.Element {
                 borderRadius={0}
                 paddingHorizontal="$4"
                 paddingVertical="$3"
+                tabIndex={isActive ? 0 : -1}
                 onPress={() => {
                   if (tab.id === 'roster') {
                     // Clicking the roster tab resets to viewing own roster
                     setViewingTeamId(null);
                   }
                   changeTab(tab.id);
+                }}
+                onKeyDown={(e: React.KeyboardEvent) => {
+                  const currentIndex = visibleTabs.findIndex(
+                    (t) => t.id === tab.id,
+                  );
+                  let targetIndex = -1;
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    targetIndex = (currentIndex + 1) % visibleTabs.length;
+                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    targetIndex =
+                      (currentIndex - 1 + visibleTabs.length) %
+                      visibleTabs.length;
+                  } else if (e.key === 'Home') {
+                    e.preventDefault();
+                    targetIndex = 0;
+                  } else if (e.key === 'End') {
+                    e.preventDefault();
+                    targetIndex = visibleTabs.length - 1;
+                  }
+                  if (targetIndex >= 0) {
+                    const targetTab = visibleTabs[targetIndex];
+                    changeTab(targetTab.id);
+                    // Move focus to the target tab
+                    const el = document.getElementById(`tab-${targetTab.id}`);
+                    el?.focus();
+                  }
                 }}
                 role="tab"
                 id={`tab-${tab.id}`}
