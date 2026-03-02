@@ -6,7 +6,7 @@
   "types": "./src/index.ts",
   "description": "AWS-specific utilities for server-side operations",
   "dependencies": {
-    "@aws-sdk/client-apigatewaymanagementapi": "^3.990.0",
-    "@aws-sdk/client-dynamodb": "^3.990.0"
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.1000.0",
+    "@aws-sdk/client-dynamodb": "^3.1000.0"
   }
 }
