@@ -11,6 +11,7 @@ import {
   Draft,
   DraftPick,
   DraftPlayer,
+  DraftRecommendation,
   DraftTeamAutoPickStatus,
   DraftTeamOrderEntry,
 } from './types';
@@ -565,6 +566,357 @@ builder.queryField('getDraftTeamAutoPickStatuses', (t) =>
         teamId: row.teamId,
         autoPick: row.autoPick,
       }));
+    },
+  }),
+);
+
+/**
+ * Query: Get draft intelligence recommendations for a team (LS-467)
+ *
+ * Returns the top 5 player recommendations for the given team using the same
+ * multi-factor algorithm powering the Draft Intelligence UI panel:
+ *   Stat Value 50% + Positional Need 30% + Scarcity 20%
+ */
+builder.queryField('getDraftRecommendations', (t) =>
+  t.field({
+    type: [DraftRecommendation],
+    description:
+      'Returns top-5 draft pick recommendations for a team using the Draft Intelligence algorithm (stat value 50% + positional need 30% + scarcity 20%).',
+    args: {
+      draftId: t.arg.int({ required: true }),
+      teamId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) throw AuthenticationError();
+      const { draftId, teamId } = args;
+
+      // Verify draft exists and caller is a league member
+      const [draft] = await context.db
+        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.id, draftId))
+        .limit(1);
+      if (!draft) throw new Error('Draft not found');
+      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+
+      // All picks for this draft — tells us who's been picked and what the
+      // requesting team already has on their roster.
+      const allPicks = await context.db
+        .select({
+          playerId: PublicSchema.draftPicks.playerId,
+          teamId: PublicSchema.draftPicks.teamId,
+        })
+        .from(PublicSchema.draftPicks)
+        .where(eq(PublicSchema.draftPicks.draftId, draftId));
+
+      const draftedIds = allPicks.map((p) => p.playerId);
+      const teamPickedIds = allPicks
+        .filter((p) => p.teamId === teamId)
+        .map((p) => p.playerId);
+
+      // --- Normalize position (LF/CF/RF → OF) ---
+      const normPos = (pos: string): string => {
+        const u = pos.toUpperCase();
+        if (u === 'LF' || u === 'CF' || u === 'RF') return 'OF';
+        return u;
+      };
+
+      // --- Min-max normalizer factory ---
+      const minMaxNorm =
+        (values: number[]) =>
+        (v: number): number => {
+          const min = Math.min(...values);
+          const max = Math.max(...values);
+          const range = max - min;
+          if (range === 0) return 0.5;
+          return (v - min) / range;
+        };
+
+      // --- Fetch available players with career stats ---
+      type PlayerRow = {
+        player_id: number;
+        first_name: string;
+        last_name: string;
+        primary_position: string | null;
+        hr: number | null;
+        rbi: number | null;
+        sb: number | null;
+        batting_h: number | null;
+        batting_ab: number | null;
+        batting_tb: number | null;
+        batting_bb: number | null;
+        batting_hbp: number | null;
+        batting_sh: number | null;
+        pitcher_wins: number | null;
+        pitcher_saves: number | null;
+        pitcher_strikeouts: number | null;
+        pitcher_er: number | null;
+        pitcher_outs: number | null;
+        pitcher_bb: number | null;
+        pitcher_h: number | null;
+        pitcher_era: string | null;
+      };
+
+      const excludeClause =
+        draftedIds.length > 0
+          ? sql`AND p.id NOT IN (${sql.raw(draftedIds.join(','))})`
+          : sql``;
+
+      const statsResult = await context.db.execute(sql`
+        SELECT
+          p.id           AS player_id,
+          p.first_name,
+          p.last_name,
+          (
+            SELECT pep.position
+            FROM public.player_eligible_positions pep
+            WHERE pep.player_id = p.id
+            ORDER BY pep.games DESC
+            LIMIT 1
+          )              AS primary_position,
+          cb.hr,
+          cb.rbi,
+          cb.sb,
+          cb.h           AS batting_h,
+          cb.ab          AS batting_ab,
+          cb.tb          AS batting_tb,
+          cb.bb          AS batting_bb,
+          cb.hbp         AS batting_hbp,
+          cb.sh          AS batting_sh,
+          cp.w           AS pitcher_wins,
+          cp.sv          AS pitcher_saves,
+          cp.so          AS pitcher_strikeouts,
+          cp.er          AS pitcher_er,
+          cp.outs_recorded AS pitcher_outs,
+          cp.bb          AS pitcher_bb,
+          cp.h           AS pitcher_h,
+          cp.era         AS pitcher_era
+        FROM public.players p
+        LEFT JOIN public.career_batting   cb ON cb.player_id = p.id
+        LEFT JOIN public.career_pitching  cp ON cp.player_id = p.id
+        WHERE EXISTS (
+          SELECT 1
+          FROM public.player_eligible_positions pep2
+          WHERE pep2.player_id = p.id
+        )
+        ${excludeClause}
+        ORDER BY p.id
+        LIMIT 500
+      `);
+
+      // --- Fetch primary position of team's already-drafted players for positional need ---
+      const positionCount: Record<string, number> = {};
+      if (teamPickedIds.length > 0) {
+        const rosterPositionsResult = await context.db.execute(sql`
+          SELECT DISTINCT ON (pep.player_id) pep.player_id, pep.position
+          FROM public.player_eligible_positions pep
+          WHERE pep.player_id IN (${sql.raw(teamPickedIds.join(','))})
+          ORDER BY pep.player_id, pep.games DESC
+        `);
+        for (const row of rosterPositionsResult.rows as {
+          player_id: number;
+          position: string;
+        }[]) {
+          const pos = normPos(row.position);
+          positionCount[pos] = (positionCount[pos] ?? 0) + 1;
+        }
+      }
+
+      // --- Build typed player data ---
+      type PlayerData = {
+        id: number;
+        name: string;
+        position: string;
+        isPitcher: boolean;
+        hr: number;
+        rbi: number;
+        sb: number;
+        avg: number;
+        obp: number;
+        slg: number;
+        wins: number;
+        saves: number;
+        strikeouts: number;
+        era: number;
+        whip: number;
+      };
+
+      const players: PlayerData[] = [];
+      for (const row of statsResult.rows as unknown as PlayerRow[]) {
+        if (!row.primary_position) continue;
+        const pos = normPos(row.primary_position);
+        const isPitcher = pos === 'SP' || pos === 'RP' || pos === 'P';
+
+        if (isPitcher) {
+          const outs = row.pitcher_outs ?? 0;
+          const innings = outs / 3;
+          const era =
+            row.pitcher_era != null ? parseFloat(row.pitcher_era) : 99;
+          const whip =
+            innings > 0
+              ? ((row.pitcher_bb ?? 0) + (row.pitcher_h ?? 0)) / innings
+              : 99;
+          players.push({
+            id: row.player_id,
+            name: `${row.first_name} ${row.last_name}`.trim(),
+            position: pos === 'P' ? 'SP' : pos,
+            isPitcher: true,
+            hr: 0,
+            rbi: 0,
+            sb: 0,
+            avg: 0,
+            obp: 0,
+            slg: 0,
+            wins: row.pitcher_wins ?? 0,
+            saves: row.pitcher_saves ?? 0,
+            strikeouts: row.pitcher_strikeouts ?? 0,
+            era,
+            whip,
+          });
+        } else {
+          const h = row.batting_h ?? 0;
+          const ab = Math.max(row.batting_ab ?? 0, 1);
+          const tb = row.batting_tb ?? 0;
+          const bb = row.batting_bb ?? 0;
+          const hbp = row.batting_hbp ?? 0;
+          const sh = row.batting_sh ?? 0;
+          const avg = h / ab;
+          const obpDen = ab + bb + hbp + sh;
+          const obp = obpDen > 0 ? (h + bb + hbp) / obpDen : 0;
+          const slg = tb / ab;
+          players.push({
+            id: row.player_id,
+            name: `${row.first_name} ${row.last_name}`.trim(),
+            position: pos,
+            isPitcher: false,
+            hr: row.hr ?? 0,
+            rbi: row.rbi ?? 0,
+            sb: row.sb ?? 0,
+            avg,
+            obp,
+            slg,
+            wins: 0,
+            saves: 0,
+            strikeouts: 0,
+            era: 99,
+            whip: 99,
+          });
+        }
+      }
+
+      if (players.length === 0) return [];
+
+      // --- Scoring algorithm (mirrors client-side computeDraftIntelligence) ---
+      const ROSTER_SLOTS: Record<string, number> = {
+        C: 1,
+        '1B': 1,
+        '2B': 1,
+        '3B': 1,
+        SS: 1,
+        OF: 3,
+        SP: 2,
+        RP: 1,
+      };
+
+      const getPositionalNeed = (position: string): number => {
+        const quota = ROSTER_SLOTS[position] ?? 1;
+        const have = positionCount[position] ?? 0;
+        if (have === 0) return 1.0;
+        if (have < quota) return 0.5;
+        return 0.0;
+      };
+
+      const availableByPos: Record<string, number> = {};
+      for (const p of players) {
+        availableByPos[p.position] = (availableByPos[p.position] ?? 0) + 1;
+      }
+      const maxCountAnyPos = Math.max(...Object.values(availableByPos), 1);
+
+      const getScarcity = (position: string): number => {
+        const count = availableByPos[position] ?? 0;
+        return 1 - count / maxCountAnyPos;
+      };
+
+      const hitters = players.filter((p) => !p.isPitcher);
+      const pitchers = players.filter((p) => p.isPitcher);
+
+      type Scored = { player: PlayerData; statScore: number };
+      const scored: Scored[] = [];
+
+      if (hitters.length > 0) {
+        const normHr = minMaxNorm(hitters.map((p) => p.hr));
+        const normRbi = minMaxNorm(hitters.map((p) => p.rbi));
+        const normAvg = minMaxNorm(hitters.map((p) => p.avg));
+        const normSb = minMaxNorm(hitters.map((p) => p.sb));
+        const normObp = minMaxNorm(hitters.map((p) => p.obp));
+        const normSlg = minMaxNorm(hitters.map((p) => p.slg));
+        for (const p of hitters) {
+          const statScore =
+            normHr(p.hr) * 0.25 +
+            normRbi(p.rbi) * 0.2 +
+            normAvg(p.avg) * 0.2 +
+            normSb(p.sb) * 0.15 +
+            normObp(p.obp) * 0.1 +
+            normSlg(p.slg) * 0.1;
+          scored.push({ player: p, statScore });
+        }
+      }
+
+      if (pitchers.length > 0) {
+        const normK = minMaxNorm(pitchers.map((p) => p.strikeouts));
+        const normW = minMaxNorm(pitchers.map((p) => p.wins));
+        const normSv = minMaxNorm(pitchers.map((p) => p.saves));
+        const normEra = minMaxNorm(pitchers.map((p) => p.era));
+        const normWhip = minMaxNorm(pitchers.map((p) => p.whip));
+        for (const p of pitchers) {
+          const statScore =
+            normK(p.strikeouts) * 0.25 +
+            (1 - normEra(p.era)) * 0.25 +
+            normW(p.wins) * 0.2 +
+            normSv(p.saves) * 0.15 +
+            (1 - normWhip(p.whip)) * 0.15;
+          scored.push({ player: p, statScore });
+        }
+      }
+
+      return scored
+        .map(({ player, statScore }) => {
+          const posNeed = getPositionalNeed(player.position);
+          const scarcity = getScarcity(player.position);
+          const score = statScore * 0.5 + posNeed * 0.3 + scarcity * 0.2;
+
+          const topStats = player.isPitcher
+            ? [
+                { label: 'ERA', value: player.era.toFixed(2) },
+                { label: 'K', value: String(player.strikeouts) },
+              ]
+            : [
+                { label: 'AVG', value: player.avg.toFixed(3) },
+                { label: 'HR', value: String(player.hr) },
+              ];
+
+          let reason: string;
+          if (posNeed === 1.0) {
+            reason = `Fills your empty ${player.position} slot`;
+          } else if (posNeed === 0.5) {
+            reason = `Adds depth at ${player.position}`;
+          } else if (scarcity > 0.7) {
+            reason = `Only ${availableByPos[player.position] ?? 0} ${player.position}s left`;
+          } else {
+            reason = `Top rated ${player.position} available`;
+          }
+
+          return {
+            playerId: player.id,
+            playerName: player.name,
+            position: player.position,
+            score,
+            reason,
+            topStats,
+          };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
     },
   }),
 );

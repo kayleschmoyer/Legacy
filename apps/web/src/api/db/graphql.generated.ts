@@ -463,6 +463,24 @@ export type DraftPlayer = {
   lastName?: Maybe<Scalars['String']['output']>;
 };
 
+/** A draft pick recommendation produced by the Draft Intelligence algorithm */
+export type DraftRecommendation = {
+  __typename?: 'DraftRecommendation';
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  score?: Maybe<Scalars['Float']['output']>;
+  topStats?: Maybe<Array<DraftRecommendationStat>>;
+};
+
+/** A stat label/value pair displayed on a draft recommendation */
+export type DraftRecommendationStat = {
+  __typename?: 'DraftRecommendationStat';
+  label?: Maybe<Scalars['String']['output']>;
+  value?: Maybe<Scalars['String']['output']>;
+};
+
 /** Auto-pick status for a team in a draft */
 export type DraftTeamAutoPickStatus = {
   __typename?: 'DraftTeamAutoPickStatus';
@@ -1675,6 +1693,8 @@ export type Query = {
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
+  /** Returns top-5 draft pick recommendations for a team using the Draft Intelligence algorithm (stat value 50% + positional need 30% + scarcity 20%). */
+  getDraftRecommendations?: Maybe<Array<DraftRecommendation>>;
   /** Returns the auto-pick status for every team registered in the given draft. */
   getDraftTeamAutoPickStatuses?: Maybe<Array<DraftTeamAutoPickStatus>>;
   getDraftTeamOrder?: Maybe<Array<DraftTeamOrderEntry>>;
@@ -1840,6 +1860,11 @@ export type QueryGetDraftArgs = {
 
 export type QueryGetDraftPicksArgs = {
   draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftRecommendationsArgs = {
+  draftId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
 };
 
 export type QueryGetDraftTeamAutoPickStatusesArgs = {
@@ -4010,6 +4035,28 @@ export type GetDraftPitchingStatsQuery = {
     outsRecorded?: number | null;
     winPercentage?: number | null;
     hits?: number | null;
+  }> | null;
+};
+
+export type GetDraftRecommendationsQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
+}>;
+
+export type GetDraftRecommendationsQuery = {
+  __typename?: 'Query';
+  getDraftRecommendations?: Array<{
+    __typename?: 'DraftRecommendation';
+    playerId?: number | null;
+    playerName?: string | null;
+    position?: string | null;
+    score?: number | null;
+    reason?: string | null;
+    topStats?: Array<{
+      __typename?: 'DraftRecommendationStat';
+      label?: string | null;
+      value?: string | null;
+    }> | null;
   }> | null;
 };
 
@@ -11074,6 +11121,105 @@ export type GetDraftPitchingStatsSuspenseQueryHookResult = ReturnType<
 export type GetDraftPitchingStatsQueryResult = Apollo.QueryResult<
   GetDraftPitchingStatsQuery,
   GetDraftPitchingStatsQueryVariables
+>;
+export const GetDraftRecommendations = gql`
+  query GetDraftRecommendations($draftId: Int!, $teamId: Int!) {
+    getDraftRecommendations(draftId: $draftId, teamId: $teamId) {
+      playerId
+      playerName
+      position
+      score
+      reason
+      topStats {
+        label
+        value
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetDraftRecommendationsQuery__
+ *
+ * To run a query within a React component, call `useGetDraftRecommendationsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftRecommendationsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftRecommendationsQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      teamId: // value for 'teamId'
+ *   },
+ * });
+ */
+export function useGetDraftRecommendationsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetDraftRecommendationsQuery,
+    GetDraftRecommendationsQueryVariables
+  > &
+    (
+      | { variables: GetDraftRecommendationsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDraftRecommendationsQuery,
+    GetDraftRecommendationsQueryVariables
+  >(GetDraftRecommendations, options);
+}
+export function useGetDraftRecommendationsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftRecommendationsQuery,
+    GetDraftRecommendationsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDraftRecommendationsQuery,
+    GetDraftRecommendationsQueryVariables
+  >(GetDraftRecommendations, options);
+}
+export function useGetDraftRecommendationsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDraftRecommendationsQuery,
+        GetDraftRecommendationsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDraftRecommendationsQuery,
+    GetDraftRecommendationsQueryVariables
+  >(
+    GetDraftRecommendations,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDraftRecommendationsQuery,
+          GetDraftRecommendationsQueryVariables
+        >,
+  );
+}
+export type GetDraftRecommendationsQueryHookResult = ReturnType<
+  typeof useGetDraftRecommendationsQuery
+>;
+export type GetDraftRecommendationsLazyQueryHookResult = ReturnType<
+  typeof useGetDraftRecommendationsLazyQuery
+>;
+export type GetDraftRecommendationsSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftRecommendationsSuspenseQuery
+>;
+export type GetDraftRecommendationsQueryResult = Apollo.QueryResult<
+  GetDraftRecommendationsQuery,
+  GetDraftRecommendationsQueryVariables
 >;
 export const GetUserTeamId = gql`
   query GetUserTeamId($leagueId: Int!) {

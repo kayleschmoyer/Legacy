@@ -268,3 +268,19 @@ query GetDraftPitchingStats($limit: Int, $minGames: Int) {
     hits
   }
 }
+
+# Server-computed draft pick recommendations (LS-467)
+# Refetch after each pick to keep suggestions current.
+query GetDraftRecommendations($draftId: Int!, $teamId: Int!) {
+  getDraftRecommendations(draftId: $draftId, teamId: $teamId) {
+    playerId
+    playerName
+    position
+    score
+    reason
+    topStats {
+      label
+      value
+    }
+  }
+}

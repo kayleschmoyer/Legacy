@@ -238,6 +238,51 @@ export const UpdateDraftSettingsInput = builder.inputType(
   },
 );
 
+/**
+ * DraftRecommendationStat — a single stat pill label/value pair inside a recommendation
+ */
+export const DraftRecommendationStat = builder.objectRef<{
+  label: string;
+  value: string;
+}>('DraftRecommendationStat');
+
+DraftRecommendationStat.implement({
+  description: 'A stat label/value pair displayed on a draft recommendation',
+  fields: (t) => ({
+    label: t.exposeString('label'),
+    value: t.exposeString('value'),
+  }),
+});
+
+/**
+ * DraftRecommendation — one player recommendation from the Draft Intelligence algorithm
+ * (stat value 50% + positional need 30% + scarcity 20%)
+ */
+export const DraftRecommendation = builder.objectRef<{
+  playerId: number;
+  playerName: string;
+  position: string;
+  score: number;
+  reason: string;
+  topStats: Array<{ label: string; value: string }>;
+}>('DraftRecommendation');
+
+DraftRecommendation.implement({
+  description:
+    'A draft pick recommendation produced by the Draft Intelligence algorithm',
+  fields: (t) => ({
+    playerId: t.exposeInt('playerId'),
+    playerName: t.exposeString('playerName'),
+    position: t.exposeString('position'),
+    score: t.exposeFloat('score'),
+    reason: t.exposeString('reason'),
+    topStats: t.field({
+      type: [DraftRecommendationStat],
+      resolve: (rec) => rec.topStats,
+    }),
+  }),
+});
+
 // Payload for draft settings update — returns the updated draft record
 export const UpdateDraftSettingsPayload = builder.objectRef<{
   id: number;

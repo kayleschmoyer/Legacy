@@ -32,7 +32,7 @@ import { PlayerCard } from './PlayerCard';
 import { SkeletonCard } from './SkeletonCard';
 import { DraftGrid } from './DraftGrid';
 import { DraftIntelligence } from './DraftIntelligence';
-import { getDraftCommentary } from './draftUtils';
+import { computeDraftIntelligence, getDraftCommentary } from './draftUtils';
 import {
   CommissionerPick as COMMISSIONER_PICK,
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
@@ -1172,12 +1172,20 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     // Mark in-progress immediately to prevent re-entry
     cpuPickInProgressRef.current = currentPickInfo.overallPick;
 
-    // Deterministic best-available: enrichedPlayers is already sorted by the
-    // server (hitterAvgPointsPerGame or pitchingAvgPointsPerGame). Pick the
-    // first player whose name is not a placeholder.
-    const bestPlayer = enrichedPlayers.find(
-      (p) => p.name && !p.name.startsWith('Unknown Player'),
+    // Use the Draft Intelligence algorithm to pick the top-scored player for
+    // the CPU team (stat value 50% + positional need 30% + scarcity 20%).
+    // Falls back to the first real enriched player if no recommendations are
+    // produced (e.g. empty stats pool).
+    const intelligenceRecs = computeDraftIntelligence(
+      statsLookup,
+      pickHistory,
+      currentPickTeamId,
     );
+    const bestPlayer =
+      intelligenceRecs[0]?.player ??
+      enrichedPlayers.find(
+        (p) => p.name && !p.name.startsWith('Unknown Player'),
+      );
 
     if (!bestPlayer) {
       showToast('CPU: No real players available to pick', 'warning');
@@ -1214,6 +1222,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     currentPickTeamId,
     cpuTeamIds,
     enrichedPlayers,
+    statsLookup,
+    pickHistory,
     commissionerPickMutation,
     refetchCurrentPick,
     refetchPickHistory,
@@ -2039,9 +2049,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           {/* Draft Intelligence (only when it's the user's turn) */}
           {isMyPick && (
             <DraftIntelligence
-              statsLookup={statsLookup}
-              pickHistory={pickHistory}
-              myTeamId={myTeamId}
+              draftId={draftId}
+              teamId={myTeamId}
+              currentOverallPick={currentPickInfo?.overallPick ?? 0}
             />
           )}
 

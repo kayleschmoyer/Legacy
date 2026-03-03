@@ -515,6 +515,26 @@ type DraftPlayer {
 }
 
 """
+A draft pick recommendation produced by the Draft Intelligence algorithm
+"""
+type DraftRecommendation {
+  playerId: Int
+  playerName: String
+  position: String
+  reason: String
+  score: Float
+  topStats: [DraftRecommendationStat!]
+}
+
+"""
+A stat label/value pair displayed on a draft recommendation
+"""
+type DraftRecommendationStat {
+  label: String
+  value: String
+}
+
+"""
 Auto-pick status for a team in a draft
 """
 type DraftTeamAutoPickStatus {
@@ -1698,6 +1718,11 @@ type Query {
   getDirectMessages(limit: Int, otherUserId: Int!): [DirectMessage!]
   getDraft(draftId: Int!): Draft
   getDraftPicks(draftId: Int!): [DraftPick!]
+
+  """
+  Returns top-5 draft pick recommendations for a team using the Draft Intelligence algorithm (stat value 50% + positional need 30% + scarcity 20%).
+  """
+  getDraftRecommendations(draftId: Int!, teamId: Int!): [DraftRecommendation!]
 
   """
   Returns the auto-pick status for every team registered in the given draft.
