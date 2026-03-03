@@ -32,7 +32,7 @@ interface CreateLeagueFormData {
 }
 
 // Team count options
-const TEAM_COUNT_OPTIONS = [6, 8, 10, 12, 14, 16];
+const TEAM_COUNT_OPTIONS = [4, 6, 8, 10, 12, 14, 16];
 
 // Roster size options
 const ROSTER_SIZE_OPTIONS = [20, 22, 25, 30, 35, 40];
@@ -109,8 +109,8 @@ export function LeagueCreatePage(): React.JSX.Element {
       return 'League name must be less than 50 characters';
     }
 
-    if (formData.numberOfTeams < 6 || formData.numberOfTeams > 16) {
-      return 'Number of teams must be between 6 and 16';
+    if (formData.numberOfTeams < 4 || formData.numberOfTeams > 16) {
+      return 'Number of teams must be between 4 and 16';
     }
 
     if (formData.maxRosterSize < 15 || formData.maxRosterSize > 50) {
@@ -258,7 +258,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                 ))}
               </XStack>
               <Text size="$2" color="$gray10">
-                Select between 6-16 teams for your league
+                Select between 4-16 teams for your league
               </Text>
             </YStack>
 

@@ -31,6 +31,7 @@ const DROPDOWN_DRAFT_ORDER_ITEMS = Object.freeze<DropdownItem[]>([
 ]);
 
 const DROPDOWN_TEAM_COUNT_ITEMS = Object.freeze<DropdownItem[]>([
+  { text: '4', value: '4' },
   { text: '6', value: '6' },
   { text: '8', value: '8' },
   { text: '10', value: '10' },

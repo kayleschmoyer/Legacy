@@ -1174,7 +1174,7 @@ export function BaseballLandingPage() {
                   Number of Teams
                 </Text>
                 <XStack gap="$2" flexWrap="wrap">
-                  {[6, 8, 10, 12, 14, 16].map((n) => (
+                  {[4, 6, 8, 10, 12, 14, 16].map((n) => (
                     <Button
                       key={n}
                       size="$3"
