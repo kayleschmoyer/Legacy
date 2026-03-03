@@ -186,18 +186,20 @@ describe('EliteDraftBoardScreen a11y', () => {
   });
 
   test('watchlist toggle exposes aria-pressed', async () => {
-    // The component runs a 1-second setInterval pick timer. Freeze timers for
-    // this test so userEvent.click() can settle without waiting for ongoing
-    // interval state updates, which would exceed the default 5 s timeout.
-    jest.useFakeTimers();
-    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    // Render with real timers so React flushes the useEffect that populates
+    // allAvailablePlayers (added for pagination in LS-412). Use findAllByRole
+    // so testing-library's built-in retry loop handles any async effect lag.
     renderDraftBoard();
-
-    // Find first player card and its watch button (☆)
-    const watchButtons = screen.getAllByRole('button', {
+    const watchButtons = await screen.findAllByRole('button', {
       name: /add .* to watchlist|remove .* from watchlist/i,
     });
     expect(watchButtons.length).toBeGreaterThan(0);
+
+    // Freeze timers NOW (after buttons are in the DOM) so the 1-second
+    // setInterval pick timer cannot fire and cause state-update churn
+    // while userEvent.click() is settling the ARIA state change.
+    jest.useFakeTimers();
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
 
     const btn = watchButtons[0];
     expect(btn).toHaveAttribute('aria-pressed', 'false');

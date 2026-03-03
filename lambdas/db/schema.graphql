@@ -1669,6 +1669,7 @@ type Query {
   getAvailableDraftPlayers(
     draftId: Int!
     limit: Int
+    offset: Int
     orderBy: String
     position: String
     search: String

@@ -302,7 +302,6 @@ export enum ConsentType {
 export type CreateLeagueAndTeamsInput = {
   customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
   customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
-  decadeChallenge?: InputMaybe<Scalars['Boolean']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   eraFilter?: InputMaybe<Scalars['String']['input']>;
@@ -1755,6 +1754,7 @@ export type QueryCommissionerAuditLogsArgs = {
 export type QueryGetAvailableDraftPlayersArgs = {
   draftId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
@@ -2454,12 +2454,15 @@ export type TeamMember = {
 /** Team standing information with wins, losses, and scoring stats */
 export type TeamStanding = {
   __typename?: 'TeamStanding';
+  avatarUrl?: Maybe<Scalars['String']['output']>;
   averagePointsAgainst?: Maybe<Scalars['Float']['output']>;
   averagePointsFor?: Maybe<Scalars['Float']['output']>;
   losses?: Maybe<Scalars['Int']['output']>;
   pointsAgainst?: Maybe<Scalars['Float']['output']>;
   pointsFor?: Maybe<Scalars['Float']['output']>;
+  primaryColor?: Maybe<Scalars['String']['output']>;
   rank?: Maybe<Scalars['Int']['output']>;
+  secondaryColor?: Maybe<Scalars['String']['output']>;
   teamId?: Maybe<Scalars['ID']['output']>;
   teamName?: Maybe<Scalars['String']['output']>;
   ties?: Maybe<Scalars['Int']['output']>;
@@ -2545,7 +2548,6 @@ export type UpdateCommissionerNoteInput = {
 export type UpdateDraftSettingsInput = {
   customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
   customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
-  decadeChallenge?: InputMaybe<Scalars['Boolean']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   eraFilter?: InputMaybe<Scalars['String']['input']>;

@@ -160,13 +160,21 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       position: t.arg.string({ required: false }),
       orderBy: t.arg.string({ required: false }),
       limit: t.arg.int({ required: false }),
+      offset: t.arg.int({ required: false }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
         throw AuthenticationError();
       }
 
-      const { draftId, search, position, orderBy, limit: resultLimit } = args;
+      const {
+        draftId,
+        search,
+        position,
+        orderBy,
+        limit: resultLimit,
+        offset: resultOffset,
+      } = args;
 
       // Verify draft exists and get league info for player pool filtering
       const [draft] = await context.db
@@ -287,6 +295,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           ? sql`WHERE ${sql.join(sqlConditions, sql` AND `)}`
           : sql``;
       const limitVal = sql.raw(String(resultLimit ?? 50));
+      const offsetVal = sql.raw(String(resultOffset ?? 0));
 
       // ---- Determine ORDER BY strategy ----
       // Scoring column expressions reference the 'cs' alias from compute_career_scores
@@ -356,7 +365,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           LEFT JOIN public.career_batting cb ON p.id = cb.player_id
           ${whereClause}
           ORDER BY COALESCE(cb.offensive_war, 0) DESC
-          LIMIT ${limitVal}
+          LIMIT ${limitVal} OFFSET ${offsetVal}
         `;
         const result = await context.db.execute(rawQuery);
         return (result.rows as unknown as RawPlayerRow[]).map(mapRow);
@@ -368,7 +377,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           ${basePlayerSelect}
           ${whereClause}
           ORDER BY p.last_name ASC, p.first_name ASC
-          LIMIT ${limitVal}
+          LIMIT ${limitVal} OFFSET ${offsetVal}
         `;
         const result = await context.db.execute(rawQuery);
         return (result.rows as unknown as RawPlayerRow[]).map(mapRow);
@@ -383,7 +392,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         LEFT JOIN public.compute_career_scores(${draft.leagueId}) cs ON p.id = cs.player_id
         ${whereClause}
         ORDER BY COALESCE(${scoringCol}, 0) DESC
-        LIMIT ${limitVal}
+        LIMIT ${limitVal} OFFSET ${offsetVal}
       `;
       const result = await context.db.execute(rawQuery);
       return (result.rows as unknown as RawPlayerRow[]).map(mapRow);

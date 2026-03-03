@@ -492,8 +492,23 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     });
   }, [leagueTeams, draftTeamOrderData]);
 
-  // ---- Available Players (server-side search) ----
+  // ---- Available Players (server-side search with offset pagination) ----
+  const PLAYER_PAGE_SIZE = 50;
   const [playerSearch, setPlayerSearch] = useState('');
+  const [playerOffset, setPlayerOffset] = useState(0);
+  const [allAvailablePlayers, setAllAvailablePlayers] = useState<
+    AvailableDraftPlayer[]
+  >([]);
+  const [hasMorePlayers, setHasMorePlayers] = useState(false);
+  // Tracks whether the next data update should append (true) or replace (false)
+  const isAppendingPlayers = useRef(false);
+  // Prevents the filter-reset effect from firing on the initial mount.
+  // In React 19, all effects from a single render are batched; without this
+  // guard the reset effect fires on mount (playerSearch/selectedPosition at
+  // their initial values) and clears the player list that the population
+  // effect just set in the same batch.
+  const hasFilterChangedRef = useRef(false);
+
   const {
     data: availablePlayersData,
     loading: availablePlayersLoading,
@@ -511,35 +526,46 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         selectedPosition === 'P'
           ? 'pitchingAvgPointsPerGame'
           : 'hitterAvgPointsPerGame',
-      limit: 200,
+      limit: PLAYER_PAGE_SIZE,
+      offset: playerOffset,
     },
     skip: !draftId,
     errorPolicy: 'all',
   });
 
-  const availablePlayers: AvailableDraftPlayer[] = (
-    availablePlayersData?.getAvailableDraftPlayers ?? []
-  )
-    .filter(
-      (
-        p,
-      ): p is {
-        id: number;
-        firstName: string;
-        lastName: string;
-        brefId: string;
-      } =>
-        p.id != null &&
-        p.firstName != null &&
-        p.lastName != null &&
-        p.brefId != null,
-    )
-    .map((p) => ({
-      id: p.id,
-      firstName: p.firstName,
-      lastName: p.lastName,
-      brefId: p.brefId,
-    }));
+  // Accumulate pages: replace on fresh fetch, append on "load more"
+  useEffect(() => {
+    const page = (availablePlayersData?.getAvailableDraftPlayers ?? [])
+      .filter(
+        (
+          p,
+        ): p is {
+          id: number;
+          firstName: string;
+          lastName: string;
+          brefId: string;
+        } =>
+          p.id != null &&
+          p.firstName != null &&
+          p.lastName != null &&
+          p.brefId != null,
+      )
+      .map((p) => ({
+        id: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        brefId: p.brefId,
+      }));
+
+    if (isAppendingPlayers.current) {
+      setAllAvailablePlayers((prev) => [...prev, ...page]);
+      isAppendingPlayers.current = false;
+    } else {
+      setAllAvailablePlayers(page);
+    }
+    setHasMorePlayers(page.length >= PLAYER_PAGE_SIZE);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availablePlayersData]);
 
   // ---- Career Batting Stats (uses existing careerBattingStats connection) ----
   const { data: statsData } = useQuery(GET_DRAFT_PLAYER_STATS, {
@@ -629,6 +655,19 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     };
   }, [searchTerm]);
 
+  // Reset player pagination when search term or position filter changes
+  useEffect(() => {
+    // Skip the initial mount — only clear when a filter actually changes,
+    // otherwise this wipes the freshly-fetched player list in the same batch.
+    if (!hasFilterChangedRef.current) {
+      hasFilterChangedRef.current = true;
+      return;
+    }
+    isAppendingPlayers.current = false;
+    setPlayerOffset(0);
+    setAllAvailablePlayers([]);
+  }, [playerSearch, selectedPosition]);
+
   // Build a lookup map by player ID for displaying player names in history/board.
   // Includes ALL players from stats (not just available), so drafted players
   // still appear with their real name instead of "Player #123".
@@ -661,7 +700,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       });
     }
     // Override with available players (which have authoritative firstName/lastName)
-    for (const ap of availablePlayers) {
+    for (const ap of allAvailablePlayers) {
       const s = playerStatsMap.get(ap.id);
       const ps = pitcherStatsMap.get(ap.id);
       map.set(ap.id, {
@@ -688,11 +727,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       });
     }
     return map;
-  }, [availablePlayers, pitcherStatsMap, playerStatsMap]);
+  }, [allAvailablePlayers, pitcherStatsMap, playerStatsMap]);
 
   // Merge available players with stats data for rich card display
   const enrichedPlayers: DraftPlayer[] = useMemo(() => {
-    return availablePlayers.map((ap) => {
+    return allAvailablePlayers.map((ap) => {
       const s = playerStatsMap.get(ap.id);
       const ps = pitcherStatsMap.get(ap.id);
       return {
@@ -718,7 +757,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         }),
       };
     });
-  }, [availablePlayers, pitcherStatsMap, playerStatsMap]);
+  }, [allAvailablePlayers, pitcherStatsMap, playerStatsMap]);
 
   // Position filtering is handled server-side via the position query variable.
   // enrichedPlayers already contains only the players matching the selected position.
@@ -737,6 +776,25 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const [commissionerPickMutation, { loading: commPickLoading }] =
     useMutation(COMMISSIONER_PICK);
   const [nudgeExpiredDraftPick] = useMutation(NUDGE_EXPIRED_DRAFT_PICK);
+
+  // ---- Player Pagination Helpers ----
+  /** Reset pagination and refetch player list from the start (call after picks). */
+  const resetAndRefetchPlayers = useCallback(() => {
+    isAppendingPlayers.current = false;
+    setPlayerOffset(0);
+    setAllAvailablePlayers([]);
+    void refetchAvailablePlayers({
+      offset: 0,
+      limit: PLAYER_PAGE_SIZE,
+    });
+  }, [refetchAvailablePlayers]);
+
+  /** Load the next page of players (called by "Load more" button). */
+  const handleLoadMorePlayers = useCallback(() => {
+    if (availablePlayersLoading || !hasMorePlayers) return;
+    isAppendingPlayers.current = true;
+    setPlayerOffset((prev) => prev + PLAYER_PAGE_SIZE);
+  }, [availablePlayersLoading, hasMorePlayers]);
 
   // ---- WebSocket ----
   const handleDraftStarted = useCallback(
@@ -808,7 +866,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
       void refetchCurrentPick({ draftId: notification.draftId });
       void refetchPickHistory();
-      void refetchAvailablePlayers();
+      resetAndRefetchPlayers();
     },
     [
       myTeamId,
@@ -818,7 +876,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       showToast,
       refetchCurrentPick,
       refetchPickHistory,
-      refetchAvailablePlayers,
+      resetAndRefetchPlayers,
     ],
   );
 
@@ -888,7 +946,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       // Reconnected — reconcile missed events
       void refetchCurrentPick({ draftId });
       void refetchPickHistory();
-      void refetchAvailablePlayers();
+      resetAndRefetchPlayers();
       void refetchDraft();
     }
     wsWasConnected.current = wsConnected;
@@ -897,7 +955,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     draftId,
     refetchCurrentPick,
     refetchPickHistory,
-    refetchAvailablePlayers,
+    resetAndRefetchPlayers,
     refetchDraft,
   ]);
 
@@ -950,13 +1008,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         // WebSocket event will handle UI updates for all clients
         void refetchCurrentPick({ draftId });
         void refetchPickHistory();
-        void refetchAvailablePlayers();
+        resetAndRefetchPlayers();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to make pick';
         // Handle specific error cases per the integration guide
         if (msg.includes('Player has already been drafted')) {
           showToast('Player already drafted — refreshing list', 'warning');
-          void refetchAvailablePlayers();
+          resetAndRefetchPlayers();
         } else if (
           msg.includes('not your turn') ||
           msg.includes('Not authorized')
@@ -976,7 +1034,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           showToast('Your roster is full!', 'error');
         } else if (msg.includes('player pool')) {
           showToast('Player is not in the allowed player pool', 'warning');
-          void refetchAvailablePlayers();
+          resetAndRefetchPlayers();
         } else {
           setUrgentMessage(
             isAutoPick
@@ -994,7 +1052,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       makeDraftPick,
       refetchCurrentPick,
       refetchPickHistory,
-      refetchAvailablePlayers,
+      resetAndRefetchPlayers,
       refetchLeague,
       showToast,
     ],
@@ -1045,13 +1103,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         setCommPickMode(false);
         void refetchCurrentPick({ draftId });
         void refetchPickHistory();
-        void refetchAvailablePlayers();
+        resetAndRefetchPlayers();
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : 'Commissioner pick failed';
         if (msg.includes('Player has already been drafted')) {
           showToast('Player already drafted — refreshing list', 'warning');
-          void refetchAvailablePlayers();
+          resetAndRefetchPlayers();
         } else {
           showToast(msg, 'error');
         }
@@ -1063,7 +1121,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       commissionerPickMutation,
       refetchCurrentPick,
       refetchPickHistory,
-      refetchAvailablePlayers,
+      resetAndRefetchPlayers,
       showToast,
     ],
   );
@@ -1342,7 +1400,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           <button
             className="d-state-btn"
             onClick={() => {
-              void refetchAvailablePlayers();
+              resetAndRefetchPlayers();
             }}
           >
             Try Again
@@ -2006,7 +2064,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           <button
             className="d-btn-glass"
             onClick={() => {
-              void refetchAvailablePlayers();
+              resetAndRefetchPlayers();
               if (draftId) void refetchCurrentPick({ draftId });
               void refetchPickHistory();
               void refetchLeague();
@@ -2214,6 +2272,32 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   </div>
                 </div>
               )}
+
+              {/* Load More */}
+              {filteredPlayers.length > 0 &&
+                (hasMorePlayers || availablePlayersLoading) && (
+                  <div
+                    style={{
+                      gridColumn: '1 / -1',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      padding: '16px 0 8px',
+                    }}
+                  >
+                    <button
+                      className="d-btn-glass"
+                      disabled={availablePlayersLoading}
+                      onClick={handleLoadMorePlayers}
+                      style={{ minWidth: 140 }}
+                    >
+                      {availablePlayersLoading ? (
+                        <span>Loading&hellip;</span>
+                      ) : (
+                        <span>Load more players</span>
+                      )}
+                    </button>
+                  </div>
+                )}
             </div>
           )}
         </div>

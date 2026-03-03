@@ -1791,6 +1791,7 @@ export type QueryCommissionerAuditLogsArgs = {
 export type QueryGetAvailableDraftPlayersArgs = {
   draftId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
@@ -3847,6 +3848,7 @@ export type GetAvailableDraftPlayersQueryVariables = Exact<{
   position?: InputMaybe<Scalars['String']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type GetAvailableDraftPlayersQuery = {
@@ -10332,6 +10334,7 @@ export const GetAvailableDraftPlayers = gql`
     $position: String
     $orderBy: String
     $limit: Int
+    $offset: Int
   ) {
     getAvailableDraftPlayers(
       draftId: $draftId
@@ -10339,6 +10342,7 @@ export const GetAvailableDraftPlayers = gql`
       position: $position
       orderBy: $orderBy
       limit: $limit
+      offset: $offset
     ) {
       id
       firstName
@@ -10365,6 +10369,7 @@ export const GetAvailableDraftPlayers = gql`
  *      position: // value for 'position'
  *      orderBy: // value for 'orderBy'
  *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
  *   },
  * });
  */
