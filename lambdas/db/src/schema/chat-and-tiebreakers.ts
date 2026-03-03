@@ -14,6 +14,29 @@ import { insertActivityLog } from '../services/activity-log';
  * and tiebreaker rules for resolving matchup ties.
  */
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize a PostgreSQL timestamp string to an ISO 8601 UTC string.
+ *
+ * Handles two formats returned by the `pg` driver:
+ *  - TIMESTAMPTZ: "2024-01-15 14:30:00.123456+00" (after LS-474 migration)
+ *  - TIMESTAMP:   "2024-01-15 14:30:00.123456"    (pre-migration rows / legacy)
+ *
+ * In both cases the value is already UTC; we just need to produce a proper
+ * ISO 8601 string with a Z suffix so JavaScript's Date constructor treats it
+ * as UTC and toLocaleTimeString() converts to the viewer's local timezone.
+ */
+function toUtcIso(pgTs: string): string {
+  const normalized = pgTs.replace(' ', 'T');
+  if (normalized.endsWith('Z') || normalized.includes('+')) {
+    return new Date(normalized).toISOString();
+  }
+  return new Date(normalized + 'Z').toISOString();
+}
+
 // ============================================================================
 // ENUMS
 // ============================================================================
@@ -274,7 +297,12 @@ builder.objectType(LeagueChatMessage, {
     leagueId: t.exposeInt('leagueId'),
     userId: t.exposeInt('userId', { nullable: true }),
     messageText: t.exposeString('messageText'),
-    timestamp: t.exposeString('timestamp', { nullable: true }),
+    timestamp: t.field({
+      type: 'String',
+      nullable: true,
+      // Serialize as ISO 8601 UTC so clients correctly convert to local time.
+      resolve: (msg) => (msg.timestamp ? toUtcIso(msg.timestamp) : null),
+    }),
     messageType: t.exposeString('messageType'),
     gifUrl: t.exposeString('gifUrl', { nullable: true }),
     metadata: t.field({
@@ -840,7 +868,9 @@ builder.mutationField('sendLeagueMessage', (t) =>
             senderId: context.user.id,
             senderUsername: context.user.username ?? `user_${context.user.id}`,
             messageText: text,
-            timestamp: msg.timestamp ?? new Date().toISOString(),
+            timestamp: msg.timestamp
+              ? toUtcIso(msg.timestamp)
+              : new Date().toISOString(),
             messageType: msg.messageType ?? 'text',
             gifUrl: msg.gifUrl ?? null,
           });
@@ -984,7 +1014,9 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
             senderId: context.user.id,
             senderUsername: context.user.username ?? `user_${context.user.id}`,
             messageText: text,
-            timestamp: msg.timestamp ?? new Date().toISOString(),
+            timestamp: msg.timestamp
+              ? toUtcIso(msg.timestamp)
+              : new Date().toISOString(),
             messageType: 'announcement',
             gifUrl: null,
           });

@@ -28,7 +28,15 @@ const Bubble = styled(YStack, {
 // Helpers
 // ---------------------------------------------------------------------------
 function formatTime(isoString: string): string {
-  return new Date(isoString).toLocaleTimeString([], {
+  // Defensively normalize to ISO 8601 UTC before parsing.  PostgreSQL
+  // TIMESTAMP strings may arrive without a timezone designator; appending 'Z'
+  // ensures the browser treats the value as UTC and toLocaleTimeString() then
+  // converts it to the viewer's local timezone instead of displaying UTC.
+  const normalized =
+    isoString.includes('Z') || isoString.includes('+')
+      ? isoString
+      : isoString.replace(' ', 'T') + 'Z';
+  return new Date(normalized).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
   });

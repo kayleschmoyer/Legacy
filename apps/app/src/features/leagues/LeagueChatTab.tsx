@@ -14,7 +14,15 @@ import type { LegacySportsJwt } from '../../common/auth/AuthHooks';
 // Helpers
 // ---------------------------------------------------------------------------
 function formatTime(isoString: string): string {
-  const date = new Date(isoString);
+  // Defensively normalize to ISO 8601 UTC before parsing.  PostgreSQL
+  // TIMESTAMP strings may arrive without a timezone designator; appending 'Z'
+  // ensures the device treats the value as UTC and toLocaleTimeString() then
+  // converts it to the viewer's local timezone instead of displaying UTC.
+  const normalized =
+    isoString.includes('Z') || isoString.includes('+')
+      ? isoString
+      : isoString.replace(' ', 'T') + 'Z';
+  const date = new Date(normalized);
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 

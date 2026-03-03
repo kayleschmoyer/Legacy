@@ -189,7 +189,10 @@ export const leagueMessages = pgTable(
   {
     leagueId: integer('league_id').notNull(),
     messageText: varchar('message_text').notNull(),
-    timestamp: timestamp('timestamp', { mode: 'string' }).defaultNow(),
+    timestamp: timestamp('timestamp', {
+      withTimezone: true,
+      mode: 'string',
+    }).defaultNow(),
     id: serial('id').primaryKey().notNull(),
     userId: integer('user_id'),
     messageType: varchar('message_type', { length: 50 })
