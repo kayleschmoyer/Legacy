@@ -2490,7 +2490,19 @@ export function LeagueDetailPage(): React.JSX.Element {
                 />
               </CommissionerSectionHeader>
               {open && (
-                <YStack id={sectionId} role="region" aria-label={title}>
+                <YStack
+                  id={sectionId}
+                  role="region"
+                  aria-label={title}
+                  borderLeftWidth={1}
+                  borderRightWidth={1}
+                  borderBottomWidth={1}
+                  borderColor="$glassBorder"
+                  borderBottomLeftRadius="$5"
+                  borderBottomRightRadius="$5"
+                  backgroundColor="$surfacePanel"
+                  overflow="hidden"
+                >
                   {content}
                 </YStack>
               )}
