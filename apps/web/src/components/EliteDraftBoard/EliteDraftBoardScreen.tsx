@@ -1338,9 +1338,14 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       myTeamPicks.map((pick) => {
         const player = statsLookup.get(pick.playerId);
         if (player) return player;
+        // Fallback: use the player name returned directly from getDraftPicks
+        // (covers pitchers which have no careerBattingStats entry — LS-431)
+        const pickPlayerName = pick.player
+          ? `${pick.player.firstName} ${pick.player.lastName}`.trim()
+          : `Player #${pick.playerId}`;
         return {
           id: pick.playerId,
-          name: `Player #${pick.playerId}`,
+          name: pickPlayerName,
           position: 'UTIL',
           avg: 0,
           hr: 0,
@@ -2152,7 +2157,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                       >
                         <span style={{ fontWeight: 600 }}>
                           #{pick.overallPick} —{' '}
-                          {player?.name ?? `Player #${pick.playerId}`}
+                          {player?.name ??
+                            (pick.player
+                              ? `${pick.player.firstName} ${pick.player.lastName}`.trim()
+                              : `Player #${pick.playerId}`)}
                         </span>
                         <span
                           style={{ color: 'var(--d-text-muted)', fontSize: 10 }}

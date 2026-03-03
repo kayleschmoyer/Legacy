@@ -42,6 +42,15 @@ DraftPick.implement({
         });
       },
     }),
+    player: t.field({
+      type: 'Player',
+      nullable: true,
+      description:
+        'The drafted player. Included so the draft board can display names for all picks (including pitchers who have no career batting entry) without a secondary lookup.',
+      resolve: (parent, _args, context) => {
+        return context.loaders.players.load(parent.playerId);
+      },
+    }),
   }),
 });
 

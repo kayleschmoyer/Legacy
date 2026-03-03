@@ -483,6 +483,11 @@ type DraftPick {
   overallPick: Int
   pickNumber: Int
   pickedAt: String
+
+  """
+  The drafted player. Included so the draft board can display names for all picks (including pitchers who have no career batting entry) without a secondary lookup.
+  """
+  player: Player
   playerId: Int
   round: Int
   team: Team

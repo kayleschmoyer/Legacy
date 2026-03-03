@@ -442,6 +442,8 @@ export type DraftPick = {
   overallPick?: Maybe<Scalars['Int']['output']>;
   pickNumber?: Maybe<Scalars['Int']['output']>;
   pickedAt?: Maybe<Scalars['String']['output']>;
+  /** The drafted player. Included so the draft board can display names for all picks (including pitchers who have no career batting entry) without a secondary lookup. */
+  player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   round?: Maybe<Scalars['Int']['output']>;
   team?: Maybe<Team>;
@@ -3871,6 +3873,12 @@ export type GetDraftPicksQuery = {
     pickedAt?: string | null;
     teamId?: number | null;
     playerId?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
   }> | null;
 };
 
@@ -10410,6 +10418,11 @@ export const GetDraftPicks = gql`
       pickedAt
       teamId
       playerId
+      player {
+        id
+        firstName
+        lastName
+      }
     }
   }
 `;

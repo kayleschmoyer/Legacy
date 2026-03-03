@@ -102,7 +102,11 @@ export function DraftGrid({
 
               if (pick) {
                 const player = statsLookup.get(pick.playerId);
-                const playerName = player ? player.name : `#${pick.playerId}`;
+                const playerName = player
+                  ? player.name
+                  : pick.player
+                    ? `${pick.player.firstName} ${pick.player.lastName}`.trim()
+                    : `#${pick.playerId}`;
                 return (
                   <div
                     key={team.id}
