@@ -5,11 +5,11 @@
 ## Workflow
 
 1. Ticket: create if needed: `acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json` → note `$key`
-2. **Dependency check**: inspect the Jira ticket for linked issues or descriptions referencing another in-progress ticket. If a dependency exists, the worktree must branch from that parent — not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).
-3. Worktree: `twig worktree create $key/description` → `twig worktree list` (note path)
-4. Setup worktree: `cd $wt` → `make install` → copy `.env` → junction `.twig` → `code $wt`
-5. **⚠️ All remaining work happens at the worktree path (`$wt`), NOT `D:\code\legacy-sports`.** Every file edit, terminal command, and git operation must target `$wt`.
-6. Jira "In Progress": `acli jira workitem transition --key LS-#### --status "In Progress"`
+2. **Jira "In Progress" immediately**: `acli jira workitem transition --key LS-#### --status "In Progress"` — do this as soon as you begin working, before any other steps.
+3. **Dependency check**: inspect the Jira ticket for linked issues or descriptions referencing another in-progress ticket. If a dependency exists, the worktree must branch from that parent — not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).
+4. Worktree: `twig worktree create $key/description` → `twig worktree list` (note path)
+5. Setup worktree: `cd $wt` → `make install` → copy `.env` → junction `.twig` → `code $wt`
+6. **⚠️ All remaining work happens at the worktree path (`$wt`), NOT `D:\code\legacy-sports`.** Every file edit, terminal command, and git operation must target `$wt`.
 7. Code: `pnpm exec nx affected -t <target>` (never `pnpm run`)
 8. Commit: `git commit -m "type(scope): msg"` → `git push origin HEAD`
 9. Rebase onto parent: `git fetch origin ; twig rebase` — keeps branch current with its parent (main or a stacked branch)

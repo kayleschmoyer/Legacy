@@ -44,7 +44,16 @@ Write-Host "Created ticket: $key"
 
 Common `--type` values: `Task`, `Bug`, `Story`. Add `--parent LS-####` to nest under an Epic.
 
-### Step 2: Verify You Are on Main
+### Step 2: Transition Jira to In Progress
+
+**Do this immediately** — as soon as you begin working on a ticket, before creating the worktree or writing any code:
+
+```powershell
+# Transition ticket to "In Progress"
+acli jira workitem transition --key LS-1234 --status "In Progress"
+```
+
+### Step 3: Verify You Are on Main
 
 ```powershell
 # Must be on main before creating a worktree
@@ -55,7 +64,7 @@ git checkout main
 git pull
 ```
 
-### Step 3: Create Branch + Worktree
+### Step 4: Create Branch + Worktree
 
 ```powershell
 cd "D:\code\legacy-sports"
@@ -79,6 +88,9 @@ code $wt   # open in a new VS Code window; do all work there
 > **⚠️ CRITICAL — switch your working context now.** From this point forward, every file
 > edit, terminal command, and git operation must happen inside `$wt`. Never edit files
 > under `D:\code\legacy-sports` when working on a ticket.
+
+> **Reminder**: The Jira ticket should already be "In Progress" from Step 2. If you skipped
+> that step, run the transition command now before proceeding.
 
 > For tickets that depend on an unmerged parent ticket, create the branch first so twig tracks the dependency, then add the worktree:
 >
@@ -108,13 +120,6 @@ code $wt   # open in a new VS Code window; do all work there
 > **⚠️ DEPENDENCY CHECK**: Before branching, check the Jira ticket for linked issues
 > or descriptions that indicate a dependency on another in-progress ticket.
 > Always verify with `twig tree` that the new branch appears under the right parent.
-
-### Step 4: Update Jira Status
-
-```powershell
-# Transition ticket to "In Progress"
-acli jira workitem transition --key LS-1234 --status "In Progress"
-```
 
 ### Step 5: Make Your Changes
 

@@ -40,6 +40,15 @@ D:\code\
 
 ## Complete Workflow
 
+> **🔔 Transition Jira to "In Progress" immediately** — the very first action after being asked
+> to work on any ticket is to run:
+>
+> ```powershell
+> acli jira workitem transition --key LS-#### --status "In Progress"
+> ```
+>
+> Do this **before** creating the worktree, installing dependencies, or writing any code. Don't wait.
+
 ### Step 0: Check for Parent Dependencies
 
 Before creating the worktree, **inspect the Jira ticket** for linked issues or descriptions that reference another in-progress (unmerged) ticket. This determines which branch the worktree should be based on:
@@ -101,7 +110,9 @@ The worktree is placed in the repository's parent directory (`D:\code\`) in a fo
 > git worktree list
 > ```
 
-### Step 2: Transition Jira to In Progress
+### Step 2: Confirm Jira is In Progress
+
+If you haven't already transitioned the ticket (see the note at the top of this section), do it now:
 
 ```powershell
 acli jira workitem transition --key LS-#### --status "In Progress"
