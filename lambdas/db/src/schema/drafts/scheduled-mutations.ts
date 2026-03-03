@@ -430,70 +430,171 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 );
 
                 let autoPlayerId: number | undefined;
+                let autoPickReason = '';
 
-                // 4. Position-aware pick: fetch career_fielding for all eligible
-                //    players once, then find in-memory the first (lowest id) that
-                //    covers an unfilled slot.
+                // ── Smart auto-pick: projected fantasy points + positional scarcity ──
+                // Instead of picking by player ID order, rank eligible players by:
+                // 1. Projected fantasy points per game (career avg, default scoring)
+                // 2. Positional scarcity bonus for unfilled roster positions
+                //
+                // Scoring weights mirror lib/scoring/src/baseball/DefaultScoring.ts:
+                //   Batting:  H=1, 2B=2, 3B=3, HR=4, R=1, RBI=1, SB=2, CS=-1, HBP=1, SO=-0.5
+                //   Pitching: W=5, L=-2, SV=5, SO=1, outsRecorded=1, H=-1, ER=-2, BB=-1
+                //   Fielding: E=-1
+                const statsRows = await tx.execute(
+                  sql`SELECT
+                    p.id AS player_id,
+                    cf.positions_played,
+                    (
+                      CASE WHEN COALESCE(cb.g, 0) > 0 THEN
+                        (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
+                         COALESCE(cb.triples,0)*3.0 + COALESCE(cb.hr,0)*4.0 +
+                         COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
+                         COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
+                         COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
+                        ) / cb.g
+                      ELSE 0 END
+                      +
+                      CASE WHEN COALESCE(cp.g, 0) > 0 THEN
+                        (COALESCE(cp.w,0)*5.0 + COALESCE(cp.l,0)*-2.0 +
+                         COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
+                         COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
+                         COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
+                        ) / cp.g
+                      ELSE 0 END
+                      +
+                      CASE WHEN COALESCE(cf.g, 0) > 0 THEN
+                        COALESCE(cf.e_def,0) * -1.0 / cf.g
+                      ELSE 0 END
+                    ) AS projected_fpg
+                  FROM players p
+                  LEFT JOIN career_batting cb ON cb.player_id = p.id
+                  LEFT JOIN career_pitching cp ON cp.player_id = p.id
+                  LEFT JOIN career_fielding cf ON cf.player_id = p.id
+                  WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
+                  ORDER BY projected_fpg DESC`,
+                );
+
+                // Build player info map: id → { fpg, positions }
+                const playerDraftInfo = new Map<
+                  number,
+                  { fpg: number; positions: string[] }
+                >();
+                for (const row of statsRows.rows) {
+                  const playerId = row.player_id as number;
+                  const positionsPlayed = row.positions_played as Record<
+                    string,
+                    unknown
+                  > | null;
+                  playerDraftInfo.set(playerId, {
+                    fpg: Number(row.projected_fpg) || 0,
+                    positions: positionsPlayed
+                      ? Object.keys(positionsPlayed)
+                      : [],
+                  });
+                }
+
                 if (unfilledPositionTypes.length > 0) {
-                  const allowedStatPositions = [
-                    ...new Set(
-                      unfilledPositionTypes.flatMap(
-                        (pt) => ALLOWED_POSITIONS_FOR_AUTO_PICK[pt] ?? [pt],
-                      ),
-                    ),
-                  ];
-
-                  const fieldingRows = await tx
-                    .select({
-                      playerId: PublicSchema.careerFielding.playerId,
-                      positionsPlayed:
-                        PublicSchema.careerFielding.positionsPlayed,
-                    })
-                    .from(PublicSchema.careerFielding)
-                    .where(
-                      inArray(
-                        PublicSchema.careerFielding.playerId,
-                        eligibleIds,
-                      ),
-                    );
-
-                  const fieldingByPlayer = new Map(
-                    fieldingRows
-                      .filter(
-                        (r) => r.playerId != null && r.positionsPlayed != null,
-                      )
-                      .map((r) => [
-                        r.playerId as number,
-                        Object.keys(
-                          r.positionsPlayed as Record<string, unknown>,
-                        ),
-                      ]),
-                  );
-
-                  for (const id of eligibleIds) {
-                    const positions = fieldingByPlayer.get(id) ?? [];
-                    if (
-                      allowedStatPositions.some((sp) => positions.includes(sp))
-                    ) {
-                      autoPlayerId = id;
-                      LOGGER.info(
-                        '[autoProcessDraftPicks] Selected position-aware auto-pick',
-                        {
-                          draftId,
-                          playerId: autoPlayerId,
-                          unfilledPositionTypes,
-                        },
-                      );
-                      break;
+                  // Compute positional scarcity: scarcer positions → higher boost
+                  const totalEligible = Math.max(playerDraftInfo.size, 1);
+                  const positionCandidateCounts = new Map<string, number>();
+                  for (const posType of unfilledPositionTypes) {
+                    const allowedStatPositions =
+                      ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [posType];
+                    let posCount = 0;
+                    for (const [, info] of playerDraftInfo) {
+                      if (
+                        allowedStatPositions.some((sp) =>
+                          info.positions.includes(sp),
+                        )
+                      ) {
+                        posCount++;
+                      }
                     }
+                    positionCandidateCounts.set(posType, Math.max(posCount, 1));
+                  }
+
+                  // Score each player: projected FPG × scarcity multiplier
+                  // Players matching scarcer unfilled positions get a boost;
+                  // players not matching any unfilled position get a penalty.
+                  let bestScore = -Infinity;
+
+                  for (const [id, info] of playerDraftInfo) {
+                    let scarcityMultiplier = 0.25; // Penalty for not filling any need
+                    let matchesUnfilled = false;
+                    let bestPosition = '';
+
+                    for (const posType of unfilledPositionTypes) {
+                      const allowedStatPositions =
+                        ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [posType];
+                      if (
+                        allowedStatPositions.some((sp) =>
+                          info.positions.includes(sp),
+                        )
+                      ) {
+                        matchesUnfilled = true;
+                        const posCount =
+                          positionCandidateCounts.get(posType) ?? totalEligible;
+                        // sqrt-based scarcity: moderate boost, capped at 5×
+                        const posScarcity = Math.min(
+                          Math.sqrt(totalEligible / posCount),
+                          5.0,
+                        );
+                        if (posScarcity > scarcityMultiplier) {
+                          scarcityMultiplier = posScarcity;
+                          bestPosition = posType;
+                        }
+                      }
+                    }
+
+                    const draftScore = info.fpg * scarcityMultiplier;
+                    if (draftScore > bestScore) {
+                      bestScore = draftScore;
+                      autoPlayerId = id;
+                      autoPickReason = matchesUnfilled
+                        ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected FPG (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
+                        : `Best available (bench) — ${info.fpg.toFixed(1)} projected FPG`;
+                    }
+                  }
+
+                  LOGGER.info(
+                    '[autoProcessDraftPicks] Smart auto-pick selected',
+                    {
+                      draftId,
+                      playerId: autoPlayerId,
+                      reason: autoPickReason,
+                      unfilledPositionTypes,
+                      positionScarcity: Object.fromEntries(
+                        positionCandidateCounts,
+                      ),
+                    },
+                  );
+                } else {
+                  // No unfilled positions — pick the highest-FPG player (bench)
+                  // statsRows is already sorted by projected_fpg DESC
+                  const topPlayer = statsRows.rows[0];
+                  if (topPlayer) {
+                    autoPlayerId = topPlayer.player_id as number;
+                    const fpg = Number(topPlayer.projected_fpg) || 0;
+                    autoPickReason = `Best available (bench) — ${fpg.toFixed(1)} projected FPG`;
+                    LOGGER.info(
+                      '[autoProcessDraftPicks] Auto-pick for bench (all positions filled)',
+                      {
+                        draftId,
+                        playerId: autoPlayerId,
+                        projectedFpg: fpg.toFixed(2),
+                      },
+                    );
                   }
                 }
 
-                // 5. Fallback: pick the first eligible player (deterministic by id)
+                // Final fallback (should rarely happen — only if no stats exist)
                 if (autoPlayerId === undefined) {
                   autoPlayerId = eligibleIds[0];
+                  autoPickReason =
+                    'Fallback selection (no career stats available)';
                   LOGGER.info(
-                    '[autoProcessDraftPicks] Using fallback auto-pick (no position match)',
+                    '[autoProcessDraftPicks] Using final fallback auto-pick',
                     { draftId, playerId: autoPlayerId },
                   );
                 }
@@ -594,6 +695,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 return {
                   draftPick,
                   autoPlayerId,
+                  autoPickReason,
                   isDraftComplete,
                   currentPickInfo,
                   nextPickInfo,
@@ -638,6 +740,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     : undefined,
                   {
                     wasAutoPick: true,
+                    autoPickReason: pickResult.autoPickReason,
                     currentPickDeadline:
                       pickResult.nextDeadline?.toISOString() ?? null,
                   },

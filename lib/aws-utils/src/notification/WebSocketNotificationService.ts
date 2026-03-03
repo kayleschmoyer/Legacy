@@ -51,6 +51,7 @@ export interface DraftPickNotification {
   overallPick: number;
   pickedAt: string;
   wasAutoPick: boolean;
+  autoPickReason: string | null;
   currentPickDeadline: string | null;
   nextPick?: {
     teamId: number;
@@ -492,6 +493,7 @@ export class WebSocketNotificationService {
     },
     options?: {
       wasAutoPick?: boolean;
+      autoPickReason?: string | null;
       currentPickDeadline?: string | null;
     },
   ): Promise<void> {
@@ -507,6 +509,7 @@ export class WebSocketNotificationService {
       overallPick,
       pickedAt: new Date().toISOString(),
       wasAutoPick: options?.wasAutoPick ?? false,
+      autoPickReason: options?.autoPickReason ?? null,
       currentPickDeadline: options?.currentPickDeadline ?? null,
       ...(nextPick ? { nextPick } : {}),
     };

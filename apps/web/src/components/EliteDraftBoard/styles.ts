@@ -742,6 +742,11 @@ export const CSS = `
   background: rgba(245,158,11,0.15); color: #f59e0b;
   border: 1px solid rgba(245,158,11,0.25);
 }
+.d-announce-reason {
+  font-size: 11px; color: rgba(245,158,11,0.75); font-weight: 500;
+  max-width: 320px; line-height: 1.3;
+  padding: 2px 0;
+}
 .d-announce-pick {
   font-size: 13px; color: var(--d-text-secondary); font-weight: 600;
 }

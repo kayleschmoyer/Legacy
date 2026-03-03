@@ -38,6 +38,7 @@ export interface DraftPickNotification {
   overallPick: number;
   pickedAt: string;
   wasAutoPick: boolean;
+  autoPickReason: string | null;
   currentPickDeadline: string | null;
   nextPick?: {
     teamId: number;

@@ -93,6 +93,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     pickNumber: number;
     isMyPick: boolean;
     isAuto: boolean;
+    autoPickReason: string | null;
   } | null>(null);
   const [announcementLeaving, setAnnouncementLeaving] = useState(false);
   const announcementTimerRef = React.useRef<
@@ -105,11 +106,18 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       pickNumber: number,
       myPick: boolean,
       auto: boolean,
+      reason: string | null = null,
     ) => {
       if (announcementTimerRef.current)
         clearTimeout(announcementTimerRef.current);
       setAnnouncementLeaving(false);
-      setAnnouncement({ player, pickNumber, isMyPick: myPick, isAuto: auto });
+      setAnnouncement({
+        player,
+        pickNumber,
+        isMyPick: myPick,
+        isAuto: auto,
+        autoPickReason: reason,
+      });
       announcementTimerRef.current = setTimeout(() => {
         setAnnouncementLeaving(true);
         setTimeout(() => {
@@ -527,7 +535,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           pickedPlayer,
           notification.overallPick,
           isMyTeamPick,
-          false,
+          notification.wasAutoPick ?? false,
+          notification.autoPickReason ?? null,
         );
       }
       setLiveMessage(
@@ -1961,6 +1970,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           pickNumber={announcement.pickNumber}
           isMyPick={announcement.isMyPick}
           isAuto={announcement.isAuto}
+          autoPickReason={announcement.autoPickReason}
           leaving={announcementLeaving}
           onDismiss={() => {
             if (announcementTimerRef.current)

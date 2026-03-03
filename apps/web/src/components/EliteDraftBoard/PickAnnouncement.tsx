@@ -12,6 +12,7 @@ export function PickAnnouncement({
   pickNumber,
   isMyPick,
   isAuto,
+  autoPickReason,
   leaving,
   onDismiss,
 }: {
@@ -19,6 +20,7 @@ export function PickAnnouncement({
   pickNumber: number;
   isMyPick: boolean;
   isAuto: boolean;
+  autoPickReason?: string | null;
   leaving: boolean;
   onDismiss: () => void;
 }) {
@@ -72,6 +74,9 @@ export function PickAnnouncement({
 
         <div className="d-announce-body">
           <span className={`d-announce-label ${labelClass}`}>{labelText}</span>
+          {isAuto && autoPickReason && (
+            <div className="d-announce-reason">{autoPickReason}</div>
+          )}
           <div className="d-announce-pick">
             Pick #{pickNumber} &middot; Round {Math.ceil(pickNumber / 12)}
           </div>
