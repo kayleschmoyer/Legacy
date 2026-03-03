@@ -158,6 +158,7 @@ query GetLeagueDraft($leagueId: Int!) {
     currentPick
     draftStartedAt
     draftCompletedAt
+    scheduledAt
   }
 }
 
@@ -172,6 +173,7 @@ mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
     playerPool
     draftStartedAt
     draftCompletedAt
+    scheduledAt
   }
 }
 

@@ -169,6 +169,8 @@ export const drafts = pgTable(
     }),
     draftStartedAt: timestamp('draft_started_at', { withTimezone: true }),
     draftCompletedAt: timestamp('draft_completed_at', { withTimezone: true }),
+    /** Scheduled start time set by the commissioner (LS-423). Draft auto-starts at this time. */
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
   },
   (table) => {
     return {

@@ -71,6 +71,14 @@ type AutoSelectGamesResult {
   leaguesProcessed: Int
 }
 
+"""
+Result of the scheduled draft auto-start job
+"""
+type AutoStartScheduledDraftsResult {
+  draftsStarted: Int
+  errors: [String!]
+}
+
 type AverageSeasonBatting {
   atBats: Float
   battingAverage: Float
@@ -457,6 +465,11 @@ type Draft {
   id: Int
   leagueId: Int
   pickTimeLimitSeconds: Int
+
+  """
+  ISO-8601 timestamp when the draft is scheduled to auto-start (LS-423). Null means no scheduled start.
+  """
+  scheduledAt: String
   selectionMethod: String
   updatedAt: String
 }
@@ -1028,6 +1041,11 @@ type Mutation {
     """
     leagueId: Int
   ): AutoSelectGamesResult
+
+  """
+  System-only: start all live drafts whose scheduled_at has arrived. Triggered by EventBridge every minute.
+  """
+  autoStartScheduledDrafts: AutoStartScheduledDraftsResult
   awardChampionship(bracketId: Int!): ChampionTrophy
 
   """
@@ -2341,6 +2359,7 @@ input UpdateDraftSettingsInput {
   leagueId: Int!
   pickTimeLimitSeconds: Int
   playerPool: String
+  scheduledAt: String
   selectionMethod: String
 }
 
@@ -2357,6 +2376,7 @@ type UpdateDraftSettingsPayload {
   leagueId: Int
   pickTimeLimitSeconds: Int
   playerPool: String
+  scheduledAt: String
   selectionMethod: String
 }
 

@@ -802,6 +802,7 @@ builder.mutationField('updateDraftSettings', (t) =>
         hofOnly,
         customEraStartYear,
         customEraEndYear,
+        scheduledAt: scheduledAtInput,
       } = args.input;
       const userId = context.user.id;
 
@@ -906,6 +907,26 @@ builder.mutationField('updateDraftSettings', (t) =>
           }
         }
 
+        // Validate scheduledAt (LS-423): if provided and not null, must be a valid
+        // future ISO-8601 date. Pass null explicitly to clear the schedule.
+        let parsedScheduledAt: Date | null | undefined = undefined; // undefined = don't touch
+        if (scheduledAtInput !== undefined) {
+          if (scheduledAtInput === null) {
+            parsedScheduledAt = null; // explicit clear
+          } else {
+            const parsed = new Date(scheduledAtInput);
+            if (isNaN(parsed.getTime())) {
+              throw new Error(
+                `Invalid scheduledAt value: "${scheduledAtInput}". Must be a valid ISO-8601 datetime.`,
+              );
+            }
+            if (parsed.getTime() <= Date.now()) {
+              throw new Error('scheduledAt must be a future date and time.');
+            }
+            parsedScheduledAt = parsed;
+          }
+        }
+
         // Update player-eligibility fields on the league if any provided
         let updatedPlayerPool = league.playerPool;
         const leagueEligibilityUpdates: Record<string, unknown> = {};
@@ -981,6 +1002,11 @@ builder.mutationField('updateDraftSettings', (t) =>
           draftUpdates['pickTimeLimitSeconds'] = pickTimeLimitSeconds;
         }
 
+        // Handle scheduledAt: set when provided, clear when null, skip when undefined
+        if (parsedScheduledAt !== undefined) {
+          draftUpdates['scheduledAt'] = parsedScheduledAt;
+        }
+
         if (existingDraft) {
           const [updated] = await context.db
             .update(PublicSchema.drafts)
@@ -1025,6 +1051,13 @@ builder.mutationField('updateDraftSettings', (t) =>
           changedFields.push(`HOF only → ${hofOnly ? 'on' : 'off'}`);
         if (pickTimeLimitSeconds)
           changedFields.push(`pick timer → ${pickTimeLimitSeconds}s`);
+        if (parsedScheduledAt !== undefined) {
+          changedFields.push(
+            parsedScheduledAt === null
+              ? 'scheduled start → removed'
+              : `scheduled start → ${parsedScheduledAt.toLocaleString('en-US', { timeZoneName: 'short' })}`,
+          );
+        }
         const changesSummary =
           changedFields.length > 0 ? ` (${changedFields.join(', ')})` : '';
         const notificationText = `${username} updated draft settings${changesSummary}.`;

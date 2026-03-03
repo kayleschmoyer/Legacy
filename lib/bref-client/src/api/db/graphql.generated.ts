@@ -90,6 +90,13 @@ export type AutoSelectGamesResult = {
   leaguesProcessed?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Result of the scheduled draft auto-start job */
+export type AutoStartScheduledDraftsResult = {
+  __typename?: 'AutoStartScheduledDraftsResult';
+  draftsStarted?: Maybe<Scalars['Int']['output']>;
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+};
+
 export type AverageSeasonBatting = {
   __typename?: 'AverageSeasonBatting';
   atBats?: Maybe<Scalars['Float']['output']>;
@@ -421,6 +428,8 @@ export type Draft = {
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
+  /** ISO-8601 timestamp when the draft is scheduled to auto-start (LS-423). Null means no scheduled start. */
+  scheduledAt?: Maybe<Scalars['String']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
@@ -896,6 +905,8 @@ export type Mutation = {
   autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
+  /** System-only: start all live drafts whose scheduled_at has arrived. Triggered by EventBridge every minute. */
+  autoStartScheduledDrafts?: Maybe<AutoStartScheduledDraftsResult>;
   awardChampionship?: Maybe<ChampionTrophy>;
   /** Award the League Champion badge to the winning team owner. Requires commissioner / system access. */
   awardLeagueChampionBadge?: Maybe<Scalars['Boolean']['output']>;
@@ -2560,6 +2571,7 @@ export type UpdateDraftSettingsInput = {
   leagueId: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
+  scheduledAt?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -2575,6 +2587,7 @@ export type UpdateDraftSettingsPayload = {
   leagueId?: Maybe<Scalars['Int']['output']>;
   pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
+  scheduledAt?: Maybe<Scalars['String']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
 };
 

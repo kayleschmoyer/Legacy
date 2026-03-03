@@ -116,6 +116,7 @@ query GetLiveDraftLeagueDraft($leagueId: Int!) {
     currentPickDeadline
     draftStartedAt
     draftCompletedAt
+    scheduledAt
     createdAt
   }
 }

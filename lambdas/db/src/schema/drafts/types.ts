@@ -59,6 +59,7 @@ export const Draft = builder.objectRef<{
   currentPickDeadline: Date | null;
   draftStartedAt: Date | null;
   draftCompletedAt: Date | null;
+  scheduledAt: Date | null;
   date: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -85,6 +86,12 @@ Draft.implement({
     draftCompletedAt: t.string({
       nullable: true,
       resolve: (draft) => draft.draftCompletedAt?.toISOString() || null,
+    }),
+    scheduledAt: t.string({
+      nullable: true,
+      description:
+        'ISO-8601 timestamp when the draft is scheduled to auto-start (LS-423). Null means no scheduled start.',
+      resolve: (draft) => draft.scheduledAt?.toISOString() || null,
     }),
     date: t.exposeString('date', { nullable: true }),
     createdAt: t.string({
@@ -200,6 +207,8 @@ export const UpdateDraftSettingsInput = builder.inputType(
       hofOnly: t.boolean({ required: false }), // restrict draft board to Hall of Famers only
       customEraStartYear: t.int({ required: false }), // commissioner-defined era start year
       customEraEndYear: t.int({ required: false }), // commissioner-defined era end year
+      /** ISO-8601 datetime for when the draft should auto-start (LS-423). Null clears the schedule. */
+      scheduledAt: t.string({ required: false }),
     }),
   },
 );
@@ -215,6 +224,7 @@ export const UpdateDraftSettingsPayload = builder.objectRef<{
   pickTimeLimitSeconds: number;
   draftStartedAt: Date | null;
   draftCompletedAt: Date | null;
+  scheduledAt: Date | null;
   date: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -239,6 +249,10 @@ UpdateDraftSettingsPayload.implement({
     draftCompletedAt: t.string({
       nullable: true,
       resolve: (payload) => payload.draftCompletedAt?.toISOString() || null,
+    }),
+    scheduledAt: t.string({
+      nullable: true,
+      resolve: (payload) => payload.scheduledAt?.toISOString() || null,
     }),
   }),
 });

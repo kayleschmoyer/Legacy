@@ -138,6 +138,8 @@ export function DraftSettingsControl({
   const [playerPool, setPlayerPool] = useState('all');
   const [eraFilterLocal, setEraFilterLocal] = useState('all');
   const [hofOnlyLocal, setHofOnlyLocal] = useState(false);
+  /** ISO-8601 string (YYYY-MM-DDTHH:MM) for the datetime-local input, or '' for no schedule */
+  const [scheduledAt, setScheduledAt] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
   // Sync local state from server data
@@ -147,6 +149,12 @@ export function DraftSettingsControl({
       setDraftMode(String(draft.draftMode ?? 'live'));
       setSelectionMethod(String(draft.selectionMethod ?? 'standard'));
       setDraftOrder(String(draft.draftOrder ?? 'snake'));
+      // Sync scheduledAt: convert ISO-8601 to datetime-local (UTC slice for input)
+      setScheduledAt(
+        draft.scheduledAt
+          ? new Date(draft.scheduledAt).toISOString().slice(0, 16)
+          : '',
+      );
     }
   }, [draftData]);
 
@@ -173,6 +181,7 @@ export function DraftSettingsControl({
       pp: string,
       ef: string,
       hof: boolean,
+      sa: string,
     ) => {
       const originalDraftMode = String(
         draftData?.getLeagueDraft?.draftMode ?? 'live',
@@ -186,6 +195,11 @@ export function DraftSettingsControl({
       const originalPlayerPool = String(leaguePlayerPool ?? 'all');
       const originalEraFilter = String(eraFilter ?? 'all');
       const originalHofOnly = hofOnly ?? false;
+      const originalScheduledAt = draftData?.getLeagueDraft?.scheduledAt
+        ? new Date(draftData.getLeagueDraft.scheduledAt)
+            .toISOString()
+            .slice(0, 16)
+        : '';
 
       setHasChanges(
         dm !== originalDraftMode ||
@@ -193,7 +207,8 @@ export function DraftSettingsControl({
           dor !== originalDraftOrder ||
           pp !== originalPlayerPool ||
           ef !== originalEraFilter ||
-          hof !== originalHofOnly,
+          hof !== originalHofOnly ||
+          sa !== originalScheduledAt,
       );
     },
     [draftData, leaguePlayerPool, eraFilter, hofOnly],
@@ -211,6 +226,7 @@ export function DraftSettingsControl({
         playerPool,
         eraFilterLocal,
         hofOnlyLocal,
+        scheduledAt,
       );
     } else {
       checkChanges(
@@ -220,6 +236,7 @@ export function DraftSettingsControl({
         playerPool,
         eraFilterLocal,
         hofOnlyLocal,
+        scheduledAt,
       );
     }
   };
@@ -233,6 +250,7 @@ export function DraftSettingsControl({
       playerPool,
       eraFilterLocal,
       hofOnlyLocal,
+      scheduledAt,
     );
   };
 
@@ -245,6 +263,7 @@ export function DraftSettingsControl({
       playerPool,
       eraFilterLocal,
       hofOnlyLocal,
+      scheduledAt,
     );
   };
 
@@ -257,6 +276,7 @@ export function DraftSettingsControl({
       value,
       eraFilterLocal,
       hofOnlyLocal,
+      scheduledAt,
     );
   };
 
@@ -269,6 +289,7 @@ export function DraftSettingsControl({
       playerPool,
       value,
       hofOnlyLocal,
+      scheduledAt,
     );
   };
 
@@ -280,6 +301,21 @@ export function DraftSettingsControl({
       draftOrder,
       playerPool,
       eraFilterLocal,
+      value,
+      scheduledAt,
+    );
+  };
+
+  /** Handle draft schedule datetime change (LS-423) */
+  const handleScheduledAtChange = (value: string) => {
+    setScheduledAt(value);
+    checkChanges(
+      draftMode,
+      selectionMethod,
+      draftOrder,
+      playerPool,
+      eraFilterLocal,
+      hofOnlyLocal,
       value,
     );
   };
@@ -296,6 +332,10 @@ export function DraftSettingsControl({
             playerPool,
             eraFilter: eraFilterLocal,
             hofOnly: hofOnlyLocal,
+            // LS-423: send null to clear the schedule, ISO-8601 string to set it
+            scheduledAt: scheduledAt
+              ? new Date(scheduledAt).toISOString()
+              : null,
           },
         },
         refetchQueries: ['GetLeagueById', 'GetLeagueDraft'],
@@ -323,6 +363,11 @@ export function DraftSettingsControl({
       draftData?.getLeagueDraft?.draftOrder ?? 'snake',
     );
     const originalPlayerPool = String(leaguePlayerPool ?? 'all');
+    const originalScheduledAt = draftData?.getLeagueDraft?.scheduledAt
+      ? new Date(draftData.getLeagueDraft.scheduledAt)
+          .toISOString()
+          .slice(0, 16)
+      : '';
 
     setDraftMode(originalDraftMode);
     setSelectionMethod(originalSelectionMethod);
@@ -330,6 +375,7 @@ export function DraftSettingsControl({
     setPlayerPool(originalPlayerPool);
     setEraFilterLocal(eraFilter ?? 'all');
     setHofOnlyLocal(hofOnly ?? false);
+    setScheduledAt(originalScheduledAt);
     setHasChanges(false);
   };
 
@@ -484,6 +530,67 @@ export function DraftSettingsControl({
                   );
                 })}
               </XStack>
+            </YStack>
+
+            {/* Draft Schedule (LS-423) */}
+            <YStack gap="$2">
+              <YStack gap="$1">
+                <Text fontSize="$3" fontWeight="600" color="$color">
+                  Scheduled Start Time
+                </Text>
+                <Text fontSize="$2" color="$gray10">
+                  Set a date and time for the draft to automatically begin. The
+                  draft room opens 30 minutes before. Leave blank for manual
+                  start. All times are in UTC.
+                </Text>
+              </YStack>
+              <XStack gap="$2" alignItems="center">
+                <input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+                  disabled={isDraftLocked || saving}
+                  onChange={(e) => {
+                    handleScheduledAtChange(e.target.value);
+                  }}
+                  style={{
+                    background: isDraftLocked ? 'var(--gray3)' : 'var(--gray3)',
+                    border: `1px solid ${scheduledAt ? BRAND_NAVY_LIGHT : 'var(--gray6)'}`,
+                    borderRadius: 8,
+                    color: isDraftLocked ? 'var(--gray10)' : 'var(--color)',
+                    fontSize: 13,
+                    opacity: isDraftLocked || saving ? 0.5 : 1,
+                    padding: '6px 10px',
+                    cursor: isDraftLocked ? 'not-allowed' : 'default',
+                  }}
+                />
+                {scheduledAt && !isDraftLocked && (
+                  <Button
+                    size="$2"
+                    theme="alt2"
+                    onPress={() => {
+                      handleScheduledAtChange('');
+                    }}
+                    disabled={saving}
+                  >
+                    <Text fontSize="$2" color="$gray10">
+                      Clear
+                    </Text>
+                  </Button>
+                )}
+              </XStack>
+              {scheduledAt && (
+                <Text fontSize="$2" color="$blue10">
+                  Draft room opens at{' '}
+                  {new Date(
+                    new Date(scheduledAt).getTime() - 30 * 60 * 1000,
+                  ).toLocaleString('en-US', { timeZoneName: 'short' })}
+                  {' — '}draft starts at{' '}
+                  {new Date(scheduledAt).toLocaleString('en-US', {
+                    timeZoneName: 'short',
+                  })}
+                </Text>
+              )}
             </YStack>
 
             {/* Action buttons */}

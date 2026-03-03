@@ -59,6 +59,152 @@ import {
 import { env } from '../../config/environment';
 
 // ===========================================================================
+// Scheduled Draft Countdown (LS-423)
+// Rendered when a draft has a scheduled start time but the room isn't open yet
+// (i.e. more than 30 minutes before the scheduled start).
+// Self-contained with its own 1-second interval — does not pollute the
+// main component's state.
+// ===========================================================================
+
+function ScheduledDraftCountdown({
+  scheduledAt,
+  roomOpensAt,
+  leagueName,
+}: {
+  scheduledAt: Date;
+  roomOpensAt: Date;
+  leagueName?: string;
+}): React.JSX.Element {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const msUntilOpen = roomOpensAt.getTime() - now.getTime();
+  const msUntilStart = scheduledAt.getTime() - now.getTime();
+  const toHMS = (ms: number) => {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+  };
+
+  return (
+    <div className="d-root">
+      <style>{CSS}</style>
+      <div className="d-bg-fx" />
+      <div className="d-state-center">
+        <div className="d-state-icon">
+          <span role="img" aria-label="clock">
+            🕐
+          </span>
+        </div>
+        <div className="d-state-title">
+          {leagueName ? `${leagueName} — Scheduled Draft` : 'Scheduled Draft'}
+        </div>
+        <div className="d-state-desc">
+          This draft has a scheduled start time. The draft room will open 30
+          minutes before the draft begins.
+        </div>
+
+        {/* Draft start time */}
+        <div
+          style={{
+            marginTop: 16,
+            padding: '12px 20px',
+            background: 'var(--d-surface)',
+            border: '1px solid var(--d-border)',
+            borderRadius: 10,
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: 1.5,
+              textTransform: 'uppercase',
+              color: 'var(--d-text-secondary)',
+              marginBottom: 6,
+            }}
+          >
+            Draft Starts At
+          </div>
+          <div
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              color: 'var(--d-text)',
+            }}
+          >
+            {scheduledAt.toLocaleString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              timeZoneName: 'short',
+            })}
+          </div>
+        </div>
+
+        {/* Countdown */}
+        <div
+          style={{
+            marginTop: 16,
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: 1.5,
+              textTransform: 'uppercase',
+              color: 'var(--d-text-secondary)',
+              marginBottom: 4,
+            }}
+          >
+            {msUntilOpen > 0 ? 'Room Opens In' : 'Draft Starts In'}
+          </div>
+          <div
+            style={{
+              fontSize: 36,
+              fontWeight: 800,
+              fontVariantNumeric: 'tabular-nums',
+              color: 'var(--d-accent)',
+              letterSpacing: 2,
+            }}
+          >
+            {toHMS(msUntilOpen > 0 ? msUntilOpen : msUntilStart)}
+          </div>
+          {msUntilOpen > 0 && (
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--d-text-secondary)',
+                marginTop: 4,
+              }}
+            >
+              Room opens at{' '}
+              {roomOpensAt.toLocaleString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                timeZoneName: 'short',
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===========================================================================
 // Main Component
 // ===========================================================================
 
@@ -1255,6 +1401,25 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const draftStatus = league?.draftStatus;
 
   if (!draftId && draftStatus !== 'in-progress') {
+    // LS-423: if the draft has a scheduled start time and the room isn't open
+    // yet (>30 min before start), show the countdown screen instead of the lobby.
+    const scheduledAtRaw = (
+      leagueDraft as { scheduledAt?: string | null } | null
+    )?.scheduledAt;
+    const scheduledAt = scheduledAtRaw ? new Date(scheduledAtRaw) : null;
+    const draftRoomOpenAt = scheduledAt
+      ? new Date(scheduledAt.getTime() - 30 * 60 * 1000)
+      : null;
+    if (draftRoomOpenAt && new Date() < draftRoomOpenAt) {
+      return (
+        <ScheduledDraftCountdown
+          scheduledAt={scheduledAt!}
+          roomOpensAt={draftRoomOpenAt}
+          leagueName={league?.name ?? undefined}
+        />
+      );
+    }
+
     return (
       <div className="d-root">
         <style>{CSS}</style>
