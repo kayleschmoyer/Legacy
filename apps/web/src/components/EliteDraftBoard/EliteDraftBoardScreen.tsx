@@ -627,6 +627,47 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   // enrichedPlayers already contains only the players matching the selected position.
   const filteredPlayers = enrichedPlayers;
 
+  // ---- Board view: teams sorted by pick order (LS-463) ----
+  // Derive column order from round-1 pick history so the board columns
+  // match the actual draft pick order.  Falls back to customDraftOrder
+  // (commissioner drag-order) or the raw API team list when no picks
+  // have been made yet.
+  const boardOrderedTeams = useMemo(() => {
+    const round1Picks = pickHistory
+      .filter((p) => p.round === 1)
+      .sort((a, b) => a.overallPick - b.overallPick);
+
+    if (round1Picks.length > 0) {
+      const seenIds = new Set<string>();
+      const ordered: LeagueTeam[] = [];
+      for (const pick of round1Picks) {
+        const id = String(pick.teamId);
+        if (!seenIds.has(id)) {
+          const team = leagueTeams.find((t) => String(t.id) === id);
+          if (team) {
+            ordered.push(team);
+            seenIds.add(id);
+          }
+        }
+      }
+      // Append any teams that haven't yet had a round-1 pick
+      for (const team of leagueTeams) {
+        if (!seenIds.has(String(team.id))) {
+          ordered.push(team);
+        }
+      }
+      return ordered;
+    }
+
+    if (customDraftOrder) {
+      return customDraftOrder
+        .map((id) => leagueTeams.find((t) => String(t.id) === id))
+        .filter(Boolean) as LeagueTeam[];
+    }
+
+    return leagueTeams;
+  }, [pickHistory, leagueTeams, customDraftOrder]);
+
   // ---- Mutations ----
   const [initializeLiveDraft, { loading: initDraftLoading }] = useMutation(
     INITIALIZE_LIVE_DRAFT,
@@ -2332,7 +2373,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           {/* Board View (Team Columns) */}
           {viewMode === 'board' && (
             <DraftGrid
-              teams={leagueTeams}
+              teams={boardOrderedTeams}
               picks={pickHistory}
               currentPickInfo={currentPickInfo}
               myTeamId={myTeamId}
