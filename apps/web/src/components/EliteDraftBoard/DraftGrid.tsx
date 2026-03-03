@@ -5,7 +5,7 @@ import {
   type DraftPlayer,
   type LeagueTeam,
 } from './types';
-import { normalizeTeamId } from './utils';
+import { getPositionColor, normalizeTeamId } from './utils';
 
 // ---------------------------------------------------------------------------
 // Draft Grid Sub-component (team columns view)
@@ -121,18 +121,48 @@ export function DraftGrid({
                   : pick.player
                     ? `${pick.player.firstName} ${pick.player.lastName}`.trim()
                     : `#${pick.playerId}`;
+                const position = player?.position;
+                const posColor = position ? getPositionColor(position) : null;
+
+                const cellStyle: React.CSSProperties = {
+                  ...(pick.teamId === myTeamId
+                    ? { borderColor: 'rgba(16,185,129,0.2)' }
+                    : {}),
+                  ...(posColor
+                    ? {
+                        borderLeftColor: posColor,
+                        borderLeftWidth: 3,
+                        background: `${posColor}18`,
+                      }
+                    : {}),
+                };
                 return (
                   <div
                     key={team.id}
                     className="d-draft-grid-cell filled"
-                    title={`Pick #${pick.overallPick}: ${playerName}`}
-                    style={
-                      pick.teamId === myTeamId
-                        ? { borderColor: 'rgba(16,185,129,0.2)' }
-                        : undefined
-                    }
+                    title={`Pick #${pick.overallPick}: ${playerName}${position ? ` (${position})` : ''}`}
+                    style={cellStyle}
                   >
-                    <span style={{ fontSize: 10 }}>{playerName}</span>
+                    {posColor && position && (
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          background: posColor,
+                          color: '#fff',
+                          fontSize: 8,
+                          fontWeight: 700,
+                          padding: '1px 4px',
+                          borderRadius: 3,
+                          marginBottom: 2,
+                          letterSpacing: '0.03em',
+                        }}
+                      >
+                        {position}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 10, display: 'block' }}>
+                      {playerName}
+                    </span>
                   </div>
                 );
               }
