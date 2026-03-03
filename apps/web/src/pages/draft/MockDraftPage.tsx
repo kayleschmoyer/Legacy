@@ -2773,24 +2773,49 @@ function DraftBoardScreen({
               flexWrap: 'wrap',
             }}
           >
-            <input
-              type="search"
-              aria-label="Search players"
-              placeholder="Search players…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                flex: '1',
-                minWidth: '160px',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                border: `1px solid ${OVERLAY_WHITE_10}`,
-                background: OVERLAY_WHITE_05,
-                color: '#ffffff',
-                fontSize: '14px',
-                outline: 'none',
-              }}
-            />
+            <div style={{ position: 'relative', flex: '1', minWidth: '160px' }}>
+              <input
+                type="text"
+                aria-label="Search players"
+                placeholder="Search players…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: searchTerm ? '8px 36px 8px 14px' : '8px 14px',
+                  borderRadius: '8px',
+                  border: `1px solid ${OVERLAY_WHITE_10}`,
+                  background: OVERLAY_WHITE_05,
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              {searchTerm && (
+                <button
+                  aria-label="Clear search"
+                  onClick={() => setSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: SLATE_400,
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    lineHeight: '1',
+                    padding: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
             <div
               role="group"
               aria-label="Filter by position"
