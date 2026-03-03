@@ -36,6 +36,9 @@ export interface TeamStanding {
   averagePointsFor: number;
   averagePointsAgainst: number;
   rank?: number;
+  avatarUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
 }
 
 /**
@@ -238,6 +241,9 @@ export async function calculateStandings(
     .select({
       id: Schema.teams.id,
       name: Schema.teams.name,
+      avatarUrl: Schema.teams.avatarUrl,
+      primaryColor: Schema.teams.primaryColor,
+      secondaryColor: Schema.teams.secondaryColor,
     })
     .from(Schema.teams)
     .where(eq(Schema.teams.leagueId, leagueId));
@@ -261,6 +267,9 @@ export async function calculateStandings(
       winPercentage: 0,
       averagePointsFor: 0,
       averagePointsAgainst: 0,
+      avatarUrl: team.avatarUrl,
+      primaryColor: team.primaryColor,
+      secondaryColor: team.secondaryColor,
     });
   }
 

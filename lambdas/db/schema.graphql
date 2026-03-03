@@ -2222,12 +2222,15 @@ type TeamMember {
 Team standing information with wins, losses, and scoring stats
 """
 type TeamStanding {
+  avatarUrl: String
   averagePointsAgainst: Float
   averagePointsFor: Float
   losses: Int
   pointsAgainst: Float
   pointsFor: Float
+  primaryColor: String
   rank: Int
+  secondaryColor: String
   teamId: ID
   teamName: String
   ties: Int

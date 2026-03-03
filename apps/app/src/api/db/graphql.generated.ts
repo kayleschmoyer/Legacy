@@ -2459,12 +2459,15 @@ export type TeamMember = {
 /** Team standing information with wins, losses, and scoring stats */
 export type TeamStanding = {
   __typename?: 'TeamStanding';
+  avatarUrl?: Maybe<Scalars['String']['output']>;
   averagePointsAgainst?: Maybe<Scalars['Float']['output']>;
   averagePointsFor?: Maybe<Scalars['Float']['output']>;
   losses?: Maybe<Scalars['Int']['output']>;
   pointsAgainst?: Maybe<Scalars['Float']['output']>;
   pointsFor?: Maybe<Scalars['Float']['output']>;
+  primaryColor?: Maybe<Scalars['String']['output']>;
   rank?: Maybe<Scalars['Int']['output']>;
+  secondaryColor?: Maybe<Scalars['String']['output']>;
   teamId?: Maybe<Scalars['ID']['output']>;
   teamName?: Maybe<Scalars['String']['output']>;
   ties?: Maybe<Scalars['Int']['output']>;
@@ -3004,6 +3007,9 @@ export type GetLeagueStandingsQuery = {
     winPercentage?: number | null;
     pointsFor?: number | null;
     pointsAgainst?: number | null;
+    avatarUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
   }> | null;
 };
 
@@ -5194,6 +5200,9 @@ export const GetLeagueStandings = gql`
       winPercentage
       pointsFor
       pointsAgainst
+      avatarUrl
+      primaryColor
+      secondaryColor
     }
   }
 `;

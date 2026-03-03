@@ -47,6 +47,9 @@ query GetLeagueStandings($leagueId: Int!) {
     winPercentage
     pointsFor
     pointsAgainst
+    avatarUrl
+    primaryColor
+    secondaryColor
   }
 }
 

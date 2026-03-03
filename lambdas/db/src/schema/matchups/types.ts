@@ -374,6 +374,9 @@ export const TeamStanding = builder.objectRef<{
   averagePointsFor: number;
   averagePointsAgainst: number;
   rank: number | undefined;
+  avatarUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
 }>('TeamStanding');
 
 builder.objectType(TeamStanding, {
@@ -391,6 +394,9 @@ builder.objectType(TeamStanding, {
     averagePointsFor: t.exposeFloat('averagePointsFor'),
     averagePointsAgainst: t.exposeFloat('averagePointsAgainst'),
     rank: t.exposeInt('rank'),
+    avatarUrl: t.exposeString('avatarUrl', { nullable: true }),
+    primaryColor: t.exposeString('primaryColor', { nullable: true }),
+    secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
   }),
 });
 
@@ -443,6 +449,9 @@ export const SeasonResults = builder.objectRef<{
     averagePointsFor: number;
     averagePointsAgainst: number;
     rank: number | undefined;
+    avatarUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
   }>;
 }>('SeasonResults');
 
@@ -479,6 +488,9 @@ export const PlayoffQualification = builder.objectRef<{
     averagePointsFor: number;
     averagePointsAgainst: number;
     rank: number | undefined;
+    avatarUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
   };
 }>('PlayoffQualification');
 

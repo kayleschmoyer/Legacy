@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView } from 'react-native';
+import { Image, ScrollView } from 'react-native';
 import { Card, H4, Separator, Text, XStack, YStack } from 'tamagui';
 import type { TeamStanding } from '../../../api/db/graphql.generated';
 
@@ -145,14 +145,41 @@ export function StandingsTable({
               >
                 {index + 1}
               </Text>
-              <Text
-                flex={2}
-                fontSize="$3"
-                fontWeight={isTopTeam ? 'bold' : 'normal'}
-                numberOfLines={1}
-              >
-                {team.teamName}
-              </Text>
+              <XStack flex={2} alignItems="center" gap="$2">
+                {/* Team avatar */}
+                <YStack
+                  width={28}
+                  height={28}
+                  borderRadius={14}
+                  overflow="hidden"
+                  alignItems="center"
+                  justifyContent="center"
+                  flexShrink={0}
+                  backgroundColor={
+                    (team.primaryColor as string | undefined) ?? '#1B3A5C'
+                  }
+                >
+                  {team.avatarUrl ? (
+                    <Image
+                      source={{ uri: team.avatarUrl }}
+                      style={{ width: 28, height: 28 }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text fontSize="$2" fontWeight="bold" color="white">
+                      {(team.teamName ?? 'T').charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                </YStack>
+                <Text
+                  fontSize="$3"
+                  fontWeight={isTopTeam ? 'bold' : 'normal'}
+                  numberOfLines={1}
+                  flex={1}
+                >
+                  {team.teamName}
+                </Text>
+              </XStack>
               <Text flex={1} fontSize="$3" textAlign="center" color="$green10">
                 {team.wins}
               </Text>
