@@ -25,6 +25,7 @@ import {
 } from './types';
 import { DEFAULT_PICK_TIME } from './constants';
 import { getPositionColor, normalizeTeamId } from './utils';
+import { useBrowserNotifications } from './useBrowserNotifications';
 import { CSS } from './styles';
 import { CircularTimer } from './CircularTimer';
 import { PickAnnouncement } from './PickAnnouncement';
@@ -122,6 +123,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   // Screen reader live regions
   const [liveMessage, setLiveMessage] = useState('');
   const [urgentMessage, setUrgentMessage] = useState('');
+
+  // ---- Browser notifications ----
+  const { notify } = useBrowserNotifications();
 
   // Toast auto-dismiss
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -493,6 +497,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const handleDraftStarted = useCallback(
     (notification: DraftStartedNotification) => {
       setLiveMessage('Draft has started!');
+      notify('🏈 Draft has started!', {
+        body: 'Get ready — your league draft is live.',
+        tag: 'draft-started',
+      });
       if (notification.pickTimeLimitSeconds) {
         setPickTimeLimitSeconds(notification.pickTimeLimitSeconds);
       }
@@ -502,7 +510,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       void refetchDraft();
       void refetchCurrentPick({ draftId: notification.draftId });
     },
-    [refetchDraft, refetchCurrentPick],
+    [notify, refetchDraft, refetchCurrentPick],
   );
 
   const handleDraftPickMade = useCallback(
@@ -535,6 +543,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         );
         if (nextTeamId !== null && nextTeamId === myTeamId) {
           showToast('🎯 Your turn to pick!', 'info');
+          notify('🎯 Your turn to pick!', {
+            body: `Round ${notification.nextPick.round ?? ''} — you're on the clock. Head back to make your pick.`,
+            tag: 'draft-your-turn',
+            requireInteraction: true,
+          });
         }
       } else if (!notification.nextPick) {
         // No nextPick means draft may be complete
@@ -552,6 +565,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     },
     [
       myTeamId,
+      notify,
       enrichedPlayers,
       showAnnouncement,
       showToast,
@@ -566,9 +580,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       setDraftComplete(true);
       setDraftPaused(false);
       setLiveMessage('Draft is complete!');
+      notify('✅ Draft complete!', {
+        body: 'Your league draft has finished. Check out your roster!',
+        tag: 'draft-complete',
+      });
       void refetchLeague();
     },
-    [refetchLeague],
+    [notify, refetchLeague],
   );
 
   const handleDraftPaused = useCallback(
