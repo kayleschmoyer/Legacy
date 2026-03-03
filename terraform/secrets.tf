@@ -28,6 +28,12 @@ variable "jira_credentials" {
   sensitive   = true
 }
 
+variable "rollbar_access_token" {
+  description = "Rollbar server-side (post_server_item) access token for Lambda error tracking"
+  type        = string
+  sensitive   = true
+}
+
 # =============================================================================
 # GENERATED SECRETS
 # =============================================================================

@@ -64,6 +64,9 @@ jobs:
           if [ -z "${{ secrets.JIRA_CREDENTIALS }}" ]; then
             MISSING+=("JIRA_CREDENTIALS")
           fi
+          if [ -z "${{ secrets.ROLLBAR_ACCESS_TOKEN }}" ]; then
+            MISSING+=("ROLLBAR_ACCESS_TOKEN")
+          fi
           if [ ${#MISSING[@]} -gt 0 ]; then
             echo "::error::Missing required secrets: ${MISSING[*]}"
             exit 1
@@ -159,6 +162,7 @@ jobs:
           TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
           TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
           TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
+          TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
         run: |
           set -o pipefail
           echo "📋 Planning Terraform changes..."
@@ -205,6 +209,7 @@ jobs:
           TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
           TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
           TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
+          TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
         run: |
           echo "🚀 Applying Terraform changes..."
 

@@ -147,6 +147,9 @@ resource "aws_lambda_function" "oauth_proxy" {
       SENTRY_TRACES_SAMPLE_RATE = "0.1"
       SENTRY_DEBUG              = "false"
       SENTRY_RELEASE            = "legacy-sports-oauth-proxy@${data.aws_ssm_parameter.oauth_proxy_lambda_version.value}"
+
+      # Rollbar error tracking
+      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
     }
   }
 

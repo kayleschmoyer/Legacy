@@ -233,6 +233,9 @@ resource "aws_lambda_function" "websocket" {
       DB_NAME                             = aws_db_instance.postgres.db_name
       DB_SECRET_NAME                      = aws_secretsmanager_secret.database_credentials.arn
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
+
+      # Rollbar error tracking
+      ROLLBAR_ACCESS_TOKEN                = var.rollbar_access_token
     }
   }
 

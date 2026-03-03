@@ -214,6 +214,9 @@ resource "aws_lambda_function" "graphql" {
       SENTRY_DEBUG              = var.environment == "dev" ? "true" : "false"
       SENTRY_RELEASE            = "legacy-sports-graphql@${data.aws_ssm_parameter.graphql_lambda_version.value}"
 
+      # Rollbar error tracking
+      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+
       # WebSocket configuration for notifications
       CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
       WEBSOCKET_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"

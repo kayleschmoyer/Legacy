@@ -128,6 +128,7 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_GIPHY_API_KEY: ${{ secrets.VITE_GIPHY_API_KEY }}
           VITE_JIRA_PROXY_URL: ${{ secrets.VITE_JIRA_PROXY_URL }}
+          VITE_ROLLBAR_ACCESS_TOKEN: ${{ secrets.VITE_ROLLBAR_ACCESS_TOKEN }}
           VITE_VERSION: ${{ needs.setup.outputs.version }}
           VITE_APP_VERSION: ${{ needs.setup.outputs.version }}
           VITE_COMMIT_SHA: ${{ needs.setup.outputs.commit_sha }}

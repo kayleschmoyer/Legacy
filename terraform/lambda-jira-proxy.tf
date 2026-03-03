@@ -95,6 +95,9 @@ resource "aws_lambda_function" "jira_proxy" {
       SENTRY_DSN                     = var.sentry_dsn
       SENTRY_TRACES_SAMPLE_RATE     = "0.1"
       SENTRY_DEBUG                   = "false"
+
+      # Rollbar error tracking
+      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
     }
   }
 
