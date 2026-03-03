@@ -586,17 +586,19 @@ endif
 
 pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_blue,Running pre-commit validation...)
-	@$(call echo_plain,1/8 Schema generation...)
+	@$(call echo_plain,1/9 Migration immutability check...)
+	@node scripts/check-migration-immutability.js --branch
+	@$(call echo_plain,2/9 Schema generation...)
 	@pnpm exec nx run db:print-schema
-	@$(call echo_plain,2/8 Code generation...)
+	@$(call echo_plain,3/9 Code generation...)
 ifeq ($(DETECTED_OS),Windows)
 	@set "GRAPHQL_SCHEMA=$(WORKSPACE_PATH_WIN)\lambdas\db\schema.graphql" && pnpm exec nx affected -t codegen --base=main
 else
 	@GRAPHQL_SCHEMA=$(WORKSPACE_PATH)/lambdas/db/schema.graphql pnpm exec nx affected -t codegen --base=main
 endif
-	@$(call echo_plain,3/8 Type checking...)
+	@$(call echo_plain,4/9 Type checking...)
 	@pnpm exec nx affected -t typecheck --base=main
-	@$(call echo_plain,4/8 Formatting...)
+	@$(call echo_plain,5/9 Formatting...)
 	@pnpm exec nx format:write
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -NoProfile -Command "$$changed = git diff --name-only; if ($$changed) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$changed | ForEach-Object { Write-Host ('  ' + $$_) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'Commit the reformatted files and re-run make pc.' -ForegroundColor Red; exit 1 }"
@@ -610,13 +612,13 @@ else
 		exit 1; \
 	fi
 endif
-	@$(call echo_plain,5/8 Linting...)
+	@$(call echo_plain,6/9 Linting...)
 	@pnpm exec nx affected -t lint --fix --base=main
-	@$(call echo_plain,6/8 Workflow validation...)
+	@$(call echo_plain,7/9 Workflow validation...)
 	@node scripts/validate-workflows.js
-	@$(call echo_plain,7/8 Testing...)
+	@$(call echo_plain,8/9 Testing...)
 	@pnpm exec nx affected -t test --base=main
-	@$(call echo_plain,8/8 Building...)
+	@$(call echo_plain,9/9 Building...)
 	@pnpm exec nx affected -t build --base=main
 	@$(call echo_green,✓ All pre-commit checks passed!)
 

@@ -140,6 +140,16 @@ runs:
 
         echo "::endgroup::"
 
+    - name: "🔒 Migration Immutability Check"
+      shell: bash
+      run: |
+        echo "::group::🔒 Migration Immutability Check"
+        echo "Verifying no previously-landed migration files have been modified or deleted..."
+
+        node scripts/check-migration-immutability.js --branch
+
+        echo "::endgroup::"
+
     - name: "🎨 Code Formatting Check"
       id: formatting
       if: inputs.skip-formatting != 'true'

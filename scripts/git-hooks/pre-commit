@@ -113,6 +113,18 @@ try {
     process.exit(1);
   }
   
+  // Check that no previously-landed migrations have been modified or deleted
+  console.log('🔒 Running migration immutability check...\n');
+
+  try {
+    const migrationCheckScript = path.join(__dirname, '../../scripts/check-migration-immutability.js');
+    execSync(`node "${migrationCheckScript}"`, { stdio: 'inherit' });
+  } catch (error) {
+    console.error('\n❌ Migration immutability check failed!');
+    console.error('Commit blocked to protect database integrity.\n');
+    process.exit(1);
+  }
+
   // Run @legacy-sports package validation on staged package.json files
   console.log('📦 Running @legacy-sports package validation...\n');
   

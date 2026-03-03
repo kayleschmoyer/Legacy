@@ -45,6 +45,7 @@ function installGitHooks() {
 
   console.log('\n🔒 Security hooks installation complete!');
   console.log('\nThe following will now be validated before each commit:');
+  console.log('• Migration files already in main are not modified or deleted');
   console.log('• No real JWT secrets in tracked files');
   console.log('• No real cookie secrets in tracked files');
   console.log('• No production database endpoints in tracked files');
