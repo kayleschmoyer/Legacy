@@ -300,10 +300,29 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
             // When pickTimeLimitSeconds < the EventBridge interval, multiple
             // deadlines may have expired. Process them all in one invocation,
             // capped to stay within Lambda timeout limits.
+            //
+            // Time-budget guard: each auto-pick spans a DB transaction that
+            // can take several seconds (eligibility + stats queries across
+            // 23 k players). The Lambda timeout is 30 s, so we stop chaining
+            // at 20 s to avoid timing out mid-transaction, which would abort
+            // the transaction and leave the connection in a bad state for the
+            // next invocation. EventBridge (every 60 s) or the next client
+            // nudge will resume where we left off.
+            const PICK_LOOP_BUDGET_MS = 20_000;
+            const loopStartTime = Date.now();
             const MAX_AUTO_PICKS_PER_DRAFT = 100;
             let picksThisDraft = 0;
 
             while (picksThisDraft < MAX_AUTO_PICKS_PER_DRAFT) {
+              // Bail out before the Lambda timeout rather than dying mid-transaction.
+              const elapsedMs = Date.now() - loopStartTime;
+              if (elapsedMs > PICK_LOOP_BUDGET_MS) {
+                LOGGER.info(
+                  `[autoProcessDraftPicks] Time budget exhausted after ${elapsedMs} ms — stopping inner loop for draft ${draftId} (${picksThisDraft} picks this invocation)`,
+                );
+                break;
+              }
+
               // Process the expired pick inside a transaction
               const pickResult = await context.db.transaction(async (tx) => {
                 // Lock the draft row
@@ -372,13 +391,46 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 // Prefer players that can fill a still-open league roster position
                 // slot (minimum requirements), falling back to any available player.
 
-                // 1. Fetch all undrafted player IDs (deterministic id-ascending order)
+                // 1. Fetch the top 1000 undrafted candidates pre-sorted by projected
+                //    fantasy points per game (FPG). Limiting the candidate pool here
+                //    avoids passing 23 k+ player IDs as array parameters to the
+                //    eligibility filters and the scoring query, which previously
+                //    caused ~10 s per pick and Lambda timeouts.
+                //    1000 candidates gives ample coverage for all roster positions
+                //    while reducing downstream query cost by ~23×.
                 const undraftedRows = await tx.execute(
-                  sql`SELECT id FROM players
-                      WHERE id NOT IN (
-                        SELECT player_id FROM draft_picks WHERE draft_id = ${draftId}
-                      )
-                      ORDER BY id ASC`,
+                  sql`SELECT p.id,
+                      (
+                        CASE WHEN COALESCE(cb.g, 0) > 0 THEN
+                          (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
+                           COALESCE(cb.triples,0)*3.0 + COALESCE(cb.hr,0)*4.0 +
+                           COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
+                           COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
+                           COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
+                          ) / cb.g
+                        ELSE 0 END
+                        +
+                        CASE WHEN COALESCE(cp.g, 0) > 0 THEN
+                          (COALESCE(cp.w,0)*5.0 + COALESCE(cp.l,0)*-2.0 +
+                           COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
+                           COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
+                           COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
+                          ) / cp.g
+                        ELSE 0 END
+                        +
+                        CASE WHEN COALESCE(cf.g, 0) > 0 THEN
+                          COALESCE(cf.e_def,0) * -1.0 / cf.g
+                        ELSE 0 END
+                      ) AS fpg
+                    FROM players p
+                    LEFT JOIN career_batting cb ON cb.player_id = p.id
+                    LEFT JOIN career_pitching cp ON cp.player_id = p.id
+                    LEFT JOIN career_fielding cf ON cf.player_id = p.id
+                    WHERE p.id NOT IN (
+                      SELECT player_id FROM draft_picks WHERE draft_id = ${draftId}
+                    )
+                    ORDER BY fpg DESC
+                    LIMIT 1000`,
                 );
                 const undraftedIds = undraftedRows.rows.map(
                   (r) => r.id as number,
