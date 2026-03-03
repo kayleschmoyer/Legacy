@@ -12,6 +12,7 @@ import {
 import {
   getPlayerByBrefId,
   PublicDb,
+  refreshCareerStats,
   refreshPlayerEligiblePositions,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
@@ -130,6 +131,24 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
     // sees up-to-date eligibility data without forcing a per-player refresh.
     const successCount = event.Records.length - batchItemFailures.length;
     if (successCount > 0) {
+      // Refresh career materialized views first — player_eligible_positions reads
+      // from career_batting and career_pitching so order matters.
+      try {
+        addBreadcrumb('Refreshing career stat materialized views');
+        await refreshCareerStats(db);
+        LOGGER.debug(
+          'career_batting, career_fielding, career_pitching refreshed',
+        );
+      } catch (refreshError) {
+        LOGGER.error(
+          'Failed to refresh career stat views:',
+          refreshError as Error,
+        );
+        captureError(refreshError as Error, {
+          tags: { operation: 'refresh_career_stats' },
+        });
+      }
+
       try {
         addBreadcrumb('Refreshing player_eligible_positions materialized view');
         await refreshPlayerEligiblePositions(db);

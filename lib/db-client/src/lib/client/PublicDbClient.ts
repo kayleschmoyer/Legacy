@@ -183,6 +183,30 @@ export async function bulkUpsertPitchingSeason(
 }
 
 /**
+ * Refresh the career_batting, career_fielding, and career_pitching materialized
+ * views.
+ *
+ * Should be called once per SQS batch after career stats have been written to the
+ * underlying season_batting / season_fielding / season_pitching base tables.
+ * Must be called BEFORE refreshPlayerEligiblePositions, which reads from
+ * career_batting and career_pitching.
+ *
+ * CONCURRENTLY allows reads to continue during refresh; it requires the unique
+ * indexes created by migration 20260303_120000 to already exist.
+ */
+export async function refreshCareerStats(db: PublicDb): Promise<void> {
+  await db.execute(
+    sql`REFRESH MATERIALIZED VIEW CONCURRENTLY public.career_batting`,
+  );
+  await db.execute(
+    sql`REFRESH MATERIALIZED VIEW CONCURRENTLY public.career_fielding`,
+  );
+  await db.execute(
+    sql`REFRESH MATERIALIZED VIEW CONCURRENTLY public.career_pitching`,
+  );
+}
+
+/**
  * Refresh the player_eligible_positions materialized view.
  *
  * Should be called once after a bulk stats-load run (not per-player) so the
@@ -190,6 +214,9 @@ export async function bulkUpsertPitchingSeason(
  *
  * CONCURRENTLY allows reads to continue during the refresh; it requires the
  * unique index created by migration 20260302_120000 to already exist.
+ *
+ * Must be called AFTER refreshCareerStats since player_eligible_positions reads
+ * from the career_batting and career_pitching materialized views.
  */
 export async function refreshPlayerEligiblePositions(
   db: PublicDb,
