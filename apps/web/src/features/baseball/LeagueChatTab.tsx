@@ -79,10 +79,18 @@ export function LeagueChatTab({
     [sendMessage],
   );
 
+  const handleSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      void handleSend();
+    },
+    [handleSend],
+  );
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Ctrl+Enter or Cmd+Enter sends
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      // Enter sends; Shift+Enter inserts a newline
+      if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         void handleSend();
       }
@@ -232,70 +240,73 @@ export function LeagueChatTab({
       )}
 
       {/* Input area */}
-      <XStack
-        paddingHorizontal="$4"
-        paddingVertical="$3"
-        borderTopWidth={1}
-        borderTopColor="$borderColor"
-        backgroundColor="$background"
-        alignItems="flex-end"
-        gap="$2"
-      >
-        {/* GIF button */}
-        <Button
-          size="$3"
-          backgroundColor={showGifPicker ? BRAND_NAVY_LIGHT : '$gray5'}
-          color={showGifPicker ? 'white' : '$color'}
-          onPress={() => setShowGifPicker((v) => !v)}
-          paddingHorizontal="$2"
-          aria-label="Open GIF picker"
-          aria-pressed={showGifPicker}
+      <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+        <XStack
+          paddingHorizontal="$4"
+          paddingVertical="$3"
+          borderTopWidth={1}
+          borderTopColor="$borderColor"
+          backgroundColor="$background"
+          alignItems="flex-end"
+          gap="$2"
         >
-          <Text
-            fontSize="$2"
-            fontWeight="700"
+          {/* GIF button */}
+          <Button
+            size="$3"
+            backgroundColor={showGifPicker ? BRAND_NAVY_LIGHT : '$gray5'}
             color={showGifPicker ? 'white' : '$color'}
+            onPress={() => setShowGifPicker((v) => !v)}
+            paddingHorizontal="$2"
+            aria-label="Open GIF picker"
+            aria-pressed={showGifPicker}
           >
-            GIF
-          </Text>
-        </Button>
-        <textarea
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Message the league… (Ctrl+Enter to send)"
-          aria-label="Message the league"
-          maxLength={2000}
-          rows={2}
-          style={{
-            flex: 1,
-            resize: 'none',
-            border: '1px solid var(--borderColor)',
-            borderRadius: 8,
-            padding: '10px 14px',
-            fontSize: 14,
-            fontFamily: 'inherit',
-            backgroundColor: `var(--surfaceSubtle, ${GRAY_50})`,
-            color: 'var(--color)',
-            outline: 'none',
-            lineHeight: 1.5,
-          }}
-        />
-        <Button
-          size="$3"
-          backgroundColor={BRAND_NAVY_LIGHT}
-          color="white"
-          onPress={() => void handleSend()}
-          disabled={!inputText.trim() || sending}
-          opacity={!inputText.trim() || sending ? 0.5 : 1}
-          minWidth={80}
-          aria-label="Send message"
-        >
-          <Text fontSize="$3" fontWeight="600" color="white">
-            {sending ? '\u2026' : 'Send'}
-          </Text>
-        </Button>
-      </XStack>
+            <Text
+              fontSize="$2"
+              fontWeight="700"
+              color={showGifPicker ? 'white' : '$color'}
+            >
+              GIF
+            </Text>
+          </Button>
+          <textarea
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Message the league… (Shift+Enter for newline)"
+            aria-label="Message the league"
+            maxLength={2000}
+            rows={2}
+            style={{
+              flex: 1,
+              resize: 'none',
+              border: '1px solid var(--borderColor)',
+              borderRadius: 8,
+              padding: '10px 14px',
+              fontSize: 14,
+              fontFamily: 'inherit',
+              backgroundColor: `var(--surfaceSubtle, ${GRAY_50})`,
+              color: 'var(--color)',
+              outline: 'none',
+              lineHeight: 1.5,
+            }}
+          />
+          <Button
+            tag="button"
+            type="submit"
+            size="$3"
+            backgroundColor={BRAND_NAVY_LIGHT}
+            color="white"
+            disabled={!inputText.trim() || sending}
+            opacity={!inputText.trim() || sending ? 0.5 : 1}
+            minWidth={80}
+            aria-label="Send message"
+          >
+            <Text fontSize="$3" fontWeight="600" color="white">
+              {sending ? '\u2026' : 'Send'}
+            </Text>
+          </Button>
+        </XStack>
+      </form>
     </YStack>
   );
 }
