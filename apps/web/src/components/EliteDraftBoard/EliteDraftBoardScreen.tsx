@@ -947,6 +947,12 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   // harmless (FOR UPDATE + deadline re-check guards against duplicates).
   // A 2-second grace period avoids needlessly nudging when a WS notification
   // for a just-completed pick is already in-flight.
+  //
+  // After the mutation resolves we immediately refetch critical draft state so
+  // the UI updates as soon as the round-trip completes (~T+3s), rather than
+  // waiting for either a WebSocket notification (may be delayed) or the next
+  // 5-second poll cycle (worst-case T+7s). The WS handler still runs when the
+  // notification arrives, but Apollo deduplicates the concurrent requests.
   const nudgeAttemptRef = useRef<number | null>(null);
   useEffect(() => {
     nudgeAttemptRef.current = null;
@@ -965,10 +971,19 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       // Double-check the pick hasn't advanced while we waited
       if (nudgeAttemptRef.current === pickNumber) return;
       nudgeAttemptRef.current = pickNumber;
-      void nudgeExpiredDraftPick({ variables: { leagueId } }).catch(() => {
-        // Swallow errors — the nudge is best-effort; EventBridge is the
-        // fallback and the server is the source of truth.
-      });
+      void nudgeExpiredDraftPick({ variables: { leagueId } })
+        .then(() => {
+          // Eagerly sync state once the server confirms the auto-pick so the
+          // board refreshes at mutation round-trip speed, not at the next WS
+          // delivery or poll cycle.
+          void refetchCurrentPick({ draftId });
+          void refetchPickHistory();
+          void refetchAvailablePlayers();
+        })
+        .catch(() => {
+          // Swallow errors — the nudge is best-effort; EventBridge is the
+          // fallback and the server is the source of truth.
+        });
     }, 2000);
 
     return () => clearTimeout(timer);
@@ -980,6 +995,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     timeRemaining,
     currentPickInfo?.overallPick,
     nudgeExpiredDraftPick,
+    refetchCurrentPick,
+    refetchPickHistory,
+    refetchAvailablePlayers,
   ]);
 
   // ---- A11y announcements ----
