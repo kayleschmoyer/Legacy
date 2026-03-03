@@ -109,9 +109,6 @@ export function PlayerStatsPage({
       {/* ── Glassmorphic Hero Header ────────────────────────────── */}
       {showHeader && (
         <YStack
-          position="sticky"
-          top={0}
-          zIndex={100}
           style={{
             background: `linear-gradient(135deg, ${BRAND_NAVY_DARK} 0%, ${BRAND_NAVY} 55%, ${BRAND_NAVY_LIGHT} 100%)`,
             backdropFilter: 'blur(16px)',
@@ -155,7 +152,10 @@ export function PlayerStatsPage({
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
-                    lineHeight: 1.1,
+                    lineHeight: 1.3,
+                    paddingTop: 2,
+                    paddingBottom: 4,
+                    display: 'inline-block',
                   }}
                 >
                   {title}
