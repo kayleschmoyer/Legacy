@@ -9,6 +9,28 @@
  * - Reproduction commands
  */
 
+/**
+ * Retry a GitHub API call up to `retries` times on transient 5xx errors.
+ */
+async function withRetry(fn, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status = err.status || err.response?.status || 0;
+      if (attempt < retries && status >= 500) {
+        const delay = attempt * 2000;
+        console.log(
+          `GitHub API error (${status}), retrying in ${delay}ms (attempt ${attempt}/${retries})...`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 module.exports = async ({ github, context, core }) => {
   const commentMarker = '<!-- CI-PIPELINE-STATUS -->';
 
@@ -53,11 +75,13 @@ module.exports = async ({ github, context, core }) => {
 
   // Find existing CI comment to update
   const prNumber = parseInt(process.env.PR_NUMBER);
-  const comments = await github.rest.issues.listComments({
-    issue_number: prNumber,
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-  });
+  const comments = await withRetry(() =>
+    github.rest.issues.listComments({
+      issue_number: prNumber,
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+    }),
+  );
 
   let existingComment = comments.data.find(
     (comment) => comment.body && comment.body.includes(commentMarker),
@@ -378,22 +402,26 @@ module.exports = async ({ github, context, core }) => {
 
   // Update or create comment
   if (existingComment) {
-    await github.rest.issues.updateComment({
-      comment_id: existingComment.id,
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      body: comment,
-    });
+    await withRetry(() =>
+      github.rest.issues.updateComment({
+        comment_id: existingComment.id,
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        body: comment,
+      }),
+    );
     console.log('Updated existing CI failure comment #' + existingComment.id);
     core.setOutput('comment_id', existingComment.id);
     return { comment_id: existingComment.id };
   } else {
-    const newComment = await github.rest.issues.createComment({
-      issue_number: prNumber,
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      body: comment,
-    });
+    const newComment = await withRetry(() =>
+      github.rest.issues.createComment({
+        issue_number: prNumber,
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        body: comment,
+      }),
+    );
     console.log('Created new CI failure comment #' + newComment.data.id);
     core.setOutput('comment_id', newComment.data.id);
     return { comment_id: newComment.data.id };

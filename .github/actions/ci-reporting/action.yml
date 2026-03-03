@@ -150,6 +150,7 @@ runs:
     - name: "PR Comment - Failure Report"
       id: pr-failure-comment
       if: inputs.status == 'failure' && inputs.event-name == 'pull_request' && inputs.pr-number != ''
+      continue-on-error: true
       uses: actions/github-script@v7
       env:
         PR_NUMBER: ${{ inputs.pr-number }}
@@ -171,6 +172,7 @@ runs:
     - name: "PR Comment - Success Report"
       id: pr-success-comment
       if: inputs.status == 'success' && inputs.event-name == 'pull_request' && inputs.pr-number != ''
+      continue-on-error: true
       uses: actions/github-script@v7
       env:
         PR_NUMBER: ${{ inputs.pr-number }}

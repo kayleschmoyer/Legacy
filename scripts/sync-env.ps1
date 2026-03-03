@@ -23,12 +23,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Ensure AWS_PROFILE is set so Terraform can find SSO credentials
-if (-not $env:AWS_PROFILE) {
-    $env:AWS_PROFILE = "Default"
-    Write-Host "AWS_PROFILE not set, defaulting to 'Default'" -ForegroundColor Gray
-}
-
 Write-Host "Legacy Sports Environment Sync" -ForegroundColor Cyan
 Write-Host "=================================" -ForegroundColor Cyan
 Write-Host ""
