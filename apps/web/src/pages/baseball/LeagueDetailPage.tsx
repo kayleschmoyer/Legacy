@@ -425,6 +425,8 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   // ── Data Fetching ──
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const {
     data,
     loading,
@@ -433,7 +435,6 @@ export function LeagueDetailPage(): React.JSX.Element {
   } = useGetLeagueByIdQuery({
     skip: isNaN(leagueId),
     variables: { id: leagueId },
-    notifyOnNetworkStatusChange: true,
   });
 
   useEffect(() => {
@@ -513,26 +514,37 @@ export function LeagueDetailPage(): React.JSX.Element {
     [],
   );
 
+  // Wrap refetchLeague so we can track background-refresh state for the UI
+  // indicator without replacing the entire page with a spinner.
+  const backgroundRefetch = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refetchLeague();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetchLeague]);
+
   const handleDraftCompleted = useCallback(() => {
-    void refetchLeague();
-    // Clear cached team members so the skip guard lifts and we get fresh data
-    dispatch(setTeamMembers([]));
+    void backgroundRefetch();
+    // Refetch team members in the background — do NOT clear redux teamMembers
+    // to [] because that causes the page to flash a full-page spinner.
     void refetchTeamMembersRef.current?.();
-  }, [refetchLeague, dispatch]);
+  }, [backgroundRefetch]);
 
   const handleDraftStarted = useCallback(() => {
-    void refetchLeague();
-  }, [refetchLeague]);
+    void backgroundRefetch();
+  }, [backgroundRefetch]);
 
   const handleRosterUpdate = useCallback(() => {
-    void refetchLeague();
-  }, [refetchLeague]);
+    void backgroundRefetch();
+  }, [backgroundRefetch]);
 
   const handleMatchupStatsComplete = useCallback(() => {
-    void refetchLeague();
+    void backgroundRefetch();
     // Also refetch matchup data so statsLoadingStatus updates and spinner clears
     void refetchCurrentMatchupRef.current?.();
-  }, [refetchLeague]);
+  }, [backgroundRefetch]);
 
   // Create the single shared WebSocket connection for this league page.
   // All child components (chat, trades, roster) subscribe via
@@ -622,9 +634,9 @@ export function LeagueDetailPage(): React.JSX.Element {
     if (!wsConnected) return;
     const status = leagueDraftStatusRef.current;
     if (status === 'in-progress' || status === 'queued') {
-      void refetchLeague();
+      void backgroundRefetch();
     }
-  }, [wsConnected, refetchLeague]);
+  }, [wsConnected, backgroundRefetch]);
 
   // ── Derived Data ──
 
@@ -1156,8 +1168,13 @@ export function LeagueDetailPage(): React.JSX.Element {
   const draftColors = getDraftBadgeColors(String(league?.draftStatus));
 
   // ── Loading / Error States ──
+  // Only show the full-page spinner on the initial load (no cached data yet).
+  // Background refetches triggered by WebSocket events keep existing content
+  // visible and show a subtle "Updating..." indicator instead.
+  const initialLoading =
+    (loading && !data) || positionsLoading || teamMembersLoading;
 
-  if (loading || positionsLoading || teamMembersLoading) {
+  if (initialLoading) {
     return (
       <PageContainer>
         <YStack
@@ -2477,6 +2494,30 @@ export function LeagueDetailPage(): React.JSX.Element {
           title={league.name ?? 'League'}
           description={`Manage your ${league.name ?? 'fantasy baseball'} league on Legacy Sports — view rosters, standings, matchups, and trades.`}
         />
+
+        {/* Subtle refresh indicator — shown during background refetches triggered
+            by WebSocket events so the user knows data is updating without
+            replacing the entire page with a spinner. */}
+        {isRefreshing && (
+          <XStack
+            alignItems="center"
+            justifyContent="center"
+            gap="$2"
+            paddingVertical="$1.5"
+            backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+            animation="quick"
+            enterStyle={{ opacity: 0, y: -8 }}
+            exitStyle={{ opacity: 0, y: -8 }}
+            role="status"
+            aria-live="polite"
+          >
+            <Spinner size="small" color={BRAND_NAVY_LIGHT} />
+            <Text fontSize="$2" fontWeight="600" color={BRAND_NAVY_LIGHT}>
+              Updating...
+            </Text>
+          </XStack>
+        )}
+
         {/* Hero Header */}
         <HeroBar
           style={{

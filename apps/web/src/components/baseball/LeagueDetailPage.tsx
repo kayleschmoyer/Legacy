@@ -246,7 +246,6 @@ export function LeagueDetailPage(): React.JSX.Element {
     skip:
       isNaN(leagueId) || (!!reduxLeagueData && reduxLeagueData.id === leagueId),
     variables: { id: leagueId },
-    notifyOnNetworkStatusChange: true,
   });
 
   useEffect(() => {
@@ -516,15 +515,16 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   // ── Loading / Error States ──
 
-  // Also gate on `!league && !error`: covers the single render gap where Apollo
-  // has not yet set its own `loading=true` after the skip flag transitions,
-  // preventing the "League not found" error from flashing transiently.
-  if (
-    loading ||
+  // Only show the full-page spinner on the initial load (no cached data yet).
+  // Background refetches triggered by WebSocket events keep existing content
+  // visible instead of replacing the entire page with a spinner.
+  const initialLoading =
+    (loading && !data) ||
     positionsLoading ||
     teamMembersLoading ||
-    (!league && !error)
-  ) {
+    (!league && !error);
+
+  if (initialLoading) {
     return (
       <PageContainer>
         <YStack

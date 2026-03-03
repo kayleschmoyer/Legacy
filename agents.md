@@ -52,6 +52,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **UI Brand Colors**             | `.github/skills/ui-brand-colors/SKILL.md`                                  |
 | **UI Standards**                | `.github/skills/ui-standards/SKILL.md`                                     |
 | **User testing**                | `.github/skills/user-testing/SKILL.md`                                     |
+| **WebSocket refetch UX**        | `.github/skills/websocket-refetch-ux/SKILL.md`                             |
 | **Rebase & conflicts**          | `.github/skills/rebase-conflicts/SKILL.md`                                 |
 | **Worktree workflow (default)** | `.github/skills/worktree-workflow/SKILL.md`                                |
 | All skills (57 guides)          | `.github/skills/`                                                          |
