@@ -6,6 +6,43 @@ import DataLoader from 'dataloader';
 import { inArray } from 'drizzle-orm';
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 
+// ---------------------------------------------------------------------------
+// Module-level eligible-positions cache (LS-434)
+//
+// player_eligible_positions is a materialized view that only refreshes when a
+// bulk stats-load run completes (nightly at most).  Caching results in the
+// Lambda process between requests eliminates redundant round-trips to the DB.
+//
+// TTL: 30 minutes — short enough that a fresh refresh is visible within one
+// scoring cycle, long enough to absorb the bulk of repeated requests during
+// an active draft or scoring pass.
+// ---------------------------------------------------------------------------
+
+/** Cache entry: sorted position strings + expiry timestamp */
+interface CacheEntry {
+  positions: string[];
+  expiresAt: number;
+}
+
+const ELIGIBLE_POSITIONS_CACHE_TTL_MS = 30 * 60 * 1_000; // 30 minutes
+
+/**
+ * Module-level map shared across all requests within a warm Lambda instance.
+ * Keyed by player ID, value is the sorted list of eligible position codes.
+ */
+const eligiblePositionsCache = new Map<number, CacheEntry>();
+
+/**
+ * Clear the module-level eligible-positions cache.
+ *
+ * Call this after `REFRESH MATERIALIZED VIEW player_eligible_positions`
+ * completes so the next DataLoader batch fetches fresh data.
+ * (Safe to call even if the cache is already empty.)
+ */
+export function clearEligiblePositionsCache(): void {
+  eligiblePositionsCache.clear();
+}
+
 /**
  * DataLoader for teams
  * Key: teamId (number)
@@ -127,38 +164,65 @@ export const createLeaguePositionByIdLoader = (
  * DataLoader for player eligible positions
  * Key: playerId (number)
  * Returns: string[] of position codes, sorted by games played (most to least)
+ *
+ * Uses a module-level cache (see above) to skip DB round-trips for player IDs
+ * whose eligible positions are already known and not yet expired.
  */
 export const createEligiblePositionsLoader = (
   db: GenericDatabase<typeof PublicSchema>,
 ) =>
   new DataLoader<number, string[]>(async (keys) => {
-    const ids = [...new Set(keys)] as number[];
-    const rows = await db
-      .select({
-        playerId: PublicSchema.playerEligiblePositions.playerId,
-        position: PublicSchema.playerEligiblePositions.position,
-        games: PublicSchema.playerEligiblePositions.games,
-      })
-      .from(PublicSchema.playerEligiblePositions)
-      .where(inArray(PublicSchema.playerEligiblePositions.playerId, ids));
+    const now = Date.now();
 
-    const posMap = new Map<
-      number,
-      Array<{ position: string; games: number }>
-    >();
-    for (const row of rows) {
-      let arr = posMap.get(row.playerId);
-      if (!arr) {
-        arr = [];
-        posMap.set(row.playerId, arr);
+    // Partition keys into cache-hits and DB-misses
+    const missing: number[] = [];
+    const hitMap = new Map<number, string[]>();
+
+    for (const key of keys) {
+      const entry = eligiblePositionsCache.get(key);
+      if (entry !== undefined && entry.expiresAt > now) {
+        hitMap.set(key, entry.positions);
+      } else {
+        missing.push(key);
       }
-      arr.push({ position: row.position, games: row.games });
     }
 
-    // Sort positions by games played (descending) and return just the position strings
-    return keys.map((key) => {
-      const positions = posMap.get(key);
-      if (!positions) return [];
-      return positions.sort((a, b) => b.games - a.games).map((p) => p.position);
-    });
+    // Fetch only the uncached player IDs
+    if (missing.length > 0) {
+      const ids = [...new Set(missing)];
+      const rows = await db
+        .select({
+          playerId: PublicSchema.playerEligiblePositions.playerId,
+          position: PublicSchema.playerEligiblePositions.position,
+          games: PublicSchema.playerEligiblePositions.games,
+        })
+        .from(PublicSchema.playerEligiblePositions)
+        .where(inArray(PublicSchema.playerEligiblePositions.playerId, ids));
+
+      const posMap = new Map<
+        number,
+        Array<{ position: string; games: number }>
+      >();
+      for (const row of rows) {
+        let arr = posMap.get(row.playerId);
+        if (!arr) {
+          arr = [];
+          posMap.set(row.playerId, arr);
+        }
+        arr.push({ position: row.position, games: row.games });
+      }
+
+      const expiresAt = now + ELIGIBLE_POSITIONS_CACHE_TTL_MS;
+      for (const id of ids) {
+        const raw = posMap.get(id) ?? [];
+        const sorted = raw
+          .sort((a, b) => b.games - a.games)
+          .map((p) => p.position);
+        eligiblePositionsCache.set(id, { positions: sorted, expiresAt });
+        hitMap.set(id, sorted);
+      }
+    }
+
+    // Return results in the same order as the input keys
+    return keys.map((key) => hitMap.get(key) ?? []);
   });

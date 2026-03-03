@@ -48,6 +48,9 @@ export {
   createGameFieldingLoader,
 } from './statistics-loaders';
 
+// Re-export cache utilities
+export { clearEligiblePositionsCache } from './entity-loaders';
+
 /**
  * Create all loaders for GraphQL context
  * Accepts a shared database connection instead of creating its own
