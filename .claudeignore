@@ -1,0 +1,57 @@
+# .claudeignore — files Claude should not read
+# Same syntax as .gitignore
+
+# Secrets & environment variables
+.env
+.env.*
+*.env
+
+# Database dumps (large, may contain PII)
+resources/
+**/*.dump
+**/*.dump.bak
+**/*.sql
+
+# Certificates & keys
+certs/
+**/*.pem
+**/*.key
+**/*.p12
+**/*.p8
+**/*.jks
+**/*.mobileprovision
+**/*.keystore
+
+# Terraform state (contains secrets)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+*.tfvars
+terraform/build/
+
+# Dependencies & generated output (large, low signal)
+node_modules/
+dist/
+build/
+.next/
+.expo/
+.tamagui/
+**/*.tsbuildinfo
+**/*.zip
+
+# Logs & scratch output
+logs/
+scratch/
+test-results/
+playwright-report/
+coverage/
+
+# Lock files (large, rarely useful for context)
+pnpm-lock.yaml
+
+# Internal tool state
+.twig/
+.nx/cache
+.nx/workspace-data
