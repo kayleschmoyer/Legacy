@@ -593,6 +593,8 @@ export function BaseballLandingPage() {
   } = useGetUserLeaguesQuery({
     // Only run the query if user is authenticated
     skip: !auth?.user,
+    // Always refetch from network so deletions/adds are reflected immediately
+    fetchPolicy: 'cache-and-network',
   });
 
   const [createLeague, { loading: creating }] = useCreateLeagueAndTeamsMutation(

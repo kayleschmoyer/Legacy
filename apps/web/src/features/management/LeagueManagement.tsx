@@ -40,7 +40,10 @@ export const LeagueManagement: React.FC = () => {
   const handleFinalConfirm = () => {
     setIsDeleting(true);
     setLiveMsg('Deleting all leagues has started.');
-    void deleteAllLeagues()
+    void deleteAllLeagues({
+      refetchQueries: ['GetUserLeagues'],
+      awaitRefetchQueries: true,
+    })
       .then((result) => {
         setIsDeleting(false);
         setShowFinalConfirm(false);
