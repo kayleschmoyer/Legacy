@@ -22,6 +22,7 @@ import {
   type DraftPickRecord,
   type DraftPlayer,
   type LeagueTeam,
+  type PitcherStatsEntry,
   type PlayerStatsEntry,
 } from './types';
 import { DEFAULT_PICK_TIME } from './constants';
@@ -38,6 +39,7 @@ import {
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
   GetCurrentDraftPick as GET_CURRENT_DRAFT_PICK,
   GetDraftPicks as GET_DRAFT_PICKS,
+  GetDraftPitcherStats as GET_DRAFT_PITCHER_STATS,
   GetDraftPlayerStats as GET_DRAFT_PLAYER_STATS,
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
@@ -370,6 +372,12 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     errorPolicy: 'all',
   });
 
+  // ---- Career Pitching Stats ----
+  const { data: pitcherStatsData } = useQuery(GET_DRAFT_PITCHER_STATS, {
+    variables: { limit: 5000, minGames: 1 },
+    errorPolicy: 'all',
+  });
+
   // Build a playerId → stats map from the careerBattingStats connection
   const playerStatsMap = useMemo(() => {
     const map = new Map<number, PlayerStatsEntry>();
@@ -406,6 +414,32 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     return map;
   }, [statsData]);
 
+  // Build a playerId → pitcher stats map from careerPitchingStats
+  const pitcherStatsMap = useMemo(() => {
+    const map = new Map<number, PitcherStatsEntry>();
+    const rows = (pitcherStatsData as Record<string, unknown>)
+      ?.careerPitchingStats as
+      | Array<Record<string, unknown>>
+      | null
+      | undefined;
+    if (!rows) return map;
+    for (const row of rows) {
+      const pid = row.playerId as number | null | undefined;
+      if (pid == null) continue;
+      map.set(pid, {
+        playerId: pid,
+        era: (row.era as string | null) ?? null,
+        wins: (row.wins as number) ?? 0,
+        losses: (row.losses as number) ?? 0,
+        saves: (row.saves as number) ?? 0,
+        strikeouts: (row.strikeouts as number) ?? 0,
+        games: (row.games as number) ?? 0,
+        gamesStarted: (row.gamesStarted as number) ?? 0,
+      });
+    }
+    return map;
+  }, [pitcherStatsData]);
+
   // Debounced search for available players
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
@@ -427,6 +461,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     const map = new Map<number, DraftPlayer>();
     // Seed from playerStatsMap (covers both drafted and available players)
     for (const [pid, s] of playerStatsMap) {
+      const ps = pitcherStatsMap.get(pid);
       map.set(pid, {
         id: pid,
         name: `${s.firstName} ${s.lastName}`.trim() || `Player #${pid}`,
@@ -440,11 +475,20 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         hits: s.hits,
         obp: s.obp,
         slg: s.slg,
+        ...(ps && {
+          era: ps.era,
+          wins: ps.wins,
+          losses: ps.losses,
+          saves: ps.saves,
+          strikeouts: ps.strikeouts,
+          gamesStarted: ps.gamesStarted,
+        }),
       });
     }
     // Override with available players (which have authoritative firstName/lastName)
     for (const ap of availablePlayers) {
       const s = playerStatsMap.get(ap.id);
+      const ps = pitcherStatsMap.get(ap.id);
       map.set(ap.id, {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
@@ -458,15 +502,24 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         hits: s?.hits ?? 0,
         obp: s?.obp ?? 0,
         slg: s?.slg ?? 0,
+        ...(ps && {
+          era: ps.era,
+          wins: ps.wins,
+          losses: ps.losses,
+          saves: ps.saves,
+          strikeouts: ps.strikeouts,
+          gamesStarted: ps.gamesStarted,
+        }),
       });
     }
     return map;
-  }, [availablePlayers, playerStatsMap]);
+  }, [availablePlayers, pitcherStatsMap, playerStatsMap]);
 
   // Merge available players with stats data for rich card display
   const enrichedPlayers: DraftPlayer[] = useMemo(() => {
     return availablePlayers.map((ap) => {
       const s = playerStatsMap.get(ap.id);
+      const ps = pitcherStatsMap.get(ap.id);
       return {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
@@ -480,9 +533,17 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         hits: s?.hits ?? 0,
         obp: s?.obp ?? 0,
         slg: s?.slg ?? 0,
+        ...(ps && {
+          era: ps.era,
+          wins: ps.wins,
+          losses: ps.losses,
+          saves: ps.saves,
+          strikeouts: ps.strikeouts,
+          gamesStarted: ps.gamesStarted,
+        }),
       };
     });
-  }, [availablePlayers, playerStatsMap]);
+  }, [availablePlayers, pitcherStatsMap, playerStatsMap]);
 
   // Position filtering is handled server-side via the position query variable.
   // enrichedPlayers already contains only the players matching the selected position.

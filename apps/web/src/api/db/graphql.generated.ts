@@ -3844,6 +3844,26 @@ export type GetAvailableDraftPlayersQuery = {
   }> | null;
 };
 
+export type GetDraftPitcherStatsQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  minGames?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetDraftPitcherStatsQuery = {
+  __typename?: 'Query';
+  careerPitchingStats?: Array<{
+    __typename?: 'CareerPitching';
+    playerId?: number | null;
+    era?: string | null;
+    wins?: number | null;
+    losses?: number | null;
+    saves?: number | null;
+    strikeouts?: number | null;
+    games?: number | null;
+    gamesStarted?: number | null;
+  }> | null;
+};
+
 export type GetDraftPlayerStatsQueryVariables = Exact<{
   first?: InputMaybe<Scalars['Int']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
@@ -10394,6 +10414,100 @@ export type GetAvailableDraftPlayersSuspenseQueryHookResult = ReturnType<
 export type GetAvailableDraftPlayersQueryResult = Apollo.QueryResult<
   GetAvailableDraftPlayersQuery,
   GetAvailableDraftPlayersQueryVariables
+>;
+export const GetDraftPitcherStats = gql`
+  query GetDraftPitcherStats($limit: Int, $minGames: Int) {
+    careerPitchingStats(limit: $limit, minGames: $minGames) {
+      playerId
+      era
+      wins
+      losses
+      saves
+      strikeouts
+      games
+      gamesStarted
+    }
+  }
+`;
+
+/**
+ * __useGetDraftPitcherStatsQuery__
+ *
+ * To run a query within a React component, call `useGetDraftPitcherStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftPitcherStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftPitcherStatsQuery({
+ *   variables: {
+ *      limit: // value for 'limit'
+ *      minGames: // value for 'minGames'
+ *   },
+ * });
+ */
+export function useGetDraftPitcherStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetDraftPitcherStatsQuery,
+    GetDraftPitcherStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDraftPitcherStatsQuery,
+    GetDraftPitcherStatsQueryVariables
+  >(GetDraftPitcherStats, options);
+}
+export function useGetDraftPitcherStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftPitcherStatsQuery,
+    GetDraftPitcherStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDraftPitcherStatsQuery,
+    GetDraftPitcherStatsQueryVariables
+  >(GetDraftPitcherStats, options);
+}
+export function useGetDraftPitcherStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDraftPitcherStatsQuery,
+        GetDraftPitcherStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDraftPitcherStatsQuery,
+    GetDraftPitcherStatsQueryVariables
+  >(
+    GetDraftPitcherStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDraftPitcherStatsQuery,
+          GetDraftPitcherStatsQueryVariables
+        >,
+  );
+}
+export type GetDraftPitcherStatsQueryHookResult = ReturnType<
+  typeof useGetDraftPitcherStatsQuery
+>;
+export type GetDraftPitcherStatsLazyQueryHookResult = ReturnType<
+  typeof useGetDraftPitcherStatsLazyQuery
+>;
+export type GetDraftPitcherStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftPitcherStatsSuspenseQuery
+>;
+export type GetDraftPitcherStatsQueryResult = Apollo.QueryResult<
+  GetDraftPitcherStatsQuery,
+  GetDraftPitcherStatsQueryVariables
 >;
 export const GetDraftPlayerStats = gql`
   query GetDraftPlayerStats($first: Int, $searchTerm: String, $minGames: Int) {

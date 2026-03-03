@@ -22,6 +22,7 @@ export function PlayerCard({
   onToggleWatch: () => void;
 }) {
   const posColor = getPositionColor(player.position);
+  const isPitcher = ['P', 'SP', 'RP'].includes(player.position);
 
   return (
     <div
@@ -39,9 +40,13 @@ export function PlayerCard({
               {player.name}
             </h3>
             <div className="d-card-meta">
-              {player.games > 0
-                ? `${player.games} G · ${player.hits} H`
-                : 'Career stats pending'}
+              {isPitcher
+                ? player.era != null
+                  ? `${player.gamesStarted ?? 0} GS · ${player.games ?? 0} G`
+                  : 'Career stats pending'
+                : player.games > 0
+                  ? `${player.games} G · ${player.hits} H`
+                  : 'Career stats pending'}
             </div>
           </div>
           <div className="d-card-badges">
@@ -52,54 +57,107 @@ export function PlayerCard({
         </div>
 
         {/* Stats */}
-        <div className="d-stats">
-          <div className="d-stat">
-            <span className="d-stat-val" style={{ color: '#10b981' }}>
-              {player.avg.toFixed(3)}
-            </span>
-            <span className="d-stat-lbl">AVG</span>
-          </div>
-          <div className="d-stat">
-            <span className="d-stat-val" style={{ color: '#f59e0b' }}>
-              {player.hr}
-            </span>
-            <span className="d-stat-lbl">HR</span>
-          </div>
-          <div className="d-stat">
-            <span className="d-stat-val" style={{ color: '#3b82f6' }}>
-              {player.rbi}
-            </span>
-            <span className="d-stat-lbl">RBI</span>
-          </div>
-          <div className="d-stat">
-            <span className="d-stat-val" style={{ color: '#8b5cf6' }}>
-              {player.sb}
-            </span>
-            <span className="d-stat-lbl">SB</span>
-          </div>
-        </div>
+        {isPitcher ? (
+          <>
+            <div className="d-stats">
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#10b981' }}>
+                  {player.era ?? '—'}
+                </span>
+                <span className="d-stat-lbl">ERA</span>
+              </div>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#f59e0b' }}>
+                  {player.saves != null && player.saves > 0
+                    ? player.saves
+                    : (player.wins ?? '—')}
+                </span>
+                <span className="d-stat-lbl">
+                  {player.saves != null && player.saves > 0 ? 'SV' : 'W'}
+                </span>
+              </div>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#8b5cf6' }}>
+                  {player.strikeouts ?? '—'}
+                </span>
+                <span className="d-stat-lbl">K</span>
+              </div>
+            </div>
 
-        {/* Secondary Stats */}
-        <div className="d-stats" style={{ marginTop: 4 }}>
-          <div className="d-stat">
-            <span className="d-stat-val" style={{ color: '#06b6d4' }}>
-              {player.obp.toFixed(3)}
-            </span>
-            <span className="d-stat-lbl">OBP</span>
-          </div>
-          <div className="d-stat">
-            <span className="d-stat-val" style={{ color: '#ec4899' }}>
-              {player.slg.toFixed(3)}
-            </span>
-            <span className="d-stat-lbl">SLG</span>
-          </div>
-          <div className="d-stat">
-            <span className="d-stat-val" style={{ color: '#f97316' }}>
-              {player.runs}
-            </span>
-            <span className="d-stat-lbl">R</span>
-          </div>
-        </div>
+            {/* Secondary pitcher stats */}
+            <div className="d-stats" style={{ marginTop: 4 }}>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#06b6d4' }}>
+                  {player.losses ?? '—'}
+                </span>
+                <span className="d-stat-lbl">L</span>
+              </div>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#ec4899' }}>
+                  {player.gamesStarted ?? '—'}
+                </span>
+                <span className="d-stat-lbl">GS</span>
+              </div>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#f97316' }}>
+                  {player.games ?? '—'}
+                </span>
+                <span className="d-stat-lbl">G</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="d-stats">
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#10b981' }}>
+                  {player.avg.toFixed(3)}
+                </span>
+                <span className="d-stat-lbl">AVG</span>
+              </div>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#f59e0b' }}>
+                  {player.hr}
+                </span>
+                <span className="d-stat-lbl">HR</span>
+              </div>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#3b82f6' }}>
+                  {player.rbi}
+                </span>
+                <span className="d-stat-lbl">RBI</span>
+              </div>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#8b5cf6' }}>
+                  {player.sb}
+                </span>
+                <span className="d-stat-lbl">SB</span>
+              </div>
+            </div>
+
+            {/* Secondary Stats */}
+            <div className="d-stats" style={{ marginTop: 4 }}>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#06b6d4' }}>
+                  {player.obp.toFixed(3)}
+                </span>
+                <span className="d-stat-lbl">OBP</span>
+              </div>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#ec4899' }}>
+                  {player.slg.toFixed(3)}
+                </span>
+                <span className="d-stat-lbl">SLG</span>
+              </div>
+              <div className="d-stat">
+                <span className="d-stat-val" style={{ color: '#f97316' }}>
+                  {player.runs}
+                </span>
+                <span className="d-stat-lbl">R</span>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Actions */}
         <div className="d-card-actions">

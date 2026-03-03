@@ -15,6 +15,13 @@ export interface DraftPlayer {
   hits: number;
   obp: number;
   slg: number;
+  // Pitcher-specific stats (populated when position is P, SP, or RP)
+  era?: string | null;
+  wins?: number;
+  losses?: number;
+  saves?: number;
+  strikeouts?: number;
+  gamesStarted?: number;
 }
 
 export interface AvailableDraftPlayer {
@@ -40,6 +47,18 @@ export interface PlayerStatsEntry {
   obp: number;
   slg: number;
   war: number;
+}
+
+/** Pitcher stats lookup entry built from careerPitchingStats */
+export interface PitcherStatsEntry {
+  playerId: number;
+  era: string | null;
+  wins: number;
+  losses: number;
+  saves: number;
+  strikeouts: number;
+  games: number;
+  gamesStarted: number;
 }
 
 export interface CurrentDraftPickInfo {

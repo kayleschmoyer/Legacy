@@ -179,6 +179,20 @@ query GetAvailableDraftPlayers(
   }
 }
 
+# Fetch career pitching stats for pitcher cards
+query GetDraftPitcherStats($limit: Int, $minGames: Int) {
+  careerPitchingStats(limit: $limit, minGames: $minGames) {
+    playerId
+    era
+    wins
+    losses
+    saves
+    strikeouts
+    games
+    gamesStarted
+  }
+}
+
 # Fetch career batting stats for player cards (uses existing connection that works on deployed server)
 query GetDraftPlayerStats($first: Int, $searchTerm: String, $minGames: Int) {
   careerBattingStats(
