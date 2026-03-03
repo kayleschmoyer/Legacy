@@ -33,8 +33,13 @@ const customConfig = {
       path.resolve(__dirname, '../../node_modules'),
       path.resolve(__dirname, './node_modules'),
     ],
-    // Ensure expo packages are resolved correctly
-    resolverMainFields: ['react-native', 'main', 'browser'],
+    // Ensure expo packages are resolved correctly.
+    // Order matters: 'browser' must come before 'main' so that packages with a
+    // browser-specific build (e.g. rollbar → dist/rollbar.umd.min.js) are
+    // resolved instead of their Node.js server entry (rollbar → src/server/rollbar.js),
+    // which depends on built-in Node modules (os, fs, …) not available on device.
+    // This matches Metro's default field order for React Native.
+    resolverMainFields: ['react-native', 'browser', 'main'],
     platforms: ['ios', 'android', 'native', 'web'],
     // Platform-specific file extensions (React Native will prefer .native.ts over .ts)
     // This allows us to have platform-specific implementations
