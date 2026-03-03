@@ -25,6 +25,7 @@ import {
 import {
   ArrowLeftRight,
   Check,
+  ChevronDown,
   ChevronLeft,
   ClipboardList,
   Copy,
@@ -227,6 +228,22 @@ const InviteCard = styled(Card, {
   borderWidth: 1,
   borderRadius: '$6',
   padding: '$5',
+});
+
+const CommissionerSectionHeader = styled(XStack, {
+  paddingHorizontal: '$4',
+  paddingVertical: '$3',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  backgroundColor: '$surfacePanel',
+  borderRadius: '$5',
+  borderWidth: 1,
+  borderColor: '$glassBorder',
+  cursor: 'pointer' as never,
+  animation: 'quick',
+  hoverStyle: {
+    backgroundColor: '$color2',
+  },
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -940,6 +957,23 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [matchupErrorMessage, setMatchupErrorMessage] = useState<string | null>(
     null,
   );
+
+  // Commissioner accordion — "Next Step" open by default
+  const [commissionerOpenSections, setCommissionerOpenSections] = useState<
+    Set<string>
+  >(() => new Set(['next-step']));
+
+  const toggleCommissionerSection = useCallback((id: string) => {
+    setCommissionerOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
 
   // ── Callbacks ──
 
@@ -2201,155 +2235,236 @@ export function LeagueDetailPage(): React.JSX.Element {
     );
   };
 
-  const renderCommissionerSettings = () => (
-    <YStack
-      gap="$4"
-      role="tabpanel"
-      id="panel-commissioner"
-      aria-labelledby="tab-commissioner"
-    >
-      {matchupSuccessMessage && (
-        <Card
-          role="status"
-          aria-live="polite"
-          backgroundColor="$green3"
-          borderColor="$green8"
-          padding="$3"
-          borderRadius="$4"
-        >
-          <Text color="$green11" fontWeight="bold">
-            {matchupSuccessMessage}
-          </Text>
-        </Card>
-      )}
+  const renderCommissionerSettings = () => {
+    const isOpen = (id: string) => commissionerOpenSections.has(id);
 
-      {matchupErrorMessage && (
-        <Card
-          role="alert"
-          aria-live="assertive"
-          backgroundColor="$red3"
-          borderColor="$red8"
-          padding="$3"
-          borderRadius="$4"
-        >
-          <Text color="$red11" fontWeight="bold">
-            Error: {matchupErrorMessage}
-          </Text>
-        </Card>
-      )}
+    const sections: Array<{
+      id: string;
+      title: string;
+      content: React.ReactNode;
+    }> = [
+      {
+        id: 'next-step',
+        title: 'Next Step',
+        content: matchupLoading ? (
+          <Card
+            backgroundColor="$surfacePanel"
+            borderColor="$surfacePanelBorder"
+            padding="$6"
+            borderRadius="$6"
+          >
+            <YStack gap="$3" alignItems="center">
+              <Spinner size="large" />
+              <Text color="$textMuted">Loading matchup data...</Text>
+            </YStack>
+          </Card>
+        ) : matchupError ? (
+          <Card
+            backgroundColor="$red2"
+            borderColor="$red6"
+            padding="$4"
+            borderRadius="$6"
+          >
+            <Text color="$red11">
+              Error loading matchup: {matchupError.message}
+            </Text>
+          </Card>
+        ) : (
+          <NextStepControl
+            leagueId={leagueId}
+            currentMatchup={currentMatchup}
+            gamesPerMatchup={currentMatchup?.gamesPerMatchup ?? 1}
+            draftStatus={league.draftStatus}
+            onSuccess={handleMatchupSuccess}
+            onError={handleMatchupError}
+            onLeagueUpdate={handleLeagueUpdate}
+          />
+        ),
+      },
+      {
+        id: 'draft-settings',
+        title: 'Draft Settings',
+        content: (
+          <DraftSettingsControl
+            leagueId={leagueId}
+            draftStatus={league.draftStatus}
+            playerPool={league.playerPool}
+            onSuccess={(message) => {
+              setMatchupSuccessMessage(message);
+              setTimeout(() => setMatchupSuccessMessage(null), 5000);
+            }}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+          />
+        ),
+      },
+      {
+        id: 'league-settings',
+        title: 'League Settings',
+        content: (
+          <LeagueSettingsControl
+            leagueId={leagueId}
+            currentGamesPerMatchup={league.gamesPerMatchup ?? 5}
+            currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
+            currentMinCareerGames={league.minCareerGames ?? 50}
+            currentMinCareerSeasons={league.minCareerSeasons ?? 3}
+            currentTotalMatchups={league.totalMatchups ?? 10}
+            currentPlayoffEnabled={league.playoffEnabled ?? true}
+            currentPlayoffFormat={league.playoffFormat ?? '4-team'}
+            currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
+            onSuccess={(message) => {
+              setMatchupSuccessMessage(message);
+              setTimeout(() => setMatchupSuccessMessage(null), 5000);
+            }}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+          />
+        ),
+      },
+      {
+        id: 'achievement-restrictions',
+        title: 'Achievement Restrictions',
+        content: (
+          <AchievementRestrictionsControl
+            leagueId={leagueId}
+            onSuccess={(message) => {
+              setMatchupSuccessMessage(message);
+              setTimeout(() => setMatchupSuccessMessage(null), 5000);
+            }}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+          />
+        ),
+      },
+      {
+        id: 'waiver-processing',
+        title: 'Waiver Processing',
+        content: (
+          <WaiverProcessControl
+            leagueId={leagueId}
+            onSuccess={(message) => {
+              setMatchupSuccessMessage(message);
+              setTimeout(() => setMatchupSuccessMessage(null), 5000);
+            }}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+          />
+        ),
+      },
+      {
+        id: 'scoring',
+        title: 'Scoring',
+        content: (
+          <LeagueScoringEditor
+            leagueId={leagueId}
+            profile={scoringProfile}
+            loading={scoringLoading}
+            error={scoringError}
+            onRefetch={async () => {
+              await refetchScoringProfile({ leagueId });
+            }}
+          />
+        ),
+      },
+      {
+        id: 'danger-zone',
+        title: 'Danger Zone',
+        content: (
+          <DeleteLeagueControl
+            leagueId={leagueId}
+            leagueName={league.name ?? 'Unknown League'}
+            onSuccess={() => {
+              // Handled by DeleteLeagueControl
+            }}
+            onError={(deleteError) => {
+              console.error('Delete league error:', deleteError);
+              alert(`Error deleting league: ${deleteError.message}`);
+            }}
+          />
+        ),
+      },
+    ];
 
-      {matchupLoading ? (
-        <Card
-          backgroundColor="$surfacePanel"
-          borderColor="$surfacePanelBorder"
-          padding="$6"
-          borderRadius="$6"
-        >
-          <YStack gap="$3" alignItems="center">
-            <Spinner size="large" />
-            <Text color="$textMuted">Loading matchup data...</Text>
-          </YStack>
-        </Card>
-      ) : matchupError ? (
-        <Card
-          backgroundColor="$red2"
-          borderColor="$red6"
-          padding="$4"
-          borderRadius="$6"
-        >
-          <Text color="$red11">
-            Error loading matchup: {matchupError.message}
-          </Text>
-        </Card>
-      ) : (
-        <NextStepControl
-          leagueId={leagueId}
-          currentMatchup={currentMatchup}
-          gamesPerMatchup={currentMatchup?.gamesPerMatchup ?? 1}
-          draftStatus={league.draftStatus}
-          onSuccess={handleMatchupSuccess}
-          onError={handleMatchupError}
-          onLeagueUpdate={handleLeagueUpdate}
-        />
-      )}
+    return (
+      <YStack
+        gap="$2"
+        role="tabpanel"
+        id="panel-commissioner"
+        aria-labelledby="tab-commissioner"
+      >
+        {matchupSuccessMessage && (
+          <Card
+            role="status"
+            aria-live="polite"
+            backgroundColor="$green3"
+            borderColor="$green8"
+            padding="$3"
+            borderRadius="$4"
+          >
+            <Text color="$green11" fontWeight="bold">
+              {matchupSuccessMessage}
+            </Text>
+          </Card>
+        )}
 
-      <DraftSettingsControl
-        leagueId={leagueId}
-        draftStatus={league.draftStatus}
-        playerPool={league.playerPool}
-        onSuccess={(message) => {
-          setMatchupSuccessMessage(message);
-          setTimeout(() => setMatchupSuccessMessage(null), 5000);
-        }}
-        onError={(err) => {
-          setMatchupErrorMessage(err.message);
-        }}
-      />
+        {matchupErrorMessage && (
+          <Card
+            role="alert"
+            aria-live="assertive"
+            backgroundColor="$red3"
+            borderColor="$red8"
+            padding="$3"
+            borderRadius="$4"
+          >
+            <Text color="$red11" fontWeight="bold">
+              Error: {matchupErrorMessage}
+            </Text>
+          </Card>
+        )}
 
-      <LeagueSettingsControl
-        leagueId={leagueId}
-        currentGamesPerMatchup={league.gamesPerMatchup ?? 5}
-        currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
-        currentMinCareerGames={league.minCareerGames ?? 50}
-        currentMinCareerSeasons={league.minCareerSeasons ?? 3}
-        currentTotalMatchups={league.totalMatchups ?? 10}
-        currentPlayoffEnabled={league.playoffEnabled ?? true}
-        currentPlayoffFormat={league.playoffFormat ?? '4-team'}
-        currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
-        onSuccess={(message) => {
-          setMatchupSuccessMessage(message);
-          setTimeout(() => setMatchupSuccessMessage(null), 5000);
-        }}
-        onError={(err) => {
-          setMatchupErrorMessage(err.message);
-        }}
-      />
-
-      <AchievementRestrictionsControl
-        leagueId={leagueId}
-        onSuccess={(message) => {
-          setMatchupSuccessMessage(message);
-          setTimeout(() => setMatchupSuccessMessage(null), 5000);
-        }}
-        onError={(err) => {
-          setMatchupErrorMessage(err.message);
-        }}
-      />
-
-      <WaiverProcessControl
-        leagueId={leagueId}
-        onSuccess={(message) => {
-          setMatchupSuccessMessage(message);
-          setTimeout(() => setMatchupSuccessMessage(null), 5000);
-        }}
-        onError={(err) => {
-          setMatchupErrorMessage(err.message);
-        }}
-      />
-
-      <LeagueScoringEditor
-        leagueId={leagueId}
-        profile={scoringProfile}
-        loading={scoringLoading}
-        error={scoringError}
-        onRefetch={async () => {
-          await refetchScoringProfile({ leagueId });
-        }}
-      />
-
-      <DeleteLeagueControl
-        leagueId={leagueId}
-        leagueName={league.name ?? 'Unknown League'}
-        onSuccess={() => {
-          // Handled by DeleteLeagueControl
-        }}
-        onError={(deleteError) => {
-          console.error('Delete league error:', deleteError);
-          alert(`Error deleting league: ${deleteError.message}`);
-        }}
-      />
-    </YStack>
-  );
+        {sections.map(({ id, title, content }) => {
+          const open = isOpen(id);
+          const sectionId = `commissioner-section-${id}`;
+          return (
+            <YStack key={id}>
+              <CommissionerSectionHeader
+                onPress={() => toggleCommissionerSection(id)}
+                role="button"
+                aria-expanded={open}
+                aria-controls={sectionId}
+                borderBottomLeftRadius={open ? 0 : '$5'}
+                borderBottomRightRadius={open ? 0 : '$5'}
+                borderBottomWidth={open ? 0 : 1}
+              >
+                <Text fontWeight="700" fontSize="$4" color="$color">
+                  {title}
+                </Text>
+                <ChevronDown
+                  size={16}
+                  color="$colorPress"
+                  style={
+                    {
+                      transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s ease',
+                    } as never
+                  }
+                />
+              </CommissionerSectionHeader>
+              {open && (
+                <YStack id={sectionId} role="region" aria-label={title}>
+                  {content}
+                </YStack>
+              )}
+            </YStack>
+          );
+        })}
+      </YStack>
+    );
+  };
 
   // ── Render ──
 
