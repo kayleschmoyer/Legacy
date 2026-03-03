@@ -199,11 +199,208 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 break;
               }
 
-              // Process the expired pick inside a transaction
+              // ─── Phase 1: Non-locking pre-computation ─────────────────────────────────
+              // Check deadline and fetch candidate pool BEFORE acquiring the row lock.
+              // This moves the expensive read queries (23 k-row player join, eligibility
+              // filters, stats for ~1000 candidates) off the critical path, dramatically
+              // reducing lock hold time and contention during live drafts.
+
+              // Fast bail-out: check deadline without acquiring any lock
+              const preCheckRows = await context.db.execute(
+                sql`SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId}`,
+              );
+              const preCheckDraft = preCheckRows.rows[0] as
+                | {
+                    id: number;
+                    league_id: number;
+                    current_pick: number;
+                    current_pick_deadline: Date | null;
+                  }
+                | undefined;
+
+              if (!preCheckDraft) {
+                LOGGER.warn(
+                  `[autoProcessDraftPicks] Draft ${draftId} not found in pre-check`,
+                );
+                break;
+              }
+
+              const preCheckNow = new Date();
+              if (
+                !preCheckDraft.current_pick_deadline ||
+                new Date(preCheckDraft.current_pick_deadline) > preCheckNow
+              ) {
+                LOGGER.info(
+                  `[autoProcessDraftPicks] Draft ${draftId} deadline not expired in pre-check — stopping loop`,
+                );
+                break;
+              }
+
+              // League status check outside transaction — fail fast without holding the row lock
+              const [leaguePre] = await context.db
+                .select()
+                .from(PublicSchema.leagues)
+                .where(eq(PublicSchema.leagues.id, draftLeagueId))
+                .limit(1);
+
+              if (!leaguePre || leaguePre.draftStatus !== 'in-progress') {
+                LOGGER.info(
+                  `[autoProcessDraftPicks] League ${draftLeagueId} is not in-progress, skipping draft ${draftId}`,
+                );
+                break;
+              }
+
+              // 1. Fetch the top 1000 undrafted candidates pre-sorted by projected
+              //    fantasy points per game (FPG). Limiting the candidate pool here
+              //    avoids passing 23 k+ player IDs as array parameters to the
+              //    eligibility filters and the scoring query, which previously
+              //    caused ~10 s per pick and Lambda timeouts.
+              //    1000 candidates gives ample coverage for all roster positions
+              //    while reducing downstream query cost by ~23×.
+              const undraftedRows = await context.db.execute(
+                sql`SELECT p.id,
+                    (
+                      CASE WHEN COALESCE(cb.g, 0) > 0 THEN
+                        (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
+                         COALESCE(cb.triples,0)*3.0 + COALESCE(cb.hr,0)*4.0 +
+                         COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
+                         COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
+                         COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
+                        ) / cb.g
+                      ELSE 0 END
+                      +
+                      CASE WHEN COALESCE(cp.g, 0) > 0 THEN
+                        (COALESCE(cp.w,0)*5.0 + COALESCE(cp.l,0)*-2.0 +
+                         COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
+                         COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
+                         COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
+                        ) / cp.g
+                      ELSE 0 END
+                      +
+                      CASE WHEN COALESCE(cf.g, 0) > 0 THEN
+                        COALESCE(cf.e_def,0) * -1.0 / cf.g
+                      ELSE 0 END
+                    ) AS fpg
+                  FROM players p
+                  LEFT JOIN career_batting cb ON cb.player_id = p.id
+                  LEFT JOIN career_pitching cp ON cp.player_id = p.id
+                  LEFT JOIN career_fielding cf ON cf.player_id = p.id
+                  WHERE p.id NOT IN (
+                    SELECT player_id FROM draft_picks WHERE draft_id = ${draftId}
+                  )
+                  ORDER BY fpg DESC
+                  LIMIT 1000`,
+              );
+              const undraftedIds = undraftedRows.rows.map(
+                (r) => r.id as number,
+              );
+
+              // 2. Apply all eligibility filters via the shared DraftUtils function
+              //    (playerPool, minCareerGames, minCareerSeasons, hofOnly, eraFilter)
+              const eligibilityResult =
+                await filterPlayerIdsByLeagueEligibility(
+                  context.db,
+                  undraftedIds,
+                  {
+                    playerPool: leaguePre.playerPool,
+                    minCareerGames: leaguePre.minCareerGames ?? 0,
+                    minCareerSeasons: leaguePre.minCareerSeasons ?? 0,
+                    hofOnly: leaguePre.hofOnly ?? false,
+                    eraFilter: leaguePre.eraFilter ?? 'all',
+                    customEraStartYear: leaguePre.customEraStartYear ?? null,
+                    customEraEndYear: leaguePre.customEraEndYear ?? null,
+                  },
+                );
+              // Filter preserves FPG-descending order from undraftedIds
+              const eligibleIds = undraftedIds.filter((id) =>
+                eligibilityResult.eligibleIds.has(id),
+              );
+
+              if (eligibleIds.length === 0) {
+                throw new Error(`No available players for draft ${draftId}`);
+              }
+
+              // 3. Pre-compute per-player stats and positions for the candidate pool.
+              //    Done outside the lock so this expensive join doesn't hold the row lock.
+              //
+              // Scoring weights mirror lib/scoring/src/baseball/DefaultScoring.ts:
+              //   Batting:  H=1, 2B=2, 3B=3, HR=4, R=1, RBI=1, SB=2, CS=-1, HBP=1, SO=-0.5
+              //   Pitching: W=5, L=-2, SV=5, SO=1, outsRecorded=1, H=-1, ER=-2, BB=-1
+              //   Fielding: E=-1
+              const statsRows = await context.db.execute(
+                sql`SELECT
+                  p.id AS player_id,
+                  cf.positions_played,
+                  (
+                    CASE WHEN COALESCE(cb.g, 0) > 0 THEN
+                      (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
+                       COALESCE(cb.triples,0)*3.0 + COALESCE(cb.hr,0)*4.0 +
+                       COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
+                       COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
+                       COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
+                      ) / cb.g
+                    ELSE 0 END
+                    +
+                    CASE WHEN COALESCE(cp.g, 0) > 0 THEN
+                      (COALESCE(cp.w,0)*5.0 + COALESCE(cp.l,0)*-2.0 +
+                       COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
+                       COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
+                       COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
+                      ) / cp.g
+                    ELSE 0 END
+                    +
+                    CASE WHEN COALESCE(cf.g, 0) > 0 THEN
+                      COALESCE(cf.e_def,0) * -1.0 / cf.g
+                    ELSE 0 END
+                  ) AS projected_fpg
+                FROM players p
+                LEFT JOIN career_batting cb ON cb.player_id = p.id
+                LEFT JOIN career_pitching cp ON cp.player_id = p.id
+                LEFT JOIN career_fielding cf ON cf.player_id = p.id
+                WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
+                ORDER BY projected_fpg DESC`,
+              );
+
+              // Build player info map: id → { fpg, positions } (passed into tx via closure)
+              const playerDraftInfo = new Map<
+                number,
+                { fpg: number; positions: string[] }
+              >();
+              // Ranked IDs in descending FPG order (statsRows already sorted)
+              const rankedEligibleIds: number[] = [];
+              for (const row of statsRows.rows) {
+                const playerId = row.player_id as number;
+                const positionsPlayed = row.positions_played as Record<
+                  string,
+                  unknown
+                > | null;
+                playerDraftInfo.set(playerId, {
+                  fpg: Number(row.projected_fpg) || 0,
+                  positions: positionsPlayed
+                    ? Object.keys(positionsPlayed)
+                    : [],
+                });
+                rankedEligibleIds.push(playerId);
+              }
+              // Append any eligibleIds not in statsRows (no career stats — final fallback)
+              for (const id of eligibleIds) {
+                if (!playerDraftInfo.has(id)) {
+                  rankedEligibleIds.push(id);
+                  playerDraftInfo.set(id, { fpg: 0, positions: [] });
+                }
+              }
+
+              // ─── Phase 2: Short locked write transaction ─────────────────────────────
+              // By this point the expensive read work is done. The transaction only needs
+              // to: acquire the row lock, re-validate the deadline (TOCTOU guard), score
+              // players from the pre-computed map (pure in-memory), and write the pick.
               const pickResult = await context.db.transaction(async (tx) => {
-                // Lock the draft row
+                // Surface lock waits as errors rather than silent hangs
+                await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
+
+                // Acquire row-level lock — narrow SELECT avoids transferring unused columns
                 const draftRows = await tx.execute(
-                  sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+                  sql`SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId} FOR UPDATE`,
                 );
                 const draft = draftRows.rows[0] as
                   | {
@@ -236,7 +433,8 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 // intended cadence is preserved when EventBridge fires late.
                 const expiredDeadline = new Date(draft.current_pick_deadline);
 
-                // Verify league still in-progress
+                // Re-validate league status inside the transaction (guards against race
+                // between the pre-check outside and this lock acquisition).
                 const [league] = await tx
                   .select()
                   .from(PublicSchema.leagues)
@@ -250,7 +448,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   return null;
                 }
 
-                // Get current pick info
+                // Get authoritative pick info from the locked draft row
                 const currentPickInfo = await getCurrentDraftPickInfo(
                   tx,
                   draftId,
@@ -263,77 +461,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   return null;
                 }
 
-                // Find the best available player (not yet drafted).
-                // Prefer players that can fill a still-open league roster position
-                // slot (minimum requirements), falling back to any available player.
-
-                // 1. Fetch the top 1000 undrafted candidates pre-sorted by projected
-                //    fantasy points per game (FPG). Limiting the candidate pool here
-                //    avoids passing 23 k+ player IDs as array parameters to the
-                //    eligibility filters and the scoring query, which previously
-                //    caused ~10 s per pick and Lambda timeouts.
-                //    1000 candidates gives ample coverage for all roster positions
-                //    while reducing downstream query cost by ~23×.
-                const undraftedRows = await tx.execute(
-                  sql`SELECT p.id,
-                      (
-                        CASE WHEN COALESCE(cb.g, 0) > 0 THEN
-                          (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
-                           COALESCE(cb.triples,0)*3.0 + COALESCE(cb.hr,0)*4.0 +
-                           COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
-                           COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
-                           COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
-                          ) / cb.g
-                        ELSE 0 END
-                        +
-                        CASE WHEN COALESCE(cp.g, 0) > 0 THEN
-                          (COALESCE(cp.w,0)*5.0 + COALESCE(cp.l,0)*-2.0 +
-                           COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
-                           COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
-                           COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
-                          ) / cp.g
-                        ELSE 0 END
-                        +
-                        CASE WHEN COALESCE(cf.g, 0) > 0 THEN
-                          COALESCE(cf.e_def,0) * -1.0 / cf.g
-                        ELSE 0 END
-                      ) AS fpg
-                    FROM players p
-                    LEFT JOIN career_batting cb ON cb.player_id = p.id
-                    LEFT JOIN career_pitching cp ON cp.player_id = p.id
-                    LEFT JOIN career_fielding cf ON cf.player_id = p.id
-                    WHERE p.id NOT IN (
-                      SELECT player_id FROM draft_picks WHERE draft_id = ${draftId}
-                    )
-                    ORDER BY fpg DESC
-                    LIMIT 1000`,
-                );
-                const undraftedIds = undraftedRows.rows.map(
-                  (r) => r.id as number,
-                );
-
-                // 2. Apply all eligibility filters via the shared DraftUtils function
-                //    (playerPool, minCareerGames, minCareerSeasons, hofOnly, eraFilter)
-                const eligibilityResult =
-                  await filterPlayerIdsByLeagueEligibility(tx, undraftedIds, {
-                    playerPool: league.playerPool,
-                    minCareerGames: league.minCareerGames ?? 0,
-                    minCareerSeasons: league.minCareerSeasons ?? 0,
-                    hofOnly: league.hofOnly ?? false,
-                    eraFilter: league.eraFilter ?? 'all',
-                    customEraStartYear: league.customEraStartYear ?? null,
-                    customEraEndYear: league.customEraEndYear ?? null,
-                  });
-                // Filter preserves id-ascending order from undraftedIds
-                const eligibleIds = undraftedIds.filter((id) =>
-                  eligibilityResult.eligibleIds.has(id),
-                );
-
-                if (eligibleIds.length === 0) {
-                  throw new Error(`No available players for draft ${draftId}`);
-                }
-
-                // 3. Determine which position slot types the team still needs to fill
+                // Determine unfilled roster positions for the current team (lightweight reads)
                 const unfilledPositionTypes = await getUnfilledPositionTypes(
                   tx,
                   draftId,
@@ -347,7 +475,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     draftId,
                     teamId: currentPickInfo.teamId,
                     unfilledPositionTypes,
-                    eligibleCount: eligibleIds.length,
+                    eligibleCount: rankedEligibleIds.length,
                     eligibilityFilters: {
                       playerPool: league.playerPool,
                       minCareerGames: league.minCareerGames,
@@ -362,67 +490,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 let autoPickReason = '';
 
                 // ── Smart auto-pick: projected fantasy points + positional scarcity ──
-                // Instead of picking by player ID order, rank eligible players by:
-                // 1. Projected fantasy points per game (career avg, default scoring)
-                // 2. Positional scarcity bonus for unfilled roster positions
-                //
-                // Scoring weights mirror lib/scoring/src/baseball/DefaultScoring.ts:
-                //   Batting:  H=1, 2B=2, 3B=3, HR=4, R=1, RBI=1, SB=2, CS=-1, HBP=1, SO=-0.5
-                //   Pitching: W=5, L=-2, SV=5, SO=1, outsRecorded=1, H=-1, ER=-2, BB=-1
-                //   Fielding: E=-1
-                const statsRows = await tx.execute(
-                  sql`SELECT
-                    p.id AS player_id,
-                    cf.positions_played,
-                    (
-                      CASE WHEN COALESCE(cb.g, 0) > 0 THEN
-                        (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
-                         COALESCE(cb.triples,0)*3.0 + COALESCE(cb.hr,0)*4.0 +
-                         COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
-                         COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
-                         COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
-                        ) / cb.g
-                      ELSE 0 END
-                      +
-                      CASE WHEN COALESCE(cp.g, 0) > 0 THEN
-                        (COALESCE(cp.w,0)*5.0 + COALESCE(cp.l,0)*-2.0 +
-                         COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
-                         COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
-                         COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
-                        ) / cp.g
-                      ELSE 0 END
-                      +
-                      CASE WHEN COALESCE(cf.g, 0) > 0 THEN
-                        COALESCE(cf.e_def,0) * -1.0 / cf.g
-                      ELSE 0 END
-                    ) AS projected_fpg
-                  FROM players p
-                  LEFT JOIN career_batting cb ON cb.player_id = p.id
-                  LEFT JOIN career_pitching cp ON cp.player_id = p.id
-                  LEFT JOIN career_fielding cf ON cf.player_id = p.id
-                  WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
-                  ORDER BY projected_fpg DESC`,
-                );
-
-                // Build player info map: id → { fpg, positions }
-                const playerDraftInfo = new Map<
-                  number,
-                  { fpg: number; positions: string[] }
-                >();
-                for (const row of statsRows.rows) {
-                  const playerId = row.player_id as number;
-                  const positionsPlayed = row.positions_played as Record<
-                    string,
-                    unknown
-                  > | null;
-                  playerDraftInfo.set(playerId, {
-                    fpg: Number(row.projected_fpg) || 0,
-                    positions: positionsPlayed
-                      ? Object.keys(positionsPlayed)
-                      : [],
-                  });
-                }
-
+                // Score the pre-computed candidate pool entirely in-memory — no DB queries.
                 if (unfilledPositionTypes.length > 0) {
                   // Compute positional scarcity: scarcer positions → higher boost
                   const totalEligible = Math.max(playerDraftInfo.size, 1);
@@ -499,12 +567,12 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     },
                   );
                 } else {
-                  // No unfilled positions — pick the highest-FPG player (bench)
-                  // statsRows is already sorted by projected_fpg DESC
-                  const topPlayer = statsRows.rows[0];
-                  if (topPlayer) {
-                    autoPlayerId = topPlayer.player_id as number;
-                    const fpg = Number(topPlayer.projected_fpg) || 0;
+                  // No unfilled positions — pick the highest-FPG player (bench).
+                  // rankedEligibleIds is pre-sorted by projected_fpg DESC.
+                  const topId = rankedEligibleIds[0];
+                  if (topId !== undefined) {
+                    autoPlayerId = topId;
+                    const fpg = playerDraftInfo.get(topId)?.fpg ?? 0;
                     autoPickReason = `Best available (bench) — ${fpg.toFixed(1)} projected FPG`;
                     LOGGER.info(
                       '[autoProcessDraftPicks] Auto-pick for bench (all positions filled)',
@@ -526,6 +594,48 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     '[autoProcessDraftPicks] Using final fallback auto-pick',
                     { draftId, playerId: autoPlayerId },
                   );
+                }
+
+                // Guard: the pre-computed top player could have been drafted by a
+                // concurrent pick between Phase 1 and this transaction. Walk the
+                // ranked list to find the first player still available.
+                if (autoPlayerId !== undefined) {
+                  const preferredId = autoPlayerId;
+                  const [alreadyDrafted] = await tx
+                    .select({ playerId: PublicSchema.draftPicks.playerId })
+                    .from(PublicSchema.draftPicks)
+                    .where(
+                      and(
+                        eq(PublicSchema.draftPicks.draftId, draftId),
+                        eq(PublicSchema.draftPicks.playerId, preferredId),
+                      ),
+                    )
+                    .limit(1);
+                  if (alreadyDrafted) {
+                    autoPlayerId = undefined;
+                    for (const candidateId of rankedEligibleIds) {
+                      if (candidateId === preferredId) continue;
+                      const [taken] = await tx
+                        .select({ playerId: PublicSchema.draftPicks.playerId })
+                        .from(PublicSchema.draftPicks)
+                        .where(
+                          and(
+                            eq(PublicSchema.draftPicks.draftId, draftId),
+                            eq(PublicSchema.draftPicks.playerId, candidateId),
+                          ),
+                        )
+                        .limit(1);
+                      if (!taken) {
+                        autoPlayerId = candidateId;
+                        autoPickReason = `${autoPickReason} (fallback: preferred player drafted concurrently)`;
+                        break;
+                      }
+                    }
+                  }
+                }
+
+                if (autoPlayerId === undefined) {
+                  throw new Error(`No available players for draft ${draftId}`);
                 }
 
                 // Validate roster limit

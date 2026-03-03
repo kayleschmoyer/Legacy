@@ -58,21 +58,22 @@ builder.mutationField('makeDraftPick', (t) =>
       try {
         // Entire pick operation runs in a transaction with row-level locking
         const result = await context.db.transaction(async (tx) => {
-          // Lock the draft row to serialize concurrent pick attempts
+          // Surface lock waits as errors rather than silent hangs
+          await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
+
+          // Lock the draft row to serialize concurrent pick attempts.
+          // Only select the columns actually needed to keep the locked row small
+          // and avoid unnecessary data transfer.
           const draftRows = await tx.execute(
-            sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+            sql`SELECT id, league_id, current_pick, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR UPDATE`,
           );
           const draft = draftRows.rows[0] as
             | {
                 id: number;
                 league_id: number;
                 current_pick: number;
-                draft_order: string;
-                draft_mode: string;
-                selection_method: string;
                 pick_time_limit_seconds: number;
-                draft_started_at: Date | null;
-                draft_completed_at: Date | null;
+                selection_method: string;
               }
             | undefined;
 

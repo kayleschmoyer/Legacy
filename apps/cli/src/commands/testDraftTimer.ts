@@ -307,9 +307,9 @@ async function processExpiredPicks(
       // Actually process the pick (simplified version without WebSocket notifications)
       try {
         const pickResult = await db.transaction(async (tx) => {
-          // Lock the draft row
+          // Lock the draft row — only select columns used in this transaction
           const draftRows = await tx.execute(
-            sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+            sql`SELECT id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId} FOR UPDATE`,
           );
           const draft = draftRows.rows[0] as
             | {

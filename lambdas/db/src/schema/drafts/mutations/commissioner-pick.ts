@@ -48,18 +48,19 @@ builder.mutationField('commissionerPick', (t) =>
 
       try {
         const result = await context.db.transaction(async (tx) => {
-          // Lock the draft row
+          // Surface lock waits as errors rather than silent hangs
+          await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
+
+          // Lock the draft row — narrow SELECT to avoid transferring unused columns
           const draftRows = await tx.execute(
-            sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+            sql`SELECT id, league_id, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR UPDATE`,
           );
           const draft = draftRows.rows[0] as
             | {
                 id: number;
                 league_id: number;
-                current_pick: number;
-                draft_order: string;
-                selection_method: string;
                 pick_time_limit_seconds: number;
+                selection_method: string;
               }
             | undefined;
 
