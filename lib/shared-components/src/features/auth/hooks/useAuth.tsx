@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
 } from 'react';
 import { AuthService } from '../services/AuthService';
 import type {
@@ -229,11 +230,88 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     }
   }, []);
 
+  // ─── Proactive token refresh ───────────────────────────────────────────────
+
+  /** Holds the ID of the pending refresh timeout so we can cancel it. */
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Stable ref to `scheduleProactiveRefresh` so its setTimeout callback can
+   * always call the *latest* version and avoid stale-closure issues.
+   */
+  const scheduleProactiveRefreshRef = useRef<((token: string) => void) | null>(
+    null,
+  );
+
+  /** Cancel any pending proactive refresh timer. */
+  const clearRefreshTimer = useCallback(() => {
+    if (refreshTimerRef.current !== null) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Schedule a background JWT refresh to fire 5 minutes before the token
+   * expires. When the timer fires it silently obtains a fresh token, updates
+   * auth state, and reschedules for the new expiry — keeping the session alive
+   * indefinitely while the browser tab stays open.
+   */
+  const scheduleProactiveRefresh = useCallback(
+    (token: string) => {
+      clearRefreshTimer();
+
+      // Read the expiry from the JWT payload
+      let expSeconds: number | undefined;
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(
+            atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')),
+          ) as { exp?: number };
+          expSeconds = payload.exp;
+        }
+      } catch {
+        // Can't decode — skip scheduling
+      }
+
+      if (!expSeconds) return;
+
+      // Fire 5 minutes before expiry; clamp to at least 0 ms
+      const FIVE_MIN_MS = 5 * 60 * 1000;
+      const msUntilRefresh = Math.max(
+        0,
+        expSeconds * 1000 - Date.now() - FIVE_MIN_MS,
+      );
+
+      refreshTimerRef.current = setTimeout(() => {
+        authService
+          .refreshJwt()
+          .then((newToken) => {
+            if (!newToken) return; // Silently skip; error link handles hard failures
+            const userInfo = decodeUserFromToken(newToken);
+            if (userInfo) {
+              dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+            }
+            // Reschedule using the ref so we always call the latest version
+            scheduleProactiveRefreshRef.current?.(newToken);
+          })
+          .catch(() => {
+            // Silently ignore — the error link is the safety net
+          });
+      }, msUntilRefresh);
+    },
+    [authService, clearRefreshTimer, decodeUserFromToken],
+  );
+
+  // Keep the ref pointing at the latest function on every render
+  scheduleProactiveRefreshRef.current = scheduleProactiveRefresh;
+
   // Initialize auth state on mount
   useEffect(() => {
     let isMounted = true;
 
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       try {
         const token = authService.getStoredToken();
 
@@ -241,7 +319,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
           const isValid = authService.verifyToken(token);
 
           if (isValid) {
-            // Token is valid, extract user info from JWT payload
+            // Token is valid — restore session from stored JWT
             const userInfo = decodeUserFromToken(token);
 
             if (userInfo && isMounted) {
@@ -258,14 +336,51 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                     type: 'IMPERSONATE_START',
                     payload: { adminUser: adminUserInfo, targetUser: userInfo },
                   });
+                  // Don't schedule proactive refresh during impersonation
                   return;
                 }
               }
 
               dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+              scheduleProactiveRefresh(token);
             }
+          } else if (authService.isTokenExpired(token)) {
+            // Token is expired but may still be refreshable — try a silent refresh
+            const newToken = await authService.refreshJwt();
+
+            if (newToken && isMounted) {
+              const userInfo = decodeUserFromToken(newToken);
+
+              if (userInfo) {
+                const adminToken =
+                  typeof localStorage !== 'undefined'
+                    ? localStorage.getItem('admin_original_jwt')
+                    : null;
+
+                if (adminToken) {
+                  const adminUserInfo = decodeUserFromToken(adminToken);
+                  if (adminUserInfo) {
+                    dispatchAuth({
+                      type: 'IMPERSONATE_START',
+                      payload: {
+                        adminUser: adminUserInfo,
+                        targetUser: userInfo,
+                      },
+                    });
+                    return;
+                  }
+                }
+
+                dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+                scheduleProactiveRefresh(newToken);
+                return;
+              }
+            }
+
+            // Refresh failed — clear tokens and require re-login
+            authService.clearTokens();
           } else {
-            // Token is invalid, clear it
+            // Token is corrupt/invalid — clear it
             authService.clearTokens();
           }
         }
@@ -283,8 +398,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
     return () => {
       isMounted = false;
+      clearRefreshTimer();
     };
-  }, [authService, decodeUserFromToken]);
+  }, [
+    authService,
+    clearRefreshTimer,
+    decodeUserFromToken,
+    scheduleProactiveRefresh,
+  ]);
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -296,6 +417,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
           password,
         );
         dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+        const storedToken = authService.getStoredToken();
+        if (storedToken) scheduleProactiveRefresh(storedToken);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Login failed';
@@ -303,7 +426,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         throw error;
       }
     },
-    [authService],
+    [authService, scheduleProactiveRefresh],
   );
 
   const loginWithOAuth = useCallback(
@@ -313,6 +436,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       try {
         const userInfo = await authService.authenticateWithOAuth(oauthResponse);
         dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+        const storedToken = authService.getStoredToken();
+        if (storedToken) scheduleProactiveRefresh(storedToken);
       } catch (error) {
         console.error('AuthProvider: loginWithOAuth error:', error);
         const errorMessage =
@@ -321,11 +446,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         throw error;
       }
     },
-    [authService],
+    [authService, scheduleProactiveRefresh],
   );
 
   const logout = useCallback(async (): Promise<void> => {
     try {
+      clearRefreshTimer();
       authService.clearTokens();
       // Also clear any impersonation state
       if (typeof localStorage !== 'undefined') {
@@ -336,7 +462,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     } catch (error) {
       console.error('Logout failed:', error);
     }
-  }, [authService]);
+  }, [authService, clearRefreshTimer]);
 
   const clearError = useCallback(() => {
     dispatchAuth({ type: 'CLEAR_ERROR' });

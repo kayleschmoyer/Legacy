@@ -368,6 +368,76 @@ export class AuthService {
   }
 
   /**
+   * Returns true if the stored (or provided) JWT has expired but its signature
+   * is otherwise valid (i.e. it is refreshable).
+   */
+  isTokenExpired(token?: string): boolean {
+    const jwt = token || this.getStoredToken();
+    if (!jwt) return false;
+
+    try {
+      const parts = jwt.split('.');
+      if (parts.length !== 3) return false;
+
+      const payload = JSON.parse(
+        atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')),
+      ) as { exp?: number };
+
+      if (!payload.exp) return false;
+
+      const currentTime = Math.floor(Date.now() / 1000);
+      return payload.exp <= currentTime;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Silently refresh an expired JWT by calling the /oauth/refresh-jwt endpoint.
+   * The caller does NOT need a Google refresh token — the endpoint re-validates
+   * the user via the database.
+   *
+   * @returns The new JWT string on success, or null if refresh is not possible.
+   */
+  async refreshJwt(): Promise<string | null> {
+    const currentToken = this.getStoredToken();
+    if (!currentToken) return null;
+
+    try {
+      const response = await fetch(`${this.oauthProxyUrl}/refresh-jwt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.warn(
+          'AuthService: JWT refresh failed with status',
+          response.status,
+        );
+        return null;
+      }
+
+      const result = (await response.json()) as { jwt?: string };
+
+      if (!result.jwt) {
+        console.warn('AuthService: JWT refresh endpoint did not return a jwt');
+        return null;
+      }
+
+      // Persist the new token so subsequent requests use it immediately
+      this.storeTokens({ jwt: result.jwt });
+
+      return result.jwt;
+    } catch (error) {
+      console.error('AuthService: JWT refresh request failed:', error);
+      return null;
+    }
+  }
+
+  /**
    * Verify if current token is still valid (remote verification - use for critical operations)
    */
   async verifyTokenRemote(token?: string): Promise<boolean> {

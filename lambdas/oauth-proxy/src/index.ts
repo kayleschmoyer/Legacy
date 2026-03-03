@@ -17,6 +17,7 @@ import {
 } from './handlers/Google';
 import { handleLogin, handleRegister } from './handlers/Local';
 import { handleVerify } from './handlers/Verify';
+import { handleRefreshJwt } from './handlers/RefreshJwt';
 import {
   handleDeviceAuthorize,
   handleDeviceToken,
@@ -167,6 +168,7 @@ const baseOAuthHandler = async (
               '/oauth/google/authorize (OAuth initiation)',
               '/oauth/google/callback (OAuth callback)',
               '/oauth/google/refresh',
+              '/oauth/refresh-jwt (silent JWT refresh for live sessions)',
               '/oauth/login',
               '/oauth/register',
               '/oauth/device/authorize (CLI device flow)',
@@ -225,6 +227,14 @@ const baseOAuthHandler = async (
       case '/dev/oauth/google/refresh':
         if (event.httpMethod === 'POST') {
           const result = await handleGoogleRefresh(event);
+          return addCorsHeaders(result);
+        }
+        break;
+
+      case '/oauth/refresh-jwt':
+      case '/dev/oauth/refresh-jwt':
+        if (event.httpMethod === 'POST') {
+          const result = await handleRefreshJwt(event);
           return addCorsHeaders(result);
         }
         break;
@@ -316,3 +326,4 @@ export * from './handlers/Google';
 export * from './handlers/Local';
 export * from './handlers/Verify';
 export * from './handlers/DeviceFlow';
+export * from './handlers/RefreshJwt';

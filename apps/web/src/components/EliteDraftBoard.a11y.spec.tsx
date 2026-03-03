@@ -93,7 +93,15 @@ jest.mock('@apollo/client/react', () => ({
     error: undefined,
     refetch: jest.fn(),
   })),
-  useMutation: jest.fn(() => [jest.fn(), { loading: false, data: undefined }]),
+  // Return a mock mutate function that resolves to {} so callers can safely
+  // chain .catch() on the result.  The draft component calls
+  // nudgeExpiredDraftPick(...).catch(...) and CI runners are slow enough that
+  // the internal pick-timer fires during the test, triggering the nudge path.
+  // Without a real Promise the `.catch` call throws a TypeError.
+  useMutation: jest.fn(() => [
+    jest.fn().mockResolvedValue({}),
+    { loading: false, data: undefined },
+  ]),
 }));
 
 /** Wrap the component with MemoryRouter so useNavigate / useParams work. */

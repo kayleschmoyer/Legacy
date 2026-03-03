@@ -1,10 +1,15 @@
 import {
   ApolloClient,
+  CombinedGraphQLErrors,
   createHttpLink,
   from,
   InMemoryCache,
+  Observable,
+  ServerError,
 } from '@apollo/client';
+import { ErrorLink } from '@apollo/client/link/error';
 import { setContext } from '@apollo/client/link/context';
+import type { ApolloLink } from '@apollo/client/link';
 import { env } from '../config/environment';
 
 // GraphQL endpoint URL from centralized environment config
@@ -35,8 +40,93 @@ const authLink = setContext((_, { headers }) => {
   };
 });
 
+// ─── Silent JWT refresh ────────────────────────────────────────────────────
+
+let refreshInFlight: Promise<string | null> | null = null;
+
+/**
+ * Silently refresh the JWT by calling the oauth proxy's /refresh-jwt endpoint.
+ * Deduplicates concurrent calls so only one network request is made even when
+ * multiple queries fail simultaneously with an auth error.
+ */
+async function silentlyRefreshJwt(): Promise<string | null> {
+  // Deduplicate: if a refresh is already in-flight, wait for it
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  const currentToken = localStorage.getItem('auth_jwt');
+  if (!currentToken) return null;
+
+  refreshInFlight = (async () => {
+    try {
+      const response = await fetch(`${env.oauthProxyUrl}/refresh-jwt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentToken}`,
+        },
+      });
+
+      if (!response.ok) return null;
+
+      const result = (await response.json()) as { jwt?: string };
+      if (!result.jwt) return null;
+
+      // Persist the new token immediately so retried requests pick it up
+      localStorage.setItem('auth_jwt', result.jwt);
+      return result.jwt;
+    } catch {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+// ─── Error link with token-refresh + retry ─────────────────────────────────
+
+const errorLink = new ErrorLink(({ error, operation, forward }) => {
+  // Check for UNAUTHENTICATED GraphQL error
+  const isUnauthenticated =
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some(
+      (e) =>
+        (e.extensions?.['code'] as string | undefined) === 'UNAUTHENTICATED',
+    );
+
+  // Check for 401 HTTP error
+  const is401 = ServerError.is(error) && error.statusCode === 401;
+
+  if (!isUnauthenticated && !is401) return;
+
+  // Attempt a silent refresh and retry the operation once
+  return new Observable<ApolloLink.Result>((observer) => {
+    silentlyRefreshJwt()
+      .then((newToken) => {
+        if (!newToken) {
+          // Refresh failed — propagate the original error
+          observer.error(error);
+          return;
+        }
+
+        // Retry the original operation; authLink will pick up the updated token
+        forward(operation).subscribe({
+          next: (value) => observer.next(value),
+          error: (err: unknown) => observer.error(err),
+          complete: () => observer.complete(),
+        });
+      })
+      .catch((err: unknown) => {
+        observer.error(err);
+      });
+  });
+});
+
 export const apolloClient = new ApolloClient({
-  link: from([authLink, httpLink]),
+  link: from([errorLink, authLink, httpLink]),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: {

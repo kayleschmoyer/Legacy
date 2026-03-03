@@ -36,3 +36,14 @@ export async function getUserByEmail(
     .where(() => eq(Schema.usersInAppInternal.email, email))
     .then(TakeUniqueOrNull);
 }
+
+export async function getUserById(
+  db: InternalDb,
+  id: number,
+): Promise<InternalUser | null> {
+  return await db
+    .select()
+    .from(Schema.usersInAppInternal)
+    .where(() => eq(Schema.usersInAppInternal.id, id))
+    .then(TakeUniqueOrNull);
+}
