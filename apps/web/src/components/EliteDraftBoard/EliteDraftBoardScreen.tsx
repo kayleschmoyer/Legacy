@@ -762,10 +762,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     (notification: DraftPickNotification) => {
       const pickTeamId = normalizeTeamId(notification.teamId);
       const isMyTeamPick = pickTeamId !== null && pickTeamId === myTeamId;
-      // Find the player in our list for announcements
-      const pickedPlayer = enrichedPlayers.find(
-        (p) => p.id === notification.playerId,
-      );
+      // Use statsLookup (all players, including already-drafted ones) so that
+      // rapid auto-picks don't miss the announcement because the player was
+      // already removed from availablePlayers/enrichedPlayers by a concurrent
+      // refetch triggered by the previous pick notification.
+      const pickedPlayer = statsLookup.get(notification.playerId);
       if (pickedPlayer) {
         showAnnouncement(
           pickedPlayer,
@@ -812,7 +813,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     [
       myTeamId,
       notify,
-      enrichedPlayers,
+      statsLookup,
       showAnnouncement,
       showToast,
       refetchCurrentPick,
