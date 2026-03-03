@@ -1,0 +1,22 @@
+# Fetch a single Season Draft Game with full state
+#import "./seasonDraftPlayer.fragment.graphql"
+#import "./seasonDraftPickHistory.fragment.graphql"
+
+query GetSeasonDraftGame($gameId: Int!) {
+  seasonDraftGame(gameId: $gameId) {
+    id
+    name
+    status
+    currentTurn
+    createdBy
+    statKey
+    gameMode
+    playerType
+    players {
+      ...SeasonDraftPlayerFields
+    }
+    picks {
+      ...SeasonDraftPickHistory
+    }
+  }
+}

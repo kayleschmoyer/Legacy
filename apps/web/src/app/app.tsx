@@ -32,6 +32,9 @@ import ManagementPage from '../pages/management/ManagementPage';
 import AboutPage from '../pages/about/AboutPage';
 import HelpPage from '../pages/help/HelpPage';
 import { MockDraftPage } from '../pages/draft/MockDraftPage';
+import { SeasonDraftGamePage } from '../pages/games/SeasonDraftGamePage';
+import { SeasonDraftGamesPage } from '../pages/games/SeasonDraftGamesPage';
+import { SeasonDraftGameCreatePage } from '../pages/games/SeasonDraftGameCreatePage';
 import { EliteDraftBoardScreen } from '../components/EliteDraftBoard';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
@@ -251,6 +254,23 @@ function Navigation() {
             <PlayersDropdown />
 
             <Link
+              to="/games/season-draft"
+              style={{ textDecoration: 'none' }}
+              aria-current={
+                location.pathname.startsWith('/games') ? 'page' : undefined
+              }
+            >
+              <NavLinkButton active={location.pathname.startsWith('/games')}>
+                <Paragraph marginBottom={0}>
+                  <span role="img" aria-label="games">
+                    🎲
+                  </span>{' '}
+                  Games
+                </Paragraph>
+              </NavLinkButton>
+            </Link>
+
+            <Link
               to="/about"
               style={{ textDecoration: 'none' }}
               aria-current={isActive('/about') ? 'page' : undefined}
@@ -357,6 +377,19 @@ function Navigation() {
                   📊
                 </span>{' '}
                 Player Stats
+              </Paragraph>
+            </MobileNavLink>
+          </Link>
+          <Link to="/games/season-draft" style={{ textDecoration: 'none' }}>
+            <MobileNavLink
+              active={location.pathname.startsWith('/games')}
+              onPress={() => setMobileOpen(false)}
+            >
+              <Paragraph marginBottom={0}>
+                <span role="img" aria-label="games">
+                  🎲
+                </span>{' '}
+                Games
               </Paragraph>
             </MobileNavLink>
           </Link>
@@ -493,6 +526,18 @@ function App() {
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/profile/settings" element={<ProfileSettingsPage />} />
           <Route path="/preferences" element={<PreferencesPage />} />
+          <Route
+            path="/games/season-draft"
+            element={<SeasonDraftGamesPage />}
+          />
+          <Route
+            path="/games/season-draft/create"
+            element={<SeasonDraftGameCreatePage />}
+          />
+          <Route
+            path="/games/season-draft/:gameId"
+            element={<SeasonDraftGamePage />}
+          />
         </Routes>
       </YStack>
     </MainLayout>

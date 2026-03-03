@@ -21,6 +21,7 @@ import './playoff-schema';
 import './commissioner-tools';
 import './on-this-day';
 import './activity-log';
+import './season-draft-game';
 
 // Export the final schema
 export const schema = builder.toSchema();

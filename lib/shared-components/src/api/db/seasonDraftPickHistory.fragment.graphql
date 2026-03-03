@@ -1,0 +1,12 @@
+# Fragment for a historical pick entry
+fragment SeasonDraftPickHistory on SeasonDraftGamePickHistory {
+  pickNumber
+  playerName
+  draftingUser
+  baseballPlayerName
+  season
+  position
+  statValue
+  team
+  pickedAt
+}

@@ -1038,6 +1038,11 @@ type Mutation {
   bulkDropTeamPlayers(input: BulkDropPlayersInput!): CommissionerActionResult
 
   """
+  Cancel a Season Draft Game (only the creator can cancel, only in setup or drafting)
+  """
+  cancelSeasonDraftGame(gameId: Int!): Boolean
+
+  """
   Cancel a pending trade offer as the team that proposed it.
   """
   cancelTrade(tradeId: Int!): TradeOffer
@@ -1062,6 +1067,18 @@ type Mutation {
     season: Int!
     startWeek: Int!
   ): PlayoffBracket
+
+  """
+  Create a new Season Draft Game
+  """
+  createSeasonDraftGame(
+    gameMode: String
+    name: String!
+    playerNames: [String!]!
+    playerType: String
+    statKey: String
+    userIds: [Int!]!
+  ): Int
   createTiebreakerRules(
     allowCommissionerOverride: Boolean
     leagueId: Int!
@@ -1121,6 +1138,18 @@ type Mutation {
   joinLeagueByCode(inviteCode: String!, teamName: String!): Team
   joinPublicLeague(leagueId: Int!, teamName: String!): JoinLeaguePayload
   makeDraftPick(draftId: Int!, playerId: Int!): DraftPick
+
+  """
+  Make a draft pick in a Season Draft Game
+  """
+  makeSeasonDraftPick(
+    gameId: Int!
+    playerId: Int!
+    position: String!
+    rosterSlotId: Int!
+    season: Int!
+    team: String
+  ): Boolean
   markAllNotificationsAsRead: Boolean
   markNotificationAsRead(notificationId: Int!): Boolean
   pauseDraft(leagueId: Int!): Draft
@@ -1202,6 +1231,11 @@ type Mutation {
     leagueId: Int!
     selectionMethod: String
   ): League
+
+  """
+  Start a Season Draft Game (move from setup to drafting)
+  """
+  startSeasonDraftGame(gameId: Int!): Boolean
   swapMatchupPlayerPositions(
     matchupPlayerIdA: Int!
     matchupPlayerIdB: Int!
@@ -1219,6 +1253,11 @@ type Mutation {
     teamMemberIdA: Int!
     teamMemberIdB: Int!
   ): [TeamMember!]
+
+  """
+  Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist.
+  """
+  triggerSeasonDraftStatLoading(playerId: Int!): Boolean
 
   """
   Commissioner: update the persistent LM note for a league.
@@ -1751,6 +1790,35 @@ type Query {
     season: Int
     team: String
   ): [SeasonBatting!]
+  seasonDraftGame(gameId: Int!): SeasonDraftGame
+
+  """
+  Get list of available positions to draft for
+  """
+  seasonDraftGameAvailablePositions(gameId: Int!): [String!]
+
+  """
+  Get stat value for a player/season/position combination
+  """
+  seasonDraftGamePlayerSeasonStatValue(
+    gameMode: String
+    playerId: Int!
+    playerType: String
+    position: String!
+    season: Int!
+    statKey: String
+    team: String
+  ): Int
+
+  """
+  Get valid stat keys for a given player type
+  """
+  seasonDraftGameValidStatKeys(playerType: String!): [String!]
+
+  """
+  Get all Season Draft Games for the current user
+  """
+  seasonDraftGames: [SeasonDraftGameSummary!]
   seasonFieldingStats(
     limit: Int
     minGames: Int
@@ -1910,6 +1978,106 @@ type SeasonBatting {
   team: String
   totalBases: Int
   triples: Int
+}
+
+"""
+A Season Draft Game with full state
+"""
+type SeasonDraftGame {
+  createdBy: Int
+  currentTurn: Int
+  gameMode: SeasonDraftGameMode
+  id: Int
+  name: String
+  picks: [SeasonDraftGamePickHistory!]
+  playerType: SeasonDraftPlayerType
+  players: [SeasonDraftPlayer!]
+  statKey: String
+  status: SeasonDraftGameStatus
+}
+
+"""
+Game mode: season (player+year) or career_team (player+team career total)
+"""
+enum SeasonDraftGameMode {
+  career_team
+  season
+}
+
+"""
+A historical pick in the draft
+"""
+type SeasonDraftGamePickHistory {
+  baseballPlayerName: String
+  draftingUser: String
+  pickNumber: Int
+  pickedAt: String
+  playerName: String
+  position: String
+  season: Int
+  statValue: Int
+  team: String
+}
+
+enum SeasonDraftGameStatus {
+  cancelled
+  completed
+  drafting
+  setup
+}
+
+"""
+Summary of a Season Draft Game
+"""
+type SeasonDraftGameSummary {
+  gameMode: SeasonDraftGameMode
+  id: Int
+  isMyTurn: Boolean
+  name: String
+  playerType: SeasonDraftPlayerType
+  statKey: String
+  status: SeasonDraftGameStatus
+}
+
+"""
+A completed draft pick with player and scoring info
+"""
+type SeasonDraftPick {
+  playerName: String
+  season: Int
+  statValue: Int
+  team: String
+}
+
+"""
+A player (human) in a Season Draft Game
+"""
+type SeasonDraftPlayer {
+  draftOrder: Int
+  id: Int
+  playerName: String
+  roster: [SeasonDraftRosterSlot!]
+  totalScore: Int
+  userId: Int
+}
+
+"""
+Whether this is a hitter draft or pitcher draft
+"""
+enum SeasonDraftPlayerType {
+  hitter
+  pitcher
+}
+
+"""
+A roster slot for a player in a Season Draft Game
+"""
+type SeasonDraftRosterSlot {
+  id: Int
+  isFilled: Boolean
+  pick: SeasonDraftPick
+  position: String
+  slotNumber: Int
 }
 
 type SeasonFielding {

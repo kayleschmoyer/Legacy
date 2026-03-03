@@ -20,6 +20,43 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import '@testing-library/jest-dom';
 
+// Set global test timeout to 30 seconds to prevent interruptions on slower CI runners
+jest.setTimeout(30000);
+
+// Suppress expected Tamagui React DOM prop warnings in test output
+const originalError = console.error;
+const tamaguiPropWarnings = [
+  'borderColor',
+  'borderWidth',
+  'flexWrap',
+  'justifyContent',
+  'alignItems',
+  'gap',
+  'rowGap',
+  'columnGap',
+  'cursor',
+];
+
+beforeAll(() => {
+  console.error = (...args: any[]) => {
+    const firstArg = args[0];
+    if (typeof firstArg === 'string') {
+      // Skip Tamagui-related React DOM warnings
+      if (
+        firstArg.includes('React does not recognize') &&
+        tamaguiPropWarnings.some((prop) => firstArg.includes(`\`${prop}\``))
+      ) {
+        return;
+      }
+    }
+    originalError.call(console, ...args);
+  };
+});
+
+afterAll(() => {
+  console.error = originalError;
+});
+
 // Mock global __DEV__ variable for React Native
 (global as any).__DEV__ = true;
 

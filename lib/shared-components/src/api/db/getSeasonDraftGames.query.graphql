@@ -1,0 +1,12 @@
+# Fetch all Season Draft Games for the current user
+query GetSeasonDraftGames {
+  seasonDraftGames {
+    id
+    name
+    status
+    statKey
+    gameMode
+    playerType
+    isMyTurn
+  }
+}

@@ -1,0 +1,18 @@
+# Make a draft pick in a Season Draft Game
+mutation MakeSeasonDraftPick(
+  $gameId: Int!
+  $rosterSlotId: Int!
+  $playerId: Int!
+  $season: Int!
+  $position: String!
+  $team: String
+) {
+  makeSeasonDraftPick(
+    gameId: $gameId
+    rosterSlotId: $rosterSlotId
+    playerId: $playerId
+    season: $season
+    position: $position
+    team: $team
+  )
+}

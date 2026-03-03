@@ -1,0 +1,3 @@
+mutation CancelSeasonDraftGame($gameId: Int!) {
+  cancelSeasonDraftGame(gameId: $gameId)
+}

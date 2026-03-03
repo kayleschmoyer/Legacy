@@ -910,6 +910,8 @@ export type Mutation = {
   awardPlayoffAppearanceBadges?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: drop all players from a team (useful for inactive teams). */
   bulkDropTeamPlayers?: Maybe<CommissionerActionResult>;
+  /** Cancel a Season Draft Game (only the creator can cancel, only in setup or drafting) */
+  cancelSeasonDraftGame?: Maybe<Scalars['Boolean']['output']>;
   /** Cancel a pending trade offer as the team that proposed it. */
   cancelTrade?: Maybe<TradeOffer>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
@@ -920,6 +922,8 @@ export type Mutation = {
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   createPlayoffBracket?: Maybe<PlayoffBracket>;
+  /** Create a new Season Draft Game */
+  createSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
   createTiebreakerRules?: Maybe<TiebreakerRule>;
   /** Remove an achievement restriction from a league. Commissioner / General Manager access required. */
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
@@ -944,6 +948,8 @@ export type Mutation = {
   joinLeagueByCode?: Maybe<Team>;
   joinPublicLeague?: Maybe<JoinLeaguePayload>;
   makeDraftPick?: Maybe<DraftPick>;
+  /** Make a draft pick in a Season Draft Game */
+  makeSeasonDraftPick?: Maybe<Scalars['Boolean']['output']>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   pauseDraft?: Maybe<Draft>;
@@ -973,10 +979,14 @@ export type Mutation = {
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
   setTradeBlock?: Maybe<TeamMember>;
   startDraft?: Maybe<League>;
+  /** Start a Season Draft Game (move from setup to drafting) */
+  startSeasonDraftGame?: Maybe<Scalars['Boolean']['output']>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
   /** Commissioner: swap the team assignments between two matchups in the same league. */
   swapMatchupTeams?: Maybe<CommissionerActionResult>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
+  /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
+  triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
@@ -1042,6 +1052,10 @@ export type MutationBulkDropTeamPlayersArgs = {
   input: BulkDropPlayersInput;
 };
 
+export type MutationCancelSeasonDraftGameArgs = {
+  gameId: Scalars['Int']['input'];
+};
+
 export type MutationCancelTradeArgs = {
   tradeId: Scalars['Int']['input'];
 };
@@ -1085,6 +1099,15 @@ export type MutationCreatePlayoffBracketArgs = {
   multiWeekMatchups?: InputMaybe<Scalars['Boolean']['input']>;
   season: Scalars['Int']['input'];
   startWeek: Scalars['Int']['input'];
+};
+
+export type MutationCreateSeasonDraftGameArgs = {
+  gameMode?: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
+  playerNames: Array<Scalars['String']['input']>;
+  playerType?: InputMaybe<Scalars['String']['input']>;
+  statKey?: InputMaybe<Scalars['String']['input']>;
+  userIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationCreateTiebreakerRulesArgs = {
@@ -1162,6 +1185,15 @@ export type MutationJoinPublicLeagueArgs = {
 export type MutationMakeDraftPickArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationMakeSeasonDraftPickArgs = {
+  gameId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  position: Scalars['String']['input'];
+  rosterSlotId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+  team?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationMarkNotificationAsReadArgs = {
@@ -1256,6 +1288,10 @@ export type MutationStartDraftArgs = {
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type MutationStartSeasonDraftGameArgs = {
+  gameId: Scalars['Int']['input'];
+};
+
 export type MutationSwapMatchupPlayerPositionsArgs = {
   matchupPlayerIdA: Scalars['Int']['input'];
   matchupPlayerIdB: Scalars['Int']['input'];
@@ -1272,6 +1308,10 @@ export type MutationSwapTeamMemberPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
+};
+
+export type MutationTriggerSeasonDraftStatLoadingArgs = {
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationUpdateCommissionerNoteArgs = {
@@ -1654,6 +1694,15 @@ export type Query = {
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
   seasonBattingStats?: Maybe<Array<SeasonBatting>>;
+  seasonDraftGame?: Maybe<SeasonDraftGame>;
+  /** Get list of available positions to draft for */
+  seasonDraftGameAvailablePositions?: Maybe<Array<Scalars['String']['output']>>;
+  /** Get stat value for a player/season/position combination */
+  seasonDraftGamePlayerSeasonStatValue?: Maybe<Scalars['Int']['output']>;
+  /** Get valid stat keys for a given player type */
+  seasonDraftGameValidStatKeys?: Maybe<Array<Scalars['String']['output']>>;
+  /** Get all Season Draft Games for the current user */
+  seasonDraftGames?: Maybe<Array<SeasonDraftGameSummary>>;
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
   /** Return earned badges for a team in a league */
@@ -1977,6 +2026,28 @@ export type QuerySeasonBattingStatsArgs = {
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QuerySeasonDraftGameArgs = {
+  gameId: Scalars['Int']['input'];
+};
+
+export type QuerySeasonDraftGameAvailablePositionsArgs = {
+  gameId: Scalars['Int']['input'];
+};
+
+export type QuerySeasonDraftGamePlayerSeasonStatValueArgs = {
+  gameMode?: InputMaybe<Scalars['String']['input']>;
+  playerId: Scalars['Int']['input'];
+  playerType?: InputMaybe<Scalars['String']['input']>;
+  position: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
+  statKey?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QuerySeasonDraftGameValidStatKeysArgs = {
+  playerType: Scalars['String']['input'];
+};
+
 export type QuerySeasonFieldingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
@@ -2162,6 +2233,96 @@ export type SeasonBatting = {
   team?: Maybe<Scalars['String']['output']>;
   totalBases?: Maybe<Scalars['Int']['output']>;
   triples?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A Season Draft Game with full state */
+export type SeasonDraftGame = {
+  __typename?: 'SeasonDraftGame';
+  createdBy?: Maybe<Scalars['Int']['output']>;
+  currentTurn?: Maybe<Scalars['Int']['output']>;
+  gameMode?: Maybe<SeasonDraftGameMode>;
+  id?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  picks?: Maybe<Array<SeasonDraftGamePickHistory>>;
+  playerType?: Maybe<SeasonDraftPlayerType>;
+  players?: Maybe<Array<SeasonDraftPlayer>>;
+  statKey?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<SeasonDraftGameStatus>;
+};
+
+/** Game mode: season (player+year) or career_team (player+team career total) */
+export enum SeasonDraftGameMode {
+  CareerTeam = 'career_team',
+  Season = 'season',
+}
+
+/** A historical pick in the draft */
+export type SeasonDraftGamePickHistory = {
+  __typename?: 'SeasonDraftGamePickHistory';
+  baseballPlayerName?: Maybe<Scalars['String']['output']>;
+  draftingUser?: Maybe<Scalars['String']['output']>;
+  pickNumber?: Maybe<Scalars['Int']['output']>;
+  pickedAt?: Maybe<Scalars['String']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  statValue?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+};
+
+export enum SeasonDraftGameStatus {
+  Cancelled = 'cancelled',
+  Completed = 'completed',
+  Drafting = 'drafting',
+  Setup = 'setup',
+}
+
+/** Summary of a Season Draft Game */
+export type SeasonDraftGameSummary = {
+  __typename?: 'SeasonDraftGameSummary';
+  gameMode?: Maybe<SeasonDraftGameMode>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isMyTurn?: Maybe<Scalars['Boolean']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  playerType?: Maybe<SeasonDraftPlayerType>;
+  statKey?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<SeasonDraftGameStatus>;
+};
+
+/** A completed draft pick with player and scoring info */
+export type SeasonDraftPick = {
+  __typename?: 'SeasonDraftPick';
+  playerName?: Maybe<Scalars['String']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  statValue?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+};
+
+/** A player (human) in a Season Draft Game */
+export type SeasonDraftPlayer = {
+  __typename?: 'SeasonDraftPlayer';
+  draftOrder?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  roster?: Maybe<Array<SeasonDraftRosterSlot>>;
+  totalScore?: Maybe<Scalars['Int']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Whether this is a hitter draft or pitcher draft */
+export enum SeasonDraftPlayerType {
+  Hitter = 'hitter',
+  Pitcher = 'pitcher',
+}
+
+/** A roster slot for a player in a Season Draft Game */
+export type SeasonDraftRosterSlot = {
+  __typename?: 'SeasonDraftRosterSlot';
+  id?: Maybe<Scalars['Int']['output']>;
+  isFilled?: Maybe<Scalars['Boolean']['output']>;
+  pick?: Maybe<SeasonDraftPick>;
+  position?: Maybe<Scalars['String']['output']>;
+  slotNumber?: Maybe<Scalars['Int']['output']>;
 };
 
 export type SeasonFielding = {
@@ -2535,6 +2696,15 @@ export type WaiverClaim = {
   userId?: Maybe<Scalars['Int']['output']>;
 };
 
+export type CancelSeasonDraftGameMutationVariables = Exact<{
+  gameId: Scalars['Int']['input'];
+}>;
+
+export type CancelSeasonDraftGameMutation = {
+  __typename?: 'Mutation';
+  cancelSeasonDraftGame?: boolean | null;
+};
+
 export type CareerBattingFragment = {
   __typename?: 'CareerBatting';
   playerId?: number | null;
@@ -2597,6 +2767,20 @@ export type CareerPitchingFragment = {
   outRate?: number | null;
   era?: string | null;
   winPercentage?: number | null;
+};
+
+export type CreateSeasonDraftGameMutationVariables = Exact<{
+  name: Scalars['String']['input'];
+  playerNames: Array<Scalars['String']['input']> | Scalars['String']['input'];
+  userIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+  statKey?: InputMaybe<Scalars['String']['input']>;
+  gameMode?: InputMaybe<Scalars['String']['input']>;
+  playerType?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type CreateSeasonDraftGameMutation = {
+  __typename?: 'Mutation';
+  createSeasonDraftGame?: number | null;
 };
 
 export type GetAllPlayersQueryVariables = Exact<{
@@ -2724,6 +2908,104 @@ export type GetCareerPitchingStatsQuery = {
   }> | null;
 };
 
+export type GetSeasonDraftGameQueryVariables = Exact<{
+  gameId: Scalars['Int']['input'];
+}>;
+
+export type GetSeasonDraftGameQuery = {
+  __typename?: 'Query';
+  seasonDraftGame?: {
+    __typename?: 'SeasonDraftGame';
+    id?: number | null;
+    name?: string | null;
+    status?: SeasonDraftGameStatus | null;
+    currentTurn?: number | null;
+    createdBy?: number | null;
+    statKey?: string | null;
+    gameMode?: SeasonDraftGameMode | null;
+    playerType?: SeasonDraftPlayerType | null;
+    players?: Array<{
+      __typename?: 'SeasonDraftPlayer';
+      id?: number | null;
+      userId?: number | null;
+      playerName?: string | null;
+      draftOrder?: number | null;
+      totalScore?: number | null;
+      roster?: Array<{
+        __typename?: 'SeasonDraftRosterSlot';
+        id?: number | null;
+        position?: string | null;
+        slotNumber?: number | null;
+        isFilled?: boolean | null;
+        pick?: {
+          __typename?: 'SeasonDraftPick';
+          playerName?: string | null;
+          season?: number | null;
+          statValue?: number | null;
+          team?: string | null;
+        } | null;
+      }> | null;
+    }> | null;
+    picks?: Array<{
+      __typename?: 'SeasonDraftGamePickHistory';
+      pickNumber?: number | null;
+      playerName?: string | null;
+      draftingUser?: string | null;
+      baseballPlayerName?: string | null;
+      season?: number | null;
+      position?: string | null;
+      statValue?: number | null;
+      team?: string | null;
+      pickedAt?: string | null;
+    }> | null;
+  } | null;
+};
+
+export type GetSeasonDraftGameStatValueQueryVariables = Exact<{
+  playerId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+  position: Scalars['String']['input'];
+  statKey?: InputMaybe<Scalars['String']['input']>;
+  playerType?: InputMaybe<Scalars['String']['input']>;
+  gameMode?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetSeasonDraftGameStatValueQuery = {
+  __typename?: 'Query';
+  seasonDraftGamePlayerSeasonStatValue?: number | null;
+};
+
+export type GetSeasonDraftGamesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetSeasonDraftGamesQuery = {
+  __typename?: 'Query';
+  seasonDraftGames?: Array<{
+    __typename?: 'SeasonDraftGameSummary';
+    id?: number | null;
+    name?: string | null;
+    status?: SeasonDraftGameStatus | null;
+    statKey?: string | null;
+    gameMode?: SeasonDraftGameMode | null;
+    playerType?: SeasonDraftPlayerType | null;
+    isMyTurn?: boolean | null;
+  }> | null;
+};
+
+export type MakeSeasonDraftPickMutationVariables = Exact<{
+  gameId: Scalars['Int']['input'];
+  rosterSlotId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+  position: Scalars['String']['input'];
+  team?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type MakeSeasonDraftPickMutation = {
+  __typename?: 'Mutation';
+  makeSeasonDraftPick?: boolean | null;
+};
+
 export type PlayerFragment = {
   __typename?: 'Player';
   id?: number | null;
@@ -2731,6 +3013,115 @@ export type PlayerFragment = {
   lastName?: string | null;
   brefId?: string | null;
   statsLastFetchedAt?: string | null;
+};
+
+export type SearchPlayersForDraftQueryVariables = Exact<{
+  search: Scalars['String']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type SearchPlayersForDraftQuery = {
+  __typename?: 'Query';
+  players?: Array<{
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    brefId?: string | null;
+    statsLastFetchedAt?: string | null;
+  }> | null;
+};
+
+export type SearchUsersForDraftQueryVariables = Exact<{
+  searchTerm: Scalars['String']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type SearchUsersForDraftQuery = {
+  __typename?: 'Query';
+  searchUsers?: Array<{
+    __typename?: 'User';
+    id?: number | null;
+    username?: string | null;
+    avatarUrl?: string | null;
+  }> | null;
+};
+
+export type SeasonDraftPickFragment = {
+  __typename?: 'SeasonDraftPick';
+  playerName?: string | null;
+  season?: number | null;
+  statValue?: number | null;
+  team?: string | null;
+};
+
+export type SeasonDraftPickHistoryFragment = {
+  __typename?: 'SeasonDraftGamePickHistory';
+  pickNumber?: number | null;
+  playerName?: string | null;
+  draftingUser?: string | null;
+  baseballPlayerName?: string | null;
+  season?: number | null;
+  position?: string | null;
+  statValue?: number | null;
+  team?: string | null;
+  pickedAt?: string | null;
+};
+
+export type SeasonDraftPlayerFieldsFragment = {
+  __typename?: 'SeasonDraftPlayer';
+  id?: number | null;
+  userId?: number | null;
+  playerName?: string | null;
+  draftOrder?: number | null;
+  totalScore?: number | null;
+  roster?: Array<{
+    __typename?: 'SeasonDraftRosterSlot';
+    id?: number | null;
+    position?: string | null;
+    slotNumber?: number | null;
+    isFilled?: boolean | null;
+    pick?: {
+      __typename?: 'SeasonDraftPick';
+      playerName?: string | null;
+      season?: number | null;
+      statValue?: number | null;
+      team?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type SeasonDraftRosterSlotFragment = {
+  __typename?: 'SeasonDraftRosterSlot';
+  id?: number | null;
+  position?: string | null;
+  slotNumber?: number | null;
+  isFilled?: boolean | null;
+  pick?: {
+    __typename?: 'SeasonDraftPick';
+    playerName?: string | null;
+    season?: number | null;
+    statValue?: number | null;
+    team?: string | null;
+  } | null;
+};
+
+export type StartSeasonDraftGameMutationVariables = Exact<{
+  gameId: Scalars['Int']['input'];
+}>;
+
+export type StartSeasonDraftGameMutation = {
+  __typename?: 'Mutation';
+  startSeasonDraftGame?: boolean | null;
+};
+
+export type TriggerSeasonDraftStatLoadingMutationVariables = Exact<{
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type TriggerSeasonDraftStatLoadingMutation = {
+  __typename?: 'Mutation';
+  triggerSeasonDraftStatLoading?: boolean | null;
 };
 
 export const CareerBattingFragmentDoc = gql`
@@ -2805,6 +3196,167 @@ export const PlayerFragmentDoc = gql`
     statsLastFetchedAt
   }
 `;
+export const SeasonDraftPickHistoryFragmentDoc = gql`
+  fragment SeasonDraftPickHistory on SeasonDraftGamePickHistory {
+    pickNumber
+    playerName
+    draftingUser
+    baseballPlayerName
+    season
+    position
+    statValue
+    team
+    pickedAt
+  }
+`;
+export const SeasonDraftPickFragmentDoc = gql`
+  fragment SeasonDraftPick on SeasonDraftPick {
+    playerName
+    season
+    statValue
+    team
+  }
+`;
+export const SeasonDraftRosterSlotFragmentDoc = gql`
+  fragment SeasonDraftRosterSlot on SeasonDraftRosterSlot {
+    id
+    position
+    slotNumber
+    isFilled
+    pick {
+      ...SeasonDraftPick
+    }
+  }
+  ${SeasonDraftPickFragmentDoc}
+`;
+export const SeasonDraftPlayerFieldsFragmentDoc = gql`
+  fragment SeasonDraftPlayerFields on SeasonDraftPlayer {
+    id
+    userId
+    playerName
+    draftOrder
+    totalScore
+    roster {
+      ...SeasonDraftRosterSlot
+    }
+  }
+  ${SeasonDraftRosterSlotFragmentDoc}
+`;
+export const CancelSeasonDraftGame = gql`
+  mutation CancelSeasonDraftGame($gameId: Int!) {
+    cancelSeasonDraftGame(gameId: $gameId)
+  }
+`;
+export type CancelSeasonDraftGameMutationFn = MutationFunction<
+  CancelSeasonDraftGameMutation,
+  CancelSeasonDraftGameMutationVariables
+>;
+
+/**
+ * __useCancelSeasonDraftGameMutation__
+ *
+ * To run a mutation, you first call `useCancelSeasonDraftGameMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCancelSeasonDraftGameMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [cancelSeasonDraftGameMutation, { data, loading, error }] = useCancelSeasonDraftGameMutation({
+ *   variables: {
+ *      gameId: // value for 'gameId'
+ *   },
+ * });
+ */
+export function useCancelSeasonDraftGameMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CancelSeasonDraftGameMutation,
+    CancelSeasonDraftGameMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CancelSeasonDraftGameMutation,
+    CancelSeasonDraftGameMutationVariables
+  >(CancelSeasonDraftGame, options);
+}
+export type CancelSeasonDraftGameMutationHookResult = ReturnType<
+  typeof useCancelSeasonDraftGameMutation
+>;
+export type CancelSeasonDraftGameMutationResult =
+  Apollo.MutationResult<CancelSeasonDraftGameMutation>;
+export type CancelSeasonDraftGameMutationOptions = BaseMutationOptions<
+  CancelSeasonDraftGameMutation,
+  CancelSeasonDraftGameMutationVariables
+>;
+export const CreateSeasonDraftGame = gql`
+  mutation CreateSeasonDraftGame(
+    $name: String!
+    $playerNames: [String!]!
+    $userIds: [Int!]!
+    $statKey: String
+    $gameMode: String
+    $playerType: String
+  ) {
+    createSeasonDraftGame(
+      name: $name
+      playerNames: $playerNames
+      userIds: $userIds
+      statKey: $statKey
+      gameMode: $gameMode
+      playerType: $playerType
+    )
+  }
+`;
+export type CreateSeasonDraftGameMutationFn = MutationFunction<
+  CreateSeasonDraftGameMutation,
+  CreateSeasonDraftGameMutationVariables
+>;
+
+/**
+ * __useCreateSeasonDraftGameMutation__
+ *
+ * To run a mutation, you first call `useCreateSeasonDraftGameMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateSeasonDraftGameMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createSeasonDraftGameMutation, { data, loading, error }] = useCreateSeasonDraftGameMutation({
+ *   variables: {
+ *      name: // value for 'name'
+ *      playerNames: // value for 'playerNames'
+ *      userIds: // value for 'userIds'
+ *      statKey: // value for 'statKey'
+ *      gameMode: // value for 'gameMode'
+ *      playerType: // value for 'playerType'
+ *   },
+ * });
+ */
+export function useCreateSeasonDraftGameMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CreateSeasonDraftGameMutation,
+    CreateSeasonDraftGameMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CreateSeasonDraftGameMutation,
+    CreateSeasonDraftGameMutationVariables
+  >(CreateSeasonDraftGame, options);
+}
+export type CreateSeasonDraftGameMutationHookResult = ReturnType<
+  typeof useCreateSeasonDraftGameMutation
+>;
+export type CreateSeasonDraftGameMutationResult =
+  Apollo.MutationResult<CreateSeasonDraftGameMutation>;
+export type CreateSeasonDraftGameMutationOptions = BaseMutationOptions<
+  CreateSeasonDraftGameMutation,
+  CreateSeasonDraftGameMutationVariables
+>;
 export const GetAllPlayers = gql`
   query GetAllPlayers(
     $limit: Int
@@ -3139,4 +3691,658 @@ export type GetCareerPitchingStatsSuspenseQueryHookResult = ReturnType<
 export type GetCareerPitchingStatsQueryResult = Apollo.QueryResult<
   GetCareerPitchingStatsQuery,
   GetCareerPitchingStatsQueryVariables
+>;
+export const GetSeasonDraftGame = gql`
+  query GetSeasonDraftGame($gameId: Int!) {
+    seasonDraftGame(gameId: $gameId) {
+      id
+      name
+      status
+      currentTurn
+      createdBy
+      statKey
+      gameMode
+      playerType
+      players {
+        ...SeasonDraftPlayerFields
+      }
+      picks {
+        ...SeasonDraftPickHistory
+      }
+    }
+  }
+  ${SeasonDraftPlayerFieldsFragmentDoc}
+  ${SeasonDraftPickHistoryFragmentDoc}
+`;
+
+/**
+ * __useGetSeasonDraftGameQuery__
+ *
+ * To run a query within a React component, call `useGetSeasonDraftGameQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetSeasonDraftGameQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetSeasonDraftGameQuery({
+ *   variables: {
+ *      gameId: // value for 'gameId'
+ *   },
+ * });
+ */
+export function useGetSeasonDraftGameQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetSeasonDraftGameQuery,
+    GetSeasonDraftGameQueryVariables
+  > &
+    (
+      | { variables: GetSeasonDraftGameQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetSeasonDraftGameQuery,
+    GetSeasonDraftGameQueryVariables
+  >(GetSeasonDraftGame, options);
+}
+export function useGetSeasonDraftGameLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetSeasonDraftGameQuery,
+    GetSeasonDraftGameQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetSeasonDraftGameQuery,
+    GetSeasonDraftGameQueryVariables
+  >(GetSeasonDraftGame, options);
+}
+export function useGetSeasonDraftGameSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetSeasonDraftGameQuery,
+        GetSeasonDraftGameQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetSeasonDraftGameQuery,
+    GetSeasonDraftGameQueryVariables
+  >(
+    GetSeasonDraftGame,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetSeasonDraftGameQuery,
+          GetSeasonDraftGameQueryVariables
+        >,
+  );
+}
+export type GetSeasonDraftGameQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGameQuery
+>;
+export type GetSeasonDraftGameLazyQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGameLazyQuery
+>;
+export type GetSeasonDraftGameSuspenseQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGameSuspenseQuery
+>;
+export type GetSeasonDraftGameQueryResult = Apollo.QueryResult<
+  GetSeasonDraftGameQuery,
+  GetSeasonDraftGameQueryVariables
+>;
+export const GetSeasonDraftGameStatValue = gql`
+  query GetSeasonDraftGameStatValue(
+    $playerId: Int!
+    $season: Int!
+    $position: String!
+    $statKey: String
+    $playerType: String
+    $gameMode: String
+    $team: String
+  ) {
+    seasonDraftGamePlayerSeasonStatValue(
+      playerId: $playerId
+      season: $season
+      position: $position
+      statKey: $statKey
+      playerType: $playerType
+      gameMode: $gameMode
+      team: $team
+    )
+  }
+`;
+
+/**
+ * __useGetSeasonDraftGameStatValueQuery__
+ *
+ * To run a query within a React component, call `useGetSeasonDraftGameStatValueQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetSeasonDraftGameStatValueQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetSeasonDraftGameStatValueQuery({
+ *   variables: {
+ *      playerId: // value for 'playerId'
+ *      season: // value for 'season'
+ *      position: // value for 'position'
+ *      statKey: // value for 'statKey'
+ *      playerType: // value for 'playerType'
+ *      gameMode: // value for 'gameMode'
+ *      team: // value for 'team'
+ *   },
+ * });
+ */
+export function useGetSeasonDraftGameStatValueQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetSeasonDraftGameStatValueQuery,
+    GetSeasonDraftGameStatValueQueryVariables
+  > &
+    (
+      | { variables: GetSeasonDraftGameStatValueQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetSeasonDraftGameStatValueQuery,
+    GetSeasonDraftGameStatValueQueryVariables
+  >(GetSeasonDraftGameStatValue, options);
+}
+export function useGetSeasonDraftGameStatValueLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetSeasonDraftGameStatValueQuery,
+    GetSeasonDraftGameStatValueQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetSeasonDraftGameStatValueQuery,
+    GetSeasonDraftGameStatValueQueryVariables
+  >(GetSeasonDraftGameStatValue, options);
+}
+export function useGetSeasonDraftGameStatValueSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetSeasonDraftGameStatValueQuery,
+        GetSeasonDraftGameStatValueQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetSeasonDraftGameStatValueQuery,
+    GetSeasonDraftGameStatValueQueryVariables
+  >(
+    GetSeasonDraftGameStatValue,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetSeasonDraftGameStatValueQuery,
+          GetSeasonDraftGameStatValueQueryVariables
+        >,
+  );
+}
+export type GetSeasonDraftGameStatValueQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGameStatValueQuery
+>;
+export type GetSeasonDraftGameStatValueLazyQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGameStatValueLazyQuery
+>;
+export type GetSeasonDraftGameStatValueSuspenseQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGameStatValueSuspenseQuery
+>;
+export type GetSeasonDraftGameStatValueQueryResult = Apollo.QueryResult<
+  GetSeasonDraftGameStatValueQuery,
+  GetSeasonDraftGameStatValueQueryVariables
+>;
+export const GetSeasonDraftGames = gql`
+  query GetSeasonDraftGames {
+    seasonDraftGames {
+      id
+      name
+      status
+      statKey
+      gameMode
+      playerType
+      isMyTurn
+    }
+  }
+`;
+
+/**
+ * __useGetSeasonDraftGamesQuery__
+ *
+ * To run a query within a React component, call `useGetSeasonDraftGamesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetSeasonDraftGamesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetSeasonDraftGamesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetSeasonDraftGamesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetSeasonDraftGamesQuery,
+    GetSeasonDraftGamesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetSeasonDraftGamesQuery,
+    GetSeasonDraftGamesQueryVariables
+  >(GetSeasonDraftGames, options);
+}
+export function useGetSeasonDraftGamesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetSeasonDraftGamesQuery,
+    GetSeasonDraftGamesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetSeasonDraftGamesQuery,
+    GetSeasonDraftGamesQueryVariables
+  >(GetSeasonDraftGames, options);
+}
+export function useGetSeasonDraftGamesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetSeasonDraftGamesQuery,
+        GetSeasonDraftGamesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetSeasonDraftGamesQuery,
+    GetSeasonDraftGamesQueryVariables
+  >(
+    GetSeasonDraftGames,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetSeasonDraftGamesQuery,
+          GetSeasonDraftGamesQueryVariables
+        >,
+  );
+}
+export type GetSeasonDraftGamesQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGamesQuery
+>;
+export type GetSeasonDraftGamesLazyQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGamesLazyQuery
+>;
+export type GetSeasonDraftGamesSuspenseQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGamesSuspenseQuery
+>;
+export type GetSeasonDraftGamesQueryResult = Apollo.QueryResult<
+  GetSeasonDraftGamesQuery,
+  GetSeasonDraftGamesQueryVariables
+>;
+export const MakeSeasonDraftPick = gql`
+  mutation MakeSeasonDraftPick(
+    $gameId: Int!
+    $rosterSlotId: Int!
+    $playerId: Int!
+    $season: Int!
+    $position: String!
+    $team: String
+  ) {
+    makeSeasonDraftPick(
+      gameId: $gameId
+      rosterSlotId: $rosterSlotId
+      playerId: $playerId
+      season: $season
+      position: $position
+      team: $team
+    )
+  }
+`;
+export type MakeSeasonDraftPickMutationFn = MutationFunction<
+  MakeSeasonDraftPickMutation,
+  MakeSeasonDraftPickMutationVariables
+>;
+
+/**
+ * __useMakeSeasonDraftPickMutation__
+ *
+ * To run a mutation, you first call `useMakeSeasonDraftPickMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useMakeSeasonDraftPickMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [makeSeasonDraftPickMutation, { data, loading, error }] = useMakeSeasonDraftPickMutation({
+ *   variables: {
+ *      gameId: // value for 'gameId'
+ *      rosterSlotId: // value for 'rosterSlotId'
+ *      playerId: // value for 'playerId'
+ *      season: // value for 'season'
+ *      position: // value for 'position'
+ *      team: // value for 'team'
+ *   },
+ * });
+ */
+export function useMakeSeasonDraftPickMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    MakeSeasonDraftPickMutation,
+    MakeSeasonDraftPickMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    MakeSeasonDraftPickMutation,
+    MakeSeasonDraftPickMutationVariables
+  >(MakeSeasonDraftPick, options);
+}
+export type MakeSeasonDraftPickMutationHookResult = ReturnType<
+  typeof useMakeSeasonDraftPickMutation
+>;
+export type MakeSeasonDraftPickMutationResult =
+  Apollo.MutationResult<MakeSeasonDraftPickMutation>;
+export type MakeSeasonDraftPickMutationOptions = BaseMutationOptions<
+  MakeSeasonDraftPickMutation,
+  MakeSeasonDraftPickMutationVariables
+>;
+export const SearchPlayersForDraft = gql`
+  query SearchPlayersForDraft($search: String!, $limit: Int) {
+    players(search: $search, limit: $limit) {
+      ...Player
+    }
+  }
+  ${PlayerFragmentDoc}
+`;
+
+/**
+ * __useSearchPlayersForDraftQuery__
+ *
+ * To run a query within a React component, call `useSearchPlayersForDraftQuery` and pass it any options that fit your needs.
+ * When your component renders, `useSearchPlayersForDraftQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useSearchPlayersForDraftQuery({
+ *   variables: {
+ *      search: // value for 'search'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useSearchPlayersForDraftQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    SearchPlayersForDraftQuery,
+    SearchPlayersForDraftQueryVariables
+  > &
+    (
+      | { variables: SearchPlayersForDraftQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    SearchPlayersForDraftQuery,
+    SearchPlayersForDraftQueryVariables
+  >(SearchPlayersForDraft, options);
+}
+export function useSearchPlayersForDraftLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    SearchPlayersForDraftQuery,
+    SearchPlayersForDraftQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    SearchPlayersForDraftQuery,
+    SearchPlayersForDraftQueryVariables
+  >(SearchPlayersForDraft, options);
+}
+export function useSearchPlayersForDraftSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        SearchPlayersForDraftQuery,
+        SearchPlayersForDraftQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    SearchPlayersForDraftQuery,
+    SearchPlayersForDraftQueryVariables
+  >(
+    SearchPlayersForDraft,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          SearchPlayersForDraftQuery,
+          SearchPlayersForDraftQueryVariables
+        >,
+  );
+}
+export type SearchPlayersForDraftQueryHookResult = ReturnType<
+  typeof useSearchPlayersForDraftQuery
+>;
+export type SearchPlayersForDraftLazyQueryHookResult = ReturnType<
+  typeof useSearchPlayersForDraftLazyQuery
+>;
+export type SearchPlayersForDraftSuspenseQueryHookResult = ReturnType<
+  typeof useSearchPlayersForDraftSuspenseQuery
+>;
+export type SearchPlayersForDraftQueryResult = Apollo.QueryResult<
+  SearchPlayersForDraftQuery,
+  SearchPlayersForDraftQueryVariables
+>;
+export const SearchUsersForDraft = gql`
+  query SearchUsersForDraft($searchTerm: String!, $limit: Int) {
+    searchUsers(searchTerm: $searchTerm, limit: $limit) {
+      id
+      username
+      avatarUrl
+    }
+  }
+`;
+
+/**
+ * __useSearchUsersForDraftQuery__
+ *
+ * To run a query within a React component, call `useSearchUsersForDraftQuery` and pass it any options that fit your needs.
+ * When your component renders, `useSearchUsersForDraftQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useSearchUsersForDraftQuery({
+ *   variables: {
+ *      searchTerm: // value for 'searchTerm'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useSearchUsersForDraftQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    SearchUsersForDraftQuery,
+    SearchUsersForDraftQueryVariables
+  > &
+    (
+      | { variables: SearchUsersForDraftQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    SearchUsersForDraftQuery,
+    SearchUsersForDraftQueryVariables
+  >(SearchUsersForDraft, options);
+}
+export function useSearchUsersForDraftLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    SearchUsersForDraftQuery,
+    SearchUsersForDraftQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    SearchUsersForDraftQuery,
+    SearchUsersForDraftQueryVariables
+  >(SearchUsersForDraft, options);
+}
+export function useSearchUsersForDraftSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        SearchUsersForDraftQuery,
+        SearchUsersForDraftQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    SearchUsersForDraftQuery,
+    SearchUsersForDraftQueryVariables
+  >(
+    SearchUsersForDraft,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          SearchUsersForDraftQuery,
+          SearchUsersForDraftQueryVariables
+        >,
+  );
+}
+export type SearchUsersForDraftQueryHookResult = ReturnType<
+  typeof useSearchUsersForDraftQuery
+>;
+export type SearchUsersForDraftLazyQueryHookResult = ReturnType<
+  typeof useSearchUsersForDraftLazyQuery
+>;
+export type SearchUsersForDraftSuspenseQueryHookResult = ReturnType<
+  typeof useSearchUsersForDraftSuspenseQuery
+>;
+export type SearchUsersForDraftQueryResult = Apollo.QueryResult<
+  SearchUsersForDraftQuery,
+  SearchUsersForDraftQueryVariables
+>;
+export const StartSeasonDraftGame = gql`
+  mutation StartSeasonDraftGame($gameId: Int!) {
+    startSeasonDraftGame(gameId: $gameId)
+  }
+`;
+export type StartSeasonDraftGameMutationFn = MutationFunction<
+  StartSeasonDraftGameMutation,
+  StartSeasonDraftGameMutationVariables
+>;
+
+/**
+ * __useStartSeasonDraftGameMutation__
+ *
+ * To run a mutation, you first call `useStartSeasonDraftGameMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useStartSeasonDraftGameMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [startSeasonDraftGameMutation, { data, loading, error }] = useStartSeasonDraftGameMutation({
+ *   variables: {
+ *      gameId: // value for 'gameId'
+ *   },
+ * });
+ */
+export function useStartSeasonDraftGameMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    StartSeasonDraftGameMutation,
+    StartSeasonDraftGameMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    StartSeasonDraftGameMutation,
+    StartSeasonDraftGameMutationVariables
+  >(StartSeasonDraftGame, options);
+}
+export type StartSeasonDraftGameMutationHookResult = ReturnType<
+  typeof useStartSeasonDraftGameMutation
+>;
+export type StartSeasonDraftGameMutationResult =
+  Apollo.MutationResult<StartSeasonDraftGameMutation>;
+export type StartSeasonDraftGameMutationOptions = BaseMutationOptions<
+  StartSeasonDraftGameMutation,
+  StartSeasonDraftGameMutationVariables
+>;
+export const TriggerSeasonDraftStatLoading = gql`
+  mutation TriggerSeasonDraftStatLoading($playerId: Int!) {
+    triggerSeasonDraftStatLoading(playerId: $playerId)
+  }
+`;
+export type TriggerSeasonDraftStatLoadingMutationFn = MutationFunction<
+  TriggerSeasonDraftStatLoadingMutation,
+  TriggerSeasonDraftStatLoadingMutationVariables
+>;
+
+/**
+ * __useTriggerSeasonDraftStatLoadingMutation__
+ *
+ * To run a mutation, you first call `useTriggerSeasonDraftStatLoadingMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useTriggerSeasonDraftStatLoadingMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [triggerSeasonDraftStatLoadingMutation, { data, loading, error }] = useTriggerSeasonDraftStatLoadingMutation({
+ *   variables: {
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useTriggerSeasonDraftStatLoadingMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    TriggerSeasonDraftStatLoadingMutation,
+    TriggerSeasonDraftStatLoadingMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    TriggerSeasonDraftStatLoadingMutation,
+    TriggerSeasonDraftStatLoadingMutationVariables
+  >(TriggerSeasonDraftStatLoading, options);
+}
+export type TriggerSeasonDraftStatLoadingMutationHookResult = ReturnType<
+  typeof useTriggerSeasonDraftStatLoadingMutation
+>;
+export type TriggerSeasonDraftStatLoadingMutationResult =
+  Apollo.MutationResult<TriggerSeasonDraftStatLoadingMutation>;
+export type TriggerSeasonDraftStatLoadingMutationOptions = BaseMutationOptions<
+  TriggerSeasonDraftStatLoadingMutation,
+  TriggerSeasonDraftStatLoadingMutationVariables
 >;

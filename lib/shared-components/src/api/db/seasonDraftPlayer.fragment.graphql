@@ -1,0 +1,13 @@
+# Fragment for a human player in a Season Draft Game
+#import "./seasonDraftRosterSlot.fragment.graphql"
+
+fragment SeasonDraftPlayerFields on SeasonDraftPlayer {
+  id
+  userId
+  playerName
+  draftOrder
+  totalScore
+  roster {
+    ...SeasonDraftRosterSlot
+  }
+}

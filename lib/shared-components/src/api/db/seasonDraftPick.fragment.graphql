@@ -1,0 +1,7 @@
+# Fragment for a completed draft pick
+fragment SeasonDraftPick on SeasonDraftPick {
+  playerName
+  season
+  statValue
+  team
+}

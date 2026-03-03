@@ -887,7 +887,7 @@ export type Mutation = {
   advancePlayoffBracket?: Maybe<PlayoffBracket>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
-  /** Automatically make draft picks for teams that have exceeded their pick deadline. Triggered every minute by EventBridge. */
+  /** Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback. */
   autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
@@ -898,6 +898,8 @@ export type Mutation = {
   awardPlayoffAppearanceBadges?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: drop all players from a team (useful for inactive teams). */
   bulkDropTeamPlayers?: Maybe<CommissionerActionResult>;
+  /** Cancel a Season Draft Game (only the creator can cancel, only in setup or drafting) */
+  cancelSeasonDraftGame?: Maybe<Scalars['Boolean']['output']>;
   /** Cancel a pending trade offer as the team that proposed it. */
   cancelTrade?: Maybe<TradeOffer>;
   cancelWaiverClaim?: Maybe<WaiverClaim>;
@@ -908,6 +910,8 @@ export type Mutation = {
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
   createPlayoffBracket?: Maybe<PlayoffBracket>;
+  /** Create a new Season Draft Game */
+  createSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
   createTiebreakerRules?: Maybe<TiebreakerRule>;
   /** Remove an achievement restriction from a league. Commissioner / General Manager access required. */
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
@@ -932,6 +936,8 @@ export type Mutation = {
   joinLeagueByCode?: Maybe<Team>;
   joinPublicLeague?: Maybe<JoinLeaguePayload>;
   makeDraftPick?: Maybe<DraftPick>;
+  /** Make a draft pick in a Season Draft Game */
+  makeSeasonDraftPick?: Maybe<Scalars['Boolean']['output']>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   pauseDraft?: Maybe<Draft>;
@@ -961,10 +967,14 @@ export type Mutation = {
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
   setTradeBlock?: Maybe<TeamMember>;
   startDraft?: Maybe<League>;
+  /** Start a Season Draft Game (move from setup to drafting) */
+  startSeasonDraftGame?: Maybe<Scalars['Boolean']['output']>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
   /** Commissioner: swap the team assignments between two matchups in the same league. */
   swapMatchupTeams?: Maybe<CommissionerActionResult>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
+  /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
+  triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
@@ -1030,6 +1040,10 @@ export type MutationBulkDropTeamPlayersArgs = {
   input: BulkDropPlayersInput;
 };
 
+export type MutationCancelSeasonDraftGameArgs = {
+  gameId: Scalars['Int']['input'];
+};
+
 export type MutationCancelTradeArgs = {
   tradeId: Scalars['Int']['input'];
 };
@@ -1073,6 +1087,15 @@ export type MutationCreatePlayoffBracketArgs = {
   multiWeekMatchups?: InputMaybe<Scalars['Boolean']['input']>;
   season: Scalars['Int']['input'];
   startWeek: Scalars['Int']['input'];
+};
+
+export type MutationCreateSeasonDraftGameArgs = {
+  gameMode?: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
+  playerNames: Array<Scalars['String']['input']>;
+  playerType?: InputMaybe<Scalars['String']['input']>;
+  statKey?: InputMaybe<Scalars['String']['input']>;
+  userIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationCreateTiebreakerRulesArgs = {
@@ -1150,6 +1173,15 @@ export type MutationJoinPublicLeagueArgs = {
 export type MutationMakeDraftPickArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationMakeSeasonDraftPickArgs = {
+  gameId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+  position: Scalars['String']['input'];
+  rosterSlotId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+  team?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationMarkNotificationAsReadArgs = {
@@ -1244,6 +1276,10 @@ export type MutationStartDraftArgs = {
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type MutationStartSeasonDraftGameArgs = {
+  gameId: Scalars['Int']['input'];
+};
+
 export type MutationSwapMatchupPlayerPositionsArgs = {
   matchupPlayerIdA: Scalars['Int']['input'];
   matchupPlayerIdB: Scalars['Int']['input'];
@@ -1260,6 +1296,10 @@ export type MutationSwapTeamMemberPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
+};
+
+export type MutationTriggerSeasonDraftStatLoadingArgs = {
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationUpdateCommissionerNoteArgs = {
@@ -1642,6 +1682,15 @@ export type Query = {
   searchPlayers?: Maybe<Array<Player>>;
   searchUsers?: Maybe<Array<User>>;
   seasonBattingStats?: Maybe<Array<SeasonBatting>>;
+  seasonDraftGame?: Maybe<SeasonDraftGame>;
+  /** Get list of available positions to draft for */
+  seasonDraftGameAvailablePositions?: Maybe<Array<Scalars['String']['output']>>;
+  /** Get stat value for a player/season/position combination */
+  seasonDraftGamePlayerSeasonStatValue?: Maybe<Scalars['Int']['output']>;
+  /** Get valid stat keys for a given player type */
+  seasonDraftGameValidStatKeys?: Maybe<Array<Scalars['String']['output']>>;
+  /** Get all Season Draft Games for the current user */
+  seasonDraftGames?: Maybe<Array<SeasonDraftGameSummary>>;
   seasonFieldingStats?: Maybe<Array<SeasonFielding>>;
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
   /** Return earned badges for a team in a league */
@@ -1965,6 +2014,28 @@ export type QuerySeasonBattingStatsArgs = {
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QuerySeasonDraftGameArgs = {
+  gameId: Scalars['Int']['input'];
+};
+
+export type QuerySeasonDraftGameAvailablePositionsArgs = {
+  gameId: Scalars['Int']['input'];
+};
+
+export type QuerySeasonDraftGamePlayerSeasonStatValueArgs = {
+  gameMode?: InputMaybe<Scalars['String']['input']>;
+  playerId: Scalars['Int']['input'];
+  playerType?: InputMaybe<Scalars['String']['input']>;
+  position: Scalars['String']['input'];
+  season: Scalars['Int']['input'];
+  statKey?: InputMaybe<Scalars['String']['input']>;
+  team?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QuerySeasonDraftGameValidStatKeysArgs = {
+  playerType: Scalars['String']['input'];
+};
+
 export type QuerySeasonFieldingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
@@ -2150,6 +2221,96 @@ export type SeasonBatting = {
   team?: Maybe<Scalars['String']['output']>;
   totalBases?: Maybe<Scalars['Int']['output']>;
   triples?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A Season Draft Game with full state */
+export type SeasonDraftGame = {
+  __typename?: 'SeasonDraftGame';
+  createdBy?: Maybe<Scalars['Int']['output']>;
+  currentTurn?: Maybe<Scalars['Int']['output']>;
+  gameMode?: Maybe<SeasonDraftGameMode>;
+  id?: Maybe<Scalars['Int']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  picks?: Maybe<Array<SeasonDraftGamePickHistory>>;
+  playerType?: Maybe<SeasonDraftPlayerType>;
+  players?: Maybe<Array<SeasonDraftPlayer>>;
+  statKey?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<SeasonDraftGameStatus>;
+};
+
+/** Game mode: season (player+year) or career_team (player+team career total) */
+export enum SeasonDraftGameMode {
+  CareerTeam = 'career_team',
+  Season = 'season',
+}
+
+/** A historical pick in the draft */
+export type SeasonDraftGamePickHistory = {
+  __typename?: 'SeasonDraftGamePickHistory';
+  baseballPlayerName?: Maybe<Scalars['String']['output']>;
+  draftingUser?: Maybe<Scalars['String']['output']>;
+  pickNumber?: Maybe<Scalars['Int']['output']>;
+  pickedAt?: Maybe<Scalars['String']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  statValue?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+};
+
+export enum SeasonDraftGameStatus {
+  Cancelled = 'cancelled',
+  Completed = 'completed',
+  Drafting = 'drafting',
+  Setup = 'setup',
+}
+
+/** Summary of a Season Draft Game */
+export type SeasonDraftGameSummary = {
+  __typename?: 'SeasonDraftGameSummary';
+  gameMode?: Maybe<SeasonDraftGameMode>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isMyTurn?: Maybe<Scalars['Boolean']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  playerType?: Maybe<SeasonDraftPlayerType>;
+  statKey?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<SeasonDraftGameStatus>;
+};
+
+/** A completed draft pick with player and scoring info */
+export type SeasonDraftPick = {
+  __typename?: 'SeasonDraftPick';
+  playerName?: Maybe<Scalars['String']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  statValue?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Scalars['String']['output']>;
+};
+
+/** A player (human) in a Season Draft Game */
+export type SeasonDraftPlayer = {
+  __typename?: 'SeasonDraftPlayer';
+  draftOrder?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  roster?: Maybe<Array<SeasonDraftRosterSlot>>;
+  totalScore?: Maybe<Scalars['Int']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Whether this is a hitter draft or pitcher draft */
+export enum SeasonDraftPlayerType {
+  Hitter = 'hitter',
+  Pitcher = 'pitcher',
+}
+
+/** A roster slot for a player in a Season Draft Game */
+export type SeasonDraftRosterSlot = {
+  __typename?: 'SeasonDraftRosterSlot';
+  id?: Maybe<Scalars['Int']['output']>;
+  isFilled?: Maybe<Scalars['Boolean']['output']>;
+  pick?: Maybe<SeasonDraftPick>;
+  position?: Maybe<Scalars['String']['output']>;
+  slotNumber?: Maybe<Scalars['Int']['output']>;
 };
 
 export type SeasonFielding = {

@@ -1,0 +1,4 @@
+# Trigger stat loading for a baseball player if stats haven't been fetched
+mutation TriggerSeasonDraftStatLoading($playerId: Int!) {
+  triggerSeasonDraftStatLoading(playerId: $playerId)
+}

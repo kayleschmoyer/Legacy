@@ -1,0 +1,8 @@
+# Search for baseball players by name (used in draft player picker)
+#import "./player.fragment.graphql"
+
+query SearchPlayersForDraft($search: String!, $limit: Int) {
+  players(search: $search, limit: $limit) {
+    ...Player
+  }
+}

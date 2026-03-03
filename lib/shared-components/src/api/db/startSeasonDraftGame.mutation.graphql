@@ -1,0 +1,4 @@
+# Start a Season Draft Game (move from setup to drafting)
+mutation StartSeasonDraftGame($gameId: Int!) {
+  startSeasonDraftGame(gameId: $gameId)
+}

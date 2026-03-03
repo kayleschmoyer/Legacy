@@ -1,0 +1,20 @@
+# Preview the stat value for a player/season/position combination
+query GetSeasonDraftGameStatValue(
+  $playerId: Int!
+  $season: Int!
+  $position: String!
+  $statKey: String
+  $playerType: String
+  $gameMode: String
+  $team: String
+) {
+  seasonDraftGamePlayerSeasonStatValue(
+    playerId: $playerId
+    season: $season
+    position: $position
+    statKey: $statKey
+    playerType: $playerType
+    gameMode: $gameMode
+    team: $team
+  )
+}

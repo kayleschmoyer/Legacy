@@ -708,7 +708,6 @@ describe('PlayerStatsDataGrid - Performance', () => {
     // Verify multiple rows are rendered (tests virtualization works)
     expect(screen.getByText('Player 1')).toBeInTheDocument();
     expect(screen.getByText('Player 2')).toBeInTheDocument();
-
     // Test passes if it completes without timeout - validates performance indirectly
   });
 

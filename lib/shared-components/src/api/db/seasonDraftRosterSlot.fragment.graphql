@@ -1,0 +1,12 @@
+# Fragment for a roster slot in a Season Draft Game
+#import "./seasonDraftPick.fragment.graphql"
+
+fragment SeasonDraftRosterSlot on SeasonDraftRosterSlot {
+  id
+  position
+  slotNumber
+  isFilled
+  pick {
+    ...SeasonDraftPick
+  }
+}

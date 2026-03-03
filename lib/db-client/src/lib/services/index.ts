@@ -20,6 +20,18 @@ import { createGdprService, GdprService } from './GdprService';
 import { BadgeService, createBadgeService } from './BadgeService';
 import { type GenericDatabase, getPublicDbConnection } from '../client/Helpers';
 import * as PublicSchema from '../../drizzle/public/schema';
+export { SeasonDraftGameService } from './SeasonDraftGameService';
+export { HITTER_STAT_KEYS, PITCHER_STAT_KEYS } from './SeasonDraftGameService';
+export type {
+  HitterStatKey,
+  PitcherStatKey,
+  StatKey,
+  PlayerType,
+  GameMode,
+  CreateSeasonDraftGameParams,
+  MakePickParams,
+  GameState as SeasonDraftGameState,
+} from './SeasonDraftGameService';
 
 export class DatabaseService {
   public readonly users: UserService;

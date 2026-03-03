@@ -1,0 +1,18 @@
+# Create a new Season Draft Game
+mutation CreateSeasonDraftGame(
+  $name: String!
+  $playerNames: [String!]!
+  $userIds: [Int!]!
+  $statKey: String
+  $gameMode: String
+  $playerType: String
+) {
+  createSeasonDraftGame(
+    name: $name
+    playerNames: $playerNames
+    userIds: $userIds
+    statKey: $statKey
+    gameMode: $gameMode
+    playerType: $playerType
+  )
+}
