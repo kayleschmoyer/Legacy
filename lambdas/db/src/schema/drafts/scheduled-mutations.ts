@@ -327,6 +327,10 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               //   Batting:  H=1, 2B=2, 3B=3, HR=4, R=1, RBI=1, SB=2, CS=-1, HBP=1, SO=-0.5
               //   Pitching: W=5, L=-2, SV=5, SO=1, outsRecorded=1, H=-1, ER=-2, BB=-1
               //   Fielding: E=-1
+              // Projected matchup pts = career ppg × games per matchup (hitters)
+              //                         career ppg × SP starts per matchup (pitchers)
+              const gamesPerMatchup = leaguePre.gamesPerMatchup ?? 5;
+              const spStartsPerMatchup = leaguePre.spStartsPerMatchup ?? 1;
               const statsRows = await context.db.execute(
                 sql`SELECT
                   p.id AS player_id,
@@ -338,7 +342,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                        COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
                        COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
                        COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
-                      ) / cb.g
+                      ) / cb.g * ${gamesPerMatchup}
                     ELSE 0 END
                     +
                     CASE WHEN COALESCE(cp.g, 0) > 0 THEN
@@ -346,11 +350,11 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                        COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
                        COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
                        COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
-                      ) / cp.g
+                      ) / cp.g * ${spStartsPerMatchup}
                     ELSE 0 END
                     +
                     CASE WHEN COALESCE(cf.g, 0) > 0 THEN
-                      COALESCE(cf.e_def,0) * -1.0 / cf.g
+                      COALESCE(cf.e_def,0) * -1.0 / cf.g * ${gamesPerMatchup}
                     ELSE 0 END
                   ) AS projected_fpg
                 FROM players p
@@ -511,7 +515,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     positionCandidateCounts.set(posType, Math.max(posCount, 1));
                   }
 
-                  // Score each player: projected FPG × scarcity multiplier
+                  // Score each player: projected matchup pts × scarcity multiplier
                   // Players matching scarcer unfilled positions get a boost;
                   // players not matching any unfilled position get a penalty.
                   let bestScore = -Infinity;
@@ -549,8 +553,8 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                       bestScore = draftScore;
                       autoPlayerId = id;
                       autoPickReason = matchesUnfilled
-                        ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected FPG (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
-                        : `Best available (bench) — ${info.fpg.toFixed(1)} projected FPG`;
+                        ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected matchup pts (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
+                        : `Best available (bench) — ${info.fpg.toFixed(1)} projected matchup pts`;
                     }
                   }
 
@@ -573,7 +577,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   if (topId !== undefined) {
                     autoPlayerId = topId;
                     const fpg = playerDraftInfo.get(topId)?.fpg ?? 0;
-                    autoPickReason = `Best available (bench) — ${fpg.toFixed(1)} projected FPG`;
+                    autoPickReason = `Best available (bench) — ${fpg.toFixed(1)} projected matchup pts`;
                     LOGGER.info(
                       '[autoProcessDraftPicks] Auto-pick for bench (all positions filled)',
                       {

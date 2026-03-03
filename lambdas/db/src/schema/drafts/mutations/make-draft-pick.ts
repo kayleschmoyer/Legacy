@@ -557,8 +557,12 @@ builder.mutationField('makeDraftPick', (t) =>
                   apDraft.league_id,
                 );
 
-                // 4. Smart player selection: projected FPG × positional scarcity
+                // 4. Smart player selection: projected matchup pts × positional scarcity
                 //    (same algorithm as autoProcessDraftPicks)
+                //    Hitters: career ppg × games per matchup
+                //    SP:      career ppg × SP starts per matchup
+                const apGamesPerMatchup = apLeague.gamesPerMatchup ?? 5;
+                const apSpStartsPerMatchup = apLeague.spStartsPerMatchup ?? 1;
                 const statsRows = await apTx.execute(sql`
                   SELECT
                     p.id AS player_id,
@@ -570,7 +574,7 @@ builder.mutationField('makeDraftPick', (t) =>
                          COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
                          COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
                          COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
-                        ) / cb.g
+                        ) / cb.g * ${apGamesPerMatchup}
                       ELSE 0 END
                       +
                       CASE WHEN COALESCE(cp.g, 0) > 0 THEN
@@ -578,11 +582,11 @@ builder.mutationField('makeDraftPick', (t) =>
                          COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
                          COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
                          COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
-                        ) / cp.g
+                        ) / cp.g * ${apSpStartsPerMatchup}
                       ELSE 0 END
                       +
                       CASE WHEN COALESCE(cf.g, 0) > 0 THEN
-                        COALESCE(cf.e_def,0) * -1.0 / cf.g
+                        COALESCE(cf.e_def,0) * -1.0 / cf.g * ${apGamesPerMatchup}
                       ELSE 0 END
                     ) AS projected_fpg
                   FROM players p
@@ -661,8 +665,8 @@ builder.mutationField('makeDraftPick', (t) =>
                       bestScore = draftScore;
                       autoPlayerId = id;
                       autoPickReason = matchesUnfilled
-                        ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected FPG (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
-                        : `Best available (bench) — ${info.fpg.toFixed(1)} projected FPG`;
+                        ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected matchup pts (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
+                        : `Best available (bench) — ${info.fpg.toFixed(1)} projected matchup pts`;
                     }
                   }
                 } else {
@@ -670,7 +674,7 @@ builder.mutationField('makeDraftPick', (t) =>
                   const topPlayer = statsRows.rows[0];
                   if (topPlayer) {
                     autoPlayerId = topPlayer.player_id as number;
-                    autoPickReason = `Best available (bench) — ${Number(topPlayer.projected_fpg).toFixed(1)} projected FPG`;
+                    autoPickReason = `Best available (bench) — ${Number(topPlayer.projected_fpg).toFixed(1)} projected matchup pts`;
                   }
                 }
 
