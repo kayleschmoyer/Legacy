@@ -567,6 +567,32 @@ builder.mutationField('joinLeagueByCode', (t) =>
           teamId: team.id,
         });
 
+        // Send a league chat notification
+        const joinerUsername = context.user.username ?? `user_${userId}`;
+        const joinText = `🎉 ${joinerUsername} joined the league!`;
+        try {
+          const [chatMsg] = await context.db
+            .insert(PublicSchema.leagueMessages)
+            .values({ leagueId: league.id, userId, messageText: joinText })
+            .returning();
+          const notificationService = createNotificationService();
+          if (notificationService) {
+            await notificationService.notifyLeagueChatMessage(league.id, {
+              leagueId: league.id,
+              messageId: chatMsg.id,
+              senderId: userId,
+              senderUsername: joinerUsername,
+              messageText: joinText,
+              timestamp: chatMsg.timestamp ?? new Date().toISOString(),
+            });
+          }
+        } catch (err: unknown) {
+          LOGGER.warn(
+            'Failed to send league chat WS notification for league join',
+            { err },
+          );
+        }
+
         return team;
       } catch (error) {
         LOGGER.error('Error joining league', {
@@ -735,6 +761,32 @@ builder.mutationField('joinLeague', (t) =>
           teamId: team.id,
           permissionLevel: 'general_manager',
         });
+
+        // Send a league chat notification
+        const joinerUsername = context.user.username ?? `user_${userId}`;
+        const joinText = `🎉 ${joinerUsername} joined the league!`;
+        try {
+          const [chatMsg] = await context.db
+            .insert(PublicSchema.leagueMessages)
+            .values({ leagueId: league.id, userId, messageText: joinText })
+            .returning();
+          const notificationService = createNotificationService();
+          if (notificationService) {
+            await notificationService.notifyLeagueChatMessage(league.id, {
+              leagueId: league.id,
+              messageId: chatMsg.id,
+              senderId: userId,
+              senderUsername: joinerUsername,
+              messageText: joinText,
+              timestamp: chatMsg.timestamp ?? new Date().toISOString(),
+            });
+          }
+        } catch (err: unknown) {
+          LOGGER.warn(
+            'Failed to send league chat WS notification for league join',
+            { err },
+          );
+        }
 
         return {
           success: true,
@@ -1395,6 +1447,32 @@ builder.mutationField('joinPublicLeague', (t) =>
         });
 
         LOGGER.info('User joined public league', { userId, leagueId, teamId });
+
+        // Send a league chat notification
+        const joinerUsername = context.user.username ?? `user_${userId}`;
+        const joinText = `🎉 ${joinerUsername} joined the league!`;
+        try {
+          const [chatMsg] = await context.db
+            .insert(PublicSchema.leagueMessages)
+            .values({ leagueId, userId, messageText: joinText })
+            .returning();
+          const notificationService = createNotificationService();
+          if (notificationService) {
+            await notificationService.notifyLeagueChatMessage(leagueId, {
+              leagueId,
+              messageId: chatMsg.id,
+              senderId: userId,
+              senderUsername: joinerUsername,
+              messageText: joinText,
+              timestamp: chatMsg.timestamp ?? new Date().toISOString(),
+            });
+          }
+        } catch (err: unknown) {
+          LOGGER.warn(
+            'Failed to send league chat WS notification for league join',
+            { err },
+          );
+        }
 
         return {
           success: true,
