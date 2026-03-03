@@ -8,7 +8,7 @@ import {
   type StartDraftMessage,
 } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 
 import { Draft } from '../types';
 import { builder } from '../../builder';
@@ -201,6 +201,52 @@ builder.mutationField('initializeDraft', (t) =>
             .update(PublicSchema.leagues)
             .set({ draftStatus: 'in-progress' })
             .where(eq(PublicSchema.leagues.id, leagueId));
+
+          // LS-480: Enable auto-pick for any teams without a general manager
+          const teamsWithGM = await context.db
+            .select({ teamId: PublicSchema.leagueMembers.teamId })
+            .from(PublicSchema.leagueMembers)
+            .where(
+              and(
+                eq(PublicSchema.leagueMembers.leagueId, leagueId),
+                eq(
+                  PublicSchema.leagueMembers.permissionLevel,
+                  'general_manager',
+                ),
+                isNotNull(PublicSchema.leagueMembers.teamId),
+              ),
+            );
+
+          const teamIdsWithGM = new Set(
+            teamsWithGM
+              .map((m) => m.teamId)
+              .filter((id): id is number => id !== null),
+          );
+
+          const teamIdsWithoutGM = shuffled
+            .map((t) => t.id)
+            .filter((id) => !teamIdsWithGM.has(id));
+
+          if (teamIdsWithoutGM.length > 0) {
+            await context.db
+              .update(PublicSchema.draftTeams)
+              .set({ autoPick: true })
+              .where(
+                and(
+                  eq(PublicSchema.draftTeams.draftId, draft.id),
+                  inArray(PublicSchema.draftTeams.teamId, teamIdsWithoutGM),
+                ),
+              );
+
+            LOGGER.info(
+              'Auto-pick enabled for teams without general managers',
+              {
+                leagueId,
+                draftId: draft.id,
+                teamIds: teamIdsWithoutGM,
+              },
+            );
+          }
 
           // Set the initial pick deadline now that draft is live
           const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;
