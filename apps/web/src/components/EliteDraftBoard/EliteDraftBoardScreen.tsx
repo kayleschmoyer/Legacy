@@ -514,9 +514,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     // Override with available players (which have authoritative firstName/lastName)
     for (const ap of availablePlayers) {
       const s = playerStatsMap.get(ap.id);
-      const pos = s?.position ?? 'UTIL';
+      // Eagerly fetch pitching stats so pure pitchers (absent from batting stats)
+      // still resolve to a pitcher position instead of defaulting to 'UTIL'.
+      const ps = pitchingStatsMap.get(ap.id);
+      const pos =
+        s?.position ??
+        (ps ? (ps.gamesStarted >= ps.games / 2 ? 'SP' : 'RP') : 'UTIL');
       const pitcher = isPitcherPosition(pos);
-      const ps = pitcher ? pitchingStatsMap.get(ap.id) : undefined;
       map.set(ap.id, {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
@@ -585,9 +589,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const enrichedPlayers: DraftPlayer[] = useMemo(() => {
     return availablePlayers.map((ap) => {
       const s = playerStatsMap.get(ap.id);
-      const pos = s?.position ?? 'UTIL';
+      // Eagerly fetch pitching stats so pure pitchers (absent from batting stats)
+      // still resolve to a pitcher position instead of defaulting to 'UTIL'.
+      const ps = pitchingStatsMap.get(ap.id);
+      const pos =
+        s?.position ??
+        (ps ? (ps.gamesStarted >= ps.games / 2 ? 'SP' : 'RP') : 'UTIL');
       const pitcher = isPitcherPosition(pos);
-      const ps = pitcher ? pitchingStatsMap.get(ap.id) : undefined;
       return {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
