@@ -6,7 +6,9 @@ import React, {
   useState,
 } from 'react';
 import {
+  ALLOWED_POSITIONS,
   Button,
+  PITCHING_POSITIONS,
   Separator,
   XStack,
   YStack,
@@ -37,7 +39,7 @@ import {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const PITCHING_POSITIONS = new Set(['SP', 'RP']);
+// PITCHING_POSITIONS and ALLOWED_POSITIONS are imported from @legacy-sports/shared-components.
 const pitchingPositions = new Set(['SP', 'RP']);
 const infieldPositions = new Set(['C', '1B', '2B', '3B', 'SS']);
 const outfieldPositions = new Set(['LF', 'CF', 'RF', 'OF']);
@@ -65,23 +67,6 @@ const isPlayerBatter = (player: TeamMemberFragment): boolean =>
 const isDualEligible = (player: TeamMemberFragment): boolean =>
   isPlayerPitcher(player) && isPlayerBatter(player);
 
-const ALLOWED_POSITIONS: Record<string, string[]> = {
-  '1B': ['1B'],
-  '2B': ['2B'],
-  '3B': ['3B'],
-  C: ['C'],
-  CF: ['CF'],
-  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
-  IF: ['1B', '2B', '3B', 'SS'],
-  LF: ['LF'],
-  OF: ['LF', 'RF', 'CF'],
-  RF: ['RF'],
-  RP: ['RP'],
-  SP: ['SP'],
-  SS: ['SS'],
-  XDH: ['DH'],
-};
-
 export const canPlayerPlayPosition = (
   player: TeamMemberFragment,
   position: LeaguePositionFragment,
@@ -90,7 +75,7 @@ export const canPlayerPlayPosition = (
   if (eligible.length === 0) return true;
   const allowed = ALLOWED_POSITIONS[position.positionType ?? ''];
   if (!allowed) return false;
-  return eligible.some((pos) => allowed.includes(pos));
+  return eligible.some((pos) => (allowed as readonly string[]).includes(pos));
 };
 
 type PositionCategory = 'pitching' | 'infield' | 'outfield' | 'utility';

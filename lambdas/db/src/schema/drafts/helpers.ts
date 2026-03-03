@@ -3,32 +3,13 @@
  */
 
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
+import { ALLOWED_POSITIONS } from '@legacy-sports/utils';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { ForbiddenError } from '../graphql-errors';
 
-// ── Position eligibility for auto-pick ──────────────────────────────────────
-// Maps each league roster slot type to the player stat position keys that qualify.
-// Source of truth: lib/shared-components/src/utils/PositionModels.ts
-// Shared by autoProcessDraftPicks (scheduled-mutations.ts) and the
-// makeDraftPick auto-pick chain (mutations.ts).
-export const ALLOWED_POSITIONS_FOR_AUTO_PICK: Readonly<
-  Record<string, readonly string[]>
-> = Object.freeze({
-  '1B': ['1B'],
-  '2B': ['2B'],
-  '3B': ['3B'],
-  C: ['C'],
-  CF: ['CF'],
-  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
-  IF: ['1B', '2B', '3B', 'SS'],
-  LF: ['LF'],
-  OF: ['LF', 'RF', 'CF'],
-  RF: ['RF'],
-  RP: ['RP', 'P'],
-  SP: ['SP', 'P'],
-  SS: ['SS'],
-  XDH: ['DH'],
-});
+// Re-export under the legacy name so callers in mutations.ts / scheduled-mutations.ts
+// do not need to be updated.
+export { ALLOWED_POSITIONS as ALLOWED_POSITIONS_FOR_AUTO_PICK } from '@legacy-sports/utils';
 
 /**
  * Determine which league-defined position slot types still need a player
@@ -94,7 +75,7 @@ export async function getUnfilledPositionTypes(
 
     const coverableSlots = new Set<string>();
     for (const [slotType, allowedStatPositions] of Object.entries(
-      ALLOWED_POSITIONS_FOR_AUTO_PICK,
+      ALLOWED_POSITIONS,
     )) {
       if (allowedStatPositions.some((sp) => playerStatPositions.includes(sp))) {
         coverableSlots.add(slotType);
@@ -107,8 +88,7 @@ export async function getUnfilledPositionTypes(
   const slotsCovered = new Map<string, number>();
   const orderedSlotTypes = [...slotsNeeded.keys()].sort(
     (a, b) =>
-      (ALLOWED_POSITIONS_FOR_AUTO_PICK[a]?.length ?? 1) -
-      (ALLOWED_POSITIONS_FOR_AUTO_PICK[b]?.length ?? 1),
+      (ALLOWED_POSITIONS[a]?.length ?? 1) - (ALLOWED_POSITIONS[b]?.length ?? 1),
   );
 
   for (const playerId of teamPlayerIds) {

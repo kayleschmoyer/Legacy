@@ -1,7 +1,13 @@
 import {
+  ALLOWED_POSITIONS,
+  PITCHING_POSITIONS,
+} from '@legacy-sports/shared-components';
+import {
   LeaguePositionFragment,
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
+
+export { ALLOWED_POSITIONS, PITCHING_POSITIONS };
 
 export type Position =
   | 'SP'
@@ -34,26 +40,7 @@ export enum PositionSlot {
   Xdh = 'XDH',
 }
 
-export const ALLOWED_POSITIONS = Object.freeze<
-  Record<PositionSlot, Position[]>
->({
-  [PositionSlot['1B']]: ['1B'],
-  [PositionSlot['2B']]: ['2B'],
-  [PositionSlot['3B']]: ['3B'],
-  [PositionSlot.C]: ['C'],
-  [PositionSlot.Cf]: ['CF'],
-  [PositionSlot.Dh]: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
-  [PositionSlot.If]: ['1B', '2B', '3B', 'SS'],
-  [PositionSlot.Lf]: ['LF'],
-  [PositionSlot.Of]: ['LF', 'RF', 'CF'],
-  [PositionSlot.Rf]: ['RF'],
-  [PositionSlot.Rp]: ['RP'],
-  [PositionSlot.Sp]: ['SP'],
-  [PositionSlot.Ss]: ['SS'],
-  [PositionSlot.Xdh]: ['DH'],
-});
-
-export const PITCHING_POSITIONS = Object.freeze(new Set(['SP', 'RP']));
+// ALLOWED_POSITIONS and PITCHING_POSITIONS are imported from @legacy-sports/shared-components above.
 
 export type PositionType = keyof typeof ALLOWED_POSITIONS;
 

@@ -30,6 +30,11 @@ import {
   validateSelectionMethod,
   validateUserAccess,
 } from '@legacy-sports/db-client';
+import {
+  ALLOWED_POSITIONS,
+  BATTING_POSITIONS,
+  PITCHING_POSITIONS,
+} from '@legacy-sports/utils';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 
 // Initialize Sentry
@@ -322,32 +327,6 @@ interface PositionPlayerGroup {
 }
 
 /**
- * Position mapping logic - MUST match GraphQL API's ALLOWED_POSITIONS exactly
- * Source: lib/shared-components/src/utils/PositionModels.ts
- */
-const ALLOWED_POSITIONS = Object.freeze({
-  '1B': ['1B'],
-  '2B': ['2B'],
-  '3B': ['3B'],
-  C: ['C'],
-  CF: ['CF'],
-  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'], // DH can be any position player
-  IF: ['1B', '2B', '3B', 'SS'],
-  LF: ['LF'],
-  OF: ['LF', 'RF', 'CF'],
-  RF: ['RF'],
-  RP: ['RP', 'P'], // Relief pitchers include generic P
-  SP: ['SP', 'P'], // Starting pitchers include generic P
-  SS: ['SS'],
-  XDH: ['DH'],
-} as const);
-
-const PITCHING_POSITIONS = Object.freeze(new Set(['SP', 'RP', 'P']));
-const BATTING_POSITIONS = Object.freeze(
-  new Set(['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH']),
-);
-
-/**
  * ENHANCED: Check if a player can play a specific position with detailed game experience
  * Uses the same ALLOWED_POSITIONS logic as GraphQL API but adds smart weighting
  * based on actual games played at each position for better draft decisions
@@ -359,8 +338,7 @@ function canPlayerPlayPosition(
   requiredPosition: string,
 ): boolean {
   // Use same core logic as GraphQL API: lib/shared-components/src/utils/PositionModels.ts
-  const allowedPositions =
-    ALLOWED_POSITIONS[requiredPosition as keyof typeof ALLOWED_POSITIONS];
+  const allowedPositions = ALLOWED_POSITIONS[requiredPosition];
 
   if (!allowedPositions) {
     return false;
@@ -424,8 +402,7 @@ function getPositionScore(
     return 0;
   }
 
-  const allowedPositions =
-    ALLOWED_POSITIONS[requiredPosition as keyof typeof ALLOWED_POSITIONS];
+  const allowedPositions = ALLOWED_POSITIONS[requiredPosition];
   if (!allowedPositions || !positionDetails) {
     return 1; // Basic eligibility score
   }

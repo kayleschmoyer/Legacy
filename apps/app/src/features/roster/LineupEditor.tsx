@@ -2,30 +2,15 @@ import { useCallback, useMemo, useState } from 'react';
 import humanizeString from 'humanize-string';
 import { Button, Separator, Text, YStack } from 'tamagui';
 import { ScrollView } from 'react-native';
+import {
+  ALLOWED_POSITIONS,
+  PITCHING_POSITIONS,
+} from '@legacy-sports/shared-components';
 import { normalizeNumericIdentifier } from '../../common/types/app-types';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
-
-const PITCHING_POSITIONS = new Set(['SP', 'RP']);
-
-const ALLOWED_POSITIONS: Record<string, string[]> = {
-  '1B': ['1B'],
-  '2B': ['2B'],
-  '3B': ['3B'],
-  C: ['C'],
-  CF: ['CF'],
-  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
-  IF: ['1B', '2B', '3B', 'SS'],
-  LF: ['LF'],
-  OF: ['LF', 'RF', 'CF'],
-  RF: ['RF'],
-  RP: ['RP'],
-  SP: ['SP'],
-  SS: ['SS'],
-  XDH: ['DH'],
-};
 
 const getEligiblePositions = (player: TeamMemberFragment): string[] =>
   player.player?.eligiblePositions ?? [];
