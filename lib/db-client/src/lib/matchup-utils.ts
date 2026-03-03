@@ -5,6 +5,7 @@
  *  - MatchupService  (schedule generation + DB persistence helpers)
  *  - selectSeasonsForPlayers (season-assignment logic)
  *  - populateMatchupPlayersAndSeasons (populates matchup_players)
+ *  - autoPopulateFirstMatchupLineup (assigns positions for week-1 after draft)
  *  - createAllMatchupsForLeague (top-level orchestrator)
  *
  * These were originally spread across lambdas/db local services but are moved
@@ -692,6 +693,195 @@ export async function populateMatchupPlayersAndSeasons(
   }
 }
 
+// ── autoPopulateFirstMatchupLineup ────────────────────────────────────────────
+
+/**
+ * Maps each lineup position slot to the set of player-eligibility positions
+ * that can fill it. Mirrors the ALLOWED_POSITIONS constant in
+ * LeagueRosterManagement.tsx so server-side auto-assignment uses the same
+ * eligibility rules as the UI.
+ */
+const ALLOWED_POSITIONS_FOR_SLOT: Record<string, string[]> = {
+  SP: ['SP'],
+  RP: ['RP'],
+  C: ['C'],
+  '1B': ['1B'],
+  '2B': ['2B'],
+  '3B': ['3B'],
+  SS: ['SS'],
+  LF: ['LF'],
+  CF: ['CF'],
+  RF: ['RF'],
+  OF: ['LF', 'RF', 'CF'],
+  IF: ['1B', '2B', '3B', 'SS'],
+  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
+  XDH: ['DH'],
+};
+
+/**
+ * Sort order for greedily filling lineup slots. More specific positions (e.g.
+ * C, SP) are filled first so that specialist players are placed correctly
+ * before flex / utility slots consume them.
+ */
+const POSITION_SPECIFICITY_ORDER: string[] = [
+  'SP',
+  'RP',
+  'C',
+  '1B',
+  '2B',
+  '3B',
+  'SS',
+  'LF',
+  'CF',
+  'RF',
+  'OF',
+  'IF',
+  'XDH',
+  'DH',
+];
+
+/**
+ * For each team in the supplied week-1 matchups, greedily assign players to
+ * lineup positions and persist the assignment as `positionId` on
+ * `matchup_players`.
+ *
+ * Algorithm:
+ *   1. Sort the league's position slots from most → least specific.
+ *   2. For each slot, pick the first unassigned player whose eligible
+ *      positions satisfy ALLOWED_POSITIONS_FOR_SLOT[slot].
+ *   3. Persist all assignments via individual UPDATE statements.
+ *
+ * Called from createAllMatchupsForLeague immediately after
+ * populateMatchupPlayersAndSeasons inserts the players (LS-445).
+ */
+export async function autoPopulateFirstMatchupLineup(
+  db: GenericDatabase<typeof PublicSchema>,
+  leagueId: number,
+  week1MatchupIds: number[],
+): Promise<{ assignedCount: number }> {
+  if (week1MatchupIds.length === 0) {
+    return { assignedCount: 0 };
+  }
+
+  // 1. Fetch league position slots
+  const leaguePositions = await db
+    .select({
+      id: PublicSchema.leaguePosition.id,
+      positionType: PublicSchema.leaguePosition.positionType,
+    })
+    .from(PublicSchema.leaguePosition)
+    .where(eq(PublicSchema.leaguePosition.leagueId, leagueId));
+
+  if (leaguePositions.length === 0) {
+    LOGGER.warn('autoPopulateFirstMatchupLineup: no league positions found', {
+      leagueId,
+    });
+    return { assignedCount: 0 };
+  }
+
+  // Sort positions: most specific first
+  const sortedPositions = [...leaguePositions].sort((a, b) => {
+    const aIdx = POSITION_SPECIFICITY_ORDER.indexOf(a.positionType ?? '');
+    const bIdx = POSITION_SPECIFICITY_ORDER.indexOf(b.positionType ?? '');
+    return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+  });
+
+  // 2. Fetch matchup_players for the first-week matchups
+  const mpRows = await db
+    .select({
+      id: PublicSchema.matchupPlayers.id,
+      matchupId: PublicSchema.matchupPlayers.matchupId,
+      playerId: PublicSchema.matchupPlayers.playerId,
+      teamId: PublicSchema.matchupPlayers.teamId,
+    })
+    .from(PublicSchema.matchupPlayers)
+    .where(inArray(PublicSchema.matchupPlayers.matchupId, week1MatchupIds));
+
+  if (mpRows.length === 0) {
+    return { assignedCount: 0 };
+  }
+
+  // 3. Fetch eligible positions for all involved players
+  const allPlayerIds = Array.from(new Set(mpRows.map((mp) => mp.playerId)));
+  const eligibleRows = await db
+    .select({
+      playerId: PublicSchema.playerEligiblePositions.playerId,
+      position: PublicSchema.playerEligiblePositions.position,
+    })
+    .from(PublicSchema.playerEligiblePositions)
+    .where(
+      inArray(PublicSchema.playerEligiblePositions.playerId, allPlayerIds),
+    );
+
+  // Build playerId → Set<eligible position string>
+  const playerEligMap = new Map<number, Set<string>>();
+  for (const row of eligibleRows) {
+    let posSet = playerEligMap.get(row.playerId);
+    if (!posSet) {
+      posSet = new Set();
+      playerEligMap.set(row.playerId, posSet);
+    }
+    posSet.add(row.position);
+  }
+
+  // 4. Group matchup_players by (matchupId, teamId) for per-team assignment
+  const groups = new Map<string, typeof mpRows>();
+  for (const mp of mpRows) {
+    const key = `${mp.matchupId}-${mp.teamId}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = [];
+      groups.set(key, group);
+    }
+    group.push(mp);
+  }
+
+  const canFill = (playerId: number, slotType: string): boolean => {
+    const eligible = playerEligMap.get(playerId);
+    // No eligibility data — allow the player to fill any slot
+    if (!eligible || eligible.size === 0) return true;
+    const allowed = ALLOWED_POSITIONS_FOR_SLOT[slotType];
+    if (!allowed) return false;
+    return allowed.some((pos) => eligible.has(pos));
+  };
+
+  // 5. Greedy assignment per (matchup, team): fill specific slots first
+  const assignments = new Map<number, number>(); // matchup_player.id → position.id
+  for (const teamPlayers of groups.values()) {
+    const assigned = new Set<number>(); // matchup_player IDs already assigned
+    for (const position of sortedPositions) {
+      for (const mp of teamPlayers) {
+        if (assigned.has(mp.id)) continue;
+        if (canFill(mp.playerId, position.positionType)) {
+          assignments.set(mp.id, position.id);
+          assigned.add(mp.id);
+          break;
+        }
+      }
+    }
+  }
+
+  if (assignments.size === 0) {
+    return { assignedCount: 0 };
+  }
+
+  // 6. Persist the lineup assignments
+  for (const [mpId, posId] of assignments) {
+    await db
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: posId })
+      .where(eq(PublicSchema.matchupPlayers.id, mpId));
+  }
+
+  LOGGER.info('Auto-populated first matchup lineup after draft', {
+    leagueId,
+    week1MatchupCount: week1MatchupIds.length,
+    assignedCount: assignments.size,
+  });
+
+  return { assignedCount: assignments.size };
+}
+
 // ── createAllMatchupsForLeague ────────────────────────────────────────────────
 
 /**
@@ -700,6 +890,7 @@ export async function populateMatchupPlayersAndSeasons(
  * Uses the scheduling library to generate a full round-robin schedule,
  * inserts all matchups, populates matchup_players, and assigns seasons.
  * Sets the league's currentMatchup to the first week-1 matchup.
+ * Also auto-populates the week-1 lineup for every team (LS-445).
  *
  * Called from:
  *  - lambdas/db  — pick-by-pick draft completion flow (via GraphQL)
@@ -785,6 +976,35 @@ export async function createAllMatchupsForLeague(
     insertedMatchups,
     gamesPerMatchup,
   );
+
+  // Auto-populate week-1 lineup so every team starts with a full lineup
+  // instead of an all-bench roster (LS-445).
+  const week1MatchupIds = insertedMatchups
+    .filter((m) => m.weekNumber === 1)
+    .map((m) => m.id);
+
+  if (week1MatchupIds.length > 0) {
+    try {
+      const lineupResult = await autoPopulateFirstMatchupLineup(
+        db,
+        leagueId,
+        week1MatchupIds,
+      );
+      LOGGER.info('Auto-populated first matchup lineup', {
+        leagueId,
+        assignedCount: lineupResult.assignedCount,
+      });
+    } catch (lineupError) {
+      // Non-fatal: users can manually adjust their lineup
+      LOGGER.error('Failed to auto-populate first matchup lineup', {
+        leagueId,
+        error:
+          lineupError instanceof Error
+            ? lineupError.message
+            : String(lineupError),
+      });
+    }
+  }
 
   const week1Matchup = insertedMatchups.find((m) => m.weekNumber === 1);
   const currentMatchupId = week1Matchup?.id ?? insertedMatchups[0]?.id ?? null;
