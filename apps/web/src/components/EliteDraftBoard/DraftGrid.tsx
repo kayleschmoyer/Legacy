@@ -18,6 +18,7 @@ export function DraftGrid({
   myTeamId,
   statsLookup,
   maxRounds,
+  autoPickTeamIds = new Set<string>(),
 }: {
   teams: LeagueTeam[];
   picks: DraftPickRecord[];
@@ -25,6 +26,8 @@ export function DraftGrid({
   myTeamId: number | null;
   statsLookup: Map<number, DraftPlayer>;
   maxRounds: number;
+  /** Set of team IDs that currently have auto-pick enabled (LS-439) */
+  autoPickTeamIds?: ReadonlySet<string>;
 }) {
   // Build a grid: rows = rounds, cols = teams
   const pickGrid = useMemo(() => {
@@ -73,6 +76,17 @@ export function DraftGrid({
             {String(team.id) === String(myTeamId) && (
               <span style={{ fontSize: 8, display: 'block', color: '#10b981' }}>
                 YOU
+              </span>
+            )}
+            {autoPickTeamIds.has(String(team.id)) && (
+              <span
+                title="Auto-pick enabled"
+                style={{ fontSize: 10, display: 'block', color: '#a78bfa' }}
+              >
+                <span role="img" aria-label="robot">
+                  🤖
+                </span>{' '}
+                AUTO
               </span>
             )}
           </div>

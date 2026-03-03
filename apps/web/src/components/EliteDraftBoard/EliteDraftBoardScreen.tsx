@@ -41,6 +41,7 @@ import {
   GetDraftPicks as GET_DRAFT_PICKS,
   GetDraftPitcherStats as GET_DRAFT_PITCHER_STATS,
   GetDraftPlayerStats as GET_DRAFT_PLAYER_STATS,
+  GetDraftTeamAutoPickStatuses as GET_DRAFT_TEAM_AUTO_PICK_STATUSES,
   GetDraftTeamOrder as GET_DRAFT_TEAM_ORDER,
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
@@ -52,6 +53,8 @@ import {
   type GetCurrentDraftPickQueryVariables,
   type GetDraftPicksQuery,
   type GetDraftPicksQueryVariables,
+  type GetDraftTeamAutoPickStatusesQuery,
+  type GetDraftTeamAutoPickStatusesQueryVariables,
   type GetDraftTeamOrderQuery,
   type GetMyDraftTeamAutoPickQuery,
   type GetMyDraftTeamAutoPickQueryVariables,
@@ -391,6 +394,25 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     skip: !draftId,
     errorPolicy: 'all',
   });
+
+  // ---- Auto-pick statuses for all teams (LS-439) ----
+  const { data: allAutoPickData } = useQuery<
+    GetDraftTeamAutoPickStatusesQuery,
+    GetDraftTeamAutoPickStatusesQueryVariables
+  >(GET_DRAFT_TEAM_AUTO_PICK_STATUSES, {
+    variables: { draftId: draftId ?? 0 },
+    skip: !draftId,
+    errorPolicy: 'all',
+    pollInterval: 5000, // refresh every 5 s to stay live
+  });
+
+  const autoPickTeamIds = useMemo<ReadonlySet<string>>(() => {
+    const ids = new Set<string>();
+    for (const entry of allAutoPickData?.getDraftTeamAutoPickStatuses ?? []) {
+      if (entry.autoPick && entry.teamId != null) ids.add(String(entry.teamId));
+    }
+    return ids;
+  }, [allAutoPickData]);
 
   // Log draft errors (debug logging removed for production)
   useEffect(() => {
@@ -2327,6 +2349,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               currentPickInfo={currentPickInfo}
               myTeamId={myTeamId}
               statsLookup={statsLookup}
+              autoPickTeamIds={autoPickTeamIds}
               maxRounds={
                 leagueTeams.length > 0
                   ? Math.max(

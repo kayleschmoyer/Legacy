@@ -112,6 +112,13 @@ query GetMyDraftTeamAutoPick($draftId: Int!) {
   getMyDraftTeamAutoPick(draftId: $draftId)
 }
 
+query GetDraftTeamAutoPickStatuses($draftId: Int!) {
+  getDraftTeamAutoPickStatuses(draftId: $draftId) {
+    teamId
+    autoPick
+  }
+}
+
 query GetLiveDraftLeagueDraft($leagueId: Int!) {
   getLeagueDraft(leagueId: $leagueId) {
     id

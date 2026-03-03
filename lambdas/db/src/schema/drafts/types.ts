@@ -198,6 +198,22 @@ DraftTeamOrderEntry.implement({
   }),
 });
 
+/**
+ * DraftTeamAutoPickStatus - Reports whether a team has auto-pick enabled (LS-439)
+ */
+export const DraftTeamAutoPickStatus = builder.objectRef<{
+  teamId: number;
+  autoPick: boolean;
+}>('DraftTeamAutoPickStatus');
+
+DraftTeamAutoPickStatus.implement({
+  description: 'Auto-pick status for a team in a draft',
+  fields: (t) => ({
+    teamId: t.exposeInt('teamId'),
+    autoPick: t.exposeBoolean('autoPick'),
+  }),
+});
+
 // ── Update Draft Settings Types ──────────────────────────────────────────────
 
 // Input type for updating draft settings before a draft starts

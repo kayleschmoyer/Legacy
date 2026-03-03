@@ -463,6 +463,13 @@ export type DraftPlayer = {
   lastName?: Maybe<Scalars['String']['output']>;
 };
 
+/** Auto-pick status for a team in a draft */
+export type DraftTeamAutoPickStatus = {
+  __typename?: 'DraftTeamAutoPickStatus';
+  autoPick?: Maybe<Scalars['Boolean']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
 /** A team and its assigned slot in the draft order */
 export type DraftTeamOrderEntry = {
   __typename?: 'DraftTeamOrderEntry';
@@ -1668,6 +1675,8 @@ export type Query = {
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
+  /** Returns the auto-pick status for every team registered in the given draft. */
+  getDraftTeamAutoPickStatuses?: Maybe<Array<DraftTeamAutoPickStatus>>;
   getDraftTeamOrder?: Maybe<Array<DraftTeamOrderEntry>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
   getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
@@ -1830,6 +1839,10 @@ export type QueryGetDraftArgs = {
 };
 
 export type QueryGetDraftPicksArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftTeamAutoPickStatusesArgs = {
   draftId: Scalars['Int']['input'];
 };
 
@@ -3795,6 +3808,19 @@ export type GetMyDraftTeamAutoPickQueryVariables = Exact<{
 export type GetMyDraftTeamAutoPickQuery = {
   __typename?: 'Query';
   getMyDraftTeamAutoPick?: boolean | null;
+};
+
+export type GetDraftTeamAutoPickStatusesQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type GetDraftTeamAutoPickStatusesQuery = {
+  __typename?: 'Query';
+  getDraftTeamAutoPickStatuses?: Array<{
+    __typename?: 'DraftTeamAutoPickStatus';
+    teamId?: number | null;
+    autoPick?: boolean | null;
+  }> | null;
 };
 
 export type GetLiveDraftLeagueDraftQueryVariables = Exact<{
@@ -10129,6 +10155,100 @@ export type GetMyDraftTeamAutoPickSuspenseQueryHookResult = ReturnType<
 export type GetMyDraftTeamAutoPickQueryResult = Apollo.QueryResult<
   GetMyDraftTeamAutoPickQuery,
   GetMyDraftTeamAutoPickQueryVariables
+>;
+export const GetDraftTeamAutoPickStatuses = gql`
+  query GetDraftTeamAutoPickStatuses($draftId: Int!) {
+    getDraftTeamAutoPickStatuses(draftId: $draftId) {
+      teamId
+      autoPick
+    }
+  }
+`;
+
+/**
+ * __useGetDraftTeamAutoPickStatusesQuery__
+ *
+ * To run a query within a React component, call `useGetDraftTeamAutoPickStatusesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftTeamAutoPickStatusesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftTeamAutoPickStatusesQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useGetDraftTeamAutoPickStatusesQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetDraftTeamAutoPickStatusesQuery,
+    GetDraftTeamAutoPickStatusesQueryVariables
+  > &
+    (
+      | {
+          variables: GetDraftTeamAutoPickStatusesQueryVariables;
+          skip?: boolean;
+        }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDraftTeamAutoPickStatusesQuery,
+    GetDraftTeamAutoPickStatusesQueryVariables
+  >(GetDraftTeamAutoPickStatuses, options);
+}
+export function useGetDraftTeamAutoPickStatusesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftTeamAutoPickStatusesQuery,
+    GetDraftTeamAutoPickStatusesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDraftTeamAutoPickStatusesQuery,
+    GetDraftTeamAutoPickStatusesQueryVariables
+  >(GetDraftTeamAutoPickStatuses, options);
+}
+export function useGetDraftTeamAutoPickStatusesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDraftTeamAutoPickStatusesQuery,
+        GetDraftTeamAutoPickStatusesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDraftTeamAutoPickStatusesQuery,
+    GetDraftTeamAutoPickStatusesQueryVariables
+  >(
+    GetDraftTeamAutoPickStatuses,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDraftTeamAutoPickStatusesQuery,
+          GetDraftTeamAutoPickStatusesQueryVariables
+        >,
+  );
+}
+export type GetDraftTeamAutoPickStatusesQueryHookResult = ReturnType<
+  typeof useGetDraftTeamAutoPickStatusesQuery
+>;
+export type GetDraftTeamAutoPickStatusesLazyQueryHookResult = ReturnType<
+  typeof useGetDraftTeamAutoPickStatusesLazyQuery
+>;
+export type GetDraftTeamAutoPickStatusesSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftTeamAutoPickStatusesSuspenseQuery
+>;
+export type GetDraftTeamAutoPickStatusesQueryResult = Apollo.QueryResult<
+  GetDraftTeamAutoPickStatusesQuery,
+  GetDraftTeamAutoPickStatusesQueryVariables
 >;
 export const GetLiveDraftLeagueDraft = gql`
   query GetLiveDraftLeagueDraft($leagueId: Int!) {

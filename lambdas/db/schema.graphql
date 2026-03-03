@@ -515,6 +515,14 @@ type DraftPlayer {
 }
 
 """
+Auto-pick status for a team in a draft
+"""
+type DraftTeamAutoPickStatus {
+  autoPick: Boolean
+  teamId: Int
+}
+
+"""
 A team and its assigned slot in the draft order
 """
 type DraftTeamOrderEntry {
@@ -1690,6 +1698,11 @@ type Query {
   getDirectMessages(limit: Int, otherUserId: Int!): [DirectMessage!]
   getDraft(draftId: Int!): Draft
   getDraftPicks(draftId: Int!): [DraftPick!]
+
+  """
+  Returns the auto-pick status for every team registered in the given draft.
+  """
+  getDraftTeamAutoPickStatuses(draftId: Int!): [DraftTeamAutoPickStatus!]
   getDraftTeamOrder(draftId: Int!): [DraftTeamOrderEntry!]
   getHeadToHeadRecord(
     leagueId: Int!

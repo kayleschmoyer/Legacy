@@ -11,6 +11,7 @@ import {
   Draft,
   DraftPick,
   DraftPlayer,
+  DraftTeamAutoPickStatus,
   DraftTeamOrderEntry,
 } from './types';
 import { builder } from '../builder';
@@ -513,6 +514,57 @@ builder.queryField('getMyDraftTeamAutoPick', (t) =>
         .limit(1);
 
       return draftTeamEntry?.autoPick ?? null;
+    },
+  }),
+);
+
+/**
+ * Query: Get auto-pick status for all teams in a draft (LS-439)
+ *
+ * Returns a list of { teamId, autoPick } for every team registered in the
+ * given draft.  Any authenticated league member may call this — the information
+ * is not sensitive and is needed to render the autopick icon on the board tab.
+ */
+builder.queryField('getDraftTeamAutoPickStatuses', (t) =>
+  t.field({
+    type: [DraftTeamAutoPickStatus],
+    args: {
+      draftId: t.arg.int({ required: true }),
+    },
+    description:
+      'Returns the auto-pick status for every team registered in the given draft.',
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { draftId } = args;
+
+      // Verify the draft exists and the caller is a league member
+      const [draft] = await context.db
+        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.id, draftId))
+        .limit(1);
+
+      if (!draft) {
+        throw new Error('Draft not found');
+      }
+
+      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+
+      const rows = await context.db
+        .select({
+          teamId: PublicSchema.draftTeams.teamId,
+          autoPick: PublicSchema.draftTeams.autoPick,
+        })
+        .from(PublicSchema.draftTeams)
+        .where(eq(PublicSchema.draftTeams.draftId, draftId));
+
+      return rows.map((row) => ({
+        teamId: row.teamId,
+        autoPick: row.autoPick,
+      }));
     },
   }),
 );
