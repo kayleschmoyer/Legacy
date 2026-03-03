@@ -70,6 +70,10 @@ export interface DraftPickRecord {
   pickedAt: string;
   teamId: number;
   playerId: number;
+  /** Player name fields returned directly from getDraftPicks. Used to display
+   * names for picks that are absent from the careerBattingStats map (e.g. pure
+   * pitchers). */
+  player?: { id: number; firstName: string; lastName: string } | null;
 }
 
 export interface LeagueTeam {

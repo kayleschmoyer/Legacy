@@ -541,8 +541,45 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         gamesStarted: ps?.gamesStarted,
       });
     }
+    // Seed from pick history for drafted players absent from both stats maps
+    // (e.g. pure pitchers removed from allAvailablePlayers after being drafted — LS-418).
+    // Only fills gaps — does not override entries already set above.
+    for (const pick of pickHistory) {
+      if (!map.has(pick.playerId) && pick.player) {
+        const name = `${pick.player.firstName} ${pick.player.lastName}`.trim();
+        if (name) {
+          const ps = pitchingStatsMap.get(pick.playerId);
+          map.set(pick.playerId, {
+            id: pick.playerId,
+            name,
+            position: ps
+              ? ps.gamesStarted >= ps.games / 2
+                ? 'SP'
+                : 'RP'
+              : 'P',
+            avg: 0,
+            hr: 0,
+            rbi: 0,
+            runs: 0,
+            sb: 0,
+            games: ps?.games ?? 0,
+            hits: 0,
+            obp: 0,
+            slg: 0,
+            ...(ps && {
+              era: ps.era,
+              wins: ps.wins,
+              losses: ps.losses,
+              saves: ps.saves,
+              strikeouts: ps.strikeouts,
+              gamesStarted: ps.gamesStarted,
+            }),
+          });
+        }
+      }
+    }
     return map;
-  }, [availablePlayers, playerStatsMap, pitchingStatsMap]);
+  }, [availablePlayers, pickHistory, playerStatsMap, pitchingStatsMap]);
 
   // Merge available players with stats data for rich card display
   const enrichedPlayers: DraftPlayer[] = useMemo(() => {

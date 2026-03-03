@@ -118,7 +118,9 @@ export function DraftGrid({
                 const player = statsLookup.get(pick.playerId);
                 const playerName = player
                   ? player.name
-                  : `Unknown (ID: ${pick.playerId})`;
+                  : pick.player
+                    ? `${pick.player.firstName} ${pick.player.lastName}`.trim()
+                    : `Player #${pick.playerId}`;
                 const position = player?.position;
                 const posColor = position ? getPositionColor(position) : null;
 
