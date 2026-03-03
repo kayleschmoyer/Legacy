@@ -83,6 +83,52 @@ try {
     $ghAvailable = $false
 }
 
+# Jira workflow order — transitions must walk through each intermediate status
+$workflowOrder = @("To Do", "In Progress", "In Review", "Done")
+
+function Invoke-JiraTransition {
+    <#
+    .SYNOPSIS
+        Transition a Jira ticket through intermediate statuses to reach the target.
+    .DESCRIPTION
+        Jira workflows require stepping through each status in order
+        (To Do → In Progress → In Review → Done). This function walks through
+        every intermediate transition so the ticket always reaches the target.
+    #>
+    param(
+        [string]$TicketKey,
+        [string]$CurrentStatus,
+        [string]$TargetStatus,
+        [switch]$IsDryRun
+    )
+
+    $currentIdx = $workflowOrder.IndexOf($CurrentStatus)
+    $targetIdx  = $workflowOrder.IndexOf($TargetStatus)
+
+    # If either status is unknown or already at/past target, skip
+    if ($currentIdx -lt 0 -or $targetIdx -lt 0 -or $currentIdx -ge $targetIdx) {
+        Write-Warning "Cannot transition $TicketKey from '$CurrentStatus' to '$TargetStatus' — skipping"
+        return $false
+    }
+
+    for ($i = $currentIdx + 1; $i -le $targetIdx; $i++) {
+        $nextStatus = $workflowOrder[$i]
+        if ($IsDryRun) {
+            Write-Warning "DRY RUN: Would transition $TicketKey → '$nextStatus'"
+        } else {
+            Write-Info "Transitioning $TicketKey → '$nextStatus'..."
+            acli jira workitem transition --key $TicketKey --status $nextStatus 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Failed to transition $TicketKey to '$nextStatus'"
+                return $false
+            }
+            Write-Success "Transitioned $TicketKey → $nextStatus"
+        }
+    }
+
+    return $true
+}
+
 # Function to get PR status for a branch
 function Get-PRStatus {
     param([string]$Branch)
@@ -306,17 +352,9 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
         
         # Auto-update if enabled
         if ($AutoUpdate -and $shouldUpdate -and $targetStatus) {
-            if ($DryRun) {
-                Write-Warning "DRY RUN: Would update $ticketKey to '$targetStatus'"
-            } else {
-                Write-Info "Updating $ticketKey to '$targetStatus'..."
-                acli jira workitem transition --key $ticketKey --status $targetStatus 2>&1 | Out-Null
-                
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Success "Updated $ticketKey to $targetStatus"
-                } else {
-                    Write-Error "Failed to update $ticketKey"
-                }
+            $transitionOk = Invoke-JiraTransition -TicketKey $ticketKey -CurrentStatus $status -TargetStatus $targetStatus -IsDryRun:$DryRun
+            if (-not $transitionOk -and -not $DryRun) {
+                Write-Error "Failed to transition $ticketKey from '$status' to '$targetStatus'"
             }
         } elseif ($recommendation -and $recommendation -ne "[OK] In sync") {
             Write-Warning $recommendation
