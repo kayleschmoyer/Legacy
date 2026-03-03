@@ -1110,7 +1110,7 @@ importers:
         specifier: workspace:*
         version: link:../logging
       rollbar:
-        specifier: ^2.26.4
+        specifier: '*'
         version: 2.26.5
       tslib:
         specifier: '*'

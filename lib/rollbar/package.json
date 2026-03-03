@@ -8,6 +8,6 @@
   "dependencies": {
     "tslib": "*",
     "@legacy-sports/logging": "workspace:*",
-    "rollbar": "^2.26.4"
+    "rollbar": "*"
   }
 }

@@ -128,7 +128,7 @@
     "@react-navigation/native": "^7.0.14",
     "@react-navigation/stack": "^7.4.8",
     "@reduxjs/toolkit": "^2.11.2",
-    "rollbar": "^2.26.4",
+
     "@tamagui/animations-css": "1.132.23",
     "@tamagui/animations-react-native": "1.132.23",
     "@tamagui/config": "1.132.23",
@@ -189,6 +189,7 @@
     "react-native-web": "^0.21.1",
     "react-redux": "^9.2.0",
     "react-router-dom": "6.29.0",
+    "rollbar": "^2.26.4",
     "solito": "^4.4.1",
     "tamagui": "1.132.23",
     "tamedevil": "0.1.0-rc.4",
