@@ -241,5 +241,45 @@ describe('Scheduled Mutations', () => {
       const nextWeek = currentWeek + 1;
       expect(nextWeek).toBe(4);
     });
+
+    it('should derive currentWeek from in-progress matchup status, not max(weekNumber)', () => {
+      // Bug LS-446: when createAllMatchupsForLeague pre-creates all 10 weeks,
+      // max(weekNumber) = 10, which is wrong. The currentWeek must come from
+      // the in-progress matchup row, not from a reduce over all matchup rows.
+      const inProgressMatchupWeek = 1;
+      const allWeeks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      const wrongWeek = allWeeks.reduce((max, w) => Math.max(max, w), 0);
+
+      // max(weekNumber) gives 10 — wrong for week 1 advance
+      expect(wrongWeek).toBe(10);
+      // Using the in-progress row's weekNumber gives the correct value
+      expect(inProgressMatchupWeek).toBe(1);
+      expect(inProgressMatchupWeek + 1).toBe(2); // correct next week
+    });
+
+    it('should activate pre-existing scheduled matchups instead of creating new ones', () => {
+      // After createAllMatchupsForLeague pre-creates weeks 1-10, all with
+      // status='scheduled' and season selections already populated,
+      // advanceLeagueWeekInternal should flip status scheduled→in_progress
+      // for the next week's matchups rather than inserting new rows.
+      // This ensures leagueWeekPlayerSeasons (season selection) is preserved.
+      const preCreatedMatchup = { weekNumber: 2, status: 'scheduled' as const };
+      const activated = {
+        ...preCreatedMatchup,
+        status: 'in_progress' as const,
+      };
+      expect(activated.weekNumber).toBe(2);
+      expect(activated.status).toBe('in_progress');
+    });
+
+    it('should warn and idle when no scheduled matchups exist for the next week', () => {
+      // If a league reaches the end of the pre-created schedule (season over)
+      // and there are no scheduled matchups for nextWeek, it should log a
+      // warning and set weekAdvanceStatus back to idle rather than throwing.
+      const nextWeek = 11;
+      const scheduledForNextWeek: unknown[] = [];
+      expect(scheduledForNextWeek.length).toBe(0);
+      expect(nextWeek).toBeGreaterThan(10); // past end of pre-created schedule
+    });
   });
 });

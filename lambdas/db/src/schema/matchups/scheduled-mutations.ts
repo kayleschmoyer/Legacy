@@ -770,11 +770,11 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
               `[autoAdvanceMatchups] League ${league.id} (${league.name}): all ${gamesPerMatchup} games complete in week ${currentWeek}, advancing`,
             );
 
-            // 5. Advance the league week by invoking the advanceLeagueWeek mutation logic
-            //    We replicate the core logic here to avoid the auth check, but we could
-            //    also call the mutation resolver directly with a synthetic context.
-            //    For now, we use the GraphQL mutation via internal invocation.
-            await advanceLeagueWeekInternal(context.db, league.id);
+            // 5. Advance the league week using the current week index so we
+            //    operate on the correct pre-created matchup rather than
+            //    recalculating from max(weekNumber) (which would be wrong when
+            //    all weeks are pre-created by createAllMatchupsForLeague).
+            await advanceLeagueWeekInternal(context.db, league.id, currentWeek);
 
             result.leaguesAdvanced++;
 
@@ -818,11 +818,23 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
 );
 
 // ── Internal advance logic ───────────────────────────────────────────────────
-// Extracted from the advanceLeagueWeek mutation to be reusable without auth.
+// Advances a league from `currentWeek` to `currentWeek + 1`.
+//
+// Assumes all weeks were pre-created by createAllMatchupsForLeague when the
+// draft completed. This function:
+//   1. Marks the current week's matchups as completed.
+//   2. Looks up the pre-existing scheduled matchup for the next week.
+//   3. Activates those matchups (status → in_progress) so autoSelectGames
+//      can start selecting games for them.
+//
+// The currentWeek parameter MUST come from the in-progress matchup row that
+// triggered the advance — NOT from max(weekNumber) — because all future weeks
+// are already stored in the DB.
 
 async function advanceLeagueWeekInternal(
   db: Db,
   leagueId: number,
+  currentWeek: number,
 ): Promise<void> {
   // Set status to processing
   await db
@@ -831,239 +843,67 @@ async function advanceLeagueWeekInternal(
     .where(eq(PublicSchema.leagues.id, leagueId));
 
   try {
-    const leagueResult = await db
-      .select({
-        id: PublicSchema.leagues.id,
-        gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
-        spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
-      })
-      .from(PublicSchema.leagues)
-      .where(eq(PublicSchema.leagues.id, leagueId))
-      .limit(1);
-
-    if (!leagueResult[0]) {
-      throw new Error('League not found');
-    }
-
-    const league = leagueResult[0];
-    const gamesPerMatchup = league.gamesPerMatchup ?? 5;
-    const spStartsPerMatchup = league.spStartsPerMatchup ?? 1;
-
-    // Get all teams in the league
-    const teams = await db
-      .select({
-        id: PublicSchema.teams.id,
-        name: PublicSchema.teams.name,
-        leagueId: PublicSchema.teams.leagueId,
-      })
-      .from(PublicSchema.teams)
-      .where(eq(PublicSchema.teams.leagueId, leagueId));
-
-    if (teams.length < 2) {
-      throw new Error('League must have at least 2 teams to create matchups');
-    }
-
-    // Find the highest week number
-    const existingMatchups = await db
-      .select({
-        weekNumber: PublicSchema.matchups.weekNumber,
-      })
-      .from(PublicSchema.matchups)
-      .where(eq(PublicSchema.matchups.leagueId, leagueId));
-
-    const currentWeek =
-      existingMatchups.reduce(
-        (max, m) => Math.max(max, m.weekNumber ?? 0),
-        0,
-      ) || 0;
     const nextWeek = currentWeek + 1;
 
-    // Complete all current week matchups
-    if (currentWeek > 0) {
-      const completedMatchups = await db
-        .update(PublicSchema.matchups)
-        .set({ status: 'completed' })
-        .where(
-          and(
-            eq(PublicSchema.matchups.leagueId, leagueId),
-            eq(PublicSchema.matchups.weekNumber, currentWeek),
-          ),
-        )
-        .returning({ id: PublicSchema.matchups.id });
-
-      // Evaluate badges for each completed matchup (fire-and-forget, non-fatal)
-      for (const matchup of completedMatchups) {
-        badgeService.evaluateMatchupBadges(matchup.id).catch((err: unknown) => {
-          LOGGER.warn(
-            '[advanceLeagueWeekInternal] Badge evaluation failed (non-fatal)',
-            { matchupId: matchup.id, err },
-          );
-        });
-      }
-    }
-
-    // Create matchups for next week (round-robin pairing)
-    const teamPairs: Array<{ team1Id: number; team2Id: number }> = [];
-
-    if (teams.length % 2 === 0) {
-      for (let i = 0; i < teams.length; i += 2) {
-        teamPairs.push({
-          team1Id: teams[i].id,
-          team2Id: teams[i + 1].id,
-        });
-      }
-    } else {
-      for (let i = 0; i < teams.length - 1; i += 2) {
-        teamPairs.push({
-          team1Id: teams[i].id,
-          team2Id: teams[i + 1].id,
-        });
-      }
-    }
-
-    // Insert matchups for the new week (bulk insert)
-    const insertedIds = await db
-      .insert(PublicSchema.matchups)
-      .values(
-        teamPairs.map((pair) => ({
-          leagueId,
-          weekNumber: nextWeek,
-          team1Id: pair.team1Id,
-          team2Id: pair.team2Id,
-          gamesPerMatchup,
-          spStartsPerMatchup,
-          status: 'scheduled' as const,
-          team1Score: null,
-          team2Score: null,
-          startTime: null,
-          endTime: null,
-        })),
+    // Complete all current week matchups and award badges
+    const completedMatchups = await db
+      .update(PublicSchema.matchups)
+      .set({ status: 'completed' })
+      .where(
+        and(
+          eq(PublicSchema.matchups.leagueId, leagueId),
+          eq(PublicSchema.matchups.weekNumber, currentWeek),
+        ),
       )
       .returning({ id: PublicSchema.matchups.id });
 
-    const newMatchups = insertedIds.map((r, i) => ({ id: r.id, teamIndex: i }));
-
-    // Auto-populate matchup players with position carry-forward
-    const priorPositionsByTeam = new Map<number, Map<number, number | null>>();
-
-    if (currentWeek > 0) {
-      const priorMatchupPlayers = await db
-        .select({
-          playerId: PublicSchema.matchupPlayers.playerId,
-          teamId: PublicSchema.matchupPlayers.teamId,
-          positionId: PublicSchema.matchupPlayers.positionId,
-        })
-        .from(PublicSchema.matchupPlayers)
-        .innerJoin(
-          PublicSchema.matchups,
-          eq(PublicSchema.matchupPlayers.matchupId, PublicSchema.matchups.id),
-        )
-        .where(
-          and(
-            eq(PublicSchema.matchups.leagueId, leagueId),
-            eq(PublicSchema.matchups.weekNumber, currentWeek),
-          ),
+    // Evaluate badges for each completed matchup (fire-and-forget, non-fatal)
+    for (const matchup of completedMatchups) {
+      badgeService.evaluateMatchupBadges(matchup.id).catch((err: unknown) => {
+        LOGGER.warn(
+          '[advanceLeagueWeekInternal] Badge evaluation failed (non-fatal)',
+          { matchupId: matchup.id, err },
         );
-
-      for (const mp of priorMatchupPlayers) {
-        if (!priorPositionsByTeam.has(mp.teamId)) {
-          priorPositionsByTeam.set(mp.teamId, new Map());
-        }
-        const teamMap = priorPositionsByTeam.get(mp.teamId);
-        if (teamMap) {
-          teamMap.set(mp.playerId, mp.positionId);
-        }
-      }
+      });
     }
 
-    // Bulk-fetch all team members for all teams in the new week (one query instead of 2×N)
-    const allTeamIds = [
-      ...new Set(teamPairs.flatMap((p) => [p.team1Id, p.team2Id])),
-    ];
-    const allTeamMembersForWeek =
-      allTeamIds.length > 0
-        ? await db
-            .select({
-              teamId: PublicSchema.teamMembers.teamId,
-              playerId: PublicSchema.teamMembers.playerId,
-              positionId: PublicSchema.teamMembers.positionId,
-            })
-            .from(PublicSchema.teamMembers)
-            .where(
-              and(
-                eq(PublicSchema.teamMembers.leagueId, leagueId),
-                inArray(PublicSchema.teamMembers.teamId, allTeamIds),
-              ),
-            )
-        : [];
+    // Activate the pre-created matchups for next week.
+    // createAllMatchupsForLeague already inserted all weeks with status
+    // 'scheduled' and populated matchup_players + leagueWeekPlayerSeasons.
+    // All we need to do is flip them to 'in_progress' so autoSelectGames
+    // will start picking games for them.
+    const activatedMatchups = await db
+      .update(PublicSchema.matchups)
+      .set({ status: 'in_progress' })
+      .where(
+        and(
+          eq(PublicSchema.matchups.leagueId, leagueId),
+          eq(PublicSchema.matchups.weekNumber, nextWeek),
+          eq(PublicSchema.matchups.status, 'scheduled'),
+        ),
+      )
+      .returning({ id: PublicSchema.matchups.id });
 
-    const membersByTeamId = new Map<
-      number,
-      Array<{ playerId: number; positionId: number | null }>
-    >();
-    for (const m of allTeamMembersForWeek) {
-      if (m.teamId === null || m.playerId === null) continue;
-      if (!membersByTeamId.has(m.teamId)) {
-        membersByTeamId.set(m.teamId, []);
-      }
-      membersByTeamId
-        .get(m.teamId)!
-        .push({ playerId: m.playerId, positionId: m.positionId });
-    }
-
-    const resolvePosition = (
-      teamId: number,
-      playerId: number,
-      teamMembersPositionId: number | null,
-    ): number | null => {
-      const priorPositions = priorPositionsByTeam.get(teamId);
-      if (priorPositions?.has(playerId)) {
-        return priorPositions.get(playerId) ?? null;
-      }
-      return teamMembersPositionId;
-    };
-
-    for (const matchup of newMatchups) {
-      const pair = teamPairs[matchup.teamIndex];
-
-      const team1Players = membersByTeamId.get(pair.team1Id) ?? [];
-      const team2Players = membersByTeamId.get(pair.team2Id) ?? [];
-
-      const allPlayers = [
-        ...team1Players.map((p) => ({
-          matchupId: matchup.id,
-          playerId: p.playerId,
-          teamId: pair.team1Id,
-          positionId: resolvePosition(pair.team1Id, p.playerId, p.positionId),
-        })),
-        ...team2Players.map((p) => ({
-          matchupId: matchup.id,
-          playerId: p.playerId,
-          teamId: pair.team2Id,
-          positionId: resolvePosition(pair.team2Id, p.playerId, p.positionId),
-        })),
-      ];
-
-      if (allPlayers.length > 0) {
-        await db.insert(PublicSchema.matchupPlayers).values(allPlayers);
-      }
-    }
-
-    // Update league current matchup and reset advance status
-    if (newMatchups.length > 0) {
-      await db
-        .update(PublicSchema.leagues)
-        .set({
-          currentMatchup: newMatchups[0].id,
-          weekAdvanceStatus: 'idle',
-        })
-        .where(eq(PublicSchema.leagues.id, leagueId));
-    } else {
+    if (activatedMatchups.length === 0) {
+      LOGGER.warn(
+        '[advanceLeagueWeekInternal] No scheduled matchups found for next week — season may be over',
+        { leagueId, nextWeek },
+      );
       await db
         .update(PublicSchema.leagues)
         .set({ weekAdvanceStatus: 'idle' })
         .where(eq(PublicSchema.leagues.id, leagueId));
+      return;
     }
+
+    // Update league current matchup and reset advance status
+    await db
+      .update(PublicSchema.leagues)
+      .set({
+        currentMatchup: activatedMatchups[0].id,
+        weekAdvanceStatus: 'idle',
+      })
+      .where(eq(PublicSchema.leagues.id, leagueId));
   } catch (error) {
     // Reset status on failure
     await db
