@@ -1110,17 +1110,18 @@ async function createLeagueMatchupsAfterDraft(leagueId: number): Promise<void> {
 }
 
 /**
- * Stamp the league's draft_completed_at timestamp.
+ * Stamp the draft's draft_completed_at timestamp.
  * Called after matchup creation so the frontend knows the league is fully ready.
+ * Updates the drafts table (which has the draft_completed_at column), not leagues.
  */
 async function setDraftCompletedAt(leagueId: number): Promise<void> {
   await runWithPublicClient(getDbOptions(), async (db) => {
     await db
-      .update(PublicSchema.leagues)
+      .update(PublicSchema.drafts)
       .set({ draftCompletedAt: new Date() })
-      .where(eq(PublicSchema.leagues.id, leagueId));
+      .where(eq(PublicSchema.drafts.leagueId, leagueId));
 
-    LOGGER.info('Set draftCompletedAt on league', { leagueId });
+    LOGGER.info('Set draftCompletedAt on draft for league', { leagueId });
   });
 }
 
