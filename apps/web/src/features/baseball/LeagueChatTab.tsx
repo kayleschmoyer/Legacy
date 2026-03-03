@@ -219,7 +219,7 @@ export function LeagueChatTab({
       {/* GIF Picker — shown above input when active */}
       {showGifPicker && (
         <YStack
-          paddingHorizontal="$4"
+          paddingHorizontal="$2"
           paddingBottom="$2"
           borderTopWidth={1}
           borderTopColor="$borderColor"

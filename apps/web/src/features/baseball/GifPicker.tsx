@@ -7,16 +7,14 @@
  *
  * Usage:
  *   <GifPicker onSelect={(url) => void handleGif(url)} onClose={() => ...} />
+ *
+ * LS-419: clicking a GIF now directly sends it (no two-step confirm).
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Search, X } from '@tamagui/lucide-icons';
-import {
-  BRAND_NAVY_LIGHT,
-  SURFACE_PANEL,
-  withAlpha,
-} from '../../constants/colors';
+import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,7 +32,8 @@ interface GiphyGif {
   images: {
     fixed_height_small: GiphyImage;
     original: GiphyImage;
-    downsized_medium: GiphyImage;
+    /** Giphy's recommended embed rendition — capped at 2 MB */
+    downsized: GiphyImage;
   };
 }
 
@@ -80,7 +79,6 @@ export function GifPicker({
   const [gifs, setGifs] = useState<GiphyGif[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch trending on mount
@@ -104,7 +102,6 @@ export function GifPicker({
   const fetchGifs = useCallback(async (url: string) => {
     setLoading(true);
     setError(null);
-    setSelectedId(null);
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Giphy API error: ${res.status}`);
@@ -133,25 +130,14 @@ export function GifPicker({
     [fetchGifs, rating],
   );
 
-  const selectedGif = gifs.find((g) => g.id === selectedId);
-
-  const handleConfirm = useCallback(() => {
-    if (!selectedGif) return;
-    const url =
-      selectedGif.images.downsized_medium?.url ??
-      selectedGif.images.original.url;
-    onSelect(url);
-  }, [selectedGif, onSelect]);
-
   return (
     <YStack
-      backgroundColor={SURFACE_PANEL}
+      backgroundColor="$background"
       borderRadius="$4"
       borderWidth={1}
       borderColor="$borderColor"
       overflow="hidden"
       width="100%"
-      maxWidth={480}
       elevation={8}
     >
       {/* Header */}
@@ -237,42 +223,14 @@ export function GifPicker({
         />
       </XStack>
 
-      {/* GIF preview of selected item */}
-      {selectedGif && (
-        <YStack
-          paddingHorizontal="$3"
-          paddingVertical="$2"
-          borderBottomWidth={1}
-          borderBottomColor="$borderColor"
-          alignItems="center"
-        >
-          <Text fontSize="$2" color="$textMuted" marginBottom="$1">
-            Preview
-          </Text>
-          <img
-            src={
-              selectedGif.images.downsized_medium?.url ??
-              selectedGif.images.original.url
-            }
-            alt={selectedGif.title}
-            style={{
-              maxHeight: 120,
-              maxWidth: '100%',
-              borderRadius: 6,
-              objectFit: 'contain',
-            }}
-          />
-        </YStack>
-      )}
-
       {/* GIF grid */}
       <div
         style={{
           overflowY: 'auto',
-          maxHeight: 300,
+          maxHeight: 320,
           padding: '8px',
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
           gap: 6,
         }}
       >
@@ -306,28 +264,36 @@ export function GifPicker({
           !error &&
           gifs.map((gif) => {
             const thumb = gif.images.fixed_height_small;
-            const isSelected = gif.id === selectedId;
             return (
               <button
                 key={gif.id}
-                onClick={() => setSelectedId(isSelected ? null : gif.id)}
+                onClick={() => {
+                  const url =
+                    gif.images.downsized?.url ?? gif.images.original.url;
+                  onSelect(url);
+                }}
                 style={{
-                  border: isSelected
-                    ? `2px solid ${BRAND_NAVY_LIGHT}`
-                    : `2px solid transparent`,
+                  border: '2px solid transparent',
                   borderRadius: 4,
                   padding: 0,
                   cursor: 'pointer',
                   background: 'rgba(0,0,0,0.15)',
                   overflow: 'hidden',
-                  aspectRatio: '16/9',
+                  // Use natural Giphy dimensions so portrait/square GIFs
+                  // aren't letterboxed by a forced 16/9 crop.
+                  aspectRatio: `${thumb.width}/${thumb.height}`,
                   outline: 'none',
-                  boxShadow: isSelected
-                    ? `0 0 0 2px ${withAlpha(BRAND_NAVY_LIGHT, 0.4)}`
-                    : 'none',
+                  transition: 'border-color 0.1s',
                 }}
-                aria-label={gif.title}
-                aria-pressed={isSelected}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor =
+                    BRAND_NAVY_LIGHT;
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor =
+                    'transparent';
+                }}
+                aria-label={`Send GIF: ${gif.title}`}
               >
                 <img
                   src={thumb?.url ?? gif.images.original.url}
@@ -344,7 +310,7 @@ export function GifPicker({
           })}
       </div>
 
-      {/* Footer actions */}
+      {/* Footer */}
       <XStack
         paddingHorizontal="$3"
         paddingVertical="$2"
@@ -354,31 +320,16 @@ export function GifPicker({
         alignItems="center"
       >
         <Text fontSize="$1" color="$textMuted">
-          Powered by GIPHY · {rating.toUpperCase()} rated
+          Powered by GIPHY · {rating.toUpperCase()} rated · click to send
         </Text>
-        <XStack gap="$2">
-          <Button
-            size="$2"
-            backgroundColor="$gray5"
-            color="$color"
-            onPress={onClose}
-          >
-            <Text fontSize="$2">Cancel</Text>
-          </Button>
-          <Button
-            size="$2"
-            backgroundColor={BRAND_NAVY_LIGHT}
-            color="white"
-            onPress={handleConfirm}
-            disabled={!selectedGif}
-            opacity={!selectedGif ? 0.5 : 1}
-            aria-label="Send selected GIF"
-          >
-            <Text fontSize="$2" fontWeight="600" color="white">
-              Send GIF
-            </Text>
-          </Button>
-        </XStack>
+        <Button
+          size="$2"
+          backgroundColor="$gray5"
+          color="$color"
+          onPress={onClose}
+        >
+          <Text fontSize="$2">Cancel</Text>
+        </Button>
       </XStack>
     </YStack>
   );
