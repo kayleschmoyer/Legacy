@@ -4,6 +4,9 @@ import { sql } from 'drizzle-orm';
 /**
  * Migration: Materialize career_batting, career_fielding, career_pitching views (LS-433)
  *
+ * Replaces 20260303_120000_materialize_career_stat_views.ts which had a syntax error:
+ * missing outer opening paren in the WAR CASE THEN expression (LS-451).
+ *
  * Purpose:
  * - career_batting, career_fielding, career_pitching are plain VIEWs that re-execute
  *   expensive multi-CTE aggregations (WAR, wOBA, park-factor adjustments) on every query.
@@ -57,6 +60,18 @@ export const up = async ({ db }: { db: PgDatabase<any> }) => {
   `);
   await db.execute(sql`
     DROP VIEW IF EXISTS public.career_pitching CASCADE
+  `);
+
+  // Also drop any materialized views that might exist from a prior failed run
+  // of the old 20260303_120000 migration (idempotent).
+  await db.execute(sql`
+    DROP MATERIALIZED VIEW IF EXISTS public.career_batting
+  `);
+  await db.execute(sql`
+    DROP MATERIALIZED VIEW IF EXISTS public.career_fielding
+  `);
+  await db.execute(sql`
+    DROP MATERIALIZED VIEW IF EXISTS public.career_pitching
   `);
 
   // ---------------------------------------------------------------------------
@@ -170,7 +185,7 @@ export const up = async ({ db }: { db: PgDatabase<any> }) => {
              st.ibb,
              CASE
                WHEN st.pa >= 1 AND (st.pa - COALESCE(st.ibb, 0)) > 0 AND w.season IS NOT NULL THEN
-                 (((w.w_bb * GREATEST(0, st.bb - COALESCE(st.ibb, 0))::numeric
+                 ((((w.w_bb * GREATEST(0, st.bb - COALESCE(st.ibb, 0))::numeric
                    + w.w_hbp * COALESCE(st.hbp, 0)::numeric
                    + w.w_1b * GREATEST(0, st.h - st.doubles - st.triples - st.hr)::numeric
                    + w.w_2b * st.doubles::numeric
@@ -558,7 +573,7 @@ export const down = async ({ db }: { db: PgDatabase<any> }) => {
              st.ibb,
              CASE
                WHEN st.pa >= 1 AND (st.pa - COALESCE(st.ibb, 0)) > 0 AND w.season IS NOT NULL THEN
-                 (((w.w_bb * GREATEST(0, st.bb - COALESCE(st.ibb, 0))::numeric
+                 ((((w.w_bb * GREATEST(0, st.bb - COALESCE(st.ibb, 0))::numeric
                    + w.w_hbp * COALESCE(st.hbp, 0)::numeric
                    + w.w_1b * GREATEST(0, st.h - st.doubles - st.triples - st.hr)::numeric
                    + w.w_2b * st.doubles::numeric
