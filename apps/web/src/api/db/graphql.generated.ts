@@ -452,6 +452,14 @@ export type DraftPlayer = {
   lastName?: Maybe<Scalars['String']['output']>;
 };
 
+/** A team and its assigned slot in the draft order */
+export type DraftTeamOrderEntry = {
+  __typename?: 'DraftTeamOrderEntry';
+  draftOrder?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+};
+
 export type EditMatchupScoreInput = {
   matchupId: Scalars['Int']['input'];
   reason?: InputMaybe<Scalars['String']['input']>;
@@ -950,6 +958,7 @@ export type Mutation = {
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
+  randomizeDraftOrder?: Maybe<Draft>;
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
   registerDeviceToken?: Maybe<DeviceToken>;
@@ -967,6 +976,7 @@ export type Mutation = {
   sendDirectMessage?: Maybe<DirectMessage>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
+  setDraftOrder?: Maybe<Draft>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
@@ -1215,6 +1225,10 @@ export type MutationProposeTradeArgs = {
   requestingPlayerIds: Array<Scalars['Int']['input']>;
 };
 
+export type MutationRandomizeDraftOrderArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
 export type MutationRecordConsentArgs = {
   input: RecordConsentInput;
 };
@@ -1263,6 +1277,11 @@ export type MutationSendMatchupMessageArgs = {
   matchupId: Scalars['Int']['input'];
   message: Scalars['String']['input'];
   replyToMessageId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationSetDraftOrderArgs = {
+  draftId: Scalars['Int']['input'];
+  teamIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationSetTeamLockArgs = {
@@ -1629,6 +1648,7 @@ export type Query = {
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
+  getDraftTeamOrder?: Maybe<Array<DraftTeamOrderEntry>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
   getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
   getLeagueDraft?: Maybe<Draft>;
@@ -1787,6 +1807,10 @@ export type QueryGetDraftArgs = {
 };
 
 export type QueryGetDraftPicksArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftTeamOrderArgs = {
   draftId: Scalars['Int']['input'];
 };
 
@@ -3655,6 +3679,59 @@ export type CommissionerPickMutation = {
     overallPick?: number | null;
     pickedAt?: string | null;
   } | null;
+};
+
+export type SetDraftOrderMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  teamIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+}>;
+
+export type SetDraftOrderMutation = {
+  __typename?: 'Mutation';
+  setDraftOrder?: {
+    __typename?: 'Draft';
+    id?: number | null;
+    leagueId?: number | null;
+    draftMode?: string | null;
+    selectionMethod?: string | null;
+    draftOrder?: string | null;
+    currentPick?: number | null;
+    draftStartedAt?: string | null;
+    createdAt?: string | null;
+  } | null;
+};
+
+export type RandomizeDraftOrderMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type RandomizeDraftOrderMutation = {
+  __typename?: 'Mutation';
+  randomizeDraftOrder?: {
+    __typename?: 'Draft';
+    id?: number | null;
+    leagueId?: number | null;
+    draftMode?: string | null;
+    selectionMethod?: string | null;
+    draftOrder?: string | null;
+    currentPick?: number | null;
+    draftStartedAt?: string | null;
+    createdAt?: string | null;
+  } | null;
+};
+
+export type GetDraftTeamOrderQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type GetDraftTeamOrderQuery = {
+  __typename?: 'Query';
+  getDraftTeamOrder?: Array<{
+    __typename?: 'DraftTeamOrderEntry';
+    teamId?: number | null;
+    teamName?: string | null;
+    draftOrder?: number | null;
+  }> | null;
 };
 
 export type NudgeExpiredDraftPickMutationVariables = Exact<{
@@ -9577,6 +9654,213 @@ export type CommissionerPickMutationResult =
 export type CommissionerPickMutationOptions = BaseMutationOptions<
   CommissionerPickMutation,
   CommissionerPickMutationVariables
+>;
+export const SetDraftOrder = gql`
+  mutation SetDraftOrder($draftId: Int!, $teamIds: [Int!]!) {
+    setDraftOrder(draftId: $draftId, teamIds: $teamIds) {
+      id
+      leagueId
+      draftMode
+      selectionMethod
+      draftOrder
+      currentPick
+      draftStartedAt
+      createdAt
+    }
+  }
+`;
+export type SetDraftOrderMutationFn = MutationFunction<
+  SetDraftOrderMutation,
+  SetDraftOrderMutationVariables
+>;
+
+/**
+ * __useSetDraftOrderMutation__
+ *
+ * To run a mutation, you first call `useSetDraftOrderMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetDraftOrderMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setDraftOrderMutation, { data, loading, error }] = useSetDraftOrderMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      teamIds: // value for 'teamIds'
+ *   },
+ * });
+ */
+export function useSetDraftOrderMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SetDraftOrderMutation,
+    SetDraftOrderMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SetDraftOrderMutation,
+    SetDraftOrderMutationVariables
+  >(SetDraftOrder, options);
+}
+export type SetDraftOrderMutationHookResult = ReturnType<
+  typeof useSetDraftOrderMutation
+>;
+export type SetDraftOrderMutationResult =
+  Apollo.MutationResult<SetDraftOrderMutation>;
+export type SetDraftOrderMutationOptions = BaseMutationOptions<
+  SetDraftOrderMutation,
+  SetDraftOrderMutationVariables
+>;
+export const RandomizeDraftOrder = gql`
+  mutation RandomizeDraftOrder($draftId: Int!) {
+    randomizeDraftOrder(draftId: $draftId) {
+      id
+      leagueId
+      draftMode
+      selectionMethod
+      draftOrder
+      currentPick
+      draftStartedAt
+      createdAt
+    }
+  }
+`;
+export type RandomizeDraftOrderMutationFn = MutationFunction<
+  RandomizeDraftOrderMutation,
+  RandomizeDraftOrderMutationVariables
+>;
+
+/**
+ * __useRandomizeDraftOrderMutation__
+ *
+ * To run a mutation, you first call `useRandomizeDraftOrderMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRandomizeDraftOrderMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [randomizeDraftOrderMutation, { data, loading, error }] = useRandomizeDraftOrderMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useRandomizeDraftOrderMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RandomizeDraftOrderMutation,
+    RandomizeDraftOrderMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RandomizeDraftOrderMutation,
+    RandomizeDraftOrderMutationVariables
+  >(RandomizeDraftOrder, options);
+}
+export type RandomizeDraftOrderMutationHookResult = ReturnType<
+  typeof useRandomizeDraftOrderMutation
+>;
+export type RandomizeDraftOrderMutationResult =
+  Apollo.MutationResult<RandomizeDraftOrderMutation>;
+export type RandomizeDraftOrderMutationOptions = BaseMutationOptions<
+  RandomizeDraftOrderMutation,
+  RandomizeDraftOrderMutationVariables
+>;
+export const GetDraftTeamOrder = gql`
+  query GetDraftTeamOrder($draftId: Int!) {
+    getDraftTeamOrder(draftId: $draftId) {
+      teamId
+      teamName
+      draftOrder
+    }
+  }
+`;
+
+/**
+ * __useGetDraftTeamOrderQuery__
+ *
+ * To run a query within a React component, call `useGetDraftTeamOrderQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftTeamOrderQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftTeamOrderQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useGetDraftTeamOrderQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetDraftTeamOrderQuery,
+    GetDraftTeamOrderQueryVariables
+  > &
+    (
+      | { variables: GetDraftTeamOrderQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDraftTeamOrderQuery,
+    GetDraftTeamOrderQueryVariables
+  >(GetDraftTeamOrder, options);
+}
+export function useGetDraftTeamOrderLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftTeamOrderQuery,
+    GetDraftTeamOrderQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDraftTeamOrderQuery,
+    GetDraftTeamOrderQueryVariables
+  >(GetDraftTeamOrder, options);
+}
+export function useGetDraftTeamOrderSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDraftTeamOrderQuery,
+        GetDraftTeamOrderQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDraftTeamOrderQuery,
+    GetDraftTeamOrderQueryVariables
+  >(
+    GetDraftTeamOrder,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDraftTeamOrderQuery,
+          GetDraftTeamOrderQueryVariables
+        >,
+  );
+}
+export type GetDraftTeamOrderQueryHookResult = ReturnType<
+  typeof useGetDraftTeamOrderQuery
+>;
+export type GetDraftTeamOrderLazyQueryHookResult = ReturnType<
+  typeof useGetDraftTeamOrderLazyQuery
+>;
+export type GetDraftTeamOrderSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftTeamOrderSuspenseQuery
+>;
+export type GetDraftTeamOrderQueryResult = Apollo.QueryResult<
+  GetDraftTeamOrderQuery,
+  GetDraftTeamOrderQueryVariables
 >;
 export const NudgeExpiredDraftPick = gql`
   mutation NudgeExpiredDraftPick($leagueId: Int!) {

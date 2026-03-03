@@ -452,6 +452,14 @@ export type DraftPlayer = {
   lastName?: Maybe<Scalars['String']['output']>;
 };
 
+/** A team and its assigned slot in the draft order */
+export type DraftTeamOrderEntry = {
+  __typename?: 'DraftTeamOrderEntry';
+  draftOrder?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+};
+
 export type EditMatchupScoreInput = {
   matchupId: Scalars['Int']['input'];
   reason?: InputMaybe<Scalars['String']['input']>;
@@ -950,6 +958,7 @@ export type Mutation = {
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
+  randomizeDraftOrder?: Maybe<Draft>;
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
   registerDeviceToken?: Maybe<DeviceToken>;
@@ -967,6 +976,7 @@ export type Mutation = {
   sendDirectMessage?: Maybe<DirectMessage>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
+  setDraftOrder?: Maybe<Draft>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
@@ -1215,6 +1225,10 @@ export type MutationProposeTradeArgs = {
   requestingPlayerIds: Array<Scalars['Int']['input']>;
 };
 
+export type MutationRandomizeDraftOrderArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
 export type MutationRecordConsentArgs = {
   input: RecordConsentInput;
 };
@@ -1263,6 +1277,11 @@ export type MutationSendMatchupMessageArgs = {
   matchupId: Scalars['Int']['input'];
   message: Scalars['String']['input'];
   replyToMessageId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationSetDraftOrderArgs = {
+  draftId: Scalars['Int']['input'];
+  teamIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationSetTeamLockArgs = {
@@ -1629,6 +1648,7 @@ export type Query = {
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
+  getDraftTeamOrder?: Maybe<Array<DraftTeamOrderEntry>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
   getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
   getLeagueDraft?: Maybe<Draft>;
@@ -1787,6 +1807,10 @@ export type QueryGetDraftArgs = {
 };
 
 export type QueryGetDraftPicksArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftTeamOrderArgs = {
   draftId: Scalars['Int']['input'];
 };
 

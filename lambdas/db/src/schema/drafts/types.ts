@@ -164,6 +164,24 @@ DraftPlayer.implement({
   }),
 });
 
+/**
+ * DraftTeamOrder - Represents a single team's draft slot position
+ */
+export const DraftTeamOrderEntry = builder.objectRef<{
+  teamId: number;
+  teamName: string;
+  draftOrder: number;
+}>('DraftTeamOrderEntry');
+
+DraftTeamOrderEntry.implement({
+  description: 'A team and its assigned slot in the draft order',
+  fields: (t) => ({
+    teamId: t.exposeInt('teamId'),
+    teamName: t.exposeString('teamName'),
+    draftOrder: t.exposeInt('draftOrder'),
+  }),
+});
+
 // ── Update Draft Settings Types ──────────────────────────────────────────────
 
 // Input type for updating draft settings before a draft starts

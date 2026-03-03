@@ -63,6 +63,40 @@ mutation CommissionerPick($draftId: Int!, $playerId: Int!) {
   }
 }
 
+mutation SetDraftOrder($draftId: Int!, $teamIds: [Int!]!) {
+  setDraftOrder(draftId: $draftId, teamIds: $teamIds) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    draftStartedAt
+    createdAt
+  }
+}
+
+mutation RandomizeDraftOrder($draftId: Int!) {
+  randomizeDraftOrder(draftId: $draftId) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    draftStartedAt
+    createdAt
+  }
+}
+
+query GetDraftTeamOrder($draftId: Int!) {
+  getDraftTeamOrder(draftId: $draftId) {
+    teamId
+    teamName
+    draftOrder
+  }
+}
+
 mutation NudgeExpiredDraftPick($leagueId: Int!) {
   autoProcessDraftPicks(leagueId: $leagueId) {
     draftsProcessed

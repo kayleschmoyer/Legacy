@@ -6,7 +6,13 @@ import { PublicSchema } from '@legacy-sports/db-client';
 import { asc, desc, eq, sql } from 'drizzle-orm';
 
 import { getCurrentDraftPickInfo, verifyLeagueMembership } from './helpers';
-import { CurrentDraftPick, Draft, DraftPick, DraftPlayer } from './types';
+import {
+  CurrentDraftPick,
+  Draft,
+  DraftPick,
+  DraftPlayer,
+  DraftTeamOrderEntry,
+} from './types';
 import { builder } from '../builder';
 
 /**
@@ -380,6 +386,61 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       `;
       const result = await context.db.execute(rawQuery);
       return (result.rows as unknown as RawPlayerRow[]).map(mapRow);
+    },
+  }),
+);
+
+/**
+ * Query: Get draft team order
+ * Returns the ordered list of teams assigned to draft slots, sorted by draftOrder.
+ * Requires user is a league member.
+ */
+builder.queryField('getDraftTeamOrder', (t) =>
+  t.field({
+    type: [DraftTeamOrderEntry],
+    args: {
+      draftId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { draftId } = args;
+
+      // Verify draft exists and user is a league member
+      const [draft] = await context.db
+        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.id, draftId))
+        .limit(1);
+
+      if (!draft) {
+        throw new Error('Draft not found');
+      }
+
+      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+
+      // Fetch draft_teams joined with team name, sorted by draftOrder
+      const rows = await context.db
+        .select({
+          teamId: PublicSchema.draftTeams.teamId,
+          draftOrder: PublicSchema.draftTeams.draftOrder,
+          teamName: PublicSchema.teams.name,
+        })
+        .from(PublicSchema.draftTeams)
+        .innerJoin(
+          PublicSchema.teams,
+          eq(PublicSchema.draftTeams.teamId, PublicSchema.teams.id),
+        )
+        .where(eq(PublicSchema.draftTeams.draftId, draftId))
+        .orderBy(asc(PublicSchema.draftTeams.draftOrder));
+
+      return rows.map((row) => ({
+        teamId: row.teamId,
+        teamName: row.teamName,
+        draftOrder: row.draftOrder,
+      }));
     },
   }),
 );

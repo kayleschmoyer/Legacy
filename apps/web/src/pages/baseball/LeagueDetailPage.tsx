@@ -103,6 +103,7 @@ import {
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
 import { AvatarPicker } from '../../components/common';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
+import { DraftOrderControl } from '../../components/commissioner/DraftOrderControl';
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
@@ -2306,6 +2307,23 @@ export function LeagueDetailPage(): React.JSX.Element {
             leagueId={leagueId}
             draftStatus={league.draftStatus}
             playerPool={league.playerPool}
+            onSuccess={(message) => {
+              setMatchupSuccessMessage(message);
+              setTimeout(() => setMatchupSuccessMessage(null), 5000);
+            }}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+          />
+        ),
+      },
+      {
+        id: 'draft-order',
+        title: 'Draft Pick Order',
+        content: (
+          <DraftOrderControl
+            leagueId={leagueId}
+            draftStatus={league.draftStatus}
             onSuccess={(message) => {
               setMatchupSuccessMessage(message);
               setTimeout(() => setMatchupSuccessMessage(null), 5000);

@@ -496,6 +496,15 @@ type DraftPlayer {
   lastName: String
 }
 
+"""
+A team and its assigned slot in the draft order
+"""
+type DraftTeamOrderEntry {
+  draftOrder: Int
+  teamId: Int
+  teamName: String
+}
+
 input EditMatchupScoreInput {
   matchupId: Int!
   reason: String
@@ -1169,6 +1178,7 @@ type Mutation {
     receivingTeamId: Int!
     requestingPlayerIds: [Int!]!
   ): TradeOffer
+  randomizeDraftOrder(draftId: Int!): Draft
 
   """
   Record user consent for a specific data processing type
@@ -1214,6 +1224,7 @@ type Mutation {
     message: String!
     replyToMessageId: Int
   ): MatchupMessage
+  setDraftOrder(draftId: Int!, teamIds: [Int!]!): Draft
 
   """
   Commissioner: lock or unlock a team to prevent/allow roster moves.
@@ -1650,6 +1661,7 @@ type Query {
   getDirectMessages(limit: Int, otherUserId: Int!): [DirectMessage!]
   getDraft(draftId: Int!): Draft
   getDraftPicks(draftId: Int!): [DraftPick!]
+  getDraftTeamOrder(draftId: Int!): [DraftTeamOrderEntry!]
   getHeadToHeadRecord(
     leagueId: Int!
     team1Id: Int!

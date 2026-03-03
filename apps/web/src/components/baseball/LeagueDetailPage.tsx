@@ -50,6 +50,7 @@ import { useLeagueScoringSettings } from '../../lib/scoring';
 import { NextStepControl } from '../commissioner/NextStepControl';
 import { DeleteLeagueControl } from '../commissioner/DeleteLeagueControl';
 import { DraftSettingsControl } from '../commissioner/DraftSettingsControl';
+import { DraftOrderControl } from '../commissioner/DraftOrderControl';
 import { LeagueSettingsControl } from '../commissioner/LeagueSettingsControl';
 import { LeagueBrandingControl } from '../commissioner/LeagueBrandingControl';
 import { AchievementRestrictionsControl } from '../commissioner/AchievementRestrictionsControl';
@@ -1179,6 +1180,18 @@ export function LeagueDetailPage(): React.JSX.Element {
         leagueId={leagueId}
         draftStatus={league.draftStatus}
         playerPool={league.playerPool}
+        onSuccess={(message) => {
+          setMatchupSuccessMessage(message);
+          setTimeout(() => setMatchupSuccessMessage(null), 5000);
+        }}
+        onError={(err) => {
+          setMatchupErrorMessage(err.message);
+        }}
+      />
+
+      <DraftOrderControl
+        leagueId={leagueId}
+        draftStatus={league.draftStatus}
         onSuccess={(message) => {
           setMatchupSuccessMessage(message);
           setTimeout(() => setMatchupSuccessMessage(null), 5000);
