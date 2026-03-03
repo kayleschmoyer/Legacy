@@ -182,7 +182,6 @@ export const UpdateDraftSettingsInput = builder.inputType(
       hofOnly: t.boolean({ required: false }), // restrict draft board to Hall of Famers only
       customEraStartYear: t.int({ required: false }), // commissioner-defined era start year
       customEraEndYear: t.int({ required: false }), // commissioner-defined era end year
-      decadeChallenge: t.boolean({ required: false }), // rotating decade player pool each week
     }),
   },
 );

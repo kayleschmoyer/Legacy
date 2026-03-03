@@ -12,7 +12,6 @@ import type { PgDatabase } from 'drizzle-orm/pg-core';
  * - Adds `era_filter` column to leagues (default 'all' — existing leagues unaffected)
  * - Adds `hof_only` boolean — restrict draft board to Hall of Famers only
  * - Adds `custom_era_start_year` / `custom_era_end_year` — commissioner-defined eras
- * - Adds `decade_challenge` boolean — rotating decade player pool each week
  *
  * Era definitions:
  *   dead_ball    : pre-1920  (Dead Ball Era)
@@ -51,8 +50,7 @@ export const up = async ({ db }: { db: PgDatabase<any> }) => {
       ADD COLUMN IF NOT EXISTS "era_filter" "public"."era_filter" NOT NULL DEFAULT 'all',
       ADD COLUMN IF NOT EXISTS "hof_only" boolean NOT NULL DEFAULT false,
       ADD COLUMN IF NOT EXISTS "custom_era_start_year" integer DEFAULT NULL,
-      ADD COLUMN IF NOT EXISTS "custom_era_end_year" integer DEFAULT NULL,
-      ADD COLUMN IF NOT EXISTS "decade_challenge" boolean NOT NULL DEFAULT false;
+      ADD COLUMN IF NOT EXISTS "custom_era_end_year" integer DEFAULT NULL;
   `);
 
   // 3. Add a check constraint to ensure custom_era_start_year <= custom_era_end_year
@@ -83,8 +81,7 @@ export const down = async ({ db }: { db: PgDatabase<any> }) => {
       DROP COLUMN IF EXISTS "era_filter",
       DROP COLUMN IF EXISTS "hof_only",
       DROP COLUMN IF EXISTS "custom_era_start_year",
-      DROP COLUMN IF EXISTS "custom_era_end_year",
-      DROP COLUMN IF EXISTS "decade_challenge";
+      DROP COLUMN IF EXISTS "custom_era_end_year";
   `);
 
   await db.execute(`DROP TYPE IF EXISTS "public"."era_filter";`);

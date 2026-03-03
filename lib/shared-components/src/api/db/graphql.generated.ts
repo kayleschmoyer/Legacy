@@ -314,7 +314,6 @@ export enum ConsentType {
 export type CreateLeagueAndTeamsInput = {
   customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
   customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
-  decadeChallenge?: InputMaybe<Scalars['Boolean']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   eraFilter?: InputMaybe<Scalars['String']['input']>;
@@ -2557,7 +2556,6 @@ export type UpdateCommissionerNoteInput = {
 export type UpdateDraftSettingsInput = {
   customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
   customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
-  decadeChallenge?: InputMaybe<Scalars['Boolean']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   eraFilter?: InputMaybe<Scalars['String']['input']>;

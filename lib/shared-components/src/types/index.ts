@@ -91,8 +91,6 @@ export interface League {
   customEraStartYear?: number | null;
   /** Custom commissioner-defined era end year */
   customEraEndYear?: number | null;
-  /** Rotating decade player pool mode */
-  decadeChallenge?: boolean;
   ownerId: string;
   teams?: TeamType[];
 }

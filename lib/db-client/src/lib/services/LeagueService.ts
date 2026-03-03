@@ -75,8 +75,6 @@ export interface CreateLeagueOptions {
   customEraStartYear?: number | null;
   /** End year for a custom era (only used when eraFilter = 'custom'). */
   customEraEndYear?: number | null;
-  /** When true, the active player pool rotates by decade each matchup week. */
-  decadeChallenge?: boolean;
   draftMode?: DraftMode;
   selectionMethod?: SelectionMethod;
   draftOrder?: DraftOrder;
@@ -105,7 +103,6 @@ export interface CreateLeagueResult {
     hofOnly?: boolean;
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
-    decadeChallenge?: boolean;
     waiverType?: 'standard' | 'faab';
     waiverEnabled?: boolean;
     faabBudgetDefault?: number;
@@ -155,7 +152,6 @@ export class LeagueService {
       hofOnly = false,
       customEraStartYear = null,
       customEraEndYear = null,
-      decadeChallenge = false,
       draftMode = 'live',
       selectionMethod = 'standard',
       draftOrder = 'snake',
@@ -183,7 +179,6 @@ export class LeagueService {
           hofOnly,
           customEraStartYear,
           customEraEndYear,
-          decadeChallenge,
           waiverType,
           waiverEnabled,
           faabBudgetDefault,
@@ -204,7 +199,6 @@ export class LeagueService {
           hofOnly: PublicSchema.leagues.hofOnly,
           customEraStartYear: PublicSchema.leagues.customEraStartYear,
           customEraEndYear: PublicSchema.leagues.customEraEndYear,
-          decadeChallenge: PublicSchema.leagues.decadeChallenge,
           waiverType: PublicSchema.leagues.waiverType,
           waiverEnabled: PublicSchema.leagues.waiverEnabled,
           faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,

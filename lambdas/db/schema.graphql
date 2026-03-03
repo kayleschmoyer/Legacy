@@ -344,7 +344,6 @@ enum ConsentType {
 input CreateLeagueAndTeamsInput {
   customEraEndYear: Int
   customEraStartYear: Int
-  decadeChallenge: Boolean
   draftMode: String
   draftOrder: String
   eraFilter: String
@@ -2320,7 +2319,6 @@ input UpdateCommissionerNoteInput {
 input UpdateDraftSettingsInput {
   customEraEndYear: Int
   customEraStartYear: Int
-  decadeChallenge: Boolean
   draftMode: String
   draftOrder: String
   eraFilter: String

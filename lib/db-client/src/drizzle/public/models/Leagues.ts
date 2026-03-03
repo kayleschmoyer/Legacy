@@ -62,7 +62,6 @@ export const leagues = pgTable(
     hofOnly: boolean('hof_only').notNull().default(false),
     customEraStartYear: integer('custom_era_start_year'),
     customEraEndYear: integer('custom_era_end_year'),
-    decadeChallenge: boolean('decade_challenge').notNull().default(false),
     waiverType: waiverType('waiver_type').notNull().default('standard'),
     waiverEnabled: boolean('waiver_enabled').notNull().default(true),
     faabBudgetDefault: integer('faab_budget_default').notNull().default(100),

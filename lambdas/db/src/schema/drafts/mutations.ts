@@ -797,7 +797,6 @@ builder.mutationField('updateDraftSettings', (t) =>
         hofOnly,
         customEraStartYear,
         customEraEndYear,
-        decadeChallenge,
       } = args.input;
       const userId = context.user.id;
 
@@ -813,7 +812,6 @@ builder.mutationField('updateDraftSettings', (t) =>
             hofOnly: PublicSchema.leagues.hofOnly,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
-            decadeChallenge: PublicSchema.leagues.decadeChallenge,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -918,9 +916,6 @@ builder.mutationField('updateDraftSettings', (t) =>
         if (hofOnly != null) {
           leagueEligibilityUpdates['hofOnly'] = hofOnly;
         }
-        if (decadeChallenge != null) {
-          leagueEligibilityUpdates['decadeChallenge'] = decadeChallenge;
-        }
         if (customEraStartYear !== undefined) {
           leagueEligibilityUpdates['customEraStartYear'] = customEraStartYear;
         }
@@ -1023,10 +1018,6 @@ builder.mutationField('updateDraftSettings', (t) =>
         if (eraFilter) changedFields.push(`era filter → ${eraFilter}`);
         if (hofOnly != null)
           changedFields.push(`HOF only → ${hofOnly ? 'on' : 'off'}`);
-        if (decadeChallenge != null)
-          changedFields.push(
-            `decade challenge → ${decadeChallenge ? 'on' : 'off'}`,
-          );
         if (pickTimeLimitSeconds)
           changedFields.push(`pick timer → ${pickTimeLimitSeconds}s`);
         const changesSummary =

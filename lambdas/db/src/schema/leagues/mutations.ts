@@ -47,7 +47,6 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       hofOnly: t.boolean({ required: false }), // restrict draft board to Hall of Famers
       customEraStartYear: t.int({ required: false }), // commissioner-defined era start
       customEraEndYear: t.int({ required: false }), // commissioner-defined era end
-      decadeChallenge: t.boolean({ required: false }), // rotating decade player pool
       isPublic: t.boolean({ required: false }),
       maxBatters: t.int({ required: false }),
       maxPitchers: t.int({ required: false }),
@@ -168,7 +167,6 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         hofOnly: inputHofOnly,
         customEraStartYear: inputCustomEraStartYear,
         customEraEndYear: inputCustomEraEndYear,
-        decadeChallenge: inputDecadeChallenge,
         isPublic: inputIsPublic,
       } = args.input;
       const userId = context.user.id;
@@ -214,7 +212,6 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           hofOnly: inputHofOnly ?? false,
           customEraStartYear: inputCustomEraStartYear ?? null,
           customEraEndYear: inputCustomEraEndYear ?? null,
-          decadeChallenge: inputDecadeChallenge ?? false,
           isPublic: inputIsPublic ?? false,
         });
 

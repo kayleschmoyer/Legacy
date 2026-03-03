@@ -27,7 +27,6 @@ interface CreateLeagueFormData {
   hofOnly: boolean;
   customEraStartYear?: number;
   customEraEndYear?: number;
-  decadeChallenge: boolean;
 }
 
 // Team count options
@@ -100,7 +99,6 @@ export function LeagueCreatePage(): React.JSX.Element {
     // Era settings — default to no restriction
     eraFilter: 'all',
     hofOnly: false,
-    decadeChallenge: false,
   });
 
   const [createLeagueAndTeams, { loading, error }] =
@@ -224,7 +222,6 @@ export function LeagueCreatePage(): React.JSX.Element {
               formData.eraFilter === 'custom'
                 ? formData.customEraEndYear
                 : undefined,
-            decadeChallenge: formData.decadeChallenge,
           },
         },
       });
@@ -795,52 +792,6 @@ export function LeagueCreatePage(): React.JSX.Element {
                 <Text size="$2" color="$gray10">
                   Restrict the draft pool to Baseball Hall of Fame inductees
                   only. Creates a prestigious, high-stakes draft experience.
-                </Text>
-              </YStack>
-
-              {/* Decade Challenge Mode */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Decade Challenge Mode
-                </Text>
-                <XStack space="$3" alignItems="center">
-                  <Button
-                    size="$3"
-                    onPress={() => {
-                      handleInputChange(
-                        'decadeChallenge',
-                        !formData.decadeChallenge,
-                      );
-                    }}
-                    disabled={loading}
-                    flex={1}
-                    backgroundColor={
-                      formData.decadeChallenge ? '$purple8' : '$color2'
-                    }
-                    borderColor={
-                      formData.decadeChallenge ? '$purple8' : '$borderColor'
-                    }
-                    borderWidth={formData.decadeChallenge ? 2 : 1}
-                    hoverStyle={{
-                      backgroundColor: formData.decadeChallenge
-                        ? '$purple9'
-                        : '$color3',
-                    }}
-                    pressStyle={{ scale: 0.95 }}
-                  >
-                    <Text
-                      color={formData.decadeChallenge ? '$purple12' : '$color'}
-                      fontWeight={formData.decadeChallenge ? '600' : '400'}
-                    >
-                      {formData.decadeChallenge
-                        ? '📅 Decade Challenge — ON'
-                        : '📅 Decade Challenge — OFF'}
-                    </Text>
-                  </Button>
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  Each week, the available player pool rotates to a different
-                  decade. Tests your knowledge across all eras of baseball.
                 </Text>
               </YStack>
 

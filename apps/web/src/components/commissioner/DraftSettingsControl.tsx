@@ -21,7 +21,6 @@ export interface DraftSettingsControlProps {
   /** Current era filter for the league (editable before draft starts). */
   eraFilter?: string | null | undefined;
   hofOnly?: boolean | null | undefined;
-  decadeChallenge?: boolean | null | undefined;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
 }
@@ -114,7 +113,6 @@ export function DraftSettingsControl({
   playerPool: leaguePlayerPool,
   eraFilter,
   hofOnly,
-  decadeChallenge,
   onSuccess,
   onError,
 }: DraftSettingsControlProps) {
@@ -140,7 +138,6 @@ export function DraftSettingsControl({
   const [playerPool, setPlayerPool] = useState('all');
   const [eraFilterLocal, setEraFilterLocal] = useState('all');
   const [hofOnlyLocal, setHofOnlyLocal] = useState(false);
-  const [decadeChallengeLocal, setDecadeChallengeLocal] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
   // Sync local state from server data
@@ -167,10 +164,6 @@ export function DraftSettingsControl({
     setHofOnlyLocal(hofOnly ?? false);
   }, [hofOnly]);
 
-  useEffect(() => {
-    setDecadeChallengeLocal(decadeChallenge ?? false);
-  }, [decadeChallenge]);
-
   // Track changes
   const checkChanges = useCallback(
     (
@@ -180,7 +173,6 @@ export function DraftSettingsControl({
       pp: string,
       ef: string,
       hof: boolean,
-      dc: boolean,
     ) => {
       const originalDraftMode = String(
         draftData?.getLeagueDraft?.draftMode ?? 'live',
@@ -194,7 +186,6 @@ export function DraftSettingsControl({
       const originalPlayerPool = String(leaguePlayerPool ?? 'all');
       const originalEraFilter = String(eraFilter ?? 'all');
       const originalHofOnly = hofOnly ?? false;
-      const originalDecadeChallenge = decadeChallenge ?? false;
 
       setHasChanges(
         dm !== originalDraftMode ||
@@ -202,11 +193,10 @@ export function DraftSettingsControl({
           dor !== originalDraftOrder ||
           pp !== originalPlayerPool ||
           ef !== originalEraFilter ||
-          hof !== originalHofOnly ||
-          dc !== originalDecadeChallenge,
+          hof !== originalHofOnly,
       );
     },
-    [draftData, leaguePlayerPool, eraFilter, hofOnly, decadeChallenge],
+    [draftData, leaguePlayerPool, eraFilter, hofOnly],
   );
 
   const handleDraftModeChange = (value: string) => {
@@ -221,7 +211,6 @@ export function DraftSettingsControl({
         playerPool,
         eraFilterLocal,
         hofOnlyLocal,
-        decadeChallengeLocal,
       );
     } else {
       checkChanges(
@@ -231,7 +220,6 @@ export function DraftSettingsControl({
         playerPool,
         eraFilterLocal,
         hofOnlyLocal,
-        decadeChallengeLocal,
       );
     }
   };
@@ -245,7 +233,6 @@ export function DraftSettingsControl({
       playerPool,
       eraFilterLocal,
       hofOnlyLocal,
-      decadeChallengeLocal,
     );
   };
 
@@ -258,7 +245,6 @@ export function DraftSettingsControl({
       playerPool,
       eraFilterLocal,
       hofOnlyLocal,
-      decadeChallengeLocal,
     );
   };
 
@@ -271,7 +257,6 @@ export function DraftSettingsControl({
       value,
       eraFilterLocal,
       hofOnlyLocal,
-      decadeChallengeLocal,
     );
   };
 
@@ -284,7 +269,6 @@ export function DraftSettingsControl({
       playerPool,
       value,
       hofOnlyLocal,
-      decadeChallengeLocal,
     );
   };
 
@@ -296,20 +280,6 @@ export function DraftSettingsControl({
       draftOrder,
       playerPool,
       eraFilterLocal,
-      value,
-      decadeChallengeLocal,
-    );
-  };
-
-  const handleDecadeChallengeChange = (value: boolean) => {
-    setDecadeChallengeLocal(value);
-    checkChanges(
-      draftMode,
-      selectionMethod,
-      draftOrder,
-      playerPool,
-      eraFilterLocal,
-      hofOnlyLocal,
       value,
     );
   };
@@ -326,7 +296,6 @@ export function DraftSettingsControl({
             playerPool,
             eraFilter: eraFilterLocal,
             hofOnly: hofOnlyLocal,
-            decadeChallenge: decadeChallengeLocal,
           },
         },
         refetchQueries: ['GetLeagueById', 'GetLeagueDraft'],
@@ -361,7 +330,6 @@ export function DraftSettingsControl({
     setPlayerPool(originalPlayerPool);
     setEraFilterLocal(eraFilter ?? 'all');
     setHofOnlyLocal(hofOnly ?? false);
-    setDecadeChallengeLocal(decadeChallenge ?? false);
     setHasChanges(false);
   };
 
@@ -503,52 +471,6 @@ export function DraftSettingsControl({
                       borderWidth={1}
                       onPress={() => {
                         handleHofOnlyChange(opt.value);
-                      }}
-                      disabled={isDraftLocked || saving}
-                    >
-                      <Text
-                        fontWeight={isSelected ? '600' : '400'}
-                        color={isSelected ? '$color' : '$gray10'}
-                      >
-                        {opt.label}
-                      </Text>
-                    </Button>
-                  );
-                })}
-              </XStack>
-            </YStack>
-
-            {/* Decade Challenge */}
-            <YStack gap="$2">
-              <YStack gap="$1">
-                <Text fontSize="$3" fontWeight="600" color="$color">
-                  Decade Challenge
-                </Text>
-                <Text fontSize="$2" color="$gray10">
-                  When enabled, the available player pool rotates to a different
-                  decade each week.
-                </Text>
-              </YStack>
-              <XStack gap="$2">
-                {[
-                  { label: 'Off', value: false },
-                  { label: 'On', value: true },
-                ].map((opt) => {
-                  const isSelected = decadeChallengeLocal === opt.value;
-                  return (
-                    <Button
-                      key={String(opt.value)}
-                      size="$3"
-                      theme={isSelected ? 'active' : 'alt2'}
-                      backgroundColor={
-                        isSelected
-                          ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
-                          : '$gray3'
-                      }
-                      borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                      borderWidth={1}
-                      onPress={() => {
-                        handleDecadeChallengeChange(opt.value);
                       }}
                       disabled={isDraftLocked || saving}
                     >
