@@ -16,10 +16,31 @@ import {
 } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
 
-// Noop function for optional callbacks
-const noop = () => {
-  // Intentionally empty - used as fallback unsubscribe function
-};
+/**
+ * Store a callback in a ref so that event subscriptions always call the
+ * latest version without needing the callback in a dependency array.
+ * This prevents unnecessary WebSocket client teardown/recreation when
+ * handler references change (e.g. due to upstream state like enrichedPlayers).
+ */
+function useLatestRef<T>(value: T): React.RefObject<T> {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyCallback = (data: any) => void;
+
+/**
+ * Declarative mapping from notification type → ref + optional debug label.
+ * The effect loop subscribes to every entry; cleanup unsubscribes them all.
+ */
+interface NotificationBinding {
+  type: string;
+  ref: React.RefObject<AnyCallback | undefined>;
+  /** When set, `console.log('[useWebSocket] received <label>', data)` is emitted. */
+  debugLabel?: string;
+}
 
 /**
  * SECURITY NOTE: Token Handling
@@ -121,6 +142,22 @@ export function useWebSocket({
   const clientRef = useRef<WebSocketClient | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Store all callbacks in refs so the main effect doesn't depend on them.
+  // This prevents tearing down and recreating the WebSocket client every
+  // time a handler's closure captures new state (e.g. enrichedPlayers).
+  const onDraftStartedRef = useLatestRef(onDraftStarted);
+  const onDraftCompletedRef = useLatestRef(onDraftCompleted);
+  const onDraftPickMadeRef = useLatestRef(onDraftPickMade);
+  const onDraftPausedRef = useLatestRef(onDraftPaused);
+  const onDraftResumedRef = useLatestRef(onDraftResumed);
+  const onPlayerStatsLoadingRef = useLatestRef(onPlayerStatsLoading);
+  const onPlayerStatsUpdatedRef = useLatestRef(onPlayerStatsUpdated);
+  const onMatchupStatsCompleteRef = useLatestRef(onMatchupStatsComplete);
+  const onRosterUpdateRef = useLatestRef(onRosterUpdate);
+  const onLeagueChatMessageRef = useLatestRef(onLeagueChatMessage);
+  const onMessageRef = useLatestRef(onMessage);
+  const onErrorRef = useLatestRef(onError);
 
   // Get WebSocket URL from environment or passed prop.
   // In Vite (web), callers should pass `url={import.meta.env.VITE_WEBSOCKET_URL}`.
@@ -270,117 +307,58 @@ export function useWebSocket({
         '(will auto-reconnect)',
       );
       setError(err.message);
-      onError?.(err);
+      onErrorRef.current?.(err);
     });
 
-    const unsubscribeMessage = onMessage
-      ? client.on('message', onMessage)
-      : noop;
+    // Subscribe to all notification types via refs so the subscriptions
+    // are stable — handlers always call through the latest ref.
+    const unsubscribeMessage = client.on('message', (msg: WebSocketMessage) => {
+      onMessageRef.current?.(msg);
+    });
 
-    const unsubscribeDraftCompleted = onDraftCompleted
-      ? client.on(
-          ClientNotificationType.DRAFT_COMPLETED,
-          (notification: NotificationData) => {
-            onDraftCompleted(notification as DraftCompletedNotification);
-          },
-        )
-      : noop;
+    // Declarative notification bindings — keeps subscription logic DRY.
+    const bindings: NotificationBinding[] = [
+      {
+        type: ClientNotificationType.DRAFT_COMPLETED,
+        ref: onDraftCompletedRef,
+      },
+      { type: ClientNotificationType.DRAFT_STARTED, ref: onDraftStartedRef },
+      { type: ClientNotificationType.DRAFT_PICK_MADE, ref: onDraftPickMadeRef },
+      { type: ClientNotificationType.DRAFT_PAUSED, ref: onDraftPausedRef },
+      { type: ClientNotificationType.DRAFT_RESUMED, ref: onDraftResumedRef },
+      {
+        type: ClientNotificationType.PLAYER_STATS_LOADING,
+        ref: onPlayerStatsLoadingRef,
+      },
+      {
+        type: ClientNotificationType.PLAYER_STATS_UPDATED,
+        ref: onPlayerStatsUpdatedRef,
+      },
+      {
+        type: ClientNotificationType.MATCHUP_STATS_COMPLETE,
+        ref: onMatchupStatsCompleteRef,
+        debugLabel: 'matchup-stats-complete',
+      },
+      {
+        type: ClientNotificationType.ROSTER_UPDATE,
+        ref: onRosterUpdateRef,
+        debugLabel: 'roster-update',
+      },
+      {
+        type: ClientNotificationType.LEAGUE_CHAT_MESSAGE,
+        ref: onLeagueChatMessageRef,
+        debugLabel: 'league-chat-message',
+      },
+    ];
 
-    const unsubscribeDraftStarted = onDraftStarted
-      ? client.on(
-          ClientNotificationType.DRAFT_STARTED,
-          (notification: NotificationData) => {
-            onDraftStarted(notification as DraftStartedNotification);
-          },
-        )
-      : noop;
-
-    const unsubscribeDraftPickMade = onDraftPickMade
-      ? client.on(
-          ClientNotificationType.DRAFT_PICK_MADE,
-          (notification: NotificationData) => {
-            onDraftPickMade(notification as DraftPickNotification);
-          },
-        )
-      : noop;
-
-    const unsubscribeDraftPaused = onDraftPaused
-      ? client.on(
-          ClientNotificationType.DRAFT_PAUSED,
-          (notification: NotificationData) => {
-            onDraftPaused(notification as DraftPausedNotification);
-          },
-        )
-      : noop;
-
-    const unsubscribeDraftResumed = onDraftResumed
-      ? client.on(
-          ClientNotificationType.DRAFT_RESUMED,
-          (notification: NotificationData) => {
-            onDraftResumed(notification as DraftResumedNotification);
-          },
-        )
-      : noop;
-
-    const unsubscribePlayerStatsLoading = onPlayerStatsLoading
-      ? client.on(
-          ClientNotificationType.PLAYER_STATS_LOADING,
-          (notification: NotificationData) => {
-            onPlayerStatsLoading(
-              notification as PlayerStatsLoadingNotification,
-            );
-          },
-        )
-      : noop;
-
-    const unsubscribePlayerStatsUpdated = onPlayerStatsUpdated
-      ? client.on(
-          ClientNotificationType.PLAYER_STATS_UPDATED,
-          (notification: NotificationData) => {
-            onPlayerStatsUpdated(
-              notification as PlayerStatsUpdatedNotification,
-            );
-          },
-        )
-      : noop;
-
-    const unsubscribeMatchupStatsComplete = onMatchupStatsComplete
-      ? client.on(
-          ClientNotificationType.MATCHUP_STATS_COMPLETE,
-          (notification: NotificationData) => {
-            console.log(
-              '[useWebSocket] received matchup-stats-complete',
-              notification,
-            );
-            onMatchupStatsComplete(
-              notification as MatchupStatsCompleteNotification,
-            );
-          },
-        )
-      : noop;
-
-    const unsubscribeRosterUpdate = onRosterUpdate
-      ? client.on(
-          ClientNotificationType.ROSTER_UPDATE,
-          (notification: NotificationData) => {
-            console.log('[useWebSocket] received roster-update', notification);
-            onRosterUpdate(notification as RosterUpdateNotification);
-          },
-        )
-      : noop;
-
-    const unsubscribeLeagueChatMessage = onLeagueChatMessage
-      ? client.on(
-          ClientNotificationType.LEAGUE_CHAT_MESSAGE,
-          (notification: NotificationData) => {
-            console.log(
-              '[useWebSocket] received league-chat-message',
-              notification,
-            );
-            onLeagueChatMessage(notification as LeagueChatMessageNotification);
-          },
-        )
-      : noop;
+    const unsubscribeBindings = bindings.map(({ type, ref, debugLabel }) =>
+      client.on(type, (notification: NotificationData) => {
+        if (debugLabel) {
+          console.log(`[useWebSocket] received ${debugLabel}`, notification);
+        }
+        ref.current?.(notification);
+      }),
+    );
 
     // Cleanup on unmount
     return () => {
@@ -389,38 +367,14 @@ export function useWebSocket({
       unsubscribeDisconnected();
       unsubscribeError();
       unsubscribeMessage();
-      unsubscribeDraftCompleted();
-      unsubscribeDraftStarted();
-      unsubscribeDraftPickMade();
-      unsubscribeDraftPaused();
-      unsubscribeDraftResumed();
-      unsubscribePlayerStatsLoading();
-      unsubscribePlayerStatsUpdated();
-      unsubscribeMatchupStatsComplete();
-      unsubscribeRosterUpdate();
-      unsubscribeLeagueChatMessage();
+      unsubscribeBindings.forEach((unsub) => unsub());
       client.dispose();
     };
-  }, [
-    wsUrl,
-    token,
-    leagueId,
-    matchupId,
-    viewContext,
-    autoConnect,
-    onDraftStarted,
-    onDraftCompleted,
-    onDraftPickMade,
-    onDraftPaused,
-    onDraftResumed,
-    onPlayerStatsLoading,
-    onPlayerStatsUpdated,
-    onMatchupStatsComplete,
-    onRosterUpdate,
-    onLeagueChatMessage,
-    onMessage,
-    onError,
-  ]);
+    // Only reconnect when connection parameters change — NOT when callbacks
+    // change.  Callbacks are accessed via refs so the subscriptions above
+    // always invoke the latest version without tearing down the socket.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsUrl, token, leagueId, matchupId, viewContext, autoConnect]);
 
   return {
     connected,
