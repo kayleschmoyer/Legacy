@@ -5,7 +5,7 @@ import {
   getSentryConfigFromEnv,
   initSentry,
   withSentry,
-} from '@legacy-sports/sentry';
+} from '@legacy-sports/rollbar';
 
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();

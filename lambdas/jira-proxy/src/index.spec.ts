@@ -1,10 +1,10 @@
-﻿import type { APIGatewayEvent } from 'aws-lambda';
+import type { APIGatewayEvent } from 'aws-lambda';
 import { sign } from 'jsonwebtoken';
 import { createJiraBug } from './JiraClient';
 import { baseHandler } from './index';
 
 // jest.mock calls are hoisted before imports by babel-jest at runtime
-jest.mock('@legacy-sports/sentry', () => ({
+jest.mock('@legacy-sports/rollbar', () => ({
   getSentryConfigFromEnv: () => null,
   initSentry: jest.fn(),
   withSentry: (fn: unknown) => fn,
@@ -92,7 +92,7 @@ describe('Jira Proxy Handler', () => {
     expect(result.statusCode).toBe(404);
   });
 
-  describe('POST /jira/bug â€” authentication', () => {
+  describe('POST /jira/bug — authentication', () => {
     it('returns 401 when Authorization header is missing', async () => {
       const event = makeEvent({ headers: {} });
       const result = await baseHandler(event);

@@ -28,11 +28,11 @@
       "@legacy-sports/env-utilities": ["lib/env-utilities/src/index.ts"],
       "@legacy-sports/logging": ["lib/logging/src/index.ts"],
       "@legacy-sports/narrative": ["lib/narrative/src/index.ts"],
+      "@legacy-sports/rollbar": ["lib/rollbar/src/index.ts"],
+      "@legacy-sports/rollbar/native": ["lib/rollbar/src/native.ts"],
+      "@legacy-sports/rollbar/web": ["lib/rollbar/src/web.ts"],
       "@legacy-sports/scheduling": ["lib/scheduling/src/index.ts"],
       "@legacy-sports/scoring": ["lib/scoring/src/index.ts"],
-      "@legacy-sports/sentry": ["lib/sentry/src/index.ts"],
-      "@legacy-sports/sentry/native": ["lib/sentry/src/native.ts"],
-      "@legacy-sports/sentry/web": ["lib/sentry/src/web.ts"],
       "@legacy-sports/shared-components": [
         "lib/shared-components/src/index.ts"
       ],

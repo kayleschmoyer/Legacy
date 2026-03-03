@@ -16,7 +16,7 @@ import {
   captureError,
   getSentryConfigFromEnv,
   initSentry,
-} from '@legacy-sports/sentry/web';
+} from '@legacy-sports/rollbar/web';
 import {
   AppProvider,
   AuthProvider,
@@ -33,7 +33,7 @@ import { store } from './store/store';
 import { initializeAnalytics, trackLogin } from './utils/analytics';
 import { ThemeProvider, useThemeContext } from './context/ThemeContext';
 
-// Initialize Sentry for web app
+// Initialize Rollbar for web app
 const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
   initSentry(sentryConfig);

@@ -5,7 +5,7 @@ import {
   captureError,
   getSentryConfigFromEnv,
   initSentry,
-} from '@legacy-sports/sentry/native';
+} from '@legacy-sports/rollbar/native';
 import {
   AppProvider,
   AuthProvider,
@@ -22,7 +22,7 @@ import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { DbClientContext } from '../common/ApolloClientContext';
 import { ThemeProvider, useThemeContext } from '../context/ThemeContext';
 
-// Initialize Sentry for mobile app
+// Initialize Rollbar for mobile app
 const sentryConfig = getSentryConfigFromEnv();
 if (sentryConfig) {
   initSentry(sentryConfig);

@@ -7,7 +7,7 @@ import {
   getSentryConfigFromEnv,
   initSentry,
   withSentry,
-} from '@legacy-sports/sentry';
+} from '@legacy-sports/rollbar';
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
 import { handler as careerHandler } from './load-career';
 import { handler as gameHandler } from './load-game';

@@ -18,8 +18,8 @@ export interface EnvironmentConfig {
   readonly commitSha: string;
   readonly buildDate: string;
   readonly branch: string;
-  readonly sentryDsn?: string;
-  readonly sentryTracesSampleRate?: number;
+  readonly rollbarAccessToken?: string;
+  readonly rollbarCaptureRate?: number;
   readonly googleAnalyticsMeasurementId?: string;
   /** URL for the Jira proxy lambda used by the bug report button. */
   readonly jiraProxyUrl: string;
@@ -52,10 +52,12 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
     (import.meta.env.VITE_BUILD_DATE as string) ||
     'unknown',
   branch: (import.meta.env.VITE_BRANCH as string) || 'unknown',
-  sentryDsn: import.meta.env.VITE_SENTRY_DSN as string | undefined,
-  sentryTracesSampleRate: import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE
-    ? parseFloat(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE as string)
-    : 0.1,
+  rollbarAccessToken: import.meta.env.VITE_ROLLBAR_ACCESS_TOKEN as
+    | string
+    | undefined,
+  rollbarCaptureRate: import.meta.env.VITE_ROLLBAR_CAPTURE_RATE
+    ? parseFloat(import.meta.env.VITE_ROLLBAR_CAPTURE_RATE as string)
+    : 1.0,
   googleAnalyticsMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID as
     | string
     | undefined,

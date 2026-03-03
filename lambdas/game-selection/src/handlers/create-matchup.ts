@@ -14,7 +14,7 @@ import {
   getSentryConfigFromEnv,
   initSentry,
   withSentry,
-} from '@legacy-sports/sentry';
+} from '@legacy-sports/rollbar';
 import { SQSBatchItemFailure, SQSBatchResponse, SQSEvent } from 'aws-lambda';
 
 // Initialize Sentry

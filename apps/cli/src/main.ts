@@ -6,7 +6,7 @@ import {
   captureError,
   getSentryConfigFromEnv,
   initSentry,
-} from '@legacy-sports/sentry';
+} from '@legacy-sports/rollbar';
 import { handleLoadPlayers } from './commands/loadPlayers';
 import { handleLoadCareerStats } from './commands/loadCareerStats';
 import { handleSeedDevData } from './commands/seedDevData';

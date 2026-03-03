@@ -2,7 +2,7 @@ import {
   getSentryConfigFromEnv,
   initSentry,
   withSentry,
-} from '@legacy-sports/sentry';
+} from '@legacy-sports/rollbar';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';

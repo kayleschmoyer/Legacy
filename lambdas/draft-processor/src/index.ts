@@ -18,7 +18,7 @@ import {
   getSentryConfigFromEnv,
   initSentry,
   withSentry,
-} from '@legacy-sports/sentry';
+} from '@legacy-sports/rollbar';
 import {
   createAllMatchupsForLeague,
   filterPlayerIdsByLeagueEligibility,

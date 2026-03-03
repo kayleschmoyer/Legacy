@@ -1,8 +1,6 @@
 import { defineConfig } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { builtinModules } from 'module';
-import { sentryVitePlugin } from '@sentry/vite-plugin';
-import { execSync } from 'child_process';
 
 // Cache the built-in modules set for performance
 const nodeBuiltins = new Set([
@@ -15,47 +13,12 @@ export function createLambdaConfig(projectName: string, entryFile?: string) {
 
   // Determine if this is a production deployment build
   const isProduction = process.env.NODE_ENV === 'production';
-  const enableSentry = isProduction && !!process.env.SENTRY_AUTH_TOKEN;
-
-  // Get version/release information
-  const appVersion = process.env.APP_VERSION || '0.0.0';
-  const commitSha = (() => {
-    try {
-      return execSync('git rev-parse --short HEAD').toString().trim();
-    } catch {
-      return 'dev';
-    }
-  })();
 
   return defineConfig({
     cacheDir: `../../node_modules/.vite/lambdas/${projectName}`,
     root: process.cwd(),
 
-    plugins: [
-      nxViteTsPaths(),
-      // Upload sourcemaps to Sentry for production builds
-      ...(enableSentry
-        ? [
-            sentryVitePlugin({
-              org: process.env.SENTRY_ORG || 'legacy-sports',
-              project: process.env.SENTRY_PROJECT || `lambda-${projectName}`,
-              authToken: process.env.SENTRY_AUTH_TOKEN,
-              release: {
-                name: `${projectName}@${appVersion}-${commitSha}`,
-                setCommits: {
-                  auto: true,
-                  ignoreMissing: true,
-                },
-              },
-              sourcemaps: {
-                assets: './dist/**',
-                filesToDeleteAfterUpload: ['./dist/**/*.map'],
-              },
-              telemetry: false,
-            }),
-          ]
-        : []),
-    ],
+    plugins: [nxViteTsPaths()],
 
     // Optimize dependency scanning to prevent timeouts
     optimizeDeps: {

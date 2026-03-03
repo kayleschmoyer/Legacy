@@ -1,56 +1,15 @@
 import { defineConfig } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
-import { sentryVitePlugin } from '@sentry/vite-plugin';
-import { execSync } from 'child_process';
 
 // Determine if this is a production deployment build
 const isProduction = process.env.NODE_ENV === 'production';
-const enableSentry = isProduction && !!process.env.SENTRY_AUTH_TOKEN;
-
-// Get version/release information
-const appVersion = process.env.APP_VERSION || '0.0.0';
-// Only shell out to git during actual builds (NX_TASK_HASH is set),
-// not during Nx graph creation where vite configs may be evaluated.
-const commitSha =
-  process.env.VITE_COMMIT_SHA ||
-  process.env.GITHUB_SHA ||
-  (process.env.NX_TASK_HASH
-    ? (() => {
-        try {
-          return execSync('git rev-parse --short HEAD').toString().trim();
-        } catch {
-          return 'dev';
-        }
-      })()
-    : 'dev');
 
 export default defineConfig({
   cacheDir: '../../node_modules/.vite/lambdas/oauth-proxy',
 
   plugins: [
     nxViteTsPaths(),
-    // Upload sourcemaps to Sentry for production builds
-    ...(enableSentry
-      ? [
-          sentryVitePlugin({
-            org: process.env.SENTRY_ORG || 'legacy-sports',
-            project: process.env.SENTRY_PROJECT || 'lambda-oauth-proxy',
-            authToken: process.env.SENTRY_AUTH_TOKEN,
-            release: {
-              name: `oauth-proxy@${appVersion}-${commitSha}`,
-              setCommits: {
-                auto: true,
-                ignoreMissing: true,
-              },
-            },
-            sourcemaps: {
-              assets: './dist/**',
-              filesToDeleteAfterUpload: ['./dist/**/*.map'],
-            },
-            telemetry: false,
-          }),
-        ]
-      : []),
+    // TODO: Add Rollbar sourcemap upload here.
   ],
 
   // Configure for Node.js/SSR mode
@@ -63,7 +22,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     ssr: true,
-    sourcemap: isProduction ? 'hidden' : false, // Enable sourcemaps for production
+    sourcemap: isProduction ? true : false, // Enable sourcemaps for production
     rollupOptions: {
       input: 'src/index.ts',
       output: {

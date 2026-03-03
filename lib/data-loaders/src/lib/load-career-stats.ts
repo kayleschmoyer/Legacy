@@ -10,7 +10,7 @@ import {
   SeasonFielding,
   SeasonPitching,
 } from '@legacy-sports/db-client';
-import { addBreadcrumb, captureError } from '@legacy-sports/sentry';
+import { addBreadcrumb, captureError } from '@legacy-sports/rollbar';
 import { sql } from 'drizzle-orm';
 
 /**

@@ -20,7 +20,7 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/sentry', () => ({
+jest.mock('@legacy-sports/rollbar', () => ({
   getSentryConfigFromEnv: jest.fn(),
   initSentry: jest.fn(),
   addBreadcrumb: jest.fn(),

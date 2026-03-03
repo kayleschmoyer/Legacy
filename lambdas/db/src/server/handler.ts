@@ -4,7 +4,7 @@ import {
   Context,
 } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { addBreadcrumb, captureError } from '@legacy-sports/sentry';
+import { addBreadcrumb, captureError } from '@legacy-sports/rollbar';
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
 
 // CORS headers constant
