@@ -12,12 +12,13 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { H4, styled, Text } from 'tamagui';
-import { AlertTriangle, Lock } from '@tamagui/lucide-icons';
+import { AlertTriangle, Info, Lock } from '@tamagui/lucide-icons';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 import type { PlayerMatchupData } from '../../pages/baseball/LeagueDetailPage';
+import { PlayerDetailModal } from '../../components/PlayerDetailModal';
 import {
   AMBER,
   BRAND_GOLD_LIGHT,
@@ -292,6 +293,7 @@ interface RosterRowProps {
   matchupData?: PlayerMatchupData;
   minCareerGames?: number;
   minCareerSeasons?: number;
+  onViewDetails?: (player: TeamMemberFragment) => void;
 }
 
 function RosterRow({
@@ -306,6 +308,7 @@ function RosterRow({
   matchupData,
   minCareerGames,
   minCareerSeasons,
+  onViewDetails,
 }: RosterRowProps): React.JSX.Element {
   const isLocked = Boolean(matchupData?.isLocked);
   const posType = position.positionType ?? '';
@@ -580,6 +583,30 @@ function RosterRow({
           </Text>
         )}
       </XStack>
+
+      {/* Player details button */}
+      {hasPlayer && assignedPlayer && onViewDetails && (
+        <XStack
+          width={28}
+          height={28}
+          borderRadius="$10"
+          alignItems="center"
+          justifyContent="center"
+          cursor="pointer"
+          hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.25) }}
+          pressStyle={{ scale: 0.92, opacity: 0.8 }}
+          animation="quick"
+          onPress={(e: { stopPropagation: () => void }) => {
+            e.stopPropagation();
+            onViewDetails(assignedPlayer);
+          }}
+          aria-label={`View ${getPlayerName(assignedPlayer)} details`}
+          role="button"
+          tabIndex={0}
+        >
+          <Info size={15} color={BRAND_NAVY_LIGHT} />
+        </XStack>
+      )}
     </XStack>
   );
 }
@@ -607,6 +634,7 @@ interface RosterSectionProps {
   playerMatchupData?: ReadonlyMap<number, PlayerMatchupData>;
   minCareerGames?: number;
   minCareerSeasons?: number;
+  onViewDetails?: (player: TeamMemberFragment) => void;
 }
 
 function RosterSection({
@@ -621,6 +649,7 @@ function RosterSection({
   playerMatchupData,
   minCareerGames,
   minCareerSeasons,
+  onViewDetails,
 }: RosterSectionProps): React.JSX.Element | null {
   if (positions.length === 0) return null;
 
@@ -701,6 +730,7 @@ function RosterSection({
             matchupData={mData}
             minCareerGames={minCareerGames}
             minCareerSeasons={minCareerSeasons}
+            onViewDetails={onViewDetails}
           />
         );
       })}
@@ -717,6 +747,7 @@ interface BenchPlayerCardProps {
   accentColor: string;
   recentlyMoved: boolean;
   matchupData?: PlayerMatchupData;
+  onViewDetails?: (player: TeamMemberFragment) => void;
 }
 
 function BenchPlayerCard({
@@ -726,6 +757,7 @@ function BenchPlayerCard({
   accentColor,
   recentlyMoved,
   matchupData,
+  onViewDetails,
 }: BenchPlayerCardProps): React.JSX.Element {
   const isLocked = Boolean(matchupData?.isLocked);
   const eligible = getEligiblePositions(player);
@@ -848,23 +880,47 @@ function BenchPlayerCard({
         </XStack>
       )}
 
-      {/* Selection indicator */}
-      {isLocked ? (
-        <XStack alignItems="center" gap="$1" flexShrink={0}>
-          <Lock size={12} color="$amber10" />
-          <Text fontSize="$2" fontWeight="600" color="$amber10">
-            Locked
+      {/* Selection indicator + details button */}
+      <XStack alignItems="center" gap="$2" flexShrink={0}>
+        {isLocked ? (
+          <XStack alignItems="center" gap="$1">
+            <Lock size={12} color="$amber10" />
+            <Text fontSize="$2" fontWeight="600" color="$amber10">
+              Locked
+            </Text>
+          </XStack>
+        ) : (
+          <Text
+            fontSize="$2"
+            fontWeight={isActive ? '700' : '400'}
+            color={isActive ? accentColor : '$textMuted'}
+          >
+            {isActive ? 'Selected' : 'Select'}
           </Text>
-        </XStack>
-      ) : (
-        <Text
-          fontSize="$2"
-          fontWeight={isActive ? '700' : '400'}
-          color={isActive ? accentColor : '$textMuted'}
-        >
-          {isActive ? 'Selected' : 'Select'}
-        </Text>
-      )}
+        )}
+        {onViewDetails && (
+          <XStack
+            width={26}
+            height={26}
+            borderRadius="$10"
+            alignItems="center"
+            justifyContent="center"
+            cursor="pointer"
+            hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.25) }}
+            pressStyle={{ scale: 0.92, opacity: 0.8 }}
+            animation="quick"
+            onPress={(e: { stopPropagation: () => void }) => {
+              e.stopPropagation();
+              onViewDetails(player);
+            }}
+            aria-label={`View ${getPlayerName(player)} details`}
+            role="button"
+            tabIndex={0}
+          >
+            <Info size={14} color={BRAND_NAVY_LIGHT} />
+          </XStack>
+        )}
+      </XStack>
     </XStack>
   );
 }
@@ -883,6 +939,7 @@ interface BenchPanelProps {
   accentColor: string;
   recentlyMovedIds: ReadonlySet<number>;
   playerMatchupData?: ReadonlyMap<number, PlayerMatchupData>;
+  onViewDetails?: (player: TeamMemberFragment) => void;
 }
 
 function BenchPanel({
@@ -897,6 +954,7 @@ function BenchPanel({
   accentColor,
   recentlyMovedIds,
   playerMatchupData,
+  onViewDetails,
 }: BenchPanelProps): React.JSX.Element {
   const isFromLineup = Boolean(selectedPlayer?.positionId);
   const selectedPlayerLocked = Boolean(
@@ -1000,6 +1058,7 @@ function BenchPanel({
                     ? playerMatchupData?.get(player.playerId)
                     : undefined
                 }
+                onViewDetails={onViewDetails}
               />
               {index < players.length - 1 && (
                 <Separator borderColor="$outlineSubtle" marginVertical={0} />
@@ -1158,6 +1217,24 @@ export function LeagueRosterManagement({
 }: LeagueRosterManagementProps): React.JSX.Element {
   const [selectedPlayer, setSelectedPlayer] =
     useState<TeamMemberFragment | null>(null);
+
+  // ── Player detail modal ──────────────────────────────────────────────────
+
+  const [detailPlayer, setDetailPlayer] = useState<{
+    id: number;
+    name: string;
+    position?: string;
+  } | null>(null);
+
+  const handleViewDetails = useCallback((player: TeamMemberFragment) => {
+    const id = player.player?.id ?? null;
+    if (id == null) return;
+    setDetailPlayer({
+      id,
+      name: getPlayerName(player),
+      position: player.player?.eligiblePositions?.[0],
+    });
+  }, []);
 
   // ── Recently-moved flash tracking ────────────────────────────────────────
 
@@ -1457,6 +1534,7 @@ export function LeagueRosterManagement({
                 playerMatchupData={playerMatchupData}
                 minCareerGames={minCareerGames}
                 minCareerSeasons={minCareerSeasons}
+                onViewDetails={handleViewDetails}
               />
 
               <RosterSection
@@ -1471,6 +1549,7 @@ export function LeagueRosterManagement({
                 playerMatchupData={playerMatchupData}
                 minCareerGames={minCareerGames}
                 minCareerSeasons={minCareerSeasons}
+                onViewDetails={handleViewDetails}
               />
 
               <RosterSection
@@ -1485,6 +1564,7 @@ export function LeagueRosterManagement({
                 playerMatchupData={playerMatchupData}
                 minCareerGames={minCareerGames}
                 minCareerSeasons={minCareerSeasons}
+                onViewDetails={handleViewDetails}
               />
 
               <RosterSection
@@ -1499,6 +1579,7 @@ export function LeagueRosterManagement({
                 playerMatchupData={playerMatchupData}
                 minCareerGames={minCareerGames}
                 minCareerSeasons={minCareerSeasons}
+                onViewDetails={handleViewDetails}
               />
             </YStack>
           </YStack>
@@ -1527,6 +1608,7 @@ export function LeagueRosterManagement({
               accentColor={BRAND_NAVY_LIGHT}
               recentlyMovedIds={recentlyMovedIds}
               playerMatchupData={playerMatchupData}
+              onViewDetails={handleViewDetails}
             />
 
             <BenchPanel
@@ -1549,10 +1631,22 @@ export function LeagueRosterManagement({
               accentColor="$green9"
               recentlyMovedIds={recentlyMovedIds}
               playerMatchupData={playerMatchupData}
+              onViewDetails={handleViewDetails}
             />
           </YStack>
         </XStack>
       </YStack>
+
+      {/* Player Detail Modal */}
+      <PlayerDetailModal
+        playerId={detailPlayer?.id ?? null}
+        playerName={detailPlayer?.name ?? ''}
+        position={detailPlayer?.position}
+        open={detailPlayer != null}
+        onOpenChange={(open) => {
+          if (!open) setDetailPlayer(null);
+        }}
+      />
     </YStack>
   );
 }
