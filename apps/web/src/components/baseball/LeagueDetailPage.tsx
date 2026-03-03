@@ -26,7 +26,7 @@ import {
   Users,
 } from '@tamagui/lucide-icons';
 import { QRCodeSVG } from 'qrcode.react';
-import { LeagueActivityFeed } from './LeagueActivityFeed';
+import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { LeagueScoringSummary } from './LeagueScoringSummary';
 import { LeagueScoringEditor } from './LeagueScoringEditor';
 import { LeagueTradeBlock } from './LeagueTradeBlock';

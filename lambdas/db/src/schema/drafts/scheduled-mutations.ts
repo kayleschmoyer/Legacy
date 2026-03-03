@@ -32,6 +32,7 @@ import {
 import { builder, type Context } from '../builder';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import { insertActivityLog } from '../../services/activity-log';
 
 /**
  * Lighter auth check for the draft auto-pick nudge.
@@ -795,6 +796,21 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
 
               result.picksAutoMade++;
               picksThisDraft++;
+
+              // Record auto-pick in the activity log (fire-and-forget, non-fatal)
+              void insertActivityLog(context, {
+                leagueId: draftLeagueId,
+                teamId: pickResult.currentPickInfo.teamId ?? null,
+                actorUserId: null,
+                eventType: 'draft_pick_made',
+                payload: {
+                  playerId: pickResult.autoPlayerId,
+                  round: pickResult.currentPickInfo.round,
+                  pickNumber: pickResult.currentPickInfo.pickNumber,
+                  overallPick: pickResult.currentPickInfo.overallPick,
+                  wasAutoPick: true,
+                },
+              });
 
               LOGGER.info('[autoProcessDraftPicks] Auto-pick made', {
                 draftId,

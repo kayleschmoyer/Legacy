@@ -18,6 +18,7 @@ import { getCurrentDraftPickInfo } from '../helpers';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { AuthenticationError, ForbiddenError } from '../../graphql-errors';
+import { insertActivityLog } from '../../../services/activity-log';
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -372,6 +373,21 @@ builder.mutationField('commissionerPick', (t) =>
               );
             });
         }
+
+        // Record commissioner pick in the activity log (fire-and-forget, non-fatal)
+        void insertActivityLog(context, {
+          leagueId: result.leagueId,
+          teamId: result.currentPickInfo.teamId ?? null,
+          actorUserId: userId,
+          eventType: 'draft_pick_made',
+          payload: {
+            playerId,
+            round: result.currentPickInfo.round,
+            pickNumber: result.currentPickInfo.pickNumber,
+            overallPick: result.currentPickInfo.overallPick,
+            wasCommissionerPick: true,
+          },
+        });
 
         return result.draftPick;
       } catch (error) {

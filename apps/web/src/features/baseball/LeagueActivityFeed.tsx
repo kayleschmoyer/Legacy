@@ -268,7 +268,7 @@ export function LeagueActivityFeed({
   const [activeFilter, setActiveFilter] = useState<ActivityType>('all');
 
   const { data, loading, error } = useGetLeagueActivityQuery({
-    variables: { leagueId, limit: 50 },
+    variables: { leagueId, limit: 200 },
     errorPolicy: 'all',
   });
 
