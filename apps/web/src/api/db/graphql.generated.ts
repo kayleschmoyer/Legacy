@@ -3925,6 +3925,7 @@ export type GetAvailableDraftPlayersQuery = {
     firstName?: string | null;
     lastName?: string | null;
     brefId?: string | null;
+    eligiblePositions?: Array<string> | null;
   }> | null;
 };
 
@@ -10675,6 +10676,7 @@ export const GetAvailableDraftPlayers = gql`
       firstName
       lastName
       brefId
+      eligiblePositions
     }
   }
 `;

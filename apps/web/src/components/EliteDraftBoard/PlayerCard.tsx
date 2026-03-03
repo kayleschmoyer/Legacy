@@ -48,6 +48,21 @@ export function PlayerCard({
             <span className="d-pos-badge" style={{ background: posColor }}>
               {player.position}
             </span>
+            {player.eligiblePositions
+              ?.filter((p) => p !== player.position)
+              .map((p) => (
+                <span
+                  key={p}
+                  className="d-pos-badge"
+                  style={{
+                    background: getPositionColor(p),
+                    opacity: 0.75,
+                    fontSize: 9,
+                  }}
+                >
+                  {p}
+                </span>
+              ))}
           </div>
         </div>
 

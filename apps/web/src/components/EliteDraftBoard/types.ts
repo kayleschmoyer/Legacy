@@ -6,6 +6,8 @@ export interface DraftPlayer {
   id: number;
   name: string;
   position: string;
+  /** All positions this player is eligible to play, sorted by games played (most → least) */
+  eligiblePositions?: string[];
   avg: number;
   hr: number;
   rbi: number;
@@ -32,6 +34,8 @@ export interface AvailableDraftPlayer {
   firstName: string;
   lastName: string;
   brefId: string;
+  /** All positions this player is eligible to play (from playerEligiblePositions table) */
+  eligiblePositions?: string[] | null;
 }
 
 /** Stats lookup entry built from careerBattingStats connection */

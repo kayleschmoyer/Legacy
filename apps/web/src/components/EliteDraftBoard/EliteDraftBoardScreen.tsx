@@ -592,6 +592,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
         position: pos,
+        eligiblePositions: ap.eligiblePositions ?? undefined,
         avg: s?.avg ?? 0,
         hr: s?.hr ?? 0,
         rbi: s?.rbi ?? 0,

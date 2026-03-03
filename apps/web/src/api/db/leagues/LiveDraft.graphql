@@ -199,6 +199,7 @@ query GetAvailableDraftPlayers(
     firstName
     lastName
     brefId
+    eligiblePositions
   }
 }
 
