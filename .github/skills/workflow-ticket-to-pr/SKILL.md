@@ -167,15 +167,13 @@ Run the full validation suite before opening the PR. Fix any failures and amend/
 make pc
 ```
 
-> ⚠️ **Formatting trap**: `make pc` runs `nx format:write` which **silently rewrites files in place**.
-> CI runs `nx format:check` and **fails** if any committed file differs from what Prettier expects.
-> After `make pc`, always check for unstaged changes and commit them:
+> ⚠️ **Formatting**: `make pc` runs `nx format:write` then checks `git diff`. If any files were
+> reformatted, `make pc` **fails** and prints the list of changed files. Commit them and re-run:
 >
 > ```powershell
-> git status          # look for modified files after make pc
-> git diff --stat     # see what was reformatted
 > git add -A
 > git commit -m "style: fix code formatting"
+> make pc  # re-run to confirm clean
 > git push origin HEAD
 > ```
 
@@ -321,22 +319,19 @@ Always update Jira status at:
 
 Always run `make pc` before creating a PR. It catches type errors, lint issues, test failures, and build breaks before reviewers see them.
 
-### ❌ MISTAKE 3b: Not Committing Formatting Changes After `make pc`
+### ❌ MISTAKE 3b: Ignoring Formatting Failures From `make pc`
 
-`make pc` runs `nx format:write` which rewrites files silently — it does **not** fail if files were changed.
-CI runs `nx format:check` which **does** fail on the same files. This is the most common cause of a CI
-formatting failure on a PR that passed `make pc` locally.
+`make pc` runs `nx format:write` and then **fails** if any files were reformatted, printing the list.
+Commit the reformatted files and re-run `make pc` before pushing.
 
 ```powershell
-# WRONG - run make pc but ignore the reformatted files
-make pc
+# WRONG - bypass the failure or push without fixing it
 git push origin HEAD  # ❌ reformatted files never committed — CI will fail!
 
-# CORRECT - always check for and commit formatting changes after make pc
-make pc
-git status             # ✅ check for modified files
+# CORRECT - commit the reformatted files, then re-run
 git add -A
-git commit -m "style: fix code formatting"  # skip only if git status was clean
+git commit -m "style: fix code formatting"
+make pc               # ✅ re-run to confirm clean
 git push origin HEAD
 ```
 

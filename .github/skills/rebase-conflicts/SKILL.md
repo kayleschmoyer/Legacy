@@ -151,7 +151,7 @@ git push --force-with-lease origin HEAD
 
 ### Step 8: Verify CI Passes
 
-After pushing, check that CI is green. The most common post-rebase failure is **formatting** — `nx format:write` silently rewrites files during `make pc` and those changes must be committed.
+After pushing, check that CI is green. The most common post-rebase failure is **formatting** — if `nx format:write` rewrites any file during `make pc`, the command **fails** and prints the changed files; commit them and re-run `make pc`.
 
 ```powershell
 # Watch CI checks until they complete
