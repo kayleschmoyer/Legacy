@@ -345,6 +345,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const league = (leagueData as any)?.league;
+  const numRounds: number =
+    (league?.maxRosterSize as number | null | undefined) ?? 20;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const leagueTeams: LeagueTeam[] = (teamsData as any)?.leagueTeams ?? [];
   const permLevel = league?.userMembership?.permissionLevel as
@@ -2359,9 +2361,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                       ),
                       currentPickInfo?.round ?? 1,
                       ...pickHistory.map((p) => p.round),
-                      20,
+                      numRounds,
                     )
-                  : 20
+                  : numRounds
               }
             />
           )}
