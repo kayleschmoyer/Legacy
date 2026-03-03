@@ -448,6 +448,8 @@ export type DraftPick = {
   overallPick?: Maybe<Scalars['Int']['output']>;
   pickNumber?: Maybe<Scalars['Int']['output']>;
   pickedAt?: Maybe<Scalars['String']['output']>;
+  /** The drafted player. Included so the draft board can display names for all picks (including pitchers who have no career batting entry) without a secondary lookup. */
+  player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   round?: Maybe<Scalars['Int']['output']>;
   team?: Maybe<Team>;
@@ -465,6 +467,13 @@ export type DraftPlayer = {
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+};
+
+/** Auto-pick status for a team in a draft */
+export type DraftTeamAutoPickStatus = {
+  __typename?: 'DraftTeamAutoPickStatus';
+  autoPick?: Maybe<Scalars['Boolean']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A team and its assigned slot in the draft order */
@@ -1672,6 +1681,8 @@ export type Query = {
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
+  /** Returns the auto-pick status for every team registered in the given draft. */
+  getDraftTeamAutoPickStatuses?: Maybe<Array<DraftTeamAutoPickStatus>>;
   getDraftTeamOrder?: Maybe<Array<DraftTeamOrderEntry>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
   getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
@@ -1834,6 +1845,10 @@ export type QueryGetDraftArgs = {
 };
 
 export type QueryGetDraftPicksArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftTeamAutoPickStatusesArgs = {
   draftId: Scalars['Int']['input'];
 };
 

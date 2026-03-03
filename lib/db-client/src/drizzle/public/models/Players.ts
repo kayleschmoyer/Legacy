@@ -32,6 +32,9 @@ export const players = pgTable(
     worldSeriesRings: integer('world_series_rings').notNull().default(0),
     hallOfFame: boolean('hall_of_fame').notNull().default(false),
     rookieOfTheYear: boolean('rookie_of_the_year').notNull().default(false),
+    // Precomputed sum of career batting + pitching games; maintained by the
+    // data loader so eligibility filters can avoid correlated subqueries.
+    totalGames: integer('total_games').notNull().default(0),
   },
   (table) => {
     return {

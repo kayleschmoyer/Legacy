@@ -54,6 +54,7 @@ async function main() {
     worldSeriesRings: 0,
     hallOfFame: false,
     rookieOfTheYear: false,
+    totalGames: 0,
   };
 
   const season = parseInt(options.season, 10);

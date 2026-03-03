@@ -48,6 +48,7 @@ async function loadPlayerGameStats(
     worldSeriesRings: number;
     hallOfFame: boolean;
     rookieOfTheYear: boolean;
+    totalGames: number;
   } = {
     id: playerId,
     firstName: '',
@@ -62,6 +63,7 @@ async function loadPlayerGameStats(
     worldSeriesRings: 0,
     hallOfFame: false,
     rookieOfTheYear: false,
+    totalGames: 0,
   };
 
   // Load batting stats

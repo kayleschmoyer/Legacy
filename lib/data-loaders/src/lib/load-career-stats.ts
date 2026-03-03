@@ -255,7 +255,9 @@ export async function loadCareerStats(
           cy_young_awards        = ${achievements.cyYoungAwards},
           world_series_rings     = ${achievements.worldSeriesRings},
           hall_of_fame           = ${achievements.hallOfFame},
-          rookie_of_the_year     = ${achievements.rookieOfTheYear}
+          rookie_of_the_year     = ${achievements.rookieOfTheYear},
+          total_games            = COALESCE((SELECT g FROM career_batting  WHERE player_id = ${player.id}), 0)
+                                 + COALESCE((SELECT g FROM career_pitching WHERE player_id = ${player.id}), 0)
       WHERE id = ${player.id}
     `);
     addBreadcrumb(

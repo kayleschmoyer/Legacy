@@ -353,11 +353,7 @@ export async function playerMeetsMinCareerGames(
   if (minCareerGames <= 0) return true;
 
   const result = await db.execute(
-    sql`SELECT COALESCE(
-          (SELECT g FROM career_batting WHERE player_id = ${playerId} LIMIT 1), 0
-        ) + COALESCE(
-          (SELECT g FROM career_pitching WHERE player_id = ${playerId} LIMIT 1), 0
-        ) AS total_games`,
+    sql`SELECT total_games FROM players WHERE id = ${playerId}`,
   );
   return Number(result.rows[0]?.total_games ?? 0) >= minCareerGames;
 }
@@ -433,15 +429,10 @@ export async function filterPlayerIdsByLeagueEligibility(
   if (settings.minCareerGames > 0 && currentIds.length > 0) {
     const rows = await db.execute(
       sql`
-        SELECT player_id,
-               COALESCE(batting_games, 0) + COALESCE(pitching_games, 0) AS total_games
-        FROM (
-          SELECT p.id AS player_id,
-                 (SELECT cb.g FROM career_batting  cb WHERE cb.player_id = p.id LIMIT 1) AS batting_games,
-                 (SELECT cp.g FROM career_pitching cp WHERE cp.player_id = p.id LIMIT 1) AS pitching_games
-          FROM players p
-          WHERE p.id = ANY(${sql.param(currentIds)}::integer[])
-        ) sub
+        SELECT p.id AS player_id,
+               p.total_games
+        FROM players p
+        WHERE p.id = ANY(${sql.param(currentIds)}::integer[])
       `,
     );
 

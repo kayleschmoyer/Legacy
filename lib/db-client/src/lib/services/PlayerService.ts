@@ -21,6 +21,7 @@ interface ScoringResultRow {
   avg_ppg: string | null;
   hitter_avg_ppg: string | null;
   pitching_avg_ppg: string | null;
+  total_games: number | null;
   // Career achievement columns
   all_star_selections: number | null;
   gold_gloves: number | null;
@@ -484,7 +485,7 @@ export class PlayerService {
             p.id, p.first_name, p.last_name, p.bref_id, p.stats_last_fetched_at,
             p.all_star_selections, p.gold_gloves, p.silver_sluggers,
             p.mvp_awards, p.cy_young_awards, p.world_series_rings,
-            p.hall_of_fame, p.rookie_of_the_year,
+            p.hall_of_fame, p.rookie_of_the_year, p.total_games,
             COALESCE(cs.batting_score, 0) AS batting_score,
             COALESCE(cs.pitching_score, 0) AS pitching_score,
             COALESCE(cs.fielding_score, 0) AS fielding_score,
@@ -523,6 +524,7 @@ export class PlayerService {
           worldSeriesRings: row.world_series_rings ?? 0,
           hallOfFame: row.hall_of_fame ?? false,
           rookieOfTheYear: row.rookie_of_the_year ?? false,
+          totalGames: row.total_games ?? 0,
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,
