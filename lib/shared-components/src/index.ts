@@ -68,6 +68,7 @@ export * from './features/leagues/CreateLeagueModal';
 
 // Draft components
 export * from './features/draft/DraftBoard';
+export * from './features/draft/ChatPanel';
 
 // Season Draft Game
 export * from './features/season-draft';

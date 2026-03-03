@@ -15,6 +15,7 @@ import {
   type DraftStartedNotification,
   useWebSocket,
 } from '@legacy-sports/shared-components';
+import { ChatPanel } from '@legacy-sports/shared-components';
 import {
   type AvailableDraftPlayer,
   type CurrentDraftPickInfo,
@@ -1988,6 +1989,20 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       {urgentMessage && !toastMessage && (
         <div className="d-toast error" role="alert" aria-live="assertive">
           {urgentMessage}
+        </div>
+      )}
+
+      {/* Chat Overlay */}
+      {chatOpen && leagueId !== null && (
+        <div
+          className="d-chat-overlay"
+          role="complementary"
+          aria-label="League chat"
+        >
+          <ChatPanel
+            leagueId={String(leagueId)}
+            onClose={() => setChatOpen(false)}
+          />
         </div>
       )}
 

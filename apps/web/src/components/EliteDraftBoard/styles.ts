@@ -957,6 +957,26 @@ export const CSS = `
   color: #bfdbfe;
 }
 
+/* ===== Chat Overlay Panel ===== */
+.d-chat-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, #0e1829 0%, #111b2f 100%);
+  border-left: 1px solid var(--d-border);
+  box-shadow: -4px 0 32px rgba(0,0,0,0.4);
+  animation: slideInRight 0.2s ease;
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
 /* ===== Screen Reader ===== */
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0;
