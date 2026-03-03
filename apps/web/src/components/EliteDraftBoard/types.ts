@@ -15,12 +15,15 @@ export interface DraftPlayer {
   hits: number;
   obp: number;
   slg: number;
-  // Pitcher-specific stats (populated when position is P, SP, or RP)
-  era?: string | null;
+  // Pitcher-specific stats (populated only for P/SP/RP)
+  isPitcher?: boolean;
   wins?: number;
   losses?: number;
-  saves?: number;
+  era?: number;
   strikeouts?: number;
+  saves?: number;
+  whip?: number;
+  winPct?: number;
   gamesStarted?: number;
 }
 
@@ -49,18 +52,6 @@ export interface PlayerStatsEntry {
   war: number;
 }
 
-/** Pitcher stats lookup entry built from careerPitchingStats */
-export interface PitcherStatsEntry {
-  playerId: number;
-  era: string | null;
-  wins: number;
-  losses: number;
-  saves: number;
-  strikeouts: number;
-  games: number;
-  gamesStarted: number;
-}
-
 export interface CurrentDraftPickInfo {
   draftId: number;
   teamId: number;
@@ -79,14 +70,18 @@ export interface DraftPickRecord {
   pickedAt: string;
   teamId: number;
   playerId: number;
-  /** Player name fields returned directly from getDraftPicks (LS-431). Used
-   * to display names for picks that are absent from the careerBattingStats
-   * map (e.g. pure pitchers). */
-  player?: { id: number; firstName: string; lastName: string } | null;
 }
 
 export interface LeagueTeam {
   id: string;
   name: string;
   leagueId: number;
+  isCpu?: boolean;
+}
+
+export interface IntelligenceRecommendation {
+  player: DraftPlayer;
+  score: number;
+  topStats: Array<{ label: string; value: string }>;
+  reason: string;
 }

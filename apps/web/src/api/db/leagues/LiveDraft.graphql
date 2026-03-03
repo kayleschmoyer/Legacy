@@ -248,3 +248,22 @@ query GetDraftPlayerStats($first: Int, $searchTerm: String, $minGames: Int) {
     totalCount
   }
 }
+
+# Fetch career pitching stats for pitcher player cards
+query GetDraftPitchingStats($limit: Int, $minGames: Int) {
+  careerPitchingStats(limit: $limit, minGames: $minGames) {
+    playerId
+    wins
+    losses
+    era
+    games
+    gamesStarted
+    strikeouts
+    saves
+    earnedRuns
+    baseOnBalls
+    outsRecorded
+    winPercentage
+    hits
+  }
+}

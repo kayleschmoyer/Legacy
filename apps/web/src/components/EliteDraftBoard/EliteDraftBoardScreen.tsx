@@ -15,203 +15,54 @@ import {
   type DraftStartedNotification,
   useWebSocket,
 } from '@legacy-sports/shared-components';
-import { ChatPanel } from '@legacy-sports/shared-components';
 import {
   type AvailableDraftPlayer,
   type CurrentDraftPickInfo,
   type DraftPickRecord,
   type DraftPlayer,
   type LeagueTeam,
-  type PitcherStatsEntry,
   type PlayerStatsEntry,
 } from './types';
 import { DEFAULT_PICK_TIME } from './constants';
 import { getPositionColor, normalizeTeamId } from './utils';
-import { useBrowserNotifications } from './useBrowserNotifications';
 import { CSS } from './styles';
 import { CircularTimer } from './CircularTimer';
 import { PickAnnouncement } from './PickAnnouncement';
 import { PlayerCard } from './PlayerCard';
 import { SkeletonCard } from './SkeletonCard';
 import { DraftGrid } from './DraftGrid';
+import { DraftIntelligence } from './DraftIntelligence';
+import { getDraftCommentary } from './draftUtils';
 import {
   CommissionerPick as COMMISSIONER_PICK,
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
   GetCurrentDraftPick as GET_CURRENT_DRAFT_PICK,
   GetDraftPicks as GET_DRAFT_PICKS,
-  GetDraftPitcherStats as GET_DRAFT_PITCHER_STATS,
+  GetDraftPitchingStats as GET_DRAFT_PITCHING_STATS,
   GetDraftPlayerStats as GET_DRAFT_PLAYER_STATS,
-  GetDraftTeamAutoPickStatuses as GET_DRAFT_TEAM_AUTO_PICK_STATUSES,
-  GetDraftTeamOrder as GET_DRAFT_TEAM_ORDER,
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
-  GetMyDraftTeamAutoPick as GET_MY_DRAFT_TEAM_AUTO_PICK,
   type GetAvailableDraftPlayersQuery,
   type GetAvailableDraftPlayersQueryVariables,
   type GetCurrentDraftPickQuery,
   type GetCurrentDraftPickQueryVariables,
   type GetDraftPicksQuery,
   type GetDraftPicksQueryVariables,
-  type GetDraftTeamAutoPickStatusesQuery,
-  type GetDraftTeamAutoPickStatusesQueryVariables,
-  type GetDraftTeamOrderQuery,
-  type GetMyDraftTeamAutoPickQuery,
-  type GetMyDraftTeamAutoPickQueryVariables,
   InitializeLiveDraft as INITIALIZE_LIVE_DRAFT,
   MakeDraftPick as MAKE_DRAFT_PICK,
   NudgeExpiredDraftPick as NUDGE_EXPIRED_DRAFT_PICK,
   PauseDraft as PAUSE_DRAFT,
   ResumeDraft as RESUME_DRAFT,
-  ToggleDraftAutoPick as TOGGLE_DRAFT_AUTO_PICK,
 } from '../../api/db/graphql.generated';
 import { env } from '../../config/environment';
 
 // ===========================================================================
-// Scheduled Draft Countdown (LS-423)
-// Rendered when a draft has a scheduled start time but the room isn't open yet
-// (i.e. more than 30 minutes before the scheduled start).
-// Self-contained with its own 1-second interval — does not pollute the
-// main component's state.
+// Helper – is this a pitcher position?
 // ===========================================================================
-
-function ScheduledDraftCountdown({
-  scheduledAt,
-  roomOpensAt,
-  leagueName,
-}: {
-  scheduledAt: Date;
-  roomOpensAt: Date;
-  leagueName?: string;
-}): React.JSX.Element {
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const msUntilOpen = roomOpensAt.getTime() - now.getTime();
-  const msUntilStart = scheduledAt.getTime() - now.getTime();
-  const toHMS = (ms: number) => {
-    const totalSec = Math.max(0, Math.floor(ms / 1000));
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-  };
-
-  return (
-    <div className="d-root">
-      <style>{CSS}</style>
-      <div className="d-bg-fx" />
-      <div className="d-state-center">
-        <div className="d-state-icon">
-          <span role="img" aria-label="clock">
-            🕐
-          </span>
-        </div>
-        <div className="d-state-title">
-          {leagueName ? `${leagueName} — Scheduled Draft` : 'Scheduled Draft'}
-        </div>
-        <div className="d-state-desc">
-          This draft has a scheduled start time. The draft room will open 30
-          minutes before the draft begins.
-        </div>
-
-        {/* Draft start time */}
-        <div
-          style={{
-            marginTop: 16,
-            padding: '12px 20px',
-            background: 'var(--d-surface)',
-            border: '1px solid var(--d-border)',
-            borderRadius: 10,
-            textAlign: 'center',
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: 1.5,
-              textTransform: 'uppercase',
-              color: 'var(--d-text-secondary)',
-              marginBottom: 6,
-            }}
-          >
-            Draft Starts At
-          </div>
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 600,
-              color: 'var(--d-text)',
-            }}
-          >
-            {scheduledAt.toLocaleString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              timeZoneName: 'short',
-            })}
-          </div>
-        </div>
-
-        {/* Countdown */}
-        <div
-          style={{
-            marginTop: 16,
-            textAlign: 'center',
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: 1.5,
-              textTransform: 'uppercase',
-              color: 'var(--d-text-secondary)',
-              marginBottom: 4,
-            }}
-          >
-            {msUntilOpen > 0 ? 'Room Opens In' : 'Draft Starts In'}
-          </div>
-          <div
-            style={{
-              fontSize: 36,
-              fontWeight: 800,
-              fontVariantNumeric: 'tabular-nums',
-              color: 'var(--d-accent)',
-              letterSpacing: 2,
-            }}
-          >
-            {toHMS(msUntilOpen > 0 ? msUntilOpen : msUntilStart)}
-          </div>
-          {msUntilOpen > 0 && (
-            <div
-              style={{
-                fontSize: 12,
-                color: 'var(--d-text-secondary)',
-                marginTop: 4,
-              }}
-            >
-              Room opens at{' '}
-              {roomOpensAt.toLocaleString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+const PITCHER_POSITIONS = new Set(['P', 'SP', 'RP']);
+const isPitcherPosition = (pos: string): boolean =>
+  PITCHER_POSITIONS.has(pos.toUpperCase());
 
 // ===========================================================================
 // Main Component
@@ -232,7 +83,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const [watchlist, setWatchlist] = useState<number[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [draftComplete, setDraftComplete] = useState(false);
-  const [autoPickEnabled, setAutoPickEnabled] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [draftPaused, setDraftPaused] = useState(false);
   // Authoritative pick deadline and time limit synced from server (WS + query)
@@ -245,13 +95,24 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     type: 'error' | 'warning' | 'info';
   } | null>(null);
 
+  // CPU team management
+  const [cpuTeamIds, setCpuTeamIds] = useState<Set<string>>(new Set());
+  const cpuPickInProgressRef = useRef<number | null>(null);
+
+  // Notification dedup: track overallPick numbers we've already notified
+  const notifiedPicksRef = useRef<Set<number>>(new Set());
+
+  // Draft order management (Issue C)
+  const [customDraftOrder, setCustomDraftOrder] = useState<string[] | null>(
+    null,
+  );
+
   // Pick announcement
   const [announcement, setAnnouncement] = useState<{
     player: DraftPlayer | AvailableDraftPlayer;
     pickNumber: number;
     isMyPick: boolean;
     isAuto: boolean;
-    autoPickReason: string | null;
   } | null>(null);
   const [announcementLeaving, setAnnouncementLeaving] = useState(false);
   const announcementTimerRef = React.useRef<
@@ -264,18 +125,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       pickNumber: number,
       myPick: boolean,
       auto: boolean,
-      reason: string | null = null,
     ) => {
       if (announcementTimerRef.current)
         clearTimeout(announcementTimerRef.current);
       setAnnouncementLeaving(false);
-      setAnnouncement({
-        player,
-        pickNumber,
-        isMyPick: myPick,
-        isAuto: auto,
-        autoPickReason: reason,
-      });
+      setAnnouncement({ player, pickNumber, isMyPick: myPick, isAuto: auto });
       announcementTimerRef.current = setTimeout(() => {
         setAnnouncementLeaving(true);
         setTimeout(() => {
@@ -290,9 +144,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   // Screen reader live regions
   const [liveMessage, setLiveMessage] = useState('');
   const [urgentMessage, setUrgentMessage] = useState('');
-
-  // ---- Browser notifications ----
-  const { notify } = useBrowserNotifications();
 
   // Toast auto-dismiss
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -345,8 +196,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const league = (leagueData as any)?.league;
-  const numRounds: number =
-    (league?.maxRosterSize as number | null | undefined) ?? 20;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const leagueTeams: LeagueTeam[] = (teamsData as any)?.leagueTeams ?? [];
   const permLevel = league?.userMembership?.permissionLevel as
@@ -356,7 +205,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     permLevel === 'owner' ||
     permLevel === 'commissioner' ||
     permLevel === 'general_manager';
-  const isCommissioner = permLevel === 'owner' || permLevel === 'commissioner';
   const myTeamId = normalizeTeamId(league?.userMembership?.teamId);
 
   // Helper: resolve team name from leagueTeams by numeric ID
@@ -387,35 +235,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     ? Number(leagueDraft.id)
     : null;
 
-  // ---- Auto-pick status for my team ----
-  const { data: autoPickData, refetch: refetchAutoPick } = useQuery<
-    GetMyDraftTeamAutoPickQuery,
-    GetMyDraftTeamAutoPickQueryVariables
-  >(GET_MY_DRAFT_TEAM_AUTO_PICK, {
-    variables: { draftId: draftId ?? 0 },
-    skip: !draftId,
-    errorPolicy: 'all',
-  });
-
-  // ---- Auto-pick statuses for all teams (LS-439) ----
-  const { data: allAutoPickData } = useQuery<
-    GetDraftTeamAutoPickStatusesQuery,
-    GetDraftTeamAutoPickStatusesQueryVariables
-  >(GET_DRAFT_TEAM_AUTO_PICK_STATUSES, {
-    variables: { draftId: draftId ?? 0 },
-    skip: !draftId,
-    errorPolicy: 'all',
-    pollInterval: 5000, // refresh every 5 s to stay live
-  });
-
-  const autoPickTeamIds = useMemo<ReadonlySet<string>>(() => {
-    const ids = new Set<string>();
-    for (const entry of allAutoPickData?.getDraftTeamAutoPickStatuses ?? []) {
-      if (entry.autoPick && entry.teamId != null) ids.add(String(entry.teamId));
-    }
-    return ids;
-  }, [allAutoPickData]);
-
   // Log draft errors (debug logging removed for production)
   useEffect(() => {
     if (draftError) console.error('[Draft] getLeagueDraft error:', draftError);
@@ -436,13 +255,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       setDraftPaused(false);
     }
   }, [league?.draftStatus]);
-
-  // Sync auto-pick status from server query result
-  useEffect(() => {
-    if (autoPickData?.getMyDraftTeamAutoPick !== undefined) {
-      setAutoPickEnabled(autoPickData.getMyDraftTeamAutoPick ?? false);
-    }
-  }, [autoPickData?.getMyDraftTeamAutoPick]);
 
   // ---- Current Pick ----
   const [draftOrderMissing, setDraftOrderMissing] = useState(false);
@@ -511,50 +323,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const pickHistory: DraftPickRecord[] = (picksData?.getDraftPicks ??
     []) as unknown as DraftPickRecord[];
 
-  // ---- Draft Team Order ----
-  const { data: draftTeamOrderData } = useQuery<GetDraftTeamOrderQuery>(
-    GET_DRAFT_TEAM_ORDER,
-    {
-      variables: { draftId: draftId ?? 0 },
-      skip: !draftId,
-    },
-  );
-
-  // Sort leagueTeams by draft slot so DraftGrid columns match pick order.
-  // Falls back to the original server order when draft slot data is unavailable.
-  const orderedLeagueTeams: LeagueTeam[] = useMemo(() => {
-    const slotEntries = draftTeamOrderData?.getDraftTeamOrder ?? [];
-    if (slotEntries.length === 0) return leagueTeams;
-    const slotMap = new Map<string, number>();
-    for (const e of slotEntries) {
-      if (e.teamId != null && e.draftOrder != null) {
-        slotMap.set(String(e.teamId), e.draftOrder);
-      }
-    }
-    return [...leagueTeams].sort((a, b) => {
-      const slotA = slotMap.get(String(a.id)) ?? Infinity;
-      const slotB = slotMap.get(String(b.id)) ?? Infinity;
-      return slotA - slotB;
-    });
-  }, [leagueTeams, draftTeamOrderData]);
-
-  // ---- Available Players (server-side search with offset pagination) ----
-  const PLAYER_PAGE_SIZE = 50;
+  // ---- Available Players (server-side search) ----
   const [playerSearch, setPlayerSearch] = useState('');
-  const [playerOffset, setPlayerOffset] = useState(0);
-  const [allAvailablePlayers, setAllAvailablePlayers] = useState<
-    AvailableDraftPlayer[]
-  >([]);
-  const [hasMorePlayers, setHasMorePlayers] = useState(false);
-  // Tracks whether the next data update should append (true) or replace (false)
-  const isAppendingPlayers = useRef(false);
-  // Prevents the filter-reset effect from firing on the initial mount.
-  // In React 19, all effects from a single render are batched; without this
-  // guard the reset effect fires on mount (playerSearch/selectedPosition at
-  // their initial values) and clears the player list that the population
-  // effect just set in the same batch.
-  const hasFilterChangedRef = useRef(false);
-
   const {
     data: availablePlayersData,
     loading: availablePlayersLoading,
@@ -572,56 +342,39 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         selectedPosition === 'P'
           ? 'pitchingAvgPointsPerGame'
           : 'hitterAvgPointsPerGame',
-      limit: PLAYER_PAGE_SIZE,
-      offset: playerOffset,
+      limit: 200,
     },
     skip: !draftId,
     errorPolicy: 'all',
   });
 
-  // Accumulate pages: replace on fresh fetch, append on "load more"
-  useEffect(() => {
-    const page = (availablePlayersData?.getAvailableDraftPlayers ?? [])
-      .filter(
-        (
-          p,
-        ): p is {
-          id: number;
-          firstName: string;
-          lastName: string;
-          brefId: string;
-        } =>
-          p.id != null &&
-          p.firstName != null &&
-          p.lastName != null &&
-          p.brefId != null,
-      )
-      .map((p) => ({
-        id: p.id,
-        firstName: p.firstName,
-        lastName: p.lastName,
-        brefId: p.brefId,
-      }));
-
-    if (isAppendingPlayers.current) {
-      setAllAvailablePlayers((prev) => [...prev, ...page]);
-      isAppendingPlayers.current = false;
-    } else {
-      setAllAvailablePlayers(page);
-    }
-    setHasMorePlayers(page.length >= PLAYER_PAGE_SIZE);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availablePlayersData]);
+  const availablePlayers: AvailableDraftPlayer[] = (
+    availablePlayersData?.getAvailableDraftPlayers ?? []
+  )
+    .filter(
+      (
+        p,
+      ): p is {
+        id: number;
+        firstName: string;
+        lastName: string;
+        brefId: string;
+      } =>
+        p.id != null &&
+        p.firstName != null &&
+        p.lastName != null &&
+        p.brefId != null,
+    )
+    .map((p) => ({
+      id: p.id,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      brefId: p.brefId,
+    }));
 
   // ---- Career Batting Stats (uses existing careerBattingStats connection) ----
   const { data: statsData } = useQuery(GET_DRAFT_PLAYER_STATS, {
     variables: { first: 5000, minGames: 1 },
-    errorPolicy: 'all',
-  });
-
-  // ---- Career Pitching Stats ----
-  const { data: pitcherStatsData } = useQuery(GET_DRAFT_PITCHER_STATS, {
-    variables: { limit: 5000, minGames: 1 },
     errorPolicy: 'all',
   });
 
@@ -661,31 +414,53 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     return map;
   }, [statsData]);
 
-  // Build a playerId → pitcher stats map from careerPitchingStats
-  const pitcherStatsMap = useMemo(() => {
-    const map = new Map<number, PitcherStatsEntry>();
-    const rows = (pitcherStatsData as Record<string, unknown>)
-      ?.careerPitchingStats as
-      | Array<Record<string, unknown>>
-      | null
-      | undefined;
-    if (!rows) return map;
-    for (const row of rows) {
-      const pid = row.playerId as number | null | undefined;
+  // ---- Career Pitching Stats ----
+  const { data: pitchingStatsData } = useQuery(GET_DRAFT_PITCHING_STATS, {
+    variables: { limit: 2000, minGames: 1 },
+    errorPolicy: 'all',
+  });
+
+  // Build a playerId → pitching stats map
+  const pitchingStatsMap = useMemo(() => {
+    const map = new Map<
+      number,
+      {
+        wins: number;
+        losses: number;
+        era: number;
+        strikeouts: number;
+        saves: number;
+        games: number;
+        gamesStarted: number;
+        whip: number;
+        winPct: number;
+      }
+    >();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = (pitchingStatsData as any)?.careerPitchingStats;
+    if (!Array.isArray(rows)) return map;
+    for (const r of rows) {
+      const pid = r.playerId as number | null | undefined;
       if (pid == null) continue;
+      const outsRecorded = (r.outsRecorded as number) ?? 0;
+      const ip = outsRecorded / 3; // innings pitched
+      const hitsAllowed = (r.hits as number) ?? 0;
+      const bb = (r.baseOnBalls as number) ?? 0;
+      const whip = ip > 0 ? (hitsAllowed + bb) / ip : 0;
       map.set(pid, {
-        playerId: pid,
-        era: (row.era as string | null) ?? null,
-        wins: (row.wins as number) ?? 0,
-        losses: (row.losses as number) ?? 0,
-        saves: (row.saves as number) ?? 0,
-        strikeouts: (row.strikeouts as number) ?? 0,
-        games: (row.games as number) ?? 0,
-        gamesStarted: (row.gamesStarted as number) ?? 0,
+        wins: (r.wins as number) ?? 0,
+        losses: (r.losses as number) ?? 0,
+        era: parseFloat((r.era as string) ?? '0') || 0,
+        strikeouts: (r.strikeouts as number) ?? 0,
+        saves: (r.saves as number) ?? 0,
+        games: (r.games as number) ?? 0,
+        gamesStarted: (r.gamesStarted as number) ?? 0,
+        whip: Math.round(whip * 1000) / 1000,
+        winPct: (r.winPercentage as number) ?? 0,
       });
     }
     return map;
-  }, [pitcherStatsData]);
+  }, [pitchingStatsData]);
 
   // Debounced search for available players
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -701,19 +476,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     };
   }, [searchTerm]);
 
-  // Reset player pagination when search term or position filter changes
-  useEffect(() => {
-    // Skip the initial mount — only clear when a filter actually changes,
-    // otherwise this wipes the freshly-fetched player list in the same batch.
-    if (!hasFilterChangedRef.current) {
-      hasFilterChangedRef.current = true;
-      return;
-    }
-    isAppendingPlayers.current = false;
-    setPlayerOffset(0);
-    setAllAvailablePlayers([]);
-  }, [playerSearch, selectedPosition]);
-
   // Build a lookup map by player ID for displaying player names in history/board.
   // Includes ALL players from stats (not just available), so drafted players
   // still appear with their real name instead of "Player #123".
@@ -721,89 +483,99 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     const map = new Map<number, DraftPlayer>();
     // Seed from playerStatsMap (covers both drafted and available players)
     for (const [pid, s] of playerStatsMap) {
-      const ps = pitcherStatsMap.get(pid);
+      const pitcher = isPitcherPosition(s.position);
+      const ps = pitcher ? pitchingStatsMap.get(pid) : undefined;
       map.set(pid, {
         id: pid,
-        name: `${s.firstName} ${s.lastName}`.trim() || `Player #${pid}`,
+        name:
+          `${s.firstName} ${s.lastName}`.trim() ||
+          `Unknown Player (ID: ${pid})`,
         position: s.position,
         avg: s.avg,
         hr: s.hr,
         rbi: s.rbi,
         runs: s.runs,
         sb: s.sb,
-        games: s.games,
+        games: ps?.games ?? s.games,
         hits: s.hits,
         obp: s.obp,
         slg: s.slg,
-        ...(ps && {
-          era: ps.era,
-          wins: ps.wins,
-          losses: ps.losses,
-          saves: ps.saves,
-          strikeouts: ps.strikeouts,
-          gamesStarted: ps.gamesStarted,
-        }),
+        isPitcher: pitcher,
+        wins: ps?.wins,
+        losses: ps?.losses,
+        era: ps?.era,
+        strikeouts: ps?.strikeouts,
+        saves: ps?.saves,
+        whip: ps?.whip,
+        winPct: ps?.winPct,
+        gamesStarted: ps?.gamesStarted,
       });
     }
     // Override with available players (which have authoritative firstName/lastName)
-    for (const ap of allAvailablePlayers) {
+    for (const ap of availablePlayers) {
       const s = playerStatsMap.get(ap.id);
-      const ps = pitcherStatsMap.get(ap.id);
+      const pos = s?.position ?? 'UTIL';
+      const pitcher = isPitcherPosition(pos);
+      const ps = pitcher ? pitchingStatsMap.get(ap.id) : undefined;
       map.set(ap.id, {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
-        position: s?.position ?? 'UTIL',
+        position: pos,
         avg: s?.avg ?? 0,
         hr: s?.hr ?? 0,
         rbi: s?.rbi ?? 0,
         runs: s?.runs ?? 0,
         sb: s?.sb ?? 0,
-        games: s?.games ?? 0,
+        games: ps?.games ?? s?.games ?? 0,
         hits: s?.hits ?? 0,
         obp: s?.obp ?? 0,
         slg: s?.slg ?? 0,
-        ...(ps && {
-          era: ps.era,
-          wins: ps.wins,
-          losses: ps.losses,
-          saves: ps.saves,
-          strikeouts: ps.strikeouts,
-          gamesStarted: ps.gamesStarted,
-        }),
+        isPitcher: pitcher,
+        wins: ps?.wins,
+        losses: ps?.losses,
+        era: ps?.era,
+        strikeouts: ps?.strikeouts,
+        saves: ps?.saves,
+        whip: ps?.whip,
+        winPct: ps?.winPct,
+        gamesStarted: ps?.gamesStarted,
       });
     }
     return map;
-  }, [allAvailablePlayers, pitcherStatsMap, playerStatsMap]);
+  }, [availablePlayers, playerStatsMap, pitchingStatsMap]);
 
   // Merge available players with stats data for rich card display
   const enrichedPlayers: DraftPlayer[] = useMemo(() => {
-    return allAvailablePlayers.map((ap) => {
+    return availablePlayers.map((ap) => {
       const s = playerStatsMap.get(ap.id);
-      const ps = pitcherStatsMap.get(ap.id);
+      const pos = s?.position ?? 'UTIL';
+      const pitcher = isPitcherPosition(pos);
+      const ps = pitcher ? pitchingStatsMap.get(ap.id) : undefined;
       return {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
-        position: s?.position ?? 'UTIL',
+        position: pos,
         avg: s?.avg ?? 0,
         hr: s?.hr ?? 0,
         rbi: s?.rbi ?? 0,
         runs: s?.runs ?? 0,
         sb: s?.sb ?? 0,
-        games: s?.games ?? 0,
+        games: ps?.games ?? s?.games ?? 0,
         hits: s?.hits ?? 0,
         obp: s?.obp ?? 0,
         slg: s?.slg ?? 0,
-        ...(ps && {
-          era: ps.era,
-          wins: ps.wins,
-          losses: ps.losses,
-          saves: ps.saves,
-          strikeouts: ps.strikeouts,
-          gamesStarted: ps.gamesStarted,
-        }),
+        isPitcher: pitcher,
+        wins: ps?.wins,
+        losses: ps?.losses,
+        era: ps?.era,
+        strikeouts: ps?.strikeouts,
+        saves: ps?.saves,
+        whip: ps?.whip,
+        winPct: ps?.winPct,
+        gamesStarted: ps?.gamesStarted,
       };
     });
-  }, [allAvailablePlayers, pitcherStatsMap, playerStatsMap]);
+  }, [availablePlayers, playerStatsMap, pitchingStatsMap]);
 
   // Position filtering is handled server-side via the position query variable.
   // enrichedPlayers already contains only the players matching the selected position.
@@ -822,36 +594,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const [commissionerPickMutation, { loading: commPickLoading }] =
     useMutation(COMMISSIONER_PICK);
   const [nudgeExpiredDraftPick] = useMutation(NUDGE_EXPIRED_DRAFT_PICK);
-  const [toggleDraftAutoPickMutation, { loading: autoPickLoading }] =
-    useMutation(TOGGLE_DRAFT_AUTO_PICK);
-
-  // ---- Player Pagination Helpers ----
-  /** Reset pagination and refetch player list from the start (call after picks). */
-  const resetAndRefetchPlayers = useCallback(() => {
-    isAppendingPlayers.current = false;
-    setPlayerOffset(0);
-    setAllAvailablePlayers([]);
-    void refetchAvailablePlayers({
-      offset: 0,
-      limit: PLAYER_PAGE_SIZE,
-    });
-  }, [refetchAvailablePlayers]);
-
-  /** Load the next page of players (called by "Load more" button). */
-  const handleLoadMorePlayers = useCallback(() => {
-    if (availablePlayersLoading || !hasMorePlayers) return;
-    isAppendingPlayers.current = true;
-    setPlayerOffset((prev) => prev + PLAYER_PAGE_SIZE);
-  }, [availablePlayersLoading, hasMorePlayers]);
 
   // ---- WebSocket ----
   const handleDraftStarted = useCallback(
     (notification: DraftStartedNotification) => {
       setLiveMessage('Draft has started!');
-      notify('🏈 Draft has started!', {
-        body: 'Get ready — your league draft is live.',
-        tag: 'draft-started',
-      });
       if (notification.pickTimeLimitSeconds) {
         setPickTimeLimitSeconds(notification.pickTimeLimitSeconds);
       }
@@ -861,27 +608,46 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       void refetchDraft();
       void refetchCurrentPick({ draftId: notification.draftId });
     },
-    [notify, refetchDraft, refetchCurrentPick],
+    [refetchDraft, refetchCurrentPick],
   );
 
   const handleDraftPickMade = useCallback(
     (notification: DraftPickNotification) => {
       const pickTeamId = normalizeTeamId(notification.teamId);
       const isMyTeamPick = pickTeamId !== null && pickTeamId === myTeamId;
-      // Use statsLookup (all players, including already-drafted ones) so that
-      // rapid auto-picks don't miss the announcement because the player was
-      // already removed from availablePlayers/enrichedPlayers by a concurrent
-      // refetch triggered by the previous pick notification.
-      const pickedPlayer = statsLookup.get(notification.playerId);
-      if (pickedPlayer) {
-        showAnnouncement(
-          pickedPlayer,
-          notification.overallPick,
-          isMyTeamPick,
-          notification.wasAutoPick ?? false,
-          notification.autoPickReason ?? null,
+
+      // ---- Pick notification (Issue E) – fire exactly once per pick ----
+      const pickKey = notification.overallPick;
+      if (!notifiedPicksRef.current.has(pickKey)) {
+        notifiedPicksRef.current.add(pickKey);
+
+        // Find the player in our lookup for rich notification text
+        const pickedPlayer =
+          enrichedPlayers.find((p) => p.id === notification.playerId) ??
+          statsLookup.get(notification.playerId);
+
+        const playerName =
+          pickedPlayer?.name ?? `Unknown (ID: ${notification.playerId})`;
+        const position = pickedPlayer?.position ?? '??';
+        const teamName = teamNameById(pickTeamId);
+
+        // Full-screen announcement for the pick
+        if (pickedPlayer) {
+          showAnnouncement(
+            pickedPlayer,
+            notification.overallPick,
+            isMyTeamPick,
+            false,
+          );
+        }
+
+        // Toast notification with Team, Player, Position, and Pick number
+        showToast(
+          `📋 Pick #${notification.overallPick}: ${playerName} (${position}) — ${teamName}`,
+          isMyTeamPick ? 'info' : 'info',
         );
       }
+
       setLiveMessage(
         `Pick #${notification.overallPick}: Round ${notification.round}, Pick ${notification.pickNumber}`,
       );
@@ -896,11 +662,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         );
         if (nextTeamId !== null && nextTeamId === myTeamId) {
           showToast('🎯 Your turn to pick!', 'info');
-          notify('🎯 Your turn to pick!', {
-            body: `Round ${notification.nextPick.round ?? ''} — you're on the clock. Head back to make your pick.`,
-            tag: 'draft-your-turn',
-            requireInteraction: true,
-          });
         }
       } else if (!notification.nextPick) {
         // No nextPick means draft may be complete
@@ -914,17 +675,18 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
       void refetchCurrentPick({ draftId: notification.draftId });
       void refetchPickHistory();
-      resetAndRefetchPlayers();
+      void refetchAvailablePlayers();
     },
     [
       myTeamId,
-      notify,
+      enrichedPlayers,
       statsLookup,
+      teamNameById,
       showAnnouncement,
       showToast,
       refetchCurrentPick,
       refetchPickHistory,
-      resetAndRefetchPlayers,
+      refetchAvailablePlayers,
     ],
   );
 
@@ -933,13 +695,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       setDraftComplete(true);
       setDraftPaused(false);
       setLiveMessage('Draft is complete!');
-      notify('✅ Draft complete!', {
-        body: 'Your league draft has finished. Check out your roster!',
-        tag: 'draft-complete',
-      });
       void refetchLeague();
     },
-    [notify, refetchLeague],
+    [refetchLeague],
   );
 
   const handleDraftPaused = useCallback(
@@ -994,7 +752,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       // Reconnected — reconcile missed events
       void refetchCurrentPick({ draftId });
       void refetchPickHistory();
-      resetAndRefetchPlayers();
+      void refetchAvailablePlayers();
       void refetchDraft();
     }
     wsWasConnected.current = wsConnected;
@@ -1003,7 +761,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     draftId,
     refetchCurrentPick,
     refetchPickHistory,
-    resetAndRefetchPlayers,
+    refetchAvailablePlayers,
     refetchDraft,
   ]);
 
@@ -1056,13 +814,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         // WebSocket event will handle UI updates for all clients
         void refetchCurrentPick({ draftId });
         void refetchPickHistory();
-        resetAndRefetchPlayers();
+        void refetchAvailablePlayers();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to make pick';
         // Handle specific error cases per the integration guide
         if (msg.includes('Player has already been drafted')) {
           showToast('Player already drafted — refreshing list', 'warning');
-          resetAndRefetchPlayers();
+          void refetchAvailablePlayers();
         } else if (
           msg.includes('not your turn') ||
           msg.includes('Not authorized')
@@ -1082,7 +840,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           showToast('Your roster is full!', 'error');
         } else if (msg.includes('player pool')) {
           showToast('Player is not in the allowed player pool', 'warning');
-          resetAndRefetchPlayers();
+          void refetchAvailablePlayers();
         } else {
           setUrgentMessage(
             isAutoPick
@@ -1100,7 +858,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       makeDraftPick,
       refetchCurrentPick,
       refetchPickHistory,
-      resetAndRefetchPlayers,
+      refetchAvailablePlayers,
       refetchLeague,
       showToast,
     ],
@@ -1151,13 +909,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         setCommPickMode(false);
         void refetchCurrentPick({ draftId });
         void refetchPickHistory();
-        resetAndRefetchPlayers();
+        void refetchAvailablePlayers();
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : 'Commissioner pick failed';
         if (msg.includes('Player has already been drafted')) {
           showToast('Player already drafted — refreshing list', 'warning');
-          resetAndRefetchPlayers();
+          void refetchAvailablePlayers();
         } else {
           showToast(msg, 'error');
         }
@@ -1169,39 +927,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       commissionerPickMutation,
       refetchCurrentPick,
       refetchPickHistory,
-      resetAndRefetchPlayers,
+      refetchAvailablePlayers,
       showToast,
     ],
   );
-
-  const handleToggleAutoPick = useCallback(async () => {
-    if (!draftId || autoPickLoading) return;
-    const newValue = !autoPickEnabled;
-    try {
-      await toggleDraftAutoPickMutation({
-        variables: { draftId, enable: newValue },
-      });
-      setAutoPickEnabled(newValue);
-      showToast(
-        newValue
-          ? "Auto-pick enabled — we'll pick for you!"
-          : 'Auto-pick disabled',
-        'info',
-      );
-      void refetchAutoPick();
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : 'Failed to toggle auto-pick';
-      showToast(msg, 'error');
-    }
-  }, [
-    draftId,
-    autoPickLoading,
-    autoPickEnabled,
-    toggleDraftAutoPickMutation,
-    showToast,
-    refetchAutoPick,
-  ]);
 
   // ---- Timer (client-side countdown for UX, not authoritative) ----
   // timeRemaining is computed from the server-assigned pickDeadline so it
@@ -1252,18 +981,31 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     pickDeadline,
   ]);
 
+  // ---- Sync deadline when the current pick advances (poll fallback) ----
+  // The GET_CURRENT_DRAFT_PICK query is polled every 5s.  When overallPick
+  // changes it means a pick happened.  If we missed the WebSocket notification
+  // for that pick, pickDeadline is stale and the timer is stuck at 0:00.
+  // Refetching the draft query here ensures we pick up the new deadline.
+  const prevOverallPickRef = useRef<number | null>(null);
+  useEffect(() => {
+    const current = currentPickInfo?.overallPick ?? null;
+    if (
+      current !== null &&
+      prevOverallPickRef.current !== null &&
+      current !== prevOverallPickRef.current
+    ) {
+      // Pick advanced — refetch draft to get the latest currentPickDeadline
+      void refetchDraft();
+    }
+    prevOverallPickRef.current = current;
+  }, [currentPickInfo?.overallPick, refetchDraft]);
+
   // ---- Server-side auto-pick nudge (any connected client) ----
   // When the timer expires, nudge the server to process the expired deadline.
   // The mutation is idempotent — concurrent calls from multiple clients are
   // harmless (FOR UPDATE + deadline re-check guards against duplicates).
   // A 2-second grace period avoids needlessly nudging when a WS notification
   // for a just-completed pick is already in-flight.
-  //
-  // After the mutation resolves we immediately refetch critical draft state so
-  // the UI updates as soon as the round-trip completes (~T+3s), rather than
-  // waiting for either a WebSocket notification (may be delayed) or the next
-  // 5-second poll cycle (worst-case T+7s). The WS handler still runs when the
-  // notification arrives, but Apollo deduplicates the concurrent requests.
   const nudgeAttemptRef = useRef<number | null>(null);
   useEffect(() => {
     nudgeAttemptRef.current = null;
@@ -1284,16 +1026,19 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       nudgeAttemptRef.current = pickNumber;
       void nudgeExpiredDraftPick({ variables: { leagueId } })
         .then(() => {
-          // Eagerly sync state once the server confirms the auto-pick so the
-          // board refreshes at mutation round-trip speed, not at the next WS
-          // delivery or poll cycle.
-          void refetchCurrentPick({ draftId });
+          // Refetch draft state so the timer picks up the new deadline,
+          // even if the WebSocket notification was lost or delayed.
+          void refetchDraft();
+          if (draftId) void refetchCurrentPick({ draftId });
           void refetchPickHistory();
           void refetchAvailablePlayers();
         })
         .catch(() => {
           // Swallow errors — the nudge is best-effort; EventBridge is the
           // fallback and the server is the source of truth.
+          // Still refetch to reconcile any state the client missed.
+          void refetchDraft();
+          if (draftId) void refetchCurrentPick({ draftId });
         });
     }, 2000);
 
@@ -1306,10 +1051,93 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     timeRemaining,
     currentPickInfo?.overallPick,
     nudgeExpiredDraftPick,
+    refetchDraft,
     refetchCurrentPick,
     refetchPickHistory,
     refetchAvailablePlayers,
   ]);
+
+  // ---- CPU auto-pick logic (Issue B) ----
+  // When the current pick belongs to a CPU-marked team, the commissioner's
+  // client fires a commissioner pick for the best available player.
+  // A ref-based guard prevents double-picks on re-renders.
+  useEffect(() => {
+    if (
+      !draftId ||
+      !currentPickInfo ||
+      currentPickInfo.isComplete ||
+      draftComplete ||
+      draftPaused ||
+      !isOwner ||
+      commPickLoading
+    )
+      return;
+
+    const currentTeamStr = String(currentPickTeamId);
+    if (!cpuTeamIds.has(currentTeamStr)) return;
+
+    // Guard: skip if we already initiated a pick for this overall pick
+    if (cpuPickInProgressRef.current === currentPickInfo.overallPick) return;
+
+    // Must have real available players to pick from
+    if (enrichedPlayers.length === 0) return;
+
+    // Mark in-progress immediately to prevent re-entry
+    cpuPickInProgressRef.current = currentPickInfo.overallPick;
+
+    // Deterministic best-available: enrichedPlayers is already sorted by the
+    // server (hitterAvgPointsPerGame or pitchingAvgPointsPerGame). Pick the
+    // first player whose name is not a placeholder.
+    const bestPlayer = enrichedPlayers.find(
+      (p) => p.name && !p.name.startsWith('Unknown Player'),
+    );
+
+    if (!bestPlayer) {
+      showToast('CPU: No real players available to pick', 'warning');
+      cpuPickInProgressRef.current = null;
+      return;
+    }
+
+    // Small delay (200ms) so the user can see the pick is about to happen
+    const timer = setTimeout(() => {
+      void commissionerPickMutation({
+        variables: { draftId, playerId: bestPlayer.id },
+      })
+        .then(() => {
+          void refetchCurrentPick({ draftId });
+          void refetchPickHistory();
+          void refetchAvailablePlayers();
+        })
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : 'CPU pick failed';
+          showToast(`CPU pick error: ${msg}`, 'error');
+          // Reset guard so a retry can occur
+          cpuPickInProgressRef.current = null;
+        });
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [
+    draftId,
+    currentPickInfo,
+    draftComplete,
+    draftPaused,
+    isOwner,
+    commPickLoading,
+    currentPickTeamId,
+    cpuTeamIds,
+    enrichedPlayers,
+    commissionerPickMutation,
+    refetchCurrentPick,
+    refetchPickHistory,
+    refetchAvailablePlayers,
+    showToast,
+  ]);
+
+  // Reset CPU pick guard when pick advances
+  useEffect(() => {
+    cpuPickInProgressRef.current = null;
+  }, [currentPickInfo?.overallPick]);
 
   // ---- A11y announcements ----
   useEffect(() => {
@@ -1350,6 +1178,20 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const gridCols =
     viewMode === 'grid' ? 'repeat(auto-fill, minmax(320px, 1fr))' : '1fr';
 
+  // Commentary for the pick announcement overlay
+  const announcementCommentary = useMemo(() => {
+    if (!announcement || !('name' in announcement.player)) return undefined;
+    const player = announcement.player;
+    const teamCount = leagueTeams.length > 0 ? leagueTeams.length : 12;
+    const announcementRound = Math.ceil(announcement.pickNumber / teamCount);
+    return getDraftCommentary(
+      player,
+      announcementRound,
+      announcement.isMyPick,
+      announcement.isAuto,
+    );
+  }, [announcement, leagueTeams.length]);
+
   // My team picks from history
   const myTeamPicks = useMemo(
     () => pickHistory.filter((p) => p.teamId === myTeamId),
@@ -1362,14 +1204,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       myTeamPicks.map((pick) => {
         const player = statsLookup.get(pick.playerId);
         if (player) return player;
-        // Fallback: use the player name returned directly from getDraftPicks
-        // (covers pitchers which have no careerBattingStats entry — LS-431)
-        const pickPlayerName = pick.player
-          ? `${pick.player.firstName} ${pick.player.lastName}`.trim()
-          : `Player #${pick.playerId}`;
         return {
           id: pick.playerId,
-          name: pickPlayerName,
+          name: `Unknown Player (ID: ${pick.playerId})`,
           position: 'UTIL',
           avg: 0,
           hr: 0,
@@ -1482,7 +1319,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           <button
             className="d-state-btn"
             onClick={() => {
-              resetAndRefetchPlayers();
+              void refetchAvailablePlayers();
             }}
           >
             Try Again
@@ -1571,25 +1408,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const draftStatus = league?.draftStatus;
 
   if (!draftId && draftStatus !== 'in-progress') {
-    // LS-423: if the draft has a scheduled start time and the room isn't open
-    // yet (>30 min before start), show the countdown screen instead of the lobby.
-    const scheduledAtRaw = (
-      leagueDraft as { scheduledAt?: string | null } | null
-    )?.scheduledAt;
-    const scheduledAt = scheduledAtRaw ? new Date(scheduledAtRaw) : null;
-    const draftRoomOpenAt = scheduledAt
-      ? new Date(scheduledAt.getTime() - 30 * 60 * 1000)
-      : null;
-    if (draftRoomOpenAt && new Date() < draftRoomOpenAt) {
-      return (
-        <ScheduledDraftCountdown
-          scheduledAt={scheduledAt!}
-          roomOpensAt={draftRoomOpenAt}
-          leagueName={league?.name ?? undefined}
-        />
-      );
-    }
-
     return (
       <div className="d-root">
         <style>{CSS}</style>
@@ -1607,11 +1425,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             {leagueTeams.length < 2
               ? 'At least 2 teams are required to start a draft. Invite more teams to your league.'
               : isOwner
-                ? 'As a league manager, you can start the live draft when all teams are ready.'
+                ? 'As the commissioner, you can start the live draft when all teams are ready.'
                 : 'Waiting for the commissioner to start the live draft.'}
           </div>
 
-          {/* Team list */}
+          {/* Team list with reorder (commissioner can set draft order) */}
           {leagueTeams.length > 0 && (
             <div style={{ maxWidth: 320, width: '100%', marginTop: 8 }}>
               <div
@@ -1624,9 +1442,15 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   marginBottom: 8,
                 }}
               >
-                Teams ({leagueTeams.length})
+                {isOwner ? 'Draft Order (drag to reorder)' : 'Teams'} (
+                {leagueTeams.length})
               </div>
-              {leagueTeams.map((team) => (
+              {(customDraftOrder
+                ? (customDraftOrder
+                    .map((id) => leagueTeams.find((t) => String(t.id) === id))
+                    .filter(Boolean) as LeagueTeam[])
+                : leagueTeams
+              ).map((team, idx, arr) => (
                 <div
                   key={team.id}
                   style={{
@@ -1641,12 +1465,106 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                       String(team.id) === String(myTeamId)
                         ? 'var(--d-accent)'
                         : 'var(--d-text)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
                   }}
                 >
-                  {team.name}{' '}
-                  {String(team.id) === String(myTeamId) ? '(You)' : ''}
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 11,
+                      color: 'var(--d-text-muted)',
+                      minWidth: 20,
+                    }}
+                  >
+                    {idx + 1}.
+                  </span>
+                  <span style={{ flex: 1 }}>
+                    {team.name}{' '}
+                    {String(team.id) === String(myTeamId) ? '(You)' : ''}
+                  </span>
+                  {isOwner && (
+                    <span style={{ display: 'flex', gap: 2 }}>
+                      <button
+                        style={{
+                          background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid var(--d-border)',
+                          borderRadius: 4,
+                          color: 'var(--d-text-secondary)',
+                          cursor: idx === 0 ? 'default' : 'pointer',
+                          opacity: idx === 0 ? 0.3 : 1,
+                          padding: '2px 6px',
+                          fontSize: 11,
+                          fontFamily: 'inherit',
+                        }}
+                        disabled={idx === 0}
+                        onClick={() => {
+                          const order =
+                            customDraftOrder ??
+                            leagueTeams.map((t) => String(t.id));
+                          const next = [...order];
+                          [next[idx - 1], next[idx]] = [
+                            next[idx],
+                            next[idx - 1],
+                          ];
+                          setCustomDraftOrder(next);
+                        }}
+                        aria-label={`Move ${team.name} up`}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        style={{
+                          background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid var(--d-border)',
+                          borderRadius: 4,
+                          color: 'var(--d-text-secondary)',
+                          cursor:
+                            idx === arr.length - 1 ? 'default' : 'pointer',
+                          opacity: idx === arr.length - 1 ? 0.3 : 1,
+                          padding: '2px 6px',
+                          fontSize: 11,
+                          fontFamily: 'inherit',
+                        }}
+                        disabled={idx === arr.length - 1}
+                        onClick={() => {
+                          const order =
+                            customDraftOrder ??
+                            leagueTeams.map((t) => String(t.id));
+                          const next = [...order];
+                          [next[idx], next[idx + 1]] = [
+                            next[idx + 1],
+                            next[idx],
+                          ];
+                          setCustomDraftOrder(next);
+                        }}
+                        aria-label={`Move ${team.name} down`}
+                      >
+                        ▼
+                      </button>
+                    </span>
+                  )}
                 </div>
               ))}
+              {isOwner && customDraftOrder && (
+                <button
+                  style={{
+                    marginTop: 4,
+                    background: 'transparent',
+                    border: '1px solid var(--d-border)',
+                    borderRadius: 6,
+                    color: 'var(--d-text-muted)',
+                    fontSize: 11,
+                    padding: '4px 10px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                  onClick={() => setCustomDraftOrder(null)}
+                >
+                  Reset to Default Order
+                </button>
+              )}
             </div>
           )}
 
@@ -1779,6 +1697,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               seconds={timeRemaining}
               isMyPick={isMyPick}
               pickTimeLimitSeconds={pickTimeLimitSeconds}
+              hasDeadline={pickDeadline !== null}
             />
           )}
           {draftPaused && (
@@ -1800,7 +1719,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           )}
 
           {/* Commissioner Controls */}
-          {isCommissioner && draftId && (
+          {isOwner && draftId && (
             <div className="d-comm-controls">
               <div className="d-comm-title">
                 <span role="img" aria-label="crown">
@@ -1847,6 +1766,53 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                 >
                   Click any player&apos;s Draft button to pick on behalf of the
                   current team
+                </div>
+              )}
+
+              {/* CPU Team Toggles */}
+              {leagueTeams.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: 1,
+                      textTransform: 'uppercase',
+                      color: 'var(--d-text-muted)',
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span role="img" aria-label="robot">
+                      🤖
+                    </span>{' '}
+                    CPU Teams (auto-pick)
+                  </div>
+                  {leagueTeams.map((team) => {
+                    const isCpu = cpuTeamIds.has(String(team.id));
+                    return (
+                      <button
+                        key={team.id}
+                        className={`d-comm-btn${isCpu ? ' success' : ''}`}
+                        style={{
+                          fontSize: 10,
+                          padding: '4px 8px',
+                          marginBottom: 2,
+                        }}
+                        onClick={() => {
+                          setCpuTeamIds((prev) => {
+                            const next = new Set(prev);
+                            if (isCpu) next.delete(String(team.id));
+                            else next.add(String(team.id));
+                            return next;
+                          });
+                        }}
+                      >
+                        {isCpu ? '✓ ' : ''}
+                        {team.name}
+                        {String(team.id) === String(myTeamId) ? ' (You)' : ''}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1924,70 +1890,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                     {currentPickTeamId}
                   </div>
                 )}
-              {/* Auto-pick toggle (LS-427) */}
-              {myTeamId !== null && !currentPickInfo.isComplete && (
-                <div
-                  style={{
-                    marginTop: 12,
-                    padding: '8px 12px',
-                    background: autoPickEnabled
-                      ? 'rgba(16,185,129,0.12)'
-                      : 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${autoPickEnabled ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                    borderRadius: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: autoPickEnabled
-                        ? '#10b981'
-                        : 'var(--d-text-muted)',
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    <span role="img" aria-label="robot">
-                      🤖
-                    </span>{' '}
-                    {autoPickEnabled
-                      ? 'Auto-pick ON — picks instantly on your turn'
-                      : 'Auto-pick: picks for you when your timer starts'}
-                  </div>
-                  <button
-                    onClick={() => void handleToggleAutoPick()}
-                    disabled={autoPickLoading}
-                    aria-pressed={autoPickEnabled}
-                    aria-label={
-                      autoPickEnabled ? 'Disable auto-pick' : 'Enable auto-pick'
-                    }
-                    style={{
-                      background: autoPickEnabled
-                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                        : 'rgba(255,255,255,0.08)',
-                      border: autoPickEnabled
-                        ? 'none'
-                        : '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: 6,
-                      padding: '4px 10px',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: autoPickEnabled
-                        ? '#fff'
-                        : 'var(--d-text-secondary)',
-                      cursor: autoPickLoading ? 'not-allowed' : 'pointer',
-                      opacity: autoPickLoading ? 0.6 : 1,
-                      whiteSpace: 'nowrap',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {autoPickLoading ? '...' : autoPickEnabled ? 'ON' : 'OFF'}
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
             <div className="d-panel" style={{ textAlign: 'center' }}>
@@ -2045,6 +1947,15 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Draft Intelligence (only when it's the user's turn) */}
+          {isMyPick && (
+            <DraftIntelligence
+              statsLookup={statsLookup}
+              pickHistory={pickHistory}
+              myTeamId={myTeamId}
+            />
           )}
 
           {/* My Roster */}
@@ -2181,10 +2092,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                       >
                         <span style={{ fontWeight: 600 }}>
                           #{pick.overallPick} —{' '}
-                          {player?.name ??
-                            (pick.player
-                              ? `${pick.player.firstName} ${pick.player.lastName}`.trim()
-                              : `Player #${pick.playerId}`)}
+                          {player?.name ?? `Unknown (ID: ${pick.playerId})`}
                         </span>
                         <span
                           style={{ color: 'var(--d-text-muted)', fontSize: 10 }}
@@ -2213,7 +2121,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           <button
             className="d-btn-glass"
             onClick={() => {
-              resetAndRefetchPlayers();
+              void refetchAvailablePlayers();
               if (draftId) void refetchCurrentPick({ draftId });
               void refetchPickHistory();
               void refetchLeague();
@@ -2225,6 +2133,38 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             &ensp;Refresh
           </button>
         </aside>
+
+        {/* ============================================================== */}
+        {/* MOBILE STICKY BANNER (visible ≤768px)                          */}
+        {/* ============================================================== */}
+        {currentPickInfo && (
+          <div className="d-mobile-banner" aria-label="Current pick info">
+            {draftPaused ? (
+              <div className="d-mobile-timer paused" aria-label="Draft paused">
+                ⏸
+              </div>
+            ) : (
+              <div
+                className={`d-mobile-timer${timeRemaining <= 10 ? ' danger' : timeRemaining <= 30 ? ' warn' : ' safe'}`}
+                aria-label={`${Math.floor(timeRemaining / 60)}:${(timeRemaining % 60).toString().padStart(2, '0')} remaining`}
+              >
+                {Math.floor(timeRemaining / 60)}:
+                {(timeRemaining % 60).toString().padStart(2, '0')}
+              </div>
+            )}
+            <div className="d-mobile-pick-info">
+              <div
+                className={`d-mobile-pick-team${isMyPick ? ' my-turn' : ''}`}
+              >
+                {isMyPick ? '🎯 YOUR PICK' : teamNameById(currentPickTeamId)}
+              </div>
+              <div className="d-mobile-pick-detail">
+                Pick #{currentPick} · Round {round} · Pick{' '}
+                {currentPickInfo.pickNumber}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ============================================================== */}
         {/* CENTER – PLAYER BOARD                                          */}
@@ -2346,12 +2286,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           {/* Board View (Team Columns) */}
           {viewMode === 'board' && (
             <DraftGrid
-              teams={orderedLeagueTeams}
+              teams={leagueTeams}
               picks={pickHistory}
               currentPickInfo={currentPickInfo}
               myTeamId={myTeamId}
               statsLookup={statsLookup}
-              autoPickTeamIds={autoPickTeamIds}
               maxRounds={
                 leagueTeams.length > 0
                   ? Math.max(
@@ -2361,9 +2300,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                       ),
                       currentPickInfo?.round ?? 1,
                       ...pickHistory.map((p) => p.round),
-                      numRounds,
+                      20,
                     )
-                  : numRounds
+                  : 20
               }
             />
           )}
@@ -2379,10 +2318,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   key={player.id}
                   player={player}
                   index={idx}
-                  isMyPick={commPickMode ? isCommissioner : isMyPick}
+                  isMyPick={commPickMode ? isOwner : isMyPick}
                   isWatched={watchlist.includes(player.id)}
                   onDraft={() => {
-                    if (commPickMode && isCommissioner) {
+                    if (commPickMode && isOwner) {
                       void handleCommissionerPick(player.id);
                     } else {
                       void handleMakePick(player.id);
@@ -2422,39 +2361,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   </div>
                 </div>
               )}
-
-              {/* Load More */}
-              {filteredPlayers.length > 0 &&
-                (hasMorePlayers || availablePlayersLoading) && (
-                  <div
-                    style={{
-                      gridColumn: '1 / -1',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      padding: '16px 0 8px',
-                    }}
-                  >
-                    <button
-                      className="d-btn-glass"
-                      disabled={availablePlayersLoading}
-                      onClick={handleLoadMorePlayers}
-                      style={{ minWidth: 140 }}
-                    >
-                      {availablePlayersLoading ? (
-                        <span>Loading&hellip;</span>
-                      ) : (
-                        <span>Load more players</span>
-                      )}
-                    </button>
-                  </div>
-                )}
             </div>
           )}
         </div>
       </div>
 
       {/* Paused Overlay */}
-      {draftPaused && !isCommissioner && (
+      {draftPaused && !isOwner && (
         <div className="d-paused-overlay" role="alert" aria-live="assertive">
           <div className="d-paused-card">
             <div className="d-paused-icon">
@@ -2478,8 +2391,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           pickNumber={announcement.pickNumber}
           isMyPick={announcement.isMyPick}
           isAuto={announcement.isAuto}
-          autoPickReason={announcement.autoPickReason}
           leaving={announcementLeaving}
+          commentary={announcementCommentary}
           onDismiss={() => {
             if (announcementTimerRef.current)
               clearTimeout(announcementTimerRef.current);
@@ -2507,20 +2420,6 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       {urgentMessage && !toastMessage && (
         <div className="d-toast error" role="alert" aria-live="assertive">
           {urgentMessage}
-        </div>
-      )}
-
-      {/* Chat Overlay */}
-      {chatOpen && leagueId !== null && (
-        <div
-          className="d-chat-overlay"
-          role="complementary"
-          aria-label="League chat"
-        >
-          <ChatPanel
-            leagueId={String(leagueId)}
-            onClose={() => setChatOpen(false)}
-          />
         </div>
       )}
 

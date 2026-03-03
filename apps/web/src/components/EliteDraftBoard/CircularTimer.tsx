@@ -9,15 +9,19 @@ export function CircularTimer({
   seconds,
   isMyPick,
   pickTimeLimitSeconds,
+  hasDeadline,
 }: {
   seconds: number;
   isMyPick: boolean;
   pickTimeLimitSeconds: number;
+  hasDeadline: boolean;
 }) {
-  const progress = seconds / pickTimeLimitSeconds;
-  const offset = TIMER_CIRCUMFERENCE * (1 - progress);
-  const stroke =
-    seconds <= 10
+  const noLimit = !hasDeadline || pickTimeLimitSeconds <= 0;
+  const progress = noLimit ? 1 : seconds / pickTimeLimitSeconds;
+  const offset = TIMER_CIRCUMFERENCE * (1 - Math.min(1, Math.max(0, progress)));
+  const stroke = noLimit
+    ? 'url(#timerSafe)'
+    : seconds <= 10
       ? 'url(#timerDanger)'
       : seconds <= 30
         ? 'url(#timerWarn)'
@@ -26,7 +30,7 @@ export function CircularTimer({
   const secs = seconds % 60;
 
   return (
-    <div className={`d-timer-wrap${seconds <= 10 ? ' warn' : ''}`}>
+    <div className={`d-timer-wrap${!noLimit && seconds <= 10 ? ' warn' : ''}`}>
       <svg
         viewBox="0 0 120 120"
         width="140"
@@ -63,7 +67,7 @@ export function CircularTimer({
           transform="rotate(-90 60 60)"
         />
         <text className="d-timer-text" x="60" y="56">
-          {mins}:{secs.toString().padStart(2, '0')}
+          {noLimit ? '∞' : `${mins}:${secs.toString().padStart(2, '0')}`}
         </text>
         <text className="d-timer-label" x="60" y="74">
           {isMyPick ? 'YOUR PICK' : 'WAITING'}

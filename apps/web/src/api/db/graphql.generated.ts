@@ -3987,6 +3987,31 @@ export type GetDraftPlayerStatsQuery = {
   } | null;
 };
 
+export type GetDraftPitchingStatsQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  minGames?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetDraftPitchingStatsQuery = {
+  __typename?: 'Query';
+  careerPitchingStats?: Array<{
+    __typename?: 'CareerPitching';
+    playerId?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    era?: string | null;
+    games?: number | null;
+    gamesStarted?: number | null;
+    strikeouts?: number | null;
+    saves?: number | null;
+    earnedRuns?: number | null;
+    baseOnBalls?: number | null;
+    outsRecorded?: number | null;
+    winPercentage?: number | null;
+    hits?: number | null;
+  }> | null;
+};
+
 export type GetUserTeamIdQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -10948,6 +10973,105 @@ export type GetDraftPlayerStatsSuspenseQueryHookResult = ReturnType<
 export type GetDraftPlayerStatsQueryResult = Apollo.QueryResult<
   GetDraftPlayerStatsQuery,
   GetDraftPlayerStatsQueryVariables
+>;
+export const GetDraftPitchingStats = gql`
+  query GetDraftPitchingStats($limit: Int, $minGames: Int) {
+    careerPitchingStats(limit: $limit, minGames: $minGames) {
+      playerId
+      wins
+      losses
+      era
+      games
+      gamesStarted
+      strikeouts
+      saves
+      earnedRuns
+      baseOnBalls
+      outsRecorded
+      winPercentage
+      hits
+    }
+  }
+`;
+
+/**
+ * __useGetDraftPitchingStatsQuery__
+ *
+ * To run a query within a React component, call `useGetDraftPitchingStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftPitchingStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftPitchingStatsQuery({
+ *   variables: {
+ *      limit: // value for 'limit'
+ *      minGames: // value for 'minGames'
+ *   },
+ * });
+ */
+export function useGetDraftPitchingStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetDraftPitchingStatsQuery,
+    GetDraftPitchingStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDraftPitchingStatsQuery,
+    GetDraftPitchingStatsQueryVariables
+  >(GetDraftPitchingStats, options);
+}
+export function useGetDraftPitchingStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftPitchingStatsQuery,
+    GetDraftPitchingStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDraftPitchingStatsQuery,
+    GetDraftPitchingStatsQueryVariables
+  >(GetDraftPitchingStats, options);
+}
+export function useGetDraftPitchingStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDraftPitchingStatsQuery,
+        GetDraftPitchingStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDraftPitchingStatsQuery,
+    GetDraftPitchingStatsQueryVariables
+  >(
+    GetDraftPitchingStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDraftPitchingStatsQuery,
+          GetDraftPitchingStatsQueryVariables
+        >,
+  );
+}
+export type GetDraftPitchingStatsQueryHookResult = ReturnType<
+  typeof useGetDraftPitchingStatsQuery
+>;
+export type GetDraftPitchingStatsLazyQueryHookResult = ReturnType<
+  typeof useGetDraftPitchingStatsLazyQuery
+>;
+export type GetDraftPitchingStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftPitchingStatsSuspenseQuery
+>;
+export type GetDraftPitchingStatsQueryResult = Apollo.QueryResult<
+  GetDraftPitchingStatsQuery,
+  GetDraftPitchingStatsQueryVariables
 >;
 export const GetUserTeamId = gql`
   query GetUserTeamId($leagueId: Int!) {
