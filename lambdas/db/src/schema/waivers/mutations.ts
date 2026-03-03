@@ -12,6 +12,7 @@ import { WaiverClaimProcessor } from '../../services/waiver-processor';
 import { assertAuthorized } from '../matchups/scheduled-mutations';
 import { builder } from '../builder';
 import { insertActivityLog } from '../../services/activity-log';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 // ── Mutation resolvers ─────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ builder.mutationField('cancelWaiverClaim', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const db = context.db;
@@ -44,7 +45,7 @@ builder.mutationField('cancelWaiverClaim', (t) =>
       const claim = existing[0];
 
       if (claim.userId !== userId) {
-        throw new Error('You can only cancel your own waiver claims');
+        throw ForbiddenError('You can only cancel your own waiver claims');
       }
 
       if (claim.status !== 'pending') {
@@ -108,7 +109,7 @@ builder.mutationField('claimFreeAgent', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { leagueId, playerId, dropPlayerId, faabBid } = args;
@@ -128,7 +129,7 @@ builder.mutationField('claimFreeAgent', (t) =>
         .limit(1);
 
       if (membership.length === 0 || !membership[0].teamId) {
-        throw new Error('You do not have a team in this league');
+        throw ForbiddenError('You do not have a team in this league');
       }
       const teamId = membership[0].teamId;
 

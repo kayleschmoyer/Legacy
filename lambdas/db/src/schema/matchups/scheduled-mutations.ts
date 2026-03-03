@@ -20,6 +20,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { builder, type Context } from '../builder';
 import { PlayoffService } from '../../services/playoff-service';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -98,12 +99,12 @@ export async function assertAuthorized(
 
   // For non-admin authenticated users, a specific leagueId is required
   if (!context.user) {
-    throw new Error('Unauthorized: system mutations require authentication.');
+    throw AuthenticationError('System mutations require authentication');
   }
 
   if (!leagueId) {
-    throw new Error(
-      'Unauthorized: only admins or system processes can trigger mutations for all leagues. Provide a leagueId to operate on your own league.',
+    throw ForbiddenError(
+      'Only admins or system processes can trigger mutations for all leagues. Provide a leagueId to operate on your own league.',
     );
   }
 
@@ -127,8 +128,8 @@ export async function assertAuthorized(
       membership.permissionLevel !== 'assistant_manager' &&
       membership.permissionLevel !== 'commissioner')
   ) {
-    throw new Error(
-      'Unauthorized: only the league General Manager or commissioner can trigger this mutation for their league.',
+    throw ForbiddenError(
+      'Only the league General Manager or commissioner can trigger this mutation for their league.',
     );
   }
 }

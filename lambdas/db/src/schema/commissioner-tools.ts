@@ -18,6 +18,7 @@ import { and, eq } from 'drizzle-orm';
 import { builder } from './builder';
 import { verifyCommissionerAccess } from './authorization';
 import { CommissionerAuditLog } from './leagues';
+import { AuthenticationError } from './graphql-errors';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ builder.mutationField('forceAddPlayer', (t) =>
       input: t.arg({ type: ForceAddPlayerInput, required: true }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) throw new Error('Authentication required');
+      if (!context.user) throw AuthenticationError();
 
       const { leagueId, teamId, playerId, reason } = args.input;
 
@@ -228,7 +229,7 @@ builder.mutationField('forceDropPlayer', (t) =>
       input: t.arg({ type: ForceDropPlayerInput, required: true }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) throw new Error('Authentication required');
+      if (!context.user) throw AuthenticationError();
 
       const { leagueId, teamId, playerId, reason } = args.input;
 
@@ -296,7 +297,7 @@ builder.mutationField('editMatchupScore', (t) =>
       input: t.arg({ type: EditMatchupScoreInput, required: true }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) throw new Error('Authentication required');
+      if (!context.user) throw AuthenticationError();
 
       const { matchupId, team1Score, team2Score, reason } = args.input;
 
@@ -373,7 +374,7 @@ builder.mutationField('swapMatchupTeams', (t) =>
       input: t.arg({ type: SwapMatchupTeamsInput, required: true }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) throw new Error('Authentication required');
+      if (!context.user) throw AuthenticationError();
 
       const { matchupId1, matchupId2, reason } = args.input;
 
@@ -490,7 +491,7 @@ builder.mutationField('updateCommissionerNote', (t) =>
       input: t.arg({ type: UpdateCommissionerNoteInput, required: true }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) throw new Error('Authentication required');
+      if (!context.user) throw AuthenticationError();
 
       const { leagueId, note } = args.input;
 
@@ -540,7 +541,7 @@ builder.mutationField('setTeamLock', (t) =>
       input: t.arg({ type: SetTeamLockInput, required: true }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) throw new Error('Authentication required');
+      if (!context.user) throw AuthenticationError();
 
       const { leagueId, teamId, locked, reason } = args.input;
 
@@ -610,7 +611,7 @@ builder.mutationField('bulkDropTeamPlayers', (t) =>
       input: t.arg({ type: BulkDropPlayersInput, required: true }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) throw new Error('Authentication required');
+      if (!context.user) throw AuthenticationError();
 
       const { leagueId, teamId, reason } = args.input;
 
@@ -691,7 +692,7 @@ builder.queryField('commissionerAuditLogs', (t) =>
       limit: t.arg.int({ required: false, defaultValue: 50 }),
     },
     resolve: async (_parent, args, context) => {
-      if (!context.user) throw new Error('Authentication required');
+      if (!context.user) throw AuthenticationError();
 
       const { leagueId, limit } = args;
 

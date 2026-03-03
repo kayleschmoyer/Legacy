@@ -1,6 +1,7 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { builder } from './builder';
+import { AuthenticationError } from './graphql-errors';
 
 /**
  * Team Statistics Type for Analytics
@@ -178,7 +179,7 @@ builder.queryField('getTeamStatistics', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Get all teams for the league
@@ -236,7 +237,7 @@ builder.queryField('getHeadToHeadRecord', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Get team names
@@ -298,7 +299,7 @@ builder.queryField('getPowerRankings', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Get all teams
@@ -346,7 +347,7 @@ builder.queryField('getPlayoffProjections', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Get all teams
@@ -394,7 +395,7 @@ builder.queryField('getLeagueAnalytics', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Get league info

@@ -37,6 +37,7 @@
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { and, count, eq, inArray, or } from 'drizzle-orm';
 import type { Context } from './builder';
+import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export type AuthorizedHandler<TParent, TArgs, TResult> = (
  */
 export function requireAuth(context: Context): AuthenticatedUser {
   if (!context.user) {
-    throw new Error('Authentication required');
+    throw AuthenticationError();
   }
   return context.user as AuthenticatedUser;
 }
@@ -227,7 +228,7 @@ export async function verifyLeagueMembership(
 ): Promise<LeagueMembership> {
   const membership = await getLeagueMembership(db, leagueId, userId);
   if (!membership) {
-    throw new Error('User is not a member of this league');
+    throw ForbiddenError('User is not a member of this league');
   }
   return membership;
 }
@@ -244,7 +245,7 @@ export async function verifyCommissionerAccess(
 ): Promise<LeagueMembership> {
   const membership = await verifyLeagueMembership(db, leagueId, userId);
   if (!isCommissionerOrOwner(membership)) {
-    throw new Error(
+    throw ForbiddenError(
       'Only a league General Manager or commissioner can perform this action',
     );
   }
@@ -287,7 +288,7 @@ export async function verifyTeamEditAccess(
     return;
   }
 
-  throw new Error(
+  throw ForbiddenError(
     'You do not have permission to edit this roster. Only the General Manager or a league commissioner can make roster changes.',
   );
 }

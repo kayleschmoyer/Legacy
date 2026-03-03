@@ -1,5 +1,5 @@
-﻿/**
- * Matchups domain â€” mutation fields
+/**
+ * Matchups domain — mutation fields
  */
 
 import {
@@ -21,6 +21,7 @@ import {
 import { builder, Context } from '../builder';
 import { verifyCommissionerAccess } from '../authorization';
 import { MatchupService } from '../../services/matchup-service';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 export { createAllMatchupsForLeague };
 
@@ -33,7 +34,7 @@ builder.mutationField('createMatchup', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Only admins and league commissioners/GMs may create matchups
@@ -96,7 +97,7 @@ builder.mutationField('updateMatchupScore', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Score updates are performed by the scoring system (admin / system requests only)
@@ -140,7 +141,7 @@ builder.mutationField('updateMatchupStatus', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Status transitions are controlled by the system or admins only
@@ -165,7 +166,7 @@ builder.mutationField('updateMatchupStatus', (t) =>
   }),
 );
 
-// â”€â”€ Matchup Roster Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Matchup Roster Mutations ───────────────────────────────────────────────
 
 /**
  * Helper: Verify that the calling user owns the team in this matchup.
@@ -190,7 +191,7 @@ async function verifyMatchupTeamOwnership(
   };
 }> {
   if (!context.user) {
-    throw new Error('Authentication required');
+    throw AuthenticationError();
   }
 
   // Get the matchup player
@@ -246,7 +247,7 @@ async function verifyMatchupTeamOwnership(
     .limit(1);
 
   if (memberResult.length === 0) {
-    throw new Error('Not a member of this league');
+    throw ForbiddenError('Not a member of this league');
   }
 
   const isCommissioner =
@@ -255,7 +256,7 @@ async function verifyMatchupTeamOwnership(
     memberResult[0].permissionLevel === 'assistant_manager';
 
   if (!isCommissioner && memberResult[0].teamId !== matchupPlayer.teamId) {
-    throw new Error('You can only modify your own team roster');
+    throw ForbiddenError('You can only modify your own team roster');
   }
 
   return { matchupPlayer, matchup };
@@ -345,7 +346,7 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { matchupPlayerIdA, positionIdA, matchupPlayerIdB, positionIdB } =
@@ -455,7 +456,7 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
   }),
 );
 
-// â”€â”€ Create All Matchups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Create All Matchups ────────────────────────────────────────────────────
 
 // populateMatchupPlayersAndSeasons and createAllMatchupsForLeague are now
 // implemented in @legacy-sports/db-client (lib/db-client/src/lib/matchup-utils.ts)
@@ -482,7 +483,7 @@ export async function adjustMatchupsForNewTotal(
   );
 
   if (highestWeek === 0 && existingMatchups.length === 0) {
-    // No matchups exist yet â€” nothing to adjust
+    // No matchups exist yet — nothing to adjust
     return { added: 0, removed: 0 };
   }
 
@@ -562,7 +563,7 @@ export async function adjustMatchupsForNewTotal(
     return { added: insertedMatchups.length, removed: 0 };
   } else {
     // Need to remove weeks from the top
-    // Only remove 'scheduled' matchups â€” refuse to delete completed/in-progress
+    // Only remove 'scheduled' matchups — refuse to delete completed/in-progress
 
     // Find weeks that can be removed (only scheduled, from highest down)
     const removableWeeks: number[] = [];
@@ -575,7 +576,7 @@ export async function adjustMatchupsForNewTotal(
           leagueId,
           weekNumber: w,
         });
-        break; // Stop removing â€” can't skip completed weeks
+        break; // Stop removing — can't skip completed weeks
       }
       removableWeeks.push(w);
     }
@@ -637,7 +638,7 @@ builder.mutationField('createAllMatchups', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const leagueId = args.leagueId;

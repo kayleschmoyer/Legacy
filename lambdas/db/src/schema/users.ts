@@ -4,6 +4,7 @@ import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
 import { requireAuth } from './authorization';
 import { getJwtSecret } from '../server/context';
+import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
 // Create a single database service instance to reuse across all resolvers
 const dbService = createDatabaseService(getDbOptions());
@@ -41,7 +42,7 @@ builder.queryField('users', (t) =>
       // Admin only — this endpoint lists all users with their email addresses
       const user = requireAuth(context);
       if (!user.isAdmin) {
-        throw new Error('Admin access required to list all users');
+        throw ForbiddenError('Admin access required to list all users');
       }
 
       const orderBy = args.orderBy as 'id' | 'email' | 'username' | undefined;
@@ -101,7 +102,7 @@ builder.queryField('userByEmail', (t) =>
       // Admin only — looking up users by email exposes PII
       const authedUser = requireAuth(context);
       if (!authedUser.isAdmin) {
-        throw new Error('Admin access required to look up users by email');
+        throw ForbiddenError('Admin access required to look up users by email');
       }
 
       // Using shared dbService instance
@@ -162,7 +163,7 @@ builder.mutationField('updateUserRole', (t) =>
     },
     resolve: async (parent, { userId, accessLevel }, context) => {
       if (!context.user?.isAdmin) {
-        throw new Error('Admin access required to update user roles');
+        throw ForbiddenError('Admin access required to update user roles');
       }
       if (accessLevel !== 'none' && accessLevel !== 'admin') {
         throw new Error('accessLevel must be "none" or "admin"');
@@ -196,7 +197,7 @@ builder.mutationField('updateUserAvatar', (t) =>
     },
     resolve: async (parent, { avatarUrl }, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const url = avatarUrl ?? null;
@@ -248,7 +249,7 @@ builder.mutationField('impersonateUser', (t) =>
     },
     resolve: async (parent, { userId }, context) => {
       if (!context.user?.isAdmin) {
-        throw new Error('Forbidden: admin access required');
+        throw ForbiddenError('Forbidden: admin access required');
       }
 
       const targetUser = await dbService.users.getUserById(userId);

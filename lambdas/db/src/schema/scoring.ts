@@ -13,6 +13,7 @@ import type {
   ScoringStatGroup,
 } from '@legacy-sports/db-client';
 import { builder } from './builder';
+import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
 const dbService = createDatabaseService(getDbOptions());
 
@@ -166,7 +167,7 @@ async function ensureLeagueAccess(
     .limit(1);
 
   if (membership.length === 0) {
-    throw new Error('Access denied: You are not a member of this league');
+    throw ForbiddenError('Access denied: You are not a member of this league');
   }
 }
 
@@ -195,8 +196,8 @@ async function ensureLeagueCommissionerAccess(
     membership[0]?.permissionLevel !== 'assistant_manager' &&
     membership[0]?.permissionLevel !== 'commissioner'
   ) {
-    throw new Error(
-      'Access denied: Commissioner or General Manager role required to update scoring profile',
+    throw ForbiddenError(
+      'Commissioner or General Manager role required to update scoring profile',
     );
   }
 }
@@ -426,7 +427,9 @@ builder.queryField('leagueScoringProfile', (t) =>
     },
     resolve: async (_, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required to fetch scoring profile');
+        throw AuthenticationError(
+          'Authentication required to fetch scoring profile',
+        );
       }
 
       await ensureLeagueAccess(context.db, args.leagueId, context.user.id);
@@ -447,7 +450,9 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
     },
     resolve: async (_, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required to update scoring profile');
+        throw AuthenticationError(
+          'Authentication required to update scoring profile',
+        );
       }
 
       const updates = (args.updates ?? []).filter(

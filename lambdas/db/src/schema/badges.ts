@@ -16,6 +16,7 @@ import {
 import { getDbOptions } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
+import { AuthenticationError } from './graphql-errors';
 
 // Module-level singleton (mirrors pattern in notifications.ts)
 const badgeService = createBadgeService(getDbOptions());
@@ -200,7 +201,7 @@ builder.mutationField('evaluateDraftBadges', (t) =>
     },
     resolve: async (_root, { leagueId }, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       LOGGER.info('Evaluating draft badges', {
@@ -234,7 +235,7 @@ builder.mutationField('evaluateMatchupBadges', (t) =>
     },
     resolve: async (_root, { matchupId }, context) => {
       if (!context.user && !context.isSystemRequest) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       LOGGER.info('Evaluating matchup badges', { matchupId });
@@ -267,7 +268,7 @@ builder.mutationField('awardLeagueChampionBadge', (t) =>
     },
     resolve: async (_root, { leagueId, teamId, userId }, context) => {
       if (!context.user && !context.isSystemRequest) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       await badgeService.awardLeagueChampion(userId, teamId, leagueId);
@@ -297,7 +298,7 @@ builder.mutationField('awardPlayoffAppearanceBadges', (t) =>
     },
     resolve: async (_root, { leagueId, teamIds }, context) => {
       if (!context.user && !context.isSystemRequest) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       await badgeService.awardPlayoffAppearances(leagueId, teamIds);

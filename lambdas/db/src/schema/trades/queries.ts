@@ -11,6 +11,7 @@ import { and, eq, inArray, or } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
 import { builder, type Context } from '../builder';
+import { AuthenticationError } from '../graphql-errors';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ builder.queryField('leagueTradeOffers', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { leagueId } = args;
@@ -154,7 +155,7 @@ builder.queryField('teamTradeOffers', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { teamId } = args;

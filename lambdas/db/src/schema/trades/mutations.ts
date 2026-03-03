@@ -15,6 +15,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { TradeOffer } from './types';
 import { builder, type Context } from '../builder';
 import { insertActivityLog } from '../../services/activity-log';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 // ── Helper: fetch and enrich a single trade ────────────────────────────────
 
@@ -98,7 +99,7 @@ async function resolveUserTeam(
     .limit(1);
 
   if (!membership?.teamId) {
-    throw new Error('You do not have a team in this league');
+    throw ForbiddenError('You do not have a team in this league');
   }
 
   return membership.teamId;
@@ -247,7 +248,7 @@ builder.mutationField('proposeTrade', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const {
@@ -499,7 +500,7 @@ builder.mutationField('acceptTrade', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const userId = context.user.id;
@@ -646,7 +647,7 @@ builder.mutationField('rejectTrade', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const userId = context.user.id;
@@ -720,7 +721,7 @@ builder.mutationField('cancelTrade', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const userId = context.user.id;
@@ -752,7 +753,9 @@ builder.mutationField('cancelTrade', (t) =>
         .limit(1);
 
       if (!membership?.teamId || membership.teamId !== trade.proposingTeamId) {
-        throw new Error('Only the team that proposed this trade can cancel it');
+        throw ForbiddenError(
+          'Only the team that proposed this trade can cancel it',
+        );
       }
 
       await db
@@ -795,7 +798,7 @@ builder.mutationField('vetoTrade', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const userId = context.user.id;

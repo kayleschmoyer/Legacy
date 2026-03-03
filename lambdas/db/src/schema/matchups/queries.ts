@@ -16,6 +16,7 @@ import {
   TeamStanding,
 } from './types';
 import { builder } from '../builder';
+import { AuthenticationError } from '../graphql-errors';
 
 // Query: getMatchupById
 builder.queryField('getMatchupById', (t) =>
@@ -27,7 +28,7 @@ builder.queryField('getMatchupById', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const results = await context.db
@@ -51,7 +52,7 @@ builder.queryField('getMatchupsForLeague', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const conditions = [eq(PublicSchema.matchups.leagueId, args.leagueId)];
@@ -78,7 +79,7 @@ builder.queryField('getCurrentMatchupForLeague', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Get the current matchup ID from the league
@@ -113,7 +114,7 @@ builder.queryField('getMatchupsByWeek', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       return await context.db
@@ -143,7 +144,7 @@ builder.queryField('getLeagueStandings', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { StandingsService } =
@@ -171,7 +172,7 @@ builder.queryField('getHeadToHeadRecord', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { StandingsService } =
@@ -196,7 +197,7 @@ builder.queryField('getSeasonResults', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { StandingsService } =
@@ -225,7 +226,7 @@ builder.queryField('getPlayoffRace', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { StandingsService } =
@@ -256,7 +257,7 @@ builder.queryField('getMatchupHistory', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { StandingsService } =
@@ -283,7 +284,7 @@ builder.queryField('getTeamRecentMatchups', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { StandingsService } =
@@ -308,7 +309,7 @@ builder.queryField('getMatchupStatusCounts', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { StandingsService } =
@@ -333,7 +334,7 @@ builder.queryField('getPowerRankings', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { StandingsService } =
@@ -363,7 +364,7 @@ builder.queryField('getMatchupPlayers', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Get matchup metadata for season lookup
@@ -441,7 +442,7 @@ builder.queryField('getMatchupRoster', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Get matchup metadata
@@ -521,7 +522,7 @@ builder.queryField('getTeamMatchupHistory', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const query = context.db

@@ -9,6 +9,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { PublicSchema } from '@legacy-sports/db-client';
 import { and, eq } from 'drizzle-orm';
 import { builder } from './builder';
+import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
 // ─── Achievement type constants ───────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ builder.queryField('achievementRestrictions', (t) =>
     },
     resolve: async (_root, { leagueId }, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const rows = await context.db
@@ -167,7 +168,7 @@ builder.mutationField('upsertAchievementRestriction', (t) =>
     },
     resolve: async (_root, { input }, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const {
@@ -200,7 +201,7 @@ builder.mutationField('upsertAchievementRestriction', (t) =>
         .limit(1);
 
       if (!membership) {
-        throw new Error('You are not a member of this league');
+        throw ForbiddenError('You are not a member of this league');
       }
 
       // Derive isRepeatable from the known type catalogue
@@ -264,7 +265,7 @@ builder.mutationField('deleteAchievementRestriction', (t) =>
     },
     resolve: async (_root, { leagueId, achievementType }, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Verify access
@@ -280,7 +281,7 @@ builder.mutationField('deleteAchievementRestriction', (t) =>
         .limit(1);
 
       if (!membership) {
-        throw new Error('You are not a member of this league');
+        throw ForbiddenError('You are not a member of this league');
       }
 
       await context.db

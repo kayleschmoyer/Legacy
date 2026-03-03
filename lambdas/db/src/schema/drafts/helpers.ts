@@ -4,6 +4,7 @@
 
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { and, asc, eq } from 'drizzle-orm';
+import { ForbiddenError } from '../graphql-errors';
 
 /**
  * Calculate current pick information based on draft settings
@@ -94,6 +95,6 @@ export async function verifyLeagueMembership(
     .limit(1);
 
   if (!membership) {
-    throw new Error('You are not a member of this league');
+    throw ForbiddenError('You are not a member of this league');
   }
 }

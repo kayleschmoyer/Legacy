@@ -24,6 +24,7 @@ import {
 } from './types';
 import { builder } from '../builder';
 import { adjustMatchupsForNewTotal } from '../matchups/mutations';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 // League service instance for create operations
 const leagueService = createLeagueService(getDbOptions());
@@ -147,7 +148,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
 
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to create a league');
+        throw AuthenticationError('Authentication required to create a league');
       }
 
       const {
@@ -252,7 +253,9 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated and has General Manager access
       if (!context.user) {
-        throw new Error('Authentication required to add positions to league');
+        throw AuthenticationError(
+          'Authentication required to add positions to league',
+        );
       }
 
       const { leagueId } = args;
@@ -273,7 +276,7 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
           .limit(1);
 
         if (leagueAccess.length === 0) {
-          throw new Error(
+          throw ForbiddenError(
             'Only the league General Manager can add positions to a league',
           );
         }
@@ -345,7 +348,7 @@ builder.mutationField('startDraft', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to start draft');
+        throw AuthenticationError('Authentication required to start draft');
       }
 
       const { leagueId } = args;
@@ -433,7 +436,7 @@ builder.mutationField('joinLeagueByCode', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to join a league');
+        throw AuthenticationError('Authentication required to join a league');
       }
 
       const { inviteCode, teamName } = args;
@@ -589,7 +592,7 @@ builder.mutationField('createLeague', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const userId = context.user.id;
@@ -627,7 +630,7 @@ builder.mutationField('joinLeague', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const userId = context.user.id;
@@ -763,7 +766,7 @@ builder.mutationField('deleteLeague', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to delete league');
+        throw AuthenticationError('Authentication required to delete league');
       }
 
       try {
@@ -783,11 +786,11 @@ builder.mutationField('deleteLeague', (t) =>
 
         // Check if user is the General Manager or admin
         if (!context.user) {
-          throw new Error('User not authenticated');
+          throw AuthenticationError('User not authenticated');
         }
 
         if (league[0].owner !== context.user.id && !context.user.isAdmin) {
-          throw new Error(
+          throw ForbiddenError(
             'Only the league owner or admin can delete this league',
           );
         }
@@ -821,7 +824,7 @@ builder.mutationField('deleteAllLeagues', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to delete leagues');
+        throw AuthenticationError('Authentication required to delete leagues');
       }
 
       try {
@@ -902,7 +905,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const {
@@ -937,7 +940,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
         .limit(1);
 
       if (membership.length === 0) {
-        throw new Error('You are not a member of this league');
+        throw ForbiddenError('You are not a member of this league');
       }
 
       // Both 'general_manager' and 'commissioner' can update settings
@@ -1302,7 +1305,7 @@ builder.mutationField('joinPublicLeague', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required to join a league');
+        throw AuthenticationError('Authentication required to join a league');
       }
 
       const { leagueId, teamName } = args;

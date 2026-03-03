@@ -7,6 +7,7 @@
 import type { Team as DbTeam } from '@legacy-sports/db-client';
 import { builder } from '../builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from '../scoring';
+import { AuthenticationError } from '../graphql-errors';
 
 // Default roster positions for new leagues
 // These represent a standard fantasy baseball roster configuration
@@ -121,7 +122,9 @@ League.implement({
       type: ScoringConfigRef,
       resolve: async (parent, args, context) => {
         if (!context.user) {
-          throw new Error('Authentication required to fetch scoring settings');
+          throw AuthenticationError(
+            'Authentication required to fetch scoring settings',
+          );
         }
 
         return loadLeagueScoringConfig(parent.id);

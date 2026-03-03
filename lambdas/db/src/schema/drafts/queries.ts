@@ -14,6 +14,7 @@ import {
   DraftTeamOrderEntry,
 } from './types';
 import { builder } from '../builder';
+import { AuthenticationError } from '../graphql-errors';
 
 /**
  * Query: Get draft by ID
@@ -27,7 +28,7 @@ builder.queryField('getDraft', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const [draft] = await context.db
@@ -58,7 +59,7 @@ builder.queryField('getLeagueDraft', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Verify user is a member of this league
@@ -88,7 +89,7 @@ builder.queryField('getCurrentDraftPick', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Verify user is a member of the league owning this draft
@@ -118,7 +119,7 @@ builder.queryField('getDraftPicks', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Verify user is a member of the league owning this draft
@@ -162,7 +163,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { draftId, search, position, orderBy, limit: resultLimit } = args;

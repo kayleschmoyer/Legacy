@@ -9,6 +9,7 @@ import { getDbOptions } from '@legacy-sports/utils';
 import { eq } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
+import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
 // Create database service instance - used in GraphQL resolvers
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -270,7 +271,7 @@ builder.queryFields((t) => ({
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const gameState = await SeasonDraftGameService.getGameState(
@@ -287,7 +288,7 @@ builder.queryFields((t) => ({
     description: 'Get all Season Draft Games for the current user',
     resolve: async (_parent, _args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       return await SeasonDraftGameService.getGamesForUser(
@@ -305,7 +306,7 @@ builder.queryFields((t) => ({
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Get the player's unfilled slots
@@ -354,7 +355,7 @@ builder.queryFields((t) => ({
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       return await SeasonDraftGameService.getStatValueForPlayerSeasonPosition(
@@ -401,7 +402,7 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const numPlayers = args.playerNames.length;
@@ -435,7 +436,7 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Verify the user is the game creator
@@ -449,7 +450,7 @@ builder.mutationFields((t) => ({
       }
 
       if (gameState.createdBy !== context.user.id) {
-        throw new Error('Only the game creator can start the game');
+        throw ForbiddenError('Only the game creator can start the game');
       }
 
       if (gameState.status !== 'setup') {
@@ -474,7 +475,7 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       await SeasonDraftGameService.makePick(context.db, {
@@ -500,7 +501,7 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Check if player already has stats
@@ -589,7 +590,7 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       await SeasonDraftGameService.cancelGame(

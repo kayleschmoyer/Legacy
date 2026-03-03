@@ -28,6 +28,7 @@ import { and, count, eq, inArray, lte, sql } from 'drizzle-orm';
 import { getCurrentDraftPickInfo } from './helpers';
 import { builder, type Context } from '../builder';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 /**
  * Lighter auth check for the draft auto-pick nudge.
@@ -46,12 +47,12 @@ async function assertLeagueMemberOrSystem(
   if (context.user?.isAdmin) return;
 
   if (!context.user) {
-    throw new Error('Unauthorized: authentication required.');
+    throw AuthenticationError();
   }
 
   if (!leagueId) {
-    throw new Error(
-      'Unauthorized: only system processes can trigger for all leagues. Provide a leagueId.',
+    throw ForbiddenError(
+      'Only system processes can trigger for all leagues. Provide a leagueId.',
     );
   }
 
@@ -68,7 +69,7 @@ async function assertLeagueMemberOrSystem(
     .limit(1);
 
   if (membership.length === 0) {
-    throw new Error('Unauthorized: you are not a member of this league.');
+    throw ForbiddenError('You are not a member of this league');
   }
 }
 

@@ -1,6 +1,7 @@
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
+import { AuthenticationError } from './graphql-errors';
 
 // Create a single database service instance to reuse across all resolvers
 const dbService = createDatabaseService(getDbOptions());
@@ -160,7 +161,7 @@ builder.queryField('myConsents', (t) =>
     description: 'Get all consent records for the authenticated user',
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       return dbService.gdpr.getUserConsents(context.user.id);
     },
@@ -174,7 +175,7 @@ builder.queryField('myDataRequests', (t) =>
       'Get all data export/deletion requests for the authenticated user',
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       return dbService.gdpr.getUserDataRequests(context.user.id);
     },
@@ -188,7 +189,7 @@ builder.queryField('privacyPolicyStatus', (t) =>
       'Check if the authenticated user has accepted the privacy policy',
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       const accepted = await dbService.gdpr.hasAcceptedPrivacyPolicy(
         context.user.id,
@@ -212,7 +213,7 @@ builder.mutationField('recordConsent', (t) =>
     },
     resolve: async (parent, { input }, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       return dbService.gdpr.recordConsent({
         userId: context.user.id,
@@ -234,7 +235,7 @@ builder.mutationField('revokeConsent', (t) =>
     },
     resolve: async (parent, { consentType }, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       return dbService.gdpr.revokeConsent(context.user.id, consentType);
     },
@@ -247,7 +248,7 @@ builder.mutationField('acceptPrivacyPolicy', (t) =>
     description: 'Record that the user has accepted the privacy policy',
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       await dbService.gdpr.acceptPrivacyPolicy(context.user.id);
       return { accepted: true, acceptedAt: new Date().toISOString() };
@@ -262,7 +263,7 @@ builder.mutationField('requestDataExport', (t) =>
       'Request an export of all personal data (GDPR Art. 15 - Right of Access)',
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       return dbService.gdpr.requestDataExport(context.user.id);
     },
@@ -276,7 +277,7 @@ builder.mutationField('requestDataDeletion', (t) =>
       'Request deletion of all personal data (GDPR Art. 17 - Right to Erasure)',
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       return dbService.gdpr.requestDataDeletion(context.user.id);
     },
@@ -290,7 +291,7 @@ builder.queryField('exportMyData', (t) =>
       'Get a complete export of all personal data for the authenticated user',
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       const data = await dbService.gdpr.collectUserData(context.user.id);
       return {

@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues/types';
 import { insertActivityLog } from '../services/activity-log';
+import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
 /**
  * Chat System & Tiebreaker Rules Schema (LS-90)
@@ -461,7 +462,7 @@ builder.queryField('getMatchupMessages', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const query = context.db
@@ -490,7 +491,7 @@ builder.queryField('getTiebreakerRules', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const results = await context.db
@@ -519,7 +520,7 @@ builder.queryField('getTiebreakerHistory', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       if (!args.matchupId && !args.leagueId) {
@@ -579,7 +580,7 @@ builder.queryField('getLeagueMessages', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Verify caller is a member of the league
@@ -595,7 +596,7 @@ builder.queryField('getLeagueMessages', (t) =>
         .limit(1);
 
       if (membership.length === 0) {
-        throw new Error('Not a member of this league');
+        throw ForbiddenError('Not a member of this league');
       }
 
       const query = context.db
@@ -630,7 +631,7 @@ builder.queryField('getDirectMessages', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const selfId = context.user.id;
@@ -698,7 +699,7 @@ builder.mutationField('sendMatchupMessage', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Get matchup to verify it exists and get leagueId
@@ -749,7 +750,7 @@ builder.mutationField('createTiebreakerRules', (t) =>
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const results = await context.db
@@ -785,7 +786,7 @@ builder.mutationField('sendLeagueMessage', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const gifUrl = args.gifUrl?.trim() ?? null;
@@ -810,7 +811,7 @@ builder.mutationField('sendLeagueMessage', (t) =>
         .limit(1);
 
       if (membership.length === 0) {
-        throw new Error('Not a member of this league');
+        throw ForbiddenError('Not a member of this league');
       }
 
       // Persist the message
@@ -877,7 +878,7 @@ builder.queryField('getLeagueAnnouncements', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       // Verify caller is a member of the league
@@ -893,7 +894,7 @@ builder.queryField('getLeagueAnnouncements', (t) =>
         .limit(1);
 
       if (membership.length === 0) {
-        throw new Error('Not a member of this league');
+        throw ForbiddenError('Not a member of this league');
       }
 
       const results = await context.db
@@ -933,7 +934,7 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const text = args.messageText.trim();
@@ -956,7 +957,7 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
       }
 
       if (leagueRows[0].owner !== context.user.id) {
-        throw new Error('Only the commissioner can post announcements');
+        throw ForbiddenError('Only the commissioner can post announcements');
       }
 
       // Persist the announcement
@@ -1029,7 +1030,7 @@ builder.mutationField('sendDirectMessage', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       if (args.toUserId === context.user.id) {

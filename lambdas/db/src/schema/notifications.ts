@@ -1,6 +1,7 @@
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
+import { AuthenticationError } from './graphql-errors';
 
 // Create a single database service instance to reuse across all resolvers
 const dbService = createDatabaseService(getDbOptions());
@@ -169,7 +170,7 @@ builder.queryField('getUserNotificationPreferences', (t) =>
     resolve: async (parent, args, context) => {
       // Security: Derive userId from authenticated context (not from arguments)
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       const userId = context.user.id;
 
@@ -203,7 +204,7 @@ builder.queryField('getNotificationHistory', (t) =>
     resolve: async (parent, { limit, offset }, context) => {
       // Security: Derive userId from authenticated context (not from arguments)
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       const userId = context.user.id;
       const history = await dbService.notifications.getNotificationHistory(
@@ -234,7 +235,7 @@ builder.queryField('getUnreadNotificationCount', (t) =>
     resolve: async (parent, args, context) => {
       // Security: Derive userId from authenticated context (not from arguments)
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       const userId = context.user.id;
 
@@ -249,7 +250,7 @@ builder.queryField('getUserDeviceTokens', (t) =>
     resolve: async (parent, args, context) => {
       // Security: Derive userId from authenticated context (not from arguments)
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       const userId = context.user.id;
 
@@ -277,7 +278,7 @@ builder.mutationField('updateNotificationPreferences', (t) =>
     resolve: async (parent, { input }, context) => {
       // Security: Derive userId from authenticated context (not from arguments)
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       const userId = context.user.id;
       // Filter out undefined values and cast null to undefined
@@ -314,7 +315,7 @@ builder.mutationField('registerDeviceToken', (t) =>
     resolve: async (parent, { input }, context) => {
       // Security: Derive userId from authenticated context (not from arguments)
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       const userId = context.user.id;
       const { deviceToken, platform } = input;
@@ -344,7 +345,7 @@ builder.mutationField('disableDeviceToken', (t) =>
     },
     resolve: async (parent, { deviceToken }, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
 
       await dbService.notifications.disableDeviceToken(
@@ -364,7 +365,7 @@ builder.mutationField('markNotificationAsRead', (t) =>
     },
     resolve: async (parent, { notificationId }, context) => {
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
 
       await dbService.notifications.markNotificationAsRead(
@@ -382,7 +383,7 @@ builder.mutationField('markAllNotificationsAsRead', (t) =>
     resolve: async (parent, args, context) => {
       // Security: Derive userId from authenticated context (not from arguments)
       if (!context.user) {
-        throw new Error('Unauthorized: Authentication required');
+        throw AuthenticationError();
       }
       const userId = context.user.id;
 

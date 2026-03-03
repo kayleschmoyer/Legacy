@@ -7,6 +7,7 @@ import { PublicSchema } from '@legacy-sports/db-client';
 import { and, eq, inArray } from 'drizzle-orm';
 import { WaiverClaim } from './types';
 import { builder } from '../builder';
+import { AuthenticationError } from '../graphql-errors';
 
 // ── Query resolvers ────────────────────────────────────────────────────────
 
@@ -19,7 +20,7 @@ builder.queryField('teamWaiverClaims', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const db = context.db;

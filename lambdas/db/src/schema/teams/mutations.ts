@@ -11,6 +11,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { authorized, isTeamGeneralManager } from '../authorization';
 import { builder } from '../builder';
 import { LeagueMember, Team, TeamMember } from '../leagues/types';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 // ── Mutation resolvers ─────────────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ builder.mutationField('renameTeam', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const name = args.newName.trim();
@@ -191,7 +192,7 @@ builder.mutationField('renameTeam', (t) =>
         .limit(1);
 
       if (membership.length === 0) {
-        throw new Error('Not a member of this league');
+        throw ForbiddenError('Not a member of this league');
       }
 
       const isCommish =
@@ -200,7 +201,7 @@ builder.mutationField('renameTeam', (t) =>
         membership[0].permissionLevel === 'assistant_manager';
 
       if (!isCommish && membership[0].teamId !== teamId) {
-        throw new Error('You can only rename your own team');
+        throw ForbiddenError('You can only rename your own team');
       }
 
       // Fetch old name for the chat notification
@@ -322,7 +323,7 @@ builder.mutationField('inviteAssistantManager', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { teamId, username } = args;
@@ -361,7 +362,7 @@ builder.mutationField('inviteAssistantManager', (t) =>
         .limit(1);
 
       if (callerMembership.length === 0) {
-        throw new Error('You are not a member of this league');
+        throw ForbiddenError('You are not a member of this league');
       }
 
       const callerRole = callerMembership[0];
@@ -501,7 +502,7 @@ builder.mutationField('removeAssistantManager', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { teamId, userId: targetUserId } = args;
@@ -537,7 +538,7 @@ builder.mutationField('removeAssistantManager', (t) =>
         .limit(1);
 
       if (callerMembership.length === 0) {
-        throw new Error('You are not a member of this league');
+        throw ForbiddenError('You are not a member of this league');
       }
 
       const callerRole = callerMembership[0];
@@ -574,14 +575,14 @@ builder.mutationField('removeAssistantManager', (t) =>
         .limit(1);
 
       if (targetMembership.length === 0) {
-        throw new Error('User is not a member of this league');
+        throw ForbiddenError('User is not a member of this league');
       }
 
       if (
         targetMembership[0].permissionLevel !== 'assistant_manager' ||
         targetMembership[0].teamId !== teamId
       ) {
-        throw new Error('User is not an assistant manager for this team');
+        throw ForbiddenError('User is not an assistant manager for this team');
       }
 
       // Remove the league_members row
@@ -663,7 +664,7 @@ builder.mutationField('updateTeamBranding', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { teamId, leagueId, primaryColor, secondaryColor } = args;
@@ -728,7 +729,7 @@ builder.mutationField('updateTeamBranding', (t) =>
         .limit(1);
 
       if (membership.length === 0) {
-        throw new Error('Not a member of this league');
+        throw ForbiddenError('Not a member of this league');
       }
 
       const { permissionLevel, teamId: memberTeamId } = membership[0];

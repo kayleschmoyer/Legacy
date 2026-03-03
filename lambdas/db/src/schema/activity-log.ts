@@ -11,6 +11,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 
 import { builder } from './builder';
+import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
 // ── GraphQL enum ───────────────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ builder.queryField('leagueActivity', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { leagueId } = args;
@@ -109,7 +110,7 @@ builder.queryField('leagueActivity', (t) =>
         .limit(1);
 
       if (membership.length === 0) {
-        throw new Error('Not a member of this league');
+        throw ForbiddenError('Not a member of this league');
       }
 
       try {

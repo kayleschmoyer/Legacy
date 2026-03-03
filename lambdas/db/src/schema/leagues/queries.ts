@@ -16,6 +16,7 @@ import {
   TeamMember,
 } from './types';
 import { builder } from '../builder';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 // Query fields
 builder.queryField('league', (t) =>
@@ -28,7 +29,9 @@ builder.queryField('league', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to fetch league details');
+        throw AuthenticationError(
+          'Authentication required to fetch league details',
+        );
       }
 
       const leagueId = args.id;
@@ -84,7 +87,9 @@ builder.queryField('league', (t) =>
 
         // Access control: members always have access; non-members can only view public leagues (spectator mode)
         if (!userMembership && !league.isPublic) {
-          throw new Error('Access denied: You are not a member of this league');
+          throw ForbiddenError(
+            'Access denied: You are not a member of this league',
+          );
         }
 
         // Non-members (spectators) do not receive the invite code; use empty string since the field is non-nullable
@@ -126,7 +131,9 @@ builder.queryField('userLeagues', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to fetch user leagues');
+        throw AuthenticationError(
+          'Authentication required to fetch user leagues',
+        );
       }
 
       const userId = context.user.id;
@@ -192,7 +199,9 @@ builder.queryField('leaguePositions', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to fetch league positions');
+        throw AuthenticationError(
+          'Authentication required to fetch league positions',
+        );
       }
 
       const { leagueId } = args;
@@ -251,7 +260,9 @@ builder.queryField('teamMembers', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to fetch team members');
+        throw AuthenticationError(
+          'Authentication required to fetch team members',
+        );
       }
 
       const { teamId } = args;
@@ -327,7 +338,9 @@ builder.queryField('userTeamId', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to fetch user team ID');
+        throw AuthenticationError(
+          'Authentication required to fetch user team ID',
+        );
       }
 
       const { leagueId } = args;
@@ -374,7 +387,9 @@ builder.queryField('leagueTeams', (t) =>
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
-        throw new Error('Authentication required to fetch league teams');
+        throw AuthenticationError(
+          'Authentication required to fetch league teams',
+        );
       }
 
       const { leagueId } = args;
@@ -461,7 +476,7 @@ builder.queryField('validateInviteCode', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const code = args.code.trim().toUpperCase();
@@ -522,7 +537,7 @@ builder.queryField('teamLeagueMembers', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { teamId } = args;
@@ -555,7 +570,7 @@ builder.queryField('teamLeagueMembers', (t) =>
         .limit(1);
 
       if (callerCheck.length === 0) {
-        throw new Error('You are not a member of this league');
+        throw ForbiddenError('You are not a member of this league');
       }
 
       // Return all league_members linked to this specific team
@@ -635,7 +650,9 @@ builder.queryField('publicLeagues', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required to browse public leagues');
+        throw AuthenticationError(
+          'Authentication required to browse public leagues',
+        );
       }
 
       const userId = context.user.id;
@@ -738,7 +755,7 @@ builder.queryField('leagueTradeBlock', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { leagueId } = args;
@@ -758,7 +775,7 @@ builder.queryField('leagueTradeBlock', (t) =>
         .limit(1);
 
       if (membership.length === 0) {
-        throw new Error('Not a member of this league');
+        throw ForbiddenError('Not a member of this league');
       }
 
       try {

@@ -29,6 +29,7 @@ import { builder } from '../builder';
 import type { Context } from '../builder';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
 import { insertActivityLog } from '../../services/activity-log';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -52,7 +53,9 @@ builder.mutationField('makeDraftPick', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required to make a draft pick');
+        throw AuthenticationError(
+          'Authentication required to make a draft pick',
+        );
       }
 
       const { draftId, playerId } = args;
@@ -517,7 +520,9 @@ builder.mutationField('initializeDraft', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required to initialize a draft');
+        throw AuthenticationError(
+          'Authentication required to initialize a draft',
+        );
       }
 
       const { leagueId } = args;
@@ -588,7 +593,7 @@ builder.mutationField('initializeDraft', (t) =>
           (membership.permissionLevel !== 'general_manager' &&
             membership.permissionLevel !== 'commissioner')
         ) {
-          throw new Error(
+          throw ForbiddenError(
             'Only the league General Manager or commissioner can initialize a draft',
           );
         }
@@ -788,7 +793,9 @@ builder.mutationField('updateDraftSettings', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required to update draft settings');
+        throw AuthenticationError(
+          'Authentication required to update draft settings',
+        );
       }
 
       const {
@@ -828,7 +835,7 @@ builder.mutationField('updateDraftSettings', (t) =>
         }
 
         if (league.owner !== userId) {
-          throw new Error(
+          throw ForbiddenError(
             'Only the league General Manager can update draft settings',
           );
         }
@@ -1125,7 +1132,7 @@ builder.mutationField('pauseDraft', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { leagueId } = args;
@@ -1144,7 +1151,7 @@ builder.mutationField('pauseDraft', (t) =>
         .limit(1);
 
       if (!membership || membership.permissionLevel !== 'commissioner') {
-        throw new Error('Only a league commissioner can pause the draft');
+        throw ForbiddenError('Only a league commissioner can pause the draft');
       }
 
       // Verify draft is in-progress
@@ -1208,7 +1215,7 @@ builder.mutationField('resumeDraft', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { leagueId } = args;
@@ -1227,7 +1234,7 @@ builder.mutationField('resumeDraft', (t) =>
         .limit(1);
 
       if (!membership || membership.permissionLevel !== 'commissioner') {
-        throw new Error('Only a league commissioner can resume the draft');
+        throw ForbiddenError('Only a league commissioner can resume the draft');
       }
 
       // Verify draft is paused
@@ -1309,7 +1316,7 @@ builder.mutationField('commissionerPick', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
-        throw new Error('Authentication required');
+        throw AuthenticationError();
       }
 
       const { draftId, playerId } = args;
@@ -1349,7 +1356,7 @@ builder.mutationField('commissionerPick', (t) =>
             .limit(1);
 
           if (!membership || membership.permissionLevel !== 'commissioner') {
-            throw new Error(
+            throw ForbiddenError(
               'Only a league commissioner can make picks on behalf of others',
             );
           }
