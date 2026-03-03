@@ -183,6 +183,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     permLevel === 'owner' ||
     permLevel === 'commissioner' ||
     permLevel === 'general_manager';
+  const isCommissioner = permLevel === 'owner' || permLevel === 'commissioner';
   const myTeamId = normalizeTeamId(league?.userMembership?.teamId);
 
   // Helper: resolve team name from leagueTeams by numeric ID
@@ -1164,7 +1165,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             {leagueTeams.length < 2
               ? 'At least 2 teams are required to start a draft. Invite more teams to your league.'
               : isOwner
-                ? 'As the commissioner, you can start the live draft when all teams are ready.'
+                ? 'As a league manager, you can start the live draft when all teams are ready.'
                 : 'Waiting for the commissioner to start the live draft.'}
           </div>
 
@@ -1357,7 +1358,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           )}
 
           {/* Commissioner Controls */}
-          {isOwner && draftId && (
+          {isCommissioner && draftId && (
             <div className="d-comm-controls">
               <div className="d-comm-title">
                 <span role="img" aria-label="crown">
@@ -1868,10 +1869,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   key={player.id}
                   player={player}
                   index={idx}
-                  isMyPick={commPickMode ? isOwner : isMyPick}
+                  isMyPick={commPickMode ? isCommissioner : isMyPick}
                   isWatched={watchlist.includes(player.id)}
                   onDraft={() => {
-                    if (commPickMode && isOwner) {
+                    if (commPickMode && isCommissioner) {
                       void handleCommissionerPick(player.id);
                     } else {
                       void handleMakePick(player.id);
@@ -1917,7 +1918,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       </div>
 
       {/* Paused Overlay */}
-      {draftPaused && !isOwner && (
+      {draftPaused && !isCommissioner && (
         <div className="d-paused-overlay" role="alert" aria-live="assertive">
           <div className="d-paused-card">
             <div className="d-paused-icon">

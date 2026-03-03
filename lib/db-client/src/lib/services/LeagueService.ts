@@ -239,7 +239,7 @@ export class LeagueService {
         leagueId: league.id,
         userId: ownerId,
         teamId: teams[0].id,
-        permissionLevel: 'general_manager' as const,
+        permissionLevel: 'commissioner' as const,
       };
       await db.insert(PublicSchema.leagueMembers).values(ownerMember);
 

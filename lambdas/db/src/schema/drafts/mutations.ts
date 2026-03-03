@@ -582,9 +582,13 @@ builder.mutationField('initializeDraft', (t) =>
           )
           .limit(1);
 
-        if (!membership || membership.permissionLevel !== 'general_manager') {
+        if (
+          !membership ||
+          (membership.permissionLevel !== 'general_manager' &&
+            membership.permissionLevel !== 'commissioner')
+        ) {
           throw new Error(
-            'Only the league General Manager can initialize a draft',
+            'Only the league General Manager or commissioner can initialize a draft',
           );
         }
 
@@ -1105,15 +1109,8 @@ builder.mutationField('pauseDraft', (t) =>
         )
         .limit(1);
 
-      if (
-        !membership ||
-        (membership.permissionLevel !== 'general_manager' &&
-          membership.permissionLevel !== 'assistant_manager' &&
-          membership.permissionLevel !== 'commissioner')
-      ) {
-        throw new Error(
-          'Only the league General Manager or commissioner can pause the draft',
-        );
+      if (!membership || membership.permissionLevel !== 'commissioner') {
+        throw new Error('Only a league commissioner can pause the draft');
       }
 
       // Verify draft is in-progress
@@ -1195,15 +1192,8 @@ builder.mutationField('resumeDraft', (t) =>
         )
         .limit(1);
 
-      if (
-        !membership ||
-        (membership.permissionLevel !== 'general_manager' &&
-          membership.permissionLevel !== 'assistant_manager' &&
-          membership.permissionLevel !== 'commissioner')
-      ) {
-        throw new Error(
-          'Only the league General Manager or commissioner can resume the draft',
-        );
+      if (!membership || membership.permissionLevel !== 'commissioner') {
+        throw new Error('Only a league commissioner can resume the draft');
       }
 
       // Verify draft is paused
@@ -1324,14 +1314,9 @@ builder.mutationField('commissionerPick', (t) =>
             )
             .limit(1);
 
-          if (
-            !membership ||
-            (membership.permissionLevel !== 'general_manager' &&
-              membership.permissionLevel !== 'assistant_manager' &&
-              membership.permissionLevel !== 'commissioner')
-          ) {
+          if (!membership || membership.permissionLevel !== 'commissioner') {
             throw new Error(
-              'Only the league General Manager or commissioner can make picks on behalf of others',
+              'Only a league commissioner can make picks on behalf of others',
             );
           }
 
