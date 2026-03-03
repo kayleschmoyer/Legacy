@@ -539,7 +539,12 @@ export class SeasonDraftGameService {
     return fieldingStats.some((stat) => {
       const statPos = stat.pos?.trim();
       if (position === 'OF') {
-        return statPos === 'LF' || statPos === 'CF' || statPos === 'RF';
+        return (
+          statPos === 'OF' ||
+          statPos === 'LF' ||
+          statPos === 'CF' ||
+          statPos === 'RF'
+        );
       }
       if (position === 'UT') {
         return true;
