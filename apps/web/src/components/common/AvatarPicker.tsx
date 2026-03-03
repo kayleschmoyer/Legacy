@@ -60,8 +60,21 @@ export function AvatarPicker({
     setPendingUrl(trimmed);
   };
 
+  /**
+   * Resolve a potentially-relative preset path (e.g. /presets/logo-bear.png)
+   * to a fully-qualified HTTPS URL using the current origin, so that the value
+   * stored in the database always passes the server-side HTTPS URL validation.
+   * Custom URLs entered by the user are returned unchanged.
+   */
+  const resolveUrl = (url: string): string => {
+    if (url.startsWith('/')) {
+      return `${window.location.origin}${url}`;
+    }
+    return url;
+  };
+
   const handleSave = () => {
-    onSelect(pendingUrl);
+    onSelect(pendingUrl ? resolveUrl(pendingUrl) : null);
   };
 
   const handleClear = () => {
