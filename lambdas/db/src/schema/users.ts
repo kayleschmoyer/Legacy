@@ -3,8 +3,8 @@ import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { builder } from './builder';
 import { requireAuth } from './authorization';
-import { getJwtSecret } from '../server/context';
 import { AuthenticationError, ForbiddenError } from './graphql-errors';
+import { getJwtSecret } from '../server/context';
 
 // Create a single database service instance to reuse across all resolvers
 const dbService = createDatabaseService(getDbOptions());

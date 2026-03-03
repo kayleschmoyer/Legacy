@@ -104,6 +104,14 @@ mutation NudgeExpiredDraftPick($leagueId: Int!) {
   }
 }
 
+mutation ToggleDraftAutoPick($draftId: Int!, $enable: Boolean!) {
+  toggleDraftAutoPick(draftId: $draftId, enable: $enable)
+}
+
+query GetMyDraftTeamAutoPick($draftId: Int!) {
+  getMyDraftTeamAutoPick(draftId: $draftId)
+}
+
 query GetLiveDraftLeagueDraft($leagueId: Int!) {
   getLeagueDraft(leagueId: $leagueId) {
     id

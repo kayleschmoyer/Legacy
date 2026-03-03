@@ -685,12 +685,55 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   acquisitionType: 'draft',
                 });
 
+                // Mark this team as auto-pick going forward since they missed a
+                // pick — subsequent picks will be made instantly on their behalf
+                // without waiting for the deadline to expire (LS-427).
+                await tx
+                  .update(PublicSchema.draftTeams)
+                  .set({ autoPick: true })
+                  .where(
+                    and(
+                      eq(PublicSchema.draftTeams.draftId, draftId),
+                      eq(
+                        PublicSchema.draftTeams.teamId,
+                        currentPickInfo.teamId,
+                      ),
+                    ),
+                  );
+
                 // Calculate next pick info for notification
                 let nextPickInfo: Awaited<
                   ReturnType<typeof getCurrentDraftPickInfo>
                 > = null;
                 if (!isDraftComplete) {
                   nextPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+                }
+
+                // If the next team has auto-pick enabled, immediately expire their
+                // deadline so the inner loop chains to them right away (LS-427).
+                let effectiveNextDeadline = nextDeadline;
+                if (nextPickInfo && !isDraftComplete) {
+                  const [nextTeamEntry] = await tx
+                    .select({ autoPick: PublicSchema.draftTeams.autoPick })
+                    .from(PublicSchema.draftTeams)
+                    .where(
+                      and(
+                        eq(PublicSchema.draftTeams.draftId, draftId),
+                        eq(PublicSchema.draftTeams.teamId, nextPickInfo.teamId),
+                      ),
+                    )
+                    .limit(1);
+                  if (nextTeamEntry?.autoPick) {
+                    effectiveNextDeadline = new Date(pickNow.getTime() - 1);
+                    await tx
+                      .update(PublicSchema.drafts)
+                      .set({ currentPickDeadline: effectiveNextDeadline })
+                      .where(eq(PublicSchema.drafts.id, draftId));
+                    LOGGER.info(
+                      '[autoProcessDraftPicks] Next team has auto-pick — expiring deadline immediately',
+                      { draftId, nextTeamId: nextPickInfo.teamId },
+                    );
+                  }
                 }
 
                 return {
@@ -700,7 +743,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   isDraftComplete,
                   currentPickInfo,
                   nextPickInfo,
-                  nextDeadline,
+                  nextDeadline: effectiveNextDeadline,
                 };
               });
 

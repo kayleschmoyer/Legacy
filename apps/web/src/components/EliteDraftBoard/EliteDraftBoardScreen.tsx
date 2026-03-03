@@ -45,6 +45,7 @@ import {
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
+  GetMyDraftTeamAutoPick as GET_MY_DRAFT_TEAM_AUTO_PICK,
   type GetAvailableDraftPlayersQuery,
   type GetAvailableDraftPlayersQueryVariables,
   type GetCurrentDraftPickQuery,
@@ -52,11 +53,14 @@ import {
   type GetDraftPicksQuery,
   type GetDraftPicksQueryVariables,
   type GetDraftTeamOrderQuery,
+  type GetMyDraftTeamAutoPickQuery,
+  type GetMyDraftTeamAutoPickQueryVariables,
   InitializeLiveDraft as INITIALIZE_LIVE_DRAFT,
   MakeDraftPick as MAKE_DRAFT_PICK,
   NudgeExpiredDraftPick as NUDGE_EXPIRED_DRAFT_PICK,
   PauseDraft as PAUSE_DRAFT,
   ResumeDraft as RESUME_DRAFT,
+  ToggleDraftAutoPick as TOGGLE_DRAFT_AUTO_PICK,
 } from '../../api/db/graphql.generated';
 import { env } from '../../config/environment';
 
@@ -225,6 +229,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const [watchlist, setWatchlist] = useState<number[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [draftComplete, setDraftComplete] = useState(false);
+  const [autoPickEnabled, setAutoPickEnabled] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [draftPaused, setDraftPaused] = useState(false);
   // Authoritative pick deadline and time limit synced from server (WS + query)
@@ -377,6 +382,16 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     ? Number(leagueDraft.id)
     : null;
 
+  // ---- Auto-pick status for my team ----
+  const { data: autoPickData, refetch: refetchAutoPick } = useQuery<
+    GetMyDraftTeamAutoPickQuery,
+    GetMyDraftTeamAutoPickQueryVariables
+  >(GET_MY_DRAFT_TEAM_AUTO_PICK, {
+    variables: { draftId: draftId ?? 0 },
+    skip: !draftId,
+    errorPolicy: 'all',
+  });
+
   // Log draft errors (debug logging removed for production)
   useEffect(() => {
     if (draftError) console.error('[Draft] getLeagueDraft error:', draftError);
@@ -397,6 +412,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       setDraftPaused(false);
     }
   }, [league?.draftStatus]);
+
+  // Sync auto-pick status from server query result
+  useEffect(() => {
+    if (autoPickData?.getMyDraftTeamAutoPick !== undefined) {
+      setAutoPickEnabled(autoPickData.getMyDraftTeamAutoPick ?? false);
+    }
+  }, [autoPickData?.getMyDraftTeamAutoPick]);
 
   // ---- Current Pick ----
   const [draftOrderMissing, setDraftOrderMissing] = useState(false);
@@ -776,6 +798,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const [commissionerPickMutation, { loading: commPickLoading }] =
     useMutation(COMMISSIONER_PICK);
   const [nudgeExpiredDraftPick] = useMutation(NUDGE_EXPIRED_DRAFT_PICK);
+  const [toggleDraftAutoPickMutation, { loading: autoPickLoading }] =
+    useMutation(TOGGLE_DRAFT_AUTO_PICK);
 
   // ---- Player Pagination Helpers ----
   /** Reset pagination and refetch player list from the start (call after picks). */
@@ -1125,6 +1149,35 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       showToast,
     ],
   );
+
+  const handleToggleAutoPick = useCallback(async () => {
+    if (!draftId || autoPickLoading) return;
+    const newValue = !autoPickEnabled;
+    try {
+      await toggleDraftAutoPickMutation({
+        variables: { draftId, enable: newValue },
+      });
+      setAutoPickEnabled(newValue);
+      showToast(
+        newValue
+          ? "Auto-pick enabled — we'll pick for you!"
+          : 'Auto-pick disabled',
+        'info',
+      );
+      void refetchAutoPick();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Failed to toggle auto-pick';
+      showToast(msg, 'error');
+    }
+  }, [
+    draftId,
+    autoPickLoading,
+    autoPickEnabled,
+    toggleDraftAutoPickMutation,
+    showToast,
+    refetchAutoPick,
+  ]);
 
   // ---- Timer (client-side countdown for UX, not authoritative) ----
   // timeRemaining is computed from the server-assigned pickDeadline so it
@@ -1842,6 +1895,70 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                     {currentPickTeamId}
                   </div>
                 )}
+              {/* Auto-pick toggle (LS-427) */}
+              {myTeamId !== null && !currentPickInfo.isComplete && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: '8px 12px',
+                    background: autoPickEnabled
+                      ? 'rgba(16,185,129,0.12)'
+                      : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${autoPickEnabled ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: autoPickEnabled
+                        ? '#10b981'
+                        : 'var(--d-text-muted)',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <span role="img" aria-label="robot">
+                      🤖
+                    </span>{' '}
+                    {autoPickEnabled
+                      ? 'Auto-pick ON — picks instantly on your turn'
+                      : 'Auto-pick: picks for you when your timer starts'}
+                  </div>
+                  <button
+                    onClick={() => void handleToggleAutoPick()}
+                    disabled={autoPickLoading}
+                    aria-pressed={autoPickEnabled}
+                    aria-label={
+                      autoPickEnabled ? 'Disable auto-pick' : 'Enable auto-pick'
+                    }
+                    style={{
+                      background: autoPickEnabled
+                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                        : 'rgba(255,255,255,0.08)',
+                      border: autoPickEnabled
+                        ? 'none'
+                        : '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: 6,
+                      padding: '4px 10px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: autoPickEnabled
+                        ? '#fff'
+                        : 'var(--d-text-secondary)',
+                      cursor: autoPickLoading ? 'not-allowed' : 'pointer',
+                      opacity: autoPickLoading ? 0.6 : 1,
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {autoPickLoading ? '...' : autoPickEnabled ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="d-panel" style={{ textAlign: 'center' }}>

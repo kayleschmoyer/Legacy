@@ -4,8 +4,8 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues/types';
-import { insertActivityLog } from '../services/activity-log';
 import { AuthenticationError, ForbiddenError } from './graphql-errors';
+import { insertActivityLog } from '../services/activity-log';
 
 /**
  * Chat System & Tiebreaker Rules Schema (LS-90)

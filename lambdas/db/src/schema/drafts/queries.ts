@@ -3,7 +3,7 @@
  */
 
 import { PublicSchema } from '@legacy-sports/db-client';
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
 import { getCurrentDraftPickInfo, verifyLeagueMembership } from './helpers';
 import {
@@ -451,6 +451,68 @@ builder.queryField('getDraftTeamOrder', (t) =>
         teamName: row.teamName,
         draftOrder: row.draftOrder,
       }));
+    },
+  }),
+);
+
+/**
+ * Query: Get auto-pick status for the current user's team in a draft (LS-427)
+ *
+ * Returns true if the user's team has auto-pick enabled for the given draft,
+ * false if disabled, or null if the user has no team in this draft.
+ */
+builder.queryField('getMyDraftTeamAutoPick', (t) =>
+  t.field({
+    type: 'Boolean',
+    nullable: true,
+    args: {
+      draftId: t.arg.int({ required: true }),
+    },
+    description:
+      "Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft.",
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
+      const { draftId } = args;
+
+      // Get the draft to resolve leagueId
+      const [draft] = await context.db
+        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.id, draftId))
+        .limit(1);
+
+      if (!draft) return null;
+
+      // Resolve the user's team in this league
+      const [membership] = await context.db
+        .select({ teamId: PublicSchema.leagueMembers.teamId })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+            eq(PublicSchema.leagueMembers.userId, context.user.id),
+          ),
+        )
+        .limit(1);
+
+      if (!membership?.teamId) return null;
+
+      // Fetch auto-pick flag from draft_teams
+      const [draftTeamEntry] = await context.db
+        .select({ autoPick: PublicSchema.draftTeams.autoPick })
+        .from(PublicSchema.draftTeams)
+        .where(
+          and(
+            eq(PublicSchema.draftTeams.draftId, draftId),
+            eq(PublicSchema.draftTeams.teamId, membership.teamId),
+          ),
+        )
+        .limit(1);
+
+      return draftTeamEntry?.autoPick ?? null;
     },
   }),
 );

@@ -467,6 +467,14 @@ export type DraftPlayer = {
   lastName?: Maybe<Scalars['String']['output']>;
 };
 
+/** A team and its assigned slot in the draft order */
+export type DraftTeamOrderEntry = {
+  __typename?: 'DraftTeamOrderEntry';
+  draftOrder?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+};
+
 export type EditMatchupScoreInput = {
   matchupId: Scalars['Int']['input'];
   reason?: InputMaybe<Scalars['String']['input']>;
@@ -967,6 +975,7 @@ export type Mutation = {
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
+  randomizeDraftOrder?: Maybe<Draft>;
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
   registerDeviceToken?: Maybe<DeviceToken>;
@@ -984,6 +993,7 @@ export type Mutation = {
   sendDirectMessage?: Maybe<DirectMessage>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
+  setDraftOrder?: Maybe<Draft>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
@@ -995,6 +1005,8 @@ export type Mutation = {
   /** Commissioner: swap the team assignments between two matchups in the same league. */
   swapMatchupTeams?: Maybe<CommissionerActionResult>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
+  /** Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. Enabling also activates automatically when a team misses a pick. */
+  toggleDraftAutoPick?: Maybe<Scalars['Boolean']['output']>;
   /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
   triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: update the persistent LM note for a league. */
@@ -1232,6 +1244,10 @@ export type MutationProposeTradeArgs = {
   requestingPlayerIds: Array<Scalars['Int']['input']>;
 };
 
+export type MutationRandomizeDraftOrderArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
 export type MutationRecordConsentArgs = {
   input: RecordConsentInput;
 };
@@ -1282,6 +1298,11 @@ export type MutationSendMatchupMessageArgs = {
   replyToMessageId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationSetDraftOrderArgs = {
+  draftId: Scalars['Int']['input'];
+  teamIds: Array<Scalars['Int']['input']>;
+};
+
 export type MutationSetTeamLockArgs = {
   input: SetTeamLockInput;
 };
@@ -1318,6 +1339,11 @@ export type MutationSwapTeamMemberPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
+};
+
+export type MutationToggleDraftAutoPickArgs = {
+  draftId: Scalars['Int']['input'];
+  enable: Scalars['Boolean']['input'];
 };
 
 export type MutationTriggerSeasonDraftStatLoadingArgs = {
@@ -1646,6 +1672,7 @@ export type Query = {
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
+  getDraftTeamOrder?: Maybe<Array<DraftTeamOrderEntry>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
   getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
   getLeagueDraft?: Maybe<Draft>;
@@ -1659,6 +1686,8 @@ export type Query = {
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
+  /** Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft. */
+  getMyDraftTeamAutoPick?: Maybe<Scalars['Boolean']['output']>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
   getPlayoffBracket?: Maybe<PlayoffBracket>;
   getPlayoffRace?: Maybe<Array<PlayoffQualification>>;
@@ -1808,6 +1837,10 @@ export type QueryGetDraftPicksArgs = {
   draftId: Scalars['Int']['input'];
 };
 
+export type QueryGetDraftTeamOrderArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
 export type QueryGetHeadToHeadRecordArgs = {
   leagueId: Scalars['Int']['input'];
   team1Id: Scalars['Int']['input'];
@@ -1871,6 +1904,10 @@ export type QueryGetMatchupsByWeekArgs = {
 export type QueryGetMatchupsForLeagueArgs = {
   leagueId: Scalars['Int']['input'];
   weekNumber?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetMyDraftTeamAutoPickArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type QueryGetNotificationHistoryArgs = {

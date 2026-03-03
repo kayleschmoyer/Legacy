@@ -999,6 +999,8 @@ export type Mutation = {
   /** Commissioner: swap the team assignments between two matchups in the same league. */
   swapMatchupTeams?: Maybe<CommissionerActionResult>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
+  /** Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. Enabling also activates automatically when a team misses a pick. */
+  toggleDraftAutoPick?: Maybe<Scalars['Boolean']['output']>;
   /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
   triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: update the persistent LM note for a league. */
@@ -1331,6 +1333,11 @@ export type MutationSwapTeamMemberPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
+};
+
+export type MutationToggleDraftAutoPickArgs = {
+  draftId: Scalars['Int']['input'];
+  enable: Scalars['Boolean']['input'];
 };
 
 export type MutationTriggerSeasonDraftStatLoadingArgs = {
@@ -1673,6 +1680,8 @@ export type Query = {
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
+  /** Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft. */
+  getMyDraftTeamAutoPick?: Maybe<Scalars['Boolean']['output']>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
   getPlayoffBracket?: Maybe<PlayoffBracket>;
   getPlayoffRace?: Maybe<Array<PlayoffQualification>>;
@@ -1889,6 +1898,10 @@ export type QueryGetMatchupsByWeekArgs = {
 export type QueryGetMatchupsForLeagueArgs = {
   leagueId: Scalars['Int']['input'];
   weekNumber?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetMyDraftTeamAutoPickArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type QueryGetNotificationHistoryArgs = {
@@ -3761,6 +3774,25 @@ export type NudgeExpiredDraftPickMutation = {
     draftsProcessed?: number | null;
     picksAutoMade?: number | null;
   } | null;
+};
+
+export type ToggleDraftAutoPickMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  enable: Scalars['Boolean']['input'];
+}>;
+
+export type ToggleDraftAutoPickMutation = {
+  __typename?: 'Mutation';
+  toggleDraftAutoPick?: boolean | null;
+};
+
+export type GetMyDraftTeamAutoPickQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type GetMyDraftTeamAutoPickQuery = {
+  __typename?: 'Query';
+  getMyDraftTeamAutoPick?: boolean | null;
 };
 
 export type GetLiveDraftLeagueDraftQueryVariables = Exact<{
@@ -9952,6 +9984,143 @@ export type NudgeExpiredDraftPickMutationResult =
 export type NudgeExpiredDraftPickMutationOptions = BaseMutationOptions<
   NudgeExpiredDraftPickMutation,
   NudgeExpiredDraftPickMutationVariables
+>;
+export const ToggleDraftAutoPick = gql`
+  mutation ToggleDraftAutoPick($draftId: Int!, $enable: Boolean!) {
+    toggleDraftAutoPick(draftId: $draftId, enable: $enable)
+  }
+`;
+export type ToggleDraftAutoPickMutationFn = MutationFunction<
+  ToggleDraftAutoPickMutation,
+  ToggleDraftAutoPickMutationVariables
+>;
+
+/**
+ * __useToggleDraftAutoPickMutation__
+ *
+ * To run a mutation, you first call `useToggleDraftAutoPickMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useToggleDraftAutoPickMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [toggleDraftAutoPickMutation, { data, loading, error }] = useToggleDraftAutoPickMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      enable: // value for 'enable'
+ *   },
+ * });
+ */
+export function useToggleDraftAutoPickMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ToggleDraftAutoPickMutation,
+    ToggleDraftAutoPickMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ToggleDraftAutoPickMutation,
+    ToggleDraftAutoPickMutationVariables
+  >(ToggleDraftAutoPick, options);
+}
+export type ToggleDraftAutoPickMutationHookResult = ReturnType<
+  typeof useToggleDraftAutoPickMutation
+>;
+export type ToggleDraftAutoPickMutationResult =
+  Apollo.MutationResult<ToggleDraftAutoPickMutation>;
+export type ToggleDraftAutoPickMutationOptions = BaseMutationOptions<
+  ToggleDraftAutoPickMutation,
+  ToggleDraftAutoPickMutationVariables
+>;
+export const GetMyDraftTeamAutoPick = gql`
+  query GetMyDraftTeamAutoPick($draftId: Int!) {
+    getMyDraftTeamAutoPick(draftId: $draftId)
+  }
+`;
+
+/**
+ * __useGetMyDraftTeamAutoPickQuery__
+ *
+ * To run a query within a React component, call `useGetMyDraftTeamAutoPickQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyDraftTeamAutoPickQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyDraftTeamAutoPickQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useGetMyDraftTeamAutoPickQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetMyDraftTeamAutoPickQuery,
+    GetMyDraftTeamAutoPickQueryVariables
+  > &
+    (
+      | { variables: GetMyDraftTeamAutoPickQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMyDraftTeamAutoPickQuery,
+    GetMyDraftTeamAutoPickQueryVariables
+  >(GetMyDraftTeamAutoPick, options);
+}
+export function useGetMyDraftTeamAutoPickLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMyDraftTeamAutoPickQuery,
+    GetMyDraftTeamAutoPickQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMyDraftTeamAutoPickQuery,
+    GetMyDraftTeamAutoPickQueryVariables
+  >(GetMyDraftTeamAutoPick, options);
+}
+export function useGetMyDraftTeamAutoPickSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMyDraftTeamAutoPickQuery,
+        GetMyDraftTeamAutoPickQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMyDraftTeamAutoPickQuery,
+    GetMyDraftTeamAutoPickQueryVariables
+  >(
+    GetMyDraftTeamAutoPick,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMyDraftTeamAutoPickQuery,
+          GetMyDraftTeamAutoPickQueryVariables
+        >,
+  );
+}
+export type GetMyDraftTeamAutoPickQueryHookResult = ReturnType<
+  typeof useGetMyDraftTeamAutoPickQuery
+>;
+export type GetMyDraftTeamAutoPickLazyQueryHookResult = ReturnType<
+  typeof useGetMyDraftTeamAutoPickLazyQuery
+>;
+export type GetMyDraftTeamAutoPickSuspenseQueryHookResult = ReturnType<
+  typeof useGetMyDraftTeamAutoPickSuspenseQuery
+>;
+export type GetMyDraftTeamAutoPickQueryResult = Apollo.QueryResult<
+  GetMyDraftTeamAutoPickQuery,
+  GetMyDraftTeamAutoPickQueryVariables
 >;
 export const GetLiveDraftLeagueDraft = gql`
   query GetLiveDraftLeagueDraft($leagueId: Int!) {

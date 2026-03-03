@@ -1283,6 +1283,11 @@ type Mutation {
   ): [TeamMember!]
 
   """
+  Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. Enabling also activates automatically when a team misses a pick.
+  """
+  toggleDraftAutoPick(draftId: Int!, enable: Boolean!): Boolean
+
+  """
   Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist.
   """
   triggerSeasonDraftStatLoading(playerId: Int!): Boolean
@@ -1704,6 +1709,11 @@ type Query {
   getMatchupStatusCounts(leagueId: Int!, season: Int): MatchupStatusCounts
   getMatchupsByWeek(leagueId: Int!, weekNumber: Int!): [Matchup!]
   getMatchupsForLeague(leagueId: Int!, weekNumber: Int): [Matchup!]
+
+  """
+  Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft.
+  """
+  getMyDraftTeamAutoPick(draftId: Int!): Boolean
   getNotificationHistory(limit: Int, offset: Int): [NotificationHistoryItem!]
   getPlayoffBracket(leagueId: Int!, season: Int): PlayoffBracket
   getPlayoffRace(

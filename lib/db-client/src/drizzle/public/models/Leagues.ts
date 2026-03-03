@@ -254,6 +254,7 @@ export const draftTeams = pgTable(
     teamId: integer('team_id').notNull(),
     leagueId: integer('league_id').notNull(),
     draftOrder: integer('draft_order').notNull(),
+    autoPick: boolean('auto_pick').notNull().default(false),
   },
   (table) => {
     return {

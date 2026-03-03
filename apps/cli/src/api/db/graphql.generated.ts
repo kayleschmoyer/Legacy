@@ -999,6 +999,8 @@ export type Mutation = {
   /** Commissioner: swap the team assignments between two matchups in the same league. */
   swapMatchupTeams?: Maybe<CommissionerActionResult>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
+  /** Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. Enabling also activates automatically when a team misses a pick. */
+  toggleDraftAutoPick?: Maybe<Scalars['Boolean']['output']>;
   /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
   triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: update the persistent LM note for a league. */
@@ -1331,6 +1333,11 @@ export type MutationSwapTeamMemberPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
+};
+
+export type MutationToggleDraftAutoPickArgs = {
+  draftId: Scalars['Int']['input'];
+  enable: Scalars['Boolean']['input'];
 };
 
 export type MutationTriggerSeasonDraftStatLoadingArgs = {
@@ -1673,6 +1680,8 @@ export type Query = {
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
+  /** Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft. */
+  getMyDraftTeamAutoPick?: Maybe<Scalars['Boolean']['output']>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
   getPlayoffBracket?: Maybe<PlayoffBracket>;
   getPlayoffRace?: Maybe<Array<PlayoffQualification>>;
@@ -1889,6 +1898,10 @@ export type QueryGetMatchupsByWeekArgs = {
 export type QueryGetMatchupsForLeagueArgs = {
   leagueId: Scalars['Int']['input'];
   weekNumber?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetMyDraftTeamAutoPickArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type QueryGetNotificationHistoryArgs = {
