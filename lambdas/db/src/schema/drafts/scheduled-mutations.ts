@@ -18,14 +18,17 @@
 
 import {
   filterPlayerIdsByLeagueEligibility,
-  PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, count, eq, lte, sql } from 'drizzle-orm';
 
-import { getCurrentDraftPickInfo } from './helpers';
+import {
+  ALLOWED_POSITIONS_FOR_AUTO_PICK,
+  getCurrentDraftPickInfo,
+  getUnfilledPositionTypes,
+} from './helpers';
 import { builder, type Context } from '../builder';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
@@ -71,133 +74,6 @@ async function assertLeagueMemberOrSystem(
   if (membership.length === 0) {
     throw ForbiddenError('You are not a member of this league');
   }
-}
-
-// ── Position eligibility for auto-pick (mirrors draft-processor ALLOWED_POSITIONS) ──
-// Maps each league roster slot type to the player stat position keys that qualify for it.
-// Source of truth: lib/shared-components/src/utils/PositionModels.ts
-const ALLOWED_POSITIONS_FOR_AUTO_PICK: Readonly<
-  Record<string, readonly string[]>
-> = Object.freeze({
-  '1B': ['1B'],
-  '2B': ['2B'],
-  '3B': ['3B'],
-  C: ['C'],
-  CF: ['CF'],
-  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
-  IF: ['1B', '2B', '3B', 'SS'],
-  LF: ['LF'],
-  OF: ['LF', 'RF', 'CF'],
-  RF: ['RF'],
-  RP: ['RP', 'P'],
-  SP: ['SP', 'P'],
-  SS: ['SS'],
-  XDH: ['DH'],
-});
-
-/**
- * Determine which league-defined position slot types still need a player on the
- * given team for this draft. Uses career_fielding.positions_played JSONB data
- * (same source as the draft-processor and GraphQL API) to map already-drafted
- * players to slot types, then returns the slot types that still have open slots.
- *
- * The greedy assignment orders slots by specificity (fewest allowed player
- * positions first) so that a multi-position player is not "wasted" on a
- * specialist slot that another player could fill instead.
- */
-async function getUnfilledPositionTypes(
-  tx: PublicDb,
-  draftId: number,
-  teamId: number,
-  leagueId: number,
-): Promise<string[]> {
-  // 1. League position requirements
-  const leaguePositions = await tx
-    .select({ positionType: PublicSchema.leaguePosition.positionType })
-    .from(PublicSchema.leaguePosition)
-    .where(eq(PublicSchema.leaguePosition.leagueId, leagueId));
-
-  if (leaguePositions.length === 0) return [];
-
-  // Count slots needed per position type
-  const slotsNeeded = new Map<string, number>();
-  for (const lp of leaguePositions) {
-    slotsNeeded.set(
-      lp.positionType,
-      (slotsNeeded.get(lp.positionType) ?? 0) + 1,
-    );
-  }
-
-  // 2. Team's already-drafted player IDs in this draft
-  const teamPicksResult = await tx.execute(
-    sql`SELECT player_id FROM draft_picks WHERE draft_id = ${draftId} AND team_id = ${teamId}`,
-  );
-  const teamPlayerIds = teamPicksResult.rows.map((r) => r.player_id as number);
-
-  if (teamPlayerIds.length === 0) {
-    // No picks yet — all position types are still needed
-    return [...new Set(leaguePositions.map((lp) => lp.positionType))];
-  }
-
-  // 3. Career fielding data for already-drafted players
-  const fieldingRows = await tx
-    .select({
-      playerId: PublicSchema.careerFielding.playerId,
-      positionsPlayed: PublicSchema.careerFielding.positionsPlayed,
-    })
-    .from(PublicSchema.careerFielding)
-    .where(inArray(PublicSchema.careerFielding.playerId, teamPlayerIds));
-
-  // Build map: playerId → set of slot types the player can fill
-  const playerSlotMap = new Map<number, Set<string>>();
-  for (const row of fieldingRows) {
-    if (!row.playerId) continue;
-    const positionsPlayed = row.positionsPlayed as Record<
-      string,
-      unknown
-    > | null;
-    const playerStatPositions = positionsPlayed
-      ? Object.keys(positionsPlayed)
-      : [];
-
-    const coverableSlots = new Set<string>();
-    for (const [slotType, allowedStatPositions] of Object.entries(
-      ALLOWED_POSITIONS_FOR_AUTO_PICK,
-    )) {
-      if (allowedStatPositions.some((sp) => playerStatPositions.includes(sp))) {
-        coverableSlots.add(slotType);
-      }
-    }
-    playerSlotMap.set(row.playerId, coverableSlots);
-  }
-
-  // 4. Greedily assign players to slots (most-specific slots first)
-  const slotsCovered = new Map<string, number>();
-  const orderedSlotTypes = [...slotsNeeded.keys()].sort(
-    (a, b) =>
-      (ALLOWED_POSITIONS_FOR_AUTO_PICK[a]?.length ?? 1) -
-      (ALLOWED_POSITIONS_FOR_AUTO_PICK[b]?.length ?? 1),
-  );
-
-  for (const playerId of teamPlayerIds) {
-    const coverableSlots = playerSlotMap.get(playerId);
-    if (!coverableSlots) continue;
-
-    for (const slotType of orderedSlotTypes) {
-      const needed = slotsNeeded.get(slotType) ?? 0;
-      const covered = slotsCovered.get(slotType) ?? 0;
-      if (covered < needed && coverableSlots.has(slotType)) {
-        slotsCovered.set(slotType, covered + 1);
-        break; // Each player fills exactly one slot
-      }
-    }
-  }
-
-  // 5. Return slot types that still have open slots
-  return orderedSlotTypes.filter(
-    (slotType) =>
-      (slotsCovered.get(slotType) ?? 0) < (slotsNeeded.get(slotType) ?? 0),
-  );
 }
 
 // ── Response Type ────────────────────────────────────────────────────────────

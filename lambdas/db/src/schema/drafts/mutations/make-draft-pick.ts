@@ -4,6 +4,7 @@
 
 import {
   createBadgeService,
+  filterPlayerIdsByLeagueEligibility,
   isPlayerInPool,
   playerMeetsMinCareerGames,
   playerMeetsMinCareerSeasons,
@@ -14,7 +15,11 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq, sql } from 'drizzle-orm';
 
 import { DraftPick } from '../types';
-import { getCurrentDraftPickInfo } from '../helpers';
+import {
+  ALLOWED_POSITIONS_FOR_AUTO_PICK,
+  getCurrentDraftPickInfo,
+  getUnfilledPositionTypes,
+} from '../helpers';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { insertActivityLog } from '../../../services/activity-log';
@@ -390,6 +395,10 @@ builder.mutationField('makeDraftPick', (t) =>
           isDraftComplete: result.isDraftComplete,
         });
 
+        // Track effective draft completion across the manual pick + any auto-pick chain.
+        let effectiveDraftComplete = result.isDraftComplete;
+        let chainedNextPickInfo = result.nextPickInfo;
+
         // Send WebSocket notification for the pick (outside transaction)
         if (context.notificationService) {
           await context.notificationService.notifyDraftPickMade(
@@ -415,8 +424,8 @@ builder.mutationField('makeDraftPick', (t) =>
             },
           );
 
-          // If draft completed, also send draft-completed notification
-          if (result.isDraftComplete) {
+          // If the manual pick itself completed the draft, notify now.
+          if (effectiveDraftComplete) {
             await context.notificationService.notifyDraftCompleted(
               result.leagueId,
               result.selectionMethod,
@@ -424,8 +433,420 @@ builder.mutationField('makeDraftPick', (t) =>
           }
         }
 
+        // ── LS-440: Chain consecutive auto-picks ───────────────────────────
+        // After a manual pick, if the next team(s) have auto-pick enabled,
+        // process their picks immediately rather than waiting for the
+        // EventBridge timer to expire (which can take up to 60 seconds).
+        // Uses the same smart FPG × positional-scarcity selection algorithm
+        // as autoProcessDraftPicks in scheduled-mutations.ts.
+        if (!effectiveDraftComplete && chainedNextPickInfo) {
+          const MAX_CHAINED_AUTO_PICKS = 50; // safety cap to stay within Lambda timeout
+          let chainCount = 0;
+
+          while (
+            chainCount < MAX_CHAINED_AUTO_PICKS &&
+            !effectiveDraftComplete &&
+            chainedNextPickInfo
+          ) {
+            // Check if the upcoming team has auto-pick enabled
+            const [upcomingTeamEntry] = await context.db
+              .select({ autoPick: PublicSchema.draftTeams.autoPick })
+              .from(PublicSchema.draftTeams)
+              .where(
+                and(
+                  eq(PublicSchema.draftTeams.draftId, draftId),
+                  eq(
+                    PublicSchema.draftTeams.teamId,
+                    chainedNextPickInfo.teamId,
+                  ),
+                ),
+              )
+              .limit(1);
+
+            if (!upcomingTeamEntry?.autoPick) break;
+
+            // Capture the expected team ID before the async closure to avoid
+            // non-null assertions inside the transaction callback.
+            const expectedAutoPickTeamId = chainedNextPickInfo.teamId;
+
+            // Execute one auto-pick inside a transaction with row-level locking
+            const autoPickResult = await context.db.transaction(
+              async (
+                apTx,
+              ): Promise<{
+                draftPick: typeof PublicSchema.draftPicks.$inferSelect;
+                playerId: number;
+                autoPickReason: string;
+                isDraftComplete: boolean;
+                currentPickInfo: NonNullable<
+                  Awaited<ReturnType<typeof getCurrentDraftPickInfo>>
+                >;
+                nextPickInfo: Awaited<
+                  ReturnType<typeof getCurrentDraftPickInfo>
+                >;
+                nextDeadline: Date | null;
+                leagueId: number;
+                selectionMethod: string;
+              } | null> => {
+                // Lock draft row to prevent concurrent modifications
+                const apDraftRows = await apTx.execute(
+                  sql`SELECT * FROM drafts WHERE id = ${draftId} FOR UPDATE`,
+                );
+                const apDraft = apDraftRows.rows[0] as
+                  | {
+                      id: number;
+                      league_id: number;
+                      current_pick: number;
+                      pick_time_limit_seconds: number;
+                      selection_method: string;
+                    }
+                  | undefined;
+                if (!apDraft) return null;
+
+                const [apLeague] = await apTx
+                  .select()
+                  .from(PublicSchema.leagues)
+                  .where(eq(PublicSchema.leagues.id, apDraft.league_id))
+                  .limit(1);
+                if (!apLeague || apLeague.draftStatus !== 'in-progress')
+                  return null;
+
+                const apPickInfo = await getCurrentDraftPickInfo(apTx, draftId);
+                if (!apPickInfo || apPickInfo.isComplete) return null;
+
+                // Race-condition guard: verify this is still the expected team
+                if (apPickInfo.teamId !== expectedAutoPickTeamId) return null;
+
+                // 1. Fetch undrafted player IDs (deterministic id-ascending order)
+                const undraftedRows = await apTx.execute(
+                  sql`SELECT id FROM players
+                      WHERE id NOT IN (
+                        SELECT player_id FROM draft_picks WHERE draft_id = ${draftId}
+                      )
+                      ORDER BY id ASC`,
+                );
+                const undraftedIds = undraftedRows.rows.map(
+                  (r) => r.id as number,
+                );
+
+                // 2. Apply league eligibility filters
+                const eligibilityResult =
+                  await filterPlayerIdsByLeagueEligibility(apTx, undraftedIds, {
+                    playerPool: apLeague.playerPool,
+                    minCareerGames: apLeague.minCareerGames ?? 0,
+                    minCareerSeasons: apLeague.minCareerSeasons ?? 0,
+                    hofOnly: apLeague.hofOnly ?? false,
+                    eraFilter: apLeague.eraFilter ?? 'all',
+                    customEraStartYear: apLeague.customEraStartYear ?? null,
+                    customEraEndYear: apLeague.customEraEndYear ?? null,
+                  });
+                const eligibleIds = undraftedIds.filter((id) =>
+                  eligibilityResult.eligibleIds.has(id),
+                );
+                if (eligibleIds.length === 0)
+                  throw new Error(
+                    `No available players for auto-pick chain in draft ${draftId}`,
+                  );
+
+                // 3. Unfilled roster position types for this team
+                const unfilledPositionTypes = await getUnfilledPositionTypes(
+                  apTx,
+                  draftId,
+                  apPickInfo.teamId,
+                  apDraft.league_id,
+                );
+
+                // 4. Smart player selection: projected FPG × positional scarcity
+                //    (same algorithm as autoProcessDraftPicks)
+                const statsRows = await apTx.execute(sql`
+                  SELECT
+                    p.id AS player_id,
+                    cf.positions_played,
+                    (
+                      CASE WHEN COALESCE(cb.g, 0) > 0 THEN
+                        (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
+                         COALESCE(cb.triples,0)*3.0 + COALESCE(cb.hr,0)*4.0 +
+                         COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
+                         COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
+                         COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
+                        ) / cb.g
+                      ELSE 0 END
+                      +
+                      CASE WHEN COALESCE(cp.g, 0) > 0 THEN
+                        (COALESCE(cp.w,0)*5.0 + COALESCE(cp.l,0)*-2.0 +
+                         COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
+                         COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
+                         COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
+                        ) / cp.g
+                      ELSE 0 END
+                      +
+                      CASE WHEN COALESCE(cf.g, 0) > 0 THEN
+                        COALESCE(cf.e_def,0) * -1.0 / cf.g
+                      ELSE 0 END
+                    ) AS projected_fpg
+                  FROM players p
+                  LEFT JOIN career_batting cb ON cb.player_id = p.id
+                  LEFT JOIN career_pitching cp ON cp.player_id = p.id
+                  LEFT JOIN career_fielding cf ON cf.player_id = p.id
+                  WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
+                  ORDER BY projected_fpg DESC
+                `);
+
+                const playerDraftInfo = new Map<
+                  number,
+                  { fpg: number; positions: string[] }
+                >();
+                for (const row of statsRows.rows) {
+                  const pid = row.player_id as number;
+                  const pp = row.positions_played as Record<
+                    string,
+                    unknown
+                  > | null;
+                  playerDraftInfo.set(pid, {
+                    fpg: Number(row.projected_fpg) || 0,
+                    positions: pp ? Object.keys(pp) : [],
+                  });
+                }
+
+                let autoPlayerId: number | undefined;
+                let autoPickReason = '';
+
+                if (unfilledPositionTypes.length > 0) {
+                  const totalEligible = Math.max(playerDraftInfo.size, 1);
+                  const positionCandidateCounts = new Map<string, number>();
+                  for (const posType of unfilledPositionTypes) {
+                    const allowedStatPositions =
+                      ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [posType];
+                    let posCount = 0;
+                    for (const [, info] of playerDraftInfo) {
+                      if (
+                        allowedStatPositions.some((sp) =>
+                          info.positions.includes(sp),
+                        )
+                      )
+                        posCount++;
+                    }
+                    positionCandidateCounts.set(posType, Math.max(posCount, 1));
+                  }
+
+                  let bestScore = -Infinity;
+                  for (const [id, info] of playerDraftInfo) {
+                    let scarcityMultiplier = 0.25;
+                    let matchesUnfilled = false;
+                    let bestPosition = '';
+                    for (const posType of unfilledPositionTypes) {
+                      const allowedStatPositions =
+                        ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [posType];
+                      if (
+                        allowedStatPositions.some((sp) =>
+                          info.positions.includes(sp),
+                        )
+                      ) {
+                        matchesUnfilled = true;
+                        const posCount =
+                          positionCandidateCounts.get(posType) ?? totalEligible;
+                        const posScarcity = Math.min(
+                          Math.sqrt(totalEligible / posCount),
+                          5.0,
+                        );
+                        if (posScarcity > scarcityMultiplier) {
+                          scarcityMultiplier = posScarcity;
+                          bestPosition = posType;
+                        }
+                      }
+                    }
+                    const draftScore = info.fpg * scarcityMultiplier;
+                    if (draftScore > bestScore) {
+                      bestScore = draftScore;
+                      autoPlayerId = id;
+                      autoPickReason = matchesUnfilled
+                        ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected FPG (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
+                        : `Best available (bench) — ${info.fpg.toFixed(1)} projected FPG`;
+                    }
+                  }
+                } else {
+                  // All positions filled — pick the highest-FPG player (bench)
+                  const topPlayer = statsRows.rows[0];
+                  if (topPlayer) {
+                    autoPlayerId = topPlayer.player_id as number;
+                    autoPickReason = `Best available (bench) — ${Number(topPlayer.projected_fpg).toFixed(1)} projected FPG`;
+                  }
+                }
+
+                // Final fallback (no career stats)
+                if (autoPlayerId === undefined) {
+                  autoPlayerId = eligibleIds[0];
+                  autoPickReason =
+                    'Fallback selection (no career stats available)';
+                }
+
+                // Roster limit check
+                const [apRosterCount] = await apTx
+                  .select({ count: count() })
+                  .from(PublicSchema.teamMembers)
+                  .where(
+                    and(
+                      eq(PublicSchema.teamMembers.teamId, apPickInfo.teamId),
+                      eq(PublicSchema.teamMembers.leagueId, apDraft.league_id),
+                    ),
+                  );
+                if (
+                  apRosterCount &&
+                  Number(apRosterCount.count) >= apLeague.maxRosterSize
+                ) {
+                  throw new Error(
+                    `Team ${apPickInfo.teamId} roster is full in draft ${draftId}`,
+                  );
+                }
+
+                const apNow = new Date();
+
+                // Insert the auto-pick
+                const [apDraftPick] = await apTx
+                  .insert(PublicSchema.draftPicks)
+                  .values({
+                    draftId,
+                    teamId: apPickInfo.teamId,
+                    playerId: autoPlayerId,
+                    round: apPickInfo.round,
+                    pickNumber: apPickInfo.pickNumber,
+                    overallPick: apPickInfo.overallPick,
+                    pickedAt: apNow,
+                  })
+                  .returning();
+
+                // Determine total picks and draft completion
+                const apNumTeams = (
+                  await apTx
+                    .select()
+                    .from(PublicSchema.draftTeams)
+                    .where(eq(PublicSchema.draftTeams.draftId, draftId))
+                ).length;
+                const apTotalPicks = apNumTeams * apLeague.maxRosterSize;
+                const apIsDraftComplete =
+                  apPickInfo.overallPick >= apTotalPicks;
+
+                const apNextDeadline = apIsDraftComplete
+                  ? null
+                  : new Date(
+                      apNow.getTime() + apDraft.pick_time_limit_seconds * 1000,
+                    );
+
+                // Advance the draft (currentPick, deadline, timestamps)
+                await apTx
+                  .update(PublicSchema.drafts)
+                  .set({
+                    currentPick: apPickInfo.overallPick,
+                    currentPickDeadline: apNextDeadline,
+                    updatedAt: apNow,
+                    ...(apIsDraftComplete ? { draftCompletedAt: apNow } : {}),
+                  })
+                  .where(eq(PublicSchema.drafts.id, draftId));
+
+                if (apIsDraftComplete) {
+                  await apTx
+                    .update(PublicSchema.leagues)
+                    .set({ draftStatus: 'completed' })
+                    .where(eq(PublicSchema.leagues.id, apDraft.league_id));
+                }
+
+                // Add player to team roster
+                await apTx.insert(PublicSchema.teamMembers).values({
+                  teamId: apPickInfo.teamId,
+                  leagueId: apDraft.league_id,
+                  playerId: autoPlayerId,
+                  draftRound: apPickInfo.round,
+                  draftPick: apPickInfo.pickNumber,
+                  acquisitionType: 'draft',
+                });
+
+                // Get next pick info for the loop and notification
+                let apNextPickInfo: Awaited<
+                  ReturnType<typeof getCurrentDraftPickInfo>
+                > = null;
+                if (!apIsDraftComplete) {
+                  apNextPickInfo = await getCurrentDraftPickInfo(apTx, draftId);
+                }
+
+                return {
+                  draftPick: apDraftPick,
+                  playerId: autoPlayerId,
+                  autoPickReason,
+                  isDraftComplete: apIsDraftComplete,
+                  currentPickInfo: apPickInfo,
+                  nextPickInfo: apNextPickInfo,
+                  nextDeadline: apNextDeadline,
+                  leagueId: apDraft.league_id,
+                  selectionMethod: apDraft.selection_method,
+                };
+              },
+            );
+
+            if (!autoPickResult) break;
+
+            chainCount++;
+
+            LOGGER.info('[LS-440] Chained auto-pick made after manual pick', {
+              draftId,
+              leagueId: autoPickResult.leagueId,
+              playerId: autoPickResult.playerId,
+              teamId: autoPickResult.currentPickInfo.teamId,
+              overallPick: autoPickResult.currentPickInfo.overallPick,
+              chainCount,
+              reason: autoPickResult.autoPickReason,
+            });
+
+            // Send WS notification for this chained auto-pick
+            if (context.notificationService) {
+              await context.notificationService.notifyDraftPickMade(
+                autoPickResult.leagueId,
+                draftId,
+                autoPickResult.draftPick.id,
+                autoPickResult.currentPickInfo.teamId,
+                autoPickResult.playerId,
+                autoPickResult.currentPickInfo.round,
+                autoPickResult.currentPickInfo.pickNumber,
+                autoPickResult.currentPickInfo.overallPick,
+                autoPickResult.nextPickInfo
+                  ? {
+                      teamId: autoPickResult.nextPickInfo.teamId,
+                      round: autoPickResult.nextPickInfo.round,
+                      pickNumber: autoPickResult.nextPickInfo.pickNumber,
+                      overallPick: autoPickResult.nextPickInfo.overallPick,
+                    }
+                  : undefined,
+                {
+                  wasAutoPick: true,
+                  autoPickReason: autoPickResult.autoPickReason,
+                  currentPickDeadline:
+                    autoPickResult.nextDeadline?.toISOString() ?? null,
+                },
+              );
+
+              if (autoPickResult.isDraftComplete) {
+                await context.notificationService.notifyDraftCompleted(
+                  autoPickResult.leagueId,
+                  autoPickResult.selectionMethod,
+                );
+              }
+            }
+
+            effectiveDraftComplete = autoPickResult.isDraftComplete;
+            chainedNextPickInfo = autoPickResult.nextPickInfo;
+          }
+
+          if (chainCount > 0) {
+            LOGGER.info('[LS-440] Auto-pick chain complete', {
+              draftId,
+              chainCount,
+              effectiveDraftComplete,
+            });
+          }
+        }
+
         // Auto-create all matchups when draft completes
-        if (result.isDraftComplete) {
+        // (checks effectiveDraftComplete to handle both manual and chained completions)
+        if (effectiveDraftComplete) {
           try {
             const matchupResult = await createAllMatchupsForLeague(
               context.db,
