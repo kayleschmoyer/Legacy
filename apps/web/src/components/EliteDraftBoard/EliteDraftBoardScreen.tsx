@@ -41,6 +41,7 @@ import {
   GetDraftPicks as GET_DRAFT_PICKS,
   GetDraftPitcherStats as GET_DRAFT_PITCHER_STATS,
   GetDraftPlayerStats as GET_DRAFT_PLAYER_STATS,
+  GetDraftTeamOrder as GET_DRAFT_TEAM_ORDER,
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
@@ -50,6 +51,7 @@ import {
   type GetCurrentDraftPickQueryVariables,
   type GetDraftPicksQuery,
   type GetDraftPicksQueryVariables,
+  type GetDraftTeamOrderQuery,
   InitializeLiveDraft as INITIALIZE_LIVE_DRAFT,
   MakeDraftPick as MAKE_DRAFT_PICK,
   NudgeExpiredDraftPick as NUDGE_EXPIRED_DRAFT_PICK,
@@ -462,6 +464,33 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
   const pickHistory: DraftPickRecord[] = (picksData?.getDraftPicks ??
     []) as unknown as DraftPickRecord[];
+
+  // ---- Draft Team Order ----
+  const { data: draftTeamOrderData } = useQuery<GetDraftTeamOrderQuery>(
+    GET_DRAFT_TEAM_ORDER,
+    {
+      variables: { draftId: draftId ?? 0 },
+      skip: !draftId,
+    },
+  );
+
+  // Sort leagueTeams by draft slot so DraftGrid columns match pick order.
+  // Falls back to the original server order when draft slot data is unavailable.
+  const orderedLeagueTeams: LeagueTeam[] = useMemo(() => {
+    const slotEntries = draftTeamOrderData?.getDraftTeamOrder ?? [];
+    if (slotEntries.length === 0) return leagueTeams;
+    const slotMap = new Map<string, number>();
+    for (const e of slotEntries) {
+      if (e.teamId != null && e.draftOrder != null) {
+        slotMap.set(String(e.teamId), e.draftOrder);
+      }
+    }
+    return [...leagueTeams].sort((a, b) => {
+      const slotA = slotMap.get(String(a.id)) ?? Infinity;
+      const slotB = slotMap.get(String(b.id)) ?? Infinity;
+      return slotA - slotB;
+    });
+  }, [leagueTeams, draftTeamOrderData]);
 
   // ---- Available Players (server-side search) ----
   const [playerSearch, setPlayerSearch] = useState('');
@@ -2109,7 +2138,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           {/* Board View (Team Columns) */}
           {viewMode === 'board' && (
             <DraftGrid
-              teams={leagueTeams}
+              teams={orderedLeagueTeams}
               picks={pickHistory}
               currentPickInfo={currentPickInfo}
               myTeamId={myTeamId}
