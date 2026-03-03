@@ -67,6 +67,19 @@ export interface DraftPausedNotification {
   pausedAt: string;
 }
 
+export interface DraftPickUndoneNotification {
+  type: typeof WireNotificationType.DRAFT_PICK_UNDONE;
+  leagueId: number;
+  draftId: number;
+  undonePickId: number;
+  playerId: number;
+  teamId: number;
+  overallPick: number;
+  newCurrentPick: number;
+  newPickDeadline: string;
+  undoneAt: string;
+}
+
 export interface DraftResumedNotification {
   type: typeof WireNotificationType.DRAFT_RESUMED;
   leagueId: number;
@@ -544,6 +557,48 @@ export class WebSocketNotificationService {
     };
 
     LOGGER.info('Sending draft paused notification', { leagueId });
+
+    await this.broadcast(
+      { type: 'notification', data: notification },
+      leagueId,
+    );
+  }
+
+  /**
+   * Send draft pick undone notification to all connections for a specific league.
+   * Informs all clients that the last pick has been rolled back.
+   */
+  async notifyDraftPickUndone(
+    leagueId: number,
+    draftId: number,
+    undonePickId: number,
+    playerId: number,
+    teamId: number,
+    overallPick: number,
+    newCurrentPick: number,
+    newPickDeadline: string,
+  ): Promise<void> {
+    const notification: DraftPickUndoneNotification = {
+      type: WireNotificationType.DRAFT_PICK_UNDONE,
+      leagueId,
+      draftId,
+      undonePickId,
+      playerId,
+      teamId,
+      overallPick,
+      newCurrentPick,
+      newPickDeadline,
+      undoneAt: new Date().toISOString(),
+    };
+
+    LOGGER.info('Sending draft pick undone notification', {
+      leagueId,
+      draftId,
+      undonePickId,
+      playerId,
+      teamId,
+      overallPick,
+    });
 
     await this.broadcast(
       { type: 'notification', data: notification },

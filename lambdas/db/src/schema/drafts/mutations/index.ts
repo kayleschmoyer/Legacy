@@ -12,3 +12,4 @@ import './pause-resume-draft';
 import './commissioner-pick';
 import './draft-order';
 import './toggle-autopick';
+import './undo-last-pick';

@@ -3,6 +3,7 @@ import {
   type DraftCompletedNotification,
   type DraftPausedNotification,
   type DraftPickNotification,
+  type DraftPickUndoneNotification,
   type DraftResumedNotification,
   type DraftStartedNotification,
   type LeagueChatMessageNotification,
@@ -69,6 +70,7 @@ export type {
   DraftCompletedNotification,
   DraftPausedNotification,
   DraftPickNotification,
+  DraftPickUndoneNotification,
   DraftResumedNotification,
   DraftStartedNotification,
   LeagueChatMessageNotification,
@@ -89,6 +91,7 @@ interface UseWebSocketOptions {
   onDraftStarted?: (notification: DraftStartedNotification) => void;
   onDraftCompleted?: (notification: DraftCompletedNotification) => void;
   onDraftPickMade?: (notification: DraftPickNotification) => void;
+  onDraftPickUndone?: (notification: DraftPickUndoneNotification) => void;
   onDraftPaused?: (notification: DraftPausedNotification) => void;
   onDraftResumed?: (notification: DraftResumedNotification) => void;
   onPlayerStatsLoading?: (notification: PlayerStatsLoadingNotification) => void;
@@ -129,6 +132,7 @@ export function useWebSocket({
   onDraftStarted,
   onDraftCompleted,
   onDraftPickMade,
+  onDraftPickUndone,
   onDraftPaused,
   onDraftResumed,
   onPlayerStatsLoading,
@@ -149,6 +153,7 @@ export function useWebSocket({
   const onDraftStartedRef = useLatestRef(onDraftStarted);
   const onDraftCompletedRef = useLatestRef(onDraftCompleted);
   const onDraftPickMadeRef = useLatestRef(onDraftPickMade);
+  const onDraftPickUndoneRef = useLatestRef(onDraftPickUndone);
   const onDraftPausedRef = useLatestRef(onDraftPaused);
   const onDraftResumedRef = useLatestRef(onDraftResumed);
   const onPlayerStatsLoadingRef = useLatestRef(onPlayerStatsLoading);
@@ -324,6 +329,11 @@ export function useWebSocket({
       },
       { type: ClientNotificationType.DRAFT_STARTED, ref: onDraftStartedRef },
       { type: ClientNotificationType.DRAFT_PICK_MADE, ref: onDraftPickMadeRef },
+      {
+        type: ClientNotificationType.DRAFT_PICK_UNDONE,
+        ref: onDraftPickUndoneRef,
+        debugLabel: 'draft-pick-undone',
+      },
       { type: ClientNotificationType.DRAFT_PAUSED, ref: onDraftPausedRef },
       { type: ClientNotificationType.DRAFT_RESUMED, ref: onDraftResumedRef },
       {

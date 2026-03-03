@@ -54,6 +54,19 @@ export interface DraftPausedNotification {
   pausedAt: string;
 }
 
+export interface DraftPickUndoneNotification {
+  type: typeof ClientNotificationType.DRAFT_PICK_UNDONE;
+  leagueId: number;
+  draftId: number;
+  undonePickId: number;
+  playerId: number;
+  teamId: number;
+  overallPick: number;
+  newCurrentPick: number;
+  newPickDeadline: string;
+  undoneAt: string;
+}
+
 export interface DraftResumedNotification {
   type: typeof ClientNotificationType.DRAFT_RESUMED;
   leagueId: number;
@@ -161,6 +174,7 @@ export type NotificationData =
   | DraftCompletedNotification
   | DraftStartedNotification
   | DraftPickNotification
+  | DraftPickUndoneNotification
   | DraftPausedNotification
   | DraftResumedNotification
   | PlayerStatsLoadingNotification

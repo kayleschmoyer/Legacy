@@ -1012,6 +1012,7 @@ export type Mutation = {
   toggleDraftAutoPick?: Maybe<Scalars['Boolean']['output']>;
   /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
   triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
+  undoLastDraftPick?: Maybe<DraftPick>;
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
@@ -1351,6 +1352,10 @@ export type MutationToggleDraftAutoPickArgs = {
 
 export type MutationTriggerSeasonDraftStatLoadingArgs = {
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationUndoLastDraftPickArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationUpdateCommissionerNoteArgs = {

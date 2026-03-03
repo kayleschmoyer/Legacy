@@ -1324,6 +1324,7 @@ type Mutation {
   Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist.
   """
   triggerSeasonDraftStatLoading(playerId: Int!): Boolean
+  undoLastDraftPick(draftId: Int!): DraftPick
 
   """
   Commissioner: update the persistent LM note for a league.

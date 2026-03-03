@@ -108,6 +108,19 @@ mutation ToggleDraftAutoPick($draftId: Int!, $enable: Boolean!) {
   toggleDraftAutoPick(draftId: $draftId, enable: $enable)
 }
 
+mutation UndoLastDraftPick($draftId: Int!) {
+  undoLastDraftPick(draftId: $draftId) {
+    id
+    draftId
+    teamId
+    playerId
+    round
+    pickNumber
+    overallPick
+    pickedAt
+  }
+}
+
 query GetMyDraftTeamAutoPick($draftId: Int!) {
   getMyDraftTeamAutoPick(draftId: $draftId)
 }

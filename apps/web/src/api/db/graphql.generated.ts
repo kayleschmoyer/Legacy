@@ -1030,6 +1030,7 @@ export type Mutation = {
   toggleDraftAutoPick?: Maybe<Scalars['Boolean']['output']>;
   /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
   triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
+  undoLastDraftPick?: Maybe<DraftPick>;
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
@@ -1369,6 +1370,10 @@ export type MutationToggleDraftAutoPickArgs = {
 
 export type MutationTriggerSeasonDraftStatLoadingArgs = {
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationUndoLastDraftPickArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationUpdateCommissionerNoteArgs = {
@@ -3824,6 +3829,25 @@ export type ToggleDraftAutoPickMutationVariables = Exact<{
 export type ToggleDraftAutoPickMutation = {
   __typename?: 'Mutation';
   toggleDraftAutoPick?: boolean | null;
+};
+
+export type UndoLastDraftPickMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type UndoLastDraftPickMutation = {
+  __typename?: 'Mutation';
+  undoLastDraftPick?: {
+    __typename?: 'DraftPick';
+    id?: number | null;
+    draftId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    round?: number | null;
+    pickNumber?: number | null;
+    overallPick?: number | null;
+    pickedAt?: string | null;
+  } | null;
 };
 
 export type GetMyDraftTeamAutoPickQueryVariables = Exact<{
@@ -10140,6 +10164,63 @@ export type ToggleDraftAutoPickMutationResult =
 export type ToggleDraftAutoPickMutationOptions = BaseMutationOptions<
   ToggleDraftAutoPickMutation,
   ToggleDraftAutoPickMutationVariables
+>;
+export const UndoLastDraftPick = gql`
+  mutation UndoLastDraftPick($draftId: Int!) {
+    undoLastDraftPick(draftId: $draftId) {
+      id
+      draftId
+      teamId
+      playerId
+      round
+      pickNumber
+      overallPick
+      pickedAt
+    }
+  }
+`;
+export type UndoLastDraftPickMutationFn = MutationFunction<
+  UndoLastDraftPickMutation,
+  UndoLastDraftPickMutationVariables
+>;
+
+/**
+ * __useUndoLastDraftPickMutation__
+ *
+ * To run a mutation, you first call `useUndoLastDraftPickMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUndoLastDraftPickMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [undoLastDraftPickMutation, { data, loading, error }] = useUndoLastDraftPickMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useUndoLastDraftPickMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UndoLastDraftPickMutation,
+    UndoLastDraftPickMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UndoLastDraftPickMutation,
+    UndoLastDraftPickMutationVariables
+  >(UndoLastDraftPick, options);
+}
+export type UndoLastDraftPickMutationHookResult = ReturnType<
+  typeof useUndoLastDraftPickMutation
+>;
+export type UndoLastDraftPickMutationResult =
+  Apollo.MutationResult<UndoLastDraftPickMutation>;
+export type UndoLastDraftPickMutationOptions = BaseMutationOptions<
+  UndoLastDraftPickMutation,
+  UndoLastDraftPickMutationVariables
 >;
 export const GetMyDraftTeamAutoPick = gql`
   query GetMyDraftTeamAutoPick($draftId: Int!) {

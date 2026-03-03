@@ -11,6 +11,7 @@ import {
   type DraftCompletedNotification,
   type DraftPausedNotification,
   type DraftPickNotification,
+  type DraftPickUndoneNotification,
   type DraftResumedNotification,
   type DraftStartedNotification,
   useWebSocket,
@@ -54,6 +55,7 @@ import {
   NudgeExpiredDraftPick as NUDGE_EXPIRED_DRAFT_PICK,
   PauseDraft as PAUSE_DRAFT,
   ResumeDraft as RESUME_DRAFT,
+  UndoLastDraftPick as UNDO_LAST_DRAFT_PICK,
 } from '../../api/db/graphql.generated';
 import { env } from '../../config/environment';
 
@@ -681,6 +683,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const [commissionerPickMutation, { loading: commPickLoading }] =
     useMutation(COMMISSIONER_PICK);
   const [nudgeExpiredDraftPick] = useMutation(NUDGE_EXPIRED_DRAFT_PICK);
+  const [undoLastDraftPickMutation, { loading: undoPickLoading }] =
+    useMutation(UNDO_LAST_DRAFT_PICK);
 
   // ---- WebSocket ----
   const handleDraftStarted = useCallback(
@@ -817,6 +821,31 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     [draftId, showToast, refetchCurrentPick],
   );
 
+  const handleDraftPickUndone = useCallback(
+    (notification: DraftPickUndoneNotification) => {
+      setLiveMessage(
+        `Pick #${notification.overallPick} has been undone by the commissioner.`,
+      );
+      showToast(`↩️ Pick #${notification.overallPick} undone`, 'info');
+      if (notification.newPickDeadline) {
+        setPickDeadline(new Date(notification.newPickDeadline));
+      }
+      setDraftComplete(false);
+      if (draftId) void refetchCurrentPick({ draftId });
+      void refetchPickHistory();
+      void refetchAvailablePlayers();
+      void refetchDraft();
+    },
+    [
+      draftId,
+      showToast,
+      refetchCurrentPick,
+      refetchPickHistory,
+      refetchAvailablePlayers,
+      refetchDraft,
+    ],
+  );
+
   const { connected: wsConnected } = useWebSocket({
     url: env.websocketUrl,
     leagueId: leagueId ?? undefined,
@@ -825,6 +854,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     autoConnect: !!leagueId && !!token,
     onDraftStarted: handleDraftStarted,
     onDraftPickMade: handleDraftPickMade,
+    onDraftPickUndone: handleDraftPickUndone,
     onDraftCompleted: handleDraftCompleted,
     onDraftPaused: handleDraftPaused,
     onDraftResumed: handleDraftResumed,
@@ -1018,6 +1048,35 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       showToast,
     ],
   );
+
+  // ---- Undo Last Pick ----
+  const handleUndoLastPick = useCallback(async () => {
+    if (!draftId || undoPickLoading) return;
+    try {
+      await undoLastDraftPickMutation({ variables: { draftId } });
+      void refetchCurrentPick({ draftId });
+      void refetchPickHistory();
+      void refetchAvailablePlayers();
+      void refetchDraft();
+      void refetchLeague();
+      setDraftComplete(false);
+      showToast('↩️ Last pick undone', 'info');
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Failed to undo last pick';
+      showToast(msg, 'error');
+    }
+  }, [
+    draftId,
+    undoPickLoading,
+    undoLastDraftPickMutation,
+    refetchCurrentPick,
+    refetchPickHistory,
+    refetchAvailablePlayers,
+    refetchDraft,
+    refetchLeague,
+    showToast,
+  ]);
 
   // ---- Timer (client-side countdown for UX, not authoritative) ----
   // timeRemaining is computed from the server-assigned pickDeadline so it
@@ -1865,6 +1924,19 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   current team
                 </div>
               )}
+
+              <button
+                className="d-comm-btn danger"
+                onClick={() => void handleUndoLastPick()}
+                disabled={undoPickLoading || pickHistory.length === 0}
+                title={
+                  pickHistory.length === 0
+                    ? 'No picks to undo'
+                    : 'Undo the last pick made in this draft'
+                }
+              >
+                {undoPickLoading ? '⏳ Undoing...' : '↩️ Undo Last Pick'}
+              </button>
 
               {/* CPU Team Toggles */}
               {leagueTeams.length > 0 && (
