@@ -153,6 +153,8 @@ export const DraftPlayer = builder.objectRef<{
   firstName: string;
   lastName: string;
   brefId: string;
+  hitterAvgPointsPerGame?: number | null;
+  pitchingAvgPointsPerGame?: number | null;
 }>('DraftPlayer');
 
 DraftPlayer.implement({
@@ -162,6 +164,16 @@ DraftPlayer.implement({
     firstName: t.exposeString('firstName'),
     lastName: t.exposeString('lastName'),
     brefId: t.exposeString('brefId'),
+    hitterAvgPointsPerGame: t.exposeFloat('hitterAvgPointsPerGame', {
+      nullable: true,
+      description:
+        'Career hitter average points per game (batting + fielding score / career games)',
+    }),
+    pitchingAvgPointsPerGame: t.exposeFloat('pitchingAvgPointsPerGame', {
+      nullable: true,
+      description:
+        'Career pitching average points per game (pitching score / career games)',
+    }),
     eligiblePositions: t.stringList({
       description:
         'List of positions this player is eligible to play (e.g. SP, RP, 1B, SS)',

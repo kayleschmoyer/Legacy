@@ -459,8 +459,30 @@ export type DraftPlayer = {
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
+  /** Career hitter average points per game (batting + fielding score / career games) */
+  hitterAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+  /** Career pitching average points per game (pitching score / career games) */
+  pitchingAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
+};
+
+/** A draft pick recommendation produced by the Draft Intelligence algorithm */
+export type DraftRecommendation = {
+  __typename?: 'DraftRecommendation';
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  score?: Maybe<Scalars['Float']['output']>;
+  topStats?: Maybe<Array<DraftRecommendationStat>>;
+};
+
+/** A stat label/value pair displayed on a draft recommendation */
+export type DraftRecommendationStat = {
+  __typename?: 'DraftRecommendationStat';
+  label?: Maybe<Scalars['String']['output']>;
+  value?: Maybe<Scalars['String']['output']>;
 };
 
 /** Auto-pick status for a team in a draft */
@@ -1680,6 +1702,8 @@ export type Query = {
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
+  /** Returns top-5 draft pick recommendations for a team using the Draft Intelligence algorithm (stat value 50% + positional need 30% + scarcity 20%). */
+  getDraftRecommendations?: Maybe<Array<DraftRecommendation>>;
   /** Returns the auto-pick status for every team registered in the given draft. */
   getDraftTeamAutoPickStatuses?: Maybe<Array<DraftTeamAutoPickStatus>>;
   getDraftTeamOrder?: Maybe<Array<DraftTeamOrderEntry>>;
@@ -1845,6 +1869,11 @@ export type QueryGetDraftArgs = {
 
 export type QueryGetDraftPicksArgs = {
   draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftRecommendationsArgs = {
+  draftId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
 };
 
 export type QueryGetDraftTeamAutoPickStatusesArgs = {

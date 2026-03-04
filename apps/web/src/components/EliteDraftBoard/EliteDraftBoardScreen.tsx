@@ -361,6 +361,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         firstName: string;
         lastName: string;
         brefId: string;
+        hitterAvgPointsPerGame?: number | null;
+        pitchingAvgPointsPerGame?: number | null;
       } =>
         p.id != null &&
         p.firstName != null &&
@@ -372,6 +374,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       firstName: p.firstName,
       lastName: p.lastName,
       brefId: p.brefId,
+      hitterAvgPointsPerGame: p.hitterAvgPointsPerGame ?? null,
+      pitchingAvgPointsPerGame: p.pitchingAvgPointsPerGame ?? null,
     }));
 
   // ---- Career Batting Stats (uses existing careerBattingStats connection) ----
@@ -621,6 +625,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         whip: ps?.whip,
         winPct: ps?.winPct,
         gamesStarted: ps?.gamesStarted,
+        ppg: pitcher
+          ? (ap.pitchingAvgPointsPerGame ?? null)
+          : (ap.hitterAvgPointsPerGame ?? null),
       };
     });
   }, [availablePlayers, playerStatsMap, pitchingStatsMap]);

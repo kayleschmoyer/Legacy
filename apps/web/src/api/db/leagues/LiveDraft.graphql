@@ -213,6 +213,8 @@ query GetAvailableDraftPlayers(
     lastName
     brefId
     eligiblePositions
+    hitterAvgPointsPerGame
+    pitchingAvgPointsPerGame
   }
 }
 

@@ -459,8 +459,12 @@ export type DraftPlayer = {
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
+  /** Career hitter average points per game (batting + fielding score / career games) */
+  hitterAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+  /** Career pitching average points per game (pitching score / career games) */
+  pitchingAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
 };
 
 /** A draft pick recommendation produced by the Draft Intelligence algorithm */
@@ -3975,6 +3979,8 @@ export type GetAvailableDraftPlayersQuery = {
     lastName?: string | null;
     brefId?: string | null;
     eligiblePositions?: Array<string> | null;
+    hitterAvgPointsPerGame?: number | null;
+    pitchingAvgPointsPerGame?: number | null;
   }> | null;
 };
 
@@ -10805,6 +10811,8 @@ export const GetAvailableDraftPlayers = gql`
       lastName
       brefId
       eligiblePositions
+      hitterAvgPointsPerGame
+      pitchingAvgPointsPerGame
     }
   }
 `;

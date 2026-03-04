@@ -27,6 +27,8 @@ export interface DraftPlayer {
   whip?: number;
   winPct?: number;
   gamesStarted?: number;
+  /** Career average points per game (hitter PPG for batters, pitching PPG for pitchers) */
+  ppg?: number | null;
 }
 
 export interface AvailableDraftPlayer {
@@ -36,6 +38,8 @@ export interface AvailableDraftPlayer {
   brefId: string;
   /** All positions this player is eligible to play (from playerEligiblePositions table) */
   eligiblePositions?: string[] | null;
+  hitterAvgPointsPerGame?: number | null;
+  pitchingAvgPointsPerGame?: number | null;
 }
 
 /** Stats lookup entry built from careerBattingStats connection */

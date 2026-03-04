@@ -167,6 +167,14 @@ export function PlayerCard({
           </>
         )}
 
+        {/* Career PPG */}
+        {player.ppg != null && (
+          <div className="d-ppg-bar">
+            <span className="d-ppg-label">Career PPG</span>
+            <span className="d-ppg-value">{player.ppg.toFixed(2)}</span>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="d-card-actions">
           <button

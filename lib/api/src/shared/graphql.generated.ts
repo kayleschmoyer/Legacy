@@ -84,6 +84,13 @@ export type AutoSelectGamesResult = {
   leaguesProcessed?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Result of the scheduled draft auto-start job */
+export type AutoStartScheduledDraftsResult = {
+  __typename?: 'AutoStartScheduledDraftsResult';
+  draftsStarted?: Maybe<Scalars['Int']['output']>;
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+};
+
 export type AverageSeasonBatting = {
   __typename?: 'AverageSeasonBatting';
   atBats?: Maybe<Scalars['Float']['output']>;
@@ -415,6 +422,8 @@ export type Draft = {
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
+  /** ISO-8601 timestamp when the draft is scheduled to auto-start (LS-423). Null means no scheduled start. */
+  scheduledAt?: Maybe<Scalars['String']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
@@ -427,6 +436,8 @@ export type DraftPick = {
   overallPick?: Maybe<Scalars['Int']['output']>;
   pickNumber?: Maybe<Scalars['Int']['output']>;
   pickedAt?: Maybe<Scalars['String']['output']>;
+  /** The drafted player. Included so the draft board can display names for all picks (including pitchers who have no career batting entry) without a secondary lookup. */
+  player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   round?: Maybe<Scalars['Int']['output']>;
   team?: Maybe<Team>;
@@ -442,8 +453,45 @@ export type DraftPlayer = {
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
+  /** Career hitter average points per game (batting + fielding score / career games) */
+  hitterAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+  /** Career pitching average points per game (pitching score / career games) */
+  pitchingAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
+};
+
+/** A draft pick recommendation produced by the Draft Intelligence algorithm */
+export type DraftRecommendation = {
+  __typename?: 'DraftRecommendation';
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  score?: Maybe<Scalars['Float']['output']>;
+  topStats?: Maybe<Array<DraftRecommendationStat>>;
+};
+
+/** A stat label/value pair displayed on a draft recommendation */
+export type DraftRecommendationStat = {
+  __typename?: 'DraftRecommendationStat';
+  label?: Maybe<Scalars['String']['output']>;
+  value?: Maybe<Scalars['String']['output']>;
+};
+
+/** Auto-pick status for a team in a draft */
+export type DraftTeamAutoPickStatus = {
+  __typename?: 'DraftTeamAutoPickStatus';
+  autoPick?: Maybe<Scalars['Boolean']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** A team and its assigned slot in the draft order */
+export type DraftTeamOrderEntry = {
+  __typename?: 'DraftTeamOrderEntry';
+  draftOrder?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
 };
 
 export type EditMatchupScoreInput = {
@@ -890,6 +938,8 @@ export type Mutation = {
   autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
+  /** System-only: start all live drafts whose scheduled_at has arrived. Triggered by EventBridge every minute. */
+  autoStartScheduledDrafts?: Maybe<AutoStartScheduledDraftsResult>;
   awardChampionship?: Maybe<ChampionTrophy>;
   /** Award the League Champion badge to the winning team owner. Requires commissioner / system access. */
   awardLeagueChampionBadge?: Maybe<Scalars['Boolean']['output']>;
@@ -944,6 +994,7 @@ export type Mutation = {
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
+  randomizeDraftOrder?: Maybe<Draft>;
   /** Record user consent for a specific data processing type */
   recordConsent?: Maybe<UserConsent>;
   registerDeviceToken?: Maybe<DeviceToken>;
@@ -961,6 +1012,7 @@ export type Mutation = {
   sendDirectMessage?: Maybe<DirectMessage>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
+  setDraftOrder?: Maybe<Draft>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
@@ -972,6 +1024,8 @@ export type Mutation = {
   /** Commissioner: swap the team assignments between two matchups in the same league. */
   swapMatchupTeams?: Maybe<CommissionerActionResult>;
   swapTeamMemberPositions?: Maybe<Array<TeamMember>>;
+  /** Enable or disable auto-pick for the current user's team in a live draft. When enabled the system immediately picks for them as soon as their turn begins. Enabling also activates automatically when a team misses a pick. */
+  toggleDraftAutoPick?: Maybe<Scalars['Boolean']['output']>;
   /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
   triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: update the persistent LM note for a league. */
@@ -1209,6 +1263,10 @@ export type MutationProposeTradeArgs = {
   requestingPlayerIds: Array<Scalars['Int']['input']>;
 };
 
+export type MutationRandomizeDraftOrderArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
 export type MutationRecordConsentArgs = {
   input: RecordConsentInput;
 };
@@ -1259,6 +1317,11 @@ export type MutationSendMatchupMessageArgs = {
   replyToMessageId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationSetDraftOrderArgs = {
+  draftId: Scalars['Int']['input'];
+  teamIds: Array<Scalars['Int']['input']>;
+};
+
 export type MutationSetTeamLockArgs = {
   input: SetTeamLockInput;
 };
@@ -1295,6 +1358,11 @@ export type MutationSwapTeamMemberPositionsArgs = {
   positionIdB?: InputMaybe<Scalars['Int']['input']>;
   teamMemberIdA: Scalars['Int']['input'];
   teamMemberIdB: Scalars['Int']['input'];
+};
+
+export type MutationToggleDraftAutoPickArgs = {
+  draftId: Scalars['Int']['input'];
+  enable: Scalars['Boolean']['input'];
 };
 
 export type MutationTriggerSeasonDraftStatLoadingArgs = {
@@ -1623,6 +1691,11 @@ export type Query = {
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
+  /** Returns top-5 draft pick recommendations for a team using the Draft Intelligence algorithm (stat value 50% + positional need 30% + scarcity 20%). */
+  getDraftRecommendations?: Maybe<Array<DraftRecommendation>>;
+  /** Returns the auto-pick status for every team registered in the given draft. */
+  getDraftTeamAutoPickStatuses?: Maybe<Array<DraftTeamAutoPickStatus>>;
+  getDraftTeamOrder?: Maybe<Array<DraftTeamOrderEntry>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
   getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
   getLeagueDraft?: Maybe<Draft>;
@@ -1636,6 +1709,8 @@ export type Query = {
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
+  /** Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft. */
+  getMyDraftTeamAutoPick?: Maybe<Scalars['Boolean']['output']>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
   getPlayoffBracket?: Maybe<PlayoffBracket>;
   getPlayoffRace?: Maybe<Array<PlayoffQualification>>;
@@ -1785,6 +1860,19 @@ export type QueryGetDraftPicksArgs = {
   draftId: Scalars['Int']['input'];
 };
 
+export type QueryGetDraftRecommendationsArgs = {
+  draftId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftTeamAutoPickStatusesArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryGetDraftTeamOrderArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
 export type QueryGetHeadToHeadRecordArgs = {
   leagueId: Scalars['Int']['input'];
   team1Id: Scalars['Int']['input'];
@@ -1848,6 +1936,10 @@ export type QueryGetMatchupsByWeekArgs = {
 export type QueryGetMatchupsForLeagueArgs = {
   leagueId: Scalars['Int']['input'];
   weekNumber?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetMyDraftTeamAutoPickArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type QueryGetNotificationHistoryArgs = {
@@ -2555,6 +2647,7 @@ export type UpdateDraftSettingsInput = {
   leagueId: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
+  scheduledAt?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -2570,6 +2663,7 @@ export type UpdateDraftSettingsPayload = {
   leagueId?: Maybe<Scalars['Int']['output']>;
   pickTimeLimitSeconds?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
+  scheduledAt?: Maybe<Scalars['String']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
 };
 

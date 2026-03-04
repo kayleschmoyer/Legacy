@@ -510,8 +510,18 @@ type DraftPlayer {
   """
   eligiblePositions: [String!]
   firstName: String
+
+  """
+  Career hitter average points per game (batting + fielding score / career games)
+  """
+  hitterAvgPointsPerGame: Float
   id: Int
   lastName: String
+
+  """
+  Career pitching average points per game (pitching score / career games)
+  """
+  pitchingAvgPointsPerGame: Float
 }
 
 """

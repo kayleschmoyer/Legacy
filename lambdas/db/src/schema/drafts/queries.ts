@@ -338,6 +338,8 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         world_series_rings: number;
         hall_of_fame: boolean;
         rookie_of_the_year: boolean;
+        hitter_avg_ppg?: number | string | null;
+        pitching_avg_ppg?: number | string | null;
       };
 
       const mapRow = (row: RawPlayerRow) => ({
@@ -356,6 +358,10 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         worldSeriesRings: row.world_series_rings ?? 0,
         hallOfFame: row.hall_of_fame ?? false,
         rookieOfTheYear: row.rookie_of_the_year ?? false,
+        hitterAvgPointsPerGame:
+          row.hitter_avg_ppg != null ? Number(row.hitter_avg_ppg) : null,
+        pitchingAvgPointsPerGame:
+          row.pitching_avg_ppg != null ? Number(row.pitching_avg_ppg) : null,
       });
 
       const orderByKey = orderBy ?? 'hitterAvgPointsPerGame';
@@ -389,8 +395,19 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       const scoringCol = sql.raw(
         scoringColMap[orderByKey] ?? scoringColMap['hitterAvgPointsPerGame'],
       );
+      // Extend the base select to also return per-game PPG values from the scoring join
+      const basePlayerSelectWithScore = sql`
+        SELECT
+          p.id, p.first_name, p.last_name, p.bref_id,
+          p.stats_last_fetched_at, p.all_star_selections, p.gold_gloves,
+          p.silver_sluggers, p.mvp_awards, p.cy_young_awards,
+          p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year,
+          CASE WHEN cs.career_games > 0 THEN (cs.batting_score + cs.fielding_score) / cs.career_games ELSE NULL END AS hitter_avg_ppg,
+          CASE WHEN cs.career_games > 0 THEN cs.pitching_score / cs.career_games ELSE NULL END AS pitching_avg_ppg
+        FROM public.players p
+      `;
       const rawQuery = sql`
-        ${basePlayerSelect}
+        ${basePlayerSelectWithScore}
         LEFT JOIN public.compute_career_scores(${draft.leagueId}) cs ON p.id = cs.player_id
         ${whereClause}
         ORDER BY COALESCE(${scoringCol}, 0) DESC

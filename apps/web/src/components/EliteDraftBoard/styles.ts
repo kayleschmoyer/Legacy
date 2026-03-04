@@ -545,6 +545,16 @@ export const CSS = `
 }
 
 /* Card actions */
+.d-ppg-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(135deg, rgba(197, 165, 90, 0.08) 0%, rgba(197, 165, 90, 0.04) 100%);
+  border: 1px solid rgba(197, 165, 90, 0.18);
+  border-radius: var(--d-radius-sm); padding: 5px 10px;
+  margin-bottom: 10px;
+}
+.d-ppg-label { font-size: 9px; font-weight: 700; letter-spacing: 0.8px; color: var(--d-accent); text-transform: uppercase; }
+.d-ppg-value { font-size: 13px; font-weight: 800; color: var(--d-accent); }
+
 .d-card-actions { display: flex; gap: 6px; position: relative; z-index: 1; }
 .d-draft-btn {
   flex: 1; padding: 9px 14px;
