@@ -117,11 +117,15 @@ export const CSS = `
 
 /* ===== Layout ===== */
 .d-root {
-  min-height: 100vh;
+  /* Use fixed positioning to escape any padded layout wrappers (e.g. nav +
+     YStack padding) so the draft board always fills the full viewport
+     without causing a page-level scrollbar. */
+  position: fixed;
+  inset: 0;
+  z-index: 100;
   background: var(--d-bg);
   color: var(--d-text);
   font-family: 'Playfair Display', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  position: relative;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   animation: 0.25s ease 0s 1 normal forwards running fadeSlideIn;
@@ -145,7 +149,8 @@ export const CSS = `
   position: relative; z-index: 1;
   display: grid;
   grid-template-columns: 310px 1fr;
-  height: 100vh;
+  /* 100% fills the fixed .d-root parent which is already viewport-sized */
+  height: 100%;
 }
 
 /* ===== Sidebar ===== */
