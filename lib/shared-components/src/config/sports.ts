@@ -107,6 +107,19 @@ export const DRAFT_ORDERS = Object.freeze([
   { label: 'Linear', value: 'linear' },
 ]);
 
+export const DIVISION_COUNTS = Object.freeze([
+  { label: '1 Division', value: '1' },
+  { label: '2 Divisions', value: '2' },
+  { label: '3 Divisions', value: '3' },
+  { label: '4 Divisions', value: '4' },
+]);
+
+export const SCHEDULING_STRATEGIES = Object.freeze([
+  { label: 'Divisional', value: 'divisional' },
+  { label: 'Round Robin', value: 'round-robin' },
+  { label: 'Random', value: 'random' },
+]);
+
 export const PLAYER_POOLS = Object.freeze([
   { label: 'All MLB', value: 'all' },
   { label: 'National League', value: 'nl' },
