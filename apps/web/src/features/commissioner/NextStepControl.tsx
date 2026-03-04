@@ -103,9 +103,13 @@ export function NextStepControl({
       0,
     ) ?? 0;
 
-  const nextWeek = highestWeek + 1;
   const hasCurrentMatchup = !!currentMatchup && !!currentMatchup.id;
-  const currentWeek = highestWeek;
+  // LS-509: derive currentWeek from the actual currentMatchup (which reflects
+  // leagues.currentMatchup → week-1 after generation), NOT from max(weekNumber).
+  // After createAllMatchupsForLeague pre-creates all 10 weeks, highestWeek = 10
+  // which would wrongly display "Current Matchup: Week 10".
+  const currentWeek = currentMatchup?.weekNumber ?? highestWeek;
+  const nextWeek = currentWeek + 1;
 
   // Get selected games count from matchup data
   const selectedGamesCount = currentMatchup?.selectedGamesCount ?? 0;
