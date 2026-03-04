@@ -94,8 +94,9 @@ class WebRollbarImplementation implements RollbarInterface {
   }
 
   getSentryConfigFromEnv(): RollbarConfig | null {
-    // In a Vite browser bundle, VITE_* env vars are inlined into process.env at build time.
-    // We read both the Vite-prefixed and bare names for compatibility.
+    // process.env.VITE_ROLLBAR_ACCESS_TOKEN is statically replaced by Vite's
+    // `define` config at build time (vite.config.mts).  The bare
+    // ROLLBAR_ACCESS_TOKEN fallback is kept for test/SSR environments.
     const accessToken =
       process.env['VITE_ROLLBAR_ACCESS_TOKEN'] ||
       process.env['ROLLBAR_ACCESS_TOKEN'];

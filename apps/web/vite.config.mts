@@ -178,6 +178,14 @@ export default defineConfig(({ mode }) => {
       'process.env.PLATFORM': JSON.stringify('web'),
       __DEV__: process.env.NODE_ENV === 'development',
 
+      // Rollbar browser-side token — read via process.env in rollbar.web.ts
+      'process.env.VITE_ROLLBAR_ACCESS_TOKEN': JSON.stringify(
+        env.VITE_ROLLBAR_ACCESS_TOKEN || '',
+      ),
+      // Release info used by rollbar.web.ts getSentryConfigFromEnv()
+      'process.env.VITE_COMMIT_SHA': JSON.stringify(commitSha),
+      'process.env.VITE_APP_VERSION': JSON.stringify(appVersion),
+
       // Define environment variables for browser access
       'import.meta.env.VITE_OAUTH_PROXY_URL': JSON.stringify(
         env.VITE_OAUTH_PROXY_URL || 'http://localhost:5001',
