@@ -257,17 +257,41 @@ export class WebSocketNotificationService {
         (error as { name?: string }).name === 'GoneException';
 
       if (isGone) {
-        LOGGER.warn('Stale connection detected, removing', { connectionId });
+        // Grace period: connections younger than 10 s may still be completing
+        // the $connect handshake — a 410 during that window is a race
+        // condition, not a genuinely stale socket.  Conditional delete so we
+        // only remove connections whose connectedAt is older than the grace.
+        const GRACE_MS = 10_000;
+        const threshold = Date.now() - GRACE_MS;
 
-        // Clean up stale connection
-        await this.dynamoClient.send(
-          new DeleteItemCommand({
-            TableName: this.connectionsTableName,
-            Key: {
-              connectionId: { S: connectionId },
-            },
-          }),
-        );
+        try {
+          await this.dynamoClient.send(
+            new DeleteItemCommand({
+              TableName: this.connectionsTableName,
+              Key: {
+                connectionId: { S: connectionId },
+              },
+              ConditionExpression:
+                'attribute_not_exists(connectedAt) OR connectedAt < :threshold',
+              ExpressionAttributeValues: {
+                ':threshold': { N: threshold.toString() },
+              },
+            }),
+          );
+          LOGGER.warn('Stale connection removed', { connectionId });
+        } catch (condErr) {
+          if (
+            (condErr as { name?: string }).name ===
+            'ConditionalCheckFailedException'
+          ) {
+            LOGGER.info(
+              'Connection within grace period, skipping stale removal',
+              { connectionId },
+            );
+          } else {
+            throw condErr;
+          }
+        }
 
         return false;
       }

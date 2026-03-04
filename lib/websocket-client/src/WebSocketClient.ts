@@ -11,7 +11,7 @@ import type {
 } from './types';
 
 // Constants
-const EIGHT_MINUTES = 8 * 60 * 1000;
+const DEFAULT_HEARTBEAT_MS = 8 * 60 * 1000; // 8 minutes
 const MAX_CONSECUTIVE_PINGS = 3;
 
 /**
@@ -50,6 +50,7 @@ export class WebSocketClient {
   private reconnectAttempts = 0;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private heartbeatMs = DEFAULT_HEARTBEAT_MS;
   private lastMessageTime = 0;
   private consecutivePings = 0;
   private disposed = false;
@@ -291,6 +292,23 @@ export class WebSocketClient {
   }
 
   /**
+   * Change the heartbeat interval and restart the heartbeat timer.
+   *
+   * Use a shorter interval (e.g. 15 s) during transient high-value windows
+   * like active drafts so zombie connections are detected quickly, then reset
+   * to the default (8 min) once the window closes.
+   *
+   * Pass `undefined` or `0` to restore the default interval.
+   */
+  public setHeartbeatInterval(ms?: number): void {
+    this.heartbeatMs = ms && ms > 0 ? ms : DEFAULT_HEARTBEAT_MS;
+    // Restart the heartbeat with the new cadence if we are already connected.
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.startHeartbeat();
+    }
+  }
+
+  /**
    * Build WebSocket URL with query parameters
    */
   private buildUrl(): string {
@@ -419,7 +437,7 @@ export class WebSocketClient {
 
   /**
    * Start heartbeat mechanism
-   * Only sends pings during idle periods (8+ minutes without messages)
+   * Sends pings when idle longer than the current heartbeat interval.
    */
   private startHeartbeat(): void {
     this.stopHeartbeat();
@@ -427,8 +445,8 @@ export class WebSocketClient {
     this.heartbeatInterval = setInterval(() => {
       const timeSinceLastMessage = Date.now() - this.lastMessageTime;
 
-      // Only ping if idle for 8+ minutes
-      if (timeSinceLastMessage >= EIGHT_MINUTES) {
+      // Only ping if idle for the configured interval
+      if (timeSinceLastMessage >= this.heartbeatMs) {
         this.consecutivePings++;
 
         // Disconnect if no response after 3 consecutive pings
@@ -438,13 +456,16 @@ export class WebSocketClient {
           return;
         }
 
-        LOGGER.debug('Sending ping (idle for 8+ min)');
+        LOGGER.debug('Sending heartbeat ping', {
+          idleMs: timeSinceLastMessage,
+          intervalMs: this.heartbeatMs,
+        });
         this.send({ type: 'ping' });
       } else {
         // Reset ping counter if we received messages
         this.consecutivePings = 0;
       }
-    }, EIGHT_MINUTES); // Check every 8 minutes
+    }, this.heartbeatMs);
   }
 
   /**

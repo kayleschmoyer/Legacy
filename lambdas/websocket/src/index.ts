@@ -906,16 +906,45 @@ export async function sendMessageToConnection(
       (error as { name?: string }).name === 'GoneException';
 
     if (isGone) {
-      LOGGER.warn('Stale connection, removing', { connectionId });
+      // Grace period: connections younger than 10 s may still be completing
+      // the $connect handshake — a 410 during that window is likely a race
+      // condition (API Gateway hasn't fully registered the route yet), not a
+      // genuinely stale socket.  Use a conditional delete so we only remove
+      // connections whose connectedAt is older than the grace threshold.
+      const GRACE_MS = 10_000;
+      const threshold = Date.now() - GRACE_MS;
 
-      await dynamoClient.send(
-        new DeleteItemCommand({
-          TableName: connectionsTable,
-          Key: {
-            connectionId: { S: connectionId },
-          },
-        }),
-      );
+      try {
+        await dynamoClient.send(
+          new DeleteItemCommand({
+            TableName: connectionsTable,
+            Key: {
+              connectionId: { S: connectionId },
+            },
+            ConditionExpression:
+              'attribute_not_exists(connectedAt) OR connectedAt < :threshold',
+            ExpressionAttributeValues: {
+              ':threshold': { N: threshold.toString() },
+            },
+          }),
+        );
+        LOGGER.warn('Stale connection removed', { connectionId });
+      } catch (condErr) {
+        // ConditionalCheckFailedException means the connection is within the
+        // grace period — leave the DynamoDB row intact so the next broadcast
+        // can retry delivery once the handshake finishes.
+        if (
+          (condErr as { name?: string }).name ===
+          'ConditionalCheckFailedException'
+        ) {
+          LOGGER.info(
+            'Connection within grace period, skipping stale removal',
+            { connectionId },
+          );
+        } else {
+          throw condErr;
+        }
+      }
     } else {
       throw error;
     }

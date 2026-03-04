@@ -645,6 +645,33 @@ export function LeagueDetailPage(): React.JSX.Element {
   const league = reduxLeagueData ?? data?.league;
   // Keep the ref in sync with the latest derived draftStatus on every render.
   leagueDraftStatusRef.current = league?.draftStatus;
+
+  // Stable snapshot used by the effects below so they have a proper dep value.
+  const draftStatus = league?.draftStatus ?? null;
+
+  // While a draft is pending / running, shorten the WebSocket heartbeat to 15 s
+  // so that a zombie connection (server-side row deleted but TCP still alive) is
+  // detected and recycled quickly — much cheaper than polling the GraphQL API.
+  const DRAFT_HEARTBEAT_MS = 15_000;
+  useEffect(() => {
+    if (!wsClient) return;
+    if (draftStatus === 'in-progress' || draftStatus === 'queued') {
+      wsClient.setHeartbeatInterval(DRAFT_HEARTBEAT_MS);
+    } else {
+      // Reset to the default 8-minute cadence
+      wsClient.setHeartbeatInterval();
+    }
+  }, [wsClient, draftStatus]);
+
+  // When the draft transitions to 'completed' (via WS event or reconnect
+  // catch-up), also refetch team members so newly drafted players appear on the
+  // roster tab.
+  useEffect(() => {
+    if (draftStatus === 'completed') {
+      void refetchTeamMembersRef.current?.();
+    }
+  }, [draftStatus]);
+
   const positions = useMemo(
     () =>
       reduxPositions.length > 0
