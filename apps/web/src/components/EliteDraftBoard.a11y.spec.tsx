@@ -5,6 +5,14 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { EliteDraftBoardScreen } from './EliteDraftBoard';
 
 // ---------------------------------------------------------------------------
+// LeagueChatTab uses GifPicker which calls import.meta.env (Vite-only).
+// Stub it out so the Jest environment can parse EliteDraftBoardScreen.
+// ---------------------------------------------------------------------------
+jest.mock('../features/baseball/LeagueChatTab', () => ({
+  LeagueChatTab: () => null,
+}));
+
+// ---------------------------------------------------------------------------
 // Apollo mock — every useQuery returns all possible top-level fields so the
 // component finds the data it needs regardless of which query document was
 // passed.  useMutation returns a no-op callable.
