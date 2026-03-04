@@ -162,8 +162,9 @@ async function getSelectedGamesCount(
 
 // ── Mutation: autoSelectGames ────────────────────────────────────────────────
 // Triggered nightly at midnight EST by EventBridge.
-// For every active league with in-progress matchups, determines the next game
-// number and triggers game selection via SQS (same path as the UI flow).
+// For every active league with in-progress or scheduled (current-week) matchups,
+// determines the next game number and triggers game selection via SQS.
+// Also used by the commissioner UI button (leagueId provided).
 
 builder.mutationField('autoSelectGames', (t) =>
   t.field({
@@ -211,9 +212,11 @@ builder.mutationField('autoSelectGames', (t) =>
           `[autoSelectGames] Found ${activeLeagues.length} active leagues`,
         );
 
-        // 2. Bulk-fetch all in-progress matchups for all active leagues (1 query)
+        // 2. Bulk-fetch all actionable matchups (in_progress OR scheduled) for all
+        //    active leagues in a single query. Scheduled matchups are included so that
+        //    commissioner-triggered game selection works before the week is advanced.
         const activeLeagueIds = activeLeagues.map((l) => l.id);
-        const allInProgressMatchups =
+        const allActionableMatchups =
           activeLeagueIds.length > 0
             ? await context.db
                 .select({
@@ -227,20 +230,38 @@ builder.mutationField('autoSelectGames', (t) =>
                 .where(
                   and(
                     inArray(PublicSchema.matchups.leagueId, activeLeagueIds),
-                    eq(PublicSchema.matchups.status, 'in_progress'),
+                    inArray(PublicSchema.matchups.status, [
+                      'in_progress',
+                      'scheduled',
+                    ]),
                   ),
                 )
             : [];
 
+        // Group matchups by league, then keep only the minimum (current) week so
+        // future scheduled weeks are never accidentally processed.
+        const allMatchupsByLeague = new Map<
+          number,
+          typeof allActionableMatchups
+        >();
+        for (const m of allActionableMatchups) {
+          if (!allMatchupsByLeague.has(m.leagueId)) {
+            allMatchupsByLeague.set(m.leagueId, []);
+          }
+          allMatchupsByLeague.get(m.leagueId)!.push(m);
+        }
+
+        // Resolve the current-week matchups per league (lowest week number)
         const matchupsByLeague = new Map<
           number,
-          typeof allInProgressMatchups
+          typeof allActionableMatchups
         >();
-        for (const m of allInProgressMatchups) {
-          if (!matchupsByLeague.has(m.leagueId)) {
-            matchupsByLeague.set(m.leagueId, []);
-          }
-          matchupsByLeague.get(m.leagueId)!.push(m);
+        for (const [lid, matchups] of allMatchupsByLeague) {
+          const minWeek = Math.min(...matchups.map((m) => m.weekNumber));
+          matchupsByLeague.set(
+            lid,
+            matchups.filter((m) => m.weekNumber === minWeek),
+          );
         }
 
         // 3. Batch selectedGamesCount for all reference matchups in parallel
@@ -264,7 +285,7 @@ builder.mutationField('autoSelectGames', (t) =>
 
             if (currentMatchups.length === 0) {
               LOGGER.debug(
-                `[autoSelectGames] League ${league.id} (${league.name}) has no in-progress matchups, skipping`,
+                `[autoSelectGames] League ${league.id} (${league.name}) has no actionable matchups (in_progress or scheduled), skipping`,
               );
               continue;
             }
