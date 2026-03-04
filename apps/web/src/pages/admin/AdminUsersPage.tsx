@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Button,
   useAuth,
@@ -9,6 +9,7 @@ import { Card, H1, Input, Paragraph, Spinner, Text } from 'tamagui';
 import { Navigate } from 'react-router-dom';
 import {
   useGetAllUsersQuery,
+  useGetUsersCountQuery,
   useUpdateUserRoleMutation,
 } from '../../api/db/graphql.generated';
 import {
@@ -18,19 +19,42 @@ import {
   withAlpha,
 } from '../../constants/colors';
 
+const PAGE_SIZE = 25;
+
 /**
  * AdminUsersPage — allows admins to view all users and promote/demote admin access.
+ * Supports server-side search (debounced) and paginated results.
  * Only accessible to users with accessLevel === 'admin'.
  */
 export default function AdminUsersPage() {
   const { user } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [feedbackMap, setFeedbackMap] = useState<Record<number, string>>({});
 
   const isAdmin = user?.accessLevel === 'admin';
 
+  // Debounce search input by 400ms; reset to page 1 on new search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const searchVar = debouncedSearch.length > 0 ? debouncedSearch : undefined;
+  const offset = (currentPage - 1) * PAGE_SIZE;
+
   const { data, loading, error, refetch } = useGetAllUsersQuery({
-    variables: { limit: 200 },
+    variables: { limit: PAGE_SIZE, offset, search: searchVar },
+    fetchPolicy: 'cache-and-network',
+    skip: !isAdmin,
+  });
+
+  const { data: countData, loading: countLoading } = useGetUsersCountQuery({
+    variables: { search: searchVar },
     fetchPolicy: 'cache-and-network',
     skip: !isAdmin,
   });
@@ -42,14 +66,9 @@ export default function AdminUsersPage() {
     return <Navigate to="/" replace />;
   }
 
-  const allUsers = data?.users ?? [];
-  const filtered = searchTerm.trim()
-    ? allUsers.filter(
-        (u) =>
-          u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          u.username?.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    : allUsers;
+  const users = data?.users ?? [];
+  const totalCount = countData?.usersCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   async function handleToggleRole(
     userId: number,
@@ -78,6 +97,32 @@ export default function AdminUsersPage() {
     }
   }
 
+  function handlePageChange(page: number) {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  }
+
+  // Build visible page numbers (at most 7: first, last, current ±1, with ellipsis)
+  function getPageNumbers(): (number | '...')[] {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages: (number | '...')[] = [];
+    pages.push(1);
+    if (currentPage > 3) pages.push('...');
+    for (
+      let i = Math.max(2, currentPage - 1);
+      i <= Math.min(totalPages - 1, currentPage + 1);
+      i++
+    ) {
+      pages.push(i);
+    }
+    if (currentPage < totalPages - 2) pages.push('...');
+    pages.push(totalPages);
+    return pages;
+  }
+
   return (
     <YStack
       padding="$5"
@@ -102,20 +147,25 @@ export default function AdminUsersPage() {
         <Input
           flex={1}
           placeholder="Search by email or username…"
-          value={searchTerm}
-          onChangeText={setSearchTerm}
+          value={searchInput}
+          onChangeText={setSearchInput}
           autoCapitalize="none"
           autoCorrect={false}
         />
-        {searchTerm.length > 0 && (
-          <Button size="$3" onPress={() => setSearchTerm('')}>
+        {searchInput.length > 0 && (
+          <Button
+            size="$3"
+            onPress={() => {
+              setSearchInput('');
+            }}
+          >
             Clear
           </Button>
         )}
       </XStack>
 
-      {/* States */}
-      {loading && (
+      {/* Initial loading state (no users yet) */}
+      {(loading || countLoading) && users.length === 0 && (
         <XStack justifyContent="center" padding="$6">
           <Spinner size="large" />
         </XStack>
@@ -134,22 +184,40 @@ export default function AdminUsersPage() {
         </Card>
       )}
 
-      {!loading && !error && (
+      {!error && (
         <YStack gap="$3">
-          <Paragraph color="$colorPress" size="$3">
-            {filtered.length} user{filtered.length !== 1 ? 's' : ''} shown
-          </Paragraph>
+          {/* Result summary */}
+          <XStack justifyContent="space-between" alignItems="center">
+            <Paragraph color="$colorPress" size="$3">
+              {countLoading ? (
+                'Loading…'
+              ) : (
+                <>
+                  {totalCount} user{totalCount !== 1 ? 's' : ''}
+                  {debouncedSearch
+                    ? ` matching "${debouncedSearch}"`
+                    : ' total'}
+                  {totalPages > 1
+                    ? ` — page ${currentPage} of ${totalPages}`
+                    : ''}
+                </>
+              )}
+            </Paragraph>
+            {loading && <Spinner size="small" />}
+          </XStack>
 
-          {filtered.length === 0 && (
+          {users.length === 0 && !loading && (
             <Card padding="$4">
               <Paragraph color="$colorPress" textAlign="center">
-                No users match your search.
+                {debouncedSearch
+                  ? 'No users match your search.'
+                  : 'No users found.'}
               </Paragraph>
             </Card>
           )}
 
-          {filtered.map((u) => {
-            const isAdmin = u.accessLevel === 'admin';
+          {users.map((u) => {
+            const isUserAdmin = u.accessLevel === 'admin';
             const feedback = feedbackMap[u.id as number];
             const displayId = u.id as number;
 
@@ -159,10 +227,10 @@ export default function AdminUsersPage() {
                 padding="$4"
                 borderWidth={1}
                 borderColor={
-                  isAdmin ? withAlpha(BRAND_GOLD, 0.4) : '$borderColor'
+                  isUserAdmin ? withAlpha(BRAND_GOLD, 0.4) : '$borderColor'
                 }
                 backgroundColor={
-                  isAdmin ? withAlpha(BRAND_NAVY, 0.08) : '$background'
+                  isUserAdmin ? withAlpha(BRAND_NAVY, 0.08) : '$background'
                 }
                 pressStyle={{ scale: 0.995 }}
               >
@@ -173,7 +241,7 @@ export default function AdminUsersPage() {
                       <Text fontWeight="600" color="$color">
                         {u.username ?? u.email ?? `User #${displayId}`}
                       </Text>
-                      {isAdmin && (
+                      {isUserAdmin && (
                         <Text
                           fontSize={11}
                           fontWeight="700"
@@ -218,26 +286,86 @@ export default function AdminUsersPage() {
                       }
                       disabled={updating}
                       backgroundColor={
-                        isAdmin
+                        isUserAdmin
                           ? withAlpha(BRAND_SEAM_RED, 0.12)
                           : withAlpha(BRAND_NAVY, 0.12)
                       }
-                      borderColor={isAdmin ? BRAND_SEAM_RED : BRAND_NAVY}
+                      borderColor={isUserAdmin ? BRAND_SEAM_RED : BRAND_NAVY}
                       borderWidth={1}
-                      color={isAdmin ? BRAND_SEAM_RED : BRAND_NAVY}
+                      color={isUserAdmin ? BRAND_SEAM_RED : BRAND_NAVY}
                       hoverStyle={{
-                        backgroundColor: isAdmin
+                        backgroundColor: isUserAdmin
                           ? withAlpha(BRAND_SEAM_RED, 0.2)
                           : withAlpha(BRAND_NAVY, 0.2),
                       }}
                     >
-                      {isAdmin ? 'Revoke Admin' : 'Make Admin'}
+                      {isUserAdmin ? 'Revoke Admin' : 'Make Admin'}
                     </Button>
                   </XStack>
                 </XStack>
               </Card>
             );
           })}
+
+          {/* Pagination controls */}
+          {totalPages > 1 && (
+            <XStack
+              justifyContent="center"
+              alignItems="center"
+              gap="$2"
+              paddingTop="$2"
+              flexWrap="wrap"
+            >
+              <Button
+                size="$3"
+                disabled={currentPage === 1}
+                onPress={() => handlePageChange(currentPage - 1)}
+                opacity={currentPage === 1 ? 0.4 : 1}
+              >
+                ← Prev
+              </Button>
+
+              {getPageNumbers().map((page, idx) =>
+                page === '...' ? (
+                  <Text
+                    key={`ellipsis-${idx}`}
+                    color="$colorPress"
+                    paddingHorizontal="$2"
+                  >
+                    …
+                  </Text>
+                ) : (
+                  <Button
+                    key={page}
+                    size="$3"
+                    onPress={() => handlePageChange(page)}
+                    backgroundColor={
+                      page === currentPage
+                        ? withAlpha(BRAND_NAVY, 0.15)
+                        : undefined
+                    }
+                    borderColor={
+                      page === currentPage ? BRAND_NAVY : '$borderColor'
+                    }
+                    borderWidth={1}
+                    color={page === currentPage ? BRAND_NAVY : '$color'}
+                    fontWeight={page === currentPage ? '700' : '400'}
+                  >
+                    {page}
+                  </Button>
+                ),
+              )}
+
+              <Button
+                size="$3"
+                disabled={currentPage === totalPages}
+                onPress={() => handlePageChange(currentPage + 1)}
+                opacity={currentPage === totalPages ? 0.4 : 1}
+              >
+                Next →
+              </Button>
+            </XStack>
+          )}
         </YStack>
       )}
     </YStack>

@@ -29,6 +29,8 @@ export interface UserFilters {
 
 export interface UserQueryOptions {
   filters?: UserFilters;
+  /** OR search across email and username (case-insensitive) */
+  searchTerm?: string;
   limit?: number;
   offset?: number;
   orderBy?: 'id' | 'email' | 'username';
@@ -52,6 +54,16 @@ export class UserService {
       const conditions = queryOptions.filters
         ? this.buildUserFilters(queryOptions.filters)
         : [];
+
+      // Server-side OR search across email and username
+      if (queryOptions.searchTerm) {
+        conditions.push(
+          or(
+            ilike(PublicSchema.users.email, `%${queryOptions.searchTerm}%`),
+            ilike(PublicSchema.users.username, `%${queryOptions.searchTerm}%`),
+          ) as SQL,
+        );
+      }
 
       if (conditions.length > 0) {
         // TypeScript has issues with Drizzle's complex query builder types
@@ -130,15 +142,29 @@ export class UserService {
   }
 
   /**
-   * Count users with optional filtering
+   * Count users with optional filtering and/or search term
    */
-  async countUsers(filters?: UserFilters): Promise<number> {
+  async countUsers(options?: {
+    filters?: UserFilters;
+    searchTerm?: string;
+  }): Promise<number> {
     return runWithPublicClient(this.options, async (db) => {
       const queryBuilder = db
         .select({ count: count() })
         .from(PublicSchema.users);
 
-      const conditions = filters ? this.buildUserFilters(filters) : [];
+      const conditions = options?.filters
+        ? this.buildUserFilters(options.filters)
+        : [];
+
+      if (options?.searchTerm) {
+        conditions.push(
+          or(
+            ilike(PublicSchema.users.email, `%${options.searchTerm}%`),
+            ilike(PublicSchema.users.username, `%${options.searchTerm}%`),
+          ) as SQL,
+        );
+      }
 
       let finalQuery = queryBuilder;
       if (conditions.length > 0) {

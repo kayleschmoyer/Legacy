@@ -1865,6 +1865,7 @@ export type Query = {
   userLeagues: Array<League>;
   userTeamId?: Maybe<Scalars['Int']['output']>;
   users?: Maybe<Array<User>>;
+  usersCount?: Maybe<Scalars['Int']['output']>;
   validateInviteCode?: Maybe<InviteCodeInfo>;
   /** Get version and deployment information for the GraphQL API */
   version?: Maybe<VersionInfo>;
@@ -2289,6 +2290,11 @@ export type QueryUsersArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryUsersCountArgs = {
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryValidateInviteCodeArgs = {

@@ -19,15 +19,20 @@ query GetUserById($id: Int!) {
   }
 }
 
-query GetAllUsers($limit: Int, $offset: Int) {
+query GetAllUsers($limit: Int, $offset: Int, $search: String) {
   users(
     limit: $limit
     offset: $offset
     orderBy: "email"
     orderDirection: "asc"
+    search: $search
   ) {
     ...User
   }
+}
+
+query GetUsersCount($search: String) {
+  usersCount(search: $search)
 }
 
 mutation UpdateUserRole($userId: Int!, $accessLevel: String!) {

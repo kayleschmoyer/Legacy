@@ -1859,6 +1859,7 @@ export type Query = {
   userLeagues: Array<League>;
   userTeamId?: Maybe<Scalars['Int']['output']>;
   users?: Maybe<Array<User>>;
+  usersCount?: Maybe<Scalars['Int']['output']>;
   validateInviteCode?: Maybe<InviteCodeInfo>;
   /** Get version and deployment information for the GraphQL API */
   version?: Maybe<VersionInfo>;
@@ -2283,6 +2284,11 @@ export type QueryUsersArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryUsersCountArgs = {
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryValidateInviteCodeArgs = {
@@ -6694,6 +6700,7 @@ export type GetUserByIdQuery = {
 export type GetAllUsersQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetAllUsersQuery = {
@@ -6706,6 +6713,15 @@ export type GetAllUsersQuery = {
     accessLevel?: string | null;
     avatarUrl?: string | null;
   }> | null;
+};
+
+export type GetUsersCountQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetUsersCountQuery = {
+  __typename?: 'Query';
+  usersCount?: number | null;
 };
 
 export type UpdateUserRoleMutationVariables = Exact<{
@@ -16035,12 +16051,13 @@ export type GetUserByIdQueryResult = Apollo.QueryResult<
   GetUserByIdQueryVariables
 >;
 export const GetAllUsers = gql`
-  query GetAllUsers($limit: Int, $offset: Int) {
+  query GetAllUsers($limit: Int, $offset: Int, $search: String) {
     users(
       limit: $limit
       offset: $offset
       orderBy: "email"
       orderDirection: "asc"
+      search: $search
     ) {
       ...User
     }
@@ -16062,6 +16079,7 @@ export const GetAllUsers = gql`
  *   variables: {
  *      limit: // value for 'limit'
  *      offset: // value for 'offset'
+ *      search: // value for 'search'
  *   },
  * });
  */
@@ -16121,6 +16139,90 @@ export type GetAllUsersSuspenseQueryHookResult = ReturnType<
 export type GetAllUsersQueryResult = Apollo.QueryResult<
   GetAllUsersQuery,
   GetAllUsersQueryVariables
+>;
+export const GetUsersCount = gql`
+  query GetUsersCount($search: String) {
+    usersCount(search: $search)
+  }
+`;
+
+/**
+ * __useGetUsersCountQuery__
+ *
+ * To run a query within a React component, call `useGetUsersCountQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetUsersCountQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetUsersCountQuery({
+ *   variables: {
+ *      search: // value for 'search'
+ *   },
+ * });
+ */
+export function useGetUsersCountQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetUsersCountQuery,
+    GetUsersCountQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetUsersCountQuery, GetUsersCountQueryVariables>(
+    GetUsersCount,
+    options,
+  );
+}
+export function useGetUsersCountLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetUsersCountQuery,
+    GetUsersCountQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetUsersCountQuery, GetUsersCountQueryVariables>(
+    GetUsersCount,
+    options,
+  );
+}
+export function useGetUsersCountSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUsersCountQuery,
+        GetUsersCountQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetUsersCountQuery,
+    GetUsersCountQueryVariables
+  >(
+    GetUsersCount,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetUsersCountQuery,
+          GetUsersCountQueryVariables
+        >,
+  );
+}
+export type GetUsersCountQueryHookResult = ReturnType<
+  typeof useGetUsersCountQuery
+>;
+export type GetUsersCountLazyQueryHookResult = ReturnType<
+  typeof useGetUsersCountLazyQuery
+>;
+export type GetUsersCountSuspenseQueryHookResult = ReturnType<
+  typeof useGetUsersCountSuspenseQuery
+>;
+export type GetUsersCountQueryResult = Apollo.QueryResult<
+  GetUsersCountQuery,
+  GetUsersCountQueryVariables
 >;
 export const UpdateUserRole = gql`
   mutation UpdateUserRole($userId: Int!, $accessLevel: String!) {

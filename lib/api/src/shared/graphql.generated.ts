@@ -1859,6 +1859,7 @@ export type Query = {
   userLeagues: Array<League>;
   userTeamId?: Maybe<Scalars['Int']['output']>;
   users?: Maybe<Array<User>>;
+  usersCount?: Maybe<Scalars['Int']['output']>;
   validateInviteCode?: Maybe<InviteCodeInfo>;
   /** Get version and deployment information for the GraphQL API */
   version?: Maybe<VersionInfo>;
@@ -2283,6 +2284,11 @@ export type QueryUsersArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryUsersCountArgs = {
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QueryValidateInviteCodeArgs = {
@@ -2605,6 +2611,8 @@ export type Team = {
   isLocked?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   logoUrl?: Maybe<Scalars['String']['output']>;
+  /** The userId of the primary manager for this team (from leagueMembers). */
+  managerId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;

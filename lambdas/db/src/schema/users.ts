@@ -37,6 +37,7 @@ builder.queryField('users', (t) =>
       offset: t.arg.int({ required: false }),
       orderBy: t.arg.string({ required: false }),
       orderDirection: t.arg.string({ required: false }),
+      search: t.arg.string({ required: false }),
     },
     resolve: async (root, args, context) => {
       // Admin only — this endpoint lists all users with their email addresses
@@ -51,8 +52,9 @@ builder.queryField('users', (t) =>
       const users = await dbService.users.getUsers({
         limit: args.limit || undefined,
         offset: args.offset || undefined,
-        orderBy: orderBy || 'id',
+        orderBy: orderBy || 'email',
         orderDirection: orderDirection || 'asc',
+        searchTerm: args.search || undefined,
       });
 
       return users.map((u) => ({
@@ -62,6 +64,26 @@ builder.queryField('users', (t) =>
         accessLevel: u.accessLevel,
         avatarUrl: u.avatarUrl ?? null,
       }));
+    },
+  }),
+);
+
+builder.queryField('usersCount', (t) =>
+  t.field({
+    type: 'Int',
+    args: {
+      search: t.arg.string({ required: false }),
+    },
+    resolve: async (root, args, context) => {
+      // Admin only
+      const user = requireAuth(context);
+      if (!user.isAdmin) {
+        throw ForbiddenError('Admin access required to count users');
+      }
+
+      return dbService.users.countUsers({
+        searchTerm: args.search || undefined,
+      });
     },
   }),
 );

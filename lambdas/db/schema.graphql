@@ -2039,7 +2039,9 @@ type Query {
     offset: Int
     orderBy: String
     orderDirection: String
+    search: String
   ): [User!]
+  usersCount(search: String): Int
   validateInviteCode(code: String!): InviteCodeInfo
 
   """
