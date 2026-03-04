@@ -347,24 +347,38 @@ builder.queryField('userTeamId', (t) =>
       const userId = context.user.id;
 
       try {
-        // Get user's team ID for this league — only match general_manager rows
-        // so that users with commissioner/assistant roles on other teams don't
-        // get the wrong team highlighted as "YOU" in the standings.
-        const membership = await context.db
+        // Fetch all of this user's memberships in the league (any role).
+        // Multiple rows can exist when a user holds different roles across teams
+        // (e.g. GM on one team + commissioner on another). We prioritise by role
+        // so the user's own team is always returned: GM > commissioner > assistant.
+        const memberships = await context.db
           .select({
             teamId: PublicSchema.leagueMembers.teamId,
+            permissionLevel: PublicSchema.leagueMembers.permissionLevel,
           })
           .from(PublicSchema.leagueMembers)
           .where(
             and(
               eq(PublicSchema.leagueMembers.leagueId, leagueId),
               eq(PublicSchema.leagueMembers.userId, userId),
-              eq(PublicSchema.leagueMembers.permissionLevel, 'general_manager'),
             ),
-          )
-          .limit(1);
+          );
 
-        return membership.length > 0 ? membership[0].teamId : null;
+        if (memberships.length === 0) return null;
+
+        const rolePriority: Record<string, number> = {
+          general_manager: 0,
+          commissioner: 1,
+          assistant_manager: 2,
+        };
+
+        const best = memberships.sort(
+          (a, b) =>
+            (rolePriority[a.permissionLevel] ?? 99) -
+            (rolePriority[b.permissionLevel] ?? 99),
+        )[0];
+
+        return best.teamId;
       } catch (error) {
         LOGGER.error('Error fetching user team ID', {
           leagueId,
