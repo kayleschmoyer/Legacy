@@ -85,6 +85,10 @@ cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
 code $wt   # open in a new VS Code window; do all work there
 ```
 
+> **Agent multi-root access (optional):** Run `make sync-worktrees` from the main
+> repo, then `code legacy-sports.code-workspace` to open one VS Code window with
+> the main repo and all active worktrees. This gives agents full search access
+> across worktrees. See [worktree-workflow](../worktree-workflow/SKILL.md) for details.
 > **⚠️ CRITICAL — switch your working context now.** From this point forward, every file
 > edit, terminal command, and git operation must happen inside `$wt`. Never edit files
 > under `D:\code\legacy-sports` when working on a ticket.

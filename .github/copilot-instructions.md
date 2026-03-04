@@ -9,6 +9,7 @@
 3. **Dependency check**: inspect the Jira ticket for linked issues or descriptions referencing another in-progress ticket. If a dependency exists, the worktree must branch from that parent — not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).
 4. Worktree: `twig worktree create $key/description` → `twig worktree list` (note path)
 5. Setup worktree: `cd $wt` → `make install` → copy `.env` → junction `.twig` → `code $wt`
+   5b. **Agent multi-root access** (optional): `make sync-worktrees` → `code legacy-sports.code-workspace` — gives agents search access across all worktrees in one window.
 6. **⚠️ All remaining work happens at the worktree path (`$wt`), NOT `D:\code\legacy-sports`.** Every file edit, terminal command, and git operation must target `$wt`.
 7. Code: `pnpm exec nx affected -t <target>` (never `pnpm run`)
 8. Commit: `git commit -m "type(scope): msg"` → `git push origin HEAD`

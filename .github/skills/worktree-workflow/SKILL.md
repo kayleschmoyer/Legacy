@@ -151,15 +151,27 @@ code $wt
 
 This opens the worktree in a **new VS Code window**. Work exclusively in that window for this ticket.
 
-> **Alternative — work from the main repo window (agent access):**
-> If you want an agent running in the main VS Code window to edit files in the worktree,
-> you do **not** need a separate window. Just reference the worktree path directly.
-> VS Code will show a prompt: **"Allow reading/editing external files? … Allow this folder in this session"**.
-> Click **Allow** and the agent has full read/write access to the worktree for the rest of the session.
+> **Alternative — multi-root workspace (recommended for agent access):**
 >
-> Agents should start by telling the user:
-> _"I need access to `<worktree path>` — please click Allow when VS Code prompts you."_
-> Then immediately attempt to read a file in that path to trigger the prompt.
+> AI agents can only search files inside VS Code workspace folders. To give an agent
+> full search access across all active worktrees, use the multi-root workspace file:
+>
+> ```powershell
+> # In the main repo (D:\code\legacy-sports):
+> make sync-worktrees      # generates legacy-sports.code-workspace
+> code legacy-sports.code-workspace
+> ```
+>
+> This opens **one** VS Code window with the main repo plus every active worktree as
+> a workspace folder. The agent's semantic search, file search, and grep tools now
+> cover all worktrees. Re-run `make sync-worktrees` whenever you create or remove
+> worktrees.
+>
+> **Fallback — per-session file access:**
+> If you don't want a multi-root workspace, the agent can still edit worktree files by
+> referencing absolute paths. VS Code will prompt: **"Allow reading/editing external
+> files?"** — click **Allow** to grant access for the session. However, search/discovery
+> tools will only cover the main repo.
 
 ### Step 5: Implement the Ticket
 
@@ -231,14 +243,14 @@ twig worktree list  # verify
 
 ## Key Rules
 
-| Rule                          | Detail                                                                                                 |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Main stays on main**        | Never check out a feature branch in the main repo — it's the base for new worktrees                    |
-| **One worktree per branch**   | Git prevents two worktrees sharing the same branch                                                     |
-| **Don't run from inside**     | `git worktree move/remove` must be run from outside the target worktree                                |
-| **Run make install**          | `node_modules` and Python deps are absent in a fresh worktree — always run `make install` inside it    |
-| **Separate VS Code window**   | Open each worktree in its own VS Code window for clean file watching                                   |
-| **Agent cross-window access** | Agent in main window can edit worktree files — VS Code will prompt "Allow this folder in this session" |
+| Rule                        | Detail                                                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Main stays on main**      | Never check out a feature branch in the main repo — it's the base for new worktrees                              |
+| **One worktree per branch** | Git prevents two worktrees sharing the same branch                                                               |
+| **Don't run from inside**   | `git worktree move/remove` must be run from outside the target worktree                                          |
+| **Run make install**        | `node_modules` and Python deps are absent in a fresh worktree — always run `make install` inside it              |
+| **Separate VS Code window** | Open each worktree in its own VS Code window for clean file watching                                             |
+| **Multi-root for agents**   | Run `make sync-worktrees` then open `legacy-sports.code-workspace` to give agents search access to all worktrees |
 
 ## Troubleshooting
 

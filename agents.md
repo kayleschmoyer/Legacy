@@ -10,7 +10,7 @@
 
 ## Workflow
 
-1. Ticket: `acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json` → note `$key` (skip if ticket exists) 2. **Jira "In Progress" immediately**: `acli jira workitem transition --key LS-#### --status "In Progress"` — do this before any other steps 3. Worktree: `twig worktree create $key/description` → note path → `make install` + copy `.env` + junction `.twig` → `code $wt` 4. Code + commit + push 5. `make pc` (must pass before PR) 6. PR: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` → Jira "In Review" (see `.github/skills/create-pr/SKILL.md`) 7. Cleanup: `twig worktree clean`
+1. Ticket: `acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json` → note `$key` (skip if ticket exists) 2. **Jira "In Progress" immediately**: `acli jira workitem transition --key LS-#### --status "In Progress"` — do this before any other steps 3. Worktree: `twig worktree create $key/description` → note path → `make install` + copy `.env` + junction `.twig` → `code $wt` 3b. **Agent multi-root access** (optional): `make sync-worktrees` → `code legacy-sports.code-workspace` — gives agents search access across all worktrees 4. Code + commit + push 5. `make pc` (must pass before PR) 6. PR: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` → Jira "In Review" (see `.github/skills/create-pr/SKILL.md`) 7. Cleanup: `twig worktree clean`
 
 ## Rules
 

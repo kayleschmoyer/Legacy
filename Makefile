@@ -468,6 +468,14 @@ pr: ## Create a GitHub pull request using twig
 	@$(call echo_blue,Creating GitHub pull request...)
 	twig github pr create
 
+sync-worktrees: ## Regenerate .code-workspace with all active worktrees (multi-root agent access)
+	@$(call echo_blue,Syncing worktree workspace file...)
+ifeq ($(DETECTED_OS),Windows)
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-worktrees.ps1
+else
+	@echo "sync-worktrees is Windows-only (PowerShell required)"
+endif
+
 # Composite Commands
 ci: clean-safe install lint typecheck test build ## Complete CI pipeline
 	@$(call echo_green,CI pipeline completed successfully!)

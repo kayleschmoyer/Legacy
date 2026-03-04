@@ -116,6 +116,7 @@ make affected        # Show affected projects
 make list-projects   # List all projects
 make workspace-lint  # Run workspace-level validations
 make pr              # Create PR via twig
+make sync-worktrees  # Generate .code-workspace with all active worktrees (agent multi-root access)
 make diagnose        # Show platform, versions, diagnostics
 make codegen         # Run GraphQL code generation
 ```
