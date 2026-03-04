@@ -159,6 +159,7 @@ export function MatchupDetailPage() {
           currentMatchup={matchup}
           leagueId={leagueIdNum}
           allMatchups={allLeagueMatchups}
+          userTeamId={userTeamId}
         />
       )}
 

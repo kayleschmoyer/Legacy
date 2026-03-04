@@ -152,15 +152,18 @@ export function MatchupNavigationControls({
   const currentWeek = currentMatchup.weekNumber ?? 1;
   const [selectedWeek, setSelectedWeek] = useState<number>(currentWeek);
 
-  // Sync selected week when the current matchup changes externally
+  // Sync selected week when the current matchup changes externally.
+  // NOTE: selectedWeek is intentionally excluded from deps — this effect
+  // should only run when the *external* prop changes (e.g. user navigates
+  // to a different matchup via the router), not when the user clicks
+  // prev/next week inside this component. Including it caused the pager
+  // to reset immediately after every user interaction (LS-510).
   useEffect(() => {
-    if (
-      currentMatchup.weekNumber &&
-      currentMatchup.weekNumber !== selectedWeek
-    ) {
+    if (currentMatchup.weekNumber) {
       setSelectedWeek(currentMatchup.weekNumber);
     }
-  }, [currentMatchup.weekNumber, selectedWeek]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMatchup.weekNumber]);
 
   // Fetch all teams in the league for name lookup
   const {
