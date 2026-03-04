@@ -107,22 +107,22 @@ function Invoke-JiraTransition {
 
     # If either status is unknown or already at/past target, skip
     if ($currentIdx -lt 0 -or $targetIdx -lt 0 -or $currentIdx -ge $targetIdx) {
-        Write-Warning "Cannot transition $TicketKey from '$CurrentStatus' to '$TargetStatus' — skipping"
+        Write-Warning "Cannot transition $TicketKey from '$CurrentStatus' to '$TargetStatus' -- skipping"
         return $false
     }
 
     for ($i = $currentIdx + 1; $i -le $targetIdx; $i++) {
         $nextStatus = $workflowOrder[$i]
         if ($IsDryRun) {
-            Write-Warning "DRY RUN: Would transition $TicketKey → '$nextStatus'"
+            Write-Warning "DRY RUN: Would transition $TicketKey -> '$nextStatus'"
         } else {
-            Write-Info "Transitioning $TicketKey → '$nextStatus'..."
+            Write-Info "Transitioning $TicketKey -> '$nextStatus'..."
             acli jira workitem transition --key $TicketKey --status $nextStatus 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {
                 Write-Error "Failed to transition $TicketKey to '$nextStatus'"
                 return $false
             }
-            Write-Success "Transitioned $TicketKey → $nextStatus"
+            Write-Success "Transitioned $TicketKey -> $nextStatus"
         }
     }
 
