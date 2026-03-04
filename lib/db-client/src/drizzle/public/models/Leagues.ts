@@ -171,6 +171,11 @@ export const drafts = pgTable(
     draftCompletedAt: timestamp('draft_completed_at', { withTimezone: true }),
     /** Scheduled start time set by the commissioner (LS-423). Draft auto-starts at this time. */
     scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+    /** When true, the commissioner has disabled auto-pick for the entire draft (LS-481).
+     *  - autoProcessDraftPicks will not fire for this draft when deadlines expire.
+     *  - Individual team auto-pick toggles are blocked while this flag is set.
+     */
+    autoPickDisabled: boolean('auto_pick_disabled').notNull().default(false),
   },
   (table) => {
     return {

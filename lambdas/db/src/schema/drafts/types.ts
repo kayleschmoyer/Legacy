@@ -72,6 +72,7 @@ export const Draft = builder.objectRef<{
   date: string | null;
   createdAt: Date;
   updatedAt: Date;
+  autoPickDisabled: boolean;
 }>('Draft');
 
 Draft.implement({
@@ -108,6 +109,10 @@ Draft.implement({
     }),
     updatedAt: t.string({
       resolve: (draft) => draft.updatedAt.toISOString(),
+    }),
+    autoPickDisabled: t.exposeBoolean('autoPickDisabled', {
+      description:
+        'When true, the commissioner has disabled auto-pick for the entire draft. autoProcessDraftPicks will not fire and individual teams cannot enable auto-pick (LS-481).',
     }),
   }),
 });

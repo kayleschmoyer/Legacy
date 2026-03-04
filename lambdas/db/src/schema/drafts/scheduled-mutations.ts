@@ -148,6 +148,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
           WHERE l.draft_status = 'in-progress'
             AND d.current_pick_deadline IS NOT NULL
             AND d.current_pick_deadline <= ${now}
+            AND d.auto_pick_disabled = FALSE
             ${leagueId ? sql`AND d.league_id = ${leagueId}` : sql``}
           ORDER BY d.current_pick_deadline ASC
         `;

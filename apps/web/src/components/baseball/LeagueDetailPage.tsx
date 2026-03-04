@@ -26,10 +26,10 @@ import {
   Users,
 } from '@tamagui/lucide-icons';
 import { QRCodeSVG } from 'qrcode.react';
-import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { LeagueScoringSummary } from './LeagueScoringSummary';
 import { LeagueScoringEditor } from './LeagueScoringEditor';
 import { LeagueTradeBlock } from './LeagueTradeBlock';
+import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
 import { env } from '../../config/environment';
 import {
   LeagueFragment,

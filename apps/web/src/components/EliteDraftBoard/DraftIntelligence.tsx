@@ -1,11 +1,11 @@
 import React, { useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
+import { getPositionColor } from './utils';
 import {
   GetDraftRecommendations as GET_DRAFT_RECOMMENDATIONS,
   type GetDraftRecommendationsQuery,
   type GetDraftRecommendationsQueryVariables,
 } from '../../api/db/graphql.generated';
-import { getPositionColor } from './utils';
 
 // ---------------------------------------------------------------------------
 // Draft Intelligence Panel — server-driven (LS-467)

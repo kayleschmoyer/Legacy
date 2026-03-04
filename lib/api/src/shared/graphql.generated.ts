@@ -411,6 +411,8 @@ export type DirectMessage = {
 /** A draft event for a league */
 export type Draft = {
   __typename?: 'Draft';
+  /** When true, the commissioner has disabled auto-pick for the entire draft. autoProcessDraftPicks will not fire and individual teams cannot enable auto-pick (LS-481). */
+  autoPickDisabled?: Maybe<Scalars['Boolean']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   currentPick?: Maybe<Scalars['Int']['output']>;
   currentPickDeadline?: Maybe<Scalars['String']['output']>;
@@ -954,6 +956,8 @@ export type Mutation = {
   cancelWaiverClaim?: Maybe<WaiverClaim>;
   claimFreeAgent?: Maybe<WaiverClaim>;
   commissionerPick?: Maybe<DraftPick>;
+  /** Commissioner: enable or disable auto-pick for the entire draft (LS-481). When disabled, autoProcessDraftPicks will not fire and teams cannot opt in to auto-pick. */
+  commissionerSetDraftAutoPickDisabled?: Maybe<Draft>;
   createAllMatchups?: Maybe<AdvanceLeagueWeekResponse>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
@@ -1028,6 +1032,7 @@ export type Mutation = {
   toggleDraftAutoPick?: Maybe<Scalars['Boolean']['output']>;
   /** Trigger stat loading for a baseball player if stats have not been fetched yet. Returns true if loading was triggered, false if stats already exist. */
   triggerSeasonDraftStatLoading?: Maybe<Scalars['Boolean']['output']>;
+  undoLastDraftPick?: Maybe<DraftPick>;
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
@@ -1115,6 +1120,11 @@ export type MutationClaimFreeAgentArgs = {
 export type MutationCommissionerPickArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationCommissionerSetDraftAutoPickDisabledArgs = {
+  disabled: Scalars['Boolean']['input'];
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationCreateAllMatchupsArgs = {
@@ -1367,6 +1377,10 @@ export type MutationToggleDraftAutoPickArgs = {
 
 export type MutationTriggerSeasonDraftStatLoadingArgs = {
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationUndoLastDraftPickArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationUpdateCommissionerNoteArgs = {

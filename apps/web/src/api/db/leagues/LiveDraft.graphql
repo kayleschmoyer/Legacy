@@ -121,6 +121,16 @@ mutation UndoLastDraftPick($draftId: Int!) {
   }
 }
 
+mutation CommissionerSetDraftAutoPickDisabled(
+  $draftId: Int!
+  $disabled: Boolean!
+) {
+  commissionerSetDraftAutoPickDisabled(draftId: $draftId, disabled: $disabled) {
+    id
+    autoPickDisabled
+  }
+}
+
 query GetMyDraftTeamAutoPick($draftId: Int!) {
   getMyDraftTeamAutoPick(draftId: $draftId)
 }
@@ -146,6 +156,7 @@ query GetLiveDraftLeagueDraft($leagueId: Int!) {
     draftCompletedAt
     scheduledAt
     createdAt
+    autoPickDisabled
   }
 }
 

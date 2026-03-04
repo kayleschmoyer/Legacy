@@ -417,6 +417,8 @@ export type DirectMessage = {
 /** A draft event for a league */
 export type Draft = {
   __typename?: 'Draft';
+  /** When true, the commissioner has disabled auto-pick for the entire draft. autoProcessDraftPicks will not fire and individual teams cannot enable auto-pick (LS-481). */
+  autoPickDisabled?: Maybe<Scalars['Boolean']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   currentPick?: Maybe<Scalars['Int']['output']>;
   currentPickDeadline?: Maybe<Scalars['String']['output']>;
@@ -960,6 +962,8 @@ export type Mutation = {
   cancelWaiverClaim?: Maybe<WaiverClaim>;
   claimFreeAgent?: Maybe<WaiverClaim>;
   commissionerPick?: Maybe<DraftPick>;
+  /** Commissioner: enable or disable auto-pick for the entire draft (LS-481). When disabled, autoProcessDraftPicks will not fire and teams cannot opt in to auto-pick. */
+  commissionerSetDraftAutoPickDisabled?: Maybe<Draft>;
   createAllMatchups?: Maybe<AdvanceLeagueWeekResponse>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
@@ -1122,6 +1126,11 @@ export type MutationClaimFreeAgentArgs = {
 export type MutationCommissionerPickArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationCommissionerSetDraftAutoPickDisabledArgs = {
+  disabled: Scalars['Boolean']['input'];
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationCreateAllMatchupsArgs = {
@@ -3854,6 +3863,20 @@ export type UndoLastDraftPickMutation = {
   } | null;
 };
 
+export type CommissionerSetDraftAutoPickDisabledMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  disabled: Scalars['Boolean']['input'];
+}>;
+
+export type CommissionerSetDraftAutoPickDisabledMutation = {
+  __typename?: 'Mutation';
+  commissionerSetDraftAutoPickDisabled?: {
+    __typename?: 'Draft';
+    id?: number | null;
+    autoPickDisabled?: boolean | null;
+  } | null;
+};
+
 export type GetMyDraftTeamAutoPickQueryVariables = Exact<{
   draftId: Scalars['Int']['input'];
 }>;
@@ -3896,6 +3919,7 @@ export type GetLiveDraftLeagueDraftQuery = {
     draftCompletedAt?: string | null;
     scheduledAt?: string | null;
     createdAt?: string | null;
+    autoPickDisabled?: boolean | null;
   } | null;
 };
 
@@ -10228,6 +10252,65 @@ export type UndoLastDraftPickMutationOptions = BaseMutationOptions<
   UndoLastDraftPickMutation,
   UndoLastDraftPickMutationVariables
 >;
+export const CommissionerSetDraftAutoPickDisabled = gql`
+  mutation CommissionerSetDraftAutoPickDisabled(
+    $draftId: Int!
+    $disabled: Boolean!
+  ) {
+    commissionerSetDraftAutoPickDisabled(
+      draftId: $draftId
+      disabled: $disabled
+    ) {
+      id
+      autoPickDisabled
+    }
+  }
+`;
+export type CommissionerSetDraftAutoPickDisabledMutationFn = MutationFunction<
+  CommissionerSetDraftAutoPickDisabledMutation,
+  CommissionerSetDraftAutoPickDisabledMutationVariables
+>;
+
+/**
+ * __useCommissionerSetDraftAutoPickDisabledMutation__
+ *
+ * To run a mutation, you first call `useCommissionerSetDraftAutoPickDisabledMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCommissionerSetDraftAutoPickDisabledMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [commissionerSetDraftAutoPickDisabledMutation, { data, loading, error }] = useCommissionerSetDraftAutoPickDisabledMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      disabled: // value for 'disabled'
+ *   },
+ * });
+ */
+export function useCommissionerSetDraftAutoPickDisabledMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CommissionerSetDraftAutoPickDisabledMutation,
+    CommissionerSetDraftAutoPickDisabledMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CommissionerSetDraftAutoPickDisabledMutation,
+    CommissionerSetDraftAutoPickDisabledMutationVariables
+  >(CommissionerSetDraftAutoPickDisabled, options);
+}
+export type CommissionerSetDraftAutoPickDisabledMutationHookResult = ReturnType<
+  typeof useCommissionerSetDraftAutoPickDisabledMutation
+>;
+export type CommissionerSetDraftAutoPickDisabledMutationResult =
+  Apollo.MutationResult<CommissionerSetDraftAutoPickDisabledMutation>;
+export type CommissionerSetDraftAutoPickDisabledMutationOptions =
+  BaseMutationOptions<
+    CommissionerSetDraftAutoPickDisabledMutation,
+    CommissionerSetDraftAutoPickDisabledMutationVariables
+  >;
 export const GetMyDraftTeamAutoPick = gql`
   query GetMyDraftTeamAutoPick($draftId: Int!) {
     getMyDraftTeamAutoPick(draftId: $draftId)
@@ -10425,6 +10508,7 @@ export const GetLiveDraftLeagueDraft = gql`
       draftCompletedAt
       scheduledAt
       createdAt
+      autoPickDisabled
     }
   }
 `;

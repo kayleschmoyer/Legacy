@@ -49,6 +49,7 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
           .select({
             id: PublicSchema.drafts.id,
             leagueId: PublicSchema.drafts.leagueId,
+            autoPickDisabled: PublicSchema.drafts.autoPickDisabled,
           })
           .from(PublicSchema.drafts)
           .where(eq(PublicSchema.drafts.id, draftId))
@@ -56,6 +57,13 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
 
         if (!draft) {
           throw new Error('Draft not found');
+        }
+
+        // LS-481: block if the commissioner has disabled auto-pick league-wide
+        if (draft.autoPickDisabled) {
+          throw new Error(
+            'Auto-pick has been disabled for this draft by the commissioner',
+          );
         }
 
         // Verify league is in-progress

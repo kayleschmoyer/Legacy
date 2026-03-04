@@ -454,6 +454,10 @@ type DirectMessage {
 A draft event for a league
 """
 type Draft {
+  """
+  When true, the commissioner has disabled auto-pick for the entire draft. autoProcessDraftPicks will not fire and individual teams cannot enable auto-pick (LS-481).
+  """
+  autoPickDisabled: Boolean
   createdAt: String
   currentPick: Int
   currentPickDeadline: String
@@ -1123,6 +1127,11 @@ type Mutation {
     playerId: Int!
   ): WaiverClaim
   commissionerPick(draftId: Int!, playerId: Int!): DraftPick
+
+  """
+  Commissioner: enable or disable auto-pick for the entire draft (LS-481). When disabled, autoProcessDraftPicks will not fire and teams cannot opt in to auto-pick.
+  """
+  commissionerSetDraftAutoPickDisabled(disabled: Boolean!, draftId: Int!): Draft
   createAllMatchups(leagueId: Int!): AdvanceLeagueWeekResponse
   createLeague(maxRosterSize: Int, name: String!): League
   createLeagueAndTeams(

@@ -38,6 +38,7 @@ import { computeDraftIntelligence, getDraftCommentary } from './draftUtils';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import {
   CommissionerPick as COMMISSIONER_PICK,
+  CommissionerSetDraftAutoPickDisabled as COMMISSIONER_SET_AUTOPICK_DISABLED,
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
   GetCurrentDraftPick as GET_CURRENT_DRAFT_PICK,
   GetDraftPicks as GET_DRAFT_PICKS,
@@ -98,6 +99,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const [pickTimeLimitSeconds, setPickTimeLimitSeconds] =
     useState(DEFAULT_PICK_TIME);
   const [commPickMode, setCommPickMode] = useState(false);
+  // LS-481: tracks whether the commissioner has disabled auto-pick for the draft
+  const [autoPickDisabled, setAutoPickDisabled] = useState(false);
   const [toastMessage, setToastMessage] = useState<{
     text: string;
     type: 'error' | 'warning' | 'info';
@@ -695,6 +698,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     useMutation(RESUME_DRAFT);
   const [commissionerPickMutation, { loading: commPickLoading }] =
     useMutation(COMMISSIONER_PICK);
+  const [
+    setDraftAutoPickDisabledMutation,
+    { loading: autoPickDisabledLoading },
+  ] = useMutation(COMMISSIONER_SET_AUTOPICK_DISABLED);
   const [nudgeExpiredDraftPick] = useMutation(NUDGE_EXPIRED_DRAFT_PICK);
   const [undoLastDraftPickMutation, { loading: undoPickLoading }] =
     useMutation(UNDO_LAST_DRAFT_PICK);
@@ -1028,6 +1035,38 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     showToast,
   ]);
 
+  // LS-481: Commissioner toggle auto-pick disabled for the draft
+  const handleToggleAutoPickDisabled = useCallback(async () => {
+    if (!draftId || autoPickDisabledLoading) return;
+    const newDisabled = !autoPickDisabled;
+    try {
+      await setDraftAutoPickDisabledMutation({
+        variables: { draftId, disabled: newDisabled },
+      });
+      setAutoPickDisabled(newDisabled);
+      showToast(
+        newDisabled
+          ? '🚫 Auto-pick disabled for this draft'
+          : '✅ Auto-pick enabled for this draft',
+        'info',
+      );
+      void refetchDraft();
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Failed to update auto-pick setting';
+      showToast(msg, 'error');
+    }
+  }, [
+    draftId,
+    autoPickDisabled,
+    autoPickDisabledLoading,
+    setDraftAutoPickDisabledMutation,
+    showToast,
+    refetchDraft,
+  ]);
+
   // ---- Commissioner Pick ----
   const handleCommissionerPick = useCallback(
     async (playerId: number) => {
@@ -1106,7 +1145,15 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     if (leagueDraft?.currentPickDeadline) {
       setPickDeadline(new Date(leagueDraft.currentPickDeadline as string));
     }
-  }, [leagueDraft?.currentPickDeadline, leagueDraft?.pickTimeLimitSeconds]);
+    // LS-481: sync commissioner auto-pick disabled state from server
+    if (leagueDraft?.autoPickDisabled != null) {
+      setAutoPickDisabled(leagueDraft.autoPickDisabled as boolean);
+    }
+  }, [
+    leagueDraft?.currentPickDeadline,
+    leagueDraft?.pickTimeLimitSeconds,
+    leagueDraft?.autoPickDisabled,
+  ]);
 
   useEffect(() => {
     if (
@@ -1921,6 +1968,23 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                 {commPickMode
                   ? '✓ Commissioner Pick ON'
                   : '👤 Commissioner Pick'}
+              </button>
+              {/* LS-481: Disable / Enable auto-pick for the entire draft */}
+              <button
+                className={`d-comm-btn${autoPickDisabled ? ' danger' : ''}`}
+                onClick={() => void handleToggleAutoPickDisabled()}
+                disabled={autoPickDisabledLoading}
+                title={
+                  autoPickDisabled
+                    ? 'Auto-pick is disabled. Click to re-enable automatic picks when time expires.'
+                    : 'Click to disable auto-pick for all teams. No picks will be made automatically when time expires.'
+                }
+              >
+                {autoPickDisabledLoading
+                  ? '⏳ Updating...'
+                  : autoPickDisabled
+                    ? '🚫 Auto-Pick DISABLED'
+                    : '🤖 Disable Auto-Pick'}
               </button>
               {commPickMode && (
                 <div

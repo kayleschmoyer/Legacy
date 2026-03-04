@@ -417,6 +417,8 @@ export type DirectMessage = {
 /** A draft event for a league */
 export type Draft = {
   __typename?: 'Draft';
+  /** When true, the commissioner has disabled auto-pick for the entire draft. autoProcessDraftPicks will not fire and individual teams cannot enable auto-pick (LS-481). */
+  autoPickDisabled?: Maybe<Scalars['Boolean']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   currentPick?: Maybe<Scalars['Int']['output']>;
   currentPickDeadline?: Maybe<Scalars['String']['output']>;
@@ -960,6 +962,8 @@ export type Mutation = {
   cancelWaiverClaim?: Maybe<WaiverClaim>;
   claimFreeAgent?: Maybe<WaiverClaim>;
   commissionerPick?: Maybe<DraftPick>;
+  /** Commissioner: enable or disable auto-pick for the entire draft (LS-481). When disabled, autoProcessDraftPicks will not fire and teams cannot opt in to auto-pick. */
+  commissionerSetDraftAutoPickDisabled?: Maybe<Draft>;
   createAllMatchups?: Maybe<AdvanceLeagueWeekResponse>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
@@ -1122,6 +1126,11 @@ export type MutationClaimFreeAgentArgs = {
 export type MutationCommissionerPickArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
+};
+
+export type MutationCommissionerSetDraftAutoPickDisabledArgs = {
+  disabled: Scalars['Boolean']['input'];
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationCreateAllMatchupsArgs = {
