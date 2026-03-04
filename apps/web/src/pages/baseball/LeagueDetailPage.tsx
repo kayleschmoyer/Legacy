@@ -531,6 +531,8 @@ export function LeagueDetailPage(): React.JSX.Element {
     // Refetch team members in the background — do NOT clear redux teamMembers
     // to [] because that causes the page to flash a full-page spinner.
     void refetchTeamMembersRef.current?.();
+    // Refetch the current matchup so it reflects the newly drafted rosters.
+    void refetchCurrentMatchupRef.current?.();
   }, [backgroundRefetch]);
 
   const handleDraftStarted = useCallback(() => {
