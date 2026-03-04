@@ -288,8 +288,8 @@ export function AdminPage(): React.JSX.Element {
                   {u.accessLevel ?? 'none'}
                 </AccessBadge>
 
-                {/* Impersonate button */}
-                {!isYou && (
+                {/* Impersonate button — hidden for other admins */}
+                {!isYou && !isAdmin && (
                   <Button
                     size="$3"
                     onPress={() => u.id != null && void handleImpersonate(u.id)}

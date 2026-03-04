@@ -237,7 +237,8 @@ ImpersonateUserResultRef.implement({
 
 /**
  * Admin-only mutation that generates a signed impersonation JWT for a target
- * user.  The calling user must have `isAdmin === true`.
+ * user.  The calling user must have `isAdmin === true`.  Admins cannot
+ * impersonate other admin users.
  */
 builder.mutationField('impersonateUser', (t) =>
   t.field({
@@ -255,6 +256,12 @@ builder.mutationField('impersonateUser', (t) =>
       const targetUser = await dbService.users.getUserById(userId);
       if (!targetUser) {
         throw new Error(`User ${userId} not found`);
+      }
+
+      if (targetUser.accessLevel === 'admin') {
+        throw ForbiddenError(
+          'Forbidden: cannot impersonate another admin user',
+        );
       }
 
       const jwtSecret = await getJwtSecret();
