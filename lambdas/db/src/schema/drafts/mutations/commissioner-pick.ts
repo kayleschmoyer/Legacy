@@ -14,11 +14,11 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, sql } from 'drizzle-orm';
 
 import { DraftPick } from '../types';
-import { getCurrentDraftPickInfo } from '../helpers';
+import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
-import { AuthenticationError, ForbiddenError } from '../../graphql-errors';
 import { insertActivityLog } from '../../../services/activity-log';
+import { AuthenticationError, ForbiddenError } from '../../graphql-errors';
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -224,66 +224,18 @@ builder.mutationField('commissionerPick', (t) =>
             );
           }
 
-          const now = new Date();
-
-          const [draftPick] = await tx
-            .insert(PublicSchema.draftPicks)
-            .values({
+          // Commit the pick: insert pick row, advance draft state, and add player to roster.
+          // commitDraftPick is the single source of truth for all draft-pick DB writes.
+          const { draftPick, isDraftComplete, nextDeadline, nextPickInfo } =
+            await commitDraftPick({
+              tx,
               draftId,
-              teamId: currentPickInfo.teamId,
+              leagueId: draft.league_id,
+              pickInfo: currentPickInfo,
               playerId,
-              round: currentPickInfo.round,
-              pickNumber: currentPickInfo.pickNumber,
-              overallPick: currentPickInfo.overallPick,
-              pickedAt: now,
-            })
-            .returning();
-
-          const numTeams = (
-            await tx
-              .select()
-              .from(PublicSchema.draftTeams)
-              .where(eq(PublicSchema.draftTeams.draftId, draftId))
-          ).length;
-          const totalPicks = numTeams * league.maxRosterSize;
-          const isDraftComplete = currentPickInfo.overallPick >= totalPicks;
-
-          const nextDeadline = isDraftComplete
-            ? null
-            : new Date(now.getTime() + draft.pick_time_limit_seconds * 1000);
-
-          await tx
-            .update(PublicSchema.drafts)
-            .set({
-              currentPick: currentPickInfo.overallPick,
-              currentPickDeadline: nextDeadline,
-              updatedAt: now,
-              ...(isDraftComplete ? { draftCompletedAt: now } : {}),
-            })
-            .where(eq(PublicSchema.drafts.id, draftId));
-
-          if (isDraftComplete) {
-            await tx
-              .update(PublicSchema.leagues)
-              .set({ draftStatus: 'completed' })
-              .where(eq(PublicSchema.leagues.id, draft.league_id));
-          }
-
-          await tx.insert(PublicSchema.teamMembers).values({
-            teamId: currentPickInfo.teamId,
-            leagueId: draft.league_id,
-            playerId,
-            draftRound: currentPickInfo.round,
-            draftPick: currentPickInfo.pickNumber,
-            acquisitionType: 'draft',
-          });
-
-          let nextPickInfo: Awaited<
-            ReturnType<typeof getCurrentDraftPickInfo>
-          > = null;
-          if (!isDraftComplete) {
-            nextPickInfo = await getCurrentDraftPickInfo(tx, draftId);
-          }
+              maxRosterSize: league.maxRosterSize,
+              pickTimeLimitSeconds: draft.pick_time_limit_seconds,
+            });
 
           return {
             draftPick,
@@ -377,14 +329,14 @@ builder.mutationField('commissionerPick', (t) =>
         // Record commissioner pick in the activity log (fire-and-forget, non-fatal)
         void insertActivityLog(context, {
           leagueId: result.leagueId,
-          teamId: result.currentPickInfo.teamId ?? null,
+          teamId: result.currentPickInfo?.teamId ?? null,
           actorUserId: userId,
           eventType: 'draft_pick_made',
           payload: {
             playerId,
-            round: result.currentPickInfo.round,
-            pickNumber: result.currentPickInfo.pickNumber,
-            overallPick: result.currentPickInfo.overallPick,
+            round: result.currentPickInfo?.round,
+            pickNumber: result.currentPickInfo?.pickNumber,
+            overallPick: result.currentPickInfo?.overallPick,
             wasCommissionerPick: true,
           },
         });

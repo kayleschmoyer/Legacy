@@ -26,13 +26,14 @@ import { and, count, eq, lte, sql } from 'drizzle-orm';
 
 import {
   ALLOWED_POSITIONS_FOR_AUTO_PICK,
+  commitDraftPick,
   getCurrentDraftPickInfo,
   getUnfilledPositionTypes,
 } from './helpers';
 import { builder, type Context } from '../builder';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
-import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 import { insertActivityLog } from '../../services/activity-log';
+import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 /**
  * Lighter auth check for the draft auto-pick nudge.
@@ -667,66 +668,25 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   );
                 }
 
-                const pickNow = new Date();
-
-                // Create the auto pick
-                const [draftPick] = await tx
-                  .insert(PublicSchema.draftPicks)
-                  .values({
-                    draftId,
-                    teamId: currentPickInfo.teamId,
-                    playerId: autoPlayerId,
-                    round: currentPickInfo.round,
-                    pickNumber: currentPickInfo.pickNumber,
-                    overallPick: currentPickInfo.overallPick,
-                    pickedAt: pickNow,
-                  })
-                  .returning();
-
-                // Calculate if draft is complete
-                const numTeams = (
-                  await tx
-                    .select()
-                    .from(PublicSchema.draftTeams)
-                    .where(eq(PublicSchema.draftTeams.draftId, draftId))
-                ).length;
-                const totalPicks = numTeams * league.maxRosterSize;
-                const isDraftComplete =
-                  currentPickInfo.overallPick >= totalPicks;
-
-                // Chain from the expired deadline (not from wall-clock now)
-                // so the next team gets their full timer window.
-                const nextDeadline = isDraftComplete
-                  ? null
-                  : new Date(
-                      expiredDeadline.getTime() + pickTimeLimitSeconds * 1000,
-                    );
-
-                await tx
-                  .update(PublicSchema.drafts)
-                  .set({
-                    currentPick: currentPickInfo.overallPick,
-                    currentPickDeadline: nextDeadline,
-                    updatedAt: pickNow,
-                    ...(isDraftComplete ? { draftCompletedAt: pickNow } : {}),
-                  })
-                  .where(eq(PublicSchema.drafts.id, draftId));
-
-                if (isDraftComplete) {
-                  await tx
-                    .update(PublicSchema.leagues)
-                    .set({ draftStatus: 'completed' })
-                    .where(eq(PublicSchema.leagues.id, draftLeagueId));
-                }
-
-                // Add player to team roster
-                await tx.insert(PublicSchema.teamMembers).values({
-                  teamId: currentPickInfo.teamId,
+                // Commit the pick: insert pick row, advance draft state, and add player to roster.
+                // commitDraftPick is the single source of truth for all draft-pick DB writes.
+                // Pass deadlineBaseTime = expiredDeadline so the next team gets their full
+                // timer window regardless of when EventBridge actually fired.
+                const {
+                  draftPick,
+                  isDraftComplete,
+                  nextDeadline,
+                  nextPickInfo,
+                  now: pickNow,
+                } = await commitDraftPick({
+                  tx,
+                  draftId,
                   leagueId: draftLeagueId,
+                  pickInfo: currentPickInfo,
                   playerId: autoPlayerId,
-                  draftRound: currentPickInfo.round,
-                  draftPick: currentPickInfo.pickNumber,
-                  acquisitionType: 'draft',
+                  maxRosterSize: league.maxRosterSize,
+                  pickTimeLimitSeconds,
+                  deadlineBaseTime: expiredDeadline,
                 });
 
                 // Mark this team as auto-pick going forward since they missed a
@@ -744,14 +704,6 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                       ),
                     ),
                   );
-
-                // Calculate next pick info for notification
-                let nextPickInfo: Awaited<
-                  ReturnType<typeof getCurrentDraftPickInfo>
-                > = null;
-                if (!isDraftComplete) {
-                  nextPickInfo = await getCurrentDraftPickInfo(tx, draftId);
-                }
 
                 // If the next team has auto-pick enabled, immediately expire their
                 // deadline so the inner loop chains to them right away (LS-427).
@@ -885,6 +837,25 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   );
                 }
               }
+
+              // Record auto-pick in the activity log (fire-and-forget, non-fatal)
+              void insertActivityLog(
+                { db: context.db },
+                {
+                  leagueId: draftLeagueId,
+                  teamId: pickResult.currentPickInfo.teamId,
+                  actorUserId: null,
+                  eventType: 'draft_pick_made',
+                  payload: {
+                    playerId: pickResult.autoPlayerId,
+                    round: pickResult.currentPickInfo.round,
+                    pickNumber: pickResult.currentPickInfo.pickNumber,
+                    overallPick: pickResult.currentPickInfo.overallPick,
+                    wasAutoPick: true,
+                    autoPickReason: pickResult.autoPickReason,
+                  },
+                },
+              );
 
               // ── Inner-loop control ──────────────────────────────────
               if (pickResult.isDraftComplete) {

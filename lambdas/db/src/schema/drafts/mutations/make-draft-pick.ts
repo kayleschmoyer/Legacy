@@ -17,6 +17,7 @@ import { and, count, eq, sql } from 'drizzle-orm';
 import { DraftPick } from '../types';
 import {
   ALLOWED_POSITIONS_FOR_AUTO_PICK,
+  commitDraftPick,
   getCurrentDraftPickInfo,
   getUnfilledPositionTypes,
 } from '../helpers';
@@ -303,77 +304,19 @@ builder.mutationField('makeDraftPick', (t) =>
             );
           }
 
-          const now = new Date();
-
-          // Create the draft pick
-          const [draftPick] = await tx
-            .insert(PublicSchema.draftPicks)
-            .values({
+          // Commit the pick: insert pick row, advance draft state, and add player to roster.
+          // commitDraftPick is the single source of truth for all draft-pick DB writes.
+          const { draftPick, isDraftComplete, nextDeadline, nextPickInfo } =
+            await commitDraftPick({
+              tx,
               draftId,
-              teamId: currentPickInfo.teamId,
+              leagueId: draft.league_id,
+              pickInfo: currentPickInfo,
               playerId,
-              round: currentPickInfo.round,
-              pickNumber: currentPickInfo.pickNumber,
-              overallPick: currentPickInfo.overallPick,
-              pickedAt: now,
-            })
-            .returning();
-
-          // Determine if this is the first pick (set draftStartedAt)
-          const isFirstPick = draft.current_pick === 0;
-
-          // Compute total picks dynamically from current league settings
-          const numTeams = (
-            await tx
-              .select()
-              .from(PublicSchema.draftTeams)
-              .where(eq(PublicSchema.draftTeams.draftId, draftId))
-          ).length;
-          const totalPicks = numTeams * league.maxRosterSize;
-          const isDraftComplete = currentPickInfo.overallPick >= totalPicks;
-
-          // Update draft: advance currentPick, conditionally set started/completed timestamps
-          // and set the next pick deadline (or clear it if complete)
-          const nextDeadline = isDraftComplete
-            ? null
-            : new Date(now.getTime() + draft.pick_time_limit_seconds * 1000);
-
-          await tx
-            .update(PublicSchema.drafts)
-            .set({
-              currentPick: currentPickInfo.overallPick,
-              currentPickDeadline: nextDeadline,
-              updatedAt: now,
-              ...(isFirstPick ? { draftStartedAt: now } : {}),
-              ...(isDraftComplete ? { draftCompletedAt: now } : {}),
-            })
-            .where(eq(PublicSchema.drafts.id, draftId));
-
-          // If draft is complete, update league status
-          if (isDraftComplete) {
-            await tx
-              .update(PublicSchema.leagues)
-              .set({ draftStatus: 'completed' })
-              .where(eq(PublicSchema.leagues.id, draft.league_id));
-          }
-
-          // Add player to team roster
-          await tx.insert(PublicSchema.teamMembers).values({
-            teamId: currentPickInfo.teamId,
-            leagueId: draft.league_id,
-            playerId,
-            draftRound: currentPickInfo.round,
-            draftPick: currentPickInfo.pickNumber,
-            acquisitionType: 'draft',
-          });
-
-          // Calculate next pick info for notification payload
-          let nextPickInfo: Awaited<
-            ReturnType<typeof getCurrentDraftPickInfo>
-          > = null;
-          if (!isDraftComplete) {
-            nextPickInfo = await getCurrentDraftPickInfo(tx, draftId);
-          }
+              maxRosterSize: league.maxRosterSize,
+              pickTimeLimitSeconds: draft.pick_time_limit_seconds,
+              setStartedAt: draft.current_pick === 0,
+            });
 
           return {
             draftPick,
@@ -704,74 +647,21 @@ builder.mutationField('makeDraftPick', (t) =>
                   );
                 }
 
-                const apNow = new Date();
-
-                // Insert the auto-pick
-                const [apDraftPick] = await apTx
-                  .insert(PublicSchema.draftPicks)
-                  .values({
-                    draftId,
-                    teamId: apPickInfo.teamId,
-                    playerId: autoPlayerId,
-                    round: apPickInfo.round,
-                    pickNumber: apPickInfo.pickNumber,
-                    overallPick: apPickInfo.overallPick,
-                    pickedAt: apNow,
-                  })
-                  .returning();
-
-                // Determine total picks and draft completion
-                const apNumTeams = (
-                  await apTx
-                    .select()
-                    .from(PublicSchema.draftTeams)
-                    .where(eq(PublicSchema.draftTeams.draftId, draftId))
-                ).length;
-                const apTotalPicks = apNumTeams * apLeague.maxRosterSize;
-                const apIsDraftComplete =
-                  apPickInfo.overallPick >= apTotalPicks;
-
-                const apNextDeadline = apIsDraftComplete
-                  ? null
-                  : new Date(
-                      apNow.getTime() + apDraft.pick_time_limit_seconds * 1000,
-                    );
-
-                // Advance the draft (currentPick, deadline, timestamps)
-                await apTx
-                  .update(PublicSchema.drafts)
-                  .set({
-                    currentPick: apPickInfo.overallPick,
-                    currentPickDeadline: apNextDeadline,
-                    updatedAt: apNow,
-                    ...(apIsDraftComplete ? { draftCompletedAt: apNow } : {}),
-                  })
-                  .where(eq(PublicSchema.drafts.id, draftId));
-
-                if (apIsDraftComplete) {
-                  await apTx
-                    .update(PublicSchema.leagues)
-                    .set({ draftStatus: 'completed' })
-                    .where(eq(PublicSchema.leagues.id, apDraft.league_id));
-                }
-
-                // Add player to team roster
-                await apTx.insert(PublicSchema.teamMembers).values({
-                  teamId: apPickInfo.teamId,
+                // Commit the pick: insert pick row, advance draft state, and add player to roster.
+                const {
+                  draftPick: apDraftPick,
+                  isDraftComplete: apIsDraftComplete,
+                  nextDeadline: apNextDeadline,
+                  nextPickInfo: apNextPickInfo,
+                } = await commitDraftPick({
+                  tx: apTx,
+                  draftId,
                   leagueId: apDraft.league_id,
+                  pickInfo: apPickInfo,
                   playerId: autoPlayerId,
-                  draftRound: apPickInfo.round,
-                  draftPick: apPickInfo.pickNumber,
-                  acquisitionType: 'draft',
+                  maxRosterSize: apLeague.maxRosterSize,
+                  pickTimeLimitSeconds: apDraft.pick_time_limit_seconds,
                 });
-
-                // Get next pick info for the loop and notification
-                let apNextPickInfo: Awaited<
-                  ReturnType<typeof getCurrentDraftPickInfo>
-                > = null;
-                if (!apIsDraftComplete) {
-                  apNextPickInfo = await getCurrentDraftPickInfo(apTx, draftId);
-                }
 
                 return {
                   draftPick: apDraftPick,

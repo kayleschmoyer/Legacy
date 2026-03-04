@@ -7,9 +7,70 @@ import { ALLOWED_POSITIONS } from '@legacy-sports/utils';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { ForbiddenError } from '../graphql-errors';
 
-// Re-export under the legacy name so callers in mutations.ts / scheduled-mutations.ts
-// do not need to be updated.
-export { ALLOWED_POSITIONS as ALLOWED_POSITIONS_FOR_AUTO_PICK } from '@legacy-sports/utils';
+// ── commitDraftPick types ─────────────────────────────────────────────────────
+
+export interface CommitDraftPickParams {
+  /** Drizzle transaction (or plain db) to run writes inside. */
+  tx: PublicDb;
+  draftId: number;
+  leagueId: number;
+  /** Current pick slot being filled, as returned by getCurrentDraftPickInfo. */
+  pickInfo: {
+    teamId: number;
+    round: number;
+    pickNumber: number;
+    overallPick: number;
+  };
+  playerId: number;
+  maxRosterSize: number;
+  pickTimeLimitSeconds: number;
+  /**
+   * Base time for computing the next pick deadline.
+   * Defaults to the wall-clock `now` captured inside this function.
+   * Scheduled auto-picks pass the *expired* deadline so the next team gets
+   * a full timer window regardless of when EventBridge fired.
+   */
+  deadlineBaseTime?: Date;
+  /**
+   * When true, sets `draftStartedAt` on the drafts row.
+   * Only the very first manual pick (overallPick === 1, current_pick === 0)
+   * should pass this as true.
+   */
+  setStartedAt?: boolean;
+}
+
+export interface CommitDraftPickResult {
+  draftPick: typeof PublicSchema.draftPicks.$inferSelect;
+  isDraftComplete: boolean;
+  nextDeadline: Date | null;
+  nextPickInfo: Awaited<ReturnType<typeof getCurrentDraftPickInfo>>;
+  /** Wall-clock timestamp captured at the start of the commit. */
+  now: Date;
+}
+
+// ── Position eligibility for auto-pick ──────────────────────────────────────
+// Maps each league roster slot type to the player stat position keys that qualify.
+// Source of truth: lib/shared-components/src/utils/PositionModels.ts
+// Shared by autoProcessDraftPicks (scheduled-mutations.ts) and the
+// makeDraftPick auto-pick chain (mutations.ts).
+export const ALLOWED_POSITIONS_FOR_AUTO_PICK: Readonly<
+  Record<string, readonly string[]>
+> = Object.freeze({
+  '1B': ['1B'],
+  '2B': ['2B'],
+  '3B': ['3B'],
+  C: ['C'],
+  CF: ['CF'],
+  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
+  IF: ['1B', '2B', '3B', 'SS'],
+  LF: ['LF'],
+  OF: ['LF', 'RF', 'CF'],
+  RF: ['RF'],
+  RP: ['RP', 'P'],
+  SP: ['SP', 'P'],
+  SS: ['SS'],
+  XDH: ['DH'],
+});
 
 /**
  * Determine which league-defined position slot types still need a player
@@ -203,4 +264,103 @@ export async function verifyLeagueMembership(
   if (!membership) {
     throw ForbiddenError('You are not a member of this league');
   }
+}
+
+/**
+ * Commit a single draft pick inside a transaction: insert the draftPicks row,
+ * advance the draft state (currentPick, deadline, completion timestamps),
+ * update league status when the draft completes, and add the player to the
+ * team roster. Returns the inserted pick, completion flag, next deadline, and
+ * the next pick info.
+ *
+ * This is the single source of truth for draft-pick DB writes, shared by:
+ *   - makeDraftPick (manual pick + chained auto-picks)
+ *   - commissionerPick
+ *   - autoProcessDraftPicks (scheduled/EventBridge auto-picks)
+ */
+export async function commitDraftPick(
+  params: CommitDraftPickParams,
+): Promise<CommitDraftPickResult> {
+  const {
+    tx,
+    draftId,
+    leagueId,
+    pickInfo,
+    playerId,
+    maxRosterSize,
+    pickTimeLimitSeconds,
+    deadlineBaseTime,
+    setStartedAt = false,
+  } = params;
+
+  const now = new Date();
+
+  // Insert the draft pick record
+  const [draftPick] = await tx
+    .insert(PublicSchema.draftPicks)
+    .values({
+      draftId,
+      teamId: pickInfo.teamId,
+      playerId,
+      round: pickInfo.round,
+      pickNumber: pickInfo.pickNumber,
+      overallPick: pickInfo.overallPick,
+      pickedAt: now,
+    })
+    .returning();
+
+  // Determine whether the draft is now complete
+  const draftTeamRows = await tx
+    .select()
+    .from(PublicSchema.draftTeams)
+    .where(eq(PublicSchema.draftTeams.draftId, draftId));
+  const numTeams = draftTeamRows.length;
+  const totalPicks = numTeams * maxRosterSize;
+  const isDraftComplete = pickInfo.overallPick >= totalPicks;
+
+  // Compute the next pick deadline.
+  // Callers that need to preserve intended cadence (scheduled auto-picks)
+  // pass deadlineBaseTime = the expired deadline rather than wall-clock now.
+  const baseTime = deadlineBaseTime ?? now;
+  const nextDeadline = isDraftComplete
+    ? null
+    : new Date(baseTime.getTime() + pickTimeLimitSeconds * 1000);
+
+  // Advance the draft row
+  await tx
+    .update(PublicSchema.drafts)
+    .set({
+      currentPick: pickInfo.overallPick,
+      currentPickDeadline: nextDeadline,
+      updatedAt: now,
+      ...(setStartedAt ? { draftStartedAt: now } : {}),
+      ...(isDraftComplete ? { draftCompletedAt: now } : {}),
+    })
+    .where(eq(PublicSchema.drafts.id, draftId));
+
+  // Mark the league draft as completed when the last pick is made
+  if (isDraftComplete) {
+    await tx
+      .update(PublicSchema.leagues)
+      .set({ draftStatus: 'completed' })
+      .where(eq(PublicSchema.leagues.id, leagueId));
+  }
+
+  // Add the drafted player to the team's roster
+  await tx.insert(PublicSchema.teamMembers).values({
+    teamId: pickInfo.teamId,
+    leagueId,
+    playerId,
+    draftRound: pickInfo.round,
+    draftPick: pickInfo.pickNumber,
+    acquisitionType: 'draft',
+  });
+
+  // Fetch next pick info so callers can send notifications / chain auto-picks
+  let nextPickInfo: Awaited<ReturnType<typeof getCurrentDraftPickInfo>> = null;
+  if (!isDraftComplete) {
+    nextPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+  }
+
+  return { draftPick, isDraftComplete, nextDeadline, nextPickInfo, now };
 }
