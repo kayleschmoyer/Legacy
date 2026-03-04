@@ -87,7 +87,7 @@ export function LeagueCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
-    numberOfTeams: 10,
+    numberOfTeams: 12,
     numberOfDivisions: 2,
     schedulingStrategy: 'divisional',
     playerPool: 'all',
