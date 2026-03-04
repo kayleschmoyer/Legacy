@@ -2119,8 +2119,10 @@ export function MatchupRosterComparison({
             hoverStyle={{ opacity: 0.8 }}
             onPress={() => setShowBench(!showBench)}
           >
-            <XStack
+            <span
+              aria-hidden="true"
               style={{
+                display: 'inline-flex',
                 transition: 'transform 250ms ease',
                 transform: showBench ? 'rotate(90deg)' : 'rotate(0deg)',
               }}
@@ -2128,7 +2130,7 @@ export function MatchupRosterComparison({
               <Text fontSize="$3" color="$gray11">
                 ▶
               </Text>
-            </XStack>
+            </span>
             <Text fontSize="$3" fontWeight="600" color="$gray11">
               {showBench ? 'Hide' : 'Show'} Bench (
               {team1Bench.length + team2Bench.length} players)

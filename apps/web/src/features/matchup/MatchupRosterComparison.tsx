@@ -2143,14 +2143,16 @@ export function MatchupRosterComparison({
         {(team1Bench.length > 0 || team2Bench.length > 0) && (
           <SectionTable marginTop="$4">
             <BenchToggle onPress={() => setShowBench(!showBench)}>
-              <XStack
+              <span
+                aria-hidden="true"
                 style={{
+                  display: 'inline-flex',
                   transition: 'transform 250ms ease',
                   transform: showBench ? 'rotate(90deg)' : 'rotate(0deg)',
                 }}
               >
                 <ChevronRight size={16} color="var(--textMuted)" />
-              </XStack>
+              </span>
               <Text fontSize="$3" fontWeight="600" color="$textMuted">
                 {showBench ? 'Hide' : 'Show'} Bench
               </Text>

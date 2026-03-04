@@ -134,19 +134,18 @@ function FaqItem({ question, answer }: FaqItemProps) {
         <Paragraph fontWeight="600" color="$color" flex={1}>
           {question}
         </Paragraph>
-        <Paragraph
-          fontSize="$5"
-          color={BRAND_GOLD_LIGHT}
-          lineHeight={20}
-          style={
-            {
-              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s',
-            } as never
-          }
+        <span
+          aria-hidden="true"
+          style={{
+            display: 'inline-flex',
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+          }}
         >
-          ▾
-        </Paragraph>
+          <Paragraph fontSize="$5" color={BRAND_GOLD_LIGHT} lineHeight={20}>
+            ▾
+          </Paragraph>
+        </span>
       </FaqQuestion>
       {open && (
         <FaqAnswer id={faqId} role="region" aria-label={question}>

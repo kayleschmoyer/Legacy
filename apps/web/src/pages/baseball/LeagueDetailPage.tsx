@@ -2478,16 +2478,16 @@ export function LeagueDetailPage(): React.JSX.Element {
                 <Text fontWeight="700" fontSize="$4" color="$color">
                   {title}
                 </Text>
-                <ChevronDown
-                  size={16}
-                  color="$colorPress"
-                  style={
-                    {
-                      transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.2s ease',
-                    } as never
-                  }
-                />
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: 'inline-flex',
+                    transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                >
+                  <ChevronDown size={16} color="$colorPress" />
+                </span>
               </CommissionerSectionHeader>
               {open && (
                 <YStack
