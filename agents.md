@@ -31,6 +31,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **Config reference**            | `.github/skills/config-standards/SKILL.md`                                 |
 | DB queries                      | `.github/skills/db-query/SKILL.md`                                         |
 | DB schema reference             | `.github/skills/db-schema/SKILL.md`                                        |
+| **Debug distributed processes** | `.github/skills/debug-distributed/SKILL.md`                                |
 | **Docker local stack**          | `.github/skills/docker-local/SKILL.md`                                     |
 | **Dump RDS to S3**              | `.github/skills/db-dump/SKILL.md`                                          |
 | Full workflow (start here)      | `.github/skills/workflow-ticket-to-pr/SKILL.md`                            |
