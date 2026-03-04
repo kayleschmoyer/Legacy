@@ -9,14 +9,14 @@
 3. **Dependency check**: inspect the Jira ticket for linked issues or descriptions referencing another in-progress ticket. If a dependency exists, the worktree must branch from that parent — not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).
 4. Worktree: `twig worktree create $key/description` → `twig worktree list` (note path)
 5. Setup worktree: `cd $wt` → `make install` → copy `.env` → junction `.twig` → `code $wt`
-   5b. **Agent multi-root access** (optional): `make sync-worktrees` → `code legacy-sports.code-workspace` — gives agents search access across all worktrees in one window.
+   5b. **Auto-add to workspace**: if `legacy-sports.code-workspace` exists, run `make sync-worktrees-add TICKET=####` to give agents search access. First time? `make sync-worktrees TICKETS=####` to create it, then `code legacy-sports.code-workspace`.
 6. **⚠️ All remaining work happens at the worktree path (`$wt`), NOT `D:\code\legacy-sports`.** Every file edit, terminal command, and git operation must target `$wt`.
 7. Code: `pnpm exec nx affected -t <target>` (never `pnpm run`)
 8. Commit: `git commit -m "type(scope): msg"` → `git push origin HEAD`
 9. Rebase onto parent: `git fetch origin ; twig rebase` — keeps branch current with its parent (main or a stacked branch)
 10. Validate: `make pc` — must pass before opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
 11. Ship: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` → Jira "In Review" (see `skills/create-pr/SKILL.md`)
-12. Cleanup: `twig worktree clean` → `git branch -d LS-####/description` → Jira "Done"
+12. Cleanup: `make sync-worktrees-remove TICKET=####` → `twig worktree clean` → `git branch -d LS-####/description` → Jira "Done"
 
 ## Rules
 

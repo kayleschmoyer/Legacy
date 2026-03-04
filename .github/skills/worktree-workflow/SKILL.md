@@ -151,21 +151,64 @@ code $wt
 
 This opens the worktree in a **new VS Code window**. Work exclusively in that window for this ticket.
 
-> **Alternative — multi-root workspace (recommended for agent access):**
+### Step 4b: Add to Multi-Root Workspace (Automatic for Agents)
+
+If a `legacy-sports.code-workspace` file exists, **always** add the new worktree to it so agents
+have search access:
+
+```powershell
+cd "D:\code\legacy-sports"
+make sync-worktrees-add TICKET=####
+```
+
+If no workspace file exists yet (first time), create one:
+
+```powershell
+cd "D:\code\legacy-sports"
+make sync-worktrees TICKETS=####
+code legacy-sports.code-workspace
+```
+
+> **About the multi-root workspace:**
 >
-> AI agents can only search files inside VS Code workspace folders. To give an agent
-> full search access across all active worktrees, use the multi-root workspace file:
+> AI agents can only search files inside VS Code workspace folders. To give
+> multiple agents search access to their assigned worktrees from a single
+> VS Code window, generate a multi-root workspace file:
 >
 > ```powershell
 > # In the main repo (D:\code\legacy-sports):
-> make sync-worktrees      # generates legacy-sports.code-workspace
+>
+> # Include ONLY the worktrees your agents are actively using:
+> make sync-worktrees TICKETS=501,493,498
+>
+> # Or include ALL active worktrees (use sparingly — see TS note below):
+> make sync-worktrees
+>
 > code legacy-sports.code-workspace
 > ```
 >
-> This opens **one** VS Code window with the main repo plus every active worktree as
-> a workspace folder. The agent's semantic search, file search, and grep tools now
-> cover all worktrees. Re-run `make sync-worktrees` whenever you create or remove
-> worktrees.
+> This opens **one** VS Code window with the main repo plus selected worktrees.
+> Agents' semantic search, file search, and grep tools now cover all included
+> folders.
+>
+> **Incremental updates** — add or remove individual worktrees without regenerating:
+>
+> ```powershell
+> make sync-worktrees-add TICKET=507       # add one worktree
+> make sync-worktrees-remove TICKET=493    # remove one worktree
+> ```
+>
+> **Auto-add on create** — `make worktree` creates the worktree AND auto-adds it:
+>
+> ```powershell
+> make worktree TICKET=507 DESC=fix-scoring
+> ```
+>
+> **TypeScript tradeoff:** Each added worktree is a full monorepo copy with
+> ~99 `tsconfig.json` files. The TS language server creates projects for each
+> one, consuming memory. The generated workspace bumps TS memory to 12 GB and
+> disables proactive diagnostics to mitigate this, but **limit to 3-4 worktrees**
+> for best performance. If IntelliSense becomes slow, reduce the included set.
 >
 > **Fallback — per-session file access:**
 > If you don't want a multi-root workspace, the agent can still edit worktree files by
@@ -219,6 +262,9 @@ acli jira workitem transition --key LS-#### --status "In Review"
 ```powershell
 cd "D:\code\legacy-sports"
 
+# Remove from the multi-root workspace (if it exists)
+make sync-worktrees-remove TICKET=####
+
 # Remove worktrees whose branches have been merged or deleted
 twig worktree clean
 
@@ -243,14 +289,14 @@ twig worktree list  # verify
 
 ## Key Rules
 
-| Rule                        | Detail                                                                                                           |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **Main stays on main**      | Never check out a feature branch in the main repo — it's the base for new worktrees                              |
-| **One worktree per branch** | Git prevents two worktrees sharing the same branch                                                               |
-| **Don't run from inside**   | `git worktree move/remove` must be run from outside the target worktree                                          |
-| **Run make install**        | `node_modules` and Python deps are absent in a fresh worktree — always run `make install` inside it              |
-| **Separate VS Code window** | Open each worktree in its own VS Code window for clean file watching                                             |
-| **Multi-root for agents**   | Run `make sync-worktrees` then open `legacy-sports.code-workspace` to give agents search access to all worktrees |
+| Rule                        | Detail                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Main stays on main**      | Never check out a feature branch in the main repo — it's the base for new worktrees                                            |
+| **One worktree per branch** | Git prevents two worktrees sharing the same branch                                                                             |
+| **Don't run from inside**   | `git worktree move/remove` must be run from outside the target worktree                                                        |
+| **Run make install**        | `node_modules` and Python deps are absent in a fresh worktree — always run `make install` inside it                            |
+| **Separate VS Code window** | Open each worktree in its own VS Code window for clean file watching                                                           |
+| **Multi-root for agents**   | Run `make sync-worktrees TICKETS=501,493` then open `legacy-sports.code-workspace` — limit to 3-4 worktrees for TS performance |
 
 ## Troubleshooting
 
@@ -329,6 +375,10 @@ cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
 # 4. Open VS Code
 code $wt
 
+# 4b. Add to multi-root workspace (if it exists)
+cd "D:\code\legacy-sports"
+make sync-worktrees-add TICKET=####   # no-op if workspace file doesn't exist yet
+
 # 5. Work, commit (from inside the worktree)
 git add . ; git commit -m "feat(scope): description (LS-####)" ; git push -u origin HEAD
 
@@ -341,6 +391,7 @@ acli jira workitem transition --key LS-#### --status "In Review"
 
 # 7. Cleanup after merge
 cd "D:\code\legacy-sports"
+make sync-worktrees-remove TICKET=####   # remove from workspace (if exists)
 twig worktree clean
 git branch -d "LS-####/description"
 twig worktree list

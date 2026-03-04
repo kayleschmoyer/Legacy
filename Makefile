@@ -468,12 +468,59 @@ pr: ## Create a GitHub pull request using twig
 	@$(call echo_blue,Creating GitHub pull request...)
 	twig github pr create
 
-sync-worktrees: ## Regenerate .code-workspace with all active worktrees (multi-root agent access)
+sync-worktrees: ## Regenerate .code-workspace with active worktrees (TICKETS=501,493 to select specific ones)
 	@$(call echo_blue,Syncing worktree workspace file...)
 ifeq ($(DETECTED_OS),Windows)
+ifdef TICKETS
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-worktrees.ps1 -Include $(TICKETS)
+else
 	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-worktrees.ps1
+endif
 else
 	@echo "sync-worktrees is Windows-only (PowerShell required)"
+endif
+
+sync-worktrees-add: ## Add worktree(s) to existing workspace (TICKET=507 or TICKETS=507,508)
+ifeq ($(DETECTED_OS),Windows)
+ifdef TICKET
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-worktrees.ps1 -Add $(TICKET)
+else ifdef TICKETS
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-worktrees.ps1 -Add $(TICKETS)
+else
+	@echo "Usage: make sync-worktrees-add TICKET=507"
+endif
+else
+	@echo "sync-worktrees-add is Windows-only (PowerShell required)"
+endif
+
+sync-worktrees-remove: ## Remove worktree(s) from existing workspace (TICKET=493 or TICKETS=493,498)
+ifeq ($(DETECTED_OS),Windows)
+ifdef TICKET
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-worktrees.ps1 -Remove $(TICKET)
+else ifdef TICKETS
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-worktrees.ps1 -Remove $(TICKETS)
+else
+	@echo "Usage: make sync-worktrees-remove TICKET=493"
+endif
+else
+	@echo "sync-worktrees-remove is Windows-only (PowerShell required)"
+endif
+
+worktree: ## Create a worktree and auto-add to workspace (TICKET=507 DESC=fix-scoring)
+ifeq ($(DETECTED_OS),Windows)
+ifdef TICKET
+	@$(call echo_blue,Creating worktree for LS-$(TICKET)...)
+	twig worktree create LS-$(TICKET)/$(or $(DESC),work)
+	@$(call echo_blue,Registering branch dependency on main...)
+	twig branch depend LS-$(TICKET)/$(or $(DESC),work) main
+	@$(call echo_blue,Worktree created. Setting up workspace...)
+	@powershell -ExecutionPolicy Bypass -Command "if (Test-Path 'legacy-sports.code-workspace') { Write-Host 'Auto-adding to workspace...' -ForegroundColor Cyan; & '$(CURDIR)/scripts/sync-worktrees.ps1' -Add $(TICKET) } else { Write-Host 'No workspace file found. Run: make sync-worktrees TICKETS=$(TICKET)' -ForegroundColor Yellow }"
+	@twig worktree list
+else
+	@echo "Usage: make worktree TICKET=507 DESC=fix-scoring"
+endif
+else
+	@echo "worktree target is Windows-only"
 endif
 
 # Composite Commands
