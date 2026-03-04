@@ -38,7 +38,8 @@ resource "aws_iam_role" "github_actions" {
           StringLike = {
             "token.actions.githubusercontent.com:sub" = [
               "repo:bkrupa/legacy-sports:ref:refs/heads/main",
-              "repo:bkrupa/legacy-sports:environment:production"
+              "repo:bkrupa/legacy-sports:environment:production",
+              "repo:bkrupa/legacy-sports:pull_request"
             ]
           }
         }

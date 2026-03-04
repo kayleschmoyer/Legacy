@@ -96,6 +96,39 @@ resource "aws_ssm_parameter" "jira_proxy_lambda_version" {
 
 
 
+# =============================================================================
+# CI INFRASTRUCTURE PARAMETERS
+# =============================================================================
+# Parameters read by GitHub Actions CI without needing to run terraform output.
+
+# RDS security group ID – CI uses this to temporarily open port 5432 for the
+# migration-state check workflow and then immediately revokes the rule.
+resource "aws_ssm_parameter" "rds_security_group_id" {
+  name        = "/legacy-sports/${var.environment}/rds/security-group-id"
+  description = "ID of the RDS security group (used by CI for temporary ingress)"
+  type        = "String"
+  value       = aws_security_group.rds.id
+
+  tags = merge(local.common_tags, {
+    Component = "ci"
+  })
+}
+
+# Secret name for the ci_readonly PostgreSQL user credentials.
+# CI fetches this parameter first, then calls secretsmanager:GetSecretValue
+# to get the actual host, port, username, and password.
+resource "aws_ssm_parameter" "ci_readonly_db_creds_secret_name" {
+  name        = "/legacy-sports/${var.environment}/ci/readonly-db-creds-secret-name"
+  description = "Secrets Manager secret name holding ci_readonly DB credentials"
+  type        = "String"
+  value       = aws_secretsmanager_secret.ci_readonly_db_credentials.name
+
+  tags = merge(local.common_tags, {
+    Component = "ci"
+    Purpose   = "migration-check"
+  })
+}
+
 # Outputs for easy access to parameter names
 output "lambda_version_parameters" {
   description = "SSM parameter names for Lambda versions"

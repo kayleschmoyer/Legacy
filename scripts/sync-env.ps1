@@ -91,6 +91,19 @@ $cookieSecretName = $terraformOutput.environment_variables_summary.value.oauth_p
 Write-Host "  Cookie secret from: $cookieSecretName" -ForegroundColor Gray
 $cookieSecret = aws secretsmanager get-secret-value --secret-id $cookieSecretName --query "SecretString" --output text
 
+# Get CI readonly DB credentials (for running migrations that create the ci_readonly Postgres role)
+$ciReadonlySecret = $null
+$ciReadonlySecretName = $terraformOutput.environment_variables_summary.value.ci_readonly_db_creds_secret_name
+if ($ciReadonlySecretName) {
+    Write-Host "  CI readonly DB secret from: $ciReadonlySecretName" -ForegroundColor Gray
+    try {
+        $ciReadonlySecret = aws secretsmanager get-secret-value --secret-id $ciReadonlySecretName --query "SecretString" --output text | ConvertFrom-Json
+        Write-Host "  [OK] CI readonly credentials retrieved" -ForegroundColor Green
+    } catch {
+        Write-Host "  [WARN] Could not retrieve CI readonly credentials (run terraform apply first)" -ForegroundColor Yellow
+    }
+}
+
 Write-Host ""
 Write-Host "Building environment variables..." -ForegroundColor Yellow
 
@@ -127,6 +140,14 @@ $newEnvVars["DB_CREDS_PATH"] = $dbCredsSecretName
 # Application Secrets
 $newEnvVars["JWT_SECRET"] = $jwtSecret
 $newEnvVars["COOKIE_SECRET"] = $cookieSecret
+
+# CI Readonly Database Credentials (needed when running migrations that create the ci_readonly Postgres role)
+if ($ciReadonlySecretName) {
+    $newEnvVars["CI_READONLY_DB_CREDS_SECRET_NAME"] = $ciReadonlySecretName
+}
+if ($ciReadonlySecret) {
+    $newEnvVars["CI_READONLY_DB_PASSWORD"] = $ciReadonlySecret.password
+}
 
 # AWS Configuration
 $newEnvVars["AWS_REGION"] = $terraformOutput.environment_variables_summary.value.aws_region

@@ -129,3 +129,36 @@ resource "aws_secretsmanager_secret_version" "jira_credentials" {
   secret_id     = aws_secretsmanager_secret.jira_credentials.id
   secret_string = var.jira_credentials
 }
+
+# =============================================================================
+# CI READONLY DATABASE CREDENTIALS
+# =============================================================================
+# A minimal read-only PostgreSQL user used exclusively by GitHub Actions CI to
+# verify that all migration files have been applied to the database.
+# The ci_readonly role is created by migration 20260303_150000_add_ci_readonly_role.ts.
+
+resource "random_password" "ci_readonly_db_password" {
+  length  = 32
+  special = false # Avoid special chars that can break PostgreSQL connection strings
+}
+
+resource "aws_secretsmanager_secret" "ci_readonly_db_credentials" {
+  name_prefix = "${local.name_prefix}-ci-readonly-db-creds-"
+  description = "Read-only DB credentials for CI migration state checks (ci_readonly Postgres role)"
+
+  tags = merge(local.common_tags, {
+    Component = "ci"
+    Purpose   = "migration-check"
+  })
+}
+
+resource "aws_secretsmanager_secret_version" "ci_readonly_db_credentials" {
+  secret_id = aws_secretsmanager_secret.ci_readonly_db_credentials.id
+  secret_string = jsonencode({
+    username = "ci_readonly"
+    password = random_password.ci_readonly_db_password.result
+    host     = aws_db_instance.postgres.address
+    port     = 5432
+    database = var.database_name
+  })
+}
