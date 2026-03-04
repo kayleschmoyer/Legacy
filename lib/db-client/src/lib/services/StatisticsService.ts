@@ -647,145 +647,178 @@ export class StatisticsService {
     day: number,
     limit = 15,
   ): Promise<OnThisDayEntry[]> {
-    const monthStr = String(month).padStart(2, '0');
-    const dayStr = String(day).padStart(2, '0');
-
     return runWithPublicClient(this.options, async (db) => {
-      // --- Notable batting ---
-      const battingRows = await db
-        .select({
-          playerId: PublicSchema.gameBatting.playerId,
-          season: PublicSchema.gameBatting.season,
-          gameIdentifier: PublicSchema.gameBatting.gameIdentifier,
-          hr: PublicSchema.gameBatting.hr,
-          rbi: PublicSchema.gameBatting.rbi,
-          h: PublicSchema.gameBatting.h,
-          doubles: PublicSchema.gameBatting.doubles,
-          triples: PublicSchema.gameBatting.triples,
-          ab: PublicSchema.gameBatting.ab,
-          bb: PublicSchema.gameBatting.bb,
-          r: PublicSchema.gameBatting.r,
-          firstName: PublicSchema.players.firstName,
-          lastName: PublicSchema.players.lastName,
-          brefId: PublicSchema.players.brefId,
-        })
-        .from(PublicSchema.gameBatting)
-        .innerJoin(
-          PublicSchema.players,
-          eq(PublicSchema.gameBatting.playerId, PublicSchema.players.id),
-        )
-        .where(
-          and(
-            sql`SUBSTRING(${PublicSchema.gameBatting.gameIdentifier}, 8, 2) = ${monthStr}`,
-            sql`SUBSTRING(${PublicSchema.gameBatting.gameIdentifier}, 10, 2) = ${dayStr}`,
-            or(
-              sql`${PublicSchema.gameBatting.hr} > 0`,
-              sql`${PublicSchema.gameBatting.h} >= 3`,
-              sql`${PublicSchema.gameBatting.rbi} >= 4`,
+      /**
+       * Run the batting + pitching queries for a specific calendar month/day.
+       * Returns an empty array when no notable performances exist for that date.
+       */
+      const queryForDate = async (
+        m: number,
+        d: number,
+      ): Promise<OnThisDayEntry[]> => {
+        const mStr = String(m).padStart(2, '0');
+        const dStr = String(d).padStart(2, '0');
+
+        // --- Notable batting ---
+        const battingRows = await db
+          .select({
+            playerId: PublicSchema.gameBatting.playerId,
+            season: PublicSchema.gameBatting.season,
+            gameIdentifier: PublicSchema.gameBatting.gameIdentifier,
+            hr: PublicSchema.gameBatting.hr,
+            rbi: PublicSchema.gameBatting.rbi,
+            h: PublicSchema.gameBatting.h,
+            doubles: PublicSchema.gameBatting.doubles,
+            triples: PublicSchema.gameBatting.triples,
+            ab: PublicSchema.gameBatting.ab,
+            bb: PublicSchema.gameBatting.bb,
+            r: PublicSchema.gameBatting.r,
+            firstName: PublicSchema.players.firstName,
+            lastName: PublicSchema.players.lastName,
+            brefId: PublicSchema.players.brefId,
+          })
+          .from(PublicSchema.gameBatting)
+          .innerJoin(
+            PublicSchema.players,
+            eq(PublicSchema.gameBatting.playerId, PublicSchema.players.id),
+          )
+          .where(
+            and(
+              sql`SUBSTRING(${PublicSchema.gameBatting.gameIdentifier}, 8, 2) = ${mStr}`,
+              sql`SUBSTRING(${PublicSchema.gameBatting.gameIdentifier}, 10, 2) = ${dStr}`,
+              or(
+                sql`${PublicSchema.gameBatting.hr} > 0`,
+                sql`${PublicSchema.gameBatting.h} >= 3`,
+                sql`${PublicSchema.gameBatting.rbi} >= 4`,
+              ),
             ),
-          ),
-        )
-        .orderBy(
-          desc(PublicSchema.gameBatting.season),
-          desc(sql`COALESCE(${PublicSchema.gameBatting.hr}, 0)`),
-          desc(sql`COALESCE(${PublicSchema.gameBatting.rbi}, 0)`),
-        )
-        .limit(limit)
-        .execute();
+          )
+          .orderBy(
+            desc(PublicSchema.gameBatting.season),
+            desc(sql`COALESCE(${PublicSchema.gameBatting.hr}, 0)`),
+            desc(sql`COALESCE(${PublicSchema.gameBatting.rbi}, 0)`),
+          )
+          .limit(limit)
+          .execute();
 
-      // --- Notable pitching ---
-      const pitchingRows = await db
-        .select({
-          playerId: PublicSchema.gamePitching.playerId,
-          season: PublicSchema.gamePitching.season,
-          gameIdentifier: PublicSchema.gamePitching.gameIdentifier,
-          so: PublicSchema.gamePitching.so,
-          ip: PublicSchema.gamePitching.ip,
-          er: PublicSchema.gamePitching.er,
-          h: PublicSchema.gamePitching.h,
-          bb: PublicSchema.gamePitching.bb,
-          sv: PublicSchema.gamePitching.sv,
-          w: PublicSchema.gamePitching.w,
-          firstName: PublicSchema.players.firstName,
-          lastName: PublicSchema.players.lastName,
-          brefId: PublicSchema.players.brefId,
-        })
-        .from(PublicSchema.gamePitching)
-        .innerJoin(
-          PublicSchema.players,
-          eq(PublicSchema.gamePitching.playerId, PublicSchema.players.id),
-        )
-        .where(
-          and(
-            sql`SUBSTRING(${PublicSchema.gamePitching.gameIdentifier}, 8, 2) = ${monthStr}`,
-            sql`SUBSTRING(${PublicSchema.gamePitching.gameIdentifier}, 10, 2) = ${dayStr}`,
-            or(
-              sql`${PublicSchema.gamePitching.so} >= 10`,
-              sql`(${PublicSchema.gamePitching.ip} >= 7 AND COALESCE(${PublicSchema.gamePitching.er}, 1) = 0)`,
-              sql`${PublicSchema.gamePitching.sv} > 0`,
+        // --- Notable pitching ---
+        const pitchingRows = await db
+          .select({
+            playerId: PublicSchema.gamePitching.playerId,
+            season: PublicSchema.gamePitching.season,
+            gameIdentifier: PublicSchema.gamePitching.gameIdentifier,
+            so: PublicSchema.gamePitching.so,
+            ip: PublicSchema.gamePitching.ip,
+            er: PublicSchema.gamePitching.er,
+            h: PublicSchema.gamePitching.h,
+            bb: PublicSchema.gamePitching.bb,
+            sv: PublicSchema.gamePitching.sv,
+            w: PublicSchema.gamePitching.w,
+            firstName: PublicSchema.players.firstName,
+            lastName: PublicSchema.players.lastName,
+            brefId: PublicSchema.players.brefId,
+          })
+          .from(PublicSchema.gamePitching)
+          .innerJoin(
+            PublicSchema.players,
+            eq(PublicSchema.gamePitching.playerId, PublicSchema.players.id),
+          )
+          .where(
+            and(
+              sql`SUBSTRING(${PublicSchema.gamePitching.gameIdentifier}, 8, 2) = ${mStr}`,
+              sql`SUBSTRING(${PublicSchema.gamePitching.gameIdentifier}, 10, 2) = ${dStr}`,
+              or(
+                sql`${PublicSchema.gamePitching.so} >= 10`,
+                sql`(${PublicSchema.gamePitching.ip} >= 7 AND COALESCE(${PublicSchema.gamePitching.er}, 1) = 0)`,
+                sql`${PublicSchema.gamePitching.sv} > 0`,
+              ),
             ),
-          ),
-        )
-        .orderBy(
-          desc(PublicSchema.gamePitching.season),
-          desc(sql`COALESCE(${PublicSchema.gamePitching.so}, 0)`),
-        )
-        .limit(Math.ceil(limit / 3))
-        .execute();
+          )
+          .orderBy(
+            desc(PublicSchema.gamePitching.season),
+            desc(sql`COALESCE(${PublicSchema.gamePitching.so}, 0)`),
+          )
+          .limit(Math.ceil(limit / 3))
+          .execute();
 
-      const batting: OnThisDayEntry[] = battingRows.map((row) => ({
-        entryType: 'batting' as const,
-        playerId: row.playerId,
-        firstName: row.firstName,
-        lastName: row.lastName,
-        brefId: row.brefId,
-        season: row.season,
-        gameIdentifier: row.gameIdentifier,
-        hr: row.hr ?? null,
-        rbi: row.rbi ?? null,
-        hits: row.h ?? null,
-        doubles: row.doubles ?? null,
-        triples: row.triples ?? null,
-        atBats: row.ab ?? null,
-        baseOnBalls: row.bb ?? null,
-        runs: row.r ?? null,
-        // pitching fields null for batting entries
-        strikeouts: null,
-        inningsPitched: null,
-        earnedRuns: null,
-        saves: null,
-        wins: null,
-        hitsAllowed: null,
-        walksAllowed: null,
-      }));
+        const batting: OnThisDayEntry[] = battingRows.map((row) => ({
+          entryType: 'batting' as const,
+          playerId: row.playerId,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          brefId: row.brefId,
+          season: row.season,
+          gameIdentifier: row.gameIdentifier,
+          hr: row.hr ?? null,
+          rbi: row.rbi ?? null,
+          hits: row.h ?? null,
+          doubles: row.doubles ?? null,
+          triples: row.triples ?? null,
+          atBats: row.ab ?? null,
+          baseOnBalls: row.bb ?? null,
+          runs: row.r ?? null,
+          // pitching fields null for batting entries
+          strikeouts: null,
+          inningsPitched: null,
+          earnedRuns: null,
+          saves: null,
+          wins: null,
+          hitsAllowed: null,
+          walksAllowed: null,
+        }));
 
-      const pitching: OnThisDayEntry[] = pitchingRows.map((row) => ({
-        entryType: 'pitching' as const,
-        playerId: row.playerId,
-        firstName: row.firstName,
-        lastName: row.lastName,
-        brefId: row.brefId,
-        season: row.season,
-        gameIdentifier: row.gameIdentifier,
-        strikeouts: row.so ?? null,
-        inningsPitched: row.ip ?? null,
-        earnedRuns: row.er ?? null,
-        saves: row.sv ?? null,
-        wins: row.w ?? null,
-        hitsAllowed: row.h ?? null,
-        walksAllowed: row.bb ?? null,
-        // batting fields null for pitching entries
-        hr: null,
-        rbi: null,
-        hits: null,
-        doubles: null,
-        triples: null,
-        atBats: null,
-        baseOnBalls: null,
-        runs: null,
-      }));
+        const pitching: OnThisDayEntry[] = pitchingRows.map((row) => ({
+          entryType: 'pitching' as const,
+          playerId: row.playerId,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          brefId: row.brefId,
+          season: row.season,
+          gameIdentifier: row.gameIdentifier,
+          strikeouts: row.so ?? null,
+          inningsPitched: row.ip ?? null,
+          earnedRuns: row.er ?? null,
+          saves: row.sv ?? null,
+          wins: row.w ?? null,
+          hitsAllowed: row.h ?? null,
+          walksAllowed: row.bb ?? null,
+          // batting fields null for pitching entries
+          hr: null,
+          rbi: null,
+          hits: null,
+          doubles: null,
+          triples: null,
+          atBats: null,
+          baseOnBalls: null,
+          runs: null,
+        }));
 
-      return [...batting, ...pitching];
+        return [...batting, ...pitching];
+      };
+
+      // Try the exact requested date first.
+      const exact = await queryForDate(month, day);
+      if (exact.length > 0) return exact;
+
+      // The requested date falls outside the baseball season (or has no
+      // notable performances in the dataset).  Walk up to ±14 calendar days —
+      // alternating forward and backward — and return the first date that
+      // yields results.  This keeps the feed populated year-round without
+      // surfacing stale or irrelevant data.
+      const base = new Date(2000, month - 1, day); // fixed year for calendar math
+      for (let offset = 1; offset <= 14; offset++) {
+        for (const sign of [1, -1]) {
+          const candidate = new Date(base);
+          candidate.setDate(candidate.getDate() + sign * offset);
+          const results = await queryForDate(
+            candidate.getMonth() + 1,
+            candidate.getDate(),
+          );
+          if (results.length > 0) return results;
+        }
+      }
+
+      return [];
     });
   }
 
