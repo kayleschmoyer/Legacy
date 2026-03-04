@@ -97,6 +97,117 @@ const AccessBadge = styled(Paragraph, {
   letterSpacing: 0.5,
 });
 
+const AccordionPanel = styled(YStack, {
+  borderRadius: '$4',
+  borderWidth: 1,
+  overflow: 'hidden',
+  style: {
+    borderColor: OUTLINE_SUBTLE,
+  } as never,
+});
+
+const AccordionHeader = styled(XStack, {
+  paddingHorizontal: '$4',
+  paddingVertical: '$4',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '$3',
+  cursor: 'pointer' as never,
+  hoverStyle: { backgroundColor: '$color2' },
+  animation: 'quick',
+  style: {
+    background: SURFACE_PANEL,
+  } as never,
+});
+
+const AccordionBody = styled(YStack, {
+  gap: '$3',
+  padding: '$4',
+  style: {
+    borderTop: `1px solid ${OUTLINE_SUBTLE}`,
+  } as never,
+});
+
+// ─── AdminSection ─────────────────────────────────────────────────────────────
+
+interface AdminSectionProps {
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+function AdminSection({
+  title,
+  subtitle,
+  badge,
+  defaultOpen = true,
+  children,
+}: AdminSectionProps) {
+  const [open, setOpen] = useState(defaultOpen);
+  const sectionId = `admin-section-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
+  return (
+    <AccordionPanel>
+      <AccordionHeader
+        onPress={() => setOpen((v) => !v)}
+        role="button"
+        aria-expanded={open}
+        aria-controls={sectionId}
+      >
+        <YStack flex={1} gap="$1">
+          <XStack gap="$2" alignItems="center">
+            <Paragraph size="$6" fontWeight="600" color="$color">
+              {title}
+            </Paragraph>
+            {badge != null && (
+              <Paragraph
+                size="$2"
+                fontWeight="600"
+                paddingHorizontal="$2"
+                paddingVertical="$1"
+                borderRadius="$2"
+                style={{
+                  background: withAlpha(BRAND_NAVY_LIGHT, 0.25),
+                  color: BRAND_GOLD_LIGHT,
+                }}
+              >
+                {badge}
+              </Paragraph>
+            )}
+          </XStack>
+          {subtitle != null && (
+            <Paragraph size="$3" color="$colorPress">
+              {subtitle}
+            </Paragraph>
+          )}
+        </YStack>
+
+        <Paragraph
+          fontSize="$5"
+          color={BRAND_GOLD_LIGHT}
+          lineHeight={20}
+          style={
+            {
+              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s',
+            } as never
+          }
+        >
+          ▾
+        </Paragraph>
+      </AccordionHeader>
+
+      {open && (
+        <AccordionBody id={sectionId} role="region" aria-label={title}>
+          {children}
+        </AccordionBody>
+      )}
+    </AccordionPanel>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AdminPage(): React.JSX.Element {
@@ -183,18 +294,11 @@ export function AdminPage(): React.JSX.Element {
       <Separator />
 
       {/* Users Section */}
-      <YStack gap="$3">
-        <XStack justifyContent="space-between" alignItems="center">
-          <Paragraph size="$6" fontWeight="600" color="$color">
-            Users
-          </Paragraph>
-          {data && (
-            <Paragraph size="$3" color="$colorPress">
-              {(data.users ?? []).length} total
-            </Paragraph>
-          )}
-        </XStack>
-
+      <AdminSection
+        title="Users"
+        subtitle="Search and impersonate user accounts."
+        badge={data ? String((data.users ?? []).length) : undefined}
+      >
         {/* Search */}
         <Input
           placeholder="Search by name, email, or ID…"
@@ -324,21 +428,14 @@ export function AdminPage(): React.JSX.Element {
             );
           })}
         </YStack>
-      </YStack>
-
-      <Separator />
+      </AdminSection>
 
       {/* JWT Decoder Section */}
-      <YStack gap="$3">
-        <YStack gap="$1">
-          <Paragraph size="$6" fontWeight="600" color="$color">
-            JWT Decoder
-          </Paragraph>
-          <Paragraph size="$3" color="$colorPress">
-            Paste an access token or refresh token to inspect its claims.
-          </Paragraph>
-        </YStack>
-
+      <AdminSection
+        title="JWT Decoder"
+        subtitle="Paste an access token or refresh token to inspect its claims."
+        defaultOpen={false}
+      >
         <TextArea
           placeholder="Paste JWT here…"
           value={jwtInput}
@@ -466,7 +563,7 @@ export function AdminPage(): React.JSX.Element {
             </YStack>
           </YStack>
         )}
-      </YStack>
+      </AdminSection>
     </PageContainer>
   );
 }
