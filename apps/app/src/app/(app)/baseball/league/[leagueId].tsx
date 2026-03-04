@@ -71,9 +71,8 @@ export default function LeagueId(): React.JSX.Element {
 
   // Fetch league data
   // Fetch matchups for the league
-  const { matchups, loading: matchupsLoading } = useMatchupsForLeague(
-    isNaN(numLeagueId) ? null : numLeagueId,
-  );
+  const { matchups: rawMatchups, loading: matchupsLoading } =
+    useMatchupsForLeague(isNaN(numLeagueId) ? null : numLeagueId);
 
   const { data: leagueData, loading: leagueLoading } = useGetLeagueByIdQuery({
     skip: isNaN(numLeagueId),
@@ -114,6 +113,19 @@ export default function LeagueId(): React.JSX.Element {
   }, [numLeagueId, userInfo?.id, getUserTeamId]);
 
   const userTeamId = userTeamData?.userTeamId;
+
+  // Sort matchups so the user's matchup is always first
+  const matchups = useMemo(() => {
+    if (!userTeamId) return rawMatchups;
+    return [...rawMatchups].sort((a, b) => {
+      const aIsUser =
+        a.team1Id === userTeamId || a.team2Id === userTeamId ? 1 : 0;
+      const bIsUser =
+        b.team1Id === userTeamId || b.team2Id === userTeamId ? 1 : 0;
+      return bIsUser - aIsUser;
+    });
+  }, [rawMatchups, userTeamId]);
+
   console.log('🔍 Debug team data:', {
     leagueData: leagueData?.league,
     userTeamId,

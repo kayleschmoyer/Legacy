@@ -175,8 +175,20 @@ export function MatchupNavigationControls({
   });
 
   // Fetch matchups for the selected week
-  const { matchups: weekMatchups, loading: matchupsLoading } =
+  const { matchups: weekMatchupsRaw, loading: matchupsLoading } =
     useMatchupsByWeek(leagueId, selectedWeek);
+
+  // Sort so the user's matchup always appears first
+  const weekMatchups = useMemo(() => {
+    if (!userTeamId) return weekMatchupsRaw;
+    return [...weekMatchupsRaw].sort((a, b) => {
+      const aIsUser =
+        a.team1Id === userTeamId || a.team2Id === userTeamId ? 1 : 0;
+      const bIsUser =
+        b.team1Id === userTeamId || b.team2Id === userTeamId ? 1 : 0;
+      return bIsUser - aIsUser;
+    });
+  }, [weekMatchupsRaw, userTeamId]);
 
   // Available weeks, sorted ascending
   const availableWeeks = useMemo(() => {
