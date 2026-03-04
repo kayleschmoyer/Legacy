@@ -1006,6 +1006,24 @@ export async function createAllMatchupsForLeague(
     }
   }
 
+  // Activate week-1 matchups to 'in_progress' so autoSelectGames can
+  // immediately start picking games after draft completion.
+  // Without this, both autoSelectGames and autoAdvanceMatchups skip the league
+  // because they only operate on matchups with status = 'in_progress'.
+  // (Subsequent weeks are activated by advanceLeagueWeekInternal after each
+  // week's games are complete — this is the equivalent step for week 1.)
+  if (week1MatchupIds.length > 0) {
+    await db
+      .update(PublicSchema.matchups)
+      .set({ status: 'in_progress' })
+      .where(inArray(PublicSchema.matchups.id, week1MatchupIds));
+
+    LOGGER.info('Activated week-1 matchups to in_progress', {
+      leagueId,
+      matchupIds: week1MatchupIds,
+    });
+  }
+
   const week1Matchup = insertedMatchups.find((m) => m.weekNumber === 1);
   const currentMatchupId = week1Matchup?.id ?? insertedMatchups[0]?.id ?? null;
 
@@ -1013,7 +1031,7 @@ export async function createAllMatchupsForLeague(
     .update(PublicSchema.leagues)
     .set({
       currentMatchup: currentMatchupId ?? undefined,
-      weekAdvanceStatus: 'success',
+      weekAdvanceStatus: 'idle',
     })
     .where(eq(PublicSchema.leagues.id, leagueId));
 

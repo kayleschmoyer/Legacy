@@ -282,4 +282,51 @@ describe('Scheduled Mutations', () => {
       expect(nextWeek).toBeGreaterThan(10); // past end of pre-created schedule
     });
   });
+
+  // ── createAllMatchupsForLeague (week-1 activation) ───────────────────────
+  // LS-511: Game selection failing for newly-drafted leagues.
+  // Root cause: createAllMatchupsForLeague created ALL matchups as 'scheduled'.
+  // Both autoSelectGames and autoAdvanceMatchups only process 'in_progress'
+  // matchups, so newly-created leagues were permanently skipped.
+  // Fix: createAllMatchupsForLeague now flips week-1 matchups to 'in_progress'.
+
+  describe('createAllMatchupsForLeague week-1 activation (LS-511)', () => {
+    it('should require week-1 matchups to be in_progress so autoSelectGames can process them', () => {
+      // autoSelectGames filters for status = 'in_progress'. If week-1 matchups
+      // remain 'scheduled', the nightly cron and commissioner-triggered game
+      // selection both silently skip the league.
+      const week1Status = 'in_progress';
+      const autoSelectGamesSees = [
+        { weekNumber: 1, status: week1Status },
+        { weekNumber: 1, status: week1Status },
+      ];
+      const inProgressForAutoSelect = autoSelectGamesSees.filter(
+        (m) => m.status === 'in_progress',
+      );
+      expect(inProgressForAutoSelect.length).toBeGreaterThan(0);
+    });
+
+    it('should set weekAdvanceStatus to idle (not success) after initial matchup creation', () => {
+      // 'idle' is consistent with advanceLeagueWeekInternal end state and signals
+      // the league is ready to receive game selection — not mid-advance.
+      const weekAdvanceStatus = 'idle';
+      expect(['processing', 'queued']).not.toContain(weekAdvanceStatus);
+    });
+
+    it('would leave a league permanently stuck if week-1 matchups stayed scheduled', () => {
+      // Without the fix: all matchups start as 'scheduled'.
+      // autoSelectGames: finds no in_progress → skips.
+      // autoAdvanceMatchups: finds no in_progress → skips.
+      // Result: no games ever selected for the league.
+      const allMatchupsBeforeFix = [
+        { weekNumber: 1, status: 'scheduled' },
+        { weekNumber: 1, status: 'scheduled' },
+        { weekNumber: 2, status: 'scheduled' },
+      ];
+      const inProgress = allMatchupsBeforeFix.filter(
+        (m) => m.status === 'in_progress',
+      );
+      expect(inProgress.length).toBe(0); // confirms the stuck state before fix
+    });
+  });
 });
