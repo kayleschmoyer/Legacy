@@ -23,6 +23,9 @@ export interface DraftSettingsControlProps {
   hofOnly?: boolean | null | undefined;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
+  /** Called whenever the unsaved-changes state changes. Used by parents to
+   * block the "Start Draft" button while settings are dirty. */
+  onDirtyChange?: (isDirty: boolean) => void;
 }
 
 interface SettingOption {
@@ -115,6 +118,7 @@ export function DraftSettingsControl({
   hofOnly,
   onSuccess,
   onError,
+  onDirtyChange,
 }: DraftSettingsControlProps) {
   const isDraftLocked = draftStatus !== 'not-started';
 
@@ -141,6 +145,11 @@ export function DraftSettingsControl({
   /** ISO-8601 string (YYYY-MM-DDTHH:MM) for the datetime-local input, or '' for no schedule */
   const [scheduledAt, setScheduledAt] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Notify parent when dirty state changes
+  useEffect(() => {
+    onDirtyChange?.(hasChanges);
+  }, [hasChanges, onDirtyChange]);
 
   // Sync local state from server data
   useEffect(() => {

@@ -33,6 +33,9 @@ export interface NextStepControlProps {
   currentMatchup?: Matchup | null;
   gamesPerMatchup: number;
   draftStatus?: string | null;
+  /** When true, the "Start Draft" button is blocked because draft settings
+   * have unsaved changes that must be saved first. */
+  hasPendingSettingsChanges?: boolean;
   onSuccess?: (
     actionType?: 'selectGame' | 'advance' | 'draft' | 'createWeek1',
   ) => void;
@@ -54,6 +57,7 @@ export function NextStepControl({
   currentMatchup,
   gamesPerMatchup,
   draftStatus,
+  hasPendingSettingsChanges = false,
   onSuccess,
   onError,
   onLeagueUpdate,
@@ -151,6 +155,10 @@ export function NextStepControl({
       actionType === 'draft' &&
       (initializeDraftLoading || isDraftInProgress || isDraftCompleted)
     ) {
+      return;
+    }
+    // Prevent starting the draft when draft settings have unsaved changes
+    if (actionType === 'draft' && hasPendingSettingsChanges) {
       return;
     }
     setShowConfirmDialog(true);
@@ -409,7 +417,8 @@ export function NextStepControl({
                   matchupsLoading ||
                   isGameSelectionInProgress ||
                   isDraftInProgress ||
-                  (actionType === 'draft' && isDraftCompleted)
+                  (actionType === 'draft' && isDraftCompleted) ||
+                  (actionType === 'draft' && hasPendingSettingsChanges)
                 }
                 icon={
                   loading ||
@@ -425,6 +434,26 @@ export function NextStepControl({
               </Button>
             )}
           </XStack>
+
+          {actionType === 'draft' &&
+            hasPendingSettingsChanges &&
+            !isDraftInProgress &&
+            !isDraftCompleted && (
+              <XStack
+                alignItems="center"
+                gap="$2"
+                backgroundColor="$orange3"
+                borderColor="$orange8"
+                borderWidth={1}
+                borderRadius="$3"
+                paddingHorizontal="$3"
+                paddingVertical="$2"
+              >
+                <Text color="$orange11" fontWeight="600" fontSize="$3">
+                  Save your draft settings before starting the draft.
+                </Text>
+              </XStack>
+            )}
 
           {isDraftInProgress && !isLiveDraft && (
             <XStack

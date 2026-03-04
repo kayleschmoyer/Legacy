@@ -1000,6 +1000,9 @@ export function LeagueDetailPage(): React.JSX.Element {
     null,
   );
 
+  // LS-507: track whether DraftSettingsControl has unsaved changes
+  const [hasDraftSettingsChanges, setHasDraftSettingsChanges] = useState(false);
+
   // Commissioner accordion — "Next Step" open by default
   const [commissionerOpenSections, setCommissionerOpenSections] = useState<
     Set<string>
@@ -2322,6 +2325,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             currentMatchup={currentMatchup}
             gamesPerMatchup={currentMatchup?.gamesPerMatchup ?? 1}
             draftStatus={league.draftStatus}
+            hasPendingSettingsChanges={hasDraftSettingsChanges}
             onSuccess={handleMatchupSuccess}
             onError={handleMatchupError}
             onLeagueUpdate={handleLeagueUpdate}
@@ -2336,6 +2340,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             leagueId={leagueId}
             draftStatus={league.draftStatus}
             playerPool={league.playerPool}
+            onDirtyChange={setHasDraftSettingsChanges}
             onSuccess={(message) => {
               setMatchupSuccessMessage(message);
               setTimeout(() => setMatchupSuccessMessage(null), 5000);
