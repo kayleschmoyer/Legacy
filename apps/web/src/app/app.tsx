@@ -41,6 +41,7 @@ import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
 import { useRouteAnnouncer } from '../hooks/useRouteAnnouncer';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
+import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { AdminPage } from '../pages/admin/AdminPage';
 import ProfileSettingsPage from '../pages/profile/ProfileSettingsPage';
 import PreferencesPage from '../pages/preferences/PreferencesPage';
@@ -470,6 +471,8 @@ function App() {
       </a>
       {/* Admin impersonation banner — shown only while impersonating */}
       <ImpersonationBanner />
+      {/* Global toast for uncaught Apollo/GraphQL errors */}
+      <ApolloErrorToast />
       <Navigation />
       <YStack
         flex={1}

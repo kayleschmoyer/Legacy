@@ -86,6 +86,14 @@ async function silentlyRefreshJwt(): Promise<string | null> {
   return refreshInFlight;
 }
 
+// ─── Dispatch a window event so the ApolloErrorToast component can display it ──
+
+function dispatchApolloError(message: string): void {
+  window.dispatchEvent(
+    new CustomEvent('apollo:error', { detail: { message } }),
+  );
+}
+
 // ─── Error link with token-refresh + retry ─────────────────────────────────
 
 const errorLink = new ErrorLink(({ error, operation, forward }) => {
@@ -100,7 +108,23 @@ const errorLink = new ErrorLink(({ error, operation, forward }) => {
   // Check for 401 HTTP error
   const is401 = ServerError.is(error) && error.statusCode === 401;
 
-  if (!isUnauthenticated && !is401) return;
+  if (!isUnauthenticated && !is401) {
+    // Surface uncaught errors to the user via the global ApolloErrorToast.
+    if (CombinedGraphQLErrors.is(error) && error.errors.length > 0) {
+      dispatchApolloError(
+        error.errors[0]?.message ?? 'An unexpected error occurred',
+      );
+    } else if (ServerError.is(error)) {
+      dispatchApolloError(
+        `Server error (${error.statusCode.toString()}): please try again`,
+      );
+    } else if (error instanceof Error) {
+      dispatchApolloError(error.message);
+    } else {
+      dispatchApolloError('An unexpected error occurred');
+    }
+    return;
+  }
 
   // Attempt a silent refresh and retry the operation once
   return new Observable<ApolloLink.Result>((observer) => {
