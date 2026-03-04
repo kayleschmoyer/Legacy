@@ -647,6 +647,7 @@ export type League = {
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
+  isMockDraft?: Maybe<Scalars['Boolean']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
   logoUrl?: Maybe<Scalars['String']['output']>;
@@ -925,6 +926,13 @@ export type MatchupStatusCounts = {
   total?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Identifiers for a newly created mock draft session */
+export type MockDraftInit = {
+  __typename?: 'MockDraftInit';
+  draftId?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
   _placeholder?: Maybe<Scalars['Boolean']['output']>;
@@ -984,6 +992,8 @@ export type Mutation = {
   /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
   impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
+  /** Create an ephemeral mock draft league to practice drafting against AI teams. Picks are recorded but rosters are not persisted to any real league. */
+  initializeMockDraft?: Maybe<MockDraftInit>;
   inviteAssistantManager?: Maybe<LeagueMember>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
@@ -1211,6 +1221,13 @@ export type MutationInitializeDraftArgs = {
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type MutationInitializeMockDraftArgs = {
+  numTeams: Scalars['Int']['input'];
+  pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
+  rosterSize: Scalars['Int']['input'];
+  userPickPosition: Scalars['Int']['input'];
 };
 
 export type MutationInviteAssistantManagerArgs = {

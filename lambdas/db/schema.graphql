@@ -721,6 +721,7 @@ type League {
   gamesPerMatchup: Int
   id: Int
   inviteCode: String
+  isMockDraft: Boolean
   isPublic: Boolean
   lmNotes: String
   logoUrl: String
@@ -1044,6 +1045,14 @@ type MatchupStatusCounts {
   total: Int
 }
 
+"""
+Identifiers for a newly created mock draft session
+"""
+type MockDraftInit {
+  draftId: Int
+  leagueId: Int
+}
+
 type Mutation {
   _placeholder: Boolean
 
@@ -1211,6 +1220,31 @@ type Mutation {
     leagueId: Int!
     selectionMethod: String
   ): Draft
+
+  """
+  Create an ephemeral mock draft league to practice drafting against AI teams. Picks are recorded but rosters are not persisted to any real league.
+  """
+  initializeMockDraft(
+    """
+    Total number of teams in the mock draft (2–12)
+    """
+    numTeams: Int!
+
+    """
+    Seconds per pick (default: 120)
+    """
+    pickTimeLimitSeconds: Int
+
+    """
+    Number of roster slots per team
+    """
+    rosterSize: Int!
+
+    """
+    The 1-based draft slot the human user will draft from
+    """
+    userPickPosition: Int!
+  ): MockDraftInit
   inviteAssistantManager(teamId: Int!, username: String!): LeagueMember
   joinLeague(inviteCode: String!, teamName: String!): JoinLeaguePayload
   joinLeagueByCode(inviteCode: String!, teamName: String!): Team

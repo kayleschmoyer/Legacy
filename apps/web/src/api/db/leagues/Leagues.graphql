@@ -21,6 +21,7 @@ fragment League on League {
   playoffFormat
   playoffMultiWeek
   lmNotes
+  isMockDraft
   isPublic
   logoUrl
   bannerUrl

@@ -78,6 +78,9 @@ export const leagues = pgTable(
     playoffMultiWeek: boolean('playoff_multi_week').notNull().default(false),
     /** Persistent commissioner notes visible to all league members */
     lmNotes: text('lm_notes'),
+    /** True for ephemeral mock drafts created via initializeMockDraft (LS-470).
+     *  Rosters are NOT persisted and matchups are NOT created when isMockDraft=true. */
+    isMockDraft: boolean('is_mock_draft').notNull().default(false),
     // League visibility
     isPublic: boolean('is_public').notNull().default(false),
     logoUrl: text('logo_url'),

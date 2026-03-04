@@ -64,6 +64,8 @@ export const League = builder.objectRef<{
   playoffFormat?: string;
   playoffMultiWeek?: boolean;
   lmNotes?: string | null;
+  /** True for ephemeral mock-draft leagues (LS-470) */
+  isMockDraft?: boolean;
   isPublic?: boolean;
   logoUrl?: string | null;
   bannerUrl?: string | null;
@@ -101,6 +103,7 @@ League.implement({
     playoffFormat: t.exposeString('playoffFormat', { nullable: true }),
     playoffMultiWeek: t.exposeBoolean('playoffMultiWeek', { nullable: true }),
     lmNotes: t.exposeString('lmNotes', { nullable: true }),
+    isMockDraft: t.exposeBoolean('isMockDraft', { nullable: true }),
     isPublic: t.exposeBoolean('isPublic', { nullable: true }),
     logoUrl: t.exposeString('logoUrl', { nullable: true }),
     bannerUrl: t.exposeString('bannerUrl', { nullable: true }),

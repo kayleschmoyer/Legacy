@@ -310,3 +310,20 @@ query GetDraftRecommendations($draftId: Int!, $teamId: Int!) {
     }
   }
 }
+
+mutation InitializeMockDraft(
+  $numTeams: Int!
+  $rosterSize: Int!
+  $userPickPosition: Int!
+  $pickTimeLimitSeconds: Int
+) {
+  initializeMockDraft(
+    numTeams: $numTeams
+    rosterSize: $rosterSize
+    userPickPosition: $userPickPosition
+    pickTimeLimitSeconds: $pickTimeLimitSeconds
+  ) {
+    leagueId
+    draftId
+  }
+}

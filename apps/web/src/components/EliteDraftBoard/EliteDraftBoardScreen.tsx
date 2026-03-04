@@ -1371,7 +1371,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           </div>
           <div className="d-state-title">Draft Complete!</div>
           <div className="d-state-desc">
-            All {pickHistory.length} picks have been made. Your roster is set!
+            {league?.isMockDraft
+              ? `All ${pickHistory.length} picks have been made. No rosters were saved — this was a practice draft.`
+              : `All ${pickHistory.length} picks have been made. Your roster is set!`}
           </div>
           {myTeam.length > 0 && (
             <div style={{ maxWidth: 400, width: '100%', marginTop: 16 }}>
@@ -1415,12 +1417,38 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               ))}
             </div>
           )}
-          <button
-            className="d-state-btn"
-            onClick={() => navigate(`/baseball/league/${leagueId}`)}
-          >
-            Back to League
-          </button>
+          {league?.isMockDraft ? (
+            <div
+              style={{
+                display: 'flex',
+                gap: 12,
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+                marginTop: 8,
+              }}
+            >
+              <button
+                className="d-state-btn"
+                onClick={() => navigate('/baseball/mock-draft')}
+              >
+                Practice Again
+              </button>
+              <button
+                className="d-state-btn"
+                style={{ background: 'rgba(255,255,255,0.1)' }}
+                onClick={() => navigate('/baseball')}
+              >
+                Go to My Leagues
+              </button>
+            </div>
+          ) : (
+            <button
+              className="d-state-btn"
+              onClick={() => navigate(`/baseball/league/${leagueId}`)}
+            >
+              Back to League
+            </button>
+          )}
         </div>
       </div>
     );

@@ -7,6 +7,7 @@
 
 import './make-draft-pick';
 import './initialize-draft';
+import './initialize-mock-draft';
 import './update-draft-settings';
 import './pause-resume-draft';
 import './commissioner-pick';
