@@ -469,6 +469,17 @@ export type DraftPlayer = {
   pitchingAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
 };
 
+/** A prioritised entry in a team's draft queue. Auto-pick picks the first available entry before falling back to the FPG algorithm. */
+export type DraftQueueEntry = {
+  __typename?: 'DraftQueueEntry';
+  draftId?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  priority?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
 /** A draft pick recommendation produced by the Draft Intelligence algorithm */
 export type DraftRecommendation = {
   __typename?: 'DraftRecommendation';
@@ -947,6 +958,8 @@ export type Mutation = {
   /** Accept a pending trade offer. Players are swapped between teams immediately. */
   acceptTrade?: Maybe<TradeOffer>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
+  /** Add a player to the end of the current user's draft queue. No-ops if already queued. */
+  addToDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   advancePlayoffBracket?: Maybe<PlayoffBracket>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
@@ -1021,7 +1034,11 @@ export type Mutation = {
   /** Reject a pending trade offer as the receiving team manager. */
   rejectTrade?: Maybe<TradeOffer>;
   removeAssistantManager?: Maybe<Scalars['Boolean']['output']>;
+  /** Remove a player from the current user's draft queue. */
+  removeFromDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   renameTeam?: Maybe<Team>;
+  /** Reorder the current user's draft queue. playerIds must contain the same players that are already queued — only the order changes. */
+  reorderDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
   requestDataDeletion?: Maybe<DataRequest>;
   /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
@@ -1033,6 +1050,8 @@ export type Mutation = {
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   setDraftOrder?: Maybe<Draft>;
+  /** Replace the current user's draft queue for a draft. The order of playerIds defines pick priority (index 0 = first pick). Pass an empty array to clear. */
+  setDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
@@ -1077,6 +1096,11 @@ export type MutationAcceptTradeArgs = {
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationAddToDraftQueueArgs = {
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationAdvancePlayoffBracketArgs = {
@@ -1317,10 +1341,20 @@ export type MutationRemoveAssistantManagerArgs = {
   userId: Scalars['Int']['input'];
 };
 
+export type MutationRemoveFromDraftQueueArgs = {
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+};
+
 export type MutationRenameTeamArgs = {
   leagueId: Scalars['Int']['input'];
   newName: Scalars['String']['input'];
   teamId: Scalars['Int']['input'];
+};
+
+export type MutationReorderDraftQueueArgs = {
+  draftId: Scalars['Int']['input'];
+  playerIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationResumeDraftArgs = {
@@ -1353,6 +1387,11 @@ export type MutationSendMatchupMessageArgs = {
 export type MutationSetDraftOrderArgs = {
   draftId: Scalars['Int']['input'];
   teamIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationSetDraftQueueArgs = {
+  draftId: Scalars['Int']['input'];
+  playerIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationSetTeamLockArgs = {
@@ -1746,6 +1785,7 @@ export type Query = {
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
+  getMyDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft. */
   getMyDraftTeamAutoPick?: Maybe<Scalars['Boolean']['output']>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
@@ -1973,6 +2013,10 @@ export type QueryGetMatchupsByWeekArgs = {
 export type QueryGetMatchupsForLeagueArgs = {
   leagueId: Scalars['Int']['input'];
   weekNumber?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetMyDraftQueueArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type QueryGetMyDraftTeamAutoPickArgs = {
@@ -3901,6 +3945,120 @@ export type CommissionerSetDraftAutoPickDisabledMutation = {
     id?: number | null;
     autoPickDisabled?: boolean | null;
   } | null;
+};
+
+export type GetMyDraftQueueQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type GetMyDraftQueueQuery = {
+  __typename?: 'Query';
+  getMyDraftQueue?: Array<{
+    __typename?: 'DraftQueueEntry';
+    id?: number | null;
+    draftId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    priority?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type SetDraftQueueMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  playerIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+}>;
+
+export type SetDraftQueueMutation = {
+  __typename?: 'Mutation';
+  setDraftQueue?: Array<{
+    __typename?: 'DraftQueueEntry';
+    id?: number | null;
+    draftId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    priority?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type AddToDraftQueueMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type AddToDraftQueueMutation = {
+  __typename?: 'Mutation';
+  addToDraftQueue?: Array<{
+    __typename?: 'DraftQueueEntry';
+    id?: number | null;
+    draftId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    priority?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type RemoveFromDraftQueueMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type RemoveFromDraftQueueMutation = {
+  __typename?: 'Mutation';
+  removeFromDraftQueue?: Array<{
+    __typename?: 'DraftQueueEntry';
+    id?: number | null;
+    draftId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    priority?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type ReorderDraftQueueMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  playerIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+}>;
+
+export type ReorderDraftQueueMutation = {
+  __typename?: 'Mutation';
+  reorderDraftQueue?: Array<{
+    __typename?: 'DraftQueueEntry';
+    id?: number | null;
+    draftId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    priority?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+  }> | null;
 };
 
 export type GetMyDraftTeamAutoPickQueryVariables = Exact<{
@@ -10355,6 +10513,345 @@ export type CommissionerSetDraftAutoPickDisabledMutationOptions =
     CommissionerSetDraftAutoPickDisabledMutation,
     CommissionerSetDraftAutoPickDisabledMutationVariables
   >;
+export const GetMyDraftQueue = gql`
+  query GetMyDraftQueue($draftId: Int!) {
+    getMyDraftQueue(draftId: $draftId) {
+      id
+      draftId
+      teamId
+      playerId
+      priority
+      player {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetMyDraftQueueQuery__
+ *
+ * To run a query within a React component, call `useGetMyDraftQueueQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyDraftQueueQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyDraftQueueQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useGetMyDraftQueueQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetMyDraftQueueQuery,
+    GetMyDraftQueueQueryVariables
+  > &
+    (
+      | { variables: GetMyDraftQueueQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetMyDraftQueueQuery, GetMyDraftQueueQueryVariables>(
+    GetMyDraftQueue,
+    options,
+  );
+}
+export function useGetMyDraftQueueLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMyDraftQueueQuery,
+    GetMyDraftQueueQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMyDraftQueueQuery,
+    GetMyDraftQueueQueryVariables
+  >(GetMyDraftQueue, options);
+}
+export function useGetMyDraftQueueSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMyDraftQueueQuery,
+        GetMyDraftQueueQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMyDraftQueueQuery,
+    GetMyDraftQueueQueryVariables
+  >(
+    GetMyDraftQueue,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMyDraftQueueQuery,
+          GetMyDraftQueueQueryVariables
+        >,
+  );
+}
+export type GetMyDraftQueueQueryHookResult = ReturnType<
+  typeof useGetMyDraftQueueQuery
+>;
+export type GetMyDraftQueueLazyQueryHookResult = ReturnType<
+  typeof useGetMyDraftQueueLazyQuery
+>;
+export type GetMyDraftQueueSuspenseQueryHookResult = ReturnType<
+  typeof useGetMyDraftQueueSuspenseQuery
+>;
+export type GetMyDraftQueueQueryResult = Apollo.QueryResult<
+  GetMyDraftQueueQuery,
+  GetMyDraftQueueQueryVariables
+>;
+export const SetDraftQueue = gql`
+  mutation SetDraftQueue($draftId: Int!, $playerIds: [Int!]!) {
+    setDraftQueue(draftId: $draftId, playerIds: $playerIds) {
+      id
+      draftId
+      teamId
+      playerId
+      priority
+      player {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+export type SetDraftQueueMutationFn = MutationFunction<
+  SetDraftQueueMutation,
+  SetDraftQueueMutationVariables
+>;
+
+/**
+ * __useSetDraftQueueMutation__
+ *
+ * To run a mutation, you first call `useSetDraftQueueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetDraftQueueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setDraftQueueMutation, { data, loading, error }] = useSetDraftQueueMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      playerIds: // value for 'playerIds'
+ *   },
+ * });
+ */
+export function useSetDraftQueueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SetDraftQueueMutation,
+    SetDraftQueueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SetDraftQueueMutation,
+    SetDraftQueueMutationVariables
+  >(SetDraftQueue, options);
+}
+export type SetDraftQueueMutationHookResult = ReturnType<
+  typeof useSetDraftQueueMutation
+>;
+export type SetDraftQueueMutationResult =
+  Apollo.MutationResult<SetDraftQueueMutation>;
+export type SetDraftQueueMutationOptions = BaseMutationOptions<
+  SetDraftQueueMutation,
+  SetDraftQueueMutationVariables
+>;
+export const AddToDraftQueue = gql`
+  mutation AddToDraftQueue($draftId: Int!, $playerId: Int!) {
+    addToDraftQueue(draftId: $draftId, playerId: $playerId) {
+      id
+      draftId
+      teamId
+      playerId
+      priority
+      player {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+export type AddToDraftQueueMutationFn = MutationFunction<
+  AddToDraftQueueMutation,
+  AddToDraftQueueMutationVariables
+>;
+
+/**
+ * __useAddToDraftQueueMutation__
+ *
+ * To run a mutation, you first call `useAddToDraftQueueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAddToDraftQueueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [addToDraftQueueMutation, { data, loading, error }] = useAddToDraftQueueMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useAddToDraftQueueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    AddToDraftQueueMutation,
+    AddToDraftQueueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    AddToDraftQueueMutation,
+    AddToDraftQueueMutationVariables
+  >(AddToDraftQueue, options);
+}
+export type AddToDraftQueueMutationHookResult = ReturnType<
+  typeof useAddToDraftQueueMutation
+>;
+export type AddToDraftQueueMutationResult =
+  Apollo.MutationResult<AddToDraftQueueMutation>;
+export type AddToDraftQueueMutationOptions = BaseMutationOptions<
+  AddToDraftQueueMutation,
+  AddToDraftQueueMutationVariables
+>;
+export const RemoveFromDraftQueue = gql`
+  mutation RemoveFromDraftQueue($draftId: Int!, $playerId: Int!) {
+    removeFromDraftQueue(draftId: $draftId, playerId: $playerId) {
+      id
+      draftId
+      teamId
+      playerId
+      priority
+      player {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+export type RemoveFromDraftQueueMutationFn = MutationFunction<
+  RemoveFromDraftQueueMutation,
+  RemoveFromDraftQueueMutationVariables
+>;
+
+/**
+ * __useRemoveFromDraftQueueMutation__
+ *
+ * To run a mutation, you first call `useRemoveFromDraftQueueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRemoveFromDraftQueueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [removeFromDraftQueueMutation, { data, loading, error }] = useRemoveFromDraftQueueMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useRemoveFromDraftQueueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RemoveFromDraftQueueMutation,
+    RemoveFromDraftQueueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RemoveFromDraftQueueMutation,
+    RemoveFromDraftQueueMutationVariables
+  >(RemoveFromDraftQueue, options);
+}
+export type RemoveFromDraftQueueMutationHookResult = ReturnType<
+  typeof useRemoveFromDraftQueueMutation
+>;
+export type RemoveFromDraftQueueMutationResult =
+  Apollo.MutationResult<RemoveFromDraftQueueMutation>;
+export type RemoveFromDraftQueueMutationOptions = BaseMutationOptions<
+  RemoveFromDraftQueueMutation,
+  RemoveFromDraftQueueMutationVariables
+>;
+export const ReorderDraftQueue = gql`
+  mutation ReorderDraftQueue($draftId: Int!, $playerIds: [Int!]!) {
+    reorderDraftQueue(draftId: $draftId, playerIds: $playerIds) {
+      id
+      draftId
+      teamId
+      playerId
+      priority
+      player {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+export type ReorderDraftQueueMutationFn = MutationFunction<
+  ReorderDraftQueueMutation,
+  ReorderDraftQueueMutationVariables
+>;
+
+/**
+ * __useReorderDraftQueueMutation__
+ *
+ * To run a mutation, you first call `useReorderDraftQueueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useReorderDraftQueueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [reorderDraftQueueMutation, { data, loading, error }] = useReorderDraftQueueMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      playerIds: // value for 'playerIds'
+ *   },
+ * });
+ */
+export function useReorderDraftQueueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ReorderDraftQueueMutation,
+    ReorderDraftQueueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ReorderDraftQueueMutation,
+    ReorderDraftQueueMutationVariables
+  >(ReorderDraftQueue, options);
+}
+export type ReorderDraftQueueMutationHookResult = ReturnType<
+  typeof useReorderDraftQueueMutation
+>;
+export type ReorderDraftQueueMutationResult =
+  Apollo.MutationResult<ReorderDraftQueueMutation>;
+export type ReorderDraftQueueMutationOptions = BaseMutationOptions<
+  ReorderDraftQueueMutation,
+  ReorderDraftQueueMutationVariables
+>;
 export const GetMyDraftTeamAutoPick = gql`
   query GetMyDraftTeamAutoPick($draftId: Int!) {
     getMyDraftTeamAutoPick(draftId: $draftId)

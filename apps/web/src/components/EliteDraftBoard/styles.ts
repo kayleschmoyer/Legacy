@@ -1121,4 +1121,111 @@ export const CSS = `
   line-height: 1.4; width: 100%;
   animation: fadeSlideUp 0.35s ease-out 0.3s both;
 }
+
+/* ===== Draft Queue Panel ===== */
+.d-queue-panel {
+  border: 1px solid rgba(197, 165, 90, 0.18);
+}
+.d-queue-empty {
+  text-align: center;
+  padding: 18px 8px;
+  color: var(--d-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.d-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  animation: fadeSlideIn 0.2s ease both;
+}
+.d-queue-row:last-of-type {
+  border-bottom: none;
+}
+.d-queue-rank {
+  min-width: 18px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--d-accent);
+  text-align: center;
+}
+.d-queue-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--d-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d-queue-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.d-queue-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  color: var(--d-text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 5px;
+  font-family: inherit;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+.d-queue-btn:hover:not(:disabled) {
+  background: rgba(197, 165, 90, 0.15);
+  color: var(--d-accent);
+  border-color: rgba(197, 165, 90, 0.3);
+}
+.d-queue-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.d-queue-btn.d-queue-remove:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.d-queue-hint {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--d-text-muted);
+  text-align: center;
+  font-style: italic;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+/* ===== Queue button on player cards ===== */
+.d-queue-card-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: var(--d-text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+.d-queue-card-btn:hover {
+  background: rgba(197, 165, 90, 0.12);
+  color: var(--d-accent);
+  border-color: rgba(197, 165, 90, 0.35);
+}
+.d-queue-card-btn.active {
+  background: rgba(197, 165, 90, 0.18);
+  color: var(--d-accent);
+  border-color: rgba(197, 165, 90, 0.5);
+}
 `;

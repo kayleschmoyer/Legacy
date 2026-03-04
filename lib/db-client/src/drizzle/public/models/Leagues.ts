@@ -352,6 +352,54 @@ export const draftPicks = pgTable(
   },
 );
 
+/**
+ * Draft queue — prioritised list of players a user wants auto-pick to select
+ * on their behalf (LS-473). Ordered by `priority` ASC; the auto-pick engine
+ * picks the first available, eligible, undrafted entry before falling back
+ * to the FPG × positional-scarcity algorithm.
+ */
+export const draftQueue = pgTable(
+  'draft_queue',
+  {
+    id: serial('id').primaryKey().notNull(),
+    draftId: integer('draft_id').notNull(),
+    teamId: integer('team_id').notNull(),
+    playerId: integer('player_id').notNull(),
+    priority: integer('priority').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      draftQueueDraftsIdFk: foreignKey({
+        columns: [table.draftId],
+        foreignColumns: [drafts.id],
+        name: 'draft_queue_drafts_id_fk',
+      }).onDelete('cascade'),
+      draftQueuePlayersIdFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: 'draft_queue_players_id_fk',
+      }).onDelete('cascade'),
+      draftQueueUkDraftTeamPlayer: unique(
+        'draft_queue_uk_draft_team_player',
+      ).on(table.draftId, table.teamId, table.playerId),
+      draftQueueUkDraftTeamPriority: unique(
+        'draft_queue_uk_draft_team_priority',
+      ).on(table.draftId, table.teamId, table.priority),
+      draftQueueDraftTeamIdx: index('draft_queue_draft_team_idx').on(
+        table.draftId,
+        table.teamId,
+      ),
+      draftQueuePlayerIdx: index('draft_queue_player_idx').on(table.playerId),
+    };
+  },
+);
+
 export const leaguePosition = pgTable(
   'league_positions',
   {

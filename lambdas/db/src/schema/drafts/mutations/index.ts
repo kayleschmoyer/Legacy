@@ -15,3 +15,4 @@ import './commissioner-disable-autopick';
 import './draft-order';
 import './toggle-autopick';
 import './undo-last-pick';
+import './draft-queue';

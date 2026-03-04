@@ -11,15 +11,19 @@ export function PlayerCard({
   index,
   isMyPick,
   isWatched,
+  isQueued,
   onDraft,
   onToggleWatch,
+  onToggleQueue,
 }: {
   player: DraftPlayer;
   index: number;
   isMyPick: boolean;
   isWatched: boolean;
+  isQueued?: boolean;
   onDraft: () => void;
   onToggleWatch: () => void;
+  onToggleQueue?: () => void;
 }) {
   const posColor = getPositionColor(player.position);
 
@@ -202,6 +206,21 @@ export function PlayerCard({
           >
             {isWatched ? '★' : '☆'}
           </button>
+          {onToggleQueue && (
+            <button
+              className={`d-queue-card-btn ${isQueued ? 'active' : ''}`}
+              onClick={onToggleQueue}
+              aria-pressed={Boolean(isQueued)}
+              aria-label={
+                isQueued
+                  ? `Remove ${player.name} from draft queue`
+                  : `Add ${player.name} to draft queue`
+              }
+              title={isQueued ? 'Remove from queue' : 'Add to queue'}
+            >
+              {isQueued ? '📋' : '📄'}
+            </button>
+          )}
         </div>
       </div>
     </div>

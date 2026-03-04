@@ -23,6 +23,7 @@ const FILES_TO_FIX = [
   'lib/bref-client/src/api/db/graphql.generated.ts',
   'lib/data-loaders/src/api/db/graphql.generated.ts',
   'lib/api/src/api/db/graphql.generated.ts',
+  'lib/api/src/shared/graphql.generated.ts',
   'apps/web/src/api/db/graphql.generated.ts',
   'apps/cli/src/api/db/graphql.generated.ts',
   'apps/app/src/api/db/graphql.generated.ts',

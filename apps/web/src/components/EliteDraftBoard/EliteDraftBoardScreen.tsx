@@ -37,9 +37,11 @@ import { PlayerCard } from './PlayerCard';
 import { SkeletonCard } from './SkeletonCard';
 import { DraftGrid } from './DraftGrid';
 import { DraftIntelligence } from './DraftIntelligence';
+import { DraftQueuePanel } from './DraftQueuePanel';
 import { getDraftCommentary } from './draftUtils';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import {
+  AddToDraftQueue as ADD_TO_DRAFT_QUEUE,
   CommissionerPick as COMMISSIONER_PICK,
   CommissionerSetDraftAutoPickDisabled as COMMISSIONER_SET_AUTOPICK_DISABLED,
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
@@ -51,6 +53,7 @@ import {
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
+  GetMyDraftQueue as GET_MY_DRAFT_QUEUE,
   type GetAvailableDraftPlayersQuery,
   type GetAvailableDraftPlayersQueryVariables,
   type GetCurrentDraftPickQuery,
@@ -59,10 +62,13 @@ import {
   type GetDraftPicksQueryVariables,
   type GetDraftTeamAutoPickStatusesQuery,
   type GetDraftTeamAutoPickStatusesQueryVariables,
+  type GetMyDraftQueueQuery,
+  type GetMyDraftQueueQueryVariables,
   InitializeLiveDraft as INITIALIZE_LIVE_DRAFT,
   MakeDraftPick as MAKE_DRAFT_PICK,
   NudgeExpiredDraftPick as NUDGE_EXPIRED_DRAFT_PICK,
   PauseDraft as PAUSE_DRAFT,
+  RemoveFromDraftQueue as REMOVE_FROM_DRAFT_QUEUE,
   ResumeDraft as RESUME_DRAFT,
 } from '../../api/db/graphql.generated';
 import { env } from '../../config/environment';
@@ -671,6 +677,41 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   ] = useMutation(COMMISSIONER_SET_AUTOPICK_DISABLED);
   const [nudgeExpiredDraftPick] = useMutation(NUDGE_EXPIRED_DRAFT_PICK);
 
+  // ---- Draft Queue ----
+  const { data: queueData, refetch: refetchQueue } = useQuery<
+    GetMyDraftQueueQuery,
+    GetMyDraftQueueQueryVariables
+  >(GET_MY_DRAFT_QUEUE, {
+    variables: { draftId: draftId ?? 0 },
+    skip: !draftId,
+    fetchPolicy: 'cache-and-network',
+  });
+  const queueEntries = queueData?.getMyDraftQueue ?? [];
+  const queuedPlayerIds = useMemo(
+    () => new Set(queueEntries.map((e) => e.playerId ?? e.player?.id ?? 0)),
+    [queueEntries],
+  );
+  const [addToQueueMutation] = useMutation(ADD_TO_DRAFT_QUEUE);
+  const [removeFromQueueMutation] = useMutation(REMOVE_FROM_DRAFT_QUEUE);
+  const handleToggleQueue = useCallback(
+    async (playerId: number) => {
+      if (!draftId) return;
+      if (queuedPlayerIds.has(playerId)) {
+        await removeFromQueueMutation({ variables: { draftId, playerId } });
+      } else {
+        await addToQueueMutation({ variables: { draftId, playerId } });
+      }
+      void refetchQueue();
+    },
+    [
+      draftId,
+      queuedPlayerIds,
+      addToQueueMutation,
+      removeFromQueueMutation,
+      refetchQueue,
+    ],
+  );
+
   // ---- WebSocket ----
   const handleDraftStarted = useCallback(
     (notification: DraftStartedNotification) => {
@@ -752,6 +793,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       void refetchCurrentPick({ draftId: notification.draftId });
       void refetchPickHistory();
       void refetchAvailablePlayers();
+      void refetchQueue();
     },
     [
       myTeamId,
@@ -763,6 +805,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       refetchCurrentPick,
       refetchPickHistory,
       refetchAvailablePlayers,
+      refetchQueue,
     ],
   );
 
@@ -2214,6 +2257,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             )}
           </div>
 
+          {/* Draft Queue */}
+          {draftId && myTeamId !== null && (
+            <DraftQueuePanel draftId={draftId} />
+          )}
+
           {/* Pick History */}
           {pickHistory.length > 0 && (
             <div className="d-panel">
@@ -2507,6 +2555,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   index={idx}
                   isMyPick={commPickMode ? isOwner : isMyPick}
                   isWatched={watchlist.includes(player.id)}
+                  isQueued={queuedPlayerIds.has(player.id)}
                   onDraft={() => {
                     if (commPickMode && isOwner) {
                       void handleCommissionerPick(player.id);
@@ -2520,6 +2569,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                         ? prev.filter((id) => id !== player.id)
                         : [...prev, player.id],
                     )
+                  }
+                  onToggleQueue={
+                    myTeamId !== null && draftId
+                      ? () => void handleToggleQueue(player.id)
+                      : undefined
                   }
                 />
               ))}

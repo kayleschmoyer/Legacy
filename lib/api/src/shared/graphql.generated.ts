@@ -1,6 +1,12 @@
 /* eslint-disable */
 import { gql } from '@apollo/client';
-import * as Apollo from '@apollo/client';
+import * as Apollo from '@apollo/client/react';
+
+// Apollo Client 4.x compatibility: these types are no longer exported
+type MutationFunction<TData, TVariables> = (
+  variables?: TVariables,
+) => Promise<any>;
+type BaseMutationOptions<TData, TVariables> = any;
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
 export type Exact<T extends { [key: string]: unknown }> = {
@@ -461,6 +467,17 @@ export type DraftPlayer = {
   lastName?: Maybe<Scalars['String']['output']>;
   /** Career pitching average points per game (pitching score / career games) */
   pitchingAvgPointsPerGame?: Maybe<Scalars['Float']['output']>;
+};
+
+/** A prioritised entry in a team's draft queue. Auto-pick picks the first available entry before falling back to the FPG algorithm. */
+export type DraftQueueEntry = {
+  __typename?: 'DraftQueueEntry';
+  draftId?: Maybe<Scalars['Int']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  priority?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
 };
 
 /** A draft pick recommendation produced by the Draft Intelligence algorithm */
@@ -941,6 +958,8 @@ export type Mutation = {
   /** Accept a pending trade offer. Players are swapped between teams immediately. */
   acceptTrade?: Maybe<TradeOffer>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
+  /** Add a player to the end of the current user's draft queue. No-ops if already queued. */
+  addToDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   advancePlayoffBracket?: Maybe<PlayoffBracket>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
@@ -1015,7 +1034,11 @@ export type Mutation = {
   /** Reject a pending trade offer as the receiving team manager. */
   rejectTrade?: Maybe<TradeOffer>;
   removeAssistantManager?: Maybe<Scalars['Boolean']['output']>;
+  /** Remove a player from the current user's draft queue. */
+  removeFromDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   renameTeam?: Maybe<Team>;
+  /** Reorder the current user's draft queue. playerIds must contain the same players that are already queued — only the order changes. */
+  reorderDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
   requestDataDeletion?: Maybe<DataRequest>;
   /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
@@ -1027,6 +1050,8 @@ export type Mutation = {
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   setDraftOrder?: Maybe<Draft>;
+  /** Replace the current user's draft queue for a draft. The order of playerIds defines pick priority (index 0 = first pick). Pass an empty array to clear. */
+  setDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
@@ -1071,6 +1096,11 @@ export type MutationAcceptTradeArgs = {
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationAddToDraftQueueArgs = {
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationAdvancePlayoffBracketArgs = {
@@ -1311,10 +1341,20 @@ export type MutationRemoveAssistantManagerArgs = {
   userId: Scalars['Int']['input'];
 };
 
+export type MutationRemoveFromDraftQueueArgs = {
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+};
+
 export type MutationRenameTeamArgs = {
   leagueId: Scalars['Int']['input'];
   newName: Scalars['String']['input'];
   teamId: Scalars['Int']['input'];
+};
+
+export type MutationReorderDraftQueueArgs = {
+  draftId: Scalars['Int']['input'];
+  playerIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationResumeDraftArgs = {
@@ -1347,6 +1387,11 @@ export type MutationSendMatchupMessageArgs = {
 export type MutationSetDraftOrderArgs = {
   draftId: Scalars['Int']['input'];
   teamIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationSetDraftQueueArgs = {
+  draftId: Scalars['Int']['input'];
+  playerIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationSetTeamLockArgs = {
@@ -1740,6 +1785,7 @@ export type Query = {
   getMatchupStatusCounts?: Maybe<MatchupStatusCounts>;
   getMatchupsByWeek?: Maybe<Array<Matchup>>;
   getMatchupsForLeague?: Maybe<Array<Matchup>>;
+  getMyDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft. */
   getMyDraftTeamAutoPick?: Maybe<Scalars['Boolean']['output']>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
@@ -1967,6 +2013,10 @@ export type QueryGetMatchupsByWeekArgs = {
 export type QueryGetMatchupsForLeagueArgs = {
   leagueId: Scalars['Int']['input'];
   weekNumber?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryGetMyDraftQueueArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type QueryGetMyDraftTeamAutoPickArgs = {
@@ -2943,27 +2993,6 @@ export function useGetAllPlayersLazyQuery(
     options,
   );
 }
-// @ts-ignore
-export function useGetAllPlayersSuspenseQuery(
-  baseOptions?: Apollo.SuspenseQueryHookOptions<
-    GetAllPlayersQuery,
-    GetAllPlayersQueryVariables
-  >,
-): Apollo.UseSuspenseQueryResult<
-  GetAllPlayersQuery,
-  GetAllPlayersQueryVariables
->;
-export function useGetAllPlayersSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<
-        GetAllPlayersQuery,
-        GetAllPlayersQueryVariables
-      >,
-): Apollo.UseSuspenseQueryResult<
-  GetAllPlayersQuery | undefined,
-  GetAllPlayersQueryVariables
->;
 export function useGetAllPlayersSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -2979,7 +3008,15 @@ export function useGetAllPlayersSuspenseQuery(
   return Apollo.useSuspenseQuery<
     GetAllPlayersQuery,
     GetAllPlayersQueryVariables
-  >(GetAllPlayers, options);
+  >(
+    GetAllPlayers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetAllPlayersQuery,
+          GetAllPlayersQueryVariables
+        >,
+  );
 }
 export type GetAllPlayersQueryHookResult = ReturnType<
   typeof useGetAllPlayersQuery
@@ -3049,21 +3086,6 @@ export function useGetPlayerLazyQuery(
     options,
   );
 }
-// @ts-ignore
-export function useGetPlayerSuspenseQuery(
-  baseOptions?: Apollo.SuspenseQueryHookOptions<
-    GetPlayerQuery,
-    GetPlayerQueryVariables
-  >,
-): Apollo.UseSuspenseQueryResult<GetPlayerQuery, GetPlayerQueryVariables>;
-export function useGetPlayerSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<GetPlayerQuery, GetPlayerQueryVariables>,
-): Apollo.UseSuspenseQueryResult<
-  GetPlayerQuery | undefined,
-  GetPlayerQueryVariables
->;
 export function useGetPlayerSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3075,7 +3097,12 @@ export function useGetPlayerSuspenseQuery(
       : { ...defaultOptions, ...baseOptions };
   return Apollo.useSuspenseQuery<GetPlayerQuery, GetPlayerQueryVariables>(
     GetPlayer,
-    options,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayerQuery,
+          GetPlayerQueryVariables
+        >,
   );
 }
 export type GetPlayerQueryHookResult = ReturnType<typeof useGetPlayerQuery>;
@@ -3144,27 +3171,6 @@ export function useGetPlayerByBrefIdLazyQuery(
     GetPlayerByBrefIdQueryVariables
   >(GetPlayerByBrefId, options);
 }
-// @ts-ignore
-export function useGetPlayerByBrefIdSuspenseQuery(
-  baseOptions?: Apollo.SuspenseQueryHookOptions<
-    GetPlayerByBrefIdQuery,
-    GetPlayerByBrefIdQueryVariables
-  >,
-): Apollo.UseSuspenseQueryResult<
-  GetPlayerByBrefIdQuery,
-  GetPlayerByBrefIdQueryVariables
->;
-export function useGetPlayerByBrefIdSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<
-        GetPlayerByBrefIdQuery,
-        GetPlayerByBrefIdQueryVariables
-      >,
-): Apollo.UseSuspenseQueryResult<
-  GetPlayerByBrefIdQuery | undefined,
-  GetPlayerByBrefIdQueryVariables
->;
 export function useGetPlayerByBrefIdSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3180,7 +3186,15 @@ export function useGetPlayerByBrefIdSuspenseQuery(
   return Apollo.useSuspenseQuery<
     GetPlayerByBrefIdQuery,
     GetPlayerByBrefIdQueryVariables
-  >(GetPlayerByBrefId, options);
+  >(
+    GetPlayerByBrefId,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayerByBrefIdQuery,
+          GetPlayerByBrefIdQueryVariables
+        >,
+  );
 }
 export type GetPlayerByBrefIdQueryHookResult = ReturnType<
   typeof useGetPlayerByBrefIdQuery
@@ -3237,21 +3251,6 @@ export function useGetHelloLazyQuery(
     options,
   );
 }
-// @ts-ignore
-export function useGetHelloSuspenseQuery(
-  baseOptions?: Apollo.SuspenseQueryHookOptions<
-    GetHelloQuery,
-    GetHelloQueryVariables
-  >,
-): Apollo.UseSuspenseQueryResult<GetHelloQuery, GetHelloQueryVariables>;
-export function useGetHelloSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<GetHelloQuery, GetHelloQueryVariables>,
-): Apollo.UseSuspenseQueryResult<
-  GetHelloQuery | undefined,
-  GetHelloQueryVariables
->;
 export function useGetHelloSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
@@ -3263,7 +3262,9 @@ export function useGetHelloSuspenseQuery(
       : { ...defaultOptions, ...baseOptions };
   return Apollo.useSuspenseQuery<GetHelloQuery, GetHelloQueryVariables>(
     GetHello,
-    options,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<GetHelloQuery, GetHelloQueryVariables>,
   );
 }
 export type GetHelloQueryHookResult = ReturnType<typeof useGetHelloQuery>;

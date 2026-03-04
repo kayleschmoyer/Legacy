@@ -11,6 +11,7 @@ import {
   Draft,
   DraftPick,
   DraftPlayer,
+  DraftQueueEntry,
   DraftRecommendation,
   DraftTeamAutoPickStatus,
   DraftTeamOrderEntry,
@@ -338,8 +339,6 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         world_series_rings: number;
         hall_of_fame: boolean;
         rookie_of_the_year: boolean;
-        hitter_avg_ppg?: number | string | null;
-        pitching_avg_ppg?: number | string | null;
       };
 
       const mapRow = (row: RawPlayerRow) => ({
@@ -358,10 +357,6 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         worldSeriesRings: row.world_series_rings ?? 0,
         hallOfFame: row.hall_of_fame ?? false,
         rookieOfTheYear: row.rookie_of_the_year ?? false,
-        hitterAvgPointsPerGame:
-          row.hitter_avg_ppg != null ? Number(row.hitter_avg_ppg) : null,
-        pitchingAvgPointsPerGame:
-          row.pitching_avg_ppg != null ? Number(row.pitching_avg_ppg) : null,
       });
 
       const orderByKey = orderBy ?? 'hitterAvgPointsPerGame';
@@ -395,19 +390,8 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       const scoringCol = sql.raw(
         scoringColMap[orderByKey] ?? scoringColMap['hitterAvgPointsPerGame'],
       );
-      // Extend the base select to also return per-game PPG values from the scoring join
-      const basePlayerSelectWithScore = sql`
-        SELECT
-          p.id, p.first_name, p.last_name, p.bref_id,
-          p.stats_last_fetched_at, p.all_star_selections, p.gold_gloves,
-          p.silver_sluggers, p.mvp_awards, p.cy_young_awards,
-          p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year,
-          CASE WHEN cs.career_games > 0 THEN (cs.batting_score + cs.fielding_score) / cs.career_games ELSE NULL END AS hitter_avg_ppg,
-          CASE WHEN cs.career_games > 0 THEN cs.pitching_score / cs.career_games ELSE NULL END AS pitching_avg_ppg
-        FROM public.players p
-      `;
       const rawQuery = sql`
-        ${basePlayerSelectWithScore}
+        ${basePlayerSelect}
         LEFT JOIN public.compute_career_scores(${draft.leagueId}) cs ON p.id = cs.player_id
         ${whereClause}
         ORDER BY COALESCE(${scoringCol}, 0) DESC
@@ -616,7 +600,7 @@ builder.queryField('getDraftRecommendations', (t) =>
       if (!draft) throw new Error('Draft not found');
       await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
 
-      // All picks for this draft — tells us who's been picked and what the
+      // All picks for this draft G�� tells us who's been picked and what the
       // requesting team already has on their roster.
       const allPicks = await context.db
         .select({
@@ -631,7 +615,7 @@ builder.queryField('getDraftRecommendations', (t) =>
         .filter((p) => p.teamId === teamId)
         .map((p) => p.playerId);
 
-      // --- Normalize position (LF/CF/RF → OF) ---
+      // --- Normalize position (LF/CF/RF G�� OF) ---
       const normPos = (pos: string): string => {
         const u = pos.toUpperCase();
         if (u === 'LF' || u === 'CF' || u === 'RF') return 'OF';
@@ -934,6 +918,58 @@ builder.queryField('getDraftRecommendations', (t) =>
         })
         .sort((a, b) => b.score - a.score)
         .slice(0, 5);
+    },
+  }),
+);
+
+/**
+ * Query: Get the current user's draft queue for a draft (LS-473)
+ *
+ * Returns entries ordered by priority ASC. Only visible to the authenticated
+ * user who owns the team in this draft.
+ */
+builder.queryField('getMyDraftQueue', (t) =>
+  t.field({
+    type: [DraftQueueEntry],
+    args: {
+      draftId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) throw AuthenticationError();
+
+      const { draftId } = args;
+
+      const [draft] = await context.db
+        .select({ leagueId: PublicSchema.drafts.leagueId })
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.id, draftId))
+        .limit(1);
+      if (!draft) throw new Error('Draft not found');
+
+      const [membership] = await context.db
+        .select({ teamId: PublicSchema.leagueMembers.teamId })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, draft.leagueId),
+            eq(PublicSchema.leagueMembers.userId, context.user.id),
+          ),
+        )
+        .limit(1);
+      if (!membership?.teamId) throw new Error('You are not in this league');
+
+      const rows = await context.db
+        .select()
+        .from(PublicSchema.draftQueue)
+        .where(
+          and(
+            eq(PublicSchema.draftQueue.draftId, draftId),
+            eq(PublicSchema.draftQueue.teamId, membership.teamId),
+          ),
+        )
+        .orderBy(asc(PublicSchema.draftQueue.priority));
+
+      return rows;
     },
   }),
 );

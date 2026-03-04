@@ -28,6 +28,7 @@ import {
   ALLOWED_POSITIONS_FOR_AUTO_PICK,
   commitDraftPick,
   getCurrentDraftPickInfo,
+  getFirstQueuedPlayerForTeam,
   getUnfilledPositionTypes,
 } from './helpers';
 import { builder, type Context } from '../builder';
@@ -496,9 +497,38 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 let autoPlayerId: number | undefined;
                 let autoPickReason = '';
 
+                // ── Draft queue check (LS-473) ──────────────────────────────
+                // Prefer the user's queued player over the FPG algorithm.
+                // getFirstQueuedPlayerForTeam returns the first undrafted entry.
+                const eligibleIdSet = new Set(eligibleIds);
+                const queuedPlayerId = await getFirstQueuedPlayerForTeam(
+                  tx,
+                  draftId,
+                  currentPickInfo.teamId,
+                );
+                if (
+                  queuedPlayerId !== null &&
+                  eligibleIdSet.has(queuedPlayerId)
+                ) {
+                  autoPlayerId = queuedPlayerId;
+                  autoPickReason = `Draft queue pick — player ${queuedPlayerId} (user's next queued selection)`;
+                  LOGGER.info(
+                    '[LS-473] autoProcessDraftPicks: using draft queue selection',
+                    {
+                      draftId,
+                      teamId: currentPickInfo.teamId,
+                      playerId: autoPlayerId,
+                    },
+                  );
+                }
+
                 // ── Smart auto-pick: projected fantasy points + positional scarcity ──
                 // Score the pre-computed candidate pool entirely in-memory — no DB queries.
-                if (unfilledPositionTypes.length > 0) {
+                // Only runs if the draft queue yielded no eligible player.
+                if (
+                  autoPlayerId === undefined &&
+                  unfilledPositionTypes.length > 0
+                ) {
                   // Compute positional scarcity: scarcer positions → higher boost
                   const totalEligible = Math.max(playerDraftInfo.size, 1);
                   const positionCandidateCounts = new Map<string, number>();
@@ -573,7 +603,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                       ),
                     },
                   );
-                } else {
+                } else if (autoPlayerId === undefined) {
                   // No unfilled positions — pick the highest-FPG player (bench).
                   // rankedEligibleIds is pre-sorted by projected_fpg DESC.
                   const topId = rankedEligibleIds[0];

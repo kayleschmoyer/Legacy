@@ -1,4 +1,4 @@
-# Live Draft GraphQL Operations
+﻿# Live Draft GraphQL Operations
 # Used by the EliteDraftBoard component for pick-by-pick live drafting
 
 mutation InitializeLiveDraft(
@@ -128,6 +128,83 @@ mutation CommissionerSetDraftAutoPickDisabled(
   commissionerSetDraftAutoPickDisabled(draftId: $draftId, disabled: $disabled) {
     id
     autoPickDisabled
+  }
+}
+
+# â”€â”€ Draft Queue (LS-473) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+query GetMyDraftQueue($draftId: Int!) {
+  getMyDraftQueue(draftId: $draftId) {
+    id
+    draftId
+    teamId
+    playerId
+    priority
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+mutation SetDraftQueue($draftId: Int!, $playerIds: [Int!]!) {
+  setDraftQueue(draftId: $draftId, playerIds: $playerIds) {
+    id
+    draftId
+    teamId
+    playerId
+    priority
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+mutation AddToDraftQueue($draftId: Int!, $playerId: Int!) {
+  addToDraftQueue(draftId: $draftId, playerId: $playerId) {
+    id
+    draftId
+    teamId
+    playerId
+    priority
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+mutation RemoveFromDraftQueue($draftId: Int!, $playerId: Int!) {
+  removeFromDraftQueue(draftId: $draftId, playerId: $playerId) {
+    id
+    draftId
+    teamId
+    playerId
+    priority
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+mutation ReorderDraftQueue($draftId: Int!, $playerIds: [Int!]!) {
+  reorderDraftQueue(draftId: $draftId, playerIds: $playerIds) {
+    id
+    draftId
+    teamId
+    playerId
+    priority
+    player {
+      id
+      firstName
+      lastName
+    }
   }
 }
 

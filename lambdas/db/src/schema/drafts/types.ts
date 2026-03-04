@@ -343,3 +343,33 @@ UpdateDraftSettingsPayload.implement({
     }),
   }),
 });
+
+/**
+ * DraftQueueEntry — one entry in a team's draft queue (LS-473).
+ * Entries are ordered by `priority` ASC.
+ */
+export const DraftQueueEntry = builder.objectRef<{
+  id: number;
+  draftId: number;
+  teamId: number;
+  playerId: number;
+  priority: number;
+}>('DraftQueueEntry');
+
+DraftQueueEntry.implement({
+  description:
+    "A prioritised entry in a team's draft queue. Auto-pick picks the first available entry before falling back to the FPG algorithm.",
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    draftId: t.exposeInt('draftId'),
+    teamId: t.exposeInt('teamId'),
+    playerId: t.exposeInt('playerId'),
+    priority: t.exposeInt('priority'),
+    player: t.field({
+      type: 'Player',
+      nullable: true,
+      resolve: (entry, _args, context) =>
+        context.loaders.players.load(entry.playerId),
+    }),
+  }),
+});

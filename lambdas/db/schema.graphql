@@ -529,6 +529,18 @@ type DraftPlayer {
 }
 
 """
+A prioritised entry in a team's draft queue. Auto-pick picks the first available entry before falling back to the FPG algorithm.
+"""
+type DraftQueueEntry {
+  draftId: Int
+  id: Int
+  player: Player
+  playerId: Int
+  priority: Int
+  teamId: Int
+}
+
+"""
 A draft pick recommendation produced by the Draft Intelligence algorithm
 """
 type DraftRecommendation {
@@ -1066,6 +1078,11 @@ type Mutation {
   """
   acceptTrade(tradeId: Int!): TradeOffer
   addDefaultPositionsToLeague(leagueId: Int!): [LeaguePosition!]
+
+  """
+  Add a player to the end of the current user's draft queue. No-ops if already queued.
+  """
+  addToDraftQueue(draftId: Int!, playerId: Int!): [DraftQueueEntry!]
   advancePlayoffBracket(bracketId: Int!): PlayoffBracket
 
   """
@@ -1295,7 +1312,17 @@ type Mutation {
   """
   rejectTrade(tradeId: Int!): TradeOffer
   removeAssistantManager(teamId: Int!, userId: Int!): Boolean
+
+  """
+  Remove a player from the current user's draft queue.
+  """
+  removeFromDraftQueue(draftId: Int!, playerId: Int!): [DraftQueueEntry!]
   renameTeam(leagueId: Int!, newName: String!, teamId: Int!): Team
+
+  """
+  Reorder the current user's draft queue. playerIds must contain the same players that are already queued — only the order changes.
+  """
+  reorderDraftQueue(draftId: Int!, playerIds: [Int!]!): [DraftQueueEntry!]
 
   """
   Request deletion of all personal data (GDPR Art. 17 - Right to Erasure)
@@ -1329,6 +1356,11 @@ type Mutation {
     replyToMessageId: Int
   ): MatchupMessage
   setDraftOrder(draftId: Int!, teamIds: [Int!]!): Draft
+
+  """
+  Replace the current user's draft queue for a draft. The order of playerIds defines pick priority (index 0 = first pick). Pass an empty array to clear.
+  """
+  setDraftQueue(draftId: Int!, playerIds: [Int!]!): [DraftQueueEntry!]
 
   """
   Commissioner: lock or unlock a team to prevent/allow roster moves.
@@ -1806,6 +1838,7 @@ type Query {
   getMatchupStatusCounts(leagueId: Int!, season: Int): MatchupStatusCounts
   getMatchupsByWeek(leagueId: Int!, weekNumber: Int!): [Matchup!]
   getMatchupsForLeague(leagueId: Int!, weekNumber: Int): [Matchup!]
+  getMyDraftQueue(draftId: Int!): [DraftQueueEntry!]
 
   """
   Returns the auto-pick status for the current user's team in the given draft, or null if the user has no team in this draft.

@@ -19,6 +19,7 @@ import {
   ALLOWED_POSITIONS_FOR_AUTO_PICK,
   commitDraftPick,
   getCurrentDraftPickInfo,
+  getFirstQueuedPlayerForTeam,
   getUnfilledPositionTypes,
 } from '../helpers';
 import { builder } from '../../builder';
@@ -500,13 +501,42 @@ builder.mutationField('makeDraftPick', (t) =>
                   apDraft.league_id,
                 );
 
-                // 4. Smart player selection: projected matchup pts × positional scarcity
-                //    (same algorithm as autoProcessDraftPicks)
-                //    Hitters: career ppg × games per matchup
-                //    SP:      career ppg × SP starts per matchup
-                const apGamesPerMatchup = apLeague.gamesPerMatchup ?? 5;
-                const apSpStartsPerMatchup = apLeague.spStartsPerMatchup ?? 1;
-                const statsRows = await apTx.execute(sql`
+                // 3a. Draft queue check (LS-473): prefer the user's queue over
+                //     the FPG algorithm when a queued, eligible player is available.
+                const eligibleSet = new Set(eligibleIds);
+                const queuedPlayerId = await getFirstQueuedPlayerForTeam(
+                  apTx,
+                  draftId,
+                  apPickInfo.teamId,
+                );
+
+                let autoPlayerId: number | undefined;
+                let autoPickReason = '';
+
+                if (
+                  queuedPlayerId !== null &&
+                  eligibleSet.has(queuedPlayerId)
+                ) {
+                  autoPlayerId = queuedPlayerId;
+                  autoPickReason = `Draft queue pick — player ${queuedPlayerId} (user's next queued selection)`;
+                }
+
+                if (autoPlayerId !== undefined) {
+                  // Queue pick: skip the expensive stats query
+                  LOGGER.info(
+                    '[LS-473] Chained auto-pick: using draft queue selection',
+                    {
+                      draftId,
+                      teamId: apPickInfo.teamId,
+                      playerId: autoPlayerId,
+                    },
+                  );
+                } else {
+                  // 4. Smart player selection: projected FPG × positional scarcity
+                  //    (same algorithm as autoProcessDraftPicks)
+                  const apGamesPerMatchup = apLeague.gamesPerMatchup ?? 5;
+                  const apSpStartsPerMatchup = apLeague.spStartsPerMatchup ?? 1;
+                  const statsRows = await apTx.execute(sql`
                   SELECT
                     p.id AS player_id,
                     cf.positions_played,
@@ -540,93 +570,95 @@ builder.mutationField('makeDraftPick', (t) =>
                   ORDER BY projected_fpg DESC
                 `);
 
-                const playerDraftInfo = new Map<
-                  number,
-                  { fpg: number; positions: string[] }
-                >();
-                for (const row of statsRows.rows) {
-                  const pid = row.player_id as number;
-                  const pp = row.positions_played as Record<
-                    string,
-                    unknown
-                  > | null;
-                  playerDraftInfo.set(pid, {
-                    fpg: Number(row.projected_fpg) || 0,
-                    positions: pp ? Object.keys(pp) : [],
-                  });
-                }
-
-                let autoPlayerId: number | undefined;
-                let autoPickReason = '';
-
-                if (unfilledPositionTypes.length > 0) {
-                  const totalEligible = Math.max(playerDraftInfo.size, 1);
-                  const positionCandidateCounts = new Map<string, number>();
-                  for (const posType of unfilledPositionTypes) {
-                    const allowedStatPositions =
-                      ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [posType];
-                    let posCount = 0;
-                    for (const [, info] of playerDraftInfo) {
-                      if (
-                        allowedStatPositions.some((sp) =>
-                          info.positions.includes(sp),
-                        )
-                      )
-                        posCount++;
-                    }
-                    positionCandidateCounts.set(posType, Math.max(posCount, 1));
+                  const playerDraftInfo = new Map<
+                    number,
+                    { fpg: number; positions: string[] }
+                  >();
+                  for (const row of statsRows.rows) {
+                    const pid = row.player_id as number;
+                    const pp = row.positions_played as Record<
+                      string,
+                      unknown
+                    > | null;
+                    playerDraftInfo.set(pid, {
+                      fpg: Number(row.projected_fpg) || 0,
+                      positions: pp ? Object.keys(pp) : [],
+                    });
                   }
 
-                  let bestScore = -Infinity;
-                  for (const [id, info] of playerDraftInfo) {
-                    let scarcityMultiplier = 0.25;
-                    let matchesUnfilled = false;
-                    let bestPosition = '';
+                  if (unfilledPositionTypes.length > 0) {
+                    const totalEligible = Math.max(playerDraftInfo.size, 1);
+                    const positionCandidateCounts = new Map<string, number>();
                     for (const posType of unfilledPositionTypes) {
                       const allowedStatPositions =
                         ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [posType];
-                      if (
-                        allowedStatPositions.some((sp) =>
-                          info.positions.includes(sp),
+                      let posCount = 0;
+                      for (const [, info] of playerDraftInfo) {
+                        if (
+                          allowedStatPositions.some((sp) =>
+                            info.positions.includes(sp),
+                          )
                         )
-                      ) {
-                        matchesUnfilled = true;
-                        const posCount =
-                          positionCandidateCounts.get(posType) ?? totalEligible;
-                        const posScarcity = Math.min(
-                          Math.sqrt(totalEligible / posCount),
-                          5.0,
-                        );
-                        if (posScarcity > scarcityMultiplier) {
-                          scarcityMultiplier = posScarcity;
-                          bestPosition = posType;
+                          posCount++;
+                      }
+                      positionCandidateCounts.set(
+                        posType,
+                        Math.max(posCount, 1),
+                      );
+                    }
+
+                    let bestScore = -Infinity;
+                    for (const [id, info] of playerDraftInfo) {
+                      let scarcityMultiplier = 0.25;
+                      let matchesUnfilled = false;
+                      let bestPosition = '';
+                      for (const posType of unfilledPositionTypes) {
+                        const allowedStatPositions =
+                          ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [posType];
+                        if (
+                          allowedStatPositions.some((sp) =>
+                            info.positions.includes(sp),
+                          )
+                        ) {
+                          matchesUnfilled = true;
+                          const posCount =
+                            positionCandidateCounts.get(posType) ??
+                            totalEligible;
+                          const posScarcity = Math.min(
+                            Math.sqrt(totalEligible / posCount),
+                            5.0,
+                          );
+                          if (posScarcity > scarcityMultiplier) {
+                            scarcityMultiplier = posScarcity;
+                            bestPosition = posType;
+                          }
                         }
                       }
+                      const draftScore = info.fpg * scarcityMultiplier;
+                      if (draftScore > bestScore) {
+                        bestScore = draftScore;
+                        autoPlayerId = id;
+                        autoPickReason = matchesUnfilled
+                          ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected FPG (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
+                          : `Best available (bench) — ${info.fpg.toFixed(1)} projected FPG`;
+                      }
                     }
-                    const draftScore = info.fpg * scarcityMultiplier;
-                    if (draftScore > bestScore) {
-                      bestScore = draftScore;
-                      autoPlayerId = id;
-                      autoPickReason = matchesUnfilled
-                        ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected matchup pts (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
-                        : `Best available (bench) — ${info.fpg.toFixed(1)} projected matchup pts`;
+                  } else {
+                    // All positions filled — pick the highest-FPG player (bench)
+                    const topPlayer = statsRows.rows[0];
+                    if (topPlayer) {
+                      autoPlayerId = topPlayer.player_id as number;
+                      autoPickReason = `Best available (bench) — ${Number(topPlayer.projected_fpg).toFixed(1)} projected FPG`;
                     }
                   }
-                } else {
-                  // All positions filled — pick the highest-FPG player (bench)
-                  const topPlayer = statsRows.rows[0];
-                  if (topPlayer) {
-                    autoPlayerId = topPlayer.player_id as number;
-                    autoPickReason = `Best available (bench) — ${Number(topPlayer.projected_fpg).toFixed(1)} projected matchup pts`;
-                  }
-                }
 
-                // Final fallback (no career stats)
-                if (autoPlayerId === undefined) {
-                  autoPlayerId = eligibleIds[0];
-                  autoPickReason =
-                    'Fallback selection (no career stats available)';
-                }
+                  // Final fallback (no career stats)
+                  if (autoPlayerId === undefined) {
+                    autoPlayerId = eligibleIds[0];
+                    autoPickReason =
+                      'Fallback selection (no career stats available)';
+                  }
+                } // end else (no queue pick)
 
                 // Roster limit check
                 const [apRosterCount] = await apTx

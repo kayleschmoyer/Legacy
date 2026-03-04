@@ -1,5 +1,5 @@
-/**
- * Draft domain — helper functions
+﻿/**
+ * Draft domain â€” helper functions
  */
 
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
@@ -7,7 +7,7 @@ import { ALLOWED_POSITIONS } from '@legacy-sports/utils';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { ForbiddenError } from '../graphql-errors';
 
-// ── commitDraftPick types ─────────────────────────────────────────────────────
+// â”€â”€ commitDraftPick types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface CommitDraftPickParams {
   /** Drizzle transaction (or plain db) to run writes inside. */
@@ -48,7 +48,7 @@ export interface CommitDraftPickResult {
   now: Date;
 }
 
-// ── Position eligibility for auto-pick ──────────────────────────────────────
+// â”€â”€ Position eligibility for auto-pick â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Maps each league roster slot type to the player stat position keys that qualify.
 // Source of truth: lib/shared-components/src/utils/PositionModels.ts
 // Shared by autoProcessDraftPicks (scheduled-mutations.ts) and the
@@ -109,7 +109,7 @@ export async function getUnfilledPositionTypes(
   const teamPlayerIds = teamPicksResult.rows.map((r) => r.player_id as number);
 
   if (teamPlayerIds.length === 0) {
-    // No picks yet — all position types are still needed
+    // No picks yet â€” all position types are still needed
     return [...new Set(leaguePositions.map((lp) => lp.positionType))];
   }
 
@@ -122,7 +122,7 @@ export async function getUnfilledPositionTypes(
     .from(PublicSchema.careerFielding)
     .where(inArray(PublicSchema.careerFielding.playerId, teamPlayerIds));
 
-  // Build map: playerId → set of slot types the player can fill
+  // Build map: playerId â†’ set of slot types the player can fill
   const playerSlotMap = new Map<number, Set<string>>();
   for (const row of fieldingRows) {
     if (!row.playerId) continue;
@@ -363,4 +363,57 @@ export async function commitDraftPick(
   }
 
   return { draftPick, isDraftComplete, nextDeadline, nextPickInfo, now };
+}
+
+/**
+ * Return the first player from a team's draft queue that is still available
+ * (not yet drafted) in the given draft.
+ *
+ * Returns `null` if:
+ *  - the queue is empty
+ *  - all queued players have already been drafted
+ *
+ * Used by both auto-pick paths (scheduled-mutations.ts and make-draft-pick.ts).
+ */
+export async function getFirstQueuedPlayerForTeam(
+  db: PublicDb,
+  draftId: number,
+  teamId: number,
+): Promise<number | null> {
+  // Fetch the queue ordered by priority
+  const queueRows = await db
+    .select({ playerId: PublicSchema.draftQueue.playerId })
+    .from(PublicSchema.draftQueue)
+    .where(
+      and(
+        eq(PublicSchema.draftQueue.draftId, draftId),
+        eq(PublicSchema.draftQueue.teamId, teamId),
+      ),
+    )
+    .orderBy(asc(PublicSchema.draftQueue.priority));
+
+  if (queueRows.length === 0) return null;
+
+  // Check which queued players are still undrafted
+  const queuedPlayerIds = queueRows.map((r) => r.playerId);
+  const draftedRows = await db
+    .select({ playerId: PublicSchema.draftPicks.playerId })
+    .from(PublicSchema.draftPicks)
+    .where(
+      and(
+        eq(PublicSchema.draftPicks.draftId, draftId),
+        inArray(PublicSchema.draftPicks.playerId, queuedPlayerIds),
+      ),
+    );
+
+  const draftedIds = new Set(draftedRows.map((r) => r.playerId));
+
+  // Return the first undrafted entry
+  for (const row of queueRows) {
+    if (!draftedIds.has(row.playerId)) {
+      return row.playerId;
+    }
+  }
+
+  return null;
 }
