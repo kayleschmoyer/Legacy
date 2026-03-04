@@ -54,6 +54,25 @@ const getPositionColors = (
   return { bg: '$gray4', text: '$gray11' };
 };
 
+// Canonical display order for position slot types on the matchup page.
+// Batters follow standard lineup card order; pitchers SP before RP.
+const POSITION_SLOT_ORDER: Record<string, number> = {
+  C: 0,
+  '1B': 1,
+  '2B': 2,
+  SS: 3,
+  '3B': 4,
+  LF: 5,
+  CF: 6,
+  RF: 7,
+  OF: 8,
+  IF: 9,
+  DH: 10,
+  XDH: 11,
+  SP: 0,
+  RP: 1,
+};
+
 const RosterCard = styled(Card, {
   overflow: 'hidden',
   borderRadius: '$6',
@@ -943,19 +962,35 @@ export function MatchupRosterComparison({
     const team2Bullpen = team2Bench.filter(isBenchPitcher);
     const team2BenchFielders = team2Bench.filter(isBenchFielder);
 
-    // Further separate starters into batters and pitchers
-    const team1Batters = team1Starters.filter(
-      (p: MatchupPlayerFragment) => !isPitcherPosition(p.positionId),
-    );
-    const team1Pitchers = team1Starters.filter((p: MatchupPlayerFragment) =>
-      isPitcherPosition(p.positionId),
-    );
-    const team2Batters = team2Starters.filter(
-      (p: MatchupPlayerFragment) => !isPitcherPosition(p.positionId),
-    );
-    const team2Pitchers = team2Starters.filter((p: MatchupPlayerFragment) =>
-      isPitcherPosition(p.positionId),
-    );
+    // Helper: sort matchup players by their assigned position slot
+    const byPositionSlot = (
+      a: MatchupPlayerFragment,
+      b: MatchupPlayerFragment,
+    ): number => {
+      const orderA =
+        a.positionId != null
+          ? (POSITION_SLOT_ORDER[positionMap.get(a.positionId) ?? ''] ?? 99)
+          : 99;
+      const orderB =
+        b.positionId != null
+          ? (POSITION_SLOT_ORDER[positionMap.get(b.positionId) ?? ''] ?? 99)
+          : 99;
+      return orderA - orderB;
+    };
+
+    // Further separate starters into batters and pitchers, ordered by position slot
+    const team1Batters = team1Starters
+      .filter((p: MatchupPlayerFragment) => !isPitcherPosition(p.positionId))
+      .sort(byPositionSlot);
+    const team1Pitchers = team1Starters
+      .filter((p: MatchupPlayerFragment) => isPitcherPosition(p.positionId))
+      .sort(byPositionSlot);
+    const team2Batters = team2Starters
+      .filter((p: MatchupPlayerFragment) => !isPitcherPosition(p.positionId))
+      .sort(byPositionSlot);
+    const team2Pitchers = team2Starters
+      .filter((p: MatchupPlayerFragment) => isPitcherPosition(p.positionId))
+      .sort(byPositionSlot);
 
     // Calculate separate totals for batters and pitchers
     const team1BatterTotals = {
