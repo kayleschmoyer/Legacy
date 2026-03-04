@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { PublicDb, PublicSchema, runWithPublicClient } from '../index';
@@ -333,10 +333,17 @@ export async function isPlayerInPool(
 ): Promise<boolean> {
   if (playerPool === 'all') return true;
 
+  // Check both batting AND pitching records so that pure pitchers (who have
+  // no season_batting rows in the DH era) are correctly included in their pool.
   const poolUpper = playerPool.toUpperCase();
   const result = await db.execute(
-    sql`SELECT 1 FROM season_batting
-        WHERE player_id = ${playerId} AND lg_id = ${poolUpper}
+    sql`SELECT 1 FROM (
+          SELECT player_id FROM season_batting
+            WHERE player_id = ${playerId} AND lg_id = ${poolUpper}
+          UNION
+          SELECT player_id FROM season_pitching
+            WHERE player_id = ${playerId} AND lg_id = ${poolUpper}
+        ) pool_check
         LIMIT 1`,
   );
   return result.rows.length > 0;
@@ -401,21 +408,27 @@ export async function filterPlayerIdsByLeagueEligibility(
   let excludedByEraFilter = 0;
 
   // 1. Player pool (AL / NL restriction)
+  // Check both season_batting and season_pitching so that pure pitchers
+  // (who have no batting records in the DH era) are correctly included
+  // in their respective pool alongside batters.
   if (settings.playerPool !== 'all' && currentIds.length > 0) {
     const poolUpper = settings.playerPool.toUpperCase();
-    const poolResults = await db
-      .selectDistinct({
-        playerId: PublicSchema.seasonBatting.playerId,
-      })
-      .from(PublicSchema.seasonBatting)
-      .where(
-        and(
-          inArray(PublicSchema.seasonBatting.playerId, currentIds),
-          sql`${PublicSchema.seasonBatting.lgId} = ${poolUpper}`,
-        ),
-      );
+    const poolRows = await db.execute(
+      sql`SELECT DISTINCT player_id
+          FROM (
+            SELECT player_id FROM season_batting
+              WHERE player_id = ANY(${sql.param(currentIds)}::integer[])
+                AND lg_id = ${poolUpper}
+            UNION
+            SELECT player_id FROM season_pitching
+              WHERE player_id = ANY(${sql.param(currentIds)}::integer[])
+                AND lg_id = ${poolUpper}
+          ) pool_players`,
+    );
 
-    const poolEligible = new Set(poolResults.map((r) => r.playerId));
+    const poolEligible = new Set(
+      poolRows.rows.map((r: Record<string, unknown>) => Number(r.player_id)),
+    );
     const before = currentIds.length;
     currentIds = currentIds.filter((id) => poolEligible.has(id));
     excludedByPool = before - currentIds.length;
