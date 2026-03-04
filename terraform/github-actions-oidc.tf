@@ -331,6 +331,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "ssm:GetParameters",
           "ssm:GetParametersByPath",
           "ssm:PutParameter",
+          "ssm:DeleteParameter",
           "ssm:ListTagsForResource",
           "ssm:AddTagsToResource",
           "ssm:RemoveTagsFromResource"
