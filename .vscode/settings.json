@@ -84,7 +84,9 @@
     "git fetch": true,
     "Test-Path": true,
     "git push": true,
-    "ConvertTo-Json": true
+    "ConvertTo-Json": true,
+    "Copy-Item": true,
+    "Tee-Object": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {
