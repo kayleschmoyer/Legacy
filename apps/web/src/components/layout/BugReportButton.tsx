@@ -91,7 +91,7 @@ export const BugReportButton: React.FC = () => {
     };
 
     try {
-      const res = await fetch(`${jiraProxyUrl}/jira/bug`, {
+      const res = await fetch(`${jiraProxyUrl}/bug`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
