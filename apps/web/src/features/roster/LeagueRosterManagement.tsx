@@ -36,6 +36,10 @@ import {
   VIOLET,
   withAlpha,
 } from '../../constants/colors';
+import {
+  CONTENT_STICKY_Z_INDEX,
+  NAV_HEIGHT_PX,
+} from '../../constants/dimensions';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -160,8 +164,10 @@ function ensureFlashStyle(): void {
 
 const GlassHeader = styled(XStack, {
   position: 'sticky' as const,
-  top: 0,
-  zIndex: 100,
+  // Offset by the nav bar height so this sticks directly below the nav,
+  // not overlapping it. zIndex must stay below NAV_Z_INDEX.
+  top: NAV_HEIGHT_PX,
+  zIndex: CONTENT_STICKY_Z_INDEX,
   backgroundColor: '$background075',
   backdropFilter: 'blur(12px)',
   paddingVertical: '$3',

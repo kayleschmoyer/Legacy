@@ -46,6 +46,7 @@ import { AdminPage } from '../pages/admin/AdminPage';
 import ProfileSettingsPage from '../pages/profile/ProfileSettingsPage';
 import PreferencesPage from '../pages/preferences/PreferencesPage';
 import { BRAND_GOLD } from '../constants/colors';
+import { NAV_Z_INDEX } from '../constants/dimensions';
 
 /* ────────────────────────────────────────────────────────
  * Modern Header – styled components
@@ -64,7 +65,9 @@ const NavContainer = styled(YStack, {
   borderBottomColor: '$borderColor',
   position: 'sticky' as never,
   top: 0,
-  zIndex: 50,
+  // NAV_Z_INDEX must exceed every secondary sticky element (e.g. CONTENT_STICKY_Z_INDEX)
+  // so the nav bar always remains above page content when both are sticky.
+  zIndex: NAV_Z_INDEX,
   // backdrop-blur applied via inline style
 });
 
