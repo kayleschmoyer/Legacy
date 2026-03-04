@@ -412,7 +412,7 @@ builder.queryField('leagueTeams', (t) =>
           throw new Error('User does not have access to this league');
         }
 
-        // Fetch all teams in the league
+        // Fetch all teams in the league with their primary manager userId
         const teams = await context.db
           .select({
             id: PublicSchema.teams.id,
@@ -429,8 +429,16 @@ builder.queryField('leagueTeams', (t) =>
             isLocked: PublicSchema.teams.isLocked,
             avatarUrl: PublicSchema.teams.avatarUrl,
             bannerUrl: PublicSchema.teams.bannerUrl,
+            managerId: PublicSchema.leagueMembers.userId,
           })
           .from(PublicSchema.teams)
+          .leftJoin(
+            PublicSchema.leagueMembers,
+            and(
+              eq(PublicSchema.leagueMembers.teamId, PublicSchema.teams.id),
+              eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            ),
+          )
           .where(eq(PublicSchema.teams.leagueId, leagueId))
           .orderBy(PublicSchema.teams.name);
 

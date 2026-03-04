@@ -170,6 +170,36 @@ export interface PlayoffBracketCreatedNotification {
   createdAt: string;
 }
 
+/**
+ * Broadcast to all connections in a league when a user connects.
+ * Also received by the connecting user via the USER_LIST notification.
+ */
+export interface UserJoinedNotification {
+  type: typeof ClientNotificationType.USER_JOINED;
+  leagueId: number;
+  userId: number;
+  username: string;
+}
+
+/**
+ * Broadcast to all connections in a league when a user disconnects.
+ */
+export interface UserLeftNotification {
+  type: typeof ClientNotificationType.USER_LEFT;
+  leagueId: number;
+  userId: number;
+}
+
+/**
+ * Sent only to the newly connected client to bootstrap their presence state
+ * with the list of users already connected to this league.
+ */
+export interface UserListNotification {
+  type: typeof ClientNotificationType.USER_LIST;
+  leagueId: number;
+  users: Array<{ userId: number; username: string }>;
+}
+
 export type NotificationData =
   | DraftCompletedNotification
   | DraftStartedNotification
@@ -184,7 +214,10 @@ export type NotificationData =
   | DirectMessageNotification
   | RosterUpdateNotification
   | TradeOfferNotification
-  | PlayoffBracketCreatedNotification;
+  | PlayoffBracketCreatedNotification
+  | UserJoinedNotification
+  | UserLeftNotification
+  | UserListNotification;
 
 /**
  * WebSocket message structure

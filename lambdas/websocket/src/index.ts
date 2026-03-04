@@ -350,9 +350,11 @@ async function handleConnect(
 
     // Build item with TTL (2 hours from now)
     const ttl = Math.floor(Date.now() / 1000) + 2 * 60 * 60; // 2 hours
+    const username = payload?.username ?? '';
     const item: Record<string, { S?: string; N?: string }> = {
       connectionId: { S: connectionId },
       userId: { N: userId.toString() },
+      username: { S: username },
       viewContext: { S: viewContext },
       connectedAt: { N: Date.now().toString() },
       ttl: { N: ttl.toString() },
@@ -382,6 +384,45 @@ async function handleConnect(
       ttl,
     });
 
+    // ── Presence: broadcast USER_JOINED to league peers, send USER_LIST back ──
+    if (leagueId) {
+      const endpoint = buildApiGatewayEndpoint(event);
+      try {
+        const peers = await getLeagueConnections(leagueId, connectionId);
+
+        // Notify existing peers that this user joined
+        const joinedMsg = {
+          type: 'USER_JOINED',
+          leagueId,
+          userId,
+          username,
+        };
+        await Promise.allSettled(
+          peers.map((p) =>
+            sendMessageToConnection(endpoint, p.connectionId, joinedMsg),
+          ),
+        );
+
+        // Send current online list back to the newly connected client
+        const userListMsg = {
+          type: 'USER_LIST',
+          leagueId,
+          users: peers.map((p) => ({ userId: p.userId, username: p.username })),
+        };
+        await sendMessageToConnection(endpoint, connectionId, userListMsg);
+      } catch (presenceErr) {
+        // Non-fatal — presence is best-effort
+        LOGGER.warn('Presence broadcast failed on connect', {
+          connectionId,
+          leagueId,
+          error:
+            presenceErr instanceof Error
+              ? presenceErr.message
+              : String(presenceErr),
+        });
+      }
+    }
+
     return { statusCode: 200, body: 'Connected' };
   } catch (error) {
     LOGGER.error('Error handling connect', { error });
@@ -395,14 +436,78 @@ async function handleConnect(
 }
 
 /**
+ * Build the API Gateway Management API endpoint from a WebSocket event.
+ */
+function buildApiGatewayEndpoint(
+  event: APIGatewayProxyWebsocketEventV2,
+): string {
+  return `https://${event.requestContext.domainName}/${event.requestContext.stage}`;
+}
+
+/**
+ * Query DynamoDB for all connections in a league, optionally excluding one.
+ * Returns connectionId, userId, and username for each connection.
+ */
+async function getLeagueConnections(
+  leagueId: number,
+  excludeConnectionId?: string,
+): Promise<Array<{ connectionId: string; userId: number; username: string }>> {
+  const result = await dynamoClient.send(
+    new QueryCommand({
+      TableName: connectionsTable,
+      IndexName: 'LeagueIdIndex',
+      KeyConditionExpression: 'leagueId = :leagueId',
+      ExpressionAttributeValues: {
+        ':leagueId': { N: leagueId.toString() },
+      },
+      ProjectionExpression: 'connectionId, userId, username',
+    }),
+  );
+
+  return (result.Items ?? [])
+    .filter(
+      (item) =>
+        item.connectionId?.S &&
+        (!excludeConnectionId || item.connectionId.S !== excludeConnectionId),
+    )
+    .map((item) => ({
+      connectionId: item.connectionId.S!,
+      userId: parseInt(item.userId?.N ?? '0', 10),
+      username: item.username?.S ?? '',
+    }));
+}
+
+/**
  * Handle disconnection event - remove connection ID from DynamoDB
+ * and broadcast USER_LEFT to remaining league peers.
  */
 async function handleDisconnect(
   connectionId: string,
+  event: APIGatewayProxyWebsocketEventV2,
 ): Promise<APIGatewayProxyResultV2> {
   addBreadcrumb('WebSocket disconnection request', { connectionId });
 
   try {
+    // Read connection data before deleting (needed for presence broadcast)
+    let disconnectingUserId: number | null = null;
+    let disconnectingLeagueId: number | null = null;
+
+    try {
+      const existing = await dynamoClient.send(
+        new GetItemCommand({
+          TableName: connectionsTable,
+          Key: { connectionId: { S: connectionId } },
+        }),
+      );
+      if (existing.Item) {
+        disconnectingUserId = parseInt(existing.Item['userId']?.N ?? '0', 10);
+        const leagueIdStr = existing.Item['leagueId']?.N;
+        if (leagueIdStr) disconnectingLeagueId = parseInt(leagueIdStr, 10);
+      }
+    } catch {
+      // Non-fatal — we still proceed with the delete
+    }
+
     await dynamoClient.send(
       new DeleteItemCommand({
         TableName: connectionsTable,
@@ -413,6 +518,36 @@ async function handleDisconnect(
     );
 
     LOGGER.info('WebSocket connection closed', { connectionId });
+
+    // ── Presence: broadcast USER_LEFT to remaining league peers ──
+    if (disconnectingUserId && disconnectingLeagueId) {
+      const endpoint = buildApiGatewayEndpoint(event);
+      try {
+        const remainingPeers = await getLeagueConnections(
+          disconnectingLeagueId,
+        );
+        const leftMsg = {
+          type: 'USER_LEFT',
+          leagueId: disconnectingLeagueId,
+          userId: disconnectingUserId,
+        };
+        await Promise.allSettled(
+          remainingPeers.map((p) =>
+            sendMessageToConnection(endpoint, p.connectionId, leftMsg),
+          ),
+        );
+      } catch (presenceErr) {
+        // Non-fatal
+        LOGGER.warn('Presence broadcast failed on disconnect', {
+          connectionId,
+          leagueId: disconnectingLeagueId,
+          error:
+            presenceErr instanceof Error
+              ? presenceErr.message
+              : String(presenceErr),
+        });
+      }
+    }
 
     return { statusCode: 200, body: 'Disconnected' };
   } catch (error) {
@@ -716,7 +851,7 @@ const baseWebSocketHandler = async (
       case '$connect':
         return await handleConnect(connectionId, event);
       case '$disconnect':
-        return await handleDisconnect(connectionId);
+        return await handleDisconnect(connectionId, event);
       case '$default':
         return await handleDefault(connectionId, event.body || '', event);
       default:

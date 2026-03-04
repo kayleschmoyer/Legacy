@@ -89,6 +89,8 @@ export interface LeagueTeam {
   name: string;
   leagueId: number;
   isCpu?: boolean;
+  /** userId of the primary manager for this team (from leagueMembers). */
+  managerId?: number | null;
 }
 
 export interface IntelligenceRecommendation {

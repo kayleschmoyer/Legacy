@@ -11,9 +11,13 @@ import {
   type DraftCompletedNotification,
   type DraftPausedNotification,
   type DraftPickNotification,
+  type DraftPickUndoneNotification,
   type DraftResumedNotification,
   type DraftStartedNotification,
   useAuth,
+  type UserJoinedNotification,
+  type UserLeftNotification,
+  type UserListNotification,
   useWebSocket,
 } from '@legacy-sports/shared-components';
 import {
@@ -106,6 +110,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     text: string;
     type: 'error' | 'warning' | 'info';
   } | null>(null);
+
+  // Online presence tracking (LS-478)
+  const [onlineUserIds, setOnlineUserIds] = useState<ReadonlySet<number>>(
+    new Set(),
+  );
 
   // Notification dedup: track overallPick numbers we've already notified
   const notifiedPicksRef = useRef<Set<number>>(new Set());
@@ -797,6 +806,55 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     [draftId, showToast, refetchCurrentPick],
   );
 
+  const handleDraftPickUndone = useCallback(
+    (notification: DraftPickUndoneNotification) => {
+      setLiveMessage(
+        `Pick #${notification.overallPick} has been undone by the commissioner.`,
+      );
+      showToast(`↩️ Pick #${notification.overallPick} undone`, 'info');
+      if (notification.newPickDeadline) {
+        setPickDeadline(new Date(notification.newPickDeadline));
+      }
+      setDraftComplete(false);
+      if (draftId) void refetchCurrentPick({ draftId });
+      void refetchPickHistory();
+      void refetchAvailablePlayers();
+      void refetchDraft();
+    },
+    [
+      draftId,
+      showToast,
+      refetchCurrentPick,
+      refetchPickHistory,
+      refetchAvailablePlayers,
+      refetchDraft,
+    ],
+  );
+
+  // ---- Presence handlers (LS-478) ----
+  const handleUserJoined = useCallback(
+    (notification: UserJoinedNotification) => {
+      setOnlineUserIds((prev) => {
+        const next = new Set(prev);
+        next.add(notification.userId);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const handleUserLeft = useCallback((notification: UserLeftNotification) => {
+    setOnlineUserIds((prev) => {
+      const next = new Set(prev);
+      next.delete(notification.userId);
+      return next;
+    });
+  }, []);
+
+  const handleUserList = useCallback((notification: UserListNotification) => {
+    setOnlineUserIds(new Set(notification.users.map((u) => u.userId)));
+  }, []);
+
   const { connected: wsConnected } = useWebSocket({
     url: env.websocketUrl,
     leagueId: leagueId ?? undefined,
@@ -805,9 +863,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     autoConnect: !!leagueId && !!token,
     onDraftStarted: handleDraftStarted,
     onDraftPickMade: handleDraftPickMade,
+    onDraftPickUndone: handleDraftPickUndone,
     onDraftCompleted: handleDraftCompleted,
     onDraftPaused: handleDraftPaused,
     onDraftResumed: handleDraftResumed,
+    onUserJoined: handleUserJoined,
+    onUserLeft: handleUserLeft,
+    onUserList: handleUserList,
   });
 
   // ---- WebSocket reconnection recovery (docs §8) ----
@@ -1203,6 +1265,18 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const gridCols =
     viewMode === 'grid' ? 'repeat(auto-fill, minmax(320px, 1fr))' : '1fr';
 
+  // Derive the set of team IDs whose managers are currently online (LS-478).
+  // Maps onlineUserIds → teamIds via leagueTeams[].managerId.
+  const onlineTeamIds = useMemo<ReadonlySet<string>>(() => {
+    const set = new Set<string>();
+    for (const team of leagueTeams) {
+      if (team.managerId != null && onlineUserIds.has(team.managerId)) {
+        set.add(String(team.id));
+      }
+    }
+    return set;
+  }, [leagueTeams, onlineUserIds]);
+
   // Commentary for the pick announcement overlay
   const announcementCommentary = useMemo(() => {
     if (!announcement || !('name' in announcement.player)) return undefined;
@@ -1533,7 +1607,37 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   >
                     {idx + 1}.
                   </span>
-                  <span style={{ flex: 1 }}>
+                  <span
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                    }}
+                  >
+                    {/* Online dot (LS-478) */}
+                    <span
+                      aria-label={
+                        onlineTeamIds.has(String(team.id))
+                          ? 'online'
+                          : 'offline'
+                      }
+                      title={
+                        onlineTeamIds.has(String(team.id))
+                          ? 'Manager is online'
+                          : 'Manager is offline'
+                      }
+                      style={{
+                        display: 'inline-block',
+                        width: 7,
+                        height: 7,
+                        borderRadius: '50%',
+                        background: onlineTeamIds.has(String(team.id))
+                          ? '#10b981'
+                          : 'rgba(148,163,184,0.35)',
+                        flexShrink: 0,
+                      }}
+                    />
                     {team.name}{' '}
                     {String(team.id) === String(myTeamId) ? '(You)' : ''}
                   </span>
@@ -1863,8 +1967,36 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   fontSize: 18,
                   fontWeight: 800,
                   color: isMyPick ? '#10b981' : '#f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
                 }}
               >
+                {/* Online dot for on-the-clock team (LS-478) */}
+                {currentPickTeamId !== null && (
+                  <span
+                    aria-label={
+                      onlineTeamIds.has(String(currentPickTeamId))
+                        ? 'online'
+                        : 'offline'
+                    }
+                    title={
+                      onlineTeamIds.has(String(currentPickTeamId))
+                        ? 'Manager is online'
+                        : 'Manager is offline'
+                    }
+                    style={{
+                      display: 'inline-block',
+                      width: 9,
+                      height: 9,
+                      borderRadius: '50%',
+                      background: onlineTeamIds.has(String(currentPickTeamId))
+                        ? '#10b981'
+                        : 'rgba(148,163,184,0.4)',
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
                 {teamNameById(currentPickTeamId)}
               </div>
               <div
@@ -2358,6 +2490,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                     )
                   : 20
               }
+              onlineTeamIds={onlineTeamIds}
             />
           )}
 

@@ -2567,6 +2567,8 @@ export type Team = {
   isLocked?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   logoUrl?: Maybe<Scalars['String']['output']>;
+  /** The userId of the primary manager for this team (from leagueMembers). */
+  managerId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;

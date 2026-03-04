@@ -146,6 +146,7 @@ query GetLeagueTeams($leagueId: Int!) {
     secondaryColor
     avatarUrl
     bannerUrl
+    managerId
   }
 }
 

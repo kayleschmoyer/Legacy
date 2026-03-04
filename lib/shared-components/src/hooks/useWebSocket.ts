@@ -12,6 +12,9 @@ import {
   type PlayerStatsLoadingNotification,
   type PlayerStatsUpdatedNotification,
   type RosterUpdateNotification,
+  type UserJoinedNotification,
+  type UserLeftNotification,
+  type UserListNotification,
   WebSocketClient,
   type WebSocketMessage,
 } from '@legacy-sports/websocket-client';
@@ -78,6 +81,9 @@ export type {
   PlayerStatsUpdatedNotification,
   MatchupStatsCompleteNotification,
   RosterUpdateNotification,
+  UserJoinedNotification,
+  UserLeftNotification,
+  UserListNotification,
   WebSocketMessage,
 };
 
@@ -101,6 +107,9 @@ interface UseWebSocketOptions {
   ) => void;
   onRosterUpdate?: (notification: RosterUpdateNotification) => void;
   onLeagueChatMessage?: (notification: LeagueChatMessageNotification) => void;
+  onUserJoined?: (notification: UserJoinedNotification) => void;
+  onUserLeft?: (notification: UserLeftNotification) => void;
+  onUserList?: (notification: UserListNotification) => void;
   onMessage?: (message: WebSocketMessage) => void;
   onError?: (error: Error) => void;
 }
@@ -140,6 +149,9 @@ export function useWebSocket({
   onMatchupStatsComplete,
   onRosterUpdate,
   onLeagueChatMessage,
+  onUserJoined,
+  onUserLeft,
+  onUserList,
   onMessage,
   onError,
 }: UseWebSocketOptions = {}) {
@@ -161,6 +173,9 @@ export function useWebSocket({
   const onMatchupStatsCompleteRef = useLatestRef(onMatchupStatsComplete);
   const onRosterUpdateRef = useLatestRef(onRosterUpdate);
   const onLeagueChatMessageRef = useLatestRef(onLeagueChatMessage);
+  const onUserJoinedRef = useLatestRef(onUserJoined);
+  const onUserLeftRef = useLatestRef(onUserLeft);
+  const onUserListRef = useLatestRef(onUserList);
   const onMessageRef = useLatestRef(onMessage);
   const onErrorRef = useLatestRef(onError);
 
@@ -358,6 +373,21 @@ export function useWebSocket({
         type: ClientNotificationType.LEAGUE_CHAT_MESSAGE,
         ref: onLeagueChatMessageRef,
         debugLabel: 'league-chat-message',
+      },
+      {
+        type: ClientNotificationType.USER_JOINED,
+        ref: onUserJoinedRef,
+        debugLabel: 'user-joined',
+      },
+      {
+        type: ClientNotificationType.USER_LEFT,
+        ref: onUserLeftRef,
+        debugLabel: 'user-left',
+      },
+      {
+        type: ClientNotificationType.USER_LIST,
+        ref: onUserListRef,
+        debugLabel: 'user-list',
       },
     ];
 

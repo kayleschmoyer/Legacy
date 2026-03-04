@@ -160,6 +160,8 @@ export const Team = builder.objectRef<
     secondaryColor?: string | null;
     avatarUrl?: string | null;
     bannerUrl?: string | null;
+    /** userId of the primary manager for this team (from leagueMembers). */
+    managerId?: number | null;
   }
 >('Team');
 
@@ -201,6 +203,13 @@ Team.implement({
     }),
     updatedAt: t.string({
       resolve: (team) => team.updatedAt.toISOString(),
+    }),
+    managerId: t.int({
+      nullable: true,
+      description:
+        'The userId of the primary manager for this team (from leagueMembers).',
+      resolve: (parent) =>
+        (parent as { managerId?: number | null }).managerId ?? null,
     }),
   }),
 });

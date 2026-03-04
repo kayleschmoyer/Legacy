@@ -19,6 +19,7 @@ export function DraftGrid({
   statsLookup,
   maxRounds,
   autoPickTeamIds = new Set<string>(),
+  onlineTeamIds = new Set<string>(),
 }: {
   teams: LeagueTeam[];
   picks: DraftPickRecord[];
@@ -28,6 +29,8 @@ export function DraftGrid({
   maxRounds: number;
   /** Set of team IDs that currently have auto-pick enabled (LS-439) */
   autoPickTeamIds?: ReadonlySet<string>;
+  /** Set of team IDs whose managers are currently online (LS-478) */
+  onlineTeamIds?: ReadonlySet<string>;
 }) {
   // Build a grid: rows = rounds, cols = teams
   const pickGrid = useMemo(() => {
@@ -72,6 +75,29 @@ export function DraftGrid({
                 : undefined
             }
           >
+            {/* Online indicator dot (LS-478) */}
+            <span
+              aria-label={
+                onlineTeamIds.has(String(team.id)) ? 'online' : 'offline'
+              }
+              title={
+                onlineTeamIds.has(String(team.id))
+                  ? 'Manager is online'
+                  : 'Manager is offline'
+              }
+              style={{
+                display: 'inline-block',
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: onlineTeamIds.has(String(team.id))
+                  ? '#10b981'
+                  : 'rgba(148,163,184,0.35)',
+                marginRight: 5,
+                verticalAlign: 'middle',
+                flexShrink: 0,
+              }}
+            />
             {team.name}
             {String(team.id) === String(myTeamId) && (
               <span style={{ fontSize: 8, display: 'block', color: '#10b981' }}>
