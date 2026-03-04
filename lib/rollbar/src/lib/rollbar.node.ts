@@ -21,6 +21,9 @@ class NodeRollbarImplementation implements RollbarInterface {
         captureUncaught: config.captureUncaught ?? true,
         captureUnhandledRejections: config.captureUnhandledRejections ?? true,
         verbose: config.verbose ?? false,
+        // 0 = unlimited; prevents "item per minute limit reached" when errors
+        // or breadcrumbs are reported in bursts.
+        maxItems: config.maxItems ?? 0,
         payload: {
           code_version: config.release,
         },
@@ -44,7 +47,15 @@ class NodeRollbarImplementation implements RollbarInterface {
         return;
       }
       const safeContext = context ? sanitizeSentryContext(context) : undefined;
-      this.rollbar.error(error, safeContext ?? {});
+      const breadcrumbContext =
+        this.breadcrumbs.length > 0
+          ? { breadcrumbs: this.breadcrumbs.slice() }
+          : {};
+      this.breadcrumbs = [];
+      this.rollbar.error(error, {
+        ...breadcrumbContext,
+        ...(safeContext ?? {}),
+      });
     } catch (captureError) {
       LOGGER.error('Failed to capture error in Rollbar', captureError as Error);
       LOGGER.error('Original error was:', error);
@@ -52,12 +63,10 @@ class NodeRollbarImplementation implements RollbarInterface {
   }
 
   addBreadcrumb(breadcrumb: RollbarBreadcrumb): void {
-    // Rollbar handles breadcrumbs via its internal telemetry system.
-    // We store them locally for compatibility and attach to next error report.
+    // Buffer breadcrumbs locally; they are attached to the next captureError call.
+    // Do NOT call rollbar.log() here — each log() counts as a rated item and
+    // causes "item per minute limit reached" when breadcrumbs are added frequently.
     this.breadcrumbs.push(breadcrumb);
-    if (this.rollbar) {
-      this.rollbar.log(breadcrumb.message, breadcrumb.data ?? {});
-    }
   }
 
   withSentry<TArgs extends unknown[], TResult>(

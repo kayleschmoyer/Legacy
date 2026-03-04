@@ -10,6 +10,8 @@ export interface RollbarConfig {
   captureUnhandledRejections?: boolean;
   verbose?: boolean;
   release?: string;
+  /** Maximum error items to send per minute. Set to 0 for unlimited. Defaults to 0. */
+  maxItems?: number;
 }
 
 export interface RollbarBreadcrumb {
