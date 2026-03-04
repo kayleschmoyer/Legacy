@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { resolve } from 'path';
+import { rollbarSourcemapPlugin } from '../../tools/vite-configs';
 
 export default defineConfig(({ mode }) => {
   // Load environment variables from workspace root and merge with process.env
@@ -20,7 +21,16 @@ export default defineConfig(({ mode }) => {
 
     plugins: [
       nxViteTsPaths(),
-      // TODO: Add Rollbar sourcemap upload here.
+      ...(isProduction && process.env.ROLLBAR_ACCESS_TOKEN
+        ? [
+            rollbarSourcemapPlugin({
+              accessToken: process.env.ROLLBAR_ACCESS_TOKEN,
+              version:
+                process.env.GITHUB_SHA || process.env.APP_VERSION || 'dev',
+              publicPath: 'app://lambda-db',
+            }),
+          ]
+        : []),
     ],
 
     // Configure for Node.js/SSR mode

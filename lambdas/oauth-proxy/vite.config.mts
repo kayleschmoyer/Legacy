@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
+import { rollbarSourcemapPlugin } from '../../tools/vite-configs';
 
 // Determine if this is a production deployment build
 const isProduction = process.env.NODE_ENV === 'production';
@@ -9,7 +10,15 @@ export default defineConfig({
 
   plugins: [
     nxViteTsPaths(),
-    // TODO: Add Rollbar sourcemap upload here.
+    ...(isProduction && process.env.ROLLBAR_ACCESS_TOKEN
+      ? [
+          rollbarSourcemapPlugin({
+            accessToken: process.env.ROLLBAR_ACCESS_TOKEN,
+            version: process.env.GITHUB_SHA || process.env.APP_VERSION || 'dev',
+            publicPath: 'app://lambda-oauth-proxy',
+          }),
+        ]
+      : []),
   ],
 
   // Configure for Node.js/SSR mode

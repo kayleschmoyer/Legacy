@@ -51,6 +51,9 @@ jobs:
 
       - name: Build Lambda
         working-directory: lambdas/oauth-proxy
+        env:
+          NODE_ENV: production
+          ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
         run: |
           echo "🔨 Building OAuth Proxy Lambda..."
 

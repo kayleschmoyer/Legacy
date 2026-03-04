@@ -139,6 +139,8 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: web
           NODE_ENV: production
+          # Rollbar sourcemap upload
+          ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
         run: |
           # Only enable Nx Cloud if DTE started successfully
           if [ "${{ steps.start-dte.outcome }}" = "success" ]; then

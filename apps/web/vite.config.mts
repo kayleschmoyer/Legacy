@@ -7,6 +7,7 @@ import { resolve } from 'path';
 import { tamaguiPlugin } from '@tamagui/vite-plugin';
 import reactNativeWeb from 'vite-plugin-react-native-web';
 import { execSync } from 'child_process';
+import { rollbarSourcemapPlugin } from '../../tools/vite-configs';
 
 export default defineConfig(({ mode }) => {
   // Load environment variables from workspace root and merge with process.env
@@ -87,8 +88,16 @@ export default defineConfig(({ mode }) => {
       }),
       react(),
       nxCopyAssetsPlugin(['*.md']),
-      // TODO: Add Rollbar sourcemap upload here.
-      // See https://docs.rollbar.com/docs/source-maps for instructions.
+      ...(isDeployBuild && process.env.ROLLBAR_ACCESS_TOKEN
+        ? [
+            rollbarSourcemapPlugin({
+              accessToken: process.env.ROLLBAR_ACCESS_TOKEN,
+              version: commitSha,
+              publicPath: 'https://legacy-fantasy.com',
+              deleteFilesAfterUpload: true,
+            }),
+          ]
+        : []),
     ],
 
     // Optimize dependency scanning and exclude React Native completely
