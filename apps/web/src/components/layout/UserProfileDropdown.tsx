@@ -9,6 +9,16 @@ import {
 import { useAuth } from '@legacy-sports/shared-components';
 import { useNavigate } from 'react-router-dom';
 import { styled } from 'tamagui';
+import {
+  ChevronDown,
+  ChevronUp,
+  HelpCircle,
+  LogOut,
+  Settings,
+  Settings2,
+  Shield,
+  User,
+} from '@tamagui/lucide-icons';
 
 const UserMenuButton = styled(Button, {
   backgroundColor: 'transparent',
@@ -116,12 +126,6 @@ export const UserProfileDropdown: React.FC = () => {
     return null;
   }
 
-  // DEBUG: Log the auth object and picture field
-  console.log('[UserProfileDropdown] Full auth object:', auth);
-  console.log('[UserProfileDropdown] auth.user:', auth.user);
-  console.log('[UserProfileDropdown] auth.user.picture:', auth.user.picture);
-  console.log('[UserProfileDropdown] userImage value:', userImage);
-
   const handleLogout = async () => {
     try {
       setIsOpen(false);
@@ -129,7 +133,6 @@ export const UserProfileDropdown: React.FC = () => {
         await auth.logout();
       } else {
         // Fallback logout logic
-        console.log('Logging out...');
         window.location.reload();
       }
     } catch (error) {
@@ -158,22 +161,10 @@ export const UserProfileDropdown: React.FC = () => {
                   borderRadius: '50%',
                   objectFit: 'cover',
                 }}
-                onError={(e) => {
-                  console.error(
-                    '[UserProfileDropdown] Image failed to load:',
-                    userImage,
-                    e,
-                  );
-                  console.log(
-                    '[UserProfileDropdown] Switching to initials fallback',
-                  );
+                onError={() => {
                   setImageError(true);
                 }}
                 onLoad={() => {
-                  console.log(
-                    '[UserProfileDropdown] Image loaded successfully:',
-                    userImage,
-                  );
                   setImageError(false);
                 }}
               />
@@ -188,9 +179,11 @@ export const UserProfileDropdown: React.FC = () => {
               {userName}
             </Paragraph>
           </YStack>
-          <Paragraph fontSize={10} color="$colorPress">
-            {isOpen ? '▲' : '▼'}
-          </Paragraph>
+          {isOpen ? (
+            <ChevronUp size={14} color="$colorPress" />
+          ) : (
+            <ChevronDown size={14} color="$colorPress" />
+          )}
         </XStack>
       </UserMenuButton>
 
@@ -253,11 +246,7 @@ export const UserProfileDropdown: React.FC = () => {
             >
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
-                  <Paragraph fontSize={15} lineHeight={17}>
-                    <span role="img" aria-label="profile">
-                      👤
-                    </span>
-                  </Paragraph>
+                  <User size={18} color="$color" />
                 </MenuIconBox>
                 <Paragraph size="$3" color="$color" fontWeight="500">
                   Profile Settings
@@ -273,11 +262,7 @@ export const UserProfileDropdown: React.FC = () => {
             >
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
-                  <Paragraph fontSize={15} lineHeight={17}>
-                    <span role="img" aria-label="settings">
-                      ⚙️
-                    </span>
-                  </Paragraph>
+                  <Settings size={18} color="$color" />
                 </MenuIconBox>
                 <Paragraph size="$3" color="$color" fontWeight="500">
                   Preferences
@@ -292,11 +277,7 @@ export const UserProfileDropdown: React.FC = () => {
             >
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
-                  <Paragraph fontSize={15} lineHeight={17}>
-                    <span role="img" aria-label="help">
-                      ❓
-                    </span>
-                  </Paragraph>
+                  <HelpCircle size={18} color="$color" />
                 </MenuIconBox>
                 <Paragraph size="$3" color="$color" fontWeight="500">
                   Help &amp; Support
@@ -314,11 +295,7 @@ export const UserProfileDropdown: React.FC = () => {
             >
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
-                  <Paragraph fontSize={15} lineHeight={17}>
-                    <span role="img" aria-label="management">
-                      ⚙️
-                    </span>
-                  </Paragraph>
+                  <Settings2 size={18} color="$color" />
                 </MenuIconBox>
                 <Paragraph size="$3" color="$color" fontWeight="500">
                   Management
@@ -335,11 +312,7 @@ export const UserProfileDropdown: React.FC = () => {
               >
                 <XStack alignItems="center" gap="$3" flex={1}>
                   <MenuIconBox>
-                    <Paragraph fontSize={15} lineHeight={17}>
-                      <span role="img" aria-label="admin">
-                        🛡️
-                      </span>
-                    </Paragraph>
+                    <Shield size={18} color="$color" />
                   </MenuIconBox>
                   <Paragraph size="$3" color="$color" fontWeight="500">
                     Admin
@@ -353,11 +326,7 @@ export const UserProfileDropdown: React.FC = () => {
             <MenuItem onPress={handleLogout}>
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox backgroundColor="$red3">
-                  <Paragraph fontSize={15} lineHeight={17}>
-                    <span role="img" aria-label="sign out">
-                      🚪
-                    </span>
-                  </Paragraph>
+                  <LogOut size={18} color="$red10" />
                 </MenuIconBox>
                 <Paragraph size="$3" color="$red10" fontWeight="600">
                   Sign Out

@@ -11,6 +11,18 @@ import {
   FootballScreen,
   PlayersScreen,
 } from '@legacy-sports/shared-components';
+import {
+  Activity,
+  BarChart2,
+  Circle,
+  Gamepad2,
+  Globe,
+  HelpCircle,
+  Info,
+  Menu,
+  Users,
+  X,
+} from '@tamagui/lucide-icons';
 import HomePage from '../pages/home/HomePage';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { SportsDropdown } from '../components/layout/SportsDropdown';
@@ -265,12 +277,10 @@ function Navigation() {
               }
             >
               <NavLinkButton active={location.pathname.startsWith('/games')}>
-                <Paragraph marginBottom={0}>
-                  <span role="img" aria-label="games">
-                    🎲
-                  </span>{' '}
-                  Games
-                </Paragraph>
+                <XStack alignItems="center" gap="$2">
+                  <Gamepad2 size={15} />
+                  <Paragraph marginBottom={0}>Games</Paragraph>
+                </XStack>
               </NavLinkButton>
             </Link>
 
@@ -280,12 +290,10 @@ function Navigation() {
               aria-current={isActive('/about') ? 'page' : undefined}
             >
               <NavLinkButton active={isActive('/about')}>
-                <Paragraph marginBottom={0}>
-                  <span role="img" aria-label="info">
-                    ℹ️
-                  </span>{' '}
-                  About
-                </Paragraph>
+                <XStack alignItems="center" gap="$2">
+                  <Info size={15} />
+                  <Paragraph marginBottom={0}>About</Paragraph>
+                </XStack>
               </NavLinkButton>
             </Link>
 
@@ -295,12 +303,10 @@ function Navigation() {
               aria-current={isActive('/help') ? 'page' : undefined}
             >
               <NavLinkButton active={isActive('/help')}>
-                <Paragraph marginBottom={0}>
-                  <span role="img" aria-label="help">
-                    🆘
-                  </span>{' '}
-                  Help
-                </Paragraph>
+                <XStack alignItems="center" gap="$2">
+                  <HelpCircle size={15} />
+                  <Paragraph marginBottom={0}>Help</Paragraph>
+                </XStack>
               </NavLinkButton>
             </Link>
           </NavLinks>
@@ -316,9 +322,7 @@ function Navigation() {
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileOpen}
             >
-              <Paragraph fontSize={22} lineHeight={24}>
-                {mobileOpen ? '✕' : '☰'}
-              </Paragraph>
+              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
             </MobileMenuButton>
           </XStack>
         </NavContent>
@@ -332,10 +336,8 @@ function Navigation() {
               active={isActive('/football')}
               onPress={() => setMobileOpen(false)}
             >
-              <span role="img" aria-label="football">
-                🏈
-              </span>{' '}
-              Football
+              <Activity size={16} />
+              <Paragraph marginBottom={0}>Football</Paragraph>
             </MobileNavLink>
           </Link>
           <Link to="/baseball" style={{ textDecoration: 'none' }}>
@@ -343,10 +345,8 @@ function Navigation() {
               active={location.pathname.startsWith('/baseball')}
               onPress={() => setMobileOpen(false)}
             >
-              <span role="img" aria-label="baseball">
-                ⚾
-              </span>{' '}
-              Baseball
+              <Circle size={16} />
+              <Paragraph marginBottom={0}>Baseball</Paragraph>
             </MobileNavLink>
           </Link>
           <Link to="/baseball/leagues" style={{ textDecoration: 'none' }}>
@@ -354,10 +354,8 @@ function Navigation() {
               active={isActive('/baseball/leagues')}
               onPress={() => setMobileOpen(false)}
             >
-              <span role="img" aria-label="globe">
-                🌐
-              </span>{' '}
-              Browse Leagues
+              <Globe size={16} />
+              <Paragraph marginBottom={0}>Browse Leagues</Paragraph>
             </MobileNavLink>
           </Link>
           <Link to="/players" style={{ textDecoration: 'none' }}>
@@ -365,10 +363,8 @@ function Navigation() {
               active={isActive('/players')}
               onPress={() => setMobileOpen(false)}
             >
-              <span role="img" aria-label="players">
-                👥
-              </span>{' '}
-              Players
+              <Users size={16} />
+              <Paragraph marginBottom={0}>Players</Paragraph>
             </MobileNavLink>
           </Link>
           <Link to="/players/stats" style={{ textDecoration: 'none' }}>
@@ -376,12 +372,8 @@ function Navigation() {
               active={isActive('/players/stats')}
               onPress={() => setMobileOpen(false)}
             >
-              <Paragraph marginBottom={0}>
-                <span role="img" aria-label="statistics">
-                  📊
-                </span>{' '}
-                Player Stats
-              </Paragraph>
+              <BarChart2 size={16} />
+              <Paragraph marginBottom={0}>Player Stats</Paragraph>
             </MobileNavLink>
           </Link>
           <Link to="/games/season-draft" style={{ textDecoration: 'none' }}>
@@ -389,12 +381,8 @@ function Navigation() {
               active={location.pathname.startsWith('/games')}
               onPress={() => setMobileOpen(false)}
             >
-              <Paragraph marginBottom={0}>
-                <span role="img" aria-label="games">
-                  🎲
-                </span>{' '}
-                Games
-              </Paragraph>
+              <Gamepad2 size={16} />
+              <Paragraph marginBottom={0}>Games</Paragraph>
             </MobileNavLink>
           </Link>
           <Link to="/about" style={{ textDecoration: 'none' }}>
@@ -402,12 +390,8 @@ function Navigation() {
               active={isActive('/about')}
               onPress={() => setMobileOpen(false)}
             >
-              <Paragraph marginBottom={0}>
-                <span role="img" aria-label="info">
-                  ℹ️
-                </span>{' '}
-                About
-              </Paragraph>
+              <Info size={16} />
+              <Paragraph marginBottom={0}>About</Paragraph>
             </MobileNavLink>
           </Link>
           <Link to="/help" style={{ textDecoration: 'none' }}>
@@ -415,12 +399,8 @@ function Navigation() {
               active={isActive('/help')}
               onPress={() => setMobileOpen(false)}
             >
-              <Paragraph marginBottom={0}>
-                <span role="img" aria-label="help">
-                  🆘
-                </span>{' '}
-                Help
-              </Paragraph>
+              <HelpCircle size={16} />
+              <Paragraph marginBottom={0}>Help</Paragraph>
             </MobileNavLink>
           </Link>
         </MobileNavPanel>
@@ -450,8 +430,6 @@ function App() {
   usePageTracking();
   // Announce page title to screen readers on route change
   useRouteAnnouncer();
-
-  console.log('Rendering authenticated app content...');
 
   return (
     <MainLayout>

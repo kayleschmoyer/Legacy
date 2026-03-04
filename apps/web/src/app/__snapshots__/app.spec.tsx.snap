@@ -61,18 +61,17 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             style="text-decoration: none;"
           >
             <button>
-              <p
-                marginbottom="0"
+              <div
+                alignitems="center"
+                gap="$2"
               >
-                <span
-                  aria-label="games"
-                  role="img"
+                Gamepad2
+                <p
+                  marginbottom="0"
                 >
-                  🎲
-                </span>
-                 
-                Games
-              </p>
+                  Games
+                </p>
+              </div>
             </button>
           </a>
           <a
@@ -80,18 +79,17 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             style="text-decoration: none;"
           >
             <button>
-              <p
-                marginbottom="0"
+              <div
+                alignitems="center"
+                gap="$2"
               >
-                <span
-                  aria-label="info"
-                  role="img"
+                Info
+                <p
+                  marginbottom="0"
                 >
-                  ℹ️
-                </span>
-                 
-                About
-              </p>
+                  About
+                </p>
+              </div>
             </button>
           </a>
           <a
@@ -99,18 +97,17 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             style="text-decoration: none;"
           >
             <button>
-              <p
-                marginbottom="0"
+              <div
+                alignitems="center"
+                gap="$2"
               >
-                <span
-                  aria-label="help"
-                  role="img"
+                HelpCircle
+                <p
+                  marginbottom="0"
                 >
-                  🆘
-                </span>
-                 
-                Help
-              </p>
+                  Help
+                </p>
+              </div>
             </button>
           </a>
         </div>
@@ -126,12 +123,7 @@ exports[`App FootballScreen should match complete football page layout snapshot 
             aria-expanded="false"
             aria-label="Open menu"
           >
-            <p
-              font-size="22"
-              lineheight="24"
-            >
-              ☰
-            </p>
+            Menu
           </button>
         </div>
       </div>
@@ -216,18 +208,17 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             style="text-decoration: none;"
           >
             <button>
-              <p
-                marginbottom="0"
+              <div
+                alignitems="center"
+                gap="$2"
               >
-                <span
-                  aria-label="games"
-                  role="img"
+                Gamepad2
+                <p
+                  marginbottom="0"
                 >
-                  🎲
-                </span>
-                 
-                Games
-              </p>
+                  Games
+                </p>
+              </div>
             </button>
           </a>
           <a
@@ -235,18 +226,17 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             style="text-decoration: none;"
           >
             <button>
-              <p
-                marginbottom="0"
+              <div
+                alignitems="center"
+                gap="$2"
               >
-                <span
-                  aria-label="info"
-                  role="img"
+                Info
+                <p
+                  marginbottom="0"
                 >
-                  ℹ️
-                </span>
-                 
-                About
-              </p>
+                  About
+                </p>
+              </div>
             </button>
           </a>
           <a
@@ -254,18 +244,17 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             style="text-decoration: none;"
           >
             <button>
-              <p
-                marginbottom="0"
+              <div
+                alignitems="center"
+                gap="$2"
               >
-                <span
-                  aria-label="help"
-                  role="img"
+                HelpCircle
+                <p
+                  marginbottom="0"
                 >
-                  🆘
-                </span>
-                 
-                Help
-              </p>
+                  Help
+                </p>
+              </div>
             </button>
           </a>
         </div>
@@ -281,12 +270,7 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
             aria-expanded="false"
             aria-label="Open menu"
           >
-            <p
-              font-size="22"
-              lineheight="24"
-            >
-              ☰
-            </p>
+            Menu
           </button>
         </div>
       </div>
@@ -369,18 +353,17 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             style="text-decoration: none;"
           >
             <button>
-              <p
-                marginbottom="0"
+              <div
+                alignitems="center"
+                gap="$2"
               >
-                <span
-                  aria-label="games"
-                  role="img"
+                Gamepad2
+                <p
+                  marginbottom="0"
                 >
-                  🎲
-                </span>
-                 
-                Games
-              </p>
+                  Games
+                </p>
+              </div>
             </button>
           </a>
           <a
@@ -388,18 +371,17 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             style="text-decoration: none;"
           >
             <button>
-              <p
-                marginbottom="0"
+              <div
+                alignitems="center"
+                gap="$2"
               >
-                <span
-                  aria-label="info"
-                  role="img"
+                Info
+                <p
+                  marginbottom="0"
                 >
-                  ℹ️
-                </span>
-                 
-                About
-              </p>
+                  About
+                </p>
+              </div>
             </button>
           </a>
           <a
@@ -407,18 +389,17 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             style="text-decoration: none;"
           >
             <button>
-              <p
-                marginbottom="0"
+              <div
+                alignitems="center"
+                gap="$2"
               >
-                <span
-                  aria-label="help"
-                  role="img"
+                HelpCircle
+                <p
+                  marginbottom="0"
                 >
-                  🆘
-                </span>
-                 
-                Help
-              </p>
+                  Help
+                </p>
+              </div>
             </button>
           </a>
         </div>
@@ -434,12 +415,7 @@ exports[`App Navigation should render navigation with correct links 1`] = `
             aria-expanded="false"
             aria-label="Open menu"
           >
-            <p
-              font-size="22"
-              lineheight="24"
-            >
-              ☰
-            </p>
+            Menu
           </button>
         </div>
       </div>

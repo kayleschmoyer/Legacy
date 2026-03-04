@@ -8,6 +8,14 @@ import {
 } from '@legacy-sports/shared-components';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
+import {
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  Circle,
+  Globe,
+  Trophy,
+} from '@tamagui/lucide-icons';
 import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 
 const DropdownButton = styled(Button, {
@@ -156,15 +164,13 @@ export const SportsDropdown: React.FC = () => {
         aria-expanded={isOpen}
         aria-controls={menuId}
       >
-        <Text>
-          <span role="img" aria-label="trophy">
-            🏆
-          </span>
-        </Text>
+        <Trophy size={15} />
         <Text>Sports</Text>
-        <Text fontSize={10} color="$colorPress">
-          {isOpen ? '▲' : '▼'}
-        </Text>
+        {isOpen ? (
+          <ChevronUp size={14} color="$colorPress" />
+        ) : (
+          <ChevronDown size={14} color="$colorPress" />
+        )}
       </DropdownButton>
 
       {isOpen && (
@@ -186,11 +192,7 @@ export const SportsDropdown: React.FC = () => {
             >
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
-                  <Paragraph fontSize={18} lineHeight={20}>
-                    <span role="img" aria-label="football">
-                      🏈
-                    </span>
-                  </Paragraph>
+                  <Activity size={20} color="$color" />
                 </MenuIconBox>
                 <YStack flex={1} gap="$1">
                   <Paragraph size="$4" color="$color" fontWeight="500">
@@ -220,11 +222,7 @@ export const SportsDropdown: React.FC = () => {
             >
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
-                  <Paragraph fontSize={18} lineHeight={20}>
-                    <span role="img" aria-label="baseball">
-                      ⚾
-                    </span>
-                  </Paragraph>
+                  <Circle size={20} color="$color" />
                 </MenuIconBox>
                 <YStack flex={1} gap="$1">
                   <Paragraph size="$4" color="$color" fontWeight="500">
@@ -254,11 +252,7 @@ export const SportsDropdown: React.FC = () => {
             >
               <XStack alignItems="center" gap="$3" flex={1}>
                 <MenuIconBox>
-                  <Paragraph fontSize={18} lineHeight={20}>
-                    <span role="img" aria-label="globe">
-                      🌐
-                    </span>
-                  </Paragraph>
+                  <Globe size={20} color="$color" />
                 </MenuIconBox>
                 <YStack flex={1} gap="$1">
                   <Paragraph size="$4" color="$color" fontWeight="500">

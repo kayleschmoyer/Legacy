@@ -52,6 +52,17 @@ export const Play = () => 'Play';
 export const TrendingUp = () => 'TrendingUp';
 export const Zap = () => 'Zap';
 
+// Icons added for header menu modernization (LS-503)
+export const Activity = () => 'Activity';
+export const BarChart2 = () => 'BarChart2';
+export const Circle = () => 'Circle';
+export const Gamepad2 = () => 'Gamepad2';
+export const HelpCircle = () => 'HelpCircle';
+export const LogOut = () => 'LogOut';
+export const Settings2 = () => 'Settings2';
+export const Shield = () => 'Shield';
+export const User = () => 'User';
+
 // Default export for any other icons
 const mockIcon = () => 'MockIcon';
 export default mockIcon;
