@@ -264,30 +264,70 @@ async function loadAllPlayersWithPositions(
     });
   }
 
-  // Handle players not found in career_fielding (no fielding/pitching stats)
-  for (const playerId of playerIds) {
-    if (!playerMap.has(playerId)) {
-      playersWithFallbackData++;
+  // Handle players not found in career_fielding — they may still be pure pitchers
+  // who never accumulated fielding records. Query career_pitching before falling
+  // back to DH so that pitchers are not incorrectly drafted into batting slots.
+  const missingPlayerIds = playerIds.filter((id) => !playerMap.has(id));
 
-      // Assign default flexible positions for players with no stats
+  if (missingPlayerIds.length > 0) {
+    const pitcherRows = await db
+      .select({
+        playerId: PublicSchema.careerPitching.playerId,
+        pitchingGames: PublicSchema.careerPitching.g,
+        pitchingGamesStarted: PublicSchema.careerPitching.gs,
+      })
+      .from(PublicSchema.careerPitching)
+      .where(inArray(PublicSchema.careerPitching.playerId, missingPlayerIds));
+
+    const pitcherLookup = new Map(pitcherRows.map((r) => [r.playerId, r]));
+
+    for (const playerId of missingPlayerIds) {
+      playersWithFallbackData++;
+      const pitcherRecord = pitcherLookup.get(playerId);
+
+      let eligiblePositions: string[];
+      let isPitcher: boolean;
+
+      if (pitcherRecord && (pitcherRecord.pitchingGames ?? 0) > 10) {
+        // Pure pitcher — never had a fielding record but has pitching stats
+        if ((pitcherRecord.pitchingGamesStarted ?? 0) > 10) {
+          eligiblePositions = ['SP'];
+        } else {
+          eligiblePositions = ['RP'];
+        }
+        isPitcher = true;
+        addBreadcrumb(
+          'Pure pitcher (no fielding record) assigned pitching position',
+          {
+            playerId,
+            pitchingGames: pitcherRecord.pitchingGames,
+            pitchingGamesStarted: pitcherRecord.pitchingGamesStarted ?? 0,
+            assignedPositions: eligiblePositions,
+          },
+        );
+      } else {
+        // Truly no usable stats — assign the most flexible slot as a last resort
+        eligiblePositions = ['DH'];
+        isPitcher = false;
+        addBreadcrumb(
+          'Player not found in career stats, assigned default position',
+          {
+            playerId,
+            assignedPositions: ['DH'],
+          },
+        );
+      }
+
       playerMap.set(playerId, {
         id: playerId,
         firstName: '',
         lastName: '',
         brefId: '',
-        statsLastFetchedAt: null, // Will be filled from main player query
-        eligiblePositions: ['DH'], // Most flexible position
-        isPitcher: false,
+        statsLastFetchedAt: null,
+        eligiblePositions,
+        isPitcher,
         positionDetails: {},
       });
-
-      addBreadcrumb(
-        'Player not found in career stats, assigned default position',
-        {
-          playerId,
-          assignedPositions: ['DH'],
-        },
-      );
     }
   }
 
