@@ -28,6 +28,7 @@ import { and, count, eq, lte, sql } from 'drizzle-orm';
 import {
   ALLOWED_POSITIONS_FOR_AUTO_PICK,
   commitDraftPick,
+  enableAutoPickForUnmanagedTeams,
   getCurrentDraftPickInfo,
   getFirstQueuedPlayerForTeam,
   getUnfilledPositionTypes,
@@ -1064,6 +1065,21 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
 
             // Randomize draft order
             const shuffled = shuffleArray(teams);
+
+            // LS-545 / LS-480: Enable auto-pick for teams without a general manager
+            const autoPickTeamIds = await enableAutoPickForUnmanagedTeams(
+              context.db,
+              leagueId,
+              draftId,
+              shuffled.map((t) => t.id),
+            );
+
+            if (autoPickTeamIds.length > 0) {
+              LOGGER.info(
+                '[autoStartScheduledDrafts] Auto-pick enabled for unmanaged teams',
+                { leagueId, draftId, teamIds: autoPickTeamIds },
+              );
+            }
 
             const startedAt = new Date();
             const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;

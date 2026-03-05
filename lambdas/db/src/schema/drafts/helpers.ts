@@ -8,7 +8,7 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { ALLOWED_POSITIONS } from '@legacy-sports/utils';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 
 // â”€â”€ commitDraftPick types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -393,4 +393,59 @@ export async function getFirstQueuedPlayerForTeam(
   }
 
   return null;
+}
+
+// ── enableAutoPickForUnmanagedTeams ──────────────────────────────────────────
+
+/**
+ * LS-480 / LS-545: Enable auto-pick for any draft_teams rows whose associated
+ * league_member has no user (unmanaged / bot teams).
+ *
+ * Must be called **after** draft_teams rows have been inserted for the draft.
+ *
+ * Shared by `initializeDraft` (initialize-draft.ts) and
+ * `autoStartScheduledDrafts` (scheduled-mutations.ts) so neither path can
+ * accidentally omit the auto-pick wiring.
+ *
+ * @returns The list of teamIds for which auto-pick was enabled.
+ */
+export async function enableAutoPickForUnmanagedTeams(
+  db: PublicDb,
+  leagueId: number,
+  draftId: number,
+  teamIds: number[],
+): Promise<number[]> {
+  if (teamIds.length === 0) return [];
+
+  // Find team IDs that already have a general-manager member with a real user
+  const teamsWithGM = await db
+    .select({ teamId: PublicSchema.leagueMembers.teamId })
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
+        eq(PublicSchema.leagueMembers.permissionLevel, 'general_manager'),
+        isNotNull(PublicSchema.leagueMembers.teamId),
+      ),
+    );
+
+  const teamIdsWithGM = new Set(
+    teamsWithGM.map((m) => m.teamId).filter((id): id is number => id !== null),
+  );
+
+  const teamIdsWithoutGM = teamIds.filter((id) => !teamIdsWithGM.has(id));
+
+  if (teamIdsWithoutGM.length > 0) {
+    await db
+      .update(PublicSchema.draftTeams)
+      .set({ autoPick: true })
+      .where(
+        and(
+          eq(PublicSchema.draftTeams.draftId, draftId),
+          inArray(PublicSchema.draftTeams.teamId, teamIdsWithoutGM),
+        ),
+      );
+  }
+
+  return teamIdsWithoutGM;
 }

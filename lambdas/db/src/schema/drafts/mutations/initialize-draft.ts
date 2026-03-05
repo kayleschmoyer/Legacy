@@ -9,9 +9,10 @@ import {
 } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { shuffleArray } from '@legacy-sports/utils';
-import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 
 import { Draft } from '../types';
+import { enableAutoPickForUnmanagedTeams } from '../helpers';
 import { builder } from '../../builder';
 import { AuthenticationError, ForbiddenError } from '../../graphql-errors';
 
@@ -149,7 +150,7 @@ builder.mutationField('initializeDraft', (t) =>
           | {
               draft: typeof PublicSchema.drafts.$inferSelect;
               mode: 'live';
-              teamIdsWithoutGM: number[];
+              autoPickTeamIds: number[];
               pickTimeLimit: number;
               initialDeadline: Date;
             }
@@ -219,42 +220,13 @@ builder.mutationField('initializeDraft', (t) =>
               .set({ draftStatus: 'in-progress' })
               .where(eq(PublicSchema.leagues.id, leagueId));
 
-            // LS-480: Enable auto-pick for any teams without a general manager
-            const teamsWithGM = await tx
-              .select({ teamId: PublicSchema.leagueMembers.teamId })
-              .from(PublicSchema.leagueMembers)
-              .where(
-                and(
-                  eq(PublicSchema.leagueMembers.leagueId, leagueId),
-                  eq(
-                    PublicSchema.leagueMembers.permissionLevel,
-                    'general_manager',
-                  ),
-                  isNotNull(PublicSchema.leagueMembers.teamId),
-                ),
-              );
-
-            const teamIdsWithGM = new Set(
-              teamsWithGM
-                .map((m) => m.teamId)
-                .filter((id): id is number => id !== null),
+            // LS-480 / LS-545: Enable auto-pick for any teams without a general manager
+            const autoPickTeamIds = await enableAutoPickForUnmanagedTeams(
+              tx,
+              leagueId,
+              txDraft.id,
+              shuffled.map((t) => t.id),
             );
-
-            const teamIdsWithoutGM = shuffled
-              .map((t) => t.id)
-              .filter((id) => !teamIdsWithGM.has(id));
-
-            if (teamIdsWithoutGM.length > 0) {
-              await tx
-                .update(PublicSchema.draftTeams)
-                .set({ autoPick: true })
-                .where(
-                  and(
-                    eq(PublicSchema.draftTeams.draftId, txDraft.id),
-                    inArray(PublicSchema.draftTeams.teamId, teamIdsWithoutGM),
-                  ),
-                );
-            }
 
             // Set the initial pick deadline now that draft is live
             const pickTimeLimit = Number(txDraft.pickTimeLimitSeconds) || 120;
@@ -269,7 +241,7 @@ builder.mutationField('initializeDraft', (t) =>
             return {
               draft: txDraft,
               mode: 'live' as const,
-              teamIdsWithoutGM,
+              autoPickTeamIds,
               pickTimeLimit,
               initialDeadline,
             };
@@ -289,15 +261,15 @@ builder.mutationField('initializeDraft', (t) =>
 
         // ── Post-transaction side effects ──────────────────────────
         if (txResult.mode === 'live') {
-          const { teamIdsWithoutGM, pickTimeLimit, initialDeadline } = txResult;
+          const { autoPickTeamIds, pickTimeLimit, initialDeadline } = txResult;
 
-          if (teamIdsWithoutGM.length > 0) {
+          if (autoPickTeamIds.length > 0) {
             LOGGER.info(
               'Auto-pick enabled for teams without general managers',
               {
                 leagueId,
                 draftId: draft.id,
-                teamIds: teamIdsWithoutGM,
+                teamIds: autoPickTeamIds,
               },
             );
           }
