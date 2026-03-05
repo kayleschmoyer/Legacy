@@ -400,6 +400,10 @@ export function LeagueDetailPage(): React.JSX.Element {
   // can read it without adding it to the dependency array.
   const leagueDraftStatusRef = useRef<string | null | undefined>(undefined);
 
+  // Tracks the previous draftStatus so we can detect the actual transition to
+  // 'completed' rather than firing on every mount for post-draft leagues.
+  const prevDraftStatusRef = useRef<string | null | undefined>(undefined);
+
   // ── Effects ──
 
   useEffect(() => {
@@ -674,11 +678,25 @@ export function LeagueDetailPage(): React.JSX.Element {
   // When the draft transitions to 'completed' (via WS event or reconnect
   // catch-up), also refetch team members so newly drafted players appear on the
   // roster tab.
+  //
+  // Guard conditions:
+  // - Only fire on the actual transition (prevStatus was not already 'completed')
+  //   to avoid a spurious refetch on every mount for post-draft leagues.
+  // - Only fire when userTeamId is known so we never call the Lambda with
+  //   teamId=0, which throws "Failed to fetch team members" (LS-531 / LS-536).
   useEffect(() => {
-    if (draftStatus === 'completed') {
+    const prevStatus = prevDraftStatusRef.current;
+    prevDraftStatusRef.current = draftStatus;
+
+    if (
+      draftStatus === 'completed' &&
+      prevStatus !== undefined &&
+      prevStatus !== 'completed' &&
+      userTeamId
+    ) {
       void refetchTeamMembersRef.current?.();
     }
-  }, [draftStatus]);
+  }, [draftStatus, userTeamId]);
 
   const positions = useMemo(
     () =>
