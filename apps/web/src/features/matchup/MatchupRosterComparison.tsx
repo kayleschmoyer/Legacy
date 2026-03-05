@@ -1209,6 +1209,24 @@ export function MatchupRosterComparison({
       ];
 
       const battingParts: string[] = [];
+
+      // Always show batting line (H-AB) for non-pitcher positions
+      const posType = player.positionId
+        ? positionMap.get(player.positionId)
+        : null;
+      const isPitcher = posType === 'SP' || posType === 'RP';
+      if (!isPitcher) {
+        const totalHits = battingGames.reduce((sum, g) => {
+          if (!g.battingGame) return sum;
+          return sum + (g.battingGame.hits ?? 0);
+        }, 0);
+        const totalAB = battingGames.reduce((sum, g) => {
+          if (!g.battingGame) return sum;
+          return sum + (g.battingGame.atBats ?? 0);
+        }, 0);
+        battingParts.push(`${totalHits}-${totalAB}`);
+      }
+
       for (const stat of battingStats) {
         // Check if this stat has a scoring value configured
         const scoringValue = scoringSettings.batting[stat.scoringKey];
