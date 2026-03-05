@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging';
 import type {
   OAuthConfig,
   OAuthResponse,
@@ -118,7 +119,10 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      console.error('AuthService: Secure OAuth authentication failed:', error);
+      LOGGER.error(
+        'AuthService: Secure OAuth authentication failed:',
+        String(error),
+      );
 
       // Enhanced error handling for different failure scenarios
       const authError = this.handleAuthenticationError(error);
@@ -154,7 +158,7 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      console.error('AuthService: Email authentication failed:', error);
+      LOGGER.error('AuthService: Email authentication failed:', String(error));
       throw new Error(
         error instanceof Error ? error.message : 'Email login failed',
       );
@@ -297,7 +301,7 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      console.error('Failed to decode JWT:', error);
+      LOGGER.error('Failed to decode JWT:', String(error));
       throw new Error('Invalid authentication token');
     }
   }
@@ -317,7 +321,7 @@ export class AuthService {
       }
       // Mobile storage would use SecureStorageProvider
     } catch (error) {
-      console.error('Failed to store auth tokens:', error);
+      LOGGER.error('Failed to store auth tokens:', String(error));
       // Don't throw here - authentication was successful, storage is optional
     }
   }
@@ -332,7 +336,7 @@ export class AuthService {
       }
       return null;
     } catch (error) {
-      console.error('Failed to retrieve stored token:', error);
+      LOGGER.error('Failed to retrieve stored token:', String(error));
       return null;
     }
   }
@@ -347,7 +351,7 @@ export class AuthService {
         localStorage.removeItem('auth_refresh_token');
       }
     } catch (error) {
-      console.error('Failed to clear auth tokens:', error);
+      LOGGER.error('Failed to clear auth tokens:', String(error));
     }
   }
 
@@ -362,7 +366,7 @@ export class AuthService {
       // Local JWT validation - check if token is properly formatted and not expired
       return this.isTokenValidLocally(jwt);
     } catch (error) {
-      console.error('Token verification failed:', error);
+      LOGGER.error('Token verification failed:', String(error));
       return false;
     }
   }
@@ -413,7 +417,7 @@ export class AuthService {
       });
 
       if (!response.ok) {
-        console.warn(
+        LOGGER.warn(
           'AuthService: JWT refresh failed with status',
           response.status,
         );
@@ -423,7 +427,7 @@ export class AuthService {
       const result = (await response.json()) as { jwt?: string };
 
       if (!result.jwt) {
-        console.warn('AuthService: JWT refresh endpoint did not return a jwt');
+        LOGGER.warn('AuthService: JWT refresh endpoint did not return a jwt');
         return null;
       }
 
@@ -432,7 +436,7 @@ export class AuthService {
 
       return result.jwt;
     } catch (error) {
-      console.error('AuthService: JWT refresh request failed:', error);
+      LOGGER.error('AuthService: JWT refresh request failed:', String(error));
       return null;
     }
   }
@@ -455,7 +459,7 @@ export class AuthService {
 
       return response.ok;
     } catch (error) {
-      console.error('Remote token verification failed:', error);
+      LOGGER.error('Remote token verification failed:', String(error));
       return false;
     }
   }
@@ -495,7 +499,7 @@ export class AuthService {
       // Token is valid and not expired
       return true;
     } catch (error) {
-      console.error('Failed to validate JWT locally:', error);
+      LOGGER.error('Failed to validate JWT locally:', String(error));
       return false;
     }
   }

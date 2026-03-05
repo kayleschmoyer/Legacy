@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
+import { LOGGER } from '@legacy-sports/logging';
 import { useLeagueWebSocket } from './useLeagueWebSocket';
 import {
   GetLeagueChatMessages,
@@ -88,7 +89,7 @@ export function useLeagueChat(leagueId: number): {
         metadata: parsedMetadata,
       };
     });
-    console.log(`[chat ${_ts()}] history-effect fired`, {
+    LOGGER.info(`[chat ${_ts()}] history-effect fired`, {
       historyCount: historyItems.length,
       historyIds: historyItems.map((m) => m.id),
       idTypes: historyItems.slice(-3).map((m) => `${m.id}(${typeof m.id})`),
@@ -97,7 +98,7 @@ export function useLeagueChat(leagueId: number): {
       const historyIds = new Set(historyItems.map((m) => m.id));
       const wsOnly = prev.filter((m) => !historyIds.has(m.id));
       const next = [...historyItems, ...wsOnly];
-      console.log(`[chat ${_ts()}] history-effect setMessages`, {
+      LOGGER.info(`[chat ${_ts()}] history-effect setMessages`, {
         prevIds: prev.map((m) => m.id),
         wsOnlyIds: wsOnly.map((m) => m.id),
         nextIds: next.map((m) => m.id),
@@ -119,7 +120,7 @@ export function useLeagueChat(leagueId: number): {
     async (text: string, gifUrl?: string) => {
       const trimmed = text.trim();
       if (!trimmed && !gifUrl) return;
-      console.log(`[chat ${_ts()}] sendMessage called`, {
+      LOGGER.info(`[chat ${_ts()}] sendMessage called`, {
         text: trimmed,
         gifUrl,
       });
@@ -152,7 +153,7 @@ export function useLeagueChat(leagueId: number): {
             messageType: raw.messageType ?? 'text',
             metadata: null,
           };
-          console.log(`[chat ${_ts()}] onCompleted`, {
+          LOGGER.info(`[chat ${_ts()}] onCompleted`, {
             msgId: msg.id,
             idType: typeof msg.id,
             rawId: raw.id,
@@ -161,7 +162,7 @@ export function useLeagueChat(leagueId: number): {
           });
           setMessages((prev) => {
             const isDupe = prev.some((m) => m.id === msg.id);
-            console.log(`[chat ${_ts()}] onCompleted setMessages`, {
+            LOGGER.info(`[chat ${_ts()}] onCompleted setMessages`, {
               msgId: msg.id,
               isDupe,
               prevIds: prev.map((m) => m.id),
@@ -171,7 +172,7 @@ export function useLeagueChat(leagueId: number): {
           });
         },
       });
-      console.log(`[chat ${_ts()}] sendMessage await resolved`);
+      LOGGER.info(`[chat ${_ts()}] sendMessage await resolved`);
     },
     [sendMutation, leagueId],
   );
@@ -180,7 +181,7 @@ export function useLeagueChat(leagueId: number): {
   useLeagueWebSocket({
     onLeagueChatMessage: (n) => {
       const numericId = Number(n.messageId);
-      console.log(`[chat ${_ts()}] ws-handler received`, {
+      LOGGER.info(`[chat ${_ts()}] ws-handler received`, {
         messageId: numericId,
         idType: typeof numericId,
         rawMessageId: n.messageId,
@@ -190,7 +191,7 @@ export function useLeagueChat(leagueId: number): {
       });
       setMessages((prev) => {
         const isDupe = prev.some((m) => m.id === numericId);
-        console.log(`[chat ${_ts()}] ws-handler setMessages`, {
+        LOGGER.info(`[chat ${_ts()}] ws-handler setMessages`, {
           messageId: numericId,
           isDupe,
           prevIds: prev.map((m) => m.id),
@@ -216,7 +217,7 @@ export function useLeagueChat(leagueId: number): {
     onReconnect: () => {
       // Refetch history to catch any messages that arrived while the socket
       // was down.
-      console.log(`[chat ${_ts()}] ws reconnected — refetching history`);
+      LOGGER.info(`[chat ${_ts()}] ws reconnected — refetching history`);
       void refetchRef.current();
     },
   });

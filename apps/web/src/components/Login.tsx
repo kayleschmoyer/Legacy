@@ -7,31 +7,32 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import type { UseAuthResult } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 
 interface LocationState {
   from?: { pathname: string };
 }
 
 export function Login() {
-  console.log('Login component - Starting to render');
+  LOGGER.info('Login component - Starting to render');
 
   const { isAuthenticated, isLoading, loginWithOAuth, config }: UseAuthResult =
     useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  console.log('Login component - Auth state:', { isAuthenticated, isLoading });
-  console.log('Login component - Location:', location.pathname);
-  console.log('Login component - OAuth config:', config);
+  LOGGER.info('Login component - Auth state:', { isAuthenticated, isLoading });
+  LOGGER.info('Login component - Location:', location.pathname);
+  LOGGER.info('Login component - OAuth config:', config);
 
   // Get the path the user was trying to visit, or default to home
   const from = (location.state as LocationState)?.from?.pathname || '/';
 
   // Listen for authentication state changes and redirect accordingly
   useEffect(() => {
-    console.log('Auth state changed:', { isAuthenticated, isLoading });
+    LOGGER.info('Auth state changed:', { isAuthenticated, isLoading });
     if (isAuthenticated && !isLoading) {
-      console.log('Navigating to:', from);
+      LOGGER.info('Navigating to:', from);
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, isLoading, navigate, from]);
@@ -67,34 +68,34 @@ export function Login() {
         config={config}
         loginWithOAuth={async (oauthResponse) => {
           try {
-            console.log(
+            LOGGER.info(
               'Calling AuthProvider loginWithOAuth with:',
               oauthResponse,
             );
             await loginWithOAuth(oauthResponse);
-            console.log('AuthProvider login completed successfully');
-            console.log('Auth state after loginWithOAuth:', {
+            LOGGER.info('AuthProvider login completed successfully');
+            LOGGER.info('Auth state after loginWithOAuth:', {
               isAuthenticated,
               isLoading,
             });
           } catch (error) {
-            console.error('AuthProvider loginWithOAuth failed:', error);
+            LOGGER.error('AuthProvider loginWithOAuth failed:', String(error));
             throw error;
           }
         }}
         onSuccess={(user) => {
-          console.log('Login successful:', user);
-          console.log('Current auth state:', { isAuthenticated, isLoading });
-          console.log('Forcing navigation to:', from);
+          LOGGER.info('Login successful:', user);
+          LOGGER.info('Current auth state:', { isAuthenticated, isLoading });
+          LOGGER.info('Forcing navigation to:', from);
           // Navigate immediately since we have a successful login
           // Use setTimeout to ensure any state updates have time to process
           setTimeout(() => {
-            console.log('Executing navigation...');
+            LOGGER.info('Executing navigation...');
             navigate(from, { replace: true });
           }, 50);
         }}
         onError={(error) => {
-          console.error('Login failed:', error);
+          LOGGER.error('Login failed:', error);
         }}
         appName="Legacy Sports"
         useWideLayout={true}

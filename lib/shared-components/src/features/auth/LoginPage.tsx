@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   Button,
   Card,
@@ -116,7 +117,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         // Start entrance animation with simple visibility
         setTimeout(() => setIsVisible(true), 100);
       } catch (error) {
-        console.error('Failed to configure OAuth:', error);
+        LOGGER.error('Failed to configure OAuth:', String(error));
         setErrorMessage('Failed to initialize authentication');
         onError?.(
           error instanceof Error ? error : new Error('Configuration failed'),
@@ -148,7 +149,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           onSuccess(user);
         }
       } catch (error) {
-        console.error('One Tap authentication failed:', error);
+        LOGGER.error('One Tap authentication failed:', String(error));
         const errorMsg =
           error instanceof Error
             ? error.message
@@ -163,7 +164,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     const handleOneTapError = (event: Event) => {
       const customEvent = event as CustomEvent<OneTapErrorEventDetail>;
       // Don't show error for One Tap failures - user can still use manual button
-      console.error('One Tap authentication error:', customEvent.detail);
+      LOGGER.error('One Tap authentication error:', customEvent.detail);
     };
 
     // Create wrapper functions for event listeners to handle async properly
@@ -207,7 +208,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         onSuccess(user);
       }
     } catch (error) {
-      console.error('Google login failed:', error);
+      LOGGER.error('Google login failed:', String(error));
       const errorMsg =
         error instanceof Error ? error.message : 'Google login failed';
       setErrorMessage(errorMsg);

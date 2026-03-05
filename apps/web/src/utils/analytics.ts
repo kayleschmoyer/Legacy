@@ -5,6 +5,7 @@
  * for tracking page views and custom events throughout the application.
  */
 
+import { LOGGER } from '@legacy-sports/logging';
 import { getEnvironmentConfig } from '../config/environment';
 
 declare global {
@@ -35,7 +36,7 @@ export function initializeAnalytics(): void {
 
   // Only initialize in production with valid measurement ID
   if (!measurementId || env.isDev) {
-    console.log('[Analytics] Skipped initialization (dev mode or no ID)');
+    LOGGER.info('[Analytics] Skipped initialization (dev mode or no ID)');
     return;
   }
 
@@ -58,7 +59,7 @@ export function initializeAnalytics(): void {
     cookie_flags: 'SameSite=None;Secure',
   });
 
-  console.log('[Analytics] Google Analytics initialized:', measurementId);
+  LOGGER.info('[Analytics] Google Analytics initialized:', measurementId);
 }
 
 /**
@@ -78,7 +79,7 @@ export function trackPageView(path: string, title?: string): void {
     page_title: title || document.title,
   });
 
-  console.log('[Analytics] Page view tracked:', path);
+  LOGGER.info('[Analytics] Page view tracked:', path);
 }
 
 /**
@@ -95,7 +96,7 @@ export function trackEvent(eventName: string, params?: AnalyticsEvent): void {
 
   window.gtag('event', eventName, params);
 
-  console.log('[Analytics] Event tracked:', eventName, params);
+  LOGGER.info('[Analytics] Event tracked:', eventName, params);
 }
 
 /**
@@ -179,7 +180,7 @@ export function setUserId(userId: string | number): void {
     user_id: String(userId),
   });
 
-  console.log('[Analytics] User ID set:', userId);
+  LOGGER.info('[Analytics] User ID set:', userId);
 }
 
 /**
@@ -212,7 +213,7 @@ export function setUserProperties(properties: {
     setUserId(properties.userId);
   }
 
-  console.log('[Analytics] User properties set:', properties);
+  LOGGER.info('[Analytics] User properties set:', properties);
 }
 
 // =============================================================================

@@ -19,6 +19,7 @@ import {
 import type { NavigationRoute } from '@legacy-sports/shared-components';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 import { DbClientContext } from '../common/ApolloClientContext';
 import { ThemeProvider, useThemeContext } from '../context/ThemeContext';
 
@@ -31,7 +32,7 @@ if (sentryConfig) {
 // Create a wrapper for HomeScreen that provides required props
 function MobileHomeScreen() {
   const handleSportPress = (sportKey: string) => {
-    console.log('Mobile app - Sport selected:', sportKey);
+    LOGGER.info('Mobile app - Sport selected:', sportKey);
     // In a real app, this would navigate to the sport-specific screen
   };
 
@@ -105,10 +106,10 @@ function InnerLayout(): React.JSX.Element {
         loginSubtitle="Sign in to access your fantasy leagues and stats"
         testMode={__DEV__} // Enable test mode in development
         onLoginSuccess={() => {
-          console.log('Mobile app login successful!');
+          LOGGER.info('Mobile app login successful!');
         }}
         onLoginFailure={(error) => {
-          console.error('Mobile app login failed:', error);
+          LOGGER.error('Mobile app login failed:', error);
           captureError(new Error(error), { context: 'mobile-app-login' });
         }}
       >

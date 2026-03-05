@@ -9,16 +9,8 @@ import {
   Routes,
   useLocation,
 } from 'react-router-dom';
+import { LOGGER } from '@legacy-sports/logging';
 import { Platform } from '../platform-components';
-// Simple logger fallback for TamaguiAppNavigator
-const LOGGER = {
-  debug: (message: string, ...args: unknown[]) =>
-    console.debug(message, ...args),
-  info: (message: string, ...args: unknown[]) => console.info(message, ...args),
-  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
-  error: (message: string, ...args: unknown[]) =>
-    console.error(message, ...args),
-};
 
 export interface NavigationRoute {
   name: string;
@@ -117,7 +109,7 @@ function NativeNavigator({
       </NavigationContainer>
     );
   } catch (error) {
-    LOGGER.warn('React Navigation not available:', error);
+    LOGGER.warn('React Navigation not available:', String(error));
 
     if (FallbackComponent) {
       return <FallbackComponent />;
@@ -218,7 +210,7 @@ function WebNavigator({ routes }: { routes: NavigationRoute[] }) {
       </BrowserRouter>
     );
   } catch (error) {
-    LOGGER.warn('React Router not available:', error);
+    LOGGER.warn('React Router not available:', String(error));
 
     // Fallback: render first available route
     const FirstRoute = routes[0]?.component;

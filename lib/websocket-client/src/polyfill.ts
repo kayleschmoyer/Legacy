@@ -5,6 +5,8 @@
  * In Node.js, we need to use the 'ws' package.
  */
 
+import { LOGGER } from '@legacy-sports/logging';
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Check if we're in a Node.js environment (no window object)
@@ -18,9 +20,8 @@ if (isNode && typeof globalThis.WebSocket === 'undefined') {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
     (globalThis as any).WebSocket = WebSocketImpl;
   } catch {
-    console.warn(
-      'ws package not found. WebSocketClient requires the "ws" package in Node.js environments.',
-      'Install it with: pnpm add ws',
+    LOGGER.warn(
+      'ws package not found. WebSocketClient requires the "ws" package in Node.js environments. Install it with: pnpm add ws',
     );
   }
 }

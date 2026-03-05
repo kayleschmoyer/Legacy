@@ -3,12 +3,7 @@
  * Uses Expo SecureStore for hardware-backed security on mobile platforms
  */
 
-// Simple logger fallback for SecureStorage
-const LOGGER = {
-  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
-  error: (message: string, ...args: unknown[]) =>
-    console.error(message, ...args),
-};
+import { LOGGER } from '@legacy-sports/logging';
 
 export interface SecureStorageOptions {
   requireAuthentication?: boolean;
@@ -60,21 +55,19 @@ export class SecureStorage implements ISecureStorage {
         secureStore
           .setItemAsync(key, value)
           .then(() => {
-            console.debug(`Stored item in SecureStore: ${key}`);
+            LOGGER.debug(`Stored item in SecureStore: ${key}`);
             resolve();
           })
           .catch((error) => {
-            console.warn(
+            LOGGER.warn(
               `Failed to store in SecureStore, using memory fallback: ${key}`,
-              error,
+              String(error),
             );
             // Value is already in memory storage, so we can continue
             resolve();
           });
       } else {
-        console.debug(
-          `Stored item in memory (SecureStore unavailable): ${key}`,
-        );
+        LOGGER.debug(`Stored item in memory (SecureStore unavailable): ${key}`);
         resolve();
       }
     });
@@ -93,26 +86,26 @@ export class SecureStorage implements ISecureStorage {
             if (value !== null) {
               // Update memory cache with retrieved value
               this._memoryStorage[key] = value;
-              console.debug(`Retrieved item from SecureStore: ${key}`);
+              LOGGER.debug(`Retrieved item from SecureStore: ${key}`);
               resolve(value);
             } else {
               // Fall back to memory storage
               const memoryValue = this._memoryStorage[key] ?? null;
               if (memoryValue !== null) {
-                console.debug(`Retrieved item from memory storage: ${key}`);
+                LOGGER.debug(`Retrieved item from memory storage: ${key}`);
               }
               resolve(memoryValue);
             }
           })
           .catch((error) => {
-            console.warn(
+            LOGGER.warn(
               `Failed to retrieve from SecureStore, falling back to memory: ${key}`,
-              error,
+              String(error),
             );
             // Fall back to memory storage
             const memoryValue = this._memoryStorage[key] ?? null;
             if (memoryValue !== null) {
-              console.debug(`Retrieved item from memory storage: ${key}`);
+              LOGGER.debug(`Retrieved item from memory storage: ${key}`);
             }
             resolve(memoryValue);
           });
@@ -120,7 +113,7 @@ export class SecureStorage implements ISecureStorage {
         // Fall back to memory storage
         const memoryValue = this._memoryStorage[key] ?? null;
         if (memoryValue !== null) {
-          console.debug(`Retrieved item from memory storage: ${key}`);
+          LOGGER.debug(`Retrieved item from memory storage: ${key}`);
         }
         resolve(memoryValue);
       }
@@ -140,16 +133,19 @@ export class SecureStorage implements ISecureStorage {
         secureStore
           .deleteItemAsync(key)
           .then(() => {
-            console.debug(`Removed item from SecureStore: ${key}`);
+            LOGGER.debug(`Removed item from SecureStore: ${key}`);
             resolve();
           })
           .catch((error) => {
-            console.warn(`Failed to remove from SecureStore: ${key}`, error);
+            LOGGER.warn(
+              `Failed to remove from SecureStore: ${key}`,
+              String(error),
+            );
             // Item is already removed from memory, so we can continue
             resolve();
           });
       } else {
-        console.debug(
+        LOGGER.debug(
           `Removed item from memory (SecureStore unavailable): ${key}`,
         );
         resolve();
@@ -169,14 +165,14 @@ export class SecureStorage implements ISecureStorage {
 
         // For SecureStore, we can only clear keys we know about
         // This is a limitation of Expo SecureStore API
-        console.warn(
+        LOGGER.warn(
           'SecureStore clear() has limited functionality - only clears tracked keys',
         );
 
         // Could implement key tracking if needed, but for now just clear memory fallback
         resolve();
       } catch (error) {
-        console.error('Error clearing secure storage:', error);
+        LOGGER.error('Error clearing secure storage:', error as Error);
         reject(error instanceof Error ? error : new Error(String(error)));
       }
     });

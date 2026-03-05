@@ -27,6 +27,7 @@ import {
   type PlayerGameStats,
   type ScoringSettings,
 } from '@legacy-sports/scoring';
+import { LOGGER } from '@legacy-sports/logging';
 
 export interface CalculateMatchupScoresEvent {
   matchupId: number;
@@ -70,7 +71,7 @@ export async function handler(
       );
     });
   } catch (error) {
-    console.error('Error calculating matchup scores:', error);
+    LOGGER.error(`Error calculating matchup scores: ${String(error)}`);
     return {
       matchupId,
       team1Score: null,
@@ -256,9 +257,8 @@ export async function batchCalculateMatchupScores(
       });
       results.push(result);
     } catch (error) {
-      console.error(
-        `Error calculating scores for matchup ${matchupId}:`,
-        error,
+      LOGGER.error(
+        `Error calculating scores for matchup ${matchupId}: ${String(error)}`,
       );
       results.push({
         matchupId,

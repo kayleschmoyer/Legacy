@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Card, XStack, YStack } from '@legacy-sports/shared-components';
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   useJoinLeagueByCodeMutation,
   useValidateInviteCodeLazyQuery,
@@ -79,7 +80,7 @@ export function JoinLeagueByCode(): React.JSX.Element {
       }
     } catch (err) {
       setError((err as Error).message || 'Failed to join league');
-      console.error('Error joining league:', err);
+      LOGGER.error('Error joining league:', String(err));
     }
   };
 

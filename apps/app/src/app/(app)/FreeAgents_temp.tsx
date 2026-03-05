@@ -19,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { Button, ScrollView, Text, XStack, YStack } from 'tamagui';
+import { LOGGER } from '@legacy-sports/logging';
 import { Filter } from './DraftBoardPage';
 
 // Configuration
@@ -550,7 +551,7 @@ const FreeAgents: React.FC = () => {
   }, []);
 
   const handleSubmitClaim = useCallback((claim: WaiverClaim) => {
-    console.log('Waiver claim submitted:', claim);
+    LOGGER.info('Waiver claim submitted:', claim);
     // TODO(LS-336): Submit to backend
   }, []);
 

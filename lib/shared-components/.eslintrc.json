@@ -58,6 +58,12 @@
         "prefer-const": "error",
         "no-inner-declarations": "error"
       }
+    },
+    {
+      "files": ["codegen.ts", ".storybook/**/*.ts"],
+      "rules": {
+        "no-console": "off"
+      }
     }
   ]
 }

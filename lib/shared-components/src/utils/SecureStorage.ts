@@ -1,3 +1,5 @@
+import { LOGGER } from '@legacy-sports/logging';
+
 /**
  * Web SecureStorage implementation
  * Uses sessionStorage for secure data storage on web platforms
@@ -35,11 +37,11 @@ export class SecureStorage implements ISecureStorage {
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.setItem(key, value);
       } else {
-        console.warn('sessionStorage not available on web platform');
+        LOGGER.warn('sessionStorage not available on web platform');
       }
       return Promise.resolve();
     } catch (error) {
-      console.error(`Error storing secure item ${key}:`, error);
+      LOGGER.error(`Error storing secure item ${key}:`, error as Error);
       return Promise.reject(
         error instanceof Error ? error : new Error(String(error)),
       );
@@ -54,11 +56,11 @@ export class SecureStorage implements ISecureStorage {
       if (typeof sessionStorage !== 'undefined') {
         return Promise.resolve(sessionStorage.getItem(key));
       } else {
-        console.warn('sessionStorage not available on web platform');
+        LOGGER.warn('sessionStorage not available on web platform');
         return Promise.resolve(null);
       }
     } catch (error) {
-      console.error(`Error retrieving secure item ${key}:`, error);
+      LOGGER.error(`Error retrieving secure item ${key}:`, error as Error);
       return Promise.reject(
         error instanceof Error ? error : new Error(String(error)),
       );
@@ -73,11 +75,11 @@ export class SecureStorage implements ISecureStorage {
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.removeItem(key);
       } else {
-        console.warn('sessionStorage not available on web platform');
+        LOGGER.warn('sessionStorage not available on web platform');
       }
       return Promise.resolve();
     } catch (error) {
-      console.error(`Error removing secure item ${key}:`, error);
+      LOGGER.error(`Error removing secure item ${key}:`, error as Error);
       return Promise.reject(
         error instanceof Error ? error : new Error(String(error)),
       );
@@ -92,11 +94,11 @@ export class SecureStorage implements ISecureStorage {
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.clear();
       } else {
-        console.warn('sessionStorage not available on web platform');
+        LOGGER.warn('sessionStorage not available on web platform');
       }
       return Promise.resolve();
     } catch (error) {
-      console.error('Error clearing secure storage:', error);
+      LOGGER.error('Error clearing secure storage:', error as Error);
       return Promise.reject(
         error instanceof Error ? error : new Error(String(error)),
       );
@@ -111,11 +113,11 @@ export class SecureStorage implements ISecureStorage {
       if (typeof sessionStorage !== 'undefined') {
         return Promise.resolve(sessionStorage.getItem(key) !== null);
       } else {
-        console.warn('sessionStorage not available on web platform');
+        LOGGER.warn('sessionStorage not available on web platform');
         return Promise.resolve(false);
       }
     } catch (error) {
-      console.error(`Error checking secure item ${key}:`, error);
+      LOGGER.error(`Error checking secure item ${key}:`, error as Error);
       return Promise.resolve(false);
     }
   }

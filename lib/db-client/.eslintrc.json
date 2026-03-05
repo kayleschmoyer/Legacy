@@ -19,8 +19,20 @@
       }
     },
     {
+      "files": [
+        "src/cli/**/*.ts",
+        "src/scripts/**/*.ts",
+        "check-constraints.ts",
+        "test-drizzle-version.ts"
+      ],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
       "files": ["migrations/**/*.ts"],
       "rules": {
+        "no-console": "off",
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-unsafe-assignment": "off",
         "@typescript-eslint/no-unsafe-member-access": "off",

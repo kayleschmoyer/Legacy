@@ -3,6 +3,7 @@
  * These help bridge the gap between untyped database results and TypeScript types
  */
 
+import { LOGGER } from '@legacy-sports/logging';
 import {
   CareerBatting,
   CareerPitching,
@@ -98,7 +99,7 @@ export function validateQueryResults<T>(
   }
 
   if (invalidResults.length > 0) {
-    console.warn(
+    LOGGER.warn(
       `Warning: ${invalidResults.length} invalid results in ${context}`,
       {
         invalidResults: invalidResults.slice(0, 3), // Log first 3 for debugging
@@ -143,7 +144,7 @@ export function safeExtractResults<T>(
 
     return validateQueryResults(rows, validator, context);
   } catch (error) {
-    console.error(`Error extracting ${context} results:`, error);
+    LOGGER.error(`Error extracting ${context} results: ${String(error)}`);
     return [];
   }
 }

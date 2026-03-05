@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging';
 import {
   OAuthConfig,
   OAuthErrorCode,
@@ -219,7 +220,7 @@ export class WebOAuthProvider implements OAuthProvider {
               );
             })
             .catch((error: unknown) => {
-              console.error('One Tap authentication failed:', error);
+              LOGGER.error('One Tap authentication failed:', String(error));
               window.dispatchEvent(
                 new CustomEvent('gsi-one-tap-error', {
                   detail: { error },
@@ -253,14 +254,14 @@ export class WebOAuthProvider implements OAuthProvider {
             momentType === 'dismissed_moment_fedcm_continue_on' ||
             momentType === 'dismissed_moment_fedcm_disabled'
           ) {
-            console.warn('One Tap dismissed:', momentType);
+            LOGGER.warn('One Tap dismissed:', momentType);
           }
         },
       );
 
       this.oneTapInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize One Tap:', error);
+      LOGGER.error('Failed to initialize One Tap:', String(error));
       // Don't throw - fall back to authorization code flow
     }
   }
@@ -358,7 +359,7 @@ export class WebOAuthProvider implements OAuthProvider {
       try {
         window.google.accounts.id.cancel();
       } catch (error) {
-        console.warn('Error canceling One Tap:', error);
+        LOGGER.warn('Error canceling One Tap:', String(error));
       }
     }
     return Promise.resolve();

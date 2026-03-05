@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -260,7 +261,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
   // Log draft errors (debug logging removed for production)
   useEffect(() => {
-    if (draftError) console.error('[Draft] getLeagueDraft error:', draftError);
+    if (draftError) LOGGER.error('[Draft] getLeagueDraft error:', draftError);
   }, [draftError]);
 
   // Mark draft complete when server data indicates it

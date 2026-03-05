@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Paragraph, useAuth, YStack } from '@legacy-sports/shared-components';
 import type { UseAuthResult } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,7 +16,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading }: UseAuthResult = useAuth();
   const location = useLocation();
 
-  console.log('ProtectedRoute - Auth state:', {
+  LOGGER.info('ProtectedRoute - Auth state:', {
     isAuthenticated,
     isLoading,
     currentPath: location.pathname,
@@ -23,7 +24,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // Show loading state while checking authentication
   if (isLoading) {
-    console.log('ProtectedRoute - Showing loading state');
+    LOGGER.info('ProtectedRoute - Showing loading state');
     return (
       <YStack
         minHeight="100vh"
@@ -39,17 +40,17 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    console.log(
+    LOGGER.info(
       'ProtectedRoute - User not authenticated, redirecting to login',
     );
-    console.log(
+    LOGGER.info(
       'ProtectedRoute - Navigate component should redirect to /login',
     );
     // Save the current location to redirect back after login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  console.log(
+  LOGGER.info(
     'ProtectedRoute - User authenticated, rendering protected content',
   );
   // User is authenticated, render the protected content

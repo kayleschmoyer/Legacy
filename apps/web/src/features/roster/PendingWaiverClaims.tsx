@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components';
 import { Card, Separator, Spinner, Text } from 'tamagui';
 import { AlertTriangle, Clock, Trash2, X } from '@tamagui/lucide-icons';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   useCancelWaiverClaimMutation,
   useGetTeamWaiverClaimsQuery,
@@ -39,7 +40,7 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
         await refetch();
       } catch (err) {
         // Error is displayed via Apollo error state
-        console.error('Failed to cancel waiver claim:', err);
+        LOGGER.error('Failed to cancel waiver claim:', String(err));
       } finally {
         setCancellingId(null);
       }

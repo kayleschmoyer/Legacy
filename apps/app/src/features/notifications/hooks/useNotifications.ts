@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { useCallback, useEffect, useState } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetNotificationHistoryQuery,
   useGetUnreadNotificationCountQuery,
@@ -91,7 +92,7 @@ export function useNotifications(userId: number) {
           },
         });
       } catch (error) {
-        console.error('Error updating notification preferences:', error);
+        LOGGER.error('Error updating notification preferences:', String(error));
         throw error;
       }
     },
@@ -105,7 +106,7 @@ export function useNotifications(userId: number) {
           variables: { notificationId },
         });
       } catch (error) {
-        console.error('Error marking notification as read:', error);
+        LOGGER.error('Error marking notification as read:', String(error));
         throw error;
       }
     },
@@ -116,7 +117,7 @@ export function useNotifications(userId: number) {
     try {
       await markAllAsReadMutation();
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      LOGGER.error('Error marking all notifications as read:', String(error));
       throw error;
     }
   }, [markAllAsReadMutation]);

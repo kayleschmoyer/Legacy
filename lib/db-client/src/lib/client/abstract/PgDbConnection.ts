@@ -1,5 +1,6 @@
 import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
 import { Pool, PoolClient, PoolConfig } from 'pg';
+import { LOGGER } from '@legacy-sports/logging';
 import { readFileSync } from 'fs';
 import { BaseDbConnection, InitProperties } from './BaseDbClient';
 import { getDatabaseConfig } from '../../../config/database';
@@ -76,17 +77,17 @@ export class PgDbConnection<
 
     // Log connection pool events for monitoring
     pgPool.on('connect', () => {
-      console.log(
+      LOGGER.info(
         `[DB Pool] Connection established. Active: ${pgPool.totalCount}, Idle: ${pgPool.idleCount}, Waiting: ${pgPool.waitingCount}`,
       );
     });
 
     pgPool.on('error', (err) => {
-      console.error('[DB Pool] Unexpected error on idle client', err);
+      LOGGER.error(`[DB Pool] Unexpected error on idle client: ${String(err)}`);
     });
 
     pgPool.on('remove', () => {
-      console.log(
+      LOGGER.info(
         `[DB Pool] Connection removed. Active: ${pgPool.totalCount}, Idle: ${pgPool.idleCount}`,
       );
     });

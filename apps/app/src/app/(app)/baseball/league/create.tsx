@@ -18,6 +18,7 @@ import {
   CreateLeagueMutation,
   useCreateLeagueMutation,
 } from '../../../../api/db/graphql.generated';
+import { LOGGER } from '@legacy-sports/logging';
 
 // Types
 interface CreateLeagueFormData {
@@ -84,7 +85,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       }
     },
     onError: (error: any) => {
-      console.error('Error creating league:', error);
+      LOGGER.error('Error creating league:', String(error));
       Alert.alert('Error', error.message || 'Failed to create league');
     },
   });
@@ -152,7 +153,7 @@ export function LeagueCreatePage(): React.JSX.Element {
         },
       });
     } catch (error) {
-      console.error('Error in handleSubmit:', error);
+      LOGGER.error('Error in handleSubmit:', String(error));
       Alert.alert('Error', 'Failed to create league. Please try again.');
     }
   };

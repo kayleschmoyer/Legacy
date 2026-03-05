@@ -14,6 +14,7 @@ import {
   getEnvVarRequired,
 } from '@legacy-sports/env-utilities';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
+import { LOGGER } from '@legacy-sports/logging';
 
 /**
  * Database connection credentials
@@ -87,9 +88,8 @@ export async function resolveDatabaseCredentials(
     try {
       return await resolveAwsSecretCredentials(secretName, config);
     } catch (error) {
-      console.warn(
-        'Failed to resolve AWS credentials, falling back to environment:',
-        error,
+      LOGGER.warn(
+        `Failed to resolve AWS credentials, falling back to environment: ${String(error)}`,
       );
     }
   }
@@ -105,7 +105,7 @@ async function resolveAwsSecretCredentials(
   secretName: string,
   config: CredentialConfig,
 ): Promise<DatabaseCredentials> {
-  console.log(
+  LOGGER.info(
     `Resolving database credentials from AWS Secrets Manager: ${secretName}`,
   );
 
@@ -145,7 +145,7 @@ async function resolveAwsSecretCredentials(
 function resolveLocalCredentials(
   config: CredentialConfig,
 ): DatabaseCredentials {
-  console.log('Resolving database credentials from environment variables');
+  LOGGER.info('Resolving database credentials from environment variables');
 
   // Parse host and port
   const hostEnv = getEnvVarOptional('DB_HOST') || 'localhost:5432';

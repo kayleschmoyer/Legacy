@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   ActivityIndicator,
   Alert,
@@ -163,7 +164,7 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
         onCreated(gameId);
       }
     } catch (error) {
-      console.error('Failed to create game:', error);
+      LOGGER.error('Failed to create game:', String(error));
       Alert.alert('Error', 'Failed to create game. Please try again.');
     } finally {
       setSubmitting(false);

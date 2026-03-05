@@ -7,6 +7,7 @@ import React, {
   useReducer,
   useRef,
 } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import { AuthService } from '../services/AuthService';
 import type {
   OAuthConfig,
@@ -194,7 +195,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       };
 
     default:
-      console.warn('authReducer - Unknown action type:', action);
+      LOGGER.warn('authReducer - Unknown action type:', action);
       return state;
   }
 };
@@ -385,7 +386,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
           }
         }
       } catch (error) {
-        console.error('Auth initialization failed:', error);
+        LOGGER.error('Auth initialization failed:', String(error));
         authService.clearTokens();
       } finally {
         if (isMounted) {
@@ -439,7 +440,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         const storedToken = authService.getStoredToken();
         if (storedToken) scheduleProactiveRefresh(storedToken);
       } catch (error) {
-        console.error('AuthProvider: loginWithOAuth error:', error);
+        LOGGER.error('AuthProvider: loginWithOAuth error:', String(error));
         const errorMessage =
           error instanceof Error ? error.message : 'OAuth login failed';
         dispatchAuth({ type: 'AUTH_FAILURE', payload: errorMessage });
@@ -460,7 +461,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       dispatchAuth({ type: 'AUTH_LOGOUT' });
       await Promise.resolve(); // Ensure async behavior to match interface
     } catch (error) {
-      console.error('Logout failed:', error);
+      LOGGER.error('Logout failed:', String(error));
     }
   }, [authService, clearRefreshTimer]);
 
@@ -478,19 +479,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     (impersonationToken: string) => {
       const currentToken = authService.getStoredToken();
       if (!currentToken) {
-        console.error('impersonateUser: no current token to save');
+        LOGGER.error('impersonateUser: no current token to save');
         return;
       }
 
       const currentAdminUser = decodeUserFromToken(currentToken);
       if (!currentAdminUser) {
-        console.error('impersonateUser: could not decode current user');
+        LOGGER.error('impersonateUser: could not decode current user');
         return;
       }
 
       const targetUser = decodeUserFromToken(impersonationToken);
       if (!targetUser) {
-        console.error('impersonateUser: could not decode impersonation token');
+        LOGGER.error('impersonateUser: could not decode impersonation token');
         return;
       }
 
@@ -520,13 +521,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         : null;
 
     if (!adminToken) {
-      console.error('stopImpersonating: no admin token stored');
+      LOGGER.error('stopImpersonating: no admin token stored');
       return;
     }
 
     const adminUserInfo = decodeUserFromToken(adminToken);
     if (!adminUserInfo) {
-      console.error('stopImpersonating: could not decode admin token');
+      LOGGER.error('stopImpersonating: could not decode admin token');
       return;
     }
 

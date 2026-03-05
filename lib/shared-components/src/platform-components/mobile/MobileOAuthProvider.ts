@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging';
 import {
   GoogleSignin,
   SignInSuccessResponse,
@@ -191,7 +192,7 @@ export class MobileOAuthProvider implements OAuthProvider {
       await GoogleSignin.signOut();
     } catch (error) {
       // Log but don't throw sign-out errors
-      console.warn('Failed to sign out from Google:', error);
+      LOGGER.warn('Failed to sign out from Google:', String(error));
     }
   }
 

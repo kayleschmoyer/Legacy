@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Platform } from 'react-native';
+import { LOGGER } from '@legacy-sports/logging';
 import { KeyboardAvoidingView } from 'react-native';
 import { Button, Text, YStack } from 'tamagui';
 import {
@@ -28,13 +29,13 @@ const MobileLogin: React.FC = () => {
   };
 
   const handleLoginSuccess = (user: AuthenticatedUser) => {
-    console.log('Mobile authentication successful:', user);
+    LOGGER.info('Mobile authentication successful:', user);
     setDebugInfo(`Welcome ${user.username || user.email}!`);
     // Navigate to main app screen here
   };
 
   const handleLoginError = (error: Error) => {
-    console.error('Mobile authentication failed:', error);
+    LOGGER.error('Mobile authentication failed:', String(error));
     setDebugInfo(`Login failed: ${error.message}`);
   };
 

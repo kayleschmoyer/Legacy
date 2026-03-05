@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging';
 import * as SecureStore from 'expo-secure-store';
 import { ISecureStorage } from '../types/auth';
 
@@ -30,7 +31,7 @@ export class MobileSecureStorage implements ISecureStorage {
       const value = await SecureStore.getItemAsync(this.prefix + key);
       return value;
     } catch (error) {
-      console.warn('Failed to retrieve item from SecureStore:', error);
+      LOGGER.warn('Failed to retrieve item from SecureStore:', String(error));
       return null;
     }
   }
@@ -43,7 +44,7 @@ export class MobileSecureStorage implements ISecureStorage {
     try {
       await SecureStore.deleteItemAsync(this.prefix + key);
     } catch (error) {
-      console.warn('Failed to remove item from SecureStore:', error);
+      LOGGER.warn('Failed to remove item from SecureStore:', String(error));
     }
   }
 
@@ -70,7 +71,7 @@ export class MobileSecureStorage implements ISecureStorage {
         ),
       );
     } catch (error) {
-      console.warn('Failed to clear SecureStore:', error);
+      LOGGER.warn('Failed to clear SecureStore:', String(error));
     }
   }
 

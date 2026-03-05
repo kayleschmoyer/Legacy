@@ -8,6 +8,7 @@ import type {
   PlayerStatsFilters,
   PlayerWithStats,
 } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
@@ -135,7 +136,7 @@ export function PlayerStatsPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      console.log('Exported player statistics:', exportData);
+      LOGGER.info('Exported player statistics:', exportData);
       setLiveMsg('Player statistics exported. Download started.');
     },
     [],
@@ -165,14 +166,14 @@ export function PlayerStatsPage() {
           setLiveMsg('Link copied to clipboard.');
         }
       } catch (error) {
-        console.error('Error sharing:', error);
+        LOGGER.error('Error sharing:', String(error));
         // Fallback - try to copy to clipboard
         try {
           await navigator.clipboard.writeText(url);
           alert('Link copied to clipboard!');
           setLiveMsg('Link copied to clipboard.');
         } catch (clipboardError) {
-          console.error('Clipboard error:', clipboardError);
+          LOGGER.error('Clipboard error:', String(clipboardError));
           // Ultimate fallback - show the URL
           prompt('Copy this link to share:', url);
           setLiveMsg('Showing a prompt with a sharable link.');

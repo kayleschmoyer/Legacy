@@ -61,7 +61,7 @@ export async function readKeychainValue(
   try {
     return await secureStorage.getItem(secret);
   } catch (error) {
-    console.error('Error reading secure storage:', error);
+    LOGGER.error('Error reading secure storage:', String(error));
     return null;
   }
 }
@@ -77,7 +77,7 @@ async function storeToken(tokens: OAuthProxyTokens): Promise<void> {
     // Trigger the react update
     KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
   } catch (error) {
-    console.error('Error storing token:', error);
+    LOGGER.error('Error storing token:', String(error));
   }
 }
 
@@ -90,14 +90,14 @@ async function resetToken(): Promise<void> {
         await secureStorage.removeItem(key);
       } catch {
         // Ignore errors for keys that don't exist
-        console.debug(`Key ${key} not found in SecureStorage`);
+        LOGGER.debug(`Key ${key} not found in SecureStorage`);
       }
     }
 
     // Trigger the react update
     KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
   } catch (error) {
-    console.error('Error resetting tokens:', error);
+    LOGGER.error('Error resetting tokens:', String(error));
   }
 }
 
@@ -141,7 +141,7 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
           onSuccess();
         }
       } catch (error) {
-        console.error('Authentication success handler error:', error);
+        LOGGER.error('Authentication success handler error:', String(error));
         if (onFailure) {
           onFailure(
             error instanceof Error ? error.message : 'Authentication failed',
@@ -154,7 +154,7 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
 
   const failureHandler = useCallback(
     (error: OAuthError) => {
-      console.error('OAuth authentication failed:', error);
+      LOGGER.error('OAuth authentication failed:', error);
       if (onFailure) {
         onFailure(error.message || 'Authentication failed');
       }
@@ -167,7 +167,7 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
       // Use platform-specific OAuth provider to sign out
       await OAuthProvider.signOut();
     } catch (error) {
-      console.warn('Error during OAuth sign-out:', error);
+      LOGGER.warn('Error during OAuth sign-out:', String(error));
       // Continue with local logout even if OAuth sign-out fails
     }
 

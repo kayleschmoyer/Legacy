@@ -9,6 +9,7 @@ import {
   Vibration,
 } from 'react-native';
 import { Input, Text, XStack, YStack } from '@tamagui/core';
+import { LOGGER } from '@legacy-sports/logging';
 import { PlayerCard } from './FreeAgents/PlayerCard';
 import { FilterPanel } from './FreeAgents/FilterPanel';
 import { WaiverClaimModal } from './FreeAgents/WaiverClaimModal';
@@ -162,7 +163,7 @@ const FreeAgents: React.FC = () => {
   }, []);
 
   const handleSubmitClaim = useCallback((claim: WaiverClaim) => {
-    console.log('Waiver claim submitted:', claim);
+    LOGGER.info('Waiver claim submitted:', claim);
     // TODO(LS-336): Submit to backend
   }, []);
 

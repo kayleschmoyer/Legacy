@@ -2,16 +2,10 @@ import React from 'react';
 import { ApolloClient } from '@apollo/client';
 import { ApolloProvider } from '@apollo/client/react';
 import { TamaguiProvider, type TamaguiProviderProps, Theme } from 'tamagui';
+import { LOGGER } from '@legacy-sports/logging';
 import { Platform } from './platform-components';
 import { LoadingPanel } from './LazyLoadingPanel';
 import { ConditionalProviders } from './ConditionalProviders';
-// Simple logger fallback for AppProvider
-const LOGGER = {
-  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
-  error: (message: string, ...args: unknown[]) =>
-    console.error(message, ...args),
-  info: (message: string, ...args: unknown[]) => console.info(message, ...args),
-};
 
 interface AppProviderProps {
   children: React.ReactNode;
@@ -50,7 +44,7 @@ const NativeLayout = ({
     );
   } catch (error: unknown) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    LOGGER.warn('Failed to load native dependencies:', error);
+    LOGGER.warn('Failed to load native dependencies:', String(error));
     return <LoadingPanel />;
   }
 };
@@ -93,7 +87,7 @@ const WebLayout = ({
     );
   } catch (error: unknown) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    LOGGER.warn('Failed to load Apollo client:', error);
+    LOGGER.warn('Failed to load Apollo client:', String(error));
     return <LoadingPanel />;
   }
 };

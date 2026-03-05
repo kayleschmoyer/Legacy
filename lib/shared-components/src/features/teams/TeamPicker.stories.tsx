@@ -1,15 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from '@storybook/test';
+import { LOGGER } from '@legacy-sports/logging';
 import { AdvancedTeamPicker, TeamData, TeamPicker } from './TeamPicker';
-// Simple logger fallback for TeamPicker.stories
-const LOGGER = {
-  debug: (message: string, ...args: unknown[]) =>
-    console.debug(message, ...args),
-  info: (message: string, ...args: unknown[]) => console.info(message, ...args),
-  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
-  error: (message: string, ...args: unknown[]) =>
-    console.error(message, ...args),
-};
 
 const meta: Meta<typeof TeamPicker> = {
   title: 'Features/Teams/TeamPicker',

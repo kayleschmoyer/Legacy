@@ -1,13 +1,6 @@
 import type * as ExpoSecureStore from 'expo-secure-store';
 
-// Simple logger fallback for SecureStorage
-const LOGGER = {
-  debug: (message: string, ...args: unknown[]) =>
-    console.debug(message, ...args),
-  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
-  error: (message: string, ...args: unknown[]) =>
-    console.error(message, ...args),
-};
+import { LOGGER } from '@legacy-sports/logging';
 
 // Dynamic import for Expo SecureStore
 let secureStore: typeof ExpoSecureStore | null = null;

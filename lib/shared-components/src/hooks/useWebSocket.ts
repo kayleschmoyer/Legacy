@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   type DraftCompletedNotification,
   type DraftPausedNotification,
@@ -42,7 +43,7 @@ type AnyCallback = (data: any) => void;
 interface NotificationBinding {
   type: string;
   ref: React.RefObject<AnyCallback | undefined>;
-  /** When set, `console.log('[useWebSocket] received <label>', data)` is emitted. */
+  /** When set, `LOGGER.info('[useWebSocket] received <label>', data)` is emitted. */
   debugLabel?: string;
 }
 
@@ -186,7 +187,7 @@ export function useWebSocket({
 
   // Log connection parameters on mount for debugging
   useEffect(() => {
-    console.log('[useWebSocket] init', {
+    LOGGER.info('[useWebSocket] init', {
       url: wsUrl ? `${wsUrl.substring(0, 30)}...` : 'NOT SET',
       hasToken: !!token,
       leagueId,
@@ -198,7 +199,7 @@ export function useWebSocket({
 
   const connect = useCallback(() => {
     if (!wsUrl) {
-      console.warn(
+      LOGGER.warn(
         '[useWebSocket] connect failed: WebSocket URL not configured',
       );
       setError('WebSocket URL not configured');
@@ -238,14 +239,14 @@ export function useWebSocket({
   // Create and manage WebSocketClient
   useEffect(() => {
     if (!wsUrl) {
-      console.warn(
+      LOGGER.warn(
         '[useWebSocket] useEffect: no wsUrl, skipping client creation',
       );
       setError('WebSocket URL not configured');
       return;
     }
 
-    console.log('[useWebSocket] creating WebSocketClient', {
+    LOGGER.info('[useWebSocket] creating WebSocketClient', {
       url: `${wsUrl.substring(0, 30)}...`,
       hasToken: !!token,
       leagueId,
@@ -282,14 +283,14 @@ export function useWebSocket({
 
     const unsubscribeConnected = client.on('connected', () => {
       if (wasConnected) {
-        console.log(
+        LOGGER.info(
           '[useWebSocket] reconnected ✓',
           viewContext,
           'leagueId:',
           leagueId,
         );
       } else {
-        console.log(
+        LOGGER.info(
           '[useWebSocket] connected ✓',
           viewContext,
           'leagueId:',
@@ -303,14 +304,14 @@ export function useWebSocket({
 
     const unsubscribeDisconnected = client.on('disconnected', () => {
       if (wasConnected) {
-        console.warn(
+        LOGGER.warn(
           '[useWebSocket] connection dropped — auto-reconnecting...',
           viewContext,
           'leagueId:',
           leagueId,
         );
       } else {
-        console.log(
+        LOGGER.info(
           '[useWebSocket] disconnected',
           viewContext,
           'leagueId:',
@@ -321,7 +322,7 @@ export function useWebSocket({
     });
 
     const unsubscribeError = client.on('error', (err) => {
-      console.error(
+      LOGGER.error(
         '[useWebSocket] error:',
         err.message,
         '(will auto-reconnect)',
@@ -394,7 +395,7 @@ export function useWebSocket({
     const unsubscribeBindings = bindings.map(({ type, ref, debugLabel }) =>
       client.on(type, (notification: NotificationData) => {
         if (debugLabel) {
-          console.log(`[useWebSocket] received ${debugLabel}`, notification);
+          LOGGER.info(`[useWebSocket] received ${debugLabel}`, notification);
         }
         ref.current?.(notification);
       }),

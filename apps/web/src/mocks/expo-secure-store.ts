@@ -1,6 +1,8 @@
 // Mock for expo-secure-store on web platform
 // This provides web-safe fallbacks for SecureStore operations
 
+import { LOGGER } from '@legacy-sports/logging';
+
 export const getItemAsync = (key: string): Promise<string | null> => {
   try {
     if (typeof sessionStorage !== 'undefined') {
@@ -8,7 +10,7 @@ export const getItemAsync = (key: string): Promise<string | null> => {
     }
     return Promise.resolve(null);
   } catch (error) {
-    console.warn('Error reading from sessionStorage:', error);
+    LOGGER.warn('Error reading from sessionStorage:', String(error));
     return Promise.resolve(null);
   }
 };
@@ -20,7 +22,7 @@ export const setItemAsync = (key: string, value: string): Promise<void> => {
     }
     return Promise.resolve();
   } catch (error) {
-    console.warn('Error writing to sessionStorage:', error);
+    LOGGER.warn('Error writing to sessionStorage:', String(error));
     return Promise.resolve();
   }
 };
@@ -32,7 +34,7 @@ export const deleteItemAsync = (key: string): Promise<void> => {
     }
     return Promise.resolve();
   } catch (error) {
-    console.warn('Error removing from sessionStorage:', error);
+    LOGGER.warn('Error removing from sessionStorage:', String(error));
     return Promise.resolve();
   }
 };

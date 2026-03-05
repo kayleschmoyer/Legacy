@@ -9,6 +9,7 @@
  */
 
 import * as React from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   CareerBattingFragment,
   GetAllPlayers,
@@ -187,7 +188,7 @@ function parsePositionsPlayed(
       ? (parsed as Record<string, PositionData>)
       : undefined;
   } catch (error) {
-    console.warn('Failed to parse positions data:', error);
+    LOGGER.warn('Failed to parse positions data:', String(error));
     return undefined;
   }
 }
@@ -215,7 +216,7 @@ function formatPositionsPlayed(
 
     return sortedPositions.join(', ');
   } catch (error) {
-    console.warn('Failed to parse positions played data:', error);
+    LOGGER.warn('Failed to parse positions played data:', String(error));
     return '';
   }
 }
@@ -341,10 +342,10 @@ export function transformCareerStatsWithFielding(
         ? (JSON.parse(positionsPlayedJson) as Record<string, PositionData>)
         : undefined;
     } catch (error) {
-      console.warn(
+      LOGGER.warn(
         'Failed to parse positions data for player',
         battingStats.playerId,
-        error,
+        String(error),
       );
     }
 

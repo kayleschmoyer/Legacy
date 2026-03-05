@@ -1,17 +1,9 @@
 import React from 'react';
 import { Text } from 'react-native';
 import type { StyleProp, TextStyle } from 'react-native';
+import { LOGGER } from '@legacy-sports/logging';
 import type { IconProps } from './LazyIcon';
 import { safeStyle } from '../../utils/styles';
-// Simple logger fallback for Icons
-const LOGGER = {
-  debug: (message: string, ...args: unknown[]) =>
-    console.debug(message, ...args),
-  info: (message: string, ...args: unknown[]) => console.info(message, ...args),
-  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
-  error: (message: string, ...args: unknown[]) =>
-    console.error(message, ...args),
-};
 
 // Native icon implementation with fallback
 const NativeIcons: React.FC<IconProps> = ({

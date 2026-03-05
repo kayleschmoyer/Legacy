@@ -26,6 +26,7 @@ import {
 import { TamaguiProvider } from 'tamagui';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 import { env } from './config/environment';
 import { apolloClient } from './lib/apollo-client';
 import { default as App } from './app/app';
@@ -83,8 +84,8 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement);
 
-console.log('Starting app with unified authentication flow...');
-console.log('Environment config:', env);
+LOGGER.info('Starting app with unified authentication flow...');
+LOGGER.info('Environment config:', env);
 
 try {
   root.render(
@@ -106,11 +107,11 @@ try {
                 loginSubtitle="Sign in to access your fantasy leagues and stats"
                 testMode={env.authTestMode}
                 onLoginSuccess={() => {
-                  console.log('Web app login successful!');
+                  LOGGER.info('Web app login successful!');
                   trackLogin('google');
                 }}
                 onLoginFailure={(error: string) => {
-                  console.error('Web app login failed:', error);
+                  LOGGER.error('Web app login failed:', error);
                   captureError(new Error(error), { context: 'web-app-login' });
                 }}
               >
@@ -122,9 +123,9 @@ try {
       </ErrorBoundary>
     </StrictMode>,
   );
-  console.log('App rendered successfully with unified auth!');
+  LOGGER.info('App rendered successfully with unified auth!');
 } catch (error: unknown) {
   const err = error instanceof Error ? error : new Error(JSON.stringify(error));
-  console.error('Error rendering app:', err);
+  LOGGER.error('Error rendering app:', String(err));
   captureError(err, { context: 'web-app-render' });
 }

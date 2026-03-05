@@ -4,6 +4,7 @@ import {
   EnhancedAuthGuard,
 } from '@legacy-sports/shared-components';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 import App from './app';
 import { env } from '../config/environment';
 
@@ -27,10 +28,10 @@ export function AppWithAuth() {
         loginSubtitle="Please sign in to access your fantasy leagues and stats"
         testMode={env.authTestMode}
         onLoginSuccess={() => {
-          console.log('Login successful!');
+          LOGGER.info('Login successful!');
         }}
         onLoginFailure={(error: string) => {
-          console.error('Login failed:', error);
+          LOGGER.error('Login failed:', error);
         }}
       >
         <App />

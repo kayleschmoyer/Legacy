@@ -24,6 +24,7 @@
 - **Nx only**: `pnpm exec nx affected -t <target>` — never direct `pnpm run`
 - **PowerShell**: `;` to chain, `$env:` for vars
 - **No suppression**: fix root causes, no `@ts-ignore` / `eslint-disable`
+- **No console.\***: use `LOGGER` from `@legacy-sports/logging` instead of `console.log/warn/error/debug`. Exceptions: `lib/logging/` (the logger itself), `apps/cli/`, migration files, and build-time scripts (`codegen.ts`, Vite plugins).
 - **Jira**: update status at each step
 
 ## Environment

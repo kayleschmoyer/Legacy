@@ -1,4 +1,5 @@
 import React from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import { Spinner, Text, YStack } from 'tamagui';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './LoginPage';
@@ -94,7 +95,7 @@ export function EnhancedAuthGuard({
               // Call the optional callback if provided
               onLoginSuccess?.();
             } catch (error) {
-              console.error('Authentication callback failed:', error);
+              LOGGER.error('Authentication callback failed:', String(error));
               const errorMessage =
                 error instanceof Error
                   ? error.message
@@ -103,7 +104,7 @@ export function EnhancedAuthGuard({
             }
           }}
           onError={(error: Error) => {
-            console.error('Authentication Error:', error);
+            LOGGER.error('Authentication Error:', error);
             const errorMessage =
               error instanceof Error ? error.message : 'Authentication failed';
             onLoginFailure?.(errorMessage);

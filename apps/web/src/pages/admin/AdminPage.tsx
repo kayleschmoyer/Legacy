@@ -6,6 +6,7 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 import { Input, Spinner, Text, TextArea } from 'tamagui';
 import { useNavigate } from 'react-router-dom';
 import { styled } from 'tamagui';
@@ -255,7 +256,7 @@ export function AdminPage(): React.JSX.Element {
         void navigate('/');
       }
     } catch (err) {
-      console.error('Impersonation failed:', err);
+      LOGGER.error('Impersonation failed:', String(err));
     } finally {
       setImpersonatingId(null);
     }

@@ -8,13 +8,14 @@ import {
 } from '@legacy-sports/shared-components';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Text } from 'tamagui';
+import { LOGGER } from '@legacy-sports/logging';
 
 export function AuthDebugger() {
   const auth: UseAuthResult = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  console.log('Auth Debug - Current state:', {
+  LOGGER.info('Auth Debug - Current state:', {
     isAuthenticated: auth.isAuthenticated,
     isLoading: auth.isLoading,
     user: auth.user,

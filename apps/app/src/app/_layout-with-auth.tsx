@@ -14,6 +14,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 import { DbClientContext } from '../common/ApolloClientContext';
 
 // Define your app routes
@@ -70,10 +71,10 @@ function InnerLayout(): React.JSX.Element {
         loginSubtitle="Sign in to access your fantasy leagues and stats"
         testMode={__DEV__} // Enable test mode in development
         onLoginSuccess={() => {
-          console.log('Mobile login successful!');
+          LOGGER.info('Mobile login successful!');
         }}
         onLoginFailure={(error) => {
-          console.error('Mobile login failed:', error);
+          LOGGER.error('Mobile login failed:', error);
         }}
       >
         <AuthenticatedContent />

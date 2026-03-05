@@ -10,6 +10,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { ScrollView } from 'tamagui';
+import { LOGGER } from '@legacy-sports/logging';
 
 export function WebHomeScreen(): React.JSX.Element {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ export function WebHomeScreen(): React.JSX.Element {
   };
 
   const handleQuickAction = (action: string) => {
-    console.log(`Quick action: ${action}`);
+    LOGGER.info(`Quick action: ${action}`);
     // Add navigation logic for quick actions
   };
 

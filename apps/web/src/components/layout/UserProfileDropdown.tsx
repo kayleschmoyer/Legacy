@@ -9,6 +9,7 @@ import {
 import { useAuth } from '@legacy-sports/shared-components';
 import { useNavigate } from 'react-router-dom';
 import { styled } from 'tamagui';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   ChevronDown,
   ChevronUp,
@@ -136,7 +137,7 @@ export const UserProfileDropdown: React.FC = () => {
         window.location.reload();
       }
     } catch (error) {
-      console.error('Error during logout:', error);
+      LOGGER.error('Error during logout:', String(error));
     }
   };
 

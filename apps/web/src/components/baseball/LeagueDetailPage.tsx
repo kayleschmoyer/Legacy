@@ -8,6 +8,7 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 import { Card, H1, Separator, Spinner, styled, Text } from 'tamagui';
 import {
   Check,
@@ -435,7 +436,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const handlePlayerAssign = useCallback(
     async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
       if (!player.id) {
-        console.error('Player ID is required');
+        LOGGER.error('Player ID is required');
         return;
       }
       try {
@@ -443,7 +444,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           variables: { teamMemberId: player.id, positionId: position.id },
         });
       } catch (error) {
-        console.error('Error assigning player:', error);
+        LOGGER.error('Error assigning player:', String(error));
       }
     },
     [updateTeamMemberPosition],
@@ -462,7 +463,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           });
         }
       } catch (error) {
-        console.error('Error removing player:', error);
+        LOGGER.error('Error removing player:', String(error));
       }
     },
     [updateTeamMemberPosition, teamMembersData?.teamMembers],
@@ -487,7 +488,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     } catch (error) {
-      console.error('Error copying invite code:', error);
+      LOGGER.error('Error copying invite code:', String(error));
       alert('Failed to copy invite code to clipboard');
     }
   }, [data?.league?.inviteCode]);
@@ -502,7 +503,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       setInviteLinkCopied(true);
       setTimeout(() => setInviteLinkCopied(false), 2000);
     } catch (error) {
-      console.error('Error copying invite link:', error);
+      LOGGER.error('Error copying invite link:', String(error));
       alert('Failed to copy invite link to clipboard');
     }
   }, [inviteUrl]);
@@ -1274,7 +1275,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           // Handled by DeleteLeagueControl
         }}
         onError={(deleteError) => {
-          console.error('Delete league error:', deleteError);
+          LOGGER.error('Delete league error:', deleteError);
           alert(`Error deleting league: ${deleteError.message}`);
         }}
       />

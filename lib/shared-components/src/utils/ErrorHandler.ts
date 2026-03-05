@@ -1,10 +1,4 @@
-// Simple logger fallback for ErrorHandler
-const LOGGER = {
-  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
-  error: (message: string, ...args: unknown[]) =>
-    console.error(message, ...args),
-  info: (message: string, ...args: unknown[]) => console.info(message, ...args),
-};
+import { LOGGER } from '@legacy-sports/logging';
 
 // Simple error message extraction function - browser compatible
 function getMessageFromError(err: unknown): string {

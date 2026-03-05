@@ -10,14 +10,15 @@ import {
 import { ErrorLink } from '@apollo/client/link/error';
 import { setContext } from '@apollo/client/link/context';
 import type { ApolloLink } from '@apollo/client/link';
+import { LOGGER } from '@legacy-sports/logging';
 import { env } from '../config/environment';
 
 // GraphQL endpoint URL from centralized environment config
 const GRAPHQL_URL = env.graphqlUrl;
 
 // Debug logging to check what URL is being used
-console.log('🔗 Apollo Client Configuration:');
-console.log('GraphQL URL from env config:', GRAPHQL_URL);
+LOGGER.info('🔗 Apollo Client Configuration:');
+LOGGER.info('GraphQL URL from env config:', GRAPHQL_URL);
 
 const httpLink = createHttpLink({
   uri: (operation) => `${GRAPHQL_URL}?ref=${operation.operationName}`,

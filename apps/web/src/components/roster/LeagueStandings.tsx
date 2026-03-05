@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, XStack, YStack } from '@legacy-sports/shared-components';
 import { Separator, Spinner, styled, Text } from 'tamagui';
 import { Trophy } from '@tamagui/lucide-icons';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -59,7 +60,7 @@ export function LeagueStandings({
 }: LeagueStandingsProps): React.JSX.Element {
   const navigate = useNavigate();
 
-  console.log(
+  LOGGER.info(
     '[LeagueStandings] render — loading:',
     loading,
     'standings count:',

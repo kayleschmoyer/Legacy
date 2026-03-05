@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApolloClient } from '@apollo/client/react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   GetTeamMembers,
   GetTeamMembersQuery,
@@ -57,14 +58,14 @@ export function useLeagueTakenPlayers(leagueId: number) {
 
         setTakenPlayerIds(ids);
       } catch (err) {
-        console.error('Failed to fetch league rosters', err);
+        LOGGER.error('Failed to fetch league rosters', String(err));
       } finally {
         setLoading(false);
       }
     };
 
     fetchMembers().catch((err) => {
-      console.error('Error fetching members:', err);
+      LOGGER.error('Error fetching members:', String(err));
     });
   }, [teamsData, teamsLoading, client]);
 

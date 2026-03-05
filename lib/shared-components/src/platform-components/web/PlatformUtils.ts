@@ -1,10 +1,11 @@
 // Web-specific error handling utilities
+import { LOGGER } from '@legacy-sports/logging';
 import { OAuthError } from '../types/auth';
 
 export const handleOAuthError = (error: OAuthError): void => {
   // On web, we typically don't show alerts - let the parent component handle it
   // or rely on UI error states
-  console.error('OAuth Error:', error);
+  LOGGER.error('OAuth Error:', error);
 };
 
 export const getInteractiveButtonProps = (isDisabled: boolean) => ({

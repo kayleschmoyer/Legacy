@@ -1,4 +1,5 @@
 import React from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import { Button, H2, H4, ScrollView, Text, XStack, YStack } from 'tamagui';
 import { Dimensions, Platform } from '../../platform-components';
 import { SPORT_CONFIGS } from '../../config/sports';
@@ -62,12 +63,12 @@ function HomeScreen({
     {
       title: 'Quick Pick',
       icon: '⚡',
-      onPress: () => console.log('Quick Pick'),
+      onPress: () => LOGGER.info('Quick Pick'),
     },
     {
       title: 'Manage Teams',
       icon: '👥',
-      onPress: () => console.log('Manage Teams'),
+      onPress: () => LOGGER.info('Manage Teams'),
     },
     ...customActions,
   ];

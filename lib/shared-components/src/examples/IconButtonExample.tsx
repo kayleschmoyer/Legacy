@@ -1,18 +1,19 @@
 import React from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import { Text } from 'tamagui';
 import { IconButton } from '../IconButton';
 import { XStack, YStack } from '../Layout';
 
 /**
  * Example usage of the IconButton component
- * 
+ *
  * This component demonstrates various ways to use the IconButton
  * with different variants, colors, and sizes - similar to the
  * CodePen example with hover effects and gradient shadows.
  */
 export function IconButtonExample() {
   const handlePress = (action: string) => {
-    console.log(`${action} button pressed`);
+    LOGGER.debug(`${action} button pressed`);
   };
 
   return (
@@ -235,21 +236,21 @@ export function NativeIconButtonExample() {
       <Text fontSize="$7" fontWeight="bold" color="$color" marginBottom="$4">
         Sports App Actions
       </Text>
-      
+
       <XStack gap="$4" justifyContent="center" marginBottom="$6">
         <IconButton
           icon="plus"
           label="Add Game"
           variant="primary"
           colorScheme="green"
-          onPress={() => console.log('Add Game')}
+          onPress={() => LOGGER.debug('Add Game')}
         />
         <IconButton
           icon="star"
           label="Favorites"
           variant="secondary"
           colorScheme="gold"
-          onPress={() => console.log('Favorites')}
+          onPress={() => LOGGER.debug('Favorites')}
         />
       </XStack>
 
@@ -259,14 +260,14 @@ export function NativeIconButtonExample() {
           label="Settings"
           variant="default"
           colorScheme="blue"
-          onPress={() => console.log('Settings')}
+          onPress={() => LOGGER.debug('Settings')}
         />
         <IconButton
           icon="user"
           label="Profile"
           variant="default"
           colorScheme="purple"
-          onPress={() => console.log('Profile')}
+          onPress={() => LOGGER.debug('Profile')}
         />
       </XStack>
     </YStack>

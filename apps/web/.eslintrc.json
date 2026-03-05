@@ -37,6 +37,12 @@
     {
       "files": ["*.js", "*.jsx"],
       "rules": {}
+    },
+    {
+      "files": ["codegen.ts", "src/plugins/**/*.ts"],
+      "rules": {
+        "no-console": "off"
+      }
     }
   ]
 }

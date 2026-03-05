@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, H1, H2, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';
 import {
   GetUserLeagues,
@@ -156,9 +157,9 @@ export function LeagueCreatePage(): React.JSX.Element {
           } catch (error) {
             // If cache read fails (e.g., query hasn't been executed yet),
             // fallback to refetchQueries approach
-            console.log(
+            LOGGER.info(
               'Cache read failed, will refetch queries instead:',
-              error,
+              String(error),
             );
           }
         }
@@ -268,7 +269,7 @@ export function LeagueCreatePage(): React.JSX.Element {
         );
       }
     } catch (error) {
-      console.error('Error creating league:', error);
+      LOGGER.error('Error creating league:', String(error));
       alert(
         (error as Error).message ||
           'Failed to create league. Please try again.',

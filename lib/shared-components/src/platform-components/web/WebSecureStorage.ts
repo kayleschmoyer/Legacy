@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging';
 import { ISecureStorage } from '../types/auth';
 
 /**
@@ -36,7 +37,7 @@ export class WebSecureStorage implements ISecureStorage {
       // In production, you might want to decrypt the value here
       return Promise.resolve(value);
     } catch (error) {
-      console.warn('Failed to retrieve item from localStorage:', error);
+      LOGGER.warn('Failed to retrieve item from localStorage:', String(error));
       return Promise.resolve(null);
     }
   }
@@ -50,7 +51,7 @@ export class WebSecureStorage implements ISecureStorage {
       localStorage.removeItem(this.prefix + key);
       return Promise.resolve();
     } catch (error) {
-      console.warn('Failed to remove item from localStorage:', error);
+      LOGGER.warn('Failed to remove item from localStorage:', String(error));
       return Promise.resolve();
     }
   }
@@ -70,7 +71,7 @@ export class WebSecureStorage implements ISecureStorage {
       }
       return Promise.resolve();
     } catch (error) {
-      console.warn('Failed to clear localStorage:', error);
+      LOGGER.warn('Failed to clear localStorage:', String(error));
       return Promise.resolve();
     }
   }

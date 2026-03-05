@@ -9,6 +9,7 @@ import React, { useCallback } from 'react';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components';
 import { Card, Separator, Spinner, Text } from 'tamagui';
 import { ArrowLeftRight, Check, Clock, Send, X } from '@tamagui/lucide-icons';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   useAcceptTradeMutation,
   useCancelTradeMutation,
@@ -69,7 +70,7 @@ export function PendingTradeOffers({
         await acceptTrade({ variables: { tradeId } });
         await refetch();
       } catch (err) {
-        console.error('Failed to accept trade:', err);
+        LOGGER.error('Failed to accept trade:', String(err));
       } finally {
         setActionLoading(null);
       }
@@ -84,7 +85,7 @@ export function PendingTradeOffers({
         await rejectTrade({ variables: { tradeId } });
         await refetch();
       } catch (err) {
-        console.error('Failed to reject trade:', err);
+        LOGGER.error('Failed to reject trade:', String(err));
       } finally {
         setActionLoading(null);
       }
@@ -99,7 +100,7 @@ export function PendingTradeOffers({
         await cancelTrade({ variables: { tradeId } });
         await refetch();
       } catch (err) {
-        console.error('Failed to cancel trade:', err);
+        LOGGER.error('Failed to cancel trade:', String(err));
       } finally {
         setActionLoading(null);
       }

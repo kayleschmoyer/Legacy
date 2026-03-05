@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react';
-// Simple logger fallback for useAISuggestions
-const LOGGER = {
-  debug: (message: string, ...args: unknown[]) =>
-    console.debug(message, ...args),
-  info: (message: string, ...args: unknown[]) => console.info(message, ...args),
-  warn: (message: string, ...args: unknown[]) => console.warn(message, ...args),
-  error: (message: string, ...args: unknown[]) =>
-    console.error(message, ...args),
-};
+
+import { LOGGER } from '@legacy-sports/logging';
 
 interface Player {
   id: string;
@@ -35,7 +28,7 @@ export const useAISuggestions = (players: Player[], sport: string) => {
         const data = (await response.json()) as { suggestions: Suggestion[] };
         setSuggestions(data.suggestions);
       } catch (error) {
-        LOGGER.error('Failed to fetch AI suggestions:', error);
+        LOGGER.error('Failed to fetch AI suggestions:', String(error));
       }
     };
     if (players.length > 0) {

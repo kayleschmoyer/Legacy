@@ -10,6 +10,12 @@
       "rules": {}
     },
     {
+      "files": ["codegen.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
       "files": ["*.json"],
       "parser": "jsonc-eslint-parser",
       "rules": {

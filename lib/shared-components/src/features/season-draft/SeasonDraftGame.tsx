@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   ActivityIndicator,
   Alert,
@@ -195,7 +196,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
       await startGameMutation({ variables: { gameId } });
       await refetchGame();
     } catch (error) {
-      console.error('Failed to start game:', error);
+      LOGGER.error('Failed to start game:', String(error));
       Alert.alert('Error', 'Failed to start game.');
     }
   };
@@ -218,7 +219,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               }
             },
             (error: unknown) => {
-              console.error('Failed to cancel game:', error);
+              LOGGER.error('Failed to cancel game:', String(error));
               Alert.alert('Error', 'Failed to cancel game.');
             },
           );
@@ -256,7 +257,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
           variables: { playerId: player.id },
         });
       } catch (error) {
-        console.error('Failed to trigger stat loading:', error);
+        LOGGER.error('Failed to trigger stat loading:', String(error));
         setStatsLoadingPlayerIds((prev) => {
           const next = new Set(prev);
           next.delete(player.id);
@@ -358,7 +359,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
       // Reload game state
       await refetchGame();
     } catch (error) {
-      console.error('Failed to make pick:', error);
+      LOGGER.error('Failed to make pick:', String(error));
       Alert.alert('Error', 'Failed to make pick. Please try again.');
     } finally {
       setSubmitting(false);

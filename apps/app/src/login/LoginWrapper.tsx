@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import { Animated, Platform } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native';
 import { Button, Input, Spinner, Text, YStack } from 'tamagui';
@@ -23,10 +24,10 @@ const Login: React.FC = () => {
 
     try {
       // TODO(LS-330): Implement authentication logic here
-      console.log('Login successful!');
+      LOGGER.info('Login successful!');
       // Navigate to the main app screen after successful login
     } catch (error) {
-      console.error('Login failed:', error);
+      LOGGER.error('Login failed:', String(error));
       setErrorMessage('Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);

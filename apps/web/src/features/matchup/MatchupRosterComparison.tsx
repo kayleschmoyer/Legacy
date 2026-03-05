@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { Card, H4, Separator, styled, Text, XStack, YStack } from 'tamagui';
 import { ChevronRight, Users } from '@tamagui/lucide-icons';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   calculateMatchupProjection,
   computeScoring,
@@ -600,7 +601,7 @@ export function MatchupRosterComparison({
   const gamesPerMatchup = matchup.gamesPerMatchup ?? 3;
 
   // Debug logging
-  console.log('[MatchupRosterComparison] Debug Info:', {
+  LOGGER.info('[MatchupRosterComparison] Debug Info:', {
     matchupId: matchup.id,
     leagueId,
     gamesPerMatchup,
@@ -651,11 +652,11 @@ export function MatchupRosterComparison({
     const map = new Map<number, SeasonStats>();
 
     if (!data?.getMatchupPlayers) {
-      console.log('[MatchupRosterComparison] No matchup players data yet');
+      LOGGER.info('[MatchupRosterComparison] No matchup players data yet');
       return map;
     }
 
-    console.log(
+    LOGGER.info(
       '[MatchupRosterComparison] Building seasonStatsMap from',
       data.getMatchupPlayers.length,
       'players',
@@ -732,14 +733,14 @@ export function MatchupRosterComparison({
       });
     });
 
-    console.log(
+    LOGGER.info(
       '[MatchupRosterComparison] seasonStatsMap built with',
       map.size,
       'players',
     );
     if (map.size > 0) {
       const firstEntries = Array.from(map.entries()).slice(0, 2);
-      console.log(
+      LOGGER.info(
         '[MatchupRosterComparison] Sample SeasonStats:',
         firstEntries,
       );
@@ -843,7 +844,7 @@ export function MatchupRosterComparison({
 
       const seasonStats = seasonStatsMap.get(playerId);
 
-      console.log('[calculatePlayerProjection] Player', playerId, ':', {
+      LOGGER.info('[calculatePlayerProjection] Player', playerId, ':', {
         hasSeasonStats: !!seasonStats,
         hasScoringSettings: !!scoringSettings,
         gamesPlayed,
@@ -860,7 +861,7 @@ export function MatchupRosterComparison({
           );
           const projectedRemainingScore =
             projection.totalPerGame * gamesRemaining;
-          console.log('[calculatePlayerProjection] Projection calculated:', {
+          LOGGER.info('[calculatePlayerProjection] Projection calculated:', {
             playerId,
             totalPerGame: projection.totalPerGame,
             projectedRemainingScore,
@@ -868,10 +869,10 @@ export function MatchupRosterComparison({
           });
           return actualScore + projectedRemainingScore;
         } catch (error) {
-          console.warn(
+          LOGGER.warn(
             'Error calculating projection for player',
             player.playerId,
-            error,
+            String(error),
           );
         }
       }

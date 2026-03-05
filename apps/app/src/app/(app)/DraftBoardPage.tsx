@@ -31,6 +31,7 @@ import {
   StartDraftMutation,
   useStartDraftMutation,
 } from '../../api/db/graphql.generated';
+import { LOGGER } from '@legacy-sports/logging';
 
 // Sport configurations
 const SPORT_CONFIGS = {
@@ -372,12 +373,12 @@ const DraftBoardPage: React.FC = () => {
     refetchQueries: ['GetLeagueById'],
     awaitRefetchQueries: true,
     onCompleted: (data: StartDraftMutation) => {
-      console.log('✅ Draft mutation completed successfully:', data);
-      console.log(
-        '🎯 Returned League object with updated status:',
+      LOGGER.info('Draft mutation completed successfully:', data);
+      LOGGER.info(
+        'Returned League object with updated status:',
         data.startDraft,
       );
-      console.log('📊 Updated draft status:', data.startDraft?.draftStatus);
+      LOGGER.info('Updated draft status:', data.startDraft?.draftStatus);
       Alert.alert(
         'Success',
         'Draft has been started and queued for processing!',
@@ -385,7 +386,7 @@ const DraftBoardPage: React.FC = () => {
       timer.start();
     },
     onError: (error: unknown) => {
-      console.error('Error starting draft:', error);
+      LOGGER.error('Error starting draft:', String(error));
       const message =
         error &&
         typeof error === 'object' &&
@@ -429,7 +430,7 @@ const DraftBoardPage: React.FC = () => {
   const handlePlayerSelect = useCallback(
     (player: Player) => {
       setSelectedPlayer(player);
-      console.log('Selected player:', player.name);
+      LOGGER.info('Selected player:', player.name);
       Platform.OS !== 'web' && Vibration.vibrate(100);
       timer.reset(90);
       timer.start();
@@ -438,7 +439,7 @@ const DraftBoardPage: React.FC = () => {
   );
 
   const handleStartDraft = useCallback(() => {
-    console.log('Starting draft...', draftId);
+    LOGGER.info('Starting draft...', draftId);
 
     // For now, using a placeholder league ID - this should come from route params or props
     // TODO(LS-337): Get actual league ID from route parameters or component props

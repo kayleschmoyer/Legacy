@@ -8,6 +8,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { useAuth } from '@legacy-sports/shared-components';
 import { styled } from 'tamagui';
+import { LOGGER } from '@legacy-sports/logging';
 import { BRAND_NAVY_LIGHT } from '../constants/colors';
 
 const UserMenuButton = styled(Button, {
@@ -104,10 +105,10 @@ export const UserProfileDropdown: React.FC = () => {
   }
 
   // DEBUG: Log the auth object and picture field
-  console.log('[UserProfileDropdown] Full auth object:', auth);
-  console.log('[UserProfileDropdown] auth.user:', auth.user);
-  console.log('[UserProfileDropdown] auth.user.picture:', auth.user.picture);
-  console.log('[UserProfileDropdown] userImage value:', userImage);
+  LOGGER.info('[UserProfileDropdown] Full auth object:', auth);
+  LOGGER.info('[UserProfileDropdown] auth.user:', auth.user);
+  LOGGER.info('[UserProfileDropdown] auth.user.picture:', auth.user.picture);
+  LOGGER.info('[UserProfileDropdown] userImage value:', userImage);
 
   const handleLogout = async () => {
     try {
@@ -116,11 +117,11 @@ export const UserProfileDropdown: React.FC = () => {
         await auth.logout();
       } else {
         // Fallback logout logic
-        console.log('Logging out...');
+        LOGGER.info('Logging out...');
         window.location.reload();
       }
     } catch (error) {
-      console.error('Error during logout:', error);
+      LOGGER.error('Error during logout:', String(error));
     }
   };
 
@@ -142,18 +143,18 @@ export const UserProfileDropdown: React.FC = () => {
                   objectFit: 'cover',
                 }}
                 onError={(e) => {
-                  console.error(
+                  LOGGER.error(
                     '[UserProfileDropdown] Image failed to load:',
                     userImage,
                     e,
                   );
-                  console.log(
+                  LOGGER.info(
                     '[UserProfileDropdown] Switching to initials fallback',
                   );
                   setImageError(true);
                 }}
                 onLoad={() => {
-                  console.log(
+                  LOGGER.info(
                     '[UserProfileDropdown] Image loaded successfully:',
                     userImage,
                   );
@@ -201,7 +202,7 @@ export const UserProfileDropdown: React.FC = () => {
           <YStack space="$1" paddingTop="$3">
             <MenuItem
               onPress={() => {
-                console.log('Profile clicked');
+                LOGGER.info('Profile clicked');
                 setIsOpen(false);
               }}
             >
@@ -219,7 +220,7 @@ export const UserProfileDropdown: React.FC = () => {
 
             <MenuItem
               onPress={() => {
-                console.log('Preferences clicked');
+                LOGGER.info('Preferences clicked');
                 setIsOpen(false);
               }}
             >
@@ -237,7 +238,7 @@ export const UserProfileDropdown: React.FC = () => {
 
             <MenuItem
               onPress={() => {
-                console.log('Help clicked');
+                LOGGER.info('Help clicked');
                 setIsOpen(false);
               }}
             >

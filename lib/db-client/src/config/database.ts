@@ -2,6 +2,7 @@ import {
   getEnvVarOptional,
   getEnvVarRequired,
 } from '@legacy-sports/env-utilities';
+import { LOGGER } from '@legacy-sports/logging';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { CredentialConfig, resolveDatabaseCredentials } from './credentials';
@@ -26,7 +27,7 @@ export interface DatabaseConfig {
  * Get database configuration using the new unified credential system
  */
 export async function getDatabaseConfig(): Promise<DatabaseConfig> {
-  console.log('Resolving database credentials from environment variables');
+  LOGGER.info('Resolving database credentials from environment variables');
 
   // Determine credential configuration based on environment
   // Default to AWS Secrets Manager unless explicitly set to use local credentials
@@ -85,7 +86,7 @@ export async function getDatabaseConfig(): Promise<DatabaseConfig> {
  * This user has full schema modification privileges (CREATE, ALTER, DROP)
  */
 export async function getMigrationDatabaseConfig(): Promise<DatabaseConfig> {
-  console.log('Resolving migration database credentials');
+  LOGGER.info('Resolving migration database credentials');
 
   // First, get the base config using standard credential resolution
   const baseConfig = await getDatabaseConfig();
@@ -95,7 +96,7 @@ export async function getMigrationDatabaseConfig(): Promise<DatabaseConfig> {
   const migrationPassword = getEnvVarOptional('DB_MIGRATION_PASSWORD');
 
   if (migrationUser && migrationPassword) {
-    console.log(`Using migration user: ${migrationUser}`);
+    LOGGER.info(`Using migration user: ${migrationUser}`);
     return {
       ...baseConfig,
       user: migrationUser,
@@ -104,11 +105,11 @@ export async function getMigrationDatabaseConfig(): Promise<DatabaseConfig> {
   }
 
   // Fallback to regular user (for backwards compatibility)
-  console.warn(
-    '⚠️  No DB_MIGRATION_USER configured - using default user for migrations',
+  LOGGER.warn(
+    'No DB_MIGRATION_USER configured - using default user for migrations',
   );
-  console.warn(
-    '⚠️  This is not recommended in production - schema changes should use a separate privileged user',
+  LOGGER.warn(
+    'This is not recommended in production - schema changes should use a separate privileged user',
   );
   return baseConfig;
 }
@@ -118,7 +119,7 @@ export async function getMigrationDatabaseConfig(): Promise<DatabaseConfig> {
  * Used for build-time operations like Drizzle schema generation
  */
 export function getDatabaseConfigSync(): DatabaseConfig {
-  console.log(
+  LOGGER.info(
     'Using synchronous database configuration from environment variables',
   );
 
