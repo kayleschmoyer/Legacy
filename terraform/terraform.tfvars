@@ -29,3 +29,6 @@ google_oauth_client_id = "1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.go
 # Public IP addresses allowed to access database for migrations and development
 # Configured with current public IP for security
 allowed_public_ips = ["71.182.228.7"] # Your current public IP - update if it changes
+
+# Monitoring & Alerting
+alert_email = "" # Set to an ops e-mail address to receive DLQ alarm notifications via SNS

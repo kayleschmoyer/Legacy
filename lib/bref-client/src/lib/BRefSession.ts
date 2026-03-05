@@ -2,9 +2,11 @@ import axios from 'axios';
 import { LOGGER } from '@legacy-sports/logging';
 
 // 15 requests/minute = ~4 second delays between requests
-// With reserved_concurrent_executions=1 and batch_size=5, worst case:
-//   5 messages × 8 players × 3 stat types = 120 requests × 4s = 480s (safe for 600s timeout)
-//   In practice, caching means far fewer actual HTTP requests per invocation
+// With reserved_concurrent_executions=1 and batch_size=1, worst case:
+//   1 message × 8 players × 3 stat types = 24 requests × 4s = ~96s baseline
+//   Plus 429 exponential backoff: up to 15s+30s+60s per retried URL.
+//   The SQS event source batch_size was reduced from 5→1 to shrink this window.
+//   In practice, DB-cached players skip all HTTP requests entirely.
 const MAX_REQUESTS_PER_MINUTE = 15;
 
 // Exponential backoff config for rate limit (429) and overload (529) responses

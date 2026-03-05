@@ -30,3 +30,6 @@ enable_rds_proxy = true       # Production RDS Proxy (private)
 # Replace with your actual domain name (leave empty to skip DNS setup)
 domain_name      = ""  # e.g., "legacysports.com"
 github_username  = "bkrupa"  # Your GitHub username/organization
+
+# Monitoring & Alerting
+alert_email = "" # Set to an ops e-mail to receive CloudWatch DLQ alarm notifications

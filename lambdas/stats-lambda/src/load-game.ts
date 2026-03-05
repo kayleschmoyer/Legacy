@@ -33,6 +33,16 @@ if (sentryConfig) {
 const notificationService = createNotificationService();
 
 /**
+ * Maximum milliseconds to spend processing players within a single Lambda invocation.
+ * Sized to leave ~60s headroom against the tightest Lambda timeout (prod = 300s).
+ * With batch_size=1, the baseline load is ~96s (8 players × 3 BBRef requests × 4s spacing)
+ * so this budget comfortably covers several 429 retries before ejecting gracefully.
+ * When the budget is exceeded the message is returned as a batchItemFailure so SQS
+ * re-delivers it cleanly; already-completed players are DB cache hits on re-delivery.
+ */
+const PLAYER_PROCESSING_BUDGET_MS = 240_000; // 4 minutes
+
+/**
  * Message format for matchup stats loading
  * Contains a batch of players for a matchup to process sequentially
  * Supports batching to avoid Lambda timeouts
@@ -651,8 +661,29 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         let failedPlayerCount = 0;
         let retryablePlayerCount = 0;
         let hitRateLimit = false;
+        let hitTimeBudget = false;
+        const invocationStart = Date.now();
 
         for (const player of message.players) {
+          // Time-budget guard: stop before starting a new player if we are approaching
+          // the Lambda timeout. The message is returned as a batchItemFailure so SQS
+          // re-delivers it; players already marked 'completed' in the DB are skipped
+          // on re-delivery (their cache check returns data, no BBRef request is made).
+          const elapsed = Date.now() - invocationStart;
+          if (elapsed > PLAYER_PROCESSING_BUDGET_MS) {
+            LOGGER.warn(
+              `Time budget exceeded (${Math.round(elapsed / 1000)}s/${PLAYER_PROCESSING_BUDGET_MS / 1000}s) before player ${player.playerId} — stopping early, message will be re-queued`,
+              {
+                matchupId: message.matchupId,
+                playersProcessed: message.players.indexOf(player),
+                playersRemaining:
+                  message.players.length - message.players.indexOf(player),
+              },
+            );
+            hitTimeBudget = true;
+            break;
+          }
+
           try {
             addBreadcrumb(`Loading stats for player ${player.playerId}`);
             await loadPlayerGameStats(db, player, message.matchupId, leagueId);
@@ -711,6 +742,20 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
                   100,
               )
             : 0;
+
+        // Time-budget exceeded: return message to queue immediately.
+        // Already-completed players are DB cache hits on re-delivery — no BBRef requests needed.
+        if (hitTimeBudget) {
+          batchItemFailures.push({ itemIdentifier: record.messageId });
+          await db
+            .update(PublicSchema.matchups)
+            .set({ statsLoadingStatus: 'retry' })
+            .where(eq(PublicSchema.matchups.id, message.matchupId));
+          LOGGER.info(
+            `Set matchup ${message.matchupId} stats_loading_status to 'retry' (time budget)`,
+          );
+          continue;
+        }
 
         // Determine if we should retry this message
         // If we have retryable failures (429 or timeout) and haven't exceeded retry limit, return as batch failure

@@ -329,7 +329,10 @@ resource "aws_lambda_event_source_mapping" "stats_sqs_game" {
   function_name    = aws_lambda_function.stats.arn
 
   # Batch processing configuration
-  batch_size = 5 # Process up to 5 matchup messages per invocation (with 600s timeout + concurrency=1)
+  # batch_size=1 keeps each invocation to at most 1 matchup (~8 players × 3 stat types = 24 BBRef
+  # requests × 4s spacing = ~96s baseline). The previous value of 5 multiplied that to 480s,
+  # leaving no headroom for 429 exponential backoff (15s→30s→60s per retried URL).
+  batch_size = 1
   # Note: maximum_batching_window_in_seconds is not supported for FIFO queues
 
   # Error handling

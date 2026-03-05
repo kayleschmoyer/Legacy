@@ -105,6 +105,12 @@ variable "sentry_dsn" {
   sensitive   = true
 }
 
+variable "alert_email" {
+  description = "E-mail address to receive CloudWatch ops-alert notifications (leave empty to disable e-mail subscription)"
+  type        = string
+  default     = ""
+}
+
 # Route 53 / DNS Configuration
 variable "domain_name" {
   description = "Primary domain name for the application (e.g., legacysports.com)"
