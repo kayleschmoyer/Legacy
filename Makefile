@@ -506,18 +506,13 @@ else
 	@echo "sync-worktrees-remove is Windows-only (PowerShell required)"
 endif
 
-worktree: ## Create a worktree and auto-add to workspace (TICKET=507 DESC=fix-scoring)
+worktree: ## Create a worktree and auto-add to workspace (TICKET=507 DESC=fix-scoring [PARENT=main])
 ifeq ($(DETECTED_OS),Windows)
 ifdef TICKET
-	@$(call echo_blue,Creating worktree for LS-$(TICKET)...)
-	twig worktree create LS-$(TICKET)/$(or $(DESC),work)
-	@$(call echo_blue,Registering branch dependency on main...)
-	twig branch depend LS-$(TICKET)/$(or $(DESC),work) main
-	@$(call echo_blue,Worktree created. Setting up workspace...)
-	@powershell -ExecutionPolicy Bypass -Command "if (Test-Path 'legacy-sports.code-workspace') { Write-Host 'Auto-adding to workspace...' -ForegroundColor Cyan; & '$(CURDIR)/scripts/sync-worktrees.ps1' -Add $(TICKET) } else { Write-Host 'No workspace file found. Run: make sync-worktrees TICKETS=$(TICKET)' -ForegroundColor Yellow }"
-	@twig worktree list
+	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)worktree-create.ps1 -TicketKey LS-$(TICKET) -Desc $(or $(DESC),work) -Parent $(or $(PARENT),main)
 else
 	@echo "Usage: make worktree TICKET=507 DESC=fix-scoring"
+	@echo "       make worktree TICKET=508 DESC=matchup-refresh PARENT=LS-507/fix-scoring"
 endif
 else
 	@echo "worktree target is Windows-only"

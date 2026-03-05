@@ -6,12 +6,21 @@ description: 'Create feature branches with automatic Jira ticket integration usi
 # Skill: Branch Creation
 
 > **⚠️ Prefer the [worktree workflow](../worktree-workflow/SKILL.md) for all ticket work.**
+> Use `make worktree TICKET=#### DESC=description` which creates the branch,
+> worktree, and parent dependency in one atomic command.
 > This skill covers in-place branching only. Use it when the user explicitly asks
 > to work without a worktree (e.g., "no worktree" or "in-place").
 
 ## Overview
 
 Create feature branches with automatic Jira integration using the branch-create script or twig.
+
+> **⚠️ Known pitfall — duplicate branches**: Do NOT combine `twig switch LS-#### -p=...`
+> with `twig worktree create LS-####/description`. `twig switch` auto-generates a
+> dash-format branch name from the Jira summary (e.g., `LS-490-fix-rollbar-init`),
+> while `twig worktree create` uses your slash-format name (`LS-490/fix-rollbar-init`).
+> This creates **two branches per ticket** — the dash-format orphan never gets a parent
+> dependency. Use one approach or the other, not both.
 
 ## When to Use
 

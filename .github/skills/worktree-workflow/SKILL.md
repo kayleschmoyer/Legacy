@@ -62,17 +62,14 @@ Before creating the worktree, **inspect the Jira ticket** for linked issues or d
 
 ### Step 1: Create the Branch + Worktree
 
-**Independent ticket (parent = main):**
+Use `make worktree` — it creates the branch, worktree, registers the parent dependency, and
+auto-adds to the VS Code workspace in one atomic command:
 
-From the main repo, use `twig worktree create` — it creates the branch if it doesn't exist and creates the worktree in one command:
+**Independent ticket (parent = main):**
 
 ```powershell
 cd "D:\code\legacy-sports"
-twig worktree create LS-####/short-description
-
-# Register the branch as a child of main in twig's tree
-# (twig worktree create does NOT do this automatically)
-twig branch depend LS-####/short-description main
+make worktree TICKET=#### DESC=short-description
 
 # Verify — note the path twig chose
 twig worktree list
@@ -80,34 +77,32 @@ twig worktree list
 
 **Dependent ticket (parent = another in-progress branch):**
 
-Create the branch from the parent first so twig tracks the dependency, then create the worktree:
-
 ```powershell
 cd "D:\code\legacy-sports"
-git checkout LS-XXXX/parent-branch-name
-twig switch LS-#### -p=current
-git checkout main
-twig worktree create LS-####/short-description
-
-# Register the branch under the correct parent (NOT main)
-twig branch depend LS-####/short-description LS-XXXX/parent-branch-name
+make worktree TICKET=#### DESC=short-description PARENT=LS-XXXX/parent-branch-name
 
 # Verify — branch must appear under the parent, not under main
 twig tree
 twig worktree list
 ```
 
-The worktree is placed in the repository's parent directory (`D:\code\`) in a folder derived from the branch name. Use `twig worktree list` to confirm the exact path before proceeding.
+> **Note:** `PARENT` accepts a branch name (`LS-XXXX/description`), a bare Jira key
+> (`LS-XXXX` — auto-resolved to the matching local branch), or `none` (no dependency).
+> When omitted it defaults to `main`.
 
-> If `twig worktree create` fails, fall back to manual creation:
+> **⚠️ CRITICAL**: Do **NOT** use `twig switch LS-#### -p=...` before `twig worktree create`.
+> `twig switch` auto-generates a dash-format branch name from the Jira summary (e.g.,
+> `LS-490-fix-rollbar-init`), while `twig worktree create` uses your slash-format name
+> (`LS-490/fix-rollbar-init`). This creates **two branches per ticket** — the dash-format
+> branch becomes an orphan. Use `make worktree` (or `scripts/worktree-create.ps1`)
+> which handles both steps correctly.
+
+> If `make worktree` fails, fall back to manual creation:
 >
 > ```powershell
-> git checkout main ; git pull
-> git checkout -b "LS-####/short-description"
-> git checkout main
-> New-Item -ItemType Directory -Path "D:\code\legacy-sports-worktrees" -Force
-> git worktree add "D:\code\legacy-sports-worktrees\LS-####" "LS-####/short-description"
-> git worktree list
+> twig worktree create LS-####/short-description
+> twig branch depend LS-####/short-description main   # or the actual parent branch
+> twig worktree list
 > ```
 
 ### Step 2: Confirm Jira is In Progress
@@ -354,13 +349,12 @@ make install
 
 ```powershell
 # 0. Check Jira ticket for dependencies on unmerged branches
-#    If dependent: use the dependent-ticket path in Step 1 of the full workflow
+#    If dependent: pass PARENT=LS-XXXX/branch-name in step 1
 
-# 1. Create branch + worktree (independent ticket — parent = main)
+# 1. Create branch + worktree + register parent (one command)
 cd "D:\code\legacy-sports"
-twig worktree create LS-####/description
-twig branch depend LS-####/description main  # register parentage — use actual parent branch if dependent
-twig worktree list   # note the path twig chose
+make worktree TICKET=#### DESC=description                           # independent (parent=main)
+make worktree TICKET=#### DESC=description PARENT=LS-XXXX/branch     # dependent
 
 # 2. Jira
 acli jira workitem transition --key LS-#### --status "In Progress"
@@ -375,9 +369,7 @@ cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
 # 4. Open VS Code
 code $wt
 
-# 4b. Add to multi-root workspace (if it exists)
-cd "D:\code\legacy-sports"
-make sync-worktrees-add TICKET=####   # no-op if workspace file doesn't exist yet
+# 4b. Workspace is auto-added by make worktree — no extra step needed
 
 # 5. Work, commit (from inside the worktree)
 git add . ; git commit -m "feat(scope): description (LS-####)" ; git push -u origin HEAD
