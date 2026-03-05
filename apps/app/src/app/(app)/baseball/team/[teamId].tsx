@@ -12,7 +12,7 @@ import {
   useGetPositionsForLeagueQuery,
   useUpdateTeamMemberPositionMutation,
 } from '../../../../api/db/graphql.generated';
-import { LoadingPanel } from '../../../../common/components/LoadingPanel';
+import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import {
   LeaguePositionFragment,
   MatchupFragment,
@@ -392,7 +392,7 @@ export default function Team(): React.JSX.Element {
     loadingLeague ||
     loadingScoringProfile
   ) {
-    return <LoadingPanel />;
+    return <UnifiedLoadingPanel />;
   }
 
   if (!team?.team) {

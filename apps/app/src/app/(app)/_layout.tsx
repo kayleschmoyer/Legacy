@@ -27,7 +27,7 @@ import ProfileSettingsScreen from './profile-settings';
 import PreferencesScreen from './preferences';
 import NotificationsScreen from './notifications';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
-import { LoadingPanel } from '../../common/components/LoadingPanel';
+import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import {
   useAuthHandlers,
   useCurrentUserInfo,
@@ -179,7 +179,7 @@ export default function Layout() {
   const { data: currentUser, loading } = useCurrentUserInfo();
 
   if (loading) {
-    return <LoadingPanel />;
+    return <UnifiedLoadingPanel />;
   }
 
   if (!currentUser) {

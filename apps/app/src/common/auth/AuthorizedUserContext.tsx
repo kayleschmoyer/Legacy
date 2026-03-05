@@ -1,7 +1,7 @@
 import { createContext, PropsWithChildren, useContext } from 'react';
 import { Redirect } from 'expo-router';
 import { LegacySportsJwt, useCurrentUserInfo } from './AuthHooks';
-import { LoadingPanel } from '../components/LoadingPanel';
+import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 
 export const AUTHORIZED_CONTEXT = createContext<null | LegacySportsJwt>(null);
 
@@ -11,7 +11,7 @@ export function AuthorizedUserContextProvider({
   const { loading, data: currentInfo } = useCurrentUserInfo();
 
   if (loading) {
-    return <LoadingPanel />;
+    return <UnifiedLoadingPanel />;
   }
 
   if (currentInfo === null) {
