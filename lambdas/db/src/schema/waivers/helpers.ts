@@ -7,7 +7,10 @@
 import type { PublicDb } from '@legacy-sports/db-client';
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { MIN_SEASON_WITH_GAME_DATA } from '@legacy-sports/utils';
+import {
+  MIN_SEASON_WITH_GAME_DATA,
+  SEASON_MATCHUP_MULTIPLIER,
+} from '@legacy-sports/utils';
 import { and, eq, gte, isNotNull, or } from 'drizzle-orm';
 
 /**
@@ -96,7 +99,7 @@ export async function addClaimedPlayerToCurrentMatchup(
 
   if (existingSeason.length === 0) {
     // Need to pick a season — query batting & pitching for eligible seasons
-    const minGames = gamesPerMatchup * 2;
+    const minGames = gamesPerMatchup * SEASON_MATCHUP_MULTIPLIER;
 
     const [battingSeasons, pitchingSeasons] = await Promise.all([
       db

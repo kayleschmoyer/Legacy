@@ -28,7 +28,7 @@ import {
   type TeamInfo,
   type TeamRoster,
 } from '@legacy-sports/scheduling';
-import { isNegroLeague } from '@legacy-sports/utils';
+import { isNegroLeague, SEASON_MATCHUP_MULTIPLIER } from '@legacy-sports/utils';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 
 import { type GenericDatabase } from './client/abstract/BaseDbClient';
@@ -572,7 +572,7 @@ export async function populateMatchupPlayersAndSeasons(
 
   if (allPlayerIds.length === 0) return;
 
-  const minGames = gamesPerMatchup * 2;
+  const minGames = gamesPerMatchup * SEASON_MATCHUP_MULTIPLIER;
   const [allBattingSeasons, allPitchingSeasons, allFieldingSeasons] =
     await Promise.all([
       db

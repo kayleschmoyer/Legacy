@@ -6,6 +6,7 @@ import {
   getVersionInfo,
   isNegroLeague,
   MIN_SEASON_WITH_GAME_DATA,
+  SEASON_MATCHUP_MULTIPLIER,
 } from '@legacy-sports/utils';
 import {
   createNotificationService,
@@ -529,7 +530,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
 
       // Calculate minimum games needed for valid seasons
       const gamesPerMatchup = leagueConfig[0]?.gamesPerMatchup ?? 5;
-      const minGames = gamesPerMatchup * 2; // Same logic as matchup season selection
+      const minGames = gamesPerMatchup * SEASON_MATCHUP_MULTIPLIER;
 
       // League eligibility settings
       const playerPool = leagueConfig[0]?.playerPool ?? 'all';

@@ -13,6 +13,13 @@
 export const MIN_SEASON_WITH_GAME_DATA = 1901;
 
 /**
+ * Number of matchup periods in a full season.
+ * Used to calculate the minimum games threshold for player eligibility and
+ * fantasy-points-per-game (FPG) computations: minGames = gamesPerMatchup * SEASON_MATCHUP_MULTIPLIER.
+ */
+export const SEASON_MATCHUP_MULTIPLIER = 2;
+
+/**
  * Check if a season has reliable game-level data available
  * @param season - The season year to check
  * @returns true if the season has game-level data, false otherwise
