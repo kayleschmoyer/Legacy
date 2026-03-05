@@ -185,6 +185,15 @@ export interface PlayoffBracketCreatedNotification {
   createdAt: string;
 }
 
+export interface WeekAdvancedNotification {
+  type: typeof WireNotificationType.WEEK_ADVANCED;
+  leagueId: number;
+  previousWeek: number;
+  newWeek: number;
+  /** ISO-8601 */
+  advancedAt: string;
+}
+
 /**
  * Service for sending real-time notifications via WebSocket.
  *
@@ -1021,6 +1030,37 @@ export class WebSocketNotificationService {
       leagueId,
       bracketId: payload.bracketId,
       format: payload.format,
+    });
+
+    await this.broadcast(
+      {
+        type: 'notification',
+        data: notification,
+      },
+      leagueId,
+    );
+  }
+
+  /**
+   * Notify all league members that the current week has been advanced.
+   * Clients should refetch their matchup data on receipt.
+   *
+   * @param leagueId - The league whose members should be notified.
+   * @param payload  - Week details (excludes the `type` discriminator).
+   */
+  async notifyWeekAdvanced(
+    leagueId: number,
+    payload: Omit<WeekAdvancedNotification, 'type'>,
+  ): Promise<void> {
+    const notification: WeekAdvancedNotification = {
+      type: WireNotificationType.WEEK_ADVANCED,
+      ...payload,
+    };
+
+    LOGGER.info('Sending week advanced notification', {
+      leagueId,
+      previousWeek: payload.previousWeek,
+      newWeek: payload.newWeek,
     });
 
     await this.broadcast(

@@ -797,6 +797,25 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
             //    all weeks are pre-created by createAllMatchupsForLeague).
             await advanceLeagueWeekInternal(context.db, league.id, currentWeek);
 
+            // Notify connected clients so they refetch matchup data without
+            // requiring a manual page refresh.
+            const weekAdvanceNotifier = createNotificationService();
+            if (weekAdvanceNotifier) {
+              try {
+                await weekAdvanceNotifier.notifyWeekAdvanced(league.id, {
+                  leagueId: league.id,
+                  previousWeek: currentWeek,
+                  newWeek: currentWeek + 1,
+                  advancedAt: new Date().toISOString(),
+                });
+              } catch (err: unknown) {
+                LOGGER.warn(
+                  '[autoAdvanceMatchups] Failed to send week-advanced WebSocket notification (non-fatal)',
+                  { leagueId: league.id, err },
+                );
+              }
+            }
+
             result.leaguesAdvanced++;
 
             LOGGER.info(

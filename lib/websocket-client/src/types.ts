@@ -170,6 +170,15 @@ export interface PlayoffBracketCreatedNotification {
   createdAt: string;
 }
 
+export interface WeekAdvancedNotification {
+  type: typeof ClientNotificationType.WEEK_ADVANCED;
+  leagueId: number;
+  previousWeek: number;
+  newWeek: number;
+  /** ISO-8601 */
+  advancedAt: string;
+}
+
 /**
  * Broadcast to all connections in a league when a user connects.
  * Also received by the connecting user via the USER_LIST notification.
@@ -215,6 +224,7 @@ export type NotificationData =
   | RosterUpdateNotification
   | TradeOfferNotification
   | PlayoffBracketCreatedNotification
+  | WeekAdvancedNotification
   | UserJoinedNotification
   | UserLeftNotification
   | UserListNotification;

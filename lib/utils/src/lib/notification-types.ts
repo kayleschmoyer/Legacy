@@ -33,6 +33,7 @@ export const WireNotificationType = {
   ROSTER_UPDATE: 'ROSTER_UPDATE',
   TRADE_OFFER: 'TRADE_OFFER',
   PLAYOFF_BRACKET_CREATED: 'PLAYOFF_BRACKET_CREATED',
+  WEEK_ADVANCED: 'WEEK_ADVANCED',
   USER_JOINED: 'USER_JOINED',
   USER_LEFT: 'USER_LEFT',
   /** Sent to a newly connected client with the list of already-online users. */
@@ -64,6 +65,7 @@ export const ClientNotificationType = {
   ROSTER_UPDATE: 'roster-update',
   TRADE_OFFER: 'trade-offer',
   PLAYOFF_BRACKET_CREATED: 'playoff-bracket-created',
+  WEEK_ADVANCED: 'week-advanced',
   USER_JOINED: 'user-joined',
   USER_LEFT: 'user-left',
   USER_LIST: 'user-list',
