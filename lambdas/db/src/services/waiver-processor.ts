@@ -13,7 +13,10 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
 
 import { insertActivityLog } from './activity-log';
-import { addClaimedPlayerToCurrentMatchup } from '../schema/waivers/helpers';
+import {
+  addClaimedPlayerToCurrentMatchup,
+  validateFaabBudget,
+} from '../schema/waivers/helpers';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -368,17 +371,16 @@ export class WaiverClaimProcessor {
       return { outcome: 'failed', reason: 'Player is no longer available' };
     }
 
-    // FAAB: verify budget at processing time
+    // FAAB: verify budget at processing time (accounts for all committed pending
+    // bids — same logic as submission-time validation in mutations.ts).
+    // The current claim is already in 'processing' state at this point, so it
+    // is naturally excluded from the committed-pending sum.
     if (waiverType === 'faab' && claim.faabBid != null && claim.faabBid > 0) {
-      const teamBudget = await db
-        .select({ faabBudget: PublicSchema.teams.faabBudget })
-        .from(PublicSchema.teams)
-        .where(eq(PublicSchema.teams.id, claim.teamId))
-        .limit(1);
-
-      const remaining = teamBudget[0]?.faabBudget ?? 0;
-      if (claim.faabBid > remaining) {
-        const faabReason = `Insufficient FAAB budget ($${remaining} remaining, bid was $${claim.faabBid})`;
+      try {
+        await validateFaabBudget(db, claim.teamId, claim.faabBid);
+      } catch (err) {
+        const faabReason =
+          err instanceof Error ? err.message : 'Insufficient FAAB budget';
         await this.failClaim(claim.id, faabReason);
         return { outcome: 'failed', reason: faabReason };
       }

@@ -5,9 +5,10 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq, sql } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 
 import { ProcessWaiverClaimsResult, WaiverClaim } from './types';
+import { validateFaabBudget } from './helpers';
 import { WaiverClaimProcessor } from '../../services/waiver-processor';
 import { assertAuthorized } from '../matchups/scheduled-mutations';
 import { builder } from '../builder';
@@ -195,32 +196,8 @@ builder.mutationField('claimFreeAgent', (t) =>
             'A FAAB bid amount is required for this league (must be >= 0)',
           );
         }
-        // Check team's remaining FAAB budget
-        const teamRow = await db
-          .select({ faabBudget: PublicSchema.teams.faabBudget })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, teamId))
-          .limit(1);
-
-        const remainingBudget = teamRow[0]?.faabBudget ?? 0;
-
-        // Calculate already-committed bids (pending claims)
-        const committedBids = await db
-          .select({ total: sql<number>`COALESCE(SUM(faab_bid), 0)` })
-          .from(PublicSchema.waiverClaims)
-          .where(
-            and(
-              eq(PublicSchema.waiverClaims.teamId, teamId),
-              eq(PublicSchema.waiverClaims.status, 'pending'),
-            ),
-          );
-        const alreadyCommitted = Number(committedBids[0]?.total ?? 0);
-
-        if (faabBid > remainingBudget - alreadyCommitted) {
-          throw new Error(
-            `Insufficient FAAB budget. You have $${remainingBudget - alreadyCommitted} available (total: $${remainingBudget}, committed: $${alreadyCommitted}).`,
-          );
-        }
+        // Validate FAAB budget (accounts for all committed pending bids)
+        await validateFaabBudget(db, teamId, faabBid);
         resolvedFaabBid = faabBid;
       }
 

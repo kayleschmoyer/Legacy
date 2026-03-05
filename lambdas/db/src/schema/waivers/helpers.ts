@@ -1,8 +1,9 @@
 /**
  * Waivers domain — Helper utilities
  *
- * Contains the addClaimedPlayerToCurrentMatchup function used by
- * processWaiverClaims to set up a newly-claimed player's matchup data.
+ * Contains shared helpers used across the waivers domain:
+ *  - validateFaabBudget: consistent FAAB budget validation (submission + processing)
+ *  - addClaimedPlayerToCurrentMatchup: set up a newly-claimed player's matchup data
  */
 import type { PublicDb } from '@legacy-sports/db-client';
 import { PublicSchema } from '@legacy-sports/db-client';
@@ -11,7 +12,50 @@ import {
   MIN_SEASON_WITH_GAME_DATA,
   SEASON_MATCHUP_MULTIPLIER,
 } from '@legacy-sports/utils';
-import { and, eq, gte, isNotNull, or } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, or, sql } from 'drizzle-orm';
+
+/**
+ * Validate that a team has sufficient FAAB budget for a bid, accounting for
+ * all currently pending (committed) bids.
+ *
+ * Throws an Error if the bid exceeds available budget.
+ * Used at both submission time (mutations.ts) and processing time
+ * (waiver-processor.ts) to ensure consistent validation.
+ *
+ * At processing time the claim being validated has already been set to
+ * 'processing' (not 'pending'), so it is naturally excluded from the
+ * committed-bids sum — no explicit exclusion needed.
+ */
+export async function validateFaabBudget(
+  db: PublicDb,
+  teamId: number,
+  faabBid: number,
+): Promise<void> {
+  const teamRow = await db
+    .select({ faabBudget: PublicSchema.teams.faabBudget })
+    .from(PublicSchema.teams)
+    .where(eq(PublicSchema.teams.id, teamId))
+    .limit(1);
+
+  const remainingBudget = teamRow[0]?.faabBudget ?? 0;
+
+  const committedBids = await db
+    .select({ total: sql<number>`COALESCE(SUM(faab_bid), 0)` })
+    .from(PublicSchema.waiverClaims)
+    .where(
+      and(
+        eq(PublicSchema.waiverClaims.teamId, teamId),
+        eq(PublicSchema.waiverClaims.status, 'pending'),
+      ),
+    );
+  const alreadyCommitted = Number(committedBids[0]?.total ?? 0);
+
+  if (faabBid > remainingBudget - alreadyCommitted) {
+    throw new Error(
+      `Insufficient FAAB budget. You have $${remainingBudget - alreadyCommitted} available (total: $${remainingBudget}, committed: $${alreadyCommitted}).`,
+    );
+  }
+}
 
 /**
  * After a player is claimed off waivers, this function:
