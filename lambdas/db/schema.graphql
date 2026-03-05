@@ -2451,6 +2451,7 @@ type TeamStanding {
   avatarUrl: String
   averagePointsAgainst: Float
   averagePointsFor: Float
+  divisionId: Int
   losses: Int
   pointsAgainst: Float
   pointsFor: Float

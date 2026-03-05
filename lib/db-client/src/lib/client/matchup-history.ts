@@ -39,6 +39,8 @@ export interface TeamStanding {
   avatarUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  /** Division this team belongs to; null means the league has no divisions */
+  divisionId?: number | null;
 }
 
 /**
@@ -244,6 +246,7 @@ export async function calculateStandings(
       avatarUrl: Schema.teams.avatarUrl,
       primaryColor: Schema.teams.primaryColor,
       secondaryColor: Schema.teams.secondaryColor,
+      divisionId: Schema.teams.divisionId,
     })
     .from(Schema.teams)
     .where(eq(Schema.teams.leagueId, leagueId));
@@ -270,6 +273,7 @@ export async function calculateStandings(
       avatarUrl: team.avatarUrl,
       primaryColor: team.primaryColor,
       secondaryColor: team.secondaryColor,
+      divisionId: team.divisionId ?? null,
     });
   }
 

@@ -377,6 +377,8 @@ export const TeamStanding = builder.objectRef<{
   avatarUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  /** Division this team belongs to; null means the league has no divisions */
+  divisionId?: number | null;
 }>('TeamStanding');
 
 builder.objectType(TeamStanding, {
@@ -397,6 +399,7 @@ builder.objectType(TeamStanding, {
     avatarUrl: t.exposeString('avatarUrl', { nullable: true }),
     primaryColor: t.exposeString('primaryColor', { nullable: true }),
     secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
+    divisionId: t.exposeInt('divisionId', { nullable: true }),
   }),
 });
 

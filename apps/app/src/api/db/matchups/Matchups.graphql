@@ -50,6 +50,7 @@ query GetLeagueStandings($leagueId: Int!) {
     avatarUrl
     primaryColor
     secondaryColor
+    divisionId
   }
 }
 
