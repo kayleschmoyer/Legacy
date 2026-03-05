@@ -256,12 +256,12 @@ const FAQ_ITEMS: FaqItemProps[] = [
   {
     question: 'How do I create a fantasy baseball league?',
     answer:
-      'Navigate to Baseball → Create League from the top navigation. Fill in your league name, choose your scoring settings, and set the number of teams. Once created, you can invite others using the league invite code found in the League Settings tab.',
+      "Head to the Baseball section and click Create League. Fill in your league name, set the number of teams, configure draft and roster options, and choose an era filter. Once created, you can invite others using the league invite code shown on your league's Overview tab.",
   },
   {
     question: 'How do I invite teammates to join my league?',
     answer:
-      'Open your league page and go to the Settings tab. Copy the invite code or share the invite link directly. Players can join via Baseball → Join League and entering the code, or by clicking your shared link.',
+      'Open your league page and look for the invite card on the Overview tab. Copy the invite code, share the invite link, or display the QR code. Players can join via Baseball → Join League and entering the code, or by clicking your shared link.',
   },
   {
     question: 'How does the draft work?',
@@ -271,17 +271,17 @@ const FAQ_ITEMS: FaqItemProps[] = [
   {
     question: 'How is my team score calculated?',
     answer:
-      "Scores are calculated from archived MLB box-score statistics loaded when games are selected for your matchup. Each counting stat (H, HR, RBI, R, SB, etc.) is multiplied by a configurable point value defined in your league's scoring profile. You can view the exact scoring breakdown in your league's Settings tab.",
+      "Scores are calculated from archived MLB box-score statistics loaded when games are selected for your matchup. Each counting stat (H, HR, RBI, R, SB, etc.) is multiplied by a configurable point value defined in your league's scoring profile. You can view the scoring summary on your league's Overview tab, and commissioners can edit scoring values in the Commissioner tab.",
   },
   {
     question: 'How do I add or drop players?',
     answer:
-      'Go to your team page and click Manage Roster. You can drop a current player and pick up a free agent in one transaction. Waiver rules (if enabled) queue your claim for nightly processing at 2 AM EST, so your pickup may be delayed up to 24 hours.',
+      'Navigate to the Free Agents tab on your league page to browse available players. When you claim a player and your roster is full, you can drop a current player in the same transaction. Waiver rules (if enabled) queue your claim for nightly processing at 2 AM EST, so your pickup may be delayed up to 24 hours.',
   },
   {
     question: 'How do I view matchup results?',
     answer:
-      'Click on your league and select the Matchups tab. Current and historical matchup scores are shown there. You can also click into any matchup for a player-by-player breakdown.',
+      'Click on your league and select the Matchup tab. Current and historical matchup scores are shown there. You can also click into any matchup for a player-by-player breakdown.',
   },
   {
     question: 'Why are my player statistics not updating?',
@@ -291,7 +291,7 @@ const FAQ_ITEMS: FaqItemProps[] = [
   {
     question: 'How do I change my display name or avatar?',
     answer:
-      'Go to Profile → Settings from the user menu in the top-right corner. You can update your display name and other profile details there.',
+      'Open the user menu in the top-right corner and select Profile Settings. Your display name and profile photo are managed through your Google account, but you can change your in-app avatar from this page.',
   },
 ];
 
@@ -306,7 +306,7 @@ const HISTORICAL_FAQ_ITEMS: FaqItemProps[] = [
   {
     question: 'What is a "season assignment"?',
     answer:
-      'When you draft a player, the system automatically assigns them a season from their MLB career — a year when they played enough games to fill a full matchup schedule. Each player on your roster can come from a different era, so your 1927 Babe Ruth plays alongside a 2019 Mike Trout. Your knowledge of great historical seasons across all eras is your competitive edge.',
+      'After the draft completes and matchups are created, the system automatically assigns each player a season from their MLB career — a year when they played enough games to fill a full matchup schedule. Each player on your roster can come from a different era, so your 1927 Babe Ruth plays alongside a 2019 Mike Trout. Your knowledge of great historical seasons across all eras is your competitive edge.',
   },
   {
     question: 'How does game selection work?',
@@ -582,7 +582,7 @@ export default function HelpPage() {
                   {
                     step: 3,
                     title: 'Follow the season',
-                    body: 'Check your matchup score throughout the week. Real MLB stats power your fantasy team — every hit, homer, and strikeout counts.',
+                    body: 'Check your matchup score throughout the week. Archived historical MLB stats power your fantasy team — every hit, homer, and strikeout counts.',
                   },
                   {
                     step: 4,
@@ -644,21 +644,21 @@ export default function HelpPage() {
                     iconLabel="bug"
                     title="Report a Bug"
                     description="Found something broken? Open a GitHub issue and we'll prioritize a fix."
-                    href="https://github.com/bbarclay/legacy-sports/issues/new?labels=bug&template=bug_report.md"
+                    href="https://github.com/bkrupa/legacy-sports/issues/new?labels=bug&template=bug_report.md"
                   />
                   <ContactOption
                     icon="💡"
                     iconLabel="idea"
                     title="Suggest a Feature"
                     description="Have an idea that would make Legacy Sports better? We'd love to hear it."
-                    href="https://github.com/bbarclay/legacy-sports/issues/new?labels=enhancement&template=feature_request.md"
+                    href="https://github.com/bkrupa/legacy-sports/issues/new?labels=enhancement&template=feature_request.md"
                   />
                   <ContactOption
                     icon="💬"
                     iconLabel="discussion"
                     title="Community Discussions"
                     description="Chat with other managers, share tips, and get advice from the community."
-                    href="https://github.com/bbarclay/legacy-sports/discussions"
+                    href="https://github.com/bkrupa/legacy-sports/discussions"
                   />
                 </YStack>
 
@@ -709,8 +709,7 @@ export default function HelpPage() {
                 Management
               </Paragraph>
               <Paragraph color="$gray10" fontSize="$2" textAlign="center">
-                Powered by official MLB statistics • Data refreshed throughout
-                each game day
+                Powered by archived MLB box-score statistics
               </Paragraph>
             </YStack>
           </ContentContainer>

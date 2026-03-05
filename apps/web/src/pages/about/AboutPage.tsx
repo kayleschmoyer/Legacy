@@ -72,7 +72,7 @@ export default function AboutPage() {
   const { appVersion, commitSha, buildDate } = env;
 
   // Generate GitHub commit URL
-  const repoUrl = 'https://github.com/bbarclay/legacy-sports';
+  const repoUrl = 'https://github.com/bkrupa/legacy-sports';
   const commitUrl =
     commitSha && commitSha !== 'unknown' && commitSha !== 'dev'
       ? `${repoUrl}/commit/${commitSha}`

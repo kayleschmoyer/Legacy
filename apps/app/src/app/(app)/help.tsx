@@ -16,12 +16,12 @@ const FAQ_ITEMS: FaqItemProps[] = [
   {
     question: 'How do I create a fantasy baseball league?',
     answer:
-      'Navigate to Baseball → Create League. Fill in your league name, choose your scoring settings, and set the number of teams. Once created, you can invite others using the league invite code found in the League Settings tab.',
+      "Head to the Baseball section and tap Create League. Fill in your league name, set the number of teams, configure draft and roster options, and choose an era filter. Once created, you can invite others using the league invite code shown on your league's Overview tab.",
   },
   {
     question: 'How do I invite teammates to join my league?',
     answer:
-      'Open your league page and go to the Settings tab. Copy the invite code or share the invite link directly. Players can join via Baseball → Join League and entering the code.',
+      'Open your league page and look for the invite card on the Overview tab. Copy the invite code or share the invite link directly. Players can join via Baseball → Join League and entering the code.',
   },
   {
     question: 'How does the draft work?',
@@ -31,22 +31,22 @@ const FAQ_ITEMS: FaqItemProps[] = [
   {
     question: 'How is my team score calculated?',
     answer:
-      "Scores are calculated from real MLB statistics pulled nightly. Each stat category (HR, RBI, AVG, etc.) is worth a set number of points defined by your league settings. You can view the exact scoring breakdown in your league's Settings tab.",
+      "Scores are calculated from archived MLB box-score statistics loaded when games are selected for your matchup. Each counting stat (H, HR, RBI, R, SB, etc.) is multiplied by a configurable point value defined in your league's scoring profile. You can view the scoring summary on your league's Overview tab.",
   },
   {
     question: 'How do I add or drop players?',
     answer:
-      'Go to your team page and tap Manage Roster. You can drop a current player and pick up a free agent in one transaction. Waiver rules (if enabled) may delay your pickup by 24–48 hours.',
+      'Navigate to the Free Agents tab on your league page to browse available players. When you claim a player and your roster is full, you can drop a current player in the same transaction. Waiver rules (if enabled) may delay your pickup up to 24 hours.',
   },
   {
     question: 'How do I view matchup results?',
     answer:
-      'Tap on your league and select the Matchups tab. Current and historical matchup scores are shown there. You can also tap into any matchup for a player-by-player breakdown.',
+      'Tap on your league and select the Matchup tab. Current and historical matchup scores are shown there. You can also tap into any matchup for a player-by-player breakdown.',
   },
   {
     question: 'Why are my player statistics not updating?',
     answer:
-      'Stats are refreshed from official MLB data sources on a schedule. During an active game day, scores typically update every 15–30 minutes. If stats appear stale after a game has ended, try pulling to refresh.',
+      'Player statistics come from archived historical box scores and are loaded when games are selected for your matchup. If stats appear missing after a game has been selected, the system may still be loading data from our historical data source. This usually completes within a few minutes. If stats are still missing after an hour, try pulling to refresh or contact support.',
   },
   {
     question: 'How do I change my display name or avatar?',
@@ -115,7 +115,7 @@ const GETTING_STARTED_STEPS = [
   {
     step: 3,
     title: 'Follow the season',
-    body: 'Check your matchup score throughout the week. Real MLB stats power your fantasy team — every hit, homer, and strikeout counts.',
+    body: 'Check your matchup score throughout the week. Archived historical MLB stats power your fantasy team — every hit, homer, and strikeout counts.',
   },
   {
     step: 4,
@@ -138,19 +138,19 @@ const CONTACT_ITEMS: ContactItem[] = [
     icon: '🐛',
     title: 'Report a Bug',
     description: 'Found something broken? Open a GitHub issue.',
-    url: 'https://github.com/bbarclay/legacy-sports/issues/new?labels=bug&template=bug_report.md',
+    url: 'https://github.com/bkrupa/legacy-sports/issues/new?labels=bug&template=bug_report.md',
   },
   {
     icon: '💡',
     title: 'Suggest a Feature',
     description: 'Have an idea? We would love to hear it.',
-    url: 'https://github.com/bbarclay/legacy-sports/issues/new?labels=enhancement&template=feature_request.md',
+    url: 'https://github.com/bkrupa/legacy-sports/issues/new?labels=enhancement&template=feature_request.md',
   },
   {
     icon: '💬',
     title: 'Community Discussions',
     description: 'Chat with other managers and share tips.',
-    url: 'https://github.com/bbarclay/legacy-sports/discussions',
+    url: 'https://github.com/bkrupa/legacy-sports/discussions',
   },
 ];
 
