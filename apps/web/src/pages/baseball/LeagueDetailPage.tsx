@@ -101,7 +101,7 @@ import {
   mapPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
-import { AvatarPicker } from '../../components/common';
+import { AvatarImage, AvatarPicker } from '../../components/common';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
 import { DraftOrderControl } from '../../components/commissioner/DraftOrderControl';
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
@@ -485,6 +485,9 @@ export function LeagueDetailPage(): React.JSX.Element {
             leagueId: t.leagueId ?? 0,
             waiverOrder: t.waiverOrder ?? null,
             faabBudget: t.faabBudget ?? null,
+            logoUrl: t.logoUrl ?? null,
+            primaryColor: t.primaryColor ?? null,
+            secondaryColor: t.secondaryColor ?? null,
           })),
         ),
       );
@@ -690,6 +693,9 @@ export function LeagueDetailPage(): React.JSX.Element {
           leagueId: t.leagueId ?? 0,
           waiverOrder: t.waiverOrder ?? null,
           faabBudget: t.faabBudget ?? null,
+          logoUrl: t.logoUrl ?? null,
+          primaryColor: t.primaryColor ?? null,
+          secondaryColor: t.secondaryColor ?? null,
         }));
 
   const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
@@ -1662,6 +1668,12 @@ export function LeagueDetailPage(): React.JSX.Element {
                       >
                         {idx + 1}
                       </Text>
+                      <AvatarImage
+                        url={team.logoUrl}
+                        username={team.name}
+                        size={24}
+                        borderRadius={4}
+                      />
                       <Text
                         fontSize="$3"
                         fontWeight={userTeamId === team.id ? '700' : '500'}

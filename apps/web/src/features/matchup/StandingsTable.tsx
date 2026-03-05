@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Card, H3, Separator, Text, XStack, YStack } from 'tamagui';
-import { BRAND_GOLD_LIGHT, BRAND_NAVY } from '../../constants/colors';
+import { BRAND_GOLD_LIGHT } from '../../constants/colors';
 import { type GetLeagueStandingsQuery } from '../../api/db/graphql.generated';
+import { AvatarImage } from '../../components/common';
 
 type StandingRecord = NonNullable<
   GetLeagueStandingsQuery['getLeagueStandings']
@@ -185,42 +186,12 @@ export function StandingsTable({
           >
             <YStack flex={1} minWidth={120} justifyContent="center">
               <XStack gap="$2" alignItems="center">
-                {/* Team avatar */}
-                <YStack
-                  width={32}
-                  height={32}
-                  borderRadius={16}
-                  overflow="hidden"
-                  alignItems="center"
-                  justifyContent="center"
-                  flexShrink={0}
-                  style={{
-                    background: standing.primaryColor ?? BRAND_NAVY,
-                  }}
-                >
-                  {standing.avatarUrl ? (
-                    <img
-                      src={standing.avatarUrl}
-                      alt={standing.teamName ?? 'Team'}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                  ) : (
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: '700',
-                        color: 'white',
-                        lineHeight: '1',
-                      }}
-                    >
-                      {(standing.teamName ?? 'T').charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                </YStack>
+                <AvatarImage
+                  url={standing.avatarUrl}
+                  username={standing.teamName}
+                  size={32}
+                  borderRadius={4}
+                />
                 <Text fontSize="$3" fontWeight="600">
                   {standing.teamName ?? `Team ${standing.teamId}`}
                 </Text>

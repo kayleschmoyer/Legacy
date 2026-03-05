@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, H3, Separator, Text, XStack, YStack } from 'tamagui';
 import { type GetLeagueStandingsQuery } from '../../api/db/graphql.generated';
+import { AvatarImage } from '../common';
 
 type StandingRecord = NonNullable<
   GetLeagueStandingsQuery['getLeagueStandings']
@@ -182,10 +183,18 @@ export function StandingsTable({
             backgroundColor={index % 2 === 0 ? '$background' : '$gray2'}
             gap="$2"
           >
-            <YStack flex={1} minWidth={120}>
-              <Text fontSize="$3" fontWeight="600">
-                {standing.teamName ?? `Team ${standing.teamId}`}
-              </Text>
+            <YStack flex={1} minWidth={120} justifyContent="center">
+              <XStack alignItems="center" gap="$2">
+                <AvatarImage
+                  url={standing.avatarUrl}
+                  username={standing.teamName}
+                  size={28}
+                  borderRadius={4}
+                />
+                <Text fontSize="$3" fontWeight="600">
+                  {standing.teamName ?? `Team ${standing.teamId}`}
+                </Text>
+              </XStack>
             </YStack>
             <YStack width={50} alignItems="center">
               <Text fontSize="$3" color="$green10" fontWeight="bold">

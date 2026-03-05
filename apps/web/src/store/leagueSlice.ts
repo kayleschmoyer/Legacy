@@ -40,6 +40,9 @@ interface LeagueState {
     leagueId: number;
     waiverOrder?: number | null;
     faabBudget?: number | null;
+    logoUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
   }>;
   userTeamId: number | null;
   isCommissioner: boolean;
