@@ -2,7 +2,11 @@
  * Draft domain â€” helper functions
  */
 
-import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
+import {
+  finalizeDraftCompletion,
+  PublicDb,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import { ALLOWED_POSITIONS } from '@legacy-sports/utils';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 
@@ -309,16 +313,14 @@ export async function commitDraftPick(
       currentPickDeadline: nextDeadline,
       updatedAt: now,
       ...(setStartedAt ? { draftStartedAt: now } : {}),
-      ...(isDraftComplete ? { draftCompletedAt: now } : {}),
     })
     .where(eq(PublicSchema.drafts.id, draftId));
 
-  // Mark the league draft as completed when the last pick is made
+  // Atomically stamp draftCompletedAt and set draftStatus='completed' on completion.
+  // Uses the shared finalizeDraftCompletion helper so both live-draft and
+  // automated-draft paths go through identical completion logic.
   if (isDraftComplete) {
-    await tx
-      .update(PublicSchema.leagues)
-      .set({ draftStatus: 'completed' })
-      .where(eq(PublicSchema.leagues.id, leagueId));
+    await finalizeDraftCompletion(tx, leagueId, now);
   }
 
   // Add the drafted player to the team's roster

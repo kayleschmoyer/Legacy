@@ -23,6 +23,7 @@ import {
 import {
   createAllMatchupsForLeague,
   filterPlayerIdsByLeagueEligibility,
+  finalizeDraftCompletion,
   PublicDb,
   PublicSchema,
   runWithPublicClient,
@@ -1132,6 +1133,31 @@ async function updateDraftStatus(
 }
 
 /**
+ * Atomically finalize the draft: stamp draftCompletedAt on the drafts row
+ * and set draftStatus = 'completed' on the leagues row, both in a single
+ * database transaction.  This eliminates the race window that existed when
+ * setDraftCompletedAt and updateDraftStatus('completed') ran as separate
+ * connections.
+ *
+ * Uses the shared finalizeDraftCompletion helper (lib/db-client) so the
+ * automated-draft path applies identical completion logic to the live-draft
+ * path (commitDraftPick).
+ */
+async function finalizeDraftAndStatus(leagueId: number): Promise<void> {
+  await runWithPublicClient(getDbOptions(), async (db) => {
+    await db.transaction(async (tx) => {
+      await finalizeDraftCompletion(tx, leagueId);
+    });
+  });
+  addBreadcrumb(
+    'Draft finalized atomically: draftCompletedAt + draftStatus=completed',
+    {
+      leagueId,
+    },
+  );
+}
+
+/**
  * Create all matchups (schedule) for the league after an automated draft completes.
  * This runs the same matchup-generation logic that the pick-by-pick GraphQL path uses.
  */
@@ -1148,22 +1174,6 @@ async function createLeagueMatchupsAfterDraft(leagueId: number): Promise<void> {
       matchupCount: result.matchupCount,
       currentMatchupId: result.currentMatchupId,
     });
-  });
-}
-
-/**
- * Stamp the draft's draft_completed_at timestamp.
- * Called after matchup creation so the frontend knows the league is fully ready.
- * Updates the drafts table (which has the draft_completed_at column), not leagues.
- */
-async function setDraftCompletedAt(leagueId: number): Promise<void> {
-  await runWithPublicClient(getDbOptions(), async (db) => {
-    await db
-      .update(PublicSchema.drafts)
-      .set({ draftCompletedAt: new Date() })
-      .where(eq(PublicSchema.drafts.leagueId, leagueId));
-
-    LOGGER.info('Set draftCompletedAt on draft for league', { leagueId });
   });
 }
 
@@ -1250,22 +1260,18 @@ async function processDraftMessage(
     await createLeagueMatchupsAfterDraft(leagueId);
     addBreadcrumb('League matchups created', { leagueId });
 
-    // Step 3.6: Stamp draft_completed_at so the frontend knows the league is ready.
-    await setDraftCompletedAt(leagueId);
+    // Step 3.6: Atomically stamp draftCompletedAt and set draftStatus='completed'.
+    // Using finalizeDraftAndStatus (shared helper) ensures both writes land in the
+    // same transaction — eliminating the race window where draftStatus could be
+    // 'completed' while draftCompletedAt was still null.
+    await finalizeDraftAndStatus(leagueId);
 
     addBreadcrumb('Draft processing completed successfully', {
       selectionMethod,
       leagueId,
     });
 
-    // Step 4: Update draft status to 'completed'
-    await updateDraftStatus(
-      leagueId,
-      'completed',
-      'draft processing completed successfully',
-    );
-
-    // Step 5: Send WebSocket notification
+    // Step 4: Send WebSocket notification
     try {
       if (notificationService) {
         await notificationService.notifyDraftCompleted(
