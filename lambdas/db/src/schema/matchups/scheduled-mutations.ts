@@ -917,11 +917,12 @@ async function advanceLeagueWeekInternal(
       return;
     }
 
-    // Update league current matchup and reset advance status
+    // Update league current matchup/week and reset advance status
     await db
       .update(PublicSchema.leagues)
       .set({
         currentMatchup: activatedMatchups[0].id,
+        currentWeek: nextWeek,
         weekAdvanceStatus: 'idle',
       })
       .where(eq(PublicSchema.leagues.id, leagueId));

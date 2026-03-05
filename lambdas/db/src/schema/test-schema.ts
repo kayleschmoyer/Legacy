@@ -22,6 +22,7 @@ export const leagues = sqliteTable('leagues', {
   owner: integer('owner').notNull(),
   maxRosterSize: integer('max_roster_size').default(25),
   currentMatchup: integer('current_matchup'),
+  currentWeek: integer('current_week'),
   draftStatus: text('draft_status').default('not-started'),
   inviteCode: text('invite_code').notNull().unique(),
   minGamesPerSeason: integer('min_games_per_season').default(10),

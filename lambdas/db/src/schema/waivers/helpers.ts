@@ -23,38 +23,62 @@ export async function addClaimedPlayerToCurrentMatchup(
   teamId: number,
   playerId: number,
 ): Promise<void> {
-  // 1. Get the current matchup to determine the active week
+  // 1. Get the current week to determine the active week
   const leagueRows = await db
-    .select({ currentMatchup: PublicSchema.leagues.currentMatchup })
+    .select({
+      currentWeek: PublicSchema.leagues.currentWeek,
+      // Keep legacy fallback for leagues not yet migrated
+      currentMatchup: PublicSchema.leagues.currentMatchup,
+    })
     .from(PublicSchema.leagues)
     .where(eq(PublicSchema.leagues.id, leagueId))
     .limit(1);
 
-  const currentMatchupId = leagueRows[0]?.currentMatchup;
-  if (!currentMatchupId) {
+  // Resolve week number: prefer authoritative currentWeek, fall back to
+  // fetching from the legacy currentMatchup pointer.
+  let weekNumber: number | null | undefined;
+  if (leagueRows[0]?.currentWeek != null) {
+    weekNumber = leagueRows[0].currentWeek;
+  } else {
+    const currentMatchupId = leagueRows[0]?.currentMatchup;
+    if (!currentMatchupId) {
+      LOGGER.info(
+        'No active matchup — skipping matchup player setup for waiver claim',
+        {
+          leagueId,
+          playerId,
+        },
+      );
+      return;
+    }
+    const refMatchup = await db
+      .select({ weekNumber: PublicSchema.matchups.weekNumber })
+      .from(PublicSchema.matchups)
+      .where(eq(PublicSchema.matchups.id, currentMatchupId))
+      .limit(1);
+    weekNumber = refMatchup[0]?.weekNumber;
+  }
+
+  if (weekNumber == null) {
     LOGGER.info(
-      'No active matchup — skipping matchup player setup for waiver claim',
-      {
-        leagueId,
-        playerId,
-      },
+      'No active match week — skipping matchup player setup for waiver claim',
+      { leagueId, playerId },
     );
     return;
   }
 
-  const refMatchup = await db
-    .select({
-      weekNumber: PublicSchema.matchups.weekNumber,
-      gamesPerMatchup: PublicSchema.matchups.gamesPerMatchup,
-    })
+  // Fetch gamesPerMatchup for eligibility threshold from any matchup this week
+  const weekMatchupRef = await db
+    .select({ gamesPerMatchup: PublicSchema.matchups.gamesPerMatchup })
     .from(PublicSchema.matchups)
-    .where(eq(PublicSchema.matchups.id, currentMatchupId))
+    .where(
+      and(
+        eq(PublicSchema.matchups.leagueId, leagueId),
+        eq(PublicSchema.matchups.weekNumber, weekNumber),
+      ),
+    )
     .limit(1);
-
-  const weekNumber = refMatchup[0]?.weekNumber;
-  if (weekNumber == null) return;
-
-  const gamesPerMatchup = refMatchup[0]?.gamesPerMatchup ?? 7;
+  const gamesPerMatchup = weekMatchupRef[0]?.gamesPerMatchup ?? 7;
 
   // 2. Season selection — pick a random eligible season for this player
   //    Mirrors the logic in game-selection lambda's createMatchupForLeagueWeek

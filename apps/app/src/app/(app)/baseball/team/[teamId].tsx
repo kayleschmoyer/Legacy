@@ -5,6 +5,7 @@ import { Separator, Tabs, Text, YStack } from 'tamagui';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { computeAverageScoring, computeScoring } from '@legacy-sports/scoring';
+import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import { applyMultiplierGroups } from '../../../../common/scoring';
 import { useGetMatchupStatsQuery } from '../../../../api/db/matchups/Matchups.generated';
 import { useGetTeamByIdQuery } from '../../../../api/db/teams/Teams.generated';
@@ -12,7 +13,6 @@ import {
   useGetPositionsForLeagueQuery,
   useUpdateTeamMemberPositionMutation,
 } from '../../../../api/db/graphql.generated';
-import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import {
   LeaguePositionFragment,
   MatchupFragment,

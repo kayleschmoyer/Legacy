@@ -27,6 +27,7 @@ async function createTestSchema(
       owner INTEGER NOT NULL,
       max_roster_size INTEGER DEFAULT 25,
       current_matchup INTEGER,
+      current_week INTEGER,
       draft_status TEXT DEFAULT 'not-started',
       invite_code TEXT UNIQUE NOT NULL,
       min_games_per_season INTEGER DEFAULT 10,

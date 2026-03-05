@@ -7,6 +7,7 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Separator, Text, YStack } from 'tamagui';
 
+import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import BaseballHome from './baseball';
 import DraftBoardPage from './DraftBoardPage';
 import FootballHome from './football';
@@ -27,7 +28,6 @@ import ProfileSettingsScreen from './profile-settings';
 import PreferencesScreen from './preferences';
 import NotificationsScreen from './notifications';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
-import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import {
   useAuthHandlers,
   useCurrentUserInfo,

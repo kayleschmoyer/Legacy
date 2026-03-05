@@ -723,9 +723,10 @@ A fantasy sports league
 type League {
   bannerUrl: String
   currentMatchup: Int
+  currentWeek: Int
 
   """
-  The week number of the current matchup (resolved from the matchup record)
+  The current active week number for the league
   """
   currentWeekNumber: Int
   draftStatus: String

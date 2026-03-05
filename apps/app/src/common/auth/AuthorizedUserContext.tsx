@@ -1,7 +1,7 @@
 import { createContext, PropsWithChildren, useContext } from 'react';
 import { Redirect } from 'expo-router';
-import { LegacySportsJwt, useCurrentUserInfo } from './AuthHooks';
 import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
+import { LegacySportsJwt, useCurrentUserInfo } from './AuthHooks';
 
 export const AUTHORIZED_CONTEXT = createContext<null | LegacySportsJwt>(null);
 

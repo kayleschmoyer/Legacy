@@ -663,7 +663,8 @@ export type League = {
   __typename?: 'League';
   bannerUrl?: Maybe<Scalars['String']['output']>;
   currentMatchup?: Maybe<Scalars['Int']['output']>;
-  /** The week number of the current matchup (resolved from the matchup record) */
+  currentWeek?: Maybe<Scalars['Int']['output']>;
+  /** The current active week number for the league */
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;

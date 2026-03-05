@@ -42,6 +42,10 @@ export const leagues = pgTable(
     owner: integer('owner').notNull(),
     maxRosterSize: integer('max_roster_size').notNull().default(25),
     currentMatchup: integer('current_matchup'),
+    /** Canonical current active week number. Replaces the currentMatchup FK as the
+     * authoritative "which week is the league on" signal. Backfilled from
+     * matchups.week_number on migration 20260305_120000. */
+    currentWeek: integer('current_week'),
     draftStatus: draftStatus('draft_status').notNull().default('not-started'),
     inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
     minGamesPerSeason: integer('min_games_per_season').default(10),
@@ -101,6 +105,7 @@ export const leagues = pgTable(
       currentMatchupIdx: index('leagues_current_matchup_idx').on(
         table.currentMatchup,
       ),
+      currentWeekIdx: index('leagues_current_week_idx').on(table.currentWeek),
     };
   },
 );

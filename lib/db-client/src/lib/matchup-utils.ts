@@ -1031,6 +1031,7 @@ export async function createAllMatchupsForLeague(
     .update(PublicSchema.leagues)
     .set({
       currentMatchup: currentMatchupId ?? undefined,
+      currentWeek: 1,
       weekAdvanceStatus: 'idle',
     })
     .where(eq(PublicSchema.leagues.id, leagueId));

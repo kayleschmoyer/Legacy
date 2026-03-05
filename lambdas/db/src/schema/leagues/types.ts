@@ -43,6 +43,8 @@ export const League = builder.objectRef<{
   owner: number;
   maxRosterSize: number;
   currentMatchup: number | null;
+  /** Authoritative current week number — replaces the currentMatchup FK pointer. */
+  currentWeek: number | null;
   draftStatus:
     | 'not-started'
     | 'queued'
@@ -87,6 +89,7 @@ League.implement({
     owner: t.exposeInt('owner'),
     maxRosterSize: t.exposeInt('maxRosterSize'),
     currentMatchup: t.exposeInt('currentMatchup', { nullable: true }),
+    currentWeek: t.exposeInt('currentWeek', { nullable: true }),
     draftStatus: t.exposeString('draftStatus'),
     inviteCode: t.exposeString('inviteCode'),
     playerPool: t.exposeString('playerPool'),
@@ -111,9 +114,11 @@ League.implement({
     secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,
-      description:
-        'The week number of the current matchup (resolved from the matchup record)',
+      description: 'The current active week number for the league',
       resolve: async (parent, _args, context) => {
+        // currentWeek is the authoritative source; fall back to resolving via
+        // the legacy currentMatchup FK for any league not yet migrated.
+        if (parent.currentWeek != null) return parent.currentWeek;
         if (!parent.currentMatchup) return null;
         const matchup = await context.loaders.matchupsById.load(
           parent.currentMatchup,

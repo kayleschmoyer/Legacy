@@ -91,6 +91,7 @@ export interface CreateLeagueResult {
     owner: number;
     maxRosterSize: number;
     currentMatchup: number | null;
+    currentWeek: number | null;
     draftStatus:
       | 'not-started'
       | 'queued'
@@ -192,6 +193,7 @@ export class LeagueService {
           owner: PublicSchema.leagues.owner,
           maxRosterSize: PublicSchema.leagues.maxRosterSize,
           currentMatchup: PublicSchema.leagues.currentMatchup,
+          currentWeek: PublicSchema.leagues.currentWeek,
           draftStatus: PublicSchema.leagues.draftStatus,
           inviteCode: PublicSchema.leagues.inviteCode,
           playerPool: PublicSchema.leagues.playerPool,

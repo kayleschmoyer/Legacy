@@ -156,6 +156,7 @@ export async function fetchLeagueDetails(leagueId: number) {
         owner: PublicSchema.leagues.owner,
         maxRosterSize: PublicSchema.leagues.maxRosterSize,
         currentMatchup: PublicSchema.leagues.currentMatchup,
+        currentWeek: PublicSchema.leagues.currentWeek,
         draftStatus: PublicSchema.leagues.draftStatus,
         inviteCode: PublicSchema.leagues.inviteCode,
         playerPool: PublicSchema.leagues.playerPool,

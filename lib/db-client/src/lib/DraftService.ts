@@ -14,6 +14,7 @@ export interface DraftTriggerResult {
     owner: number;
     maxRosterSize: number;
     currentMatchup: number | null;
+    currentWeek: number | null;
     draftStatus:
       | 'not-started'
       | 'queued'
@@ -197,6 +198,7 @@ export class DraftService {
           owner: requestedBy,
           maxRosterSize: 0,
           currentMatchup: null,
+          currentWeek: null,
           draftStatus: 'not-started' as const,
           inviteCode: 'UNKNOWN',
           playerPool: 'all' as const,
