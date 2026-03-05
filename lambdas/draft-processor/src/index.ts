@@ -1015,8 +1015,32 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           })),
         );
 
+        // Insert activity log entries for every assignment so the activity feed
+        // is populated for random drafts, matching the live pick-by-pick behaviour.
+        await tx.insert(PublicSchema.leagueActivityLog).values(
+          assignments.map((assignment, index) => ({
+            leagueId: assignment.leagueId,
+            teamId: assignment.teamId,
+            actorUserId: null,
+            eventType: 'draft_pick_made' as const,
+            payload: {
+              playerId: assignment.playerId,
+              positionId: assignment.positionId,
+              overallPick: index + 1,
+              wasAutoPick: true,
+              wasRandomDraft: true,
+            },
+          })),
+        );
+
+        LOGGER.info(
+          `Inserted ${assignments.length} activity log entries for random draft`,
+          { leagueId },
+        );
+
         addBreadcrumb('Batch insert completed', {
           assignmentCount: assignments.length,
+          activityLogEntries: assignments.length,
         });
       }
 
