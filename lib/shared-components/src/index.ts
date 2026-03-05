@@ -123,6 +123,7 @@ export * from './features/baseball/MLBHome';
 
 // Roster management
 export * from './features/roster/LineupEditor';
+export * from './features/roster/MatchupRosterEditorView';
 
 // Stats components (updated)
 export * from './features/stats/FieldingStatsTable';
