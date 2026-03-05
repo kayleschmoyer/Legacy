@@ -68,6 +68,38 @@ acli jira workitem comment create --key LS-1234 \
   --body "Work in progress, will update soon"
 ```
 
+### View & Download Attachments
+
+```powershell
+# List attachments on a ticket
+acli jira workitem attachment list --key LS-1234
+acli jira workitem attachment list --key LS-1234 --json
+```
+
+To **download** an attachment image (e.g. a screenshot from a bug report), use the Jira REST API with Basic Auth credentials from your `~/.netrc` file:
+
+```powershell
+# 1. Get the attachment ID
+$json = acli jira workitem attachment list --key LS-1234 --json | ConvertFrom-Json
+$att = $json.attachments[0]  # or filter by name
+Write-Host "Attachment: $($att.name) (ID: $($att.id))"
+
+# 2. Download using .netrc credentials (Basic Auth: email + API token)
+$netrc = Get-Content "$env:USERPROFILE\.netrc" -Raw
+if ($netrc -match 'machine atlassian\.net\s+login\s+(\S+)\s+password\s+(\S+)') {
+    $base64 = [Convert]::ToBase64String(
+        [Text.Encoding]::ASCII.GetBytes("$($Matches[1]):$($Matches[2])")
+    )
+    $headers = @{ Authorization = "Basic $base64" }
+    $url = "https://bkrupa.atlassian.net/rest/api/3/attachment/content/$($att.id)"
+    Invoke-WebRequest -Uri $url -Headers $headers `
+        -OutFile "scratch/$($att.name)"
+    Write-Host "Downloaded: scratch/$($att.name)"
+}
+```
+
+> **Note:** The `.netrc` file at `~/.netrc` must contain an `atlassian.net` entry with your email and Jira API token. The `acli` attachment commands only support listing — not downloading — so the REST API approach above is required.
+
 ### Link Tickets
 
 ```powershell

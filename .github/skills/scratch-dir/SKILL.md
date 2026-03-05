@@ -35,6 +35,12 @@ pnpm exec nx lint web 2>&1 | Tee-Object -FilePath "scratch/lint-output.txt"
 ### Common patterns
 
 ```powershell
+# Jira attachment / screenshot download
+acli jira workitem attachment list --key LS-1234 --json  # get attachment ID
+# then download via REST API — see jira-ticket skill for full recipe
+Invoke-WebRequest -Uri "https://bkrupa.atlassian.net/rest/api/3/attachment/content/<ID>" `
+    -Headers @{ Authorization = "Basic $base64" } -OutFile "scratch/ls-1234-screenshot.png"
+
 # Lint output
 pnpm exec nx affected -t lint --skip-nx-cache 2>&1 | Tee-Object "scratch/lint.txt" | Select-String "error"
 
