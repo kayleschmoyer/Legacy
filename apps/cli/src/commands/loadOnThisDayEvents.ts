@@ -165,7 +165,7 @@ export async function handleLoadOnThisDayEvents(
                   (month, day, year, event_type, description, player_name, from_team, to_team, mlb_transaction_id)
                 VALUES
                   (${month}, ${day}, ${year}, ${eventType}, ${description}, ${playerName}, ${fromTeam}, ${toTeam}, ${mlbTransactionId})
-                ON CONFLICT (mlb_transaction_id)
+                ON CONFLICT (mlb_transaction_id) WHERE mlb_transaction_id IS NOT NULL
                 DO UPDATE SET
                   event_type = EXCLUDED.event_type,
                   description = EXCLUDED.description,
