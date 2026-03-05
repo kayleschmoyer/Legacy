@@ -13,7 +13,11 @@ import {
   MatchupStatus,
   useGetUserTeamIdQuery,
 } from '../../api/db/graphql.generated';
-import { useMatchupById, useMatchupsForLeague } from '../../hooks/useMatchup';
+import {
+  useCurrentMatchup,
+  useMatchupById,
+  useMatchupsForLeague,
+} from '../../hooks/useMatchup';
 import {
   BRAND_NAVY,
   BRAND_NAVY_DARK,
@@ -37,6 +41,9 @@ export function MatchupDetailPage() {
 
   // Fetch all matchups for the league to determine available weeks
   const { matchups: allLeagueMatchups } = useMatchupsForLeague(leagueIdNum);
+
+  // Fetch the league's current matchup to derive the real "current week" for badge
+  const { matchup: currentLeagueMatchup } = useCurrentMatchup(leagueIdNum);
 
   // Determine the current user's team in this league
   const { data: userTeamData } = useGetUserTeamIdQuery({
@@ -157,9 +164,22 @@ export function MatchupDetailPage() {
       {leagueIdNum && (
         <MatchupNavigationControls
           currentMatchup={matchup}
+          currentLeagueWeek={currentLeagueMatchup?.weekNumber ?? undefined}
           leagueId={leagueIdNum}
           allMatchups={allLeagueMatchups}
           userTeamId={userTeamId}
+          isViewingOther={
+            matchup != null &&
+            currentLeagueMatchup != null &&
+            matchup.id !== currentLeagueMatchup.id
+          }
+          onResetToDefault={() => {
+            if (currentLeagueMatchup?.id) {
+              navigate(
+                `/baseball/league/${leagueId}/matchups/${currentLeagueMatchup.id}`,
+              );
+            }
+          }}
         />
       )}
 

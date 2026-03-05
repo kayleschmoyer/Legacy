@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, Spinner, styled, Text, XStack, YStack } from 'tamagui';
-import { ChevronLeft, ChevronRight, RotateCcw } from '@tamagui/lucide-icons';
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+} from '@tamagui/lucide-icons';
 import { useNavigate } from 'react-router-dom';
 import {
   type MatchupFragment,
@@ -119,9 +124,14 @@ const BackToCurrentButton = styled(XStack, {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface MatchupNavigationControlsProps {
-  currentMatchup: MatchupFragment;
+  /** The matchup currently being viewed/highlighted. Optional — when absent the
+   * stepper still renders so users can browse to any week. */
+  currentMatchup?: MatchupFragment | null;
   leagueId: number;
   allMatchups?: MatchupFragment[];
+  /** The league's actual current week (used for the "Current" badge).
+   * Defaults to currentMatchup.weekNumber when not provided. */
+  currentLeagueWeek?: number;
   /** The user's team ID to highlight "Your Matchup" */
   userTeamId?: number | null;
   /** Whether we're showing a different matchup than the user's current one */
@@ -138,32 +148,63 @@ export interface MatchupNavigationControlsProps {
  * Replaces the old dropdown-based selectors with a modern week stepper
  * (prev / "Week N" / next) and a horizontally scrolling row of tappable
  * matchup cards showing team names, scores, and a "You" badge.
+ *
+ * Works even when no matchup is currently selected — users can browse any week.
  */
 export function MatchupNavigationControls({
   currentMatchup,
   leagueId,
   allMatchups = [],
+  currentLeagueWeek: currentLeagueWeekProp,
   userTeamId,
   isViewingOther = false,
   onMatchupChange,
   onResetToDefault,
 }: MatchupNavigationControlsProps) {
   const navigate = useNavigate();
-  const currentWeek = currentMatchup.weekNumber ?? 1;
-  const [selectedWeek, setSelectedWeek] = useState<number>(currentWeek);
 
-  // Sync selected week when the current matchup changes externally.
-  // NOTE: selectedWeek is intentionally excluded from deps — this effect
-  // should only run when the *external* prop changes (e.g. user navigates
-  // to a different matchup via the router), not when the user clicks
-  // prev/next week inside this component. Including it caused the pager
-  // to reset immediately after every user interaction (LS-510).
-  useEffect(() => {
-    if (currentMatchup.weekNumber) {
-      setSelectedWeek(currentMatchup.weekNumber);
+  // The league's actual "now" week — used for badge labelling only
+  const currentLeagueWeek =
+    currentLeagueWeekProp ?? currentMatchup?.weekNumber ?? 1;
+
+  // Available weeks derived from allMatchups, sorted ascending
+  const availableWeeks = useMemo(() => {
+    if (allMatchups.length === 0) {
+      return currentMatchup?.weekNumber ? [currentMatchup.weekNumber] : [1];
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMatchup.weekNumber]);
+    const weeks = new Set(allMatchups.map((m) => m.weekNumber).filter(Boolean));
+    return Array.from(weeks).sort((a, b) => (a ?? 0) - (b ?? 0));
+  }, [allMatchups, currentMatchup?.weekNumber]);
+
+  // Default to the currently-viewed matchup's week, falling back to the
+  // league's current week (or the last available week).
+  const defaultWeek =
+    currentMatchup?.weekNumber ??
+    currentLeagueWeek ??
+    availableWeeks[availableWeeks.length - 1] ??
+    1;
+
+  const [selectedWeek, setSelectedWeek] = useState<number>(defaultWeek);
+
+  // Sync selected week when the viewed matchup changes externally.
+  // Only depends on the matchup's week number so user's manual stepper
+  // navigation is not overwritten on every render.
+  const matchupWeek = currentMatchup?.weekNumber;
+  useEffect(() => {
+    if (matchupWeek) {
+      setSelectedWeek(matchupWeek);
+    }
+  }, [matchupWeek]);
+
+  const weekIndex = availableWeeks.indexOf(selectedWeek);
+  const canGoPrev = weekIndex > 0;
+  const canGoNext = weekIndex < availableWeeks.length - 1;
+  const totalWeeks = availableWeeks.length;
+  const isCurrentWeek = selectedWeek === currentLeagueWeek;
+  const isFutureWeek =
+    currentLeagueWeekProp != null && selectedWeek > currentLeagueWeek;
+  const isPastWeek =
+    currentLeagueWeekProp != null && selectedWeek < currentLeagueWeek;
 
   // Fetch all teams in the league for name lookup
   const {
@@ -189,19 +230,6 @@ export function MatchupNavigationControls({
       return bIsUser - aIsUser;
     });
   }, [weekMatchupsRaw, userTeamId]);
-
-  // Available weeks, sorted ascending
-  const availableWeeks = useMemo(() => {
-    if (allMatchups.length === 0) return [currentWeek];
-    const weeks = new Set(allMatchups.map((m) => m.weekNumber).filter(Boolean));
-    return Array.from(weeks).sort((a, b) => (a ?? 0) - (b ?? 0));
-  }, [allMatchups, currentWeek]);
-
-  const weekIndex = availableWeeks.indexOf(selectedWeek);
-  const canGoPrev = weekIndex > 0;
-  const canGoNext = weekIndex < availableWeeks.length - 1;
-  const totalWeeks = availableWeeks.length;
-  const isCurrentWeek = selectedWeek === currentWeek;
 
   // Index-stable team name lookup
   const teamMap = useMemo(() => {
@@ -289,6 +317,24 @@ export function MatchupNavigationControls({
               </Text>
             </WeekBadge>
           )}
+          {isFutureWeek && (
+            <WeekBadge
+              backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.1)}
+              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+            >
+              <Calendar size={10} color={BRAND_NAVY_LIGHT} />
+              <Text fontSize="$1" fontWeight="700" color={BRAND_NAVY_LIGHT}>
+                Upcoming
+              </Text>
+            </WeekBadge>
+          )}
+          {isPastWeek && (
+            <WeekBadge backgroundColor="$gray3" borderColor="$gray7">
+              <Text fontSize="$1" fontWeight="700" color="$gray11">
+                Past
+              </Text>
+            </WeekBadge>
+          )}
         </XStack>
 
         <StepperButton
@@ -326,7 +372,8 @@ export function MatchupNavigationControls({
         ) : (
           <XStack flexWrap="wrap" gap="$2.5">
             {weekMatchups.map((m) => {
-              const isActive = m.id === currentMatchup.id;
+              const isActive =
+                currentMatchup != null && m.id === currentMatchup.id;
               const isUserMatchup =
                 userTeamId != null &&
                 (m.team1Id === userTeamId || m.team2Id === userTeamId);

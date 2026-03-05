@@ -2957,6 +2957,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   {/* Matchup Navigation */}
                   <MatchupNavigationControls
                     currentMatchup={displayedMatchup}
+                    currentLeagueWeek={currentMatchup?.weekNumber ?? undefined}
                     leagueId={leagueId}
                     allMatchups={allLeagueMatchups}
                     userTeamId={reduxUserTeamId}
@@ -3032,44 +3033,94 @@ export function LeagueDetailPage(): React.JSX.Element {
                   )}
                 </YStack>
               ) : (
-                <Card
-                  backgroundColor="$surfacePanel"
-                  borderColor="$surfacePanelBorder"
-                  borderWidth={1}
-                  padding="$6"
-                  borderRadius="$6"
-                  alignItems="center"
-                >
-                  <YStack alignItems="center" gap="$3">
-                    <Swords size={32} color="var(--textMuted)" />
-                    <Text color="$textMuted" fontSize="$5" fontWeight="600">
-                      No Active Matchup
-                    </Text>
-                    <Text
-                      color="$textMuted"
-                      fontSize="$3"
-                      textAlign="center"
-                      maxWidth={400}
-                    >
-                      {isCommissioner
-                        ? 'Head to the Commissioner tab to start the draft and create matchups.'
-                        : "The commissioner hasn't created matchups yet. Check back soon!"}
-                    </Text>
-                    {isCommissioner && (
-                      <Button
-                        marginTop="$2"
-                        backgroundColor={BRAND_NAVY_LIGHT}
-                        color="white"
-                        borderRadius="$4"
-                        onPress={() => changeTab('commissioner')}
-                      >
-                        <Text fontWeight="600" color="white">
-                          Go to Commissioner
-                        </Text>
-                      </Button>
-                    )}
-                  </YStack>
-                </Card>
+                <YStack gap="$4">
+                  {/* Navigation — shown even when no matchup is currently active,
+                      so users can browse past and future weeks */}
+                  {allLeagueMatchups.length > 0 && (
+                    <MatchupNavigationControls
+                      currentMatchup={undefined}
+                      currentLeagueWeek={
+                        currentMatchup?.weekNumber ?? undefined
+                      }
+                      leagueId={leagueId}
+                      allMatchups={allLeagueMatchups}
+                      userTeamId={reduxUserTeamId}
+                      isViewingOther={false}
+                      onMatchupChange={(matchupId) => {
+                        setSelectedMatchupId(matchupId);
+                        navigate(
+                          `/baseball/league/${leagueId}/matchup/${matchupId}`,
+                          { replace: true },
+                        );
+                      }}
+                    />
+                  )}
+                  <Card
+                    backgroundColor="$surfacePanel"
+                    borderColor="$surfacePanelBorder"
+                    borderWidth={1}
+                    padding="$6"
+                    borderRadius="$6"
+                    alignItems="center"
+                  >
+                    <YStack alignItems="center" gap="$3">
+                      <Swords size={32} color="var(--textMuted)" />
+                      {allLeagueMatchups.length > 0 ? (
+                        <>
+                          <Text
+                            color="$textMuted"
+                            fontSize="$5"
+                            fontWeight="600"
+                          >
+                            No Active Matchup
+                          </Text>
+                          <Text
+                            color="$textMuted"
+                            fontSize="$3"
+                            textAlign="center"
+                            maxWidth={400}
+                          >
+                            Use the navigation above to browse past or upcoming
+                            matchups.
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text
+                            color="$textMuted"
+                            fontSize="$5"
+                            fontWeight="600"
+                          >
+                            No Active Matchup
+                          </Text>
+                          <Text
+                            color="$textMuted"
+                            fontSize="$3"
+                            textAlign="center"
+                            maxWidth={400}
+                          >
+                            {isCommissioner
+                              ? 'Head to the Commissioner tab to start the draft and create matchups.'
+                              : "The commissioner hasn't created matchups yet. Check back soon!"}
+                          </Text>
+                          {isCommissioner && (
+                            <Button
+                              marginTop="$2"
+                              backgroundColor={BRAND_NAVY_LIGHT}
+                              color="white"
+                              borderRadius="$4"
+                              onPress={() => changeTab('commissioner')}
+                            >
+                              <Text fontWeight="600" color="white">
+                                Go to Commissioner
+                              </Text>
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </YStack>
+                  </Card>
+                </YStack>
               )}
             </YStack>
           )}
