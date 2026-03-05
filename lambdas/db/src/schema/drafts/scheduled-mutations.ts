@@ -17,11 +17,13 @@
  */
 
 import {
+  createBadgeService,
   filterPlayerIdsByLeagueEligibility,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
+import { getDbOptions } from '@legacy-sports/utils';
 import { and, count, eq, lte, sql } from 'drizzle-orm';
 
 import {
@@ -35,6 +37,8 @@ import { builder, type Context } from '../builder';
 import { createAllMatchupsForLeague } from '../matchups/mutations';
 import { insertActivityLog } from '../../services/activity-log';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+
+const badgeService = createBadgeService(getDbOptions());
 
 /**
  * Lighter auth check for the draft auto-pick nudge.
@@ -866,6 +870,16 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     },
                   );
                 }
+
+                // Evaluate draft badges for all participants (fire-and-forget, non-fatal)
+                badgeService
+                  .evaluateDraftBadges(draftLeagueId)
+                  .catch((err: unknown) => {
+                    LOGGER.warn(
+                      '[autoProcessDraftPicks] Badge evaluation after draft failed (non-fatal)',
+                      { leagueId: draftLeagueId, err },
+                    );
+                  });
               }
 
               // Record auto-pick in the activity log (fire-and-forget, non-fatal)
