@@ -304,11 +304,36 @@ pnpm exec nx test shared-components
 pnpm exec nx lint web
 ```
 
-### 6. Push and verify
+### 6. Rebase on the parent branch, then push and verify
+
+Before pushing the fix, always rebase onto the parent branch so the new CI run is based on the latest tip. Skipping this wastes a CI run if the parent has moved ahead.
+
+**Use `twig rebase`** — it reads the branch's configured parent from twig metadata and rebases correctly, whether the parent is `main` or another feature branch.
+
+```powershell
+# Always fetch first so twig sees the latest remote state
+git fetch origin
+
+# Rebase onto the configured parent (main or a stacked branch)
+twig rebase
+
+# If there are conflicts, resolve them, then:
+#   git add <resolved-files>
+#   $env:GIT_EDITOR = "true" ; git rebase --continue
+```
+
+If `twig rebase` is unavailable or the parent is confirmed to be `main`, fall back to an explicit rebase:
+
+```powershell
+git fetch origin main
+git rebase origin/main
+```
+
+Then push (force-with-lease is required after a rebase):
 
 ```powershell
 git add -A ; git commit -m "fix(scope): resolve CI failure"
-git push origin HEAD
+git push origin HEAD --force-with-lease
 ```
 
 Then watch the new run:
