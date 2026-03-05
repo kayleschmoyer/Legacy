@@ -858,6 +858,25 @@ export function LeagueDetailPage(): React.JSX.Element {
     !isNaN(leagueId) ? leagueId : null,
   );
 
+  // The user's own matchup for the current active week (may differ from the
+  // league-level currentMatchup pointer, since a league has one matchup *per
+  // team pair* each week).
+  const userCurrentMatchup = useMemo(() => {
+    if (
+      !reduxUserTeamId ||
+      !allLeagueMatchups.length ||
+      !currentMatchup?.weekNumber
+    )
+      return null;
+    return (
+      allLeagueMatchups.find(
+        (m) =>
+          m.weekNumber === currentMatchup.weekNumber &&
+          (m.team1Id === reduxUserTeamId || m.team2Id === reduxUserTeamId),
+      ) ?? null
+    );
+  }, [reduxUserTeamId, allLeagueMatchups, currentMatchup?.weekNumber]);
+
   // Active or next matchup for the Roster tab — in-progress (locked) takes priority over scheduled
   const rosterTabMatchup = useMemo(() => {
     if (!userTeamId || !allLeagueMatchups.length) return null;
@@ -3009,7 +3028,11 @@ export function LeagueDetailPage(): React.JSX.Element {
                     leagueId={leagueId}
                     allMatchups={allLeagueMatchups}
                     userTeamId={reduxUserTeamId}
-                    isViewingOther={selectedMatchupId != null}
+                    isViewingOther={
+                      selectedMatchupId != null &&
+                      selectedMatchupId !==
+                        String(userCurrentMatchup?.id ?? currentMatchup?.id)
+                    }
                     onMatchupChange={(matchupId) => {
                       setSelectedMatchupId(matchupId);
                       // Update URL with matchup ID as route parameter for shareable links
@@ -3021,11 +3044,19 @@ export function LeagueDetailPage(): React.JSX.Element {
                       );
                     }}
                     onResetToDefault={() => {
-                      setSelectedMatchupId(null);
-                      // Navigate back to base matchup tab without matchupId
-                      navigate(`/baseball/league/${leagueId}/matchup`, {
-                        replace: true,
-                      });
+                      const targetId = userCurrentMatchup?.id;
+                      if (targetId) {
+                        setSelectedMatchupId(targetId);
+                        navigate(
+                          `/baseball/league/${leagueId}/matchup/${targetId}`,
+                          { replace: true },
+                        );
+                      } else {
+                        setSelectedMatchupId(null);
+                        navigate(`/baseball/league/${leagueId}/matchup`, {
+                          replace: true,
+                        });
+                      }
                     }}
                   />
                   <MatchupScoreboard
