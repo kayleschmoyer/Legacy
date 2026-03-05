@@ -78,10 +78,15 @@ $wt = "<path-from-twig-worktree-list>"
 Then set up the worktree environment before opening it:
 
 ```powershell
+# Smart setup — handles node_modules, .env, and .twig in one command:
+make wt-setup WT=$wt
+
+# Or manually:
 cd $wt
 make install
 Copy-Item "D:\code\legacy-sports\.env" .env
 cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
+
 code $wt   # open in a new VS Code window; do all work there
 ```
 

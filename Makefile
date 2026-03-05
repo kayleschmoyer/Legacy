@@ -14,7 +14,8 @@
 	ci ci-force ci-full release full-deploy full-check dev-setup \
 	fix-windows-locks diagnose \
 	branch-tree cleanup-merged-branches squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
-	pre-commit pc quick-check
+	pre-commit pc quick-check \
+	wt-setup
 .DEFAULT_GOAL := help
 
 # Platform detection and commands
@@ -127,6 +128,13 @@ install-python: ## Install only Python dependencies
 setup: install ## Alias for install
 
 setup-force: install-force ## Setup with force install for Windows file lock issues
+
+wt-setup: ## Set up a worktree (node_modules junction, .env, .twig). Usage: make wt-setup WT=<path>
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH)/scripts/setup-worktree.ps1" -WorktreePath "$(WT)"
+else
+	@echo "wt-setup is currently Windows-only. Run: make install && cp .env from main repo."
+endif
 
 # Cleaning
 clean-safe: clean-cache ## Safely clean build artifacts and cache (alias for clean-cache)

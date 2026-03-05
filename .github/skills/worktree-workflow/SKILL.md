@@ -117,8 +117,35 @@ acli jira workitem transition --key LS-#### --status "In Progress"
 
 Git worktrees only contain tracked files — `node_modules`, `.env`, and `.twig` are gitignored and absent.
 
+**Recommended — use the smart setup script** (handles all three in one command):
+
 ```powershell
-# Use the path reported by `twig worktree list`
+# From the main repo:
+$wt = "<path-from-twig-worktree-list>"
+make wt-setup WT=$wt
+```
+
+The script (`scripts/setup-worktree.ps1`):
+
+- **Compares lockfile hashes** between the worktree and main repo
+- **If they match**: creates a Windows **junction** from the worktree's `node_modules` → main repo's `node_modules` (instant, zero extra disk)
+- **If they differ**: runs `pnpm install --frozen-lockfile` (creates independent `node_modules`)
+- **Copies `.env`** from the main repo (or updates it if stale)
+- **Junctions `.twig`** so twig shares branch-dependency state
+
+> **Why junctions save disk**: With 20+ worktrees and ~1.8 GB per `node_modules`, full copies consume **36+ GB**. Junction-based sharing reduces this to near zero for worktrees whose lockfile matches main.
+
+Pass `-Force` to skip the lockfile check and always run a full `pnpm install`:
+
+```powershell
+make wt-setup WT=$wt FORCE=-Force
+# Or directly:
+.\scripts\setup-worktree.ps1 -WorktreePath $wt -Force
+```
+
+**Manual alternative** (if the script isn't available):
+
+```powershell
 $wt = (twig worktree list --porcelain 2>$null | Select-String "path:" | Where-Object { $_ -match "LS-####" } | ForEach-Object { ($_ -split "path: ")[1].Trim() })
 # OR just set it manually:
 $wt = "<path-from-twig-worktree-list>"
@@ -338,9 +365,13 @@ acli jira workitem transition --key LS-#### --status "In Progress"
 
 ### node_modules missing in worktree
 
-`node_modules` is gitignored so it is never present in a fresh worktree. Install all deps using the standard Makefile target:
+`node_modules` is gitignored so it is never present in a fresh worktree. Use the smart setup script, which junctions to main when possible:
 
 ```powershell
+# From the main repo (recommended — handles .env and .twig too):
+make wt-setup WT=$wt
+
+# Or install independently inside the worktree:
 cd $wt   # path from twig worktree list
 make install
 ```
@@ -359,12 +390,11 @@ make worktree TICKET=#### DESC=description PARENT=LS-XXXX/branch     # dependent
 # 2. Jira
 acli jira workitem transition --key LS-#### --status "In Progress"
 
-# 3. Install deps + copy .env + link .twig  (use path from twig worktree list)
+# 3. Smart setup (node_modules + .env + .twig in one command)
 $wt = "<path-from-twig-worktree-list>"
-cd $wt
-make install
-Copy-Item "D:\code\legacy-sports\.env" .env
-cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
+make wt-setup WT=$wt
+# Or manually:
+#   cd $wt ; make install ; Copy-Item "D:\code\legacy-sports\.env" .env ; cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
 
 # 4. Open VS Code
 code $wt

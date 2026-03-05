@@ -71,6 +71,7 @@ make graphiql        # Start GraphQL explorer
 ```powershell
 make install         # Install all deps (Node.js + Python)
 make install-force   # Force install (handles Windows file locks)
+make wt-setup WT=<path>  # Smart worktree setup (node_modules junction + .env + .twig)
 make clean           # Full clean (node_modules, .nx cache, daemon)
 make clean-cache     # Clear Nx cache only (alias: reset, clean-safe)
 make force-clean     # Force clean with Windows lock handling
