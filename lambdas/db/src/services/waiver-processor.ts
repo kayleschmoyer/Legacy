@@ -12,6 +12,7 @@ import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
 
+import { insertActivityLog } from './activity-log';
 import { addClaimedPlayerToCurrentMatchup } from '../schema/waivers/helpers';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -109,15 +110,27 @@ export class WaiverClaimProcessor {
               waiverType,
             );
 
-            if (result === 'failed') {
+            if (result.outcome === 'failed') {
               failed++;
-              if (result === 'failed') {
-                // Check if it's a "player taken" failure — block remaining claims
-                claimed = await this.isPlayerTaken(
-                  claim.leagueId,
-                  claim.playerId,
-                );
-              }
+              void insertActivityLog(
+                { db: this.db },
+                {
+                  leagueId: claim.leagueId,
+                  teamId: claim.teamId,
+                  actorUserId: claim.userId,
+                  eventType: 'waiver_claim_rejected',
+                  payload: {
+                    claimId: claim.id,
+                    playerId: claim.playerId,
+                    reason: result.reason ?? 'Claim could not be fulfilled',
+                  },
+                },
+              );
+              // Check if it's a "player taken" failure — block remaining claims
+              claimed = await this.isPlayerTaken(
+                claim.leagueId,
+                claim.playerId,
+              );
               continue;
             }
 
@@ -134,25 +147,59 @@ export class WaiverClaimProcessor {
               waiverType,
             });
 
+            void insertActivityLog(
+              { db: this.db },
+              {
+                leagueId: claim.leagueId,
+                teamId: claim.teamId,
+                actorUserId: claim.userId,
+                eventType: 'waiver_claim_approved',
+                payload: {
+                  claimId: claim.id,
+                  playerId: claim.playerId,
+                  dropPlayerId: claim.dropPlayerId ?? null,
+                  faabBid: claim.faabBid ?? null,
+                  waiverType,
+                },
+              },
+            );
+
             // Rotate waiver order for standard waivers
             if (waiverType === 'standard') {
               await this.rotateWaiverOrder(claim, teamSettingsMap);
             }
           } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : 'Unknown error';
+
             LOGGER.error('Error processing waiver claim', {
               claimId: claim.id,
-              error: error instanceof Error ? error.message : String(error),
+              error: errorMessage,
             });
 
             await db
               .update(PublicSchema.waiverClaims)
               .set({
                 status: 'failed',
-                errorMessage:
-                  error instanceof Error ? error.message : 'Unknown error',
+                errorMessage,
                 processedAt: new Date(),
               })
               .where(eq(PublicSchema.waiverClaims.id, claim.id));
+
+            void insertActivityLog(
+              { db: this.db },
+              {
+                leagueId: claim.leagueId,
+                teamId: claim.teamId,
+                actorUserId: claim.userId,
+                eventType: 'waiver_claim_rejected',
+                payload: {
+                  claimId: claim.id,
+                  playerId: claim.playerId,
+                  reason: errorMessage,
+                },
+              },
+            );
 
             failed++;
           }
@@ -285,13 +332,14 @@ export class WaiverClaimProcessor {
   }
 
   /**
-   * Process a single waiver claim. Returns 'succeeded' or 'failed'.
+   * Process a single waiver claim. Returns an outcome object with 'succeeded'
+   * or 'failed', plus an optional human-readable reason on failure.
    */
   private async processSingleClaim(
     claim: PendingClaim,
     maxRoster: number,
     waiverType: string,
-  ): Promise<'succeeded' | 'failed'> {
+  ): Promise<{ outcome: 'succeeded' | 'failed'; reason?: string }> {
     const { db } = this;
 
     // Mark as processing
@@ -314,7 +362,7 @@ export class WaiverClaimProcessor {
 
     if (alreadyTaken.length > 0) {
       await this.failClaim(claim.id, 'Player is no longer available');
-      return 'failed';
+      return { outcome: 'failed', reason: 'Player is no longer available' };
     }
 
     // FAAB: verify budget at processing time
@@ -327,17 +375,16 @@ export class WaiverClaimProcessor {
 
       const remaining = teamBudget[0]?.faabBudget ?? 0;
       if (claim.faabBid > remaining) {
-        await this.failClaim(
-          claim.id,
-          `Insufficient FAAB budget ($${remaining} remaining, bid was $${claim.faabBid})`,
-        );
-        return 'failed';
+        const faabReason = `Insufficient FAAB budget ($${remaining} remaining, bid was $${claim.faabBid})`;
+        await this.failClaim(claim.id, faabReason);
+        return { outcome: 'failed', reason: faabReason };
       }
     }
 
     // Roster size enforcement + drop handling
     const dropResult = await this.handleRosterAndDrop(claim, maxRoster);
-    if (dropResult === 'failed') return 'failed';
+    if (dropResult === 'failed')
+      return { outcome: 'failed', reason: 'Roster or drop player issue' };
 
     // Add player to roster
     await db.insert(PublicSchema.teamMembers).values({
@@ -397,7 +444,7 @@ export class WaiverClaimProcessor {
       });
     }
 
-    return 'succeeded';
+    return { outcome: 'succeeded' };
   }
 
   private async handleRosterAndDrop(

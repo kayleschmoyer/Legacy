@@ -26,6 +26,8 @@ const LeagueActivityEventTypeEnum = builder.enumType(
       'trade_vetoed',
       'waiver_claimed',
       'waiver_cancelled',
+      'waiver_claim_approved',
+      'waiver_claim_rejected',
       'draft_pick_made',
       'league_announcement',
     ] as const,

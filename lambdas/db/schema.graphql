@@ -784,6 +784,8 @@ enum LeagueActivityEventType {
   trade_rejected
   trade_vetoed
   waiver_cancelled
+  waiver_claim_approved
+  waiver_claim_rejected
   waiver_claimed
 }
 

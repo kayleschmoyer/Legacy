@@ -718,6 +718,8 @@ export enum LeagueActivityEventType {
   TradeRejected = 'trade_rejected',
   TradeVetoed = 'trade_vetoed',
   WaiverCancelled = 'waiver_cancelled',
+  WaiverClaimApproved = 'waiver_claim_approved',
+  WaiverClaimRejected = 'waiver_claim_rejected',
   WaiverClaimed = 'waiver_claimed',
 }
 
