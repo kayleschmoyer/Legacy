@@ -22,6 +22,8 @@ import {
 interface CreateLeagueFormData {
   leagueName: string;
   numberOfTeams: number;
+  numberOfDivisions: number;
+  schedulingStrategy: 'divisional' | 'round-robin' | 'random';
   playerPool: 'all' | 'nl' | 'al';
   draftMode: 'live' | 'automated';
   selectionMethod: 'standard' | 'auction' | 'random';
@@ -31,6 +33,11 @@ interface CreateLeagueFormData {
   waiverType: 'standard' | 'faab';
   faabBudgetDefault: number;
   isPublic: boolean;
+  // Era-based league settings (LS-295)
+  eraFilter: string;
+  hofOnly: boolean;
+  customEraStartYear?: number;
+  customEraEndYear?: number;
 }
 
 // Team count options
@@ -65,6 +72,28 @@ const DRAFT_ORDER_OPTIONS = [
   { label: 'Linear', value: 'linear' },
 ] as const;
 
+// Division count options
+const DIVISION_COUNT_OPTIONS = [1, 2, 3, 4];
+
+// Scheduling strategy options
+const SCHEDULING_STRATEGY_OPTIONS = [
+  { label: 'Divisional', value: 'divisional' },
+  { label: 'Round Robin', value: 'round-robin' },
+  { label: 'Random', value: 'random' },
+] as const;
+
+// Era filter options (matches era_filter DB enum)
+const ERA_FILTER_OPTIONS = [
+  { label: 'All Eras', value: 'all' },
+  { label: 'Dead Ball (pre-1920)', value: 'dead_ball' },
+  { label: 'Golden Age (1920-1960)', value: 'golden_age' },
+  { label: 'Expansion (1961-1976)', value: 'expansion' },
+  { label: 'Free Agency (1977-1993)', value: 'free_agency' },
+  { label: 'Steroid Era (1994-2005)', value: 'steroid_era' },
+  { label: 'Modern (2006+)', value: 'modern' },
+  { label: 'Custom Era', value: 'custom' },
+] as const;
+
 // Waiver type options
 const WAIVER_TYPE_OPTIONS = [
   {
@@ -87,6 +116,8 @@ export function LeagueCreatePage(): React.JSX.Element {
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
     numberOfTeams: 12,
+    numberOfDivisions: 2,
+    schedulingStrategy: 'divisional',
     playerPool: 'all',
     draftMode: 'live',
     selectionMethod: 'standard',
@@ -96,6 +127,8 @@ export function LeagueCreatePage(): React.JSX.Element {
     waiverType: 'standard',
     faabBudgetDefault: 100,
     isPublic: false,
+    eraFilter: 'all',
+    hofOnly: false,
   });
 
   const [createLeagueAndTeams, { loading, error }] =
@@ -199,6 +232,8 @@ export function LeagueCreatePage(): React.JSX.Element {
           input: {
             leagueName: formData.leagueName.trim(),
             numberOfTeams: formData.numberOfTeams,
+            numberOfDivisions: formData.numberOfDivisions,
+            schedulingStrategy: formData.schedulingStrategy,
             playerPool: formData.playerPool,
             draftMode: formData.draftMode,
             selectionMethod: formData.selectionMethod,
@@ -212,6 +247,16 @@ export function LeagueCreatePage(): React.JSX.Element {
             waiverEnabled: true,
             waiverType: formData.waiverType,
             faabBudgetDefault: formData.faabBudgetDefault,
+            eraFilter: formData.eraFilter,
+            hofOnly: formData.hofOnly,
+            customEraStartYear:
+              formData.eraFilter === 'custom'
+                ? formData.customEraStartYear
+                : undefined,
+            customEraEndYear:
+              formData.eraFilter === 'custom'
+                ? formData.customEraEndYear
+                : undefined,
           },
         },
       });
@@ -372,6 +417,149 @@ export function LeagueCreatePage(): React.JSX.Element {
                 </Text>
               </YStack>
 
+              {/* Number of Divisions */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Number of Divisions
+                </Text>
+                <XStack space="$2" flexWrap="wrap">
+                  {DIVISION_COUNT_OPTIONS.map((count) => (
+                    <Button
+                      key={count}
+                      size="$3"
+                      variant={
+                        formData.numberOfDivisions === count
+                          ? 'primary'
+                          : 'outlined'
+                      }
+                      onPress={() => {
+                        handleInputChange('numberOfDivisions', count);
+                      }}
+                      disabled={loading}
+                      minWidth="$5"
+                      backgroundColor={
+                        formData.numberOfDivisions === count
+                          ? BRAND_NAVY_LIGHT
+                          : '$color2'
+                      }
+                      borderColor={
+                        formData.numberOfDivisions === count
+                          ? BRAND_NAVY_LIGHT
+                          : '$borderColor'
+                      }
+                      borderWidth={formData.numberOfDivisions === count ? 2 : 1}
+                      hoverStyle={{
+                        backgroundColor:
+                          formData.numberOfDivisions === count
+                            ? BRAND_NAVY
+                            : '$color3',
+                        borderColor:
+                          formData.numberOfDivisions === count
+                            ? BRAND_NAVY
+                            : '$borderColorHover',
+                      }}
+                      pressStyle={{
+                        scale: 0.95,
+                        backgroundColor:
+                          formData.numberOfDivisions === count
+                            ? BRAND_NAVY_DARK
+                            : '$color4',
+                      }}
+                    >
+                      <Text
+                        color={
+                          formData.numberOfDivisions === count
+                            ? BRAND_GOLD
+                            : '$color'
+                        }
+                        fontWeight={
+                          formData.numberOfDivisions === count ? '600' : '400'
+                        }
+                      >
+                        {count}
+                      </Text>
+                    </Button>
+                  ))}
+                </XStack>
+                <Text size="$2" color="$gray10">
+                  How many divisions to split your teams into
+                </Text>
+              </YStack>
+
+              {/* Scheduling Strategy */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Scheduling Strategy
+                </Text>
+                <XStack space="$3">
+                  {SCHEDULING_STRATEGY_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      size="$3"
+                      variant={
+                        formData.schedulingStrategy === option.value
+                          ? 'primary'
+                          : 'outlined'
+                      }
+                      onPress={() => {
+                        handleInputChange('schedulingStrategy', option.value);
+                      }}
+                      disabled={loading}
+                      flex={1}
+                      backgroundColor={
+                        formData.schedulingStrategy === option.value
+                          ? '$green8'
+                          : '$color2'
+                      }
+                      borderColor={
+                        formData.schedulingStrategy === option.value
+                          ? '$green8'
+                          : '$borderColor'
+                      }
+                      borderWidth={
+                        formData.schedulingStrategy === option.value ? 2 : 1
+                      }
+                      hoverStyle={{
+                        backgroundColor:
+                          formData.schedulingStrategy === option.value
+                            ? '$green9'
+                            : '$color3',
+                        borderColor:
+                          formData.schedulingStrategy === option.value
+                            ? '$green9'
+                            : '$borderColorHover',
+                      }}
+                      pressStyle={{
+                        scale: 0.95,
+                        backgroundColor:
+                          formData.schedulingStrategy === option.value
+                            ? '$green7'
+                            : '$color4',
+                      }}
+                    >
+                      <Text
+                        color={
+                          formData.schedulingStrategy === option.value
+                            ? '$green12'
+                            : '$color'
+                        }
+                        fontWeight={
+                          formData.schedulingStrategy === option.value
+                            ? '600'
+                            : '400'
+                        }
+                      >
+                        {option.label}
+                      </Text>
+                    </Button>
+                  ))}
+                </XStack>
+                <Text size="$2" color="$gray10">
+                  Divisional schedules prioritize in-division matchups;
+                  round-robin ensures all teams play each other
+                </Text>
+              </YStack>
+
               {/* Roster Size */}
               <YStack space="$2">
                 <Text size="$4" fontWeight="600" color="$gray12">
@@ -505,6 +693,157 @@ export function LeagueCreatePage(): React.JSX.Element {
                 </XStack>
                 <Text size="$2" color="$gray10">
                   Which players can be drafted in this league
+                </Text>
+              </YStack>
+
+              {/* Era Filter — Era-Based Leagues (LS-295) */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Historical Era Filter
+                </Text>
+                <Text size="$2" color="$gray10">
+                  Restrict your league's player pool to a specific baseball era
+                  — a unique differentiator no live-stats platform can offer.
+                </Text>
+                <XStack space="$2" flexWrap="wrap">
+                  {ERA_FILTER_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      size="$3"
+                      onPress={() => {
+                        handleInputChange('eraFilter', option.value);
+                      }}
+                      disabled={loading}
+                      backgroundColor={
+                        formData.eraFilter === option.value
+                          ? '$orange8'
+                          : '$color2'
+                      }
+                      borderColor={
+                        formData.eraFilter === option.value
+                          ? '$orange8'
+                          : '$borderColor'
+                      }
+                      borderWidth={formData.eraFilter === option.value ? 2 : 1}
+                      hoverStyle={{
+                        backgroundColor:
+                          formData.eraFilter === option.value
+                            ? '$orange9'
+                            : '$color3',
+                      }}
+                      pressStyle={{ scale: 0.95 }}
+                    >
+                      <Text
+                        color={
+                          formData.eraFilter === option.value
+                            ? '$orange12'
+                            : '$color'
+                        }
+                        fontWeight={
+                          formData.eraFilter === option.value ? '600' : '400'
+                        }
+                        fontSize="$2"
+                      >
+                        {option.label}
+                      </Text>
+                    </Button>
+                  ))}
+                </XStack>
+
+                {/* Custom era year range */}
+                {formData.eraFilter === 'custom' && (
+                  <XStack space="$3" alignItems="center" flexWrap="wrap">
+                    <YStack flex={1} space="$1">
+                      <Text fontSize="$2" color="$gray10">
+                        Start Year
+                      </Text>
+                      <Input
+                        size="$3"
+                        placeholder="e.g. 1940"
+                        value={
+                          formData.customEraStartYear !== undefined
+                            ? String(formData.customEraStartYear)
+                            : ''
+                        }
+                        onChangeText={(text: string) => {
+                          const year = parseInt(text, 10);
+                          handleInputChange(
+                            'customEraStartYear',
+                            isNaN(year) ? '' : year,
+                          );
+                        }}
+                        keyboardType="numeric"
+                        disabled={loading}
+                        borderColor="$orange8"
+                      />
+                    </YStack>
+                    <Text color="$gray10" marginTop="$4">
+                      –
+                    </Text>
+                    <YStack flex={1} space="$1">
+                      <Text fontSize="$2" color="$gray10">
+                        End Year
+                      </Text>
+                      <Input
+                        size="$3"
+                        placeholder="e.g. 1960"
+                        value={
+                          formData.customEraEndYear !== undefined
+                            ? String(formData.customEraEndYear)
+                            : ''
+                        }
+                        onChangeText={(text: string) => {
+                          const year = parseInt(text, 10);
+                          handleInputChange(
+                            'customEraEndYear',
+                            isNaN(year) ? '' : year,
+                          );
+                        }}
+                        keyboardType="numeric"
+                        disabled={loading}
+                        borderColor="$orange8"
+                      />
+                    </YStack>
+                  </XStack>
+                )}
+              </YStack>
+
+              {/* Hall of Fame Only Toggle */}
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Hall of Fame Draft Mode
+                </Text>
+                <XStack space="$3" alignItems="center">
+                  <Button
+                    size="$3"
+                    onPress={() => {
+                      handleInputChange('hofOnly', !formData.hofOnly);
+                    }}
+                    disabled={loading}
+                    flex={1}
+                    backgroundColor={formData.hofOnly ? '$yellow8' : '$color2'}
+                    borderColor={formData.hofOnly ? '$yellow8' : '$borderColor'}
+                    borderWidth={formData.hofOnly ? 2 : 1}
+                    hoverStyle={{
+                      backgroundColor: formData.hofOnly
+                        ? '$yellow9'
+                        : '$color3',
+                    }}
+                    pressStyle={{ scale: 0.95 }}
+                  >
+                    <Text
+                      color={formData.hofOnly ? '$yellow12' : '$color'}
+                      fontWeight={formData.hofOnly ? '600' : '400'}
+                    >
+                      {formData.hofOnly
+                        ? '🏆 Hall of Famers Only — ON'
+                        : '🏆 Hall of Famers Only — OFF'}
+                    </Text>
+                  </Button>
+                </XStack>
+                <Text size="$2" color="$gray10">
+                  Restrict the draft pool to Baseball Hall of Fame inductees
+                  only. Creates a prestigious, high-stakes draft experience.
                 </Text>
               </YStack>
 
