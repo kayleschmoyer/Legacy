@@ -1,4 +1,5 @@
 export * from './lib/allowed-positions';
+export { shuffleArray } from './lib/utils';
 export * from './lib/DbCredentials';
 export * from './lib/DbOptions';
 export * from './lib/ErrorHandling';

@@ -8,6 +8,7 @@ import {
   type StartDraftMessage,
 } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
+import { shuffleArray } from '@legacy-sports/utils';
 import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 
 import { Draft } from '../types';
@@ -127,12 +128,8 @@ builder.mutationField('initializeDraft', (t) =>
           throw new Error('At least 2 teams are required to start a draft');
         }
 
-        // Fisher-Yates shuffle for randomized draft order
-        const shuffled = [...teams];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-        }
+        // Randomize draft order
+        const shuffled = shuffleArray(teams);
 
         // Upsert the draft record — update the existing one from league creation,
         // or create a new one if somehow missing

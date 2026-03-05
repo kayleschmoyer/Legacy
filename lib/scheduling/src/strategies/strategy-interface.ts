@@ -20,18 +20,6 @@ export interface SchedulingStrategy {
 }
 
 /**
- * Helper: Shuffle array in place (Fisher-Yates algorithm)
- */
-export function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-
-/**
  * Helper: Check if a pairing already exists in an array
  */
 export function pairingExists(

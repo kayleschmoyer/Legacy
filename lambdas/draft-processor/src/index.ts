@@ -1,12 +1,16 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  ALLOWED_POSITIONS,
+  BATTING_POSITIONS,
   formatVersionInfo,
   getDbOptions,
   getVersionInfo,
   isNegroLeague,
   MIN_SEASON_WITH_GAME_DATA,
+  PITCHING_POSITIONS,
   SEASON_MATCHUP_MULTIPLIER,
+  shuffleArray,
 } from '@legacy-sports/utils';
 import {
   createNotificationService,
@@ -32,11 +36,6 @@ import {
   validateSelectionMethod,
   validateUserAccess,
 } from '@legacy-sports/db-client';
-import {
-  ALLOWED_POSITIONS,
-  BATTING_POSITIONS,
-  PITCHING_POSITIONS,
-} from '@legacy-sports/utils';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 
 // Initialize Sentry
@@ -59,18 +58,6 @@ const notificationService = createNotificationService();
  * Draft Processing Lambda
  * Processes draft messages from SQS queue and executes the draft logic
  */
-
-/**
- * Shuffle an array using Fisher-Yates algorithm
- */
-function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
 
 /**
  * Enhanced player data with positions and stats for draft optimization

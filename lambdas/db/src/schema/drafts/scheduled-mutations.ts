@@ -23,7 +23,7 @@ import {
 } from '@legacy-sports/db-client';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions, shuffleArray } from '@legacy-sports/utils';
 import { and, count, eq, lte, sql } from 'drizzle-orm';
 
 import {
@@ -1063,12 +1063,8 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
               continue;
             }
 
-            // Fisher-Yates shuffle
-            const shuffled = [...teams];
-            for (let i = shuffled.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-            }
+            // Randomize draft order
+            const shuffled = shuffleArray(teams);
 
             const startedAt = new Date();
             const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;

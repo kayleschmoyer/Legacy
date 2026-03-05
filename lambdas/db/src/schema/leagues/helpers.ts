@@ -6,18 +6,7 @@
 import type { Team as DbTeam, PublicDb } from '@legacy-sports/db-client';
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-
-/**
- * Fisher-Yates shuffle — returns a new array.
- */
-export function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
+import { shuffleArray } from '@legacy-sports/utils';
 
 /**
  * Randomly distribute players across teams (currently unused but preserved).
