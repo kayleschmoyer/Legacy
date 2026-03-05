@@ -784,21 +784,6 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               result.picksAutoMade++;
               picksThisDraft++;
 
-              // Record auto-pick in the activity log (fire-and-forget, non-fatal)
-              void insertActivityLog(context, {
-                leagueId: draftLeagueId,
-                teamId: pickResult.currentPickInfo.teamId ?? null,
-                actorUserId: null,
-                eventType: 'draft_pick_made',
-                payload: {
-                  playerId: pickResult.autoPlayerId,
-                  round: pickResult.currentPickInfo.round,
-                  pickNumber: pickResult.currentPickInfo.pickNumber,
-                  overallPick: pickResult.currentPickInfo.overallPick,
-                  wasAutoPick: true,
-                },
-              });
-
               LOGGER.info('[autoProcessDraftPicks] Auto-pick made', {
                 draftId,
                 leagueId: draftLeagueId,
