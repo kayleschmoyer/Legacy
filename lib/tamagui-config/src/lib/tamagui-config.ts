@@ -53,6 +53,10 @@ const brandDark = {
   glassTextSubdued: 'rgba(248, 250, 252, 0.65)',
   glassTextMuted: 'rgba(248, 250, 252, 0.45)',
 
+  // Semi-transparent background — used for glassmorphism sticky headers
+  // e.g. `backgroundColor: '$background075'` with `backdropFilter: 'blur(...)'`
+  background075: 'rgba(10, 15, 26, 0.75)',
+
   // Heritage brand accents
   brandNavy: '#1B3A5C', // deep baseball navy
   brandNavyLight: '#2C4A7C', // lighter navy for gradients
@@ -197,6 +201,10 @@ const brandLight = {
   glassBorderHover: 'rgba(0, 0, 0, 0.12)',
   glassTextSubdued: 'rgba(11, 18, 32, 0.65)',
   glassTextMuted: 'rgba(11, 18, 32, 0.45)',
+
+  // Semi-transparent background — used for glassmorphism sticky headers
+  // e.g. `backgroundColor: '$background075'` with `backdropFilter: 'blur(...)'`
+  background075: 'rgba(255, 255, 255, 0.75)',
 
   // Heritage brand accents
   brandNavy: '#1B3A5C',

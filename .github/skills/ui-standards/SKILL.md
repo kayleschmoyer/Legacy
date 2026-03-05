@@ -22,20 +22,27 @@ Use sticky headers with backdrop blur to create depth and maintain context while
 **Key Properties:**
 
 - `position: 'sticky'`
-- `top: 0`
-- `zIndex: 100`
-- `backgroundColor: '$background075'` (75% opacity)
-- `backdropFilter: 'blur(10px)'`
+- `top: NAV_HEIGHT_PX` (import from `../../constants/dimensions` — sticks immediately below the nav bar, not over it)
+- `zIndex: CONTENT_STICKY_Z_INDEX` (import from `../../constants/dimensions` — must be lower than the nav's `NAV_Z_INDEX`)
+- `backgroundColor: '$background075'` (75% opacity — defined in both `brandDark` and `brandLight` themes)
+- `backdropFilter: 'blur(12px)'`
 
 **Example:**
 
 ```tsx
+import {
+  NAV_HEIGHT_PX,
+  CONTENT_STICKY_Z_INDEX,
+} from '../../constants/dimensions';
+
 const GlassHeader = styled(XStack, {
-  position: 'sticky',
-  top: 0,
-  zIndex: 100,
+  position: 'sticky' as const,
+  // Offset by nav height so this sticks directly below the nav, not over it.
+  // zIndex must stay below NAV_Z_INDEX so the nav always wins the stack.
+  top: NAV_HEIGHT_PX,
+  zIndex: CONTENT_STICKY_Z_INDEX,
   backgroundColor: '$background075',
-  backdropFilter: 'blur(10px)',
+  backdropFilter: 'blur(12px)',
   paddingVertical: '$4',
   borderBottomWidth: 1,
   borderBottomColor: '$borderColor',
