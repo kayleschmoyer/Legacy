@@ -79,7 +79,7 @@ export const canPlayerPlayPosition = (
   if (eligible.length === 0) return true;
   const allowed = ALLOWED_POSITIONS[position.positionType ?? ''];
   if (!allowed) return false;
-  return eligible.some((pos) => (allowed as readonly string[]).includes(pos));
+  return eligible.some((pos) => allowed.includes(pos));
 };
 
 type PositionCategory = 'pitching' | 'infield' | 'outfield' | 'utility';

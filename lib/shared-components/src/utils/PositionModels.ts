@@ -1,3 +1,10 @@
+import {
+  ALLOWED_POSITIONS,
+  PITCHING_POSITIONS,
+} from '@legacy-sports/utils/positions';
+
+export { ALLOWED_POSITIONS, PITCHING_POSITIONS };
+
 // Generic position types for shared components
 export type Position =
   | 'SP' // Starting Pitcher
@@ -33,25 +40,8 @@ export enum PositionSlot {
   'XDH' = 'XDH',
 }
 
-// Position mapping for what positions can play what slots
-export const ALLOWED_POSITIONS = Object.freeze<Record<string, Position[]>>({
-  '1B': ['1B'],
-  '2B': ['2B'],
-  '3B': ['3B'],
-  C: ['C'],
-  CF: ['CF'],
-  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
-  IF: ['1B', '2B', '3B', 'SS'],
-  LF: ['LF'],
-  OF: ['LF', 'RF', 'CF'],
-  RF: ['RF'],
-  RP: ['RP', 'P'],
-  SP: ['SP', 'P'],
-  SS: ['SS'],
-  XDH: ['DH'],
-});
-
-export const PITCHING_POSITIONS = Object.freeze(new Set(['SP', 'RP', 'P']));
+// Position mapping and pitching-position set are imported from
+// @legacy-sports/utils and re-exported above — single source of truth.
 
 // Generic interfaces to replace GraphQL-specific ones
 export interface LeaguePosition {

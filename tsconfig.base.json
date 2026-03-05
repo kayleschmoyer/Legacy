@@ -43,6 +43,9 @@
       "@legacy-sports/utils/notification-types": [
         "lib/utils/src/lib/notification-types.ts"
       ],
+      "@legacy-sports/utils/positions": [
+        "lib/utils/src/lib/allowed-positions.ts"
+      ],
       "@legacy-sports/websocket-client": ["lib/websocket-client/src/index.ts"],
       "__PLATFORM_COMPONENTS__": [
         "lib/shared-components/src/platform-components/web/index.ts"

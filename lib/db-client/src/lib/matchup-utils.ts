@@ -28,7 +28,11 @@ import {
   type TeamInfo,
   type TeamRoster,
 } from '@legacy-sports/scheduling';
-import { isNegroLeague, SEASON_MATCHUP_MULTIPLIER } from '@legacy-sports/utils';
+import {
+  ALLOWED_POSITIONS,
+  isNegroLeague,
+  SEASON_MATCHUP_MULTIPLIER,
+} from '@legacy-sports/utils';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 
 import { type GenericDatabase } from './client/abstract/BaseDbClient';
@@ -695,28 +699,10 @@ export async function populateMatchupPlayersAndSeasons(
 
 // ── autoPopulateFirstMatchupLineup ────────────────────────────────────────────
 
-/**
- * Maps each lineup position slot to the set of player-eligibility positions
- * that can fill it. Mirrors the ALLOWED_POSITIONS constant in
- * LeagueRosterManagement.tsx so server-side auto-assignment uses the same
- * eligibility rules as the UI.
- */
-const ALLOWED_POSITIONS_FOR_SLOT: Record<string, string[]> = {
-  SP: ['SP'],
-  RP: ['RP'],
-  C: ['C'],
-  '1B': ['1B'],
-  '2B': ['2B'],
-  '3B': ['3B'],
-  SS: ['SS'],
-  LF: ['LF'],
-  CF: ['CF'],
-  RF: ['RF'],
-  OF: ['LF', 'RF', 'CF'],
-  IF: ['1B', '2B', '3B', 'SS'],
-  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
-  XDH: ['DH'],
-};
+// Position eligibility is imported from the single source of truth in
+// @legacy-sports/utils (ALLOWED_POSITIONS). SP/RP include generic 'P' so
+// that players whose stat position is the generic pitcher key are slotted
+// correctly — fixing the previous omission in the local copy.
 
 /**
  * Sort order for greedily filling lineup slots. More specific positions (e.g.
@@ -748,7 +734,7 @@ const POSITION_SPECIFICITY_ORDER: string[] = [
  * Algorithm:
  *   1. Sort the league's position slots from most → least specific.
  *   2. For each slot, pick the first unassigned player whose eligible
- *      positions satisfy ALLOWED_POSITIONS_FOR_SLOT[slot].
+ *      positions satisfy ALLOWED_POSITIONS[slot] (from @legacy-sports/utils).
  *   3. Persist all assignments via individual UPDATE statements.
  *
  * Called from createAllMatchupsForLeague immediately after
@@ -840,7 +826,7 @@ export async function autoPopulateFirstMatchupLineup(
     const eligible = playerEligMap.get(playerId);
     // No eligibility data — allow the player to fill any slot
     if (!eligible || eligible.size === 0) return true;
-    const allowed = ALLOWED_POSITIONS_FOR_SLOT[slotType];
+    const allowed = ALLOWED_POSITIONS[slotType];
     if (!allowed) return false;
     return allowed.some((pos) => eligible.has(pos));
   };

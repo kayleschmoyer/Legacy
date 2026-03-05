@@ -52,28 +52,12 @@ export interface CommitDraftPickResult {
 }
 
 // â”€â”€ Position eligibility for auto-pick â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Maps each league roster slot type to the player stat position keys that qualify.
-// Source of truth: lib/shared-components/src/utils/PositionModels.ts
-// Shared by autoProcessDraftPicks (scheduled-mutations.ts) and the
-// makeDraftPick auto-pick chain (mutations.ts).
-export const ALLOWED_POSITIONS_FOR_AUTO_PICK: Readonly<
-  Record<string, readonly string[]>
-> = Object.freeze({
-  '1B': ['1B'],
-  '2B': ['2B'],
-  '3B': ['3B'],
-  C: ['C'],
-  CF: ['CF'],
-  DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
-  IF: ['1B', '2B', '3B', 'SS'],
-  LF: ['LF'],
-  OF: ['LF', 'RF', 'CF'],
-  RF: ['RF'],
-  RP: ['RP', 'P'],
-  SP: ['SP', 'P'],
-  SS: ['SS'],
-  XDH: ['DH'],
-});
+// Single source of truth: ALLOWED_POSITIONS from @legacy-sports/utils.
+// Exported as ALLOWED_POSITIONS_FOR_AUTO_PICK for backward compatibility
+// with scheduled-mutations.ts and make-draft-pick.ts.
+// SP/RP include generic 'P' so players whose stat position is the generic
+// pitcher key are correctly identified as eligible.
+export const ALLOWED_POSITIONS_FOR_AUTO_PICK = ALLOWED_POSITIONS;
 
 /**
  * Determine which league-defined position slot types still need a player
