@@ -276,6 +276,7 @@ describe('Matchup Queries', () => {
 
     it('should return the current matchup in progress', async () => {
       const mockLeague = {
+        currentWeek: 2,
         currentMatchup: 2,
       };
 
@@ -286,7 +287,7 @@ describe('Matchup Queries', () => {
         status: 'in_progress',
       };
 
-      // First query: get league's current matchup ID
+      // First query: get league's currentWeek (or fall back to currentMatchup FK)
       mockDb.select.mockReturnValueOnce(mockDb).mockReturnValueOnce(mockDb); // Second query: get matchup details
 
       mockDb.from.mockReturnValue(mockDb);

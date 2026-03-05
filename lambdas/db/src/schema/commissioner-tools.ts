@@ -19,6 +19,7 @@ import { builder } from './builder';
 import { verifyCommissionerAccess } from './authorization';
 import { CommissionerAuditLog } from './leagues';
 import { AuthenticationError } from './graphql-errors';
+import { addPlayerToRoster } from '../services/roster-service';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -190,11 +191,10 @@ builder.mutationField('forceAddPlayer', (t) =>
       }
 
       // Add to the new team (no position slot assigned — commissioner can adjust)
-      await db.insert(PublicSchema.teamMembers).values({
+      await addPlayerToRoster(db, {
         teamId,
         leagueId,
         playerId,
-        positionId: null,
         acquisitionType: 'commissioner',
       });
 

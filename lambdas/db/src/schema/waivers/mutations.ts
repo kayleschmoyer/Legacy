@@ -5,10 +5,14 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { ProcessWaiverClaimsResult, WaiverClaim } from './types';
 import { validateFaabBudget } from './helpers';
+import {
+  checkRosterCapacity,
+  isPlayerOnRoster,
+} from '../../services/roster-service';
 import { WaiverClaimProcessor } from '../../services/waiver-processor';
 import { assertAuthorized } from '../matchups/scheduled-mutations';
 import { builder } from '../builder';
@@ -135,18 +139,7 @@ builder.mutationField('claimFreeAgent', (t) =>
       const teamId = membership[0].teamId;
 
       // 2. Check the player is not already on a team in this league
-      const alreadyTaken = await db
-        .select({ id: PublicSchema.teamMembers.id })
-        .from(PublicSchema.teamMembers)
-        .where(
-          and(
-            eq(PublicSchema.teamMembers.leagueId, leagueId),
-            eq(PublicSchema.teamMembers.playerId, playerId),
-          ),
-        )
-        .limit(1);
-
-      if (alreadyTaken.length > 0) {
+      if (await isPlayerOnRoster(db, leagueId, playerId)) {
         throw new Error('This player is already on a roster in this league');
       }
 
@@ -201,19 +194,14 @@ builder.mutationField('claimFreeAgent', (t) =>
         resolvedFaabBid = faabBid;
       }
 
-      const rosterCount = await db
-        .select({ total: count() })
-        .from(PublicSchema.teamMembers)
-        .where(
-          and(
-            eq(PublicSchema.teamMembers.teamId, teamId),
-            eq(PublicSchema.teamMembers.leagueId, leagueId),
-          ),
-        );
+      const { isFull: rosterFull } = await checkRosterCapacity(
+        db,
+        teamId,
+        leagueId,
+        leagueRow[0].maxRosterSize,
+      );
 
-      const currentSize = rosterCount[0]?.total ?? 0;
-
-      if (currentSize >= leagueRow[0].maxRosterSize && !dropPlayerId) {
+      if (rosterFull && !dropPlayerId) {
         throw new Error(
           'Roster is full. You must drop a player to add a free agent.',
         );

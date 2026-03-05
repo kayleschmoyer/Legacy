@@ -2,13 +2,11 @@
  * Draft domain â€” helper functions
  */
 
-import {
-  finalizeDraftCompletion,
-  PublicDb,
-  PublicSchema,
-} from '@legacy-sports/db-client';
+import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { ALLOWED_POSITIONS } from '@legacy-sports/utils';
 import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { ForbiddenError } from '../graphql-errors';
+import { addPlayerToRoster } from '../../services/roster-service';
 
 // â”€â”€ commitDraftPick types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -230,6 +228,30 @@ export async function getCurrentDraftPickInfo(
 }
 
 /**
+ * Verify that a user is a member of a league. Throws if not.
+ */
+export async function verifyLeagueMembership(
+  db: PublicDb,
+  leagueId: number,
+  userId: number,
+): Promise<void> {
+  const [membership] = await db
+    .select({ leagueId: PublicSchema.leagueMembers.leagueId })
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
+        eq(PublicSchema.leagueMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (!membership) {
+    throw ForbiddenError('You are not a member of this league');
+  }
+}
+
+/**
  * Commit a single draft pick inside a transaction: insert the draftPicks row,
  * advance the draft state (currentPick, deadline, completion timestamps),
  * update league status when the draft completes, and add the player to the
@@ -297,18 +319,20 @@ export async function commitDraftPick(
       currentPickDeadline: nextDeadline,
       updatedAt: now,
       ...(setStartedAt ? { draftStartedAt: now } : {}),
+      ...(isDraftComplete ? { draftCompletedAt: now } : {}),
     })
     .where(eq(PublicSchema.drafts.id, draftId));
 
-  // Atomically stamp draftCompletedAt and set draftStatus='completed' on completion.
-  // Uses the shared finalizeDraftCompletion helper so both live-draft and
-  // automated-draft paths go through identical completion logic.
+  // Mark the league draft as completed when the last pick is made
   if (isDraftComplete) {
-    await finalizeDraftCompletion(tx, leagueId, now);
+    await tx
+      .update(PublicSchema.leagues)
+      .set({ draftStatus: 'completed' })
+      .where(eq(PublicSchema.leagues.id, leagueId));
   }
 
   // Add the drafted player to the team's roster
-  await tx.insert(PublicSchema.teamMembers).values({
+  await addPlayerToRoster(tx, {
     teamId: pickInfo.teamId,
     leagueId,
     playerId,

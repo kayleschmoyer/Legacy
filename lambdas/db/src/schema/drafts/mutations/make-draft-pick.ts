@@ -12,7 +12,7 @@ import {
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { DraftPick } from '../types';
 import {
@@ -25,6 +25,7 @@ import {
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { insertActivityLog } from '../../../services/activity-log';
+import { checkRosterCapacity } from '../../../services/roster-service';
 import { AuthenticationError } from '../../graphql-errors';
 
 const badgeService = createBadgeService(getDbOptions());
@@ -286,20 +287,14 @@ builder.mutationField('makeDraftPick', (t) =>
           }
 
           // Validate roster limit — count existing team members
-          const [rosterCount] = await tx
-            .select({ count: count() })
-            .from(PublicSchema.teamMembers)
-            .where(
-              and(
-                eq(PublicSchema.teamMembers.teamId, currentPickInfo.teamId),
-                eq(PublicSchema.teamMembers.leagueId, draft.league_id),
-              ),
-            );
+          const { isFull: rosterFull } = await checkRosterCapacity(
+            tx,
+            currentPickInfo.teamId,
+            draft.league_id,
+            league.maxRosterSize,
+          );
 
-          if (
-            rosterCount &&
-            Number(rosterCount.count) >= league.maxRosterSize
-          ) {
+          if (rosterFull) {
             throw new Error(
               `Team roster is full (${league.maxRosterSize} players maximum)`,
             );
@@ -661,19 +656,13 @@ builder.mutationField('makeDraftPick', (t) =>
                 } // end else (no queue pick)
 
                 // Roster limit check
-                const [apRosterCount] = await apTx
-                  .select({ count: count() })
-                  .from(PublicSchema.teamMembers)
-                  .where(
-                    and(
-                      eq(PublicSchema.teamMembers.teamId, apPickInfo.teamId),
-                      eq(PublicSchema.teamMembers.leagueId, apDraft.league_id),
-                    ),
-                  );
-                if (
-                  apRosterCount &&
-                  Number(apRosterCount.count) >= apLeague.maxRosterSize
-                ) {
+                const { isFull: apRosterFull } = await checkRosterCapacity(
+                  apTx,
+                  apPickInfo.teamId,
+                  apDraft.league_id,
+                  apLeague.maxRosterSize,
+                );
+                if (apRosterFull) {
                   throw new Error(
                     `Team ${apPickInfo.teamId} roster is full in draft ${draftId}`,
                   );

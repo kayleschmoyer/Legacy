@@ -10,9 +10,14 @@
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { insertActivityLog } from './activity-log';
+import {
+  addPlayerToRoster,
+  checkRosterCapacity,
+  isPlayerOnRoster,
+} from './roster-service';
 import {
   addClaimedPlayerToCurrentMatchup,
   validateFaabBudget,
@@ -133,7 +138,8 @@ export class WaiverClaimProcessor {
                 },
               );
               // Check if it's a "player taken" failure — block remaining claims
-              claimed = await this.isPlayerTaken(
+              claimed = await isPlayerOnRoster(
+                this.db,
                 claim.leagueId,
                 claim.playerId,
               );
@@ -320,23 +326,6 @@ export class WaiverClaimProcessor {
       .where(eq(PublicSchema.waiverClaims.id, claim.id));
   }
 
-  private async isPlayerTaken(
-    leagueId: number,
-    playerId: number,
-  ): Promise<boolean> {
-    const rows = await this.db
-      .select({ id: PublicSchema.teamMembers.id })
-      .from(PublicSchema.teamMembers)
-      .where(
-        and(
-          eq(PublicSchema.teamMembers.leagueId, leagueId),
-          eq(PublicSchema.teamMembers.playerId, playerId),
-        ),
-      )
-      .limit(1);
-    return rows.length > 0;
-  }
-
   /**
    * Process a single waiver claim. Returns an outcome object with 'succeeded'
    * or 'failed', plus an optional human-readable reason on failure.
@@ -355,18 +344,7 @@ export class WaiverClaimProcessor {
       .where(eq(PublicSchema.waiverClaims.id, claim.id));
 
     // Check player is still available
-    const alreadyTaken = await db
-      .select({ id: PublicSchema.teamMembers.id })
-      .from(PublicSchema.teamMembers)
-      .where(
-        and(
-          eq(PublicSchema.teamMembers.leagueId, claim.leagueId),
-          eq(PublicSchema.teamMembers.playerId, claim.playerId),
-        ),
-      )
-      .limit(1);
-
-    if (alreadyTaken.length > 0) {
+    if (await isPlayerOnRoster(db, claim.leagueId, claim.playerId)) {
       await this.failClaim(claim.id, 'Player is no longer available');
       return { outcome: 'failed', reason: 'Player is no longer available' };
     }
@@ -392,11 +370,10 @@ export class WaiverClaimProcessor {
       return { outcome: 'failed', reason: 'Roster or drop player issue' };
 
     // Add player to roster
-    await db.insert(PublicSchema.teamMembers).values({
+    await addPlayerToRoster(db, {
       teamId: claim.teamId,
       leagueId: claim.leagueId,
       playerId: claim.playerId,
-      positionId: null,
       acquisitionType: 'waiver',
     });
 
@@ -458,19 +435,14 @@ export class WaiverClaimProcessor {
   ): Promise<'ok' | 'failed'> {
     const { db } = this;
 
-    const rosterCount = await db
-      .select({ total: count() })
-      .from(PublicSchema.teamMembers)
-      .where(
-        and(
-          eq(PublicSchema.teamMembers.teamId, claim.teamId),
-          eq(PublicSchema.teamMembers.leagueId, claim.leagueId),
-        ),
-      );
+    const { isFull } = await checkRosterCapacity(
+      db,
+      claim.teamId,
+      claim.leagueId,
+      maxRoster,
+    );
 
-    const currentSize = rosterCount[0]?.total ?? 0;
-
-    if (currentSize >= maxRoster) {
+    if (isFull) {
       if (!claim.dropPlayerId) {
         await this.failClaim(
           claim.id,
