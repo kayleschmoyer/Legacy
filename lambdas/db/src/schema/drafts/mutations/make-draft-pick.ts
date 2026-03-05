@@ -758,6 +758,21 @@ builder.mutationField('makeDraftPick', (t) =>
               }
             }
 
+            // Record chained auto-pick in the activity log (LS-538)
+            void insertActivityLog(context, {
+              leagueId: autoPickResult.leagueId,
+              teamId: autoPickResult.currentPickInfo.teamId,
+              actorUserId: null, // system-driven auto-pick
+              eventType: 'draft_pick_made',
+              payload: {
+                playerId: autoPickResult.playerId,
+                round: autoPickResult.currentPickInfo.round,
+                pickNumber: autoPickResult.currentPickInfo.pickNumber,
+                overallPick: autoPickResult.currentPickInfo.overallPick,
+                wasAutoPick: true,
+              },
+            });
+
             effectiveDraftComplete = autoPickResult.isDraftComplete;
             chainedNextPickInfo = autoPickResult.nextPickInfo;
           }
