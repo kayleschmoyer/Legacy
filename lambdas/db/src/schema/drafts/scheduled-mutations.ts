@@ -21,7 +21,6 @@ import {
   filterPlayerIdsByLeagueEligibility,
   PublicSchema,
 } from '@legacy-sports/db-client';
-import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions, shuffleArray } from '@legacy-sports/utils';
 import { and, count, eq, lte, sql } from 'drizzle-orm';
@@ -170,7 +169,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
           `[autoProcessDraftPicks] Found ${expiredDrafts.rows.length} drafts with expired deadlines`,
         );
 
-        const notificationService = createNotificationService();
+        const notificationService = context.notificationService;
 
         for (const row of expiredDrafts.rows) {
           const draftId = row.draft_id as number;
@@ -1041,7 +1040,7 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
           `[autoStartScheduledDrafts] Found ${scheduledDrafts.length} draft(s) to start`,
         );
 
-        const notificationService = createNotificationService();
+        const notificationService = context.notificationService;
 
         for (const draft of scheduledDrafts) {
           const { draftId, leagueId } = draft;

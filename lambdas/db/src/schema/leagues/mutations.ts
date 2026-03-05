@@ -12,7 +12,6 @@ import {
   DraftService,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { createNotificationService } from '@legacy-sports/aws-utils';
 import { getDbOptions } from '@legacy-sports/utils';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import {
@@ -575,7 +574,7 @@ builder.mutationField('joinLeagueByCode', (t) =>
             .insert(PublicSchema.leagueMessages)
             .values({ leagueId: league.id, userId, messageText: joinText })
             .returning();
-          const notificationService = createNotificationService();
+          const { notificationService } = context;
           if (notificationService) {
             await notificationService.notifyLeagueChatMessage(league.id, {
               leagueId: league.id,
@@ -770,7 +769,7 @@ builder.mutationField('joinLeague', (t) =>
             .insert(PublicSchema.leagueMessages)
             .values({ leagueId: league.id, userId, messageText: joinText })
             .returning();
-          const notificationService = createNotificationService();
+          const { notificationService } = context;
           if (notificationService) {
             await notificationService.notifyLeagueChatMessage(league.id, {
               leagueId: league.id,
@@ -1307,7 +1306,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
           })
           .returning();
 
-        const notificationService = createNotificationService();
+        const { notificationService } = context;
         if (notificationService) {
           try {
             await notificationService.notifyLeagueChatMessage(leagueId, {
@@ -1456,7 +1455,7 @@ builder.mutationField('joinPublicLeague', (t) =>
             .insert(PublicSchema.leagueMessages)
             .values({ leagueId, userId, messageText: joinText })
             .returning();
-          const notificationService = createNotificationService();
+          const { notificationService } = context;
           if (notificationService) {
             await notificationService.notifyLeagueChatMessage(leagueId, {
               leagueId,

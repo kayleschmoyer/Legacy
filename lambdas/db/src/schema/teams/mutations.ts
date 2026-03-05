@@ -5,7 +5,6 @@
  *            inviteAssistantManager, removeAssistantManager
  */
 import { PublicSchema } from '@legacy-sports/db-client';
-import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray } from 'drizzle-orm';
 import { authorized, isTeamGeneralManager } from '../authorization';
@@ -256,7 +255,7 @@ builder.mutationField('renameTeam', (t) =>
       const senderUsername = context.user.username ?? `user_${context.user.id}`;
 
       // Send league chat notification (fire-and-forget)
-      const notificationService = createNotificationService();
+      const { notificationService } = context;
       if (notificationService) {
         const chatText = `${senderUsername} renamed "${oldName}" to "${name}"`;
         // Persist the system message
@@ -457,7 +456,7 @@ builder.mutationField('inviteAssistantManager', (t) =>
 
       // 6. Send a league chat notification
       const senderUsername = context.user.username ?? `user_${userId}`;
-      const notificationService = createNotificationService();
+      const { notificationService } = context;
       if (notificationService) {
         const chatText = `${senderUsername} added ${username} as an assistant manager`;
         try {
@@ -604,7 +603,7 @@ builder.mutationField('removeAssistantManager', (t) =>
 
       // Send a league chat notification
       const senderUsername = context.user.username ?? `user_${callerId}`;
-      const notificationService = createNotificationService();
+      const { notificationService } = context;
       if (notificationService) {
         const chatText = `${senderUsername} removed an assistant manager from the team`;
         try {

@@ -7,9 +7,9 @@
  * - Balanced home/away distribution
  */
 
+import { shuffleArray } from '@legacy-sports/utils';
 import type { SchedulingStrategy } from './strategy-interface';
 import type { MatchupPairing, TeamInfo } from '../types';
-import { shuffleArray } from '@legacy-sports/utils';
 
 export class RandomStrategy implements SchedulingStrategy {
   getName(): string {

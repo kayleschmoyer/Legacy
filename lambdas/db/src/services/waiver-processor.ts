@@ -8,7 +8,7 @@
  */
 
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
-import { createNotificationService } from '@legacy-sports/aws-utils';
+import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
 
@@ -48,7 +48,10 @@ interface TeamSettings {
 // ── Service ────────────────────────────────────────────────────────────────
 
 export class WaiverClaimProcessor {
-  constructor(private readonly db: GenericDatabase<typeof PublicSchema>) {}
+  constructor(
+    private readonly db: GenericDatabase<typeof PublicSchema>,
+    private readonly notificationService?: WebSocketNotificationService | null,
+  ) {}
 
   /**
    * Process all pending waiver claims, optionally scoped to a single league.
@@ -578,7 +581,7 @@ export class WaiverClaimProcessor {
     succeededClaims: SucceededClaim[],
   ) {
     const { db } = this;
-    const notificationService = createNotificationService();
+    const notificationService = this.notificationService ?? null;
 
     // WebSocket roster-update notifications
     if (notificationService && succeededLeagueIds.size > 0) {
@@ -625,7 +628,7 @@ export class WaiverClaimProcessor {
       .where(inArray(PublicSchema.teams.id, allTeamIds));
     const teamNameMap = new Map(teamRows.map((t) => [t.id, t.name]));
 
-    const notifyService = notificationService ?? createNotificationService();
+    const notifyService = notificationService;
 
     for (const sc of succeededClaims) {
       const teamName = teamNameMap.get(sc.teamId) ?? `Team ${sc.teamId}`;

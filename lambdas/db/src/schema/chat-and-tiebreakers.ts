@@ -1,5 +1,4 @@
 import { PublicSchema } from '@legacy-sports/db-client';
-import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { builder } from './builder';
@@ -867,7 +866,7 @@ builder.mutationField('sendLeagueMessage', (t) =>
       // Dispatch WebSocket notification — MUST be awaited so the Lambda
       // execution context is not frozen before the API Gateway PostToConnection
       // calls complete.  Fire-and-forget caused silent notification loss.
-      const notificationService = createNotificationService();
+      const { notificationService } = context;
       if (notificationService) {
         try {
           await notificationService.notifyLeagueChatMessage(args.leagueId, {
@@ -1013,7 +1012,7 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
       const msg = rows[0];
 
       // Notify all league members via WebSocket
-      const notificationService = createNotificationService();
+      const { notificationService } = context;
       if (notificationService) {
         try {
           await notificationService.notifyLeagueChatMessage(args.leagueId, {
@@ -1109,7 +1108,7 @@ builder.mutationField('sendDirectMessage', (t) =>
           : String(msg.createdAt);
 
       // Dispatch WebSocket notification to the recipient's active connections
-      const notificationService = createNotificationService();
+      const { notificationService } = context;
       if (notificationService) {
         notificationService
           .notifyDirectMessage(args.toUserId, {

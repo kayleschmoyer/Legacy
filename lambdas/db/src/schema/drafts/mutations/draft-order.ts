@@ -4,7 +4,6 @@
  */
 
 import { PublicSchema } from '@legacy-sports/db-client';
-import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, eq } from 'drizzle-orm';
 
@@ -20,6 +19,7 @@ import type { Context } from '../../builder';
  */
 async function postDraftOrderChatNotification(
   db: Context['db'],
+  notificationService: Context['notificationService'],
   leagueId: number,
   username: string,
   messageText: string,
@@ -35,7 +35,6 @@ async function postDraftOrderChatNotification(
     })
     .returning();
 
-  const notificationService = createNotificationService();
   if (notificationService) {
     notificationService
       .notifyLeagueChatMessage(leagueId, {
@@ -186,6 +185,7 @@ builder.mutationField('setDraftOrder', (t) =>
         const notificationText = `${username} set a custom draft order.`;
         await postDraftOrderChatNotification(
           context.db,
+          context.notificationService,
           draft.leagueId,
           username,
           notificationText,
@@ -337,6 +337,7 @@ builder.mutationField('randomizeDraftOrder', (t) =>
         const notificationText = `${username} randomized the draft order.`;
         await postDraftOrderChatNotification(
           context.db,
+          context.notificationService,
           draft.leagueId,
           username,
           notificationText,

@@ -14,7 +14,6 @@ import {
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { createNotificationService } from '@legacy-sports/aws-utils';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 
@@ -743,7 +742,7 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
                 .where(eq(PublicSchema.leagues.id, league.id));
 
               // Notify league members via WebSocket
-              const notificationService = createNotificationService();
+              const { notificationService } = context;
               if (notificationService) {
                 try {
                   await notificationService.notifyPlayoffBracketCreated(
@@ -799,7 +798,7 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
 
             // Notify connected clients so they refetch matchup data without
             // requiring a manual page refresh.
-            const weekAdvanceNotifier = createNotificationService();
+            const weekAdvanceNotifier = context.notificationService;
             if (weekAdvanceNotifier) {
               try {
                 await weekAdvanceNotifier.notifyWeekAdvanced(league.id, {

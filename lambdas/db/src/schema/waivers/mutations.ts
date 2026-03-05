@@ -343,7 +343,10 @@ builder.mutationField('processWaiverClaims', (t) =>
     resolve: async (_parent, args, context) => {
       await assertAuthorized(context, args.leagueId);
 
-      const processor = new WaiverClaimProcessor(context.db);
+      const processor = new WaiverClaimProcessor(
+        context.db,
+        context.notificationService,
+      );
       return processor.process({ leagueId: args.leagueId });
     },
   }),

@@ -4,7 +4,6 @@ import {
   PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
-import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils';
 import type {
@@ -549,7 +548,7 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
         })
         .returning();
 
-      const notificationService = createNotificationService();
+      const notificationService = context.notificationService;
       if (notificationService) {
         notificationService
           .notifyLeagueChatMessage(args.leagueId, {

@@ -3,7 +3,6 @@
  */
 
 import { PublicSchema } from '@legacy-sports/db-client';
-import { createNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { eq } from 'drizzle-orm';
 
@@ -310,7 +309,7 @@ builder.mutationField('updateDraftSettings', (t) =>
           })
           .returning();
 
-        const notificationService = createNotificationService();
+        const { notificationService } = context;
         if (notificationService) {
           notificationService
             .notifyLeagueChatMessage(leagueId, {

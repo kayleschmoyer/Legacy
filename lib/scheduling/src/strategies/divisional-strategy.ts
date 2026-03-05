@@ -7,9 +7,9 @@
  * Assumes teams have a `divisionId` field.
  */
 
+import { shuffleArray } from '@legacy-sports/utils';
 import type { SchedulingStrategy } from './strategy-interface';
 import type { MatchupPairing, TeamInfo } from '../types';
-import { shuffleArray } from '@legacy-sports/utils';
 
 export interface DivisionalConfig {
   divisionalGamePercentage: number; // 0.0 to 1.0 (e.g., 0.6 for 60%)
