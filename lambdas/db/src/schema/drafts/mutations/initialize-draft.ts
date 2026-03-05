@@ -143,101 +143,158 @@ builder.mutationField('initializeDraft', (t) =>
           .orderBy(desc(PublicSchema.drafts.createdAt))
           .limit(1);
 
-        let draft: typeof PublicSchema.drafts.$inferSelect;
-        if (existingDraft) {
-          // Clear any leftover draft_teams from a previous initialization
-          await context.db
-            .delete(PublicSchema.draftTeams)
-            .where(eq(PublicSchema.draftTeams.draftId, existingDraft.id));
+        // Wrap all multi-step DB writes in a transaction so the sequence is
+        // atomic. A failure mid-sequence no longer leaves the draft in an
+        // inconsistent state. For automated drafts, the SQS send happens
+        // *after* the transaction commits so the external call does not block
+        // the DB connection; a compensating write rolls back if SQS fails.
+        type TxResult =
+          | {
+              draft: typeof PublicSchema.drafts.$inferSelect;
+              mode: 'live';
+              teamIdsWithoutGM: number[];
+              pickTimeLimit: number;
+              initialDeadline: Date;
+            }
+          | {
+              draft: typeof PublicSchema.drafts.$inferSelect;
+              mode: 'automated';
+            };
 
-          // Clear any leftover draft_picks from a previous initialization
-          await context.db
-            .delete(PublicSchema.draftPicks)
-            .where(eq(PublicSchema.draftPicks.draftId, existingDraft.id));
+        const txResult: TxResult = await context.db.transaction(async (tx) => {
+          let txDraft: typeof PublicSchema.drafts.$inferSelect;
 
-          const [updated] = await context.db
-            .update(PublicSchema.drafts)
-            .set({
-              draftMode,
-              selectionMethod,
-              draftOrder,
-              currentPick: 0,
-              draftStartedAt: new Date(),
-              draftCompletedAt: null,
-              currentPickDeadline: null,
-            })
-            .where(eq(PublicSchema.drafts.id, existingDraft.id))
-            .returning();
-          draft = updated;
-        } else {
-          const [created] = await context.db
-            .insert(PublicSchema.drafts)
-            .values({
+          if (existingDraft) {
+            // Clear any leftover draft_teams from a previous initialization
+            await tx
+              .delete(PublicSchema.draftTeams)
+              .where(eq(PublicSchema.draftTeams.draftId, existingDraft.id));
+
+            // Clear any leftover draft_picks from a previous initialization
+            await tx
+              .delete(PublicSchema.draftPicks)
+              .where(eq(PublicSchema.draftPicks.draftId, existingDraft.id));
+
+            const [updated] = await tx
+              .update(PublicSchema.drafts)
+              .set({
+                draftMode,
+                selectionMethod,
+                draftOrder,
+                currentPick: 0,
+                draftStartedAt: new Date(),
+                draftCompletedAt: null,
+                currentPickDeadline: null,
+              })
+              .where(eq(PublicSchema.drafts.id, existingDraft.id))
+              .returning();
+            txDraft = updated;
+          } else {
+            const [created] = await tx
+              .insert(PublicSchema.drafts)
+              .values({
+                leagueId,
+                draftMode,
+                selectionMethod,
+                draftOrder,
+                currentPick: 0,
+                draftStartedAt: new Date(),
+              })
+              .returning();
+            txDraft = created;
+          }
+
+          // Insert draft_teams with the randomized order (1-indexed)
+          await tx.insert(PublicSchema.draftTeams).values(
+            shuffled.map((team, index) => ({
+              draftId: txDraft.id,
+              teamId: team.id,
               leagueId,
-              draftMode,
-              selectionMethod,
-              draftOrder,
-              currentPick: 0,
-              draftStartedAt: new Date(),
-            })
-            .returning();
-          draft = created;
-        }
-
-        // Insert draft_teams with the randomized order (1-indexed)
-        await context.db.insert(PublicSchema.draftTeams).values(
-          shuffled.map((team, index) => ({
-            draftId: draft.id,
-            teamId: team.id,
-            leagueId,
-            draftOrder: index + 1,
-          })),
-        );
-
-        // ── Branch: Live vs Automated ───────────────────────────────
-        if (draftMode === 'live') {
-          // Update league status to in-progress
-          await context.db
-            .update(PublicSchema.leagues)
-            .set({ draftStatus: 'in-progress' })
-            .where(eq(PublicSchema.leagues.id, leagueId));
-
-          // LS-480: Enable auto-pick for any teams without a general manager
-          const teamsWithGM = await context.db
-            .select({ teamId: PublicSchema.leagueMembers.teamId })
-            .from(PublicSchema.leagueMembers)
-            .where(
-              and(
-                eq(PublicSchema.leagueMembers.leagueId, leagueId),
-                eq(
-                  PublicSchema.leagueMembers.permissionLevel,
-                  'general_manager',
-                ),
-                isNotNull(PublicSchema.leagueMembers.teamId),
-              ),
-            );
-
-          const teamIdsWithGM = new Set(
-            teamsWithGM
-              .map((m) => m.teamId)
-              .filter((id): id is number => id !== null),
+              draftOrder: index + 1,
+            })),
           );
 
-          const teamIdsWithoutGM = shuffled
-            .map((t) => t.id)
-            .filter((id) => !teamIdsWithGM.has(id));
+          // ── Branch: Live vs Automated ───────────────────────────────
+          if (draftMode === 'live') {
+            // Update league status to in-progress
+            await tx
+              .update(PublicSchema.leagues)
+              .set({ draftStatus: 'in-progress' })
+              .where(eq(PublicSchema.leagues.id, leagueId));
 
-          if (teamIdsWithoutGM.length > 0) {
-            await context.db
-              .update(PublicSchema.draftTeams)
-              .set({ autoPick: true })
+            // LS-480: Enable auto-pick for any teams without a general manager
+            const teamsWithGM = await tx
+              .select({ teamId: PublicSchema.leagueMembers.teamId })
+              .from(PublicSchema.leagueMembers)
               .where(
                 and(
-                  eq(PublicSchema.draftTeams.draftId, draft.id),
-                  inArray(PublicSchema.draftTeams.teamId, teamIdsWithoutGM),
+                  eq(PublicSchema.leagueMembers.leagueId, leagueId),
+                  eq(
+                    PublicSchema.leagueMembers.permissionLevel,
+                    'general_manager',
+                  ),
+                  isNotNull(PublicSchema.leagueMembers.teamId),
                 ),
               );
 
+            const teamIdsWithGM = new Set(
+              teamsWithGM
+                .map((m) => m.teamId)
+                .filter((id): id is number => id !== null),
+            );
+
+            const teamIdsWithoutGM = shuffled
+              .map((t) => t.id)
+              .filter((id) => !teamIdsWithGM.has(id));
+
+            if (teamIdsWithoutGM.length > 0) {
+              await tx
+                .update(PublicSchema.draftTeams)
+                .set({ autoPick: true })
+                .where(
+                  and(
+                    eq(PublicSchema.draftTeams.draftId, txDraft.id),
+                    inArray(PublicSchema.draftTeams.teamId, teamIdsWithoutGM),
+                  ),
+                );
+            }
+
+            // Set the initial pick deadline now that draft is live
+            const pickTimeLimit = Number(txDraft.pickTimeLimitSeconds) || 120;
+            const initialDeadline = new Date(Date.now() + pickTimeLimit * 1000);
+            const [draftWithDeadline] = await tx
+              .update(PublicSchema.drafts)
+              .set({ currentPickDeadline: initialDeadline })
+              .where(eq(PublicSchema.drafts.id, txDraft.id))
+              .returning();
+            txDraft = draftWithDeadline;
+
+            return {
+              draft: txDraft,
+              mode: 'live' as const,
+              teamIdsWithoutGM,
+              pickTimeLimit,
+              initialDeadline,
+            };
+          } else {
+            // Automated: update league status to 'queued' inside the transaction.
+            // SQS send happens after commit (see below).
+            await tx
+              .update(PublicSchema.leagues)
+              .set({ draftStatus: 'queued' })
+              .where(eq(PublicSchema.leagues.id, leagueId));
+
+            return { draft: txDraft, mode: 'automated' as const };
+          }
+        });
+
+        const draft = txResult.draft;
+
+        // ── Post-transaction side effects ──────────────────────────
+        if (txResult.mode === 'live') {
+          const { teamIdsWithoutGM, pickTimeLimit, initialDeadline } = txResult;
+
+          if (teamIdsWithoutGM.length > 0) {
             LOGGER.info(
               'Auto-pick enabled for teams without general managers',
               {
@@ -247,16 +304,6 @@ builder.mutationField('initializeDraft', (t) =>
               },
             );
           }
-
-          // Set the initial pick deadline now that draft is live
-          const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;
-          const initialDeadline = new Date(Date.now() + pickTimeLimit * 1000);
-          const [draftWithDeadline] = await context.db
-            .update(PublicSchema.drafts)
-            .set({ currentPickDeadline: initialDeadline })
-            .where(eq(PublicSchema.drafts.id, draft.id))
-            .returning();
-          draft = draftWithDeadline;
 
           LOGGER.info('Live draft initialized', {
             leagueId,
@@ -278,20 +325,14 @@ builder.mutationField('initializeDraft', (t) =>
             );
           }
         } else {
-          // Automated draft: queue via SQS for background processing
+          // Automated draft: send SQS message now that DB writes are committed.
+          // If SQS fails, a compensating write rolls back the league status.
           const queueUrl = process.env.SQS_AUTOMATIC_DRAFTS_URL;
           if (!queueUrl) {
             throw new Error(
               'Automated draft queue is not configured (SQS_AUTOMATIC_DRAFTS_URL)',
             );
           }
-
-          // Set status to 'queued' first, then send SQS message
-          // If SQS fails, rollback the status change
-          await context.db
-            .update(PublicSchema.leagues)
-            .set({ draftStatus: 'queued' })
-            .where(eq(PublicSchema.leagues.id, leagueId));
 
           try {
             const sqsService = new DraftSqsService(queueUrl);

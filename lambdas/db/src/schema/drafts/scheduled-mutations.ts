@@ -1071,46 +1071,50 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
               [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
 
-            // Clear any stale draft_teams and draft_picks from previous runs
-            await context.db
-              .delete(PublicSchema.draftTeams)
-              .where(eq(PublicSchema.draftTeams.draftId, draftId));
-            await context.db
-              .delete(PublicSchema.draftPicks)
-              .where(eq(PublicSchema.draftPicks.draftId, draftId));
-
-            // Insert draft teams in randomized order
-            await context.db.insert(PublicSchema.draftTeams).values(
-              shuffled.map((team, index) => ({
-                draftId,
-                teamId: team.id,
-                leagueId,
-                draftOrder: index + 1,
-              })),
-            );
-
             const startedAt = new Date();
             const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;
             const initialDeadline = new Date(
               startedAt.getTime() + pickTimeLimit * 1000,
             );
 
-            // Update the draft record with started timestamps + first pick deadline
-            await context.db
-              .update(PublicSchema.drafts)
-              .set({
-                draftStartedAt: startedAt,
-                currentPick: 0,
-                currentPickDeadline: initialDeadline,
-                updatedAt: startedAt,
-              })
-              .where(eq(PublicSchema.drafts.id, draftId));
+            // Wrap the multi-step write sequence in a transaction so a
+            // mid-flight failure cannot leave draft state inconsistent.
+            await context.db.transaction(async (tx) => {
+              // Clear any stale draft_teams and draft_picks from previous runs
+              await tx
+                .delete(PublicSchema.draftTeams)
+                .where(eq(PublicSchema.draftTeams.draftId, draftId));
+              await tx
+                .delete(PublicSchema.draftPicks)
+                .where(eq(PublicSchema.draftPicks.draftId, draftId));
 
-            // Update league status
-            await context.db
-              .update(PublicSchema.leagues)
-              .set({ draftStatus: 'in-progress' })
-              .where(eq(PublicSchema.leagues.id, leagueId));
+              // Insert draft teams in randomized order
+              await tx.insert(PublicSchema.draftTeams).values(
+                shuffled.map((team, index) => ({
+                  draftId,
+                  teamId: team.id,
+                  leagueId,
+                  draftOrder: index + 1,
+                })),
+              );
+
+              // Update the draft record with started timestamps + first pick deadline
+              await tx
+                .update(PublicSchema.drafts)
+                .set({
+                  draftStartedAt: startedAt,
+                  currentPick: 0,
+                  currentPickDeadline: initialDeadline,
+                  updatedAt: startedAt,
+                })
+                .where(eq(PublicSchema.drafts.id, draftId));
+
+              // Update league status
+              await tx
+                .update(PublicSchema.leagues)
+                .set({ draftStatus: 'in-progress' })
+                .where(eq(PublicSchema.leagues.id, leagueId));
+            });
 
             // Send WebSocket notification
             if (notificationService) {
