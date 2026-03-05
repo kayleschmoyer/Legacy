@@ -4,6 +4,9 @@
  * Returns historically notable batting and pitching game-log performances
  * that occurred on the given calendar month + day across all seasons
  * stored in the database.
+ *
+ * Also returns baseball events (signings, trades) from the on_this_day_events
+ * table populated via the MLB Stats API.
  */
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils';
@@ -103,6 +106,72 @@ builder.queryField('onThisDay', (t) =>
     },
     resolve: async (_root, { month, day, limit }) => {
       return dbService.statistics.getOnThisDay(month, day, limit ?? 15);
+    },
+  }),
+);
+
+// ─── OnThisDayEvent type ──────────────────────────────────────────────────────
+
+interface OnThisDayEventShape {
+  id: number;
+  month: number;
+  day: number;
+  year: number;
+  eventType: string;
+  description: string;
+  playerId: number | null;
+  playerName: string | null;
+  fromTeam: string | null;
+  toTeam: string | null;
+}
+
+const OnThisDayEventRef =
+  builder.objectRef<OnThisDayEventShape>('OnThisDayEvent');
+
+OnThisDayEventRef.implement({
+  description:
+    'A historical baseball event (signing, trade) on a calendar date',
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    month: t.exposeInt('month'),
+    day: t.exposeInt('day'),
+    year: t.exposeInt('year', { description: 'Year the event occurred' }),
+    eventType: t.exposeString('eventType', {
+      description: 'MLB transaction type code (e.g. TR, SFA, CE)',
+    }),
+    description: t.exposeString('description', {
+      description: 'Human-readable description of the event',
+    }),
+    playerId: t.exposeInt('playerId', { nullable: true }),
+    playerName: t.exposeString('playerName', { nullable: true }),
+    fromTeam: t.exposeString('fromTeam', { nullable: true }),
+    toTeam: t.exposeString('toTeam', { nullable: true }),
+  }),
+});
+
+// ─── onThisDayEvents query ───────────────────────────────────────────────────
+
+builder.queryField('onThisDayEvents', (t) =>
+  t.field({
+    type: [OnThisDayEventRef],
+    description:
+      'Baseball events (signings, trades) that occurred on the given calendar date',
+    args: {
+      month: t.arg.int({
+        required: true,
+        description: 'Calendar month (1–12)',
+      }),
+      day: t.arg.int({
+        required: true,
+        description: 'Calendar day (1–31)',
+      }),
+      limit: t.arg.int({
+        required: false,
+        description: 'Maximum number of events to return (default 20)',
+      }),
+    },
+    resolve: async (_root, { month, day, limit }) => {
+      return dbService.statistics.getOnThisDayEvents(month, day, limit ?? 20);
     },
   }),
 );

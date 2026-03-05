@@ -24,3 +24,15 @@ query GetOnThisDay($month: Int!, $day: Int!, $limit: Int) {
     walksAllowed
   }
 }
+
+query GetOnThisDayEvents($month: Int!, $day: Int!, $limit: Int) {
+  onThisDayEvents(month: $month, day: $day, limit: $limit) {
+    id
+    year
+    eventType
+    description
+    playerName
+    fromTeam
+    toTeam
+  }
+}

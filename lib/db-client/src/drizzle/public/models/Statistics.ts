@@ -2,6 +2,7 @@ import {
   pgTable,
   unique,
   serial,
+  smallint,
   text,
   varchar,
   foreignKey,
@@ -798,3 +799,41 @@ export const positionalAdjustments = pgTable('positional_adjustments', {
     .defaultNow()
     .notNull(),
 });
+
+/**
+ * on_this_day_events — historical MLB baseball events indexed by calendar
+ * month + day.  Used by the "On This Day" home page feed to surface
+ * interesting content on every date of the year, including the off-season.
+ *
+ * Data is populated by the `load-on-this-day-events` CLI command which
+ * pulls transaction history from the MLB Stats API (statsapi.mlb.com)
+ * for all 366 calendar dates covering 2008–present.
+ */
+export const onThisDayEvents = pgTable(
+  'on_this_day_events',
+  {
+    id: serial('id').primaryKey().notNull(),
+    // Indexed calendar date (month 1–12, day 1–31)
+    month: smallint('month').notNull(),
+    day: smallint('day').notNull(),
+    year: smallint('year').notNull(),
+    // Transaction / event category (SFA, TR, CE, …)
+    eventType: varchar('event_type', { length: 50 }).notNull(),
+    description: text('description').notNull(),
+    // Optional FK to the player in our players table
+    playerId: integer('player_id').references(() => players.id),
+    playerName: varchar('player_name', { length: 200 }),
+    fromTeam: varchar('from_team', { length: 100 }),
+    toTeam: varchar('to_team', { length: 100 }),
+    mlbTransactionId: integer('mlb_transaction_id'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    monthDayIdx: index('on_this_day_events_month_day_idx').on(
+      table.month,
+      table.day,
+    ),
+  }),
+);

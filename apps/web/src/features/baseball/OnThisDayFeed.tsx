@@ -2,12 +2,14 @@
  * OnThisDayFeed — "On This Day in Baseball History" widget.
  *
  * Surfaces notable batting/pitching game-log performances that occurred on
- * today's calendar date (month + day) across all seasons in the database.
+ * today's calendar date (month + day) across all seasons in the database,
+ * plus off-season events (signings, trades) from the on_this_day_events table.
  */
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Separator, Spinner, styled, Text, XStack, YStack } from 'tamagui';
 import {
+  ArrowLeftRight,
   Calendar,
   ChevronRight,
   Star,
@@ -24,7 +26,10 @@ import {
   BRAND_SEAM_RED_LIGHT,
   withAlpha,
 } from '../../constants/colors';
-import { useGetOnThisDayQuery } from '../../api/db/graphql.generated';
+import {
+  useGetOnThisDayEventsQuery,
+  useGetOnThisDayQuery,
+} from '../../api/db/graphql.generated';
 
 // ─── Styled components ───────────────────────────────────────────────────────
 
@@ -97,6 +102,21 @@ const MONTH_NAMES = [
   'November',
   'December',
 ];
+
+/** Human-readable label for an MLB transaction type code. */
+function eventTypeLabel(code: string): string {
+  switch (code) {
+    case 'TR':
+      return 'Trade';
+    case 'SFA':
+      return 'Signed';
+    case 'CE':
+    case 'EX':
+      return 'Extension';
+    default:
+      return code;
+  }
+}
 
 type Entry = NonNullable<
   NonNullable<ReturnType<typeof useGetOnThisDayQuery>['data']>['onThisDay']
@@ -180,7 +200,14 @@ export function OnThisDayFeed(): React.JSX.Element {
     fetchPolicy: 'cache-first',
   });
 
+  const { data: eventsData, loading: eventsLoading } =
+    useGetOnThisDayEventsQuery({
+      variables: { month, day, limit: 20 },
+      fetchPolicy: 'cache-first',
+    });
+
   const entries = data?.onThisDay ?? [];
+  const events = eventsData?.onThisDayEvents ?? [];
 
   const dateLabel = `${MONTH_NAMES[month - 1]} ${ordinal(day)}`;
 
@@ -247,17 +274,21 @@ export function OnThisDayFeed(): React.JSX.Element {
         </YStack>
       )}
 
-      {!loading && !error && entries.length === 0 && (
-        <YStack
-          alignItems="center"
-          justifyContent="center"
-          paddingVertical="$6"
-        >
-          <Text fontSize="$3" color="$textMuted" textAlign="center">
-            No notable performances found for {dateLabel}.
-          </Text>
-        </YStack>
-      )}
+      {!loading &&
+        !error &&
+        entries.length === 0 &&
+        events.length === 0 &&
+        !eventsLoading && (
+          <YStack
+            alignItems="center"
+            justifyContent="center"
+            paddingVertical="$6"
+          >
+            <Text fontSize="$3" color="$textMuted" textAlign="center">
+              No notable performances found for {dateLabel}.
+            </Text>
+          </YStack>
+        )}
 
       {!loading && !error && entries.length > 0 && (
         <YStack>
@@ -326,6 +357,97 @@ export function OnThisDayFeed(): React.JSX.Element {
                     flexShrink={0}
                   />
                 </EntryRow>
+              </React.Fragment>
+            );
+          })}
+        </YStack>
+      )}
+
+      {/* Events section: signings, trades, extensions */}
+      {!eventsLoading && events.length > 0 && (
+        <YStack>
+          <XStack
+            alignItems="center"
+            gap="$2"
+            paddingHorizontal="$5"
+            paddingVertical="$2"
+            borderTopWidth={entries.length > 0 ? 1 : 0}
+            borderTopColor={withAlpha(BRAND_NAVY, 0.5)}
+            style={{ background: withAlpha(BRAND_NAVY, 0.3) }}
+          >
+            <ArrowLeftRight size={12} color={withAlpha(BRAND_GOLD, 0.7)} />
+            <Text
+              fontSize="$2"
+              fontWeight="600"
+              color={withAlpha(BRAND_GOLD_LIGHT, 0.8)}
+            >
+              Transactions &amp; Signings
+            </Text>
+          </XStack>
+
+          {events.map((event, idx) => {
+            const label = eventTypeLabel(event.eventType ?? '');
+            const accentColor =
+              event.eventType === 'TR'
+                ? BRAND_SEAM_RED_LIGHT
+                : BRAND_GOLD_LIGHT;
+
+            return (
+              <React.Fragment key={event.id ?? idx}>
+                {idx > 0 && (
+                  <Separator
+                    backgroundColor={withAlpha(BRAND_NAVY, 0.4)}
+                    marginHorizontal="$4"
+                  />
+                )}
+                <XStack
+                  alignItems="flex-start"
+                  paddingHorizontal="$5"
+                  paddingVertical="$3"
+                  gap="$3"
+                >
+                  <YStack
+                    width={36}
+                    height={36}
+                    borderRadius={9999}
+                    alignItems="center"
+                    justifyContent="center"
+                    flexShrink={0}
+                    style={{
+                      background: `radial-gradient(circle, ${withAlpha(accentColor, 0.18)}, ${withAlpha(BG_DARK, 0.6)})`,
+                      border: `1px solid ${withAlpha(accentColor, 0.35)}`,
+                    }}
+                  >
+                    <ArrowLeftRight size={14} color={accentColor} />
+                  </YStack>
+
+                  <YStack flex={1} gap="$0.5" minWidth={0}>
+                    <XStack alignItems="center" gap="$2" flexWrap="wrap">
+                      {event.playerName && (
+                        <Text
+                          fontSize="$4"
+                          fontWeight="700"
+                          color="$color"
+                          numberOfLines={1}
+                        >
+                          {event.playerName}
+                        </Text>
+                      )}
+                      <StatBadge>
+                        <Text
+                          fontSize="$1"
+                          fontWeight="600"
+                          color={accentColor}
+                        >
+                          {label} · {event.year}
+                        </Text>
+                      </StatBadge>
+                    </XStack>
+                    <Text fontSize="$3" color="$textMuted" numberOfLines={2}>
+                      {event.description}
+                    </Text>
+                  </YStack>
+                </XStack>
               </React.Fragment>
             );
           })}

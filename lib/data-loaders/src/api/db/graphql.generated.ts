@@ -1598,6 +1598,24 @@ export type OnThisDayEntry = {
   wins?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A historical baseball event (signing, trade) on a calendar date */
+export type OnThisDayEvent = {
+  __typename?: 'OnThisDayEvent';
+  day?: Maybe<Scalars['Int']['output']>;
+  /** Human-readable description of the event */
+  description?: Maybe<Scalars['String']['output']>;
+  /** MLB transaction type code (e.g. TR, SFA, CE) */
+  eventType?: Maybe<Scalars['String']['output']>;
+  fromTeam?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  month?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  toTeam?: Maybe<Scalars['String']['output']>;
+  /** Year the event occurred */
+  year?: Maybe<Scalars['Int']['output']>;
+};
+
 export type PageInfo = {
   __typename?: 'PageInfo';
   endCursor?: Maybe<Scalars['String']['output']>;
@@ -1817,6 +1835,8 @@ export type Query = {
   myDataRequests?: Maybe<Array<DataRequest>>;
   /** Notable historical game-log performances from today's calendar date across all seasons */
   onThisDay?: Maybe<Array<OnThisDayEntry>>;
+  /** Baseball events (signings, trades) that occurred on the given calendar date */
+  onThisDayEvents?: Maybe<Array<OnThisDayEvent>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
@@ -2106,6 +2126,12 @@ export type QueryLeagueTradeOffersArgs = {
 };
 
 export type QueryOnThisDayArgs = {
+  day: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  month: Scalars['Int']['input'];
+};
+
+export type QueryOnThisDayEventsArgs = {
   day: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   month: Scalars['Int']['input'];

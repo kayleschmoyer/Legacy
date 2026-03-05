@@ -51,6 +51,7 @@ import { handleTestDraftTimer } from './commands/testDraftTimer';
 import { handleLoadWobaWeights } from './commands/loadWobaWeights';
 import { handleLoadBrParkFactors } from './commands/loadBrParkFactors';
 import { handleLoadPositionalAdjustments } from './commands/loadPositionalAdjustments';
+import { handleLoadOnThisDayEvents } from './commands/loadOnThisDayEvents';
 
 // Initialize Sentry for CLI
 const sentryConfig = getSentryConfigFromEnv();
@@ -539,6 +540,28 @@ async function run(): Promise<void> {
     .option('--upsert', 'Overwrite existing rows instead of skipping')
     .action((options: { upsert?: boolean }) =>
       handleLoadPositionalAdjustments(options),
+    );
+
+  program
+    .command('load-on-this-day-events')
+    .description(
+      'Fetch MLB Stats API transaction records for every calendar day and insert notable events into on_this_day_events table',
+    )
+    .option('--from <year>', 'Start year (default: 2008)', parseInt)
+    .option('--to <year>', 'End year (default: current year)', parseInt)
+    .option(
+      '--delay <ms>',
+      'Milliseconds between API requests (default: 200)',
+      parseInt,
+    )
+    .option('--upsert', 'Overwrite existing rows instead of skipping')
+    .action(
+      (options: {
+        from?: number;
+        to?: number;
+        delay?: number;
+        upsert?: boolean;
+      }) => handleLoadOnThisDayEvents(options),
     );
 
   await program.parseAsync(process.argv);

@@ -1598,6 +1598,24 @@ export type OnThisDayEntry = {
   wins?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A historical baseball event (signing, trade) on a calendar date */
+export type OnThisDayEvent = {
+  __typename?: 'OnThisDayEvent';
+  day?: Maybe<Scalars['Int']['output']>;
+  /** Human-readable description of the event */
+  description?: Maybe<Scalars['String']['output']>;
+  /** MLB transaction type code (e.g. TR, SFA, CE) */
+  eventType?: Maybe<Scalars['String']['output']>;
+  fromTeam?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  month?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerName?: Maybe<Scalars['String']['output']>;
+  toTeam?: Maybe<Scalars['String']['output']>;
+  /** Year the event occurred */
+  year?: Maybe<Scalars['Int']['output']>;
+};
+
 export type PageInfo = {
   __typename?: 'PageInfo';
   endCursor?: Maybe<Scalars['String']['output']>;
@@ -1817,6 +1835,8 @@ export type Query = {
   myDataRequests?: Maybe<Array<DataRequest>>;
   /** Notable historical game-log performances from today's calendar date across all seasons */
   onThisDay?: Maybe<Array<OnThisDayEntry>>;
+  /** Baseball events (signings, trades) that occurred on the given calendar date */
+  onThisDayEvents?: Maybe<Array<OnThisDayEvent>>;
   player?: Maybe<Player>;
   playerByBrefId?: Maybe<Player>;
   playerCareerBatting?: Maybe<CareerBatting>;
@@ -2106,6 +2126,12 @@ export type QueryLeagueTradeOffersArgs = {
 };
 
 export type QueryOnThisDayArgs = {
+  day: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  month: Scalars['Int']['input'];
+};
+
+export type QueryOnThisDayEventsArgs = {
   day: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   month: Scalars['Int']['input'];
@@ -3155,6 +3181,26 @@ export type GetOnThisDayQuery = {
     wins?: number | null;
     hitsAllowed?: number | null;
     walksAllowed?: number | null;
+  }> | null;
+};
+
+export type GetOnThisDayEventsQueryVariables = Exact<{
+  month: Scalars['Int']['input'];
+  day: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetOnThisDayEventsQuery = {
+  __typename?: 'Query';
+  onThisDayEvents?: Array<{
+    __typename?: 'OnThisDayEvent';
+    id?: number | null;
+    year?: number | null;
+    eventType?: string | null;
+    description?: string | null;
+    playerName?: string | null;
+    fromTeam?: string | null;
+    toTeam?: string | null;
   }> | null;
 };
 
@@ -8170,6 +8216,104 @@ export type GetOnThisDaySuspenseQueryHookResult = ReturnType<
 export type GetOnThisDayQueryResult = Apollo.QueryResult<
   GetOnThisDayQuery,
   GetOnThisDayQueryVariables
+>;
+export const GetOnThisDayEvents = gql`
+  query GetOnThisDayEvents($month: Int!, $day: Int!, $limit: Int) {
+    onThisDayEvents(month: $month, day: $day, limit: $limit) {
+      id
+      year
+      eventType
+      description
+      playerName
+      fromTeam
+      toTeam
+    }
+  }
+`;
+
+/**
+ * __useGetOnThisDayEventsQuery__
+ *
+ * To run a query within a React component, call `useGetOnThisDayEventsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetOnThisDayEventsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetOnThisDayEventsQuery({
+ *   variables: {
+ *      month: // value for 'month'
+ *      day: // value for 'day'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetOnThisDayEventsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetOnThisDayEventsQuery,
+    GetOnThisDayEventsQueryVariables
+  > &
+    (
+      | { variables: GetOnThisDayEventsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetOnThisDayEventsQuery,
+    GetOnThisDayEventsQueryVariables
+  >(GetOnThisDayEvents, options);
+}
+export function useGetOnThisDayEventsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetOnThisDayEventsQuery,
+    GetOnThisDayEventsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetOnThisDayEventsQuery,
+    GetOnThisDayEventsQueryVariables
+  >(GetOnThisDayEvents, options);
+}
+export function useGetOnThisDayEventsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetOnThisDayEventsQuery,
+        GetOnThisDayEventsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetOnThisDayEventsQuery,
+    GetOnThisDayEventsQueryVariables
+  >(
+    GetOnThisDayEvents,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetOnThisDayEventsQuery,
+          GetOnThisDayEventsQueryVariables
+        >,
+  );
+}
+export type GetOnThisDayEventsQueryHookResult = ReturnType<
+  typeof useGetOnThisDayEventsQuery
+>;
+export type GetOnThisDayEventsLazyQueryHookResult = ReturnType<
+  typeof useGetOnThisDayEventsLazyQuery
+>;
+export type GetOnThisDayEventsSuspenseQueryHookResult = ReturnType<
+  typeof useGetOnThisDayEventsSuspenseQuery
+>;
+export type GetOnThisDayEventsQueryResult = Apollo.QueryResult<
+  GetOnThisDayEventsQuery,
+  GetOnThisDayEventsQueryVariables
 >;
 export const GetLeagueActivity = gql`
   query GetLeagueActivity(

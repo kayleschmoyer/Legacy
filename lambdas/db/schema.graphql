@@ -1566,6 +1566,34 @@ type OnThisDayEntry {
   wins: Int
 }
 
+"""
+A historical baseball event (signing, trade) on a calendar date
+"""
+type OnThisDayEvent {
+  day: Int
+
+  """
+  Human-readable description of the event
+  """
+  description: String
+
+  """
+  MLB transaction type code (e.g. TR, SFA, CE)
+  """
+  eventType: String
+  fromTeam: String
+  id: Int
+  month: Int
+  playerId: Int
+  playerName: String
+  toTeam: String
+
+  """
+  Year the event occurred
+  """
+  year: Int
+}
+
 type PageInfo {
   endCursor: String
   hasNextPage: Boolean!
@@ -1911,6 +1939,26 @@ type Query {
     """
     month: Int!
   ): [OnThisDayEntry!]
+
+  """
+  Baseball events (signings, trades) that occurred on the given calendar date
+  """
+  onThisDayEvents(
+    """
+    Calendar day (1–31)
+    """
+    day: Int!
+
+    """
+    Maximum number of events to return (default 20)
+    """
+    limit: Int
+
+    """
+    Calendar month (1–12)
+    """
+    month: Int!
+  ): [OnThisDayEvent!]
   player(id: Int!): Player
   playerByBrefId(brefId: String!): Player
   playerCareerBatting(playerId: Int!): CareerBatting
