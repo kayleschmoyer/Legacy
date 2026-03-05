@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
+import { applyScoring } from '@legacy-sports/utils';
 import { getScoringMultipliersForLeague, PublicDb } from './PublicDbClient';
 import * as Schema from '../../drizzle/public/schema';
 import { Matchup } from '../../types/DatabaseTypes';
@@ -205,25 +206,6 @@ function camelCaseMultipliers(
     result[snakeToCamel(key)] = value;
   }
   return result;
-}
-
-/**
- * Compute a fantasy score by applying multiplier weights to stat values.
- * Inlined here to avoid circular dependency with @legacy-sports/scoring.
- */
-function applyScoring(
-  stats: Record<string, unknown>,
-  weights: Record<string, number>,
-): number {
-  let sum = 0;
-  for (const [key, multiplier] of Object.entries(weights)) {
-    if (!multiplier || typeof multiplier !== 'number') continue;
-    const value = stats[key];
-    if (value === null || value === undefined || typeof value !== 'number')
-      continue;
-    sum += multiplier * value;
-  }
-  return sum;
 }
 
 /**
