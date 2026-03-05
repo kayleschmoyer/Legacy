@@ -26,6 +26,21 @@ class WebRollbarImplementation implements RollbarInterface {
         payload: {
           code_version: config.release,
         },
+        // Filter out browser-noise errors that are not actionable:
+        // - AbortError: thrown by fetch() when a request is cancelled on
+        //   navigation or component unmount (LS-502). This is expected browser
+        //   behaviour, not a bug.
+        // - ResizeObserver loop: a benign browser warning, not an app error.
+        checkIgnore: (_isUncaught: boolean, args: unknown[]) => {
+          const err = args[0];
+          if (err instanceof Error && err.name === 'AbortError') {
+            return true;
+          }
+          if (typeof err === 'string' && err.includes('ResizeObserver loop')) {
+            return true;
+          }
+          return false;
+        },
       });
       LOGGER.info('Rollbar initialized for Web environment', {
         environment: config.environment,
