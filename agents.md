@@ -50,12 +50,13 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **Scratch output files**        | `.github/skills/scratch-dir/SKILL.md`                                      |
 | Troubleshooting                 | `.github/skills/troubleshoot/SKILL.md`                                     |
 | Type errors                     | `.github/skills/fix-types/SKILL.md`                                        |
+| **Storybook**                   | `.github/skills/storybook/SKILL.md`                                        |
 | **UI Brand Colors**             | `.github/skills/ui-brand-colors/SKILL.md`                                  |
 | **UI Standards**                | `.github/skills/ui-standards/SKILL.md`                                     |
 | **User testing**                | `.github/skills/user-testing/SKILL.md`                                     |
 | **WebSocket refetch UX**        | `.github/skills/websocket-refetch-ux/SKILL.md`                             |
 | **Rebase & conflicts**          | `.github/skills/rebase-conflicts/SKILL.md`                                 |
 | **Worktree workflow (default)** | `.github/skills/worktree-workflow/SKILL.md`                                |
-| All skills (57 guides)          | `.github/skills/`                                                          |
+| All skills (58 guides)          | `.github/skills/`                                                          |
 | CSV reference data              | `docs/agents/*.csv`                                                        |
 | Tech stack                      | React Native · Next.js · Lambda · GraphQL · PostgreSQL/Drizzle · Terraform |

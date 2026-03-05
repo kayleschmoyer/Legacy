@@ -5,25 +5,12 @@ const enableCoverageAddon =
   process.env.STORYBOOK_ENABLE_COVERAGE === 'true';
 
 const config: StorybookConfig = {
+  // Auto-discovers all *.stories.{ts,tsx,mdx} files under src/.
+  // Welcome is listed first so it appears at the top of the sidebar.
+  // Any new *.stories.tsx file added anywhere under src/ is picked up automatically.
   stories: [
     '../src/Welcome.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/ThemeGallery.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/Layout.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/XStack.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/YStack.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/Typography.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/components/Button.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/components/LoadingPanel.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/Dropdown.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/ConditionalProviders.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/features/draft/PlayerCard.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/features/draft/FilterComponents.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/features/draft/QuickFilters.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/features/draft/FilterDrawer.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/features/stats/StatsTable.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/features/teams/TeamPicker.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/features/players/PlayerRow.stories.@(js|jsx|ts|tsx|mdx)',
-    '../src/navigation/index.stories.@(js|jsx|ts|tsx|mdx)',
+    '../src/**/*.stories.@(js|jsx|ts|tsx|mdx)',
   ],
   addons: [
     '@storybook/addon-links',

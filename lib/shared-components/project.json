@@ -31,6 +31,38 @@
       "options": {
         "jestConfig": "lib/shared-components/jest.config.mobile.ts"
       }
+    },
+    "test:stories": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}/stories"],
+      "options": {
+        "jestConfig": "lib/shared-components/jest.storybook.config.ts"
+      }
+    },
+    "storybook": {
+      "executor": "@nx/storybook:storybook",
+      "options": {
+        "port": 6009,
+        "configDir": "lib/shared-components/.storybook"
+      },
+      "configurations": {
+        "ci": {
+          "quiet": true
+        }
+      }
+    },
+    "build-storybook": {
+      "executor": "@nx/storybook:build",
+      "outputs": ["{workspaceRoot}/dist/storybook"],
+      "options": {
+        "outputDir": "dist/storybook",
+        "configDir": "lib/shared-components/.storybook"
+      },
+      "configurations": {
+        "ci": {
+          "quiet": true
+        }
+      }
     }
   }
 }
