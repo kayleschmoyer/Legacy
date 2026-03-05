@@ -108,6 +108,10 @@ export * from './features/common/SearchBar';
 export * from './components/DatePicker';
 export * from './components/DateTimePicker';
 export * from './components/ErrorBoundary';
+export * from './components/AvatarImage';
+
+// Cross-platform form controls
+export * from './Dropdown';
 
 // Team components
 export * from './features/teams/TeamPicker';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { PlatformUtils } from './platform-components/wrappers/PlatformUtils';
+import { Select } from 'tamagui';
 
 export interface DropdownItem {
   text: string;
@@ -10,85 +10,42 @@ export interface DropdownProperties {
   value: string;
   onChange: (value: string) => void;
   items: readonly Readonly<DropdownItem>[];
+  disabled?: boolean;
   placeholder?: string;
   /** Accessible label for the select element (required for a11y when no visible label is present) */
   'aria-label'?: string;
 }
 
-// React Native implementation
-const RNDropdown = (props: DropdownProperties) => {
-  const {
-    value,
-    onChange,
-    items,
-    placeholder,
-    'aria-label': ariaLabel,
-  } = props;
-
+/**
+ * Dropdown  cross-platform select component built on Tamagui's Select.
+ *
+ * Replaces the legacy HTML <select>-based implementation with a Tamagui
+ * component that renders consistently on both web and React Native.
+ */
+export function Dropdown({
+  value,
+  onChange,
+  items,
+  disabled = false,
+  placeholder = 'Select an option...',
+}: DropdownProperties): React.JSX.Element {
   return (
-    <div style={{ padding: '10px' }}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label={ariaLabel}
-        style={{
-          width: '100%',
-          padding: '8px',
-          borderRadius: '4px',
-          border: '1px solid #ccc',
-        }}
-      >
-        {placeholder && <option value="">{placeholder}</option>}
-        {items.map((item) => (
-          <option key={item.value} value={item.value}>
-            {item.text}
-          </option>
-        ))}
-      </select>
-    </div>
+    <Select value={value} onValueChange={disabled ? undefined : onChange}>
+      <Select.Trigger disabled={disabled} opacity={disabled ? 0.5 : 1}>
+        <Select.Value placeholder={placeholder} />
+      </Select.Trigger>
+
+      <Select.Content>
+        <Select.ScrollUpButton />
+        <Select.Viewport>
+          {items.map((item, i) => (
+            <Select.Item key={item.value} index={i} value={item.value}>
+              <Select.ItemText>{item.text}</Select.ItemText>
+            </Select.Item>
+          ))}
+        </Select.Viewport>
+        <Select.ScrollDownButton />
+      </Select.Content>
+    </Select>
   );
-};
-
-// Web implementation
-const WebDropdown = (props: DropdownProperties) => {
-  const {
-    value,
-    onChange,
-    items,
-    placeholder,
-    'aria-label': ariaLabel,
-  } = props;
-
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={ariaLabel}
-      style={{
-        padding: '8px 12px',
-        borderRadius: '4px',
-        border: '1px solid var(--color-basic-600, #8F9BB3)',
-        backgroundColor: 'var(--color-basic-100, #FFFFFF)',
-        color: 'var(--color-basic-800, #222B45)',
-        fontSize: '16px',
-        minWidth: '120px',
-      }}
-    >
-      {placeholder && <option value="">{placeholder}</option>}
-      {items.map((item) => (
-        <option key={item.value} value={item.value}>
-          {item.text}
-        </option>
-      ))}
-    </select>
-  );
-};
-
-function Dropdown(props: DropdownProperties) {
-  if (PlatformUtils.isWeb) {
-    return <WebDropdown {...props} />;
-  }
-  return <RNDropdown {...props} />;
 }
-
-export { Dropdown };

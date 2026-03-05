@@ -1,86 +1,9 @@
-import React, { useState } from 'react';
-import { Text, XStack } from 'tamagui';
-
-// ─── Props ────────────────────────────────────────────────────────────────────
-
-interface AvatarImageProps {
-  /** URL of the avatar image. If null/undefined, shows an initials fallback. */
-  url?: string | null;
-  /** Username used to derive the initials fallback. */
-  username?: string | null;
-  /** Diameter in pixels. Defaults to 32. */
-  size?: number;
-  /** Border radius as a ratio of size. Defaults to 0.5 (circle). */
-  borderRadius?: number;
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
-
 /**
- * AvatarImage — displays a user or team avatar.
+ * Re-exported from @legacy-sports/shared-components.
  *
- * Shows the image URL when provided; falls back to a colored circle with the
- * first letter of the username. The initial color is derived from the username
- * so the same user always gets the same hue.
+ * AvatarImage is now a shared cross-platform component. Import it
+ * from this path to maintain backward compatibility with existing web
+ * imports, or import directly from @legacy-sports/shared-components.
  */
-export function AvatarImage({
-  url,
-  username,
-  size = 32,
-  borderRadius,
-}: AvatarImageProps): React.JSX.Element {
-  const [imgError, setImgError] = useState(false);
-  const radius = borderRadius !== undefined ? borderRadius : size / 2;
-
-  const initial = username ? username[0].toUpperCase() : '?';
-  const hue = usernameToHue(username ?? '');
-
-  const showImg = !!url && !imgError;
-
-  return (
-    <XStack
-      width={size}
-      height={size}
-      borderRadius={radius}
-      overflow="hidden"
-      alignItems="center"
-      justifyContent="center"
-      style={{
-        flexShrink: 0,
-        backgroundColor: showImg ? 'transparent' : `hsl(${hue}, 60%, 45%)`,
-      }}
-    >
-      {showImg ? (
-        <img
-          src={url}
-          alt={username ?? 'avatar'}
-          width={size}
-          height={size}
-          onError={() => setImgError(true)}
-          style={{ display: 'block', objectFit: 'cover', borderRadius: radius }}
-        />
-      ) : (
-        <Text
-          color="white"
-          fontSize={size * 0.4}
-          fontWeight="700"
-          lineHeight={`${size}px`}
-          textAlign="center"
-        >
-          {initial}
-        </Text>
-      )}
-    </XStack>
-  );
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Deterministic hue (0–360) from a username string. */
-function usernameToHue(username: string): number {
-  let hash = 0;
-  for (let i = 0; i < username.length; i++) {
-    hash = username.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash) % 360;
-}
+export { AvatarImage } from '@legacy-sports/shared-components';
+export type { AvatarImageProps } from '@legacy-sports/shared-components';
