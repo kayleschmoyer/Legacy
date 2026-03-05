@@ -1,0 +1,210 @@
+name: "🎯 Jira Branch Sync"
+
+# Keeps Jira ticket statuses in sync with branch/PR activity.
+# Only runs when there is actual activity on LS-* branches or their PRs —
+# no unnecessary polling; each trigger is scoped to a real change.
+#
+# Transitions applied:
+#   push to LS-*/...   (no open PR yet)  → In Progress
+#   PR opened / reopened                 → In Review
+#   PR closed + merged                   → Done
+#   PR closed without merging            → In Progress
+
+on:
+  push:
+    branches:
+      - "LS-*/**"
+      - "LS-*/*"
+  pull_request:
+    types: [opened, reopened, closed]
+
+jobs:
+  sync-jira:
+    name: Sync Jira Ticket
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Determine the branch name regardless of trigger type
+      # -----------------------------------------------------------------------
+      - name: Resolve branch name
+        id: branch
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BRANCH="${{ github.head_ref }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Branch: $BRANCH"
+
+      # -----------------------------------------------------------------------
+      # 2. Extract Jira ticket key (LS-####) from branch name
+      # -----------------------------------------------------------------------
+      - name: Extract ticket key
+        id: ticket
+        run: |
+          BRANCH="${{ steps.branch.outputs.name }}"
+          KEY=$(echo "$BRANCH" | grep -oP 'LS-\d+' | head -1)
+
+          if [[ -z "$KEY" ]]; then
+            echo "⏭️  No Jira ticket key found in branch '$BRANCH' — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "key=$KEY" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Ticket: $KEY"
+          fi
+
+      # -----------------------------------------------------------------------
+      # 3. Determine the desired Jira transition name
+      # -----------------------------------------------------------------------
+      - name: Determine target status
+        id: target
+        if: steps.ticket.outputs.skip != 'true'
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          MERGED: ${{ github.event.pull_request.merged }}
+        run: |
+          if [[ "$EVENT" == "push" ]]; then
+            # Only transition to In Progress on push when the branch has no
+            # associated open PR (GitHub sets GITHUB_BASE_REF for PRs; for
+            # plain pushes it is empty).
+            echo "transition=In Progress" >> "$GITHUB_OUTPUT"
+
+          elif [[ "$EVENT" == "pull_request" ]]; then
+            if [[ "$ACTION" == "opened" || "$ACTION" == "reopened" ]]; then
+              echo "transition=In Review" >> "$GITHUB_OUTPUT"
+            elif [[ "$ACTION" == "closed" && "$MERGED" == "true" ]]; then
+              echo "transition=Done" >> "$GITHUB_OUTPUT"
+            elif [[ "$ACTION" == "closed" && "$MERGED" != "true" ]]; then
+              # PR was closed without merging — move ticket back to In Progress
+              echo "transition=In Progress" >> "$GITHUB_OUTPUT"
+            else
+              echo "transition=" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+          echo "Transition: $(cat "$GITHUB_OUTPUT" | grep transition | cut -d= -f2-)"
+
+      # -----------------------------------------------------------------------
+      # 4. Skip if there is nothing to transition (e.g. PR synchronize)
+      # -----------------------------------------------------------------------
+      - name: Check if transition is needed
+        id: guard
+        if: steps.ticket.outputs.skip != 'true'
+        run: |
+          TARGET="${{ steps.target.outputs.transition }}"
+          if [[ -z "$TARGET" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "⏭️  No transition needed for this event — skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -----------------------------------------------------------------------
+      # 5. Fetch available transitions and find the ID for our target
+      # -----------------------------------------------------------------------
+      - name: Get available transitions
+        id: transitions
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
+          TICKET: ${{ steps.ticket.outputs.key }}
+          TARGET: ${{ steps.target.outputs.transition }}
+        run: |
+          # Validate that JIRA_CREDENTIALS is set and is valid JSON before parsing.
+          if [[ -z "$JIRA_CREDENTIALS" ]]; then
+            echo "❌ JIRA_CREDENTIALS secret is not set."
+            echo "   Expected a JSON object: {\"email\":\"...\",\"api_token\":\"...\",\"base_url\":\"...\"}"
+            exit 1
+          fi
+
+          if ! echo "$JIRA_CREDENTIALS" | jq empty 2>/dev/null; then
+            echo "❌ JIRA_CREDENTIALS is not valid JSON."
+            echo "   Expected format: {\"email\":\"you@example.com\",\"api_token\":\"<token>\",\"base_url\":\"https://your-org.atlassian.net\"}"
+            echo "   Update the JIRA_CREDENTIALS repository secret with the correct JSON format."
+            exit 1
+          fi
+
+          JIRA_EMAIL=$(echo "$JIRA_CREDENTIALS" | jq -r '.email')
+          JIRA_API_TOKEN=$(echo "$JIRA_CREDENTIALS" | jq -r '.api_token')
+          JIRA_BASE_URL=$(echo "$JIRA_CREDENTIALS" | jq -r '.base_url')
+
+          if [[ -z "$JIRA_EMAIL" || "$JIRA_EMAIL" == "null" ]] || \
+             [[ -z "$JIRA_API_TOKEN" || "$JIRA_API_TOKEN" == "null" ]] || \
+             [[ -z "$JIRA_BASE_URL" || "$JIRA_BASE_URL" == "null" ]]; then
+            echo "❌ JIRA_CREDENTIALS JSON is missing required fields."
+            echo "   Required: email, api_token, base_url"
+            echo "   Got keys: $(echo "$JIRA_CREDENTIALS" | jq -r 'keys | join(", ")')"
+            exit 1
+          fi
+
+          # Mask the token so it never appears in logs
+          echo "::add-mask::$JIRA_API_TOKEN"
+
+          RESPONSE=$(curl -sf \
+            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Accept: application/json" \
+            "$JIRA_BASE_URL/rest/api/3/issue/$TICKET/transitions" \
+            2>&1) || {
+            echo "❌ Failed to fetch transitions for $TICKET (curl exit $?)"
+            echo "Response: $RESPONSE"
+            exit 1
+          }
+
+          TRANSITION_ID=$(echo "$RESPONSE" | jq -r --arg t "$TARGET" \
+            '.transitions[] | select(.name == $t) | .id' | head -1)
+
+          if [[ -z "$TRANSITION_ID" ]]; then
+            echo "⚠️  Transition '$TARGET' is not available for $TICKET."
+            echo "Available: $(echo "$RESPONSE" | jq -r '[.transitions[].name] | join(", ")')"
+            echo "id=" >> "$GITHUB_OUTPUT"
+          else
+            echo "id=$TRANSITION_ID" >> "$GITHUB_OUTPUT"
+            echo "Found transition ID $TRANSITION_ID for '$TARGET'"
+          fi
+
+          # Pass masked credentials forward via output so the next step
+          # does not re-parse the secret (avoids a second mask needed).
+          # We write them as env-file entries, not GITHUB_OUTPUT, to keep
+          # them out of the step summary.
+          {
+            echo "JIRA_EMAIL=$JIRA_EMAIL"
+            echo "JIRA_API_TOKEN=$JIRA_API_TOKEN"
+            echo "JIRA_BASE_URL=$JIRA_BASE_URL"
+          } >> "$GITHUB_ENV"
+
+      # -----------------------------------------------------------------------
+      # 6. Apply the transition
+      # -----------------------------------------------------------------------
+      - name: Apply Jira transition
+        if: steps.transitions.outputs.id != ''
+        env:
+          TICKET: ${{ steps.ticket.outputs.key }}
+          TRANSITION_ID: ${{ steps.transitions.outputs.id }}
+          TARGET: ${{ steps.target.outputs.transition }}
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            --request POST \
+            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --header "Accept: application/json" \
+            --data "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" \
+            "$JIRA_BASE_URL/rest/api/3/issue/$TICKET/transitions")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          if [[ "$HTTP_CODE" == "204" ]]; then
+            echo "✅ $TICKET → $TARGET"
+          else
+            echo "❌ Failed to transition $TICKET to '$TARGET'. HTTP $HTTP_CODE"
+            echo "$BODY"
+            exit 1
+          fi
