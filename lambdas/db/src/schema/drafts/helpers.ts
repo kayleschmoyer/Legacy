@@ -5,7 +5,6 @@
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { ALLOWED_POSITIONS } from '@legacy-sports/utils';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-import { ForbiddenError } from '../graphql-errors';
 
 // â”€â”€ commitDraftPick types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -240,30 +239,6 @@ export async function getCurrentDraftPickInfo(
     overallPick: currentOverallPick,
     isComplete: false,
   };
-}
-
-/**
- * Verify that a user is a member of a league. Throws if not.
- */
-export async function verifyLeagueMembership(
-  db: PublicDb,
-  leagueId: number,
-  userId: number,
-): Promise<void> {
-  const [membership] = await db
-    .select({ leagueId: PublicSchema.leagueMembers.leagueId })
-    .from(PublicSchema.leagueMembers)
-    .where(
-      and(
-        eq(PublicSchema.leagueMembers.leagueId, leagueId),
-        eq(PublicSchema.leagueMembers.userId, userId),
-      ),
-    )
-    .limit(1);
-
-  if (!membership) {
-    throw ForbiddenError('You are not a member of this league');
-  }
 }
 
 /**

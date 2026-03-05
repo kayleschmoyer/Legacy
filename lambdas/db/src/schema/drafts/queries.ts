@@ -5,7 +5,7 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
-import { getCurrentDraftPickInfo, verifyLeagueMembership } from './helpers';
+import { getCurrentDraftPickInfo } from './helpers';
 import {
   CurrentDraftPick,
   Draft,
@@ -16,6 +16,7 @@ import {
   DraftTeamAutoPickStatus,
   DraftTeamOrderEntry,
 } from './types';
+import { verifyLeagueMembership } from '../authorization';
 import { builder } from '../builder';
 import { AuthenticationError } from '../graphql-errors';
 
