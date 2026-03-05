@@ -24,6 +24,7 @@ import {
 } from 'tamagui';
 import {
   ArrowLeftRight,
+  Calendar,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -64,6 +65,7 @@ import { env } from '../../config/environment';
 import {
   LeagueFragment,
   LeaguePositionFragment,
+  MatchupStatus,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
   useGetLeagueTeamsLazyQuery,
@@ -117,6 +119,7 @@ import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { GamesRemaining } from '../../features/matchup/GamesRemaining';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
 import { MatchupNavigationControls } from '../../features/matchup/MatchupNavigationControls';
+import { MatchupRosterEditor } from '../../features/matchup/MatchupRosterEditor';
 import { announcePolite } from '../../utils/a11y';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -854,6 +857,25 @@ export function LeagueDetailPage(): React.JSX.Element {
   const { matchups: allLeagueMatchups } = useMatchupsForLeague(
     !isNaN(leagueId) ? leagueId : null,
   );
+
+  // Active or next matchup for the Roster tab — in-progress (locked) takes priority over scheduled
+  const rosterTabMatchup = useMemo(() => {
+    if (!userTeamId || !allLeagueMatchups.length) return null;
+    const forUser = allLeagueMatchups.filter(
+      (m) => m.team1Id === userTeamId || m.team2Id === userTeamId,
+    );
+    const inProgress = forUser.find(
+      (m) => m.status === MatchupStatus.InProgress,
+    );
+    if (inProgress) return inProgress;
+    const scheduled = forUser.filter(
+      (m) => m.status === MatchupStatus.Scheduled,
+    );
+    scheduled.sort((a, b) => (a.weekNumber ?? 0) - (b.weekNumber ?? 0));
+    return scheduled[0] ?? null;
+  }, [userTeamId, allLeagueMatchups]);
+
+  const isLineupLocked = rosterTabMatchup?.status === MatchupStatus.InProgress;
 
   // Fetch selected matchup if user navigated away from current
   const {
@@ -1942,6 +1964,32 @@ export function LeagueDetailPage(): React.JSX.Element {
 
         {!isViewingOther && userTeamId && (
           <PendingTradeOffers teamId={userTeamId} leagueId={leagueId} />
+        )}
+
+        {!isViewingOther && rosterTabMatchup && userTeamId && (
+          <YStack gap="$2">
+            <XStack
+              alignItems="center"
+              gap="$2"
+              paddingHorizontal="$1"
+              paddingVertical="$1"
+            >
+              <Calendar size={16} color={BRAND_NAVY_LIGHT} />
+              <Text fontSize="$4" fontWeight="700" color={BRAND_GOLD_LIGHT}>
+                Week {rosterTabMatchup.weekNumber} Lineup
+              </Text>
+              <Text fontSize="$2" color="$textMuted">
+                {isLineupLocked
+                  ? '— matchup in progress'
+                  : '— set your starting lineup for the upcoming matchup'}
+              </Text>
+            </XStack>
+            <MatchupRosterEditor
+              matchup={rosterTabMatchup}
+              userTeamId={userTeamId}
+              locked={isLineupLocked}
+            />
+          </YStack>
         )}
 
         <LeagueRosterManagement

@@ -49,6 +49,8 @@ const getPositionColors = (
 export interface MatchupRosterEditorProps {
   matchup: MatchupFragment;
   userTeamId: number;
+  /** When true the lineup is displayed read-only (e.g. matchup is in-progress). */
+  locked?: boolean;
 }
 
 /**
@@ -58,6 +60,7 @@ export interface MatchupRosterEditorProps {
 export function MatchupRosterEditor({
   matchup,
   userTeamId,
+  locked = false,
 }: MatchupRosterEditorProps) {
   // ── Selection state ─────────────────────────────────────────────────────
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -225,24 +228,28 @@ export function MatchupRosterEditor({
         paddingVertical="$2.5"
         paddingHorizontal="$3"
         backgroundColor={
-          isSelected
+          !locked && isSelected
             ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
-            : isSwapTarget
+            : !locked && isSwapTarget
               ? withAlpha(BRAND_NAVY_LIGHT, 0.06)
               : undefined
         }
-        borderWidth={isSelected ? 2 : 0}
-        borderColor={isSelected ? BRAND_NAVY_LIGHT : undefined}
+        borderWidth={!locked && isSelected ? 2 : 0}
+        borderColor={!locked && isSelected ? BRAND_NAVY_LIGHT : undefined}
         borderRadius="$3"
-        hoverStyle={{
-          backgroundColor: isSwapTarget
-            ? withAlpha(BRAND_NAVY_LIGHT, 0.12)
-            : '$gray3',
-          cursor: 'pointer',
-        }}
-        pressStyle={{ scale: 0.99 }}
+        hoverStyle={
+          locked
+            ? undefined
+            : {
+                backgroundColor: isSwapTarget
+                  ? withAlpha(BRAND_NAVY_LIGHT, 0.12)
+                  : '$gray3',
+                cursor: 'pointer',
+              }
+        }
+        pressStyle={locked ? undefined : { scale: 0.99 }}
         animation="quick"
-        onPress={() => handlePlayerClick(player)}
+        onPress={locked ? undefined : () => handlePlayerClick(player)}
         alignItems="center"
         gap="$2"
       >
@@ -278,7 +285,7 @@ export function MatchupRosterEditor({
         </YStack>
 
         {/* Actions */}
-        {isSelected && section === 'starter' && (
+        {!locked && isSelected && section === 'starter' && (
           <Button
             size="$2"
             theme="red"
@@ -292,29 +299,32 @@ export function MatchupRosterEditor({
           </Button>
         )}
 
-        {isSelected && section === 'bench' && positionOptions.length > 0 && (
-          <XStack gap="$1" flexWrap="wrap" maxWidth={200}>
-            {positionOptions.map((opt) => (
-              <Button
-                key={opt.id}
-                size="$2"
-                backgroundColor={BRAND_NAVY_LIGHT}
-                color="white"
-                pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
-                hoverStyle={{ backgroundColor: BRAND_NAVY }}
-                onPress={(e: { stopPropagation: () => void }) => {
-                  e.stopPropagation();
-                  handleAssignPosition(player, opt.id);
-                }}
-                disabled={mutating}
-              >
-                {opt.type}
-              </Button>
-            ))}
-          </XStack>
-        )}
+        {!locked &&
+          isSelected &&
+          section === 'bench' &&
+          positionOptions.length > 0 && (
+            <XStack gap="$1" flexWrap="wrap" maxWidth={200}>
+              {positionOptions.map((opt) => (
+                <Button
+                  key={opt.id}
+                  size="$2"
+                  backgroundColor={BRAND_NAVY_LIGHT}
+                  color="white"
+                  pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                  hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                  onPress={(e: { stopPropagation: () => void }) => {
+                    e.stopPropagation();
+                    handleAssignPosition(player, opt.id);
+                  }}
+                  disabled={mutating}
+                >
+                  {opt.type}
+                </Button>
+              ))}
+            </XStack>
+          )}
 
-        {isSwapTarget && (
+        {!locked && isSwapTarget && (
           <Text fontSize="$1" color={BRAND_GOLD_LIGHT} fontWeight="600">
             Tap to swap
           </Text>
@@ -324,8 +334,11 @@ export function MatchupRosterEditor({
   };
 
   // ── Loading / not editable states ───────────────────────────────────────
-  if (matchup.status !== MatchupStatus.Scheduled) {
-    return null; // Not editable — the comparison view is sufficient
+  if (
+    matchup.status !== MatchupStatus.Scheduled &&
+    matchup.status !== MatchupStatus.InProgress
+  ) {
+    return null;
   }
 
   if (playersLoading) {
@@ -367,20 +380,26 @@ export function MatchupRosterEditor({
         backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
       >
         <XStack alignItems="center" gap="$2">
-          <H4 color={BRAND_GOLD_LIGHT}>Edit Lineup</H4>
+          <H4 color={BRAND_GOLD_LIGHT}>
+            {locked ? 'Current Lineup' : 'Edit Lineup'}
+          </H4>
           <XStack
             paddingHorizontal="$2"
             paddingVertical="$0.5"
             borderRadius="$10"
-            backgroundColor="$green3"
+            backgroundColor={locked ? '$orange3' : '$green3'}
           >
-            <Text fontSize="$1" fontWeight="600" color="$green11">
-              Unlocked
+            <Text
+              fontSize="$1"
+              fontWeight="600"
+              color={locked ? '$orange11' : '$green11'}
+            >
+              {locked ? 'Locked' : 'Unlocked'}
             </Text>
           </XStack>
         </XStack>
 
-        {selectedPlayerId && (
+        {!locked && selectedPlayerId && (
           <Button
             size="$2"
             theme="alt2"
@@ -400,13 +419,15 @@ export function MatchupRosterEditor({
         borderBottomColor="$gray4"
       >
         <Text fontSize="$2" color="$gray11">
-          {selectedPlayerId
-            ? 'Tap another player to swap positions, or use the action buttons.'
-            : 'Tap a player to select them, then tap another to swap positions.'}
+          {locked
+            ? 'This matchup is in progress — your lineup is locked.'
+            : selectedPlayerId
+              ? 'Tap another player to swap positions, or use the action buttons.'
+              : 'Tap a player to select them, then tap another to swap positions.'}
         </Text>
       </YStack>
 
-      {mutating && (
+      {!locked && mutating && (
         <XStack
           padding="$2"
           justifyContent="center"
