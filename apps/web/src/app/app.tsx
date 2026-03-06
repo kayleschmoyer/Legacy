@@ -75,11 +75,6 @@ const NavContainer = styled(YStack, {
   backgroundColor: '$background',
   borderBottomWidth: 1,
   borderBottomColor: '$borderColor',
-  position: 'sticky' as never,
-  top: 0,
-  // NAV_Z_INDEX must exceed every secondary sticky element (e.g. CONTENT_STICKY_Z_INDEX)
-  // so the nav bar always remains above page content when both are sticky.
-  zIndex: NAV_Z_INDEX,
   // backdrop-blur applied via inline style
 });
 
@@ -217,7 +212,15 @@ function Navigation() {
   }, [mobileOpen]);
 
   return (
-    <YStack ref={mobileRef} role="banner">
+    <YStack
+      ref={mobileRef}
+      role="banner"
+      position={'sticky' as never}
+      top={0}
+      // NAV_Z_INDEX must exceed every secondary sticky element (e.g. CONTENT_STICKY_Z_INDEX)
+      // so the nav bar always remains above page content when both are sticky.
+      zIndex={NAV_Z_INDEX}
+    >
       {/* Gradient accent strip */}
       <AccentBar
         style={{

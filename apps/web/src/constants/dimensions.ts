@@ -10,17 +10,18 @@
  * Height of the sticky top navigation bar in pixels.
  *
  * Composed of:
+ *   - AccentBar gradient strip (3 px)
  *   - NavContent paddingVertical ($3 × 2 = 24 px)
  *   - Logo image height (38 px)
  *   - Border bottom (1 px)
  *   - 1 px safety buffer
- *   = 64 px
+ *   = 67 px
  *
  * Consumers that render their own `position: sticky` elements should use
  * this value as the `top` offset so they stack directly below the nav bar
  * instead of overlapping it.
  */
-export const NAV_HEIGHT_PX = 64;
+export const NAV_HEIGHT_PX = 67;
 
 /**
  * Z-index for the main sticky navigation bar.
