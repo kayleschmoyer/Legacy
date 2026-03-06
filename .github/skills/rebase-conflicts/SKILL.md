@@ -241,20 +241,25 @@ Classify each conflicted file and apply the correct strategy:
 
 #### 2d. Resolve Source File Conflicts with Copilot
 
+> **⚠️ CRITICAL: Load the [resolve-merge-conflicts](../resolve-merge-conflicts/SKILL.md) skill before resolving any source conflicts.** It contains the full reasoning framework, worked examples, and decision checklist that prevents the #1 agent mistake: blindly picking one side instead of synthesizing both changes.
+
 For each conflicted source file, Copilot should:
 
-1. **Read the file** to see the conflict markers
-2. **Understand both sides**: what `main` changed vs what the feature branch changed
-3. **Determine intent**: Do both changes need to coexist? Does one supersede the other?
-4. **Write the resolution**: Remove conflict markers and produce correct merged code
-5. **Stage the file**: `git add <file>`
+1. **Read the full file** (not just the conflict block) to understand surrounding context
+2. **Understand both sides**: what `main` changed vs what the feature branch changed — and **why**
+3. **Check the merge base** if intent is unclear: `git show $(git merge-base HEAD REBASE_HEAD):<file>`
+4. **Determine intent**: Do both changes need to coexist? Does one supersede the other?
+5. **Synthesize the resolution**: Remove conflict markers and produce code that preserves **both** sides' intent
+6. **Verify references**: If main renamed something, update ALL occurrences in the file
+7. **Stage the file**: `git add <file>`
 
 **Key principles for source conflict resolution:**
 
+- **NEVER** blindly run `git checkout --ours` or `--theirs` on source files — always read and reason first
 - If main added new imports and the branch added different imports → keep both
-- If main renamed a function and the branch modified it → use the new name with the branch's modifications
+- If main renamed/refactored and the branch modified → use main's structure with the branch's behavioral changes
 - If main deleted code the branch modified → the deletion usually wins (check with the developer if unsure)
-- If both sides modified the same line differently → combine the intent of both changes
+- If both sides modified the same logic differently → combine the intent of both changes
 - When in doubt, **ask the developer** rather than guessing
 
 #### 2e. Continue Through All Commits
@@ -611,6 +616,7 @@ $env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --cont
 
 ## Related Skills
 
+- [resolve-merge-conflicts](../resolve-merge-conflicts/SKILL.md) — **Reasoning framework for intelligent conflict resolution** (load this for any non-trivial source conflict)
 - [branch-tree](../branch-tree/SKILL.md) — View and manage dependent branch trees
 - [worktree-workflow](../worktree-workflow/SKILL.md) — Working in isolated worktrees
 - [fix-types](../fix-types/SKILL.md) — Fix TypeScript errors after rebase

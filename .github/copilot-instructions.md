@@ -33,40 +33,41 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 
 ## Load When Needed
 
-| Task                            | File                                     |
-| ------------------------------- | ---------------------------------------- |
-| **Add secret / env var**        | `skills/add-secret-or-env-var/SKILL.md`  |
-| Architecture                    | `skills/architecture/SKILL.md`           |
-| **AWS orphan cleanup**          | `skills/aws-orphan-cleanup/SKILL.md`     |
-| Branch creation (advanced)      | `skills/branch-create/SKILL.md`          |
-| **Config reference**            | `skills/config-standards/SKILL.md`       |
-| DB queries                      | `skills/db-query/SKILL.md`               |
-| DB schema reference             | `skills/db-schema/SKILL.md`              |
-| **Debug distributed processes** | `skills/debug-distributed/SKILL.md`      |
-| **Docker local stack**          | `skills/docker-local/SKILL.md`           |
-| **Dump RDS to S3**              | `skills/db-dump/SKILL.md`                |
-| Full workflow (start here)      | `skills/workflow-ticket-to-pr/SKILL.md`  |
-| **Install packages**            | `skills/install-packages/SKILL.md`       |
-| Lint errors                     | `skills/fix-lint/SKILL.md`               |
-| **Never edit generated**        | `skills/no-edit-generated/SKILL.md`      |
-| **Never edit schema.graphql**   | `skills/no-edit-schema-graphql/SKILL.md` |
-| **New app**                     | `skills/create-app/SKILL.md`             |
-| **New lambda**                  | `skills/create-lambda/SKILL.md`          |
-| **New library**                 | `skills/create-lib/SKILL.md`             |
-| **New skill**                   | `skills/create-skill/SKILL.md`           |
-| PR creation                     | `skills/create-pr/SKILL.md`              |
-| **Refresh dev seed**            | `skills/db-dump-dev/SKILL.md`            |
-| **Restore dev seed**            | `skills/db-restore-dev/SKILL.md`         |
-| **Restore from S3 dump**        | `skills/db-restore/SKILL.md`             |
-| **Scratch output files**        | `skills/scratch-dir/SKILL.md`            |
-| Troubleshooting                 | `skills/troubleshoot/SKILL.md`           |
-| Type errors                     | `skills/fix-types/SKILL.md`              |
-| **Storybook**                   | `skills/storybook/SKILL.md`              |
-| **UI Brand Colors**             | `skills/ui-brand-colors/SKILL.md`        |
-| **UI Standards**                | `skills/ui-standards/SKILL.md`           |
-| **User testing**                | `skills/user-testing/SKILL.md`           |
-| **WebSocket refetch UX**        | `skills/websocket-refetch-ux/SKILL.md`   |
-| **Rebase & conflicts**          | `skills/rebase-conflicts/SKILL.md`       |
-| **Worktree workflow (default)** | `skills/worktree-workflow/SKILL.md`      |
-| All skills (58 guides)          | `skills/`                                |
-| CSV reference data              | `docs/agents/*.csv`                      |
+| Task                            | File                                      |
+| ------------------------------- | ----------------------------------------- |
+| **Add secret / env var**        | `skills/add-secret-or-env-var/SKILL.md`   |
+| Architecture                    | `skills/architecture/SKILL.md`            |
+| **AWS orphan cleanup**          | `skills/aws-orphan-cleanup/SKILL.md`      |
+| Branch creation (advanced)      | `skills/branch-create/SKILL.md`           |
+| **Config reference**            | `skills/config-standards/SKILL.md`        |
+| DB queries                      | `skills/db-query/SKILL.md`                |
+| DB schema reference             | `skills/db-schema/SKILL.md`               |
+| **Debug distributed processes** | `skills/debug-distributed/SKILL.md`       |
+| **Docker local stack**          | `skills/docker-local/SKILL.md`            |
+| **Dump RDS to S3**              | `skills/db-dump/SKILL.md`                 |
+| Full workflow (start here)      | `skills/workflow-ticket-to-pr/SKILL.md`   |
+| **Install packages**            | `skills/install-packages/SKILL.md`        |
+| Lint errors                     | `skills/fix-lint/SKILL.md`                |
+| **Never edit generated**        | `skills/no-edit-generated/SKILL.md`       |
+| **Never edit schema.graphql**   | `skills/no-edit-schema-graphql/SKILL.md`  |
+| **New app**                     | `skills/create-app/SKILL.md`              |
+| **New lambda**                  | `skills/create-lambda/SKILL.md`           |
+| **New library**                 | `skills/create-lib/SKILL.md`              |
+| **New skill**                   | `skills/create-skill/SKILL.md`            |
+| PR creation                     | `skills/create-pr/SKILL.md`               |
+| **Refresh dev seed**            | `skills/db-dump-dev/SKILL.md`             |
+| **Restore dev seed**            | `skills/db-restore-dev/SKILL.md`          |
+| **Restore from S3 dump**        | `skills/db-restore/SKILL.md`              |
+| **Scratch output files**        | `skills/scratch-dir/SKILL.md`             |
+| Troubleshooting                 | `skills/troubleshoot/SKILL.md`            |
+| Type errors                     | `skills/fix-types/SKILL.md`               |
+| **Storybook**                   | `skills/storybook/SKILL.md`               |
+| **UI Brand Colors**             | `skills/ui-brand-colors/SKILL.md`         |
+| **UI Standards**                | `skills/ui-standards/SKILL.md`            |
+| **User testing**                | `skills/user-testing/SKILL.md`            |
+| **WebSocket refetch UX**        | `skills/websocket-refetch-ux/SKILL.md`    |
+| **Rebase & conflicts**          | `skills/rebase-conflicts/SKILL.md`        |
+| **Resolve merge conflicts**     | `skills/resolve-merge-conflicts/SKILL.md` |
+| **Worktree workflow (default)** | `skills/worktree-workflow/SKILL.md`       |
+| All skills (59 guides)          | `skills/`                                 |
+| CSV reference data              | `docs/agents/*.csv`                       |
