@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, sql, SQL } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { PublicDb, PublicSchema, runWithPublicClient } from '../index';
@@ -387,6 +387,51 @@ export async function playerMeetsMinCareerSeasons(
   return Number(result.rows[0]?.season_count ?? 0) >= minCareerSeasons;
 }
 
+// ---------------------------------------------------------------------------
+// Shared SQL condition builders — single source of truth for career filters.
+// Both the UI draft-pool query (queries.ts) and the batch eligibility
+// filter below consume these so the criteria can never drift apart.
+//
+// Each builder returns a Drizzle SQL fragment that references the table
+// alias `p` (i.e. `players p`).  Callers are responsible for providing a
+// query context where that alias exists.
+// ---------------------------------------------------------------------------
+
+/**
+ * SQL condition: player meets a minimum career-games threshold.
+ *
+ * Uses `career_batting.g` — NOT `players.total_games` which double-counts
+ * batting + pitching appearances.  Pure pitchers with no `career_batting`
+ * record pass via the `NOT EXISTS` escape hatch.
+ */
+export function careerGamesCondition(minCareerGames: number): SQL {
+  return sql`(
+    NOT EXISTS (SELECT 1 FROM career_batting WHERE player_id = p.id)
+    OR p.id IN (SELECT player_id FROM career_batting WHERE g >= ${minCareerGames})
+  )`;
+}
+
+/**
+ * SQL condition: player meets a minimum career-seasons threshold.
+ *
+ * Counts only MLB (AL / NL) batting seasons.  Pure pitchers with no
+ * MLB batting records pass via the `NOT EXISTS` escape hatch.
+ */
+export function careerSeasonsCondition(minCareerSeasons: number): SQL {
+  return sql`(
+    NOT EXISTS (
+      SELECT 1 FROM season_batting
+      WHERE player_id = p.id AND lg_id IN ('AL', 'NL')
+    )
+    OR p.id IN (
+      SELECT player_id FROM season_batting
+      WHERE lg_id IN ('AL', 'NL')
+      GROUP BY player_id
+      HAVING COUNT(DISTINCT season) >= ${minCareerSeasons}
+    )
+  )`;
+}
+
 /**
  * Batch-filter a set of player IDs by league eligibility settings.
  *
@@ -443,20 +488,15 @@ export async function filterPlayerIdsByLeagueEligibility(
   if (settings.minCareerGames > 0 && currentIds.length > 0) {
     const rows = await db.execute(
       sql`
-        SELECT p.id AS player_id,
-               p.total_games
+        SELECT p.id AS player_id
         FROM players p
         WHERE p.id = ANY(${sql.param(currentIds)}::integer[])
+          AND ${careerGamesCondition(settings.minCareerGames)}
       `,
     );
 
     const eligible = new Set(
-      rows.rows
-        .filter(
-          (r: Record<string, unknown>) =>
-            Number(r.total_games) >= settings.minCareerGames,
-        )
-        .map((r: Record<string, unknown>) => Number(r.player_id)),
+      rows.rows.map((r: Record<string, unknown>) => Number(r.player_id)),
     );
     const before = currentIds.length;
     currentIds = currentIds.filter((id) => eligible.has(id));
@@ -471,23 +511,15 @@ export async function filterPlayerIdsByLeagueEligibility(
   if (settings.minCareerSeasons > 0 && currentIds.length > 0) {
     const rows = await db.execute(
       sql`
-        SELECT player_id, COUNT(DISTINCT season) AS season_count
-        FROM (
-          SELECT player_id, season FROM season_batting  WHERE player_id = ANY(${sql.param(currentIds)}::integer[])
-          UNION
-          SELECT player_id, season FROM season_pitching WHERE player_id = ANY(${sql.param(currentIds)}::integer[])
-        ) all_seasons
-        GROUP BY player_id
+        SELECT p.id AS player_id
+        FROM players p
+        WHERE p.id = ANY(${sql.param(currentIds)}::integer[])
+          AND ${careerSeasonsCondition(settings.minCareerSeasons)}
       `,
     );
 
     const eligible = new Set(
-      rows.rows
-        .filter(
-          (r: Record<string, unknown>) =>
-            Number(r.season_count) >= settings.minCareerSeasons,
-        )
-        .map((r: Record<string, unknown>) => Number(r.player_id)),
+      rows.rows.map((r: Record<string, unknown>) => Number(r.player_id)),
     );
     const before = currentIds.length;
     currentIds = currentIds.filter((id) => eligible.has(id));

@@ -2,7 +2,11 @@
  * Draft domain — query fields
  */
 
-import { PublicSchema } from '@legacy-sports/db-client';
+import {
+  careerGamesCondition,
+  careerSeasonsCondition,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
 import { getCurrentDraftPickInfo } from './helpers';
@@ -270,28 +274,13 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // Apply career games minimum (defaults to 50 if the league has no setting)
       const minCareerGames = league?.minCareerGames ?? 50;
       if (minCareerGames > 0) {
-        sqlConditions.push(
-          sql`(
-            NOT EXISTS (SELECT 1 FROM public.career_batting WHERE player_id = p.id)
-            OR p.id IN (SELECT player_id FROM public.career_batting WHERE g >= ${minCareerGames})
-          )`,
-        );
+        sqlConditions.push(careerGamesCondition(minCareerGames));
       }
 
       // Apply career seasons minimum (defaults to 3 if the league has no setting)
       const minCareerSeasons = league?.minCareerSeasons ?? 3;
       if (minCareerSeasons > 0) {
-        sqlConditions.push(
-          sql`(
-            NOT EXISTS (SELECT 1 FROM public.season_batting WHERE player_id = p.id AND lg_id IN ('AL', 'NL'))
-            OR p.id IN (
-              SELECT player_id FROM public.season_batting
-              WHERE lg_id IN ('AL', 'NL')
-              GROUP BY player_id
-              HAVING COUNT(DISTINCT season) >= ${minCareerSeasons}
-            )
-          )`,
-        );
+        sqlConditions.push(careerSeasonsCondition(minCareerSeasons));
       }
 
       const whereClause =
