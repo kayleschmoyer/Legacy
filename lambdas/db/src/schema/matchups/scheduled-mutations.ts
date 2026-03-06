@@ -921,7 +921,11 @@ async function advanceLeagueWeekInternal(
           eq(PublicSchema.matchups.status, 'scheduled'),
         ),
       )
-      .returning({ id: PublicSchema.matchups.id });
+      .returning({
+        id: PublicSchema.matchups.id,
+        team1Id: PublicSchema.matchups.team1Id,
+        team2Id: PublicSchema.matchups.team2Id,
+      });
 
     if (activatedMatchups.length === 0) {
       LOGGER.warn(
@@ -933,6 +937,63 @@ async function advanceLeagueWeekInternal(
         .set({ weekAdvanceStatus: 'idle' })
         .where(eq(PublicSchema.leagues.id, leagueId));
       return;
+    }
+
+    // Sync matchup_players positions from current teamMembers so roster changes
+    // made during the prior week are reflected in the new week's lineup.
+    // All future matchups are pre-created at draft time using positions that
+    // were correct then; this step keeps them up-to-date as teams evolve.
+    const activatedMatchupIds = activatedMatchups.map((m) => m.id);
+    const teamIds = Array.from(
+      new Set(
+        activatedMatchups.flatMap((m) =>
+          [m.team1Id, m.team2Id].filter((id): id is number => id !== null),
+        ),
+      ),
+    );
+
+    if (teamIds.length > 0) {
+      const currentMembers = await db
+        .select({
+          teamId: PublicSchema.teamMembers.teamId,
+          playerId: PublicSchema.teamMembers.playerId,
+          positionId: PublicSchema.teamMembers.positionId,
+        })
+        .from(PublicSchema.teamMembers)
+        .where(
+          and(
+            eq(PublicSchema.teamMembers.leagueId, leagueId),
+            inArray(PublicSchema.teamMembers.teamId, teamIds),
+          ),
+        );
+
+      const memberPositionMap = new Map<string, number | null>();
+      for (const m of currentMembers) {
+        if (m.teamId !== null) {
+          memberPositionMap.set(`${m.teamId}-${m.playerId}`, m.positionId);
+        }
+      }
+
+      const matchupPlayerRows = await db
+        .select({
+          id: PublicSchema.matchupPlayers.id,
+          teamId: PublicSchema.matchupPlayers.teamId,
+          playerId: PublicSchema.matchupPlayers.playerId,
+        })
+        .from(PublicSchema.matchupPlayers)
+        .where(
+          inArray(PublicSchema.matchupPlayers.matchupId, activatedMatchupIds),
+        );
+
+      for (const mp of matchupPlayerRows) {
+        const key = `${mp.teamId}-${mp.playerId}`;
+        if (memberPositionMap.has(key)) {
+          await db
+            .update(PublicSchema.matchupPlayers)
+            .set({ positionId: memberPositionMap.get(key) ?? null })
+            .where(eq(PublicSchema.matchupPlayers.id, mp.id));
+        }
+      }
     }
 
     // Update league current matchup/week and reset advance status

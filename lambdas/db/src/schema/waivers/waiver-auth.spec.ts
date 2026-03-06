@@ -163,7 +163,7 @@ describe('processWaiverClaims — authorization', () => {
 
   it('should reject unauthenticated requests', async () => {
     await expect(assertAuthorized(ctx(), null)).rejects.toThrow(
-      'Unauthorized: system mutations require authentication.',
+      'System mutations require authentication',
     );
   });
 
@@ -171,7 +171,7 @@ describe('processWaiverClaims — authorization', () => {
     await expect(
       assertAuthorized(ctx({ user: { id: 5, isAdmin: false } }), null),
     ).rejects.toThrow(
-      'Unauthorized: only admins or system processes can trigger mutations for all leagues.',
+      'Only admins or system processes can trigger mutations for all leagues',
     );
   });
 
@@ -194,7 +194,7 @@ describe('processWaiverClaims — authorization', () => {
     await expect(
       assertAuthorized(ctx({ user: { id: 5, isAdmin: false }, db }), 42),
     ).rejects.toThrow(
-      'Unauthorized: only the league General Manager or commissioner can trigger this mutation for their league.',
+      'Only the league General Manager or commissioner can trigger this mutation for their league',
     );
   });
 
@@ -203,7 +203,7 @@ describe('processWaiverClaims — authorization', () => {
     await expect(
       assertAuthorized(ctx({ user: { id: 5, isAdmin: false }, db }), 42),
     ).rejects.toThrow(
-      'Unauthorized: only the league General Manager or commissioner can trigger this mutation for their league.',
+      'Only the league General Manager or commissioner can trigger this mutation for their league',
     );
   });
 });
