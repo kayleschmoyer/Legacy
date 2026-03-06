@@ -250,6 +250,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "secretsmanager:PutSecretValue",
           "secretsmanager:UpdateSecret",
           "secretsmanager:DeleteSecret",
+          "secretsmanager:UpdateSecretVersionStage",
           "secretsmanager:TagResource",
           "secretsmanager:UntagResource",
           "secretsmanager:RestoreSecret"
@@ -462,6 +463,35 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:events:${local.region}:${local.account_id}:rule/${local.name_prefix}-*"
+        ]
+      },
+      # Lambda event source mapping write permissions for Terraform apply
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:CreateEventSourceMapping",
+          "lambda:UpdateEventSourceMapping",
+          "lambda:DeleteEventSourceMapping"
+        ]
+        Resource = "*"
+      },
+      # SNS permissions for Terraform apply (ops alerts topic)
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:CreateTopic",
+          "sns:DeleteTopic",
+          "sns:GetTopicAttributes",
+          "sns:SetTopicAttributes",
+          "sns:ListTagsForResource",
+          "sns:TagResource",
+          "sns:UntagResource",
+          "sns:Subscribe",
+          "sns:Unsubscribe",
+          "sns:GetSubscriptionAttributes"
+        ]
+        Resource = [
+          "arn:aws:sns:${local.region}:${local.account_id}:${local.name_prefix}-*"
         ]
       }
     ]
