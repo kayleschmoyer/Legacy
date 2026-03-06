@@ -44,7 +44,7 @@ Rebasing replays your branch's commits on top of another branch (usually `main`)
 | Abort and return to pre-rebase state     | `git rebase --abort`                                                                                                       |
 | Resolve generated file conflicts         | `.\scripts\resolve-generated-conflicts.ps1`                                                                                |
 | Skip duplicate migration commits         | `.\scripts\skip-migration-conflict.ps1`                                                                                    |
-| **Watch CI checks after push**           | `gh pr checks --watch`                                                                                                     |
+| **Verify locally after push**            | `make pc`                                                                                                                  |
 | **Fix CI formatting failure**            | `pnpm exec nx format:write ; git add -A ; git commit -m "style: fix formatting" ; git push --force-with-lease origin HEAD` |
 
 ---
@@ -155,19 +155,16 @@ git push --force-with-lease origin HEAD
 > The branch guard above is a safety net — if you somehow end up on `main` after
 > a botched checkout, the script stops before rewriting public history.
 
-### Step 8: Verify CI Passes
+### Step 8: Verify Locally with `make pc`
 
-After pushing, check that CI is green. The most common post-rebase failure is **formatting** — if `nx format:write` rewrites any file during `make pc`, the command **fails** and prints the changed files; commit them and re-run `make pc`.
+After pushing, confirm all checks pass **locally** by running `make pc`. Do not wait on GitHub CI — run the same checks yourself. The most common post-rebase failure is **formatting** — if `nx format:write` rewrites any file during `make pc`, the command **fails** and prints the changed files; commit them and re-run `make pc`.
 
 ```powershell
-# Watch CI checks until they complete
-gh pr checks --watch
-
-# Or see the latest run status
-gh run list --branch (git branch --show-current) --limit 1
+# Run all pre-commit checks locally
+make pc
 ```
 
-If **Quality Gates** fails with a formatting error:
+If `make pc` fails with a formatting error:
 
 ```powershell
 # Fix formatting
@@ -182,7 +179,7 @@ git commit -m "style: fix Prettier formatting after rebase"
 git push --force-with-lease origin HEAD
 ```
 
-If **Quality Gates** fails with lint or type errors, see the [fix-lint](../fix-lint/SKILL.md) and [fix-types](../fix-types/SKILL.md) skills.
+If `make pc` fails with lint or type errors, see the [fix-lint](../fix-lint/SKILL.md) and [fix-types](../fix-types/SKILL.md) skills.
 
 ---
 
@@ -456,11 +453,11 @@ git push --force-with-lease origin HEAD
 
 > **Important**: Never rebase from the main repo directory if the branch is checked out in a worktree. Always `cd` into the worktree first.
 
-After pushing from a worktree, always verify CI:
+After pushing from a worktree, always verify locally:
 
 ```powershell
-# From inside the worktree
-gh pr checks --watch
+# From inside the worktree — run all pre-commit checks
+make pc
 ```
 
 ---
@@ -546,14 +543,14 @@ git commit --amend --no-edit
 git push --force-with-lease origin HEAD
 ```
 
-Then **verify CI passes** after the push — formatting issues in particular are silent until CI runs:
+Then **verify locally** after the push — run `make pc` to catch formatting, lint, and type errors before CI does:
 
 ```powershell
-# Watch all checks for the PR
-gh pr checks --watch
+# Run all pre-commit checks locally
+make pc
 ```
 
-If CI fails with a formatting error, run `pnpm exec nx format:write`, commit the changes, and push again. See Step 8 above.
+If `make pc` fails with a formatting error, run `pnpm exec nx format:write`, commit the changes, and push again. See Step 8 above.
 
 ---
 

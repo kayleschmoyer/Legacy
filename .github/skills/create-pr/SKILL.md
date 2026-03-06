@@ -418,7 +418,7 @@ acli jira workitem transition --key LS-1234 --status "In Review"
 - [ ] Jira ticket updated to "In Review"
 - [ ] Reviewers assigned
 - [ ] Labels added (if needed)
-- [ ] CI checks passing
+- [ ] `make pc` passes locally (do not wait on GitHub CI — verify locally)
 
 ## De-scoping Work
 
@@ -447,8 +447,8 @@ gh pr list --head $(git branch --show-current)
 # View PR details
 gh pr view
 
-# Check CI status
-gh pr checks
+# Verify checks locally (preferred over waiting on GitHub CI)
+make pc
 ```
 
 ## Exit Codes

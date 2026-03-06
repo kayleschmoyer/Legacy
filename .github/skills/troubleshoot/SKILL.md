@@ -109,11 +109,14 @@ pnpm run db:credentials
 ### CI Failures
 
 ```powershell
-# View CI logs
+# Always verify locally first (preferred over waiting on GitHub CI)
+make pc
+
+# If a remote-only failure occurs, view CI logs
 gh run list --branch <branch> --limit 5
 gh run view <run-id> --log-failed
 
-# Re-run failed jobs
+# Re-run failed jobs (only for flaky / transient failures)
 gh run rerun <run-id> --failed
 ```
 

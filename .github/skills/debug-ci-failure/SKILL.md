@@ -336,14 +336,11 @@ git add -A ; git commit -m "fix(scope): resolve CI failure"
 git push origin HEAD --force-with-lease
 ```
 
-Then watch the new run:
+Then verify the fix passes locally before waiting on GitHub CI:
 
 ```powershell
-# Wait for checks to complete
-gh pr checks --watch
-
-# Or monitor the run
-gh run watch
+# Run all pre-commit checks locally to confirm the fix
+make pc
 ```
 
 ### 7. If the failure is flaky / transient

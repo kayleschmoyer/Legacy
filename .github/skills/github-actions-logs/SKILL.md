@@ -645,18 +645,18 @@ code --diff run1.txt run2.txt
 ### After Creating PR
 
 ```powershell
-# 1. Wait for CI to complete
-gh pr checks
+# 1. Run all pre-commit checks locally (don't wait on GitHub CI)
+make pc
 
-# 2. If failed, view logs
-gh run view --log-failed
-
-# 3. Fix issues based on logs
+# 2. If make pc fails, fix issues locally
 # ... make changes ...
 
-# 4. Push and re-check
+# 3. If debugging a remote-only failure, view logs
+gh run view --log-failed
+
+# 4. Push fix and re-verify locally
 git push
-gh pr checks
+make pc
 ```
 
 ### During Development
@@ -675,7 +675,7 @@ if ($LASTEXITCODE -ne 0) {
 ## Related Skills
 
 - [Jira Ticket Management](jira-ticket.md) - Update tickets based on CI results
-- [Create PR](create-pr.md) - PR creation after CI passes
+- [Create PR](create-pr.md) - PR creation after `make pc` passes locally
 - [Testing](test.md) - Local testing to prevent CI failures
 - [Type Checking](typecheck.md) - Fix type errors before CI
 - [Linting](lint.md) - Fix lint errors before CI
