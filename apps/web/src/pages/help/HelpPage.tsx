@@ -9,6 +9,13 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { ScrollView, styled } from 'tamagui';
+import {
+  HELP_CONTACT_ITEMS,
+  HELP_FAQ_ITEMS,
+  HELP_GETTING_STARTED_STEPS,
+  HELP_HISTORICAL_FAQ_ITEMS,
+  type HelpFaqItem,
+} from '@legacy-sports/utils/help-content';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { PageMeta } from '../../components/PageMeta';
 import {
@@ -83,10 +90,7 @@ const SectionBody = styled(YStack, {
 
 /* ─── FAQ accordion item ─── */
 
-interface FaqItemProps {
-  question: string;
-  answer: string;
-}
+type FaqItemProps = HelpFaqItem;
 
 const FaqRow = styled(YStack, {
   borderRadius: '$4',
@@ -250,85 +254,7 @@ const QuickLinkChip = styled(XStack, {
   },
 });
 
-/* ─── FAQ data ─── */
-
-const FAQ_ITEMS: FaqItemProps[] = [
-  {
-    question: 'How do I create a fantasy baseball league?',
-    answer:
-      "Head to the Baseball section and click Create League. Fill in your league name, set the number of teams, configure draft and roster options, and choose an era filter. Once created, you can invite others using the league invite code shown on your league's Overview tab.",
-  },
-  {
-    question: 'How do I invite teammates to join my league?',
-    answer:
-      'Open your league page and look for the invite card on the Overview tab. Copy the invite code, share the invite link, or display the QR code. Players can join via Baseball → Join League and entering the code, or by clicking your shared link.',
-  },
-  {
-    question: 'How does the draft work?',
-    answer:
-      'When the league commissioner starts the draft, all team managers join the Draft Board. Players are listed in order of their projected value. Each team picks in snake-draft order by default (the order reverses each round), though commissioners can also choose linear order. The draft board live-updates so you can see picks in real time.',
-  },
-  {
-    question: 'How is my team score calculated?',
-    answer:
-      "Scores are calculated from archived MLB box-score statistics loaded when games are selected for your matchup. Each counting stat (H, HR, RBI, R, SB, etc.) is multiplied by a configurable point value defined in your league's scoring profile. You can view the scoring summary on your league's Overview tab, and commissioners can edit scoring values in the Commissioner tab.",
-  },
-  {
-    question: 'How do I add or drop players?',
-    answer:
-      'Navigate to the Free Agents tab on your league page to browse available players. When you claim a player and your roster is full, you can drop a current player in the same transaction. Waiver rules (if enabled) queue your claim for nightly processing at 2 AM EST, so your pickup may be delayed up to 24 hours.',
-  },
-  {
-    question: 'How do I view matchup results?',
-    answer:
-      'Click on your league and select the Matchup tab. Current and historical matchup scores are shown there. You can also click into any matchup for a player-by-player breakdown.',
-  },
-  {
-    question: 'Why are my player statistics not updating?',
-    answer:
-      'Player statistics come from archived historical box scores and are loaded when games are selected for your matchup. If stats appear missing after a game has been selected, the system may still be loading data from our historical data source. This usually completes within minutes. If stats are still missing after an hour, try refreshing the page or contact support.',
-  },
-  {
-    question: 'How do I change my display name or avatar?',
-    answer:
-      'Open the user menu in the top-right corner and select Profile Settings. Your display name and profile photo are managed through your Google account, but you can change your in-app avatar from this page.',
-  },
-];
-
-/* ─── Historical concepts FAQ items ─── */
-
-const HISTORICAL_FAQ_ITEMS: FaqItemProps[] = [
-  {
-    question: 'What makes Legacy Sports different from live fantasy leagues?',
-    answer:
-      'Legacy Sports uses archived MLB box scores from historical seasons rather than live games. Each player is assigned a season from their own career, so your roster can span multiple eras. Every stat is final, verified, and drawn from real history — no weather cancellations, no injury luck mid-game. Pure historical knowledge is your edge.',
-  },
-  {
-    question: 'What is a "season assignment"?',
-    answer:
-      'After the draft completes and matchups are created, the system automatically assigns each player a season from their MLB career — a year when they played enough games to fill a full matchup schedule. Each player on your roster can come from a different era, so your 1927 Babe Ruth plays alongside a 2019 Mike Trout. Your knowledge of great historical seasons across all eras is your competitive edge.',
-  },
-  {
-    question: 'How does game selection work?',
-    answer:
-      "Each matchup consists of a set number of randomly selected historical games per player (default 5). The system automatically selects one game per day for all active matchups. Games are drawn randomly from each player's assigned season, excluding previously selected games, so no game is repeated within a matchup. Commissioners can configure how many games occur per matchup in league settings.",
-  },
-  {
-    question: 'What is an archived box score?',
-    answer:
-      "An archived box score is the official record of a completed MLB game: every at-bat, hit, run, RBI, pitching line, and fielding stat. Legacy Sports reads these records to calculate your fantasy team's score with 100% accuracy against real historical data.",
-  },
-  {
-    question: 'Can I use the same player in multiple leagues?',
-    answer:
-      'Yes! Each league has its own draft, and seasons are assigned per player. You can own the same player in different leagues — their stats may come from different historical seasons, so your scores will differ between leagues.',
-  },
-  {
-    question: "Why did my player's stats change after the week ended?",
-    answer:
-      'Our system processes archived games in batches. Scores may take a short time to fully settle after the matchup period ends. Once all selected games are processed, scores are final and will not change.',
-  },
-];
+/* ─── FAQ data (imported from @legacy-sports/utils) ─── */
 
 /* ─── Main component ─── */
 
@@ -517,7 +443,7 @@ export default function HelpPage() {
                 <H3 color="$color">Frequently Asked Questions</H3>
               </SectionHeader>
               <SectionBody>
-                {FAQ_ITEMS.map((item) => (
+                {HELP_FAQ_ITEMS.map((item) => (
                   <FaqItem
                     key={item.question}
                     question={item.question}
@@ -546,7 +472,7 @@ export default function HelpPage() {
                 </YStack>
               </SectionHeader>
               <SectionBody>
-                {HISTORICAL_FAQ_ITEMS.map((item) => (
+                {HELP_HISTORICAL_FAQ_ITEMS.map((item) => (
                   <FaqItem
                     key={item.question}
                     question={item.question}
@@ -568,28 +494,7 @@ export default function HelpPage() {
                 <H3 color="$color">Getting Started</H3>
               </SectionHeader>
               <SectionBody gap="$5">
-                {[
-                  {
-                    step: 1,
-                    title: 'Create or join a league',
-                    body: 'Head to the Baseball section and either create a new private league or join an existing one with an invite code.',
-                  },
-                  {
-                    step: 2,
-                    title: 'Set your roster',
-                    body: 'Once the league draft is complete, review your roster and make any trades or waiver wire moves to build the best team.',
-                  },
-                  {
-                    step: 3,
-                    title: 'Follow the season',
-                    body: 'Check your matchup score throughout the week. Archived historical MLB stats power your fantasy team — every hit, homer, and strikeout counts.',
-                  },
-                  {
-                    step: 4,
-                    title: 'Win the championship',
-                    body: 'Manage your roster actively through the season, make smart trades, and outlast your league-mates in the playoffs.',
-                  },
-                ].map(({ step, title, body }) => (
+                {HELP_GETTING_STARTED_STEPS.map(({ step, title, body }) => (
                   <XStack key={step} gap="$4" alignItems="flex-start">
                     <YStack
                       width={32}
@@ -639,27 +544,16 @@ export default function HelpPage() {
               </SectionHeader>
               <SectionBody>
                 <YStack gap="$3">
-                  <ContactOption
-                    icon="🐛"
-                    iconLabel="bug"
-                    title="Report a Bug"
-                    description="Found something broken? Open a GitHub issue and we'll prioritize a fix."
-                    href="https://github.com/bkrupa/legacy-sports/issues/new?labels=bug&template=bug_report.md"
-                  />
-                  <ContactOption
-                    icon="💡"
-                    iconLabel="idea"
-                    title="Suggest a Feature"
-                    description="Have an idea that would make Legacy Sports better? We'd love to hear it."
-                    href="https://github.com/bkrupa/legacy-sports/issues/new?labels=enhancement&template=feature_request.md"
-                  />
-                  <ContactOption
-                    icon="💬"
-                    iconLabel="discussion"
-                    title="Community Discussions"
-                    description="Chat with other managers, share tips, and get advice from the community."
-                    href="https://github.com/bkrupa/legacy-sports/discussions"
-                  />
+                  {HELP_CONTACT_ITEMS.map((item) => (
+                    <ContactOption
+                      key={item.title}
+                      icon={item.icon}
+                      iconLabel={item.title.toLowerCase()}
+                      title={item.title}
+                      description={item.description}
+                      href={item.url}
+                    />
+                  ))}
                 </YStack>
 
                 <Separator marginVertical="$2" />
@@ -709,7 +603,8 @@ export default function HelpPage() {
                 Management
               </Paragraph>
               <Paragraph color="$gray10" fontSize="$2" textAlign="center">
-                Powered by archived MLB box-score statistics
+                Powered by official MLB statistics • Data refreshed throughout
+                each game day
               </Paragraph>
             </YStack>
           </ContentContainer>
