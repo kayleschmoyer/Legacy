@@ -156,7 +156,9 @@ async function getSelectedGamesCount(
     )
     .where(eq(PublicSchema.matchupPlayers.matchupId, matchupId));
 
-  return rows[0]?.count ?? 0;
+  // The pg driver returns COUNT(*) results as strings over the wire.
+  // Coerce to a JS number so callers use arithmetic (not string concat).
+  return Number(rows[0]?.count ?? 0);
 }
 
 // ── Mutation: autoSelectGames ────────────────────────────────────────────────
