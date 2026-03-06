@@ -787,9 +787,15 @@ export async function getGamePitchingStats(
   result.gameNum = gameNumber;
 
   // Pitching specific stat parsing
+  // BBRef Upgraded tables use p_game_decision (was player_game_result)
   const decision =
-    cells.find(
-      (cell) => cell.getAttribute('data-stat') === 'player_game_result',
+    (
+      cells.find(
+        (cell) => cell.getAttribute('data-stat') === 'p_game_decision',
+      ) ??
+      cells.find(
+        (cell) => cell.getAttribute('data-stat') === 'player_game_result',
+      )
     )?.text || '';
 
   if (decision.includes('BW') || decision.startsWith('W')) {
@@ -804,9 +810,16 @@ export async function getGamePitchingStats(
     result.sv = 1;
   }
 
+  // BBRef Upgraded tables use p_player_game_span (was player_game_span)
   const gameSpan =
-    cells.find((cell) => cell.getAttribute('data-stat') === 'player_game_span')
-      ?.text || '';
+    (
+      cells.find(
+        (cell) => cell.getAttribute('data-stat') === 'p_player_game_span',
+      ) ??
+      cells.find(
+        (cell) => cell.getAttribute('data-stat') === 'player_game_span',
+      )
+    )?.text || '';
 
   if (gameSpan.includes('GS')) {
     result.gs = 1;
@@ -894,9 +907,15 @@ export async function getAllGamePitchingStats(
     result.gameNum = gameNumber;
 
     // Pitching specific stat parsing
+    // BBRef Upgraded tables use p_game_decision (was player_game_result)
     const decision =
-      cells.find(
-        (cell) => cell.getAttribute('data-stat') === 'player_game_result',
+      (
+        cells.find(
+          (cell) => cell.getAttribute('data-stat') === 'p_game_decision',
+        ) ??
+        cells.find(
+          (cell) => cell.getAttribute('data-stat') === 'player_game_result',
+        )
       )?.text || '';
 
     if (decision.includes('BW') || decision.startsWith('W')) {
@@ -911,9 +930,15 @@ export async function getAllGamePitchingStats(
       result.sv = 1;
     }
 
+    // BBRef Upgraded tables use p_player_game_span (was player_game_span)
     const gameSpan =
-      cells.find(
-        (cell) => cell.getAttribute('data-stat') === 'player_game_span',
+      (
+        cells.find(
+          (cell) => cell.getAttribute('data-stat') === 'p_player_game_span',
+        ) ??
+        cells.find(
+          (cell) => cell.getAttribute('data-stat') === 'player_game_span',
+        )
       )?.text || '';
 
     if (gameSpan.includes('GS')) {
