@@ -273,7 +273,7 @@ function CountdownTimer({
   warningThresholds = [30, 10, 5, 3, 2, 1],
   label = 'Time Remaining',
   variant = 'default',
-  showProgress = true,
+  showProgress: _showProgress = true,
 }: CountdownTimerProps) {
   const timer = useTimer({
     initialTime,

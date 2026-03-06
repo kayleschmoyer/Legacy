@@ -13,7 +13,7 @@ import {
 } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import type { BaseballScoringSettings } from '@legacy-sports/scoring';
-/* eslint-enable */
+
 import {
   mapBattingStats,
   mapFieldingStats,

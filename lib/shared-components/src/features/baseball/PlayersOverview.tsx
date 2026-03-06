@@ -31,7 +31,7 @@ export interface PlayersOverviewProps {
 function PlayersOverview({
   initialView = TableView.BATTING,
   containerStyle,
-  tabStyle,
+  tabStyle: _tabStyle,
 }: PlayersOverviewProps) {
   const [selectedView, setSelectedView] = useState(initialView);
 

@@ -187,18 +187,17 @@ export const WithInteraction: Story = {
 // Controlled component story
 export const Controlled: Story = {
   render: function ControlledDropdown(args) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Storybook args are loosely typed
     const [value, setValue] = React.useState(args.value);
 
     return (
       <div style={{ padding: '20px' }}>
         <Dropdown
           {...args}
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Storybook args are loosely typed
           value={value}
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           onChange={setValue}
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Storybook args are loosely typed
           items={args.items || []}
         />
         <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>

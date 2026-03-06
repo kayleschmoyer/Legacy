@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-enum-comparison */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 // Complex GraphQL type interactions and platform-specific API mismatches require architectural review
 import { useMemo, useState } from 'react';
 import { Separator, Tabs, Text, YStack } from 'tamagui';
@@ -254,7 +254,6 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
 }
 
 export default function Team(): React.JSX.Element {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const params = useLocalSearchParams();
   const teamId = params.teamId;
 
@@ -444,7 +443,6 @@ export default function Team(): React.JSX.Element {
 }
 
 export function TeamIdHeader(): React.JSX.Element {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const params = useLocalSearchParams();
   const teamId = params.teamId;
 

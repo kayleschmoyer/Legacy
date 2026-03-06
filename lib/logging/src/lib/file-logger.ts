@@ -21,9 +21,9 @@ export class FileLogger {
 
     try {
       // Use require() for Node.js built-ins - this module should only be used in Node.js
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Node.js built-in conditional import
       const fs = require('fs') as typeof import('fs');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Node.js built-in conditional import
       const path = require('path') as typeof import('path');
 
       const fullPath = path.resolve(process.cwd(), this.logFile);

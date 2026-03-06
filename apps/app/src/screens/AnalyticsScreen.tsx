@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- legacy mobile code pending type improvements */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access -- legacy mobile code pending type improvements */
+/* eslint-disable @typescript-eslint/no-unsafe-call -- legacy mobile code pending type improvements */
 /* eslint-disable no-restricted-imports -- TODO(LS-332): Migrate to codegen once getLeagueAnalytics is added to the schema */
 import React, { useState } from 'react';
 import { RefreshControl, ScrollView } from 'react-native';

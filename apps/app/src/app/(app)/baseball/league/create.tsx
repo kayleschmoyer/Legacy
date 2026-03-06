@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any -- Legacy mobile code pending type improvements */
 import React, { useState } from 'react';
 import {
   Button,
@@ -14,11 +14,11 @@ import {
 import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { DateTimePicker } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   CreateLeagueMutation,
   useCreateLeagueMutation,
 } from '../../../../api/db/graphql.generated';
-import { LOGGER } from '@legacy-sports/logging';
 
 // Types
 interface CreateLeagueFormData {

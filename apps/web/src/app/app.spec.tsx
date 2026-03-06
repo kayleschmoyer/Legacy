@@ -6,9 +6,8 @@ import App from './app';
 
 // Mock all the components that might have complex dependencies
 jest.mock('@legacy-sports/shared-components', () => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const actual = jest.requireActual('@legacy-sports/shared-components');
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- spread of jest.requireActual result
   return {
     ...actual,
     Button: ({

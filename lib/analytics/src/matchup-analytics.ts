@@ -515,7 +515,7 @@ export function exportToCSV(data: TeamStats[] | PowerRanking[]): string {
           return JSON.stringify(value);
         }
         // Safe to convert to string after checking it's not an object
-        // eslint-disable-next-line @typescript-eslint/no-base-to-string
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string -- value is primitive after object check
         return String(value ?? '');
       })
       .join(',');

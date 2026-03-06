@@ -1,4 +1,3 @@
-/* eslint-disable @nx/enforce-module-boundaries */
 import config from '@legacy-sports/codegen-base';
 
 // The base config now handles dynamic schema endpoint detection

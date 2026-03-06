@@ -33,7 +33,7 @@ function useLatestRef<T>(value: T): React.RefObject<T> {
   return ref;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- callback data shape varies by event type
 type AnyCallback = (data: any) => void;
 
 /**
@@ -195,7 +195,7 @@ export function useWebSocket({
       viewContext,
       autoConnect,
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- one-time mount log, deps intentionally empty
 
   const connect = useCallback(() => {
     if (!wsUrl) {
@@ -414,7 +414,7 @@ export function useWebSocket({
     // Only reconnect when connection parameters change — NOT when callbacks
     // change.  Callbacks are accessed via refs so the subscriptions above
     // always invoke the latest version without tearing down the socket.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks accessed via refs, not deps
   }, [wsUrl, token, leagueId, matchupId, viewContext, autoConnect]);
 
   return {

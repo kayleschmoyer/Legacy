@@ -142,7 +142,6 @@ export function useCareerAverageStats(
     setError(undefined);
 
     void Promise.all(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       missingIds.map(async (playerId) => {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
         const response = await client.query<
@@ -165,7 +164,7 @@ export function useCareerAverageStats(
 
         setRecords((previous) => {
           const next = new Map(previous);
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
           for (const { playerId, data } of results) {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             next.set(playerId, transformCareerStats(data));

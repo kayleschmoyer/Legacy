@@ -112,9 +112,9 @@ class UniversalLogger implements Logger {
 
     try {
       // Use import() for dynamic imports in Node.js environments
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Node.js built-in conditional import
       const fs = require('fs') as typeof import('fs');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Node.js built-in conditional import
       const path = require('path') as typeof import('path');
 
       const formattedMessage =

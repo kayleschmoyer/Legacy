@@ -22,11 +22,10 @@ export function LeagueStandings({
   userTeamId,
 }: LeagueStandingsProps): React.JSX.Element {
   // expo-router types cannot be resolved in this project's TS config
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+
   const router = useRouter();
 
   const handleTeamPress = (teamId: number) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     router.push(`/baseball/team/${teamId}` as Href);
   };
 

@@ -11,7 +11,7 @@ export class SecureStorage {
   static async setItem(
     key: string,
     value: string,
-    options?: SecureStorageOptions,
+    _options?: SecureStorageOptions,
   ): Promise<void> {
     try {
       if (typeof sessionStorage !== 'undefined') {
@@ -31,20 +31,19 @@ export class SecureStorage {
    */
   static async getItem(
     key: string,
-    options?: SecureStorageOptions,
+    _options?: SecureStorageOptions,
   ): Promise<string | null> {
     try {
       if (typeof sessionStorage !== 'undefined') {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return Promise.resolve(sessionStorage.getItem(key));
       } else {
         LOGGER.warn('sessionStorage not available on web platform');
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+
         return Promise.resolve(null);
       }
     } catch (error) {
       LOGGER.error(`Error retrieving secure item ${key}:`, error as Error);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+
       return Promise.resolve(null);
     }
   }

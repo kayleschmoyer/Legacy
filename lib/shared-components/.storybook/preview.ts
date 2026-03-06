@@ -8,7 +8,7 @@ const withTamagui: Decorator = (Story) => {
   return React.createElement(
     TamaguiProvider,
     {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Tamagui config type mismatch with provider
       config: tamaguiConfig as any,
       defaultTheme: 'dark',
     },

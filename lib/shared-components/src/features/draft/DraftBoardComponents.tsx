@@ -267,7 +267,7 @@ function DraftPickHistory({
 
   const renderPickItem = ({
     item: pick,
-    index,
+    index: _index,
   }: {
     item: Pick;
     index: number;
@@ -421,10 +421,10 @@ function DraftPickHistory({
  */
 function TeamRoster({
   team,
-  sport,
+  sport: _sport,
   onPlayerPress,
-  variant = 'list',
-  showPositions = true,
+  variant: _variant = 'list',
+  showPositions: _showPositions = true,
 }: TeamRosterProps) {
   const renderRosterItem = ({ item: pick }: { item: Pick }) => (
     <Button

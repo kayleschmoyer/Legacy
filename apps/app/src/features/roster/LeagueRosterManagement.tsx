@@ -1,4 +1,3 @@
-/* eslint-disable */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Button,
@@ -12,17 +11,17 @@ import {
   YStack,
 } from 'tamagui';
 import {
+  ALLOWED_POSITIONS,
+  getPositionDisplayName,
+  PITCHING_POSITIONS,
+} from '@legacy-sports/shared-components';
+import { getPlayerName } from '@legacy-sports/shared-components';
+import {
   LeaguePositionFragment,
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 import { normalizeNumericIdentifier } from '../../common/types/app-types';
 import { useTeamMemberProjections } from '../scoring';
-import {
-  PITCHING_POSITIONS,
-  ALLOWED_POSITIONS,
-  getPositionDisplayName,
-} from '@legacy-sports/shared-components';
-import { getPlayerName } from '@legacy-sports/shared-components';
 
 /** Returns the list of eligible position strings for a team member */
 const getEligiblePositions = (player: TeamMemberFragment): string[] =>
@@ -70,7 +69,7 @@ interface RosterSlotProps {
 function RosterSlot({
   position,
   assignedPlayer,
-  availablePlayers,
+  availablePlayers: _availablePlayers,
   selectedPlayer,
   onPlayerAssign,
   onPlayerRemove,
@@ -79,13 +78,6 @@ function RosterSlot({
   projectionValue,
   isProjectionLoading = false,
 }: RosterSlotProps): React.JSX.Element {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const eligiblePlayers = useMemo(() => {
-    return availablePlayers.filter(
-      (player) => player && canPlayerPlayPosition(player, position),
-    );
-  }, [availablePlayers, position]);
-
   const handleSlotPress = useCallback(() => {
     if (assignedPlayer) {
       // If there's an assigned player, select it

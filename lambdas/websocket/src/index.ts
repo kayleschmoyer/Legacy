@@ -263,9 +263,9 @@ async function handleConnect(
     });
 
     // Extract optional context from query params
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- API Gateway event types are loosely typed
     const rawQueryParams = event.queryStringParameters;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- API Gateway event types are loosely typed
     const queryParams: Record<string, string> | undefined =
       rawQueryParams !== null && rawQueryParams !== undefined
         ? rawQueryParams

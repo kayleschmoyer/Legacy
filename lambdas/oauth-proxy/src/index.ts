@@ -75,12 +75,10 @@ function handleOptions(): APIGatewayProxyResult {
  *
  * Previously controlled by VERBOSE_LOGGING=true, now use LOG_LEVEL=debug for same effect
  */
-/* eslint-disable @typescript-eslint/no-unused-vars -- AWS Lambda context parameter required but not used */
 const baseOAuthHandler = async (
   event: APIGatewayEvent,
   _context: Context,
 ): Promise<APIGatewayProxyResult> => {
-  /* eslint-enable @typescript-eslint/no-unused-vars */
   // Enhanced logging version - 2025-09-26
   LOGGER.info(
     `OAuth Proxy Handler - Method: ${event.httpMethod}, Path: ${event.path}`,

@@ -90,7 +90,7 @@ export function PlayerStatsPage({
       }}
     >
       {/* ── CSS Keyframes ───────────────────────────────────────── */}
-      {/* eslint-disable-next-line react/no-danger */}
+      {}
       <style
         dangerouslySetInnerHTML={{
           __html: `

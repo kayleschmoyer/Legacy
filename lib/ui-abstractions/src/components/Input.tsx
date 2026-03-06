@@ -7,23 +7,26 @@ import type { InputProps, InputRef } from '../types/ui';
 
 // Input component with stable types
 export const Input = forwardRef<InputRef, InputProps>(
-  ({
-    value,
-    defaultValue,
-    placeholder,
-    placeholderTextColor,
-    onChangeText,
-    onFocus,
-    onBlur,
-    editable = true,
-    multiline = false,
-    numberOfLines,
-    maxLength,
-    keyboardType,
-    autoCapitalize,
-    secureTextEntry = false,
-    ...props
-  }, ref) => {
+  (
+    {
+      value,
+      defaultValue,
+      placeholder,
+      placeholderTextColor,
+      onChangeText,
+      onFocus,
+      onBlur,
+      editable = true,
+      multiline = false,
+      numberOfLines,
+      maxLength,
+      keyboardType: _keyboardType,
+      autoCapitalize: _autoCapitalize,
+      secureTextEntry = false,
+      ...props
+    },
+    ref,
+  ) => {
     // If multiline, use TextArea, otherwise use Input
     if (multiline) {
       return (
@@ -115,39 +118,50 @@ export const Input = forwardRef<InputRef, InputProps>(
         accessibilityLabel={props.accessibilityLabel}
       />
     );
-  }
+  },
 );
 
 Input.displayName = 'Input';
 
 // TextArea component - alias for multiline Input
-export const TextArea = forwardRef<InputRef, InputProps>(
-  (props, ref) => <Input ref={ref} multiline {...props} />
-);
+export const TextArea = forwardRef<InputRef, InputProps>((props, ref) => (
+  <Input ref={ref} multiline {...props} />
+));
 
 TextArea.displayName = 'TextArea';
 
 // Specialized input components
-export const PasswordInput = forwardRef<InputRef, Omit<InputProps, 'secureTextEntry'>>(
-  (props, ref) => <Input ref={ref} secureTextEntry {...props} />
-);
+export const PasswordInput = forwardRef<
+  InputRef,
+  Omit<InputProps, 'secureTextEntry'>
+>((props, ref) => <Input ref={ref} secureTextEntry {...props} />);
 
 PasswordInput.displayName = 'PasswordInput';
 
-export const EmailInput = forwardRef<InputRef, Omit<InputProps, 'keyboardType' | 'autoCapitalize'>>(
-  (props, ref) => <Input ref={ref} keyboardType="email-address" autoCapitalize="none" {...props} />
-);
+export const EmailInput = forwardRef<
+  InputRef,
+  Omit<InputProps, 'keyboardType' | 'autoCapitalize'>
+>((props, ref) => (
+  <Input
+    ref={ref}
+    keyboardType="email-address"
+    autoCapitalize="none"
+    {...props}
+  />
+));
 
 EmailInput.displayName = 'EmailInput';
 
-export const PhoneInput = forwardRef<InputRef, Omit<InputProps, 'keyboardType'>>(
-  (props, ref) => <Input ref={ref} keyboardType="phone-pad" {...props} />
-);
+export const PhoneInput = forwardRef<
+  InputRef,
+  Omit<InputProps, 'keyboardType'>
+>((props, ref) => <Input ref={ref} keyboardType="phone-pad" {...props} />);
 
 PhoneInput.displayName = 'PhoneInput';
 
-export const NumberInput = forwardRef<InputRef, Omit<InputProps, 'keyboardType'>>(
-  (props, ref) => <Input ref={ref} keyboardType="numeric" {...props} />
-);
+export const NumberInput = forwardRef<
+  InputRef,
+  Omit<InputProps, 'keyboardType'>
+>((props, ref) => <Input ref={ref} keyboardType="numeric" {...props} />);
 
 NumberInput.displayName = 'NumberInput';

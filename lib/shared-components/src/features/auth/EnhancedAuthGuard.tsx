@@ -48,11 +48,11 @@ export function EnhancedAuthGuard({
   loadingComponent,
   loginComponent,
   loginTitle,
-  loginSubtitle,
+  loginSubtitle: _loginSubtitle,
   testMode = false,
   onLoginSuccess,
   onLoginFailure,
-  onLogoutSuccess,
+  onLogoutSuccess: _onLogoutSuccess,
 }: EnhancedAuthGuardProps) {
   const { isAuthenticated, isLoading, config, loginWithOAuth } = useAuth();
 
@@ -89,7 +89,7 @@ export function EnhancedAuthGuard({
           appName={
             loginTitle ? loginTitle.replace('Welcome to ', '') : 'Legacy Sports'
           }
-          onSuccess={(user: { id: number; email: string; name?: string }) => {
+          onSuccess={(_user: { id: number; email: string; name?: string }) => {
             try {
               // The authentication state should already be updated by loginWithOAuth
               // Call the optional callback if provided

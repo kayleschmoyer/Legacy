@@ -49,7 +49,7 @@ export function initializeAnalytics(): void {
   // Initialize dataLayer and gtag function
   window.dataLayer = window.dataLayer || [];
   window.gtag = function gtag() {
-    // eslint-disable-next-line prefer-rest-params
+    // eslint-disable-next-line prefer-rest-params -- GA4 gtag requires arguments object
     window.dataLayer?.push(arguments);
   };
 

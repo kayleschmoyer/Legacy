@@ -128,7 +128,6 @@
     "@react-navigation/native": "^7.0.14",
     "@react-navigation/stack": "^7.4.8",
     "@reduxjs/toolkit": "^2.11.2",
-
     "@tamagui/animations-css": "1.132.23",
     "@tamagui/animations-react-native": "1.132.23",
     "@tamagui/config": "1.132.23",
@@ -230,6 +229,7 @@
     "@babel/preset-env": "^7.25.0",
     "@babel/preset-react": "^7.14.5",
     "@babel/runtime": "^7.25.0",
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
     "@graphql-codegen/cli": "^5.0.7",
     "@graphql-codegen/introspection": "^5.0.0",
     "@graphql-codegen/near-operation-file-preset": "^3.1.0",

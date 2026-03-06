@@ -111,7 +111,7 @@ export class PgDbConnection<
 
     return {
       // Deprecated field - pool manages all clients now, but kept for backward compatibility
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any -- deprecated field kept for backward compat
       client: null as any,
       db: db,
       pool: pgPool,

@@ -16,13 +16,11 @@ export class CompositeLogger implements ILogger {
   }
 
   // Stub implementation - CompositeLogger doesn't support dynamic destinations
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   addDestination(_destination: OutputDestination): void {
     // No-op: CompositeLogger doesn't support dynamic destinations
   }
 
   // Stub implementation - CompositeLogger doesn't support dynamic destinations
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   removeDestination(_destination: OutputDestination): void {
     // No-op: CompositeLogger doesn't support dynamic destinations
   }

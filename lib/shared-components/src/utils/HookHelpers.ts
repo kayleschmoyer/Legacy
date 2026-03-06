@@ -39,7 +39,7 @@ export function useAsyncHook<T>(
       })
       .finally(() => setLoading(false));
     // User-provided deps array controls when effect runs, promiseCreator captured in deps
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- user-provided deps array controls effect
   }, deps);
 
   return {

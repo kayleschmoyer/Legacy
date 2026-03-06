@@ -3,10 +3,10 @@
  * Verifies that the WebSocket polyfill works correctly in Node.js
  */
 
-/* eslint-disable @typescript-eslint/no-require-imports */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-require-imports -- test requires runtime require for polyfill */
+/* eslint-disable @typescript-eslint/no-explicit-any -- globals accessed via any cast */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- globals accessed via any cast */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access -- globals accessed via any cast */
 
 describe('WebSocket Polyfill', () => {
   it('should make WebSocket available in Node.js environment', () => {

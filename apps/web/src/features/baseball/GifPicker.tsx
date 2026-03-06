@@ -88,7 +88,7 @@ export function GifPicker({
       return;
     }
     void fetchGifs(TRENDING_URL);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time mount fetch, deps intentionally empty
   }, []);
 
   // Re-fetch when rating changes (respects the current query)
@@ -96,7 +96,7 @@ export function GifPicker({
     if (!GIPHY_API_KEY) return;
     const trimmed = query.trim();
     void fetchGifs(trimmed ? buildSearchUrl(trimmed, rating) : TRENDING_URL);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-fetch when rating changes
   }, [rating]);
 
   const fetchGifs = useCallback(async (url: string) => {

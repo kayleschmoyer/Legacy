@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /**
  * CareerStatsService.test.ts - Comprehensive Test Suite
  *
@@ -88,14 +87,12 @@ const mockEmptyPlayerStats: CareerBattingStatsRaw = {
   sluggingPercentage: null,
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const mockGraphQLResponse: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
     variables: {},
   },
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
   result: {
     data: {
       careerBattingStats: {
@@ -114,7 +111,6 @@ const mockGraphQLResponse: MockedResponse = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const mockErrorResponse: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
@@ -252,13 +248,12 @@ describe('CareerStatsService - React Hooks', () => {
         minHomeRuns: 100,
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const customMock: MockedResponse = {
         request: {
           query: CAREER_BATTING_STATS_QUERY,
           variables: customParams,
         },
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
         result: {
           data: {
             careerBattingStats: {
@@ -306,7 +301,6 @@ describe('CareerStatsService - React Hooks', () => {
     });
 
     test('should calculate pagination metadata correctly', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const paginationMock: MockedResponse = {
         request: {
           query: CAREER_BATTING_STATS_QUERY,
@@ -315,7 +309,7 @@ describe('CareerStatsService - React Hooks', () => {
             after: 'cursor-50',
           },
         },
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
         result: {
           data: {
             careerBattingStats: {

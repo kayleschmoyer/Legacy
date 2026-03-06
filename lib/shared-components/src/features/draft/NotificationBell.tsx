@@ -12,11 +12,20 @@ interface NotificationBellProps {
   settings: { sound: boolean; vibration: boolean };
 }
 
-export const NotificationBell: React.FC<NotificationBellProps> = ({ updates, settings }) => {
+export const NotificationBell: React.FC<NotificationBellProps> = ({
+  updates,
+  settings: _settings,
+}) => {
   return (
     <Button size="$3" position="relative">
-      <span role="img" aria-label="notifications">🔔</span>
-      {updates.length > 0 && <Badge position="absolute" top={-5} right={-5}>{updates.length}</Badge>}
+      <span role="img" aria-label="notifications">
+        🔔
+      </span>
+      {updates.length > 0 && (
+        <Badge position="absolute" top={-5} right={-5}>
+          {updates.length}
+        </Badge>
+      )}
     </Button>
   );
 };

@@ -293,7 +293,7 @@ export const WithInteraction: Story = {
     const canvas = within(canvasElement);
 
     // Test row click
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access -- Storybook args type is loosely typed
     const playerName = canvas.getByText(args.player.player);
     const row = playerName.closest('div');
     if (row) {

@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { useCallback, useEffect, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
@@ -123,9 +120,8 @@ export function useNotifications(userId: number) {
   }, [markAllAsReadMutation]);
 
   return {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     preferences: preferencesData?.getUserNotificationPreferences,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
     notifications: historyData?.getNotificationHistory || [],
     unreadCount,
     loading: preferencesLoading || historyLoading,

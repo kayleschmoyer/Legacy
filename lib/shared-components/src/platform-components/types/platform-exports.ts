@@ -118,7 +118,7 @@ export type ReactNativeStyleProperties = Omit<
   rotate?: string;
 
   // Allow any other React Native style properties
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- index signature for RN style extensibility
   [key: string]: any;
 };
 

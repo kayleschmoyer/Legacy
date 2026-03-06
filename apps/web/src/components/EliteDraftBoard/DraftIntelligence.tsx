@@ -42,7 +42,7 @@ export function DraftIntelligence({
     if (!skip) {
       void refetch();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when pick number changes
   }, [currentOverallPick]);
 
   const recommendations = data?.getDraftRecommendations ?? [];

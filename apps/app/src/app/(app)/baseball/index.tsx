@@ -26,7 +26,9 @@ interface BaseballHomeProps {
   navigation: NavigationProp<RootStackParamList>;
 }
 
-export default function BaseballHome({ navigation }: BaseballHomeProps) {
+export default function BaseballHome({
+  navigation: _navigation,
+}: BaseballHomeProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [emailOrPhone, setEmailOrPhone] = useState('');

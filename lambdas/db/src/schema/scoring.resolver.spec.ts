@@ -77,10 +77,8 @@ describe('League scoring GraphQL resolvers', () => {
     }));
 
     jest.doMock('@legacy-sports/db-client', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const actual = jest.requireActual('@legacy-sports/db-client');
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return {
         ...actual,
         createDatabaseService: jest.fn(() => databaseServiceMock),
@@ -89,7 +87,7 @@ describe('League scoring GraphQL resolvers', () => {
     });
 
     jest.isolateModules(() => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.isolateModules requires runtime require
       const schemaModule = require('../schema') as { schema: GraphQLSchema };
       schemaUnderTest = schemaModule.schema;
     });

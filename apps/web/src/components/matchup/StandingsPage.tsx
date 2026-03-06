@@ -51,7 +51,7 @@ export function StandingsPage() {
         <Text marginTop="$2" color="$gray11">
           {String(error.message)}
         </Text>
-        {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return */}
+        {}
         <Button marginTop="$4" theme="blue" onPress={() => refetch()}>
           Retry
         </Button>
@@ -76,7 +76,7 @@ export function StandingsPage() {
       >
         <H2>League Standings</H2>
         <XStack space="$2">
-          {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return */}
+          {}
           <Button theme="alt2" onPress={() => refetch()}>
             Refresh
           </Button>

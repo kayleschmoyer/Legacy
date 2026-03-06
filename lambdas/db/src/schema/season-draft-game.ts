@@ -12,8 +12,7 @@ import { builder } from './builder';
 import { AuthenticationError, ForbiddenError } from './graphql-errors';
 
 // Create database service instance - used in GraphQL resolvers
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const dbService = createDatabaseService(getDbOptions());
+const _dbService = createDatabaseService(getDbOptions());
 
 /**
  * Season Draft Game GraphQL Schema

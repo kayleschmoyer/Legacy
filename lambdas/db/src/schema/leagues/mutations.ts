@@ -95,13 +95,13 @@ CreateLeagueAndTeamsPayload.implement({
   fields: (t) => ({
     league: t.field({
       type: League,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Pothos parent type lacks runtime field shape
       resolve: (parent) => parent.league as any, // GraphQL schema type mismatch - parent.league missing draftStatus field
     }),
     teams: t.field({
       type: [Team],
       nullable: true,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Pothos parent type lacks runtime field shape
       resolve: (parent) => (parent.teams || []) as any,
     }),
     leagueMembers: t.field({
@@ -1231,7 +1231,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
           throw new Error('League not found');
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Pothos resolver return type mismatch
         return league as any;
       }
 
@@ -1332,7 +1332,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
         userId,
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Pothos resolver return type mismatch
       return updatedLeague as any;
     },
   }),

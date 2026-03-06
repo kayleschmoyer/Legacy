@@ -109,7 +109,7 @@ describe('Matchup Queries', () => {
     // Load the schema after mocks are set up
     // Note: Do NOT use jest.isolateModules() as it creates a separate module realm
     // which causes "Cannot use GraphQLSchema from another module or realm" errors
-    // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -401,7 +401,7 @@ describe('Matchup Queries', () => {
 
     it('should return standings sorted by wins', async () => {
       // Mock StandingsService.getStandings
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { StandingsService } = require('../services/standings-service') as {
         StandingsService: { getStandings: jest.Mock };
       };
@@ -445,7 +445,7 @@ describe('Matchup Queries', () => {
 
     it('should return empty array for league with no matchups', async () => {
       // Mock StandingsService.getStandings returning empty array
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { StandingsService } = require('../services/standings-service') as {
         StandingsService: { getStandings: jest.Mock };
       };
@@ -493,7 +493,7 @@ describe('Matchup Queries', () => {
       };
 
       // Mock StandingsService.getHeadToHead
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { StandingsService } = require('../services/standings-service') as {
         StandingsService: { getHeadToHead: jest.Mock };
       };
@@ -556,7 +556,7 @@ describe('Matchup Queries', () => {
       ];
 
       // Mock StandingsService.getMatchupStats
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { StandingsService } = require('../services/standings-service') as {
         StandingsService: { getMatchupStats: jest.Mock };
       };
@@ -594,7 +594,7 @@ describe('Matchup Queries', () => {
 
     it('should return zero counts when league has no matchups', async () => {
       // Mock StandingsService.getMatchupStats returning zero counts
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { StandingsService } = require('../services/standings-service') as {
         StandingsService: { getMatchupStats: jest.Mock };
       };

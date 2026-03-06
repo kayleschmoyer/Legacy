@@ -218,9 +218,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     skip: !leagueId,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GraphQL query data shape not codegen'd
   const league = (leagueData as any)?.league;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GraphQL query data shape not codegen'd
   const leagueTeams: LeagueTeam[] = (teamsData as any)?.leagueTeams ?? [];
   const permLevel = league?.userMembership?.permissionLevel as
     | string
@@ -253,7 +253,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   });
 
   // Derive draftId directly from the league query (keyed off leagueId in the URL)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GraphQL query data shape not codegen'd
   const leagueDraft = (draftData as any)?.getLeagueDraft;
   const draftId: number | null = leagueDraft?.id
     ? Number(leagueDraft.id)
@@ -460,7 +460,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         winPct: number;
       }
     >();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GraphQL query data shape not codegen'd
     const rows = (pitchingStatsData as any)?.careerPitchingStats;
     if (!Array.isArray(rows)) return map;
     for (const r of rows) {
@@ -951,7 +951,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         const result = await initializeLiveDraft({
           variables: { leagueId, draftOrder, draftMode, selectionMethod },
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GraphQL mutation result not codegen'd
         const draft = (result.data as any)?.initializeDraft;
         if (draft?.id) {
           const newDraftId = Number(draft.id);

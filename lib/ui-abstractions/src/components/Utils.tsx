@@ -2,7 +2,10 @@ import * as React from 'react';
 import { forwardRef } from 'react';
 
 // Import Tamagui utility components
-import { Separator as TamaguiSeparator, Spinner as TamaguiSpinner } from 'tamagui';
+import {
+  Separator as TamaguiSeparator,
+  Spinner as TamaguiSpinner,
+} from 'tamagui';
 import type { BaseUIProps, ViewProps } from '../types/ui';
 
 // Loading spinner component
@@ -12,17 +15,21 @@ interface SpinnerProps extends BaseUIProps {
 }
 
 export const Spinner = forwardRef<any, SpinnerProps>(
-  ({ size = 'small', color, testID, accessibilityLabel, id }, ref) => {
-    const tamaguiSize = typeof size === 'number' ? 'small' : size === 'large' ? 'large' : 'small';
-    
-    return (
-      <TamaguiSpinner
-        ref={ref}
-        size={tamaguiSize}
-        color={color}
-      />
-    );
-  }
+  (
+    {
+      size = 'small',
+      color,
+      testID: _testID,
+      accessibilityLabel: _accessibilityLabel,
+      id: _id,
+    },
+    ref,
+  ) => {
+    const tamaguiSize =
+      typeof size === 'number' ? 'small' : size === 'large' ? 'large' : 'small';
+
+    return <TamaguiSpinner ref={ref} size={tamaguiSize} color={color} />;
+  },
 );
 
 Spinner.displayName = 'Spinner';
@@ -33,7 +40,11 @@ interface LoadingPanelProps extends ViewProps {
   spinnerSize?: 'small' | 'large' | number;
 }
 
-export function LoadingPanel({ message = 'Loading...', spinnerSize = 'large', ...props }: LoadingPanelProps) {
+export function LoadingPanel({
+  message = 'Loading...',
+  spinnerSize = 'large',
+  ...props
+}: LoadingPanelProps) {
   return (
     <div
       style={{
@@ -42,9 +53,9 @@ export function LoadingPanel({ message = 'Loading...', spinnerSize = 'large', ..
         alignItems: 'center',
         justifyContent: 'center',
         padding: 16,
-        ...props.flex && { flex: props.flex },
-        ...props.width && { width: props.width },
-        ...props.height && { height: props.height },
+        ...(props.flex && { flex: props.flex }),
+        ...(props.width && { width: props.width }),
+        ...(props.height && { height: props.height }),
       }}
     >
       <Spinner size={spinnerSize} />
@@ -67,7 +78,19 @@ interface SeparatorProps extends BaseUIProps {
 }
 
 export const Separator = forwardRef<any, SeparatorProps>(
-  ({ orientation = 'horizontal', color, width, height, margin, testID, accessibilityLabel, id }, ref) => {
+  (
+    {
+      orientation = 'horizontal',
+      color,
+      width,
+      height,
+      margin,
+      testID,
+      accessibilityLabel,
+      id,
+    },
+    ref,
+  ) => {
     return (
       <TamaguiSeparator
         ref={ref}
@@ -81,7 +104,7 @@ export const Separator = forwardRef<any, SeparatorProps>(
         accessibilityLabel={accessibilityLabel}
       />
     );
-  }
+  },
 );
 
 Separator.displayName = 'Separator';

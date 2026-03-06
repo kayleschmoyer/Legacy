@@ -1,6 +1,5 @@
 import type { Config } from 'jest';
 
-/* eslint-disable */
 const config: Config = {
   displayName: 'db',
   preset: '../../jest.preset.js',

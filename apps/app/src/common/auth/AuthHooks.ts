@@ -102,7 +102,6 @@ async function resetToken(): Promise<void> {
 }
 
 function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
-  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
   const router = useRouter();
   const onSuccess = callbacks?.onSuccess;
   const onFailure = callbacks?.onFailure;
@@ -211,7 +210,6 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
       logout: logout,
     };
   }, [googleLogin, logout]);
-  /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
 }
 
 export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
@@ -219,7 +217,7 @@ export function useAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
   return usePlatformAuthHandlers(callbacks);
 }
 
-const refreshJwt = memoizeOne(async (keychainLastUpdate: number) => {
+const refreshJwt = memoizeOne(async (_keychainLastUpdate: number) => {
   const oauthProxy = getEnvVarRequired(EnvironmentVariable.OAUTH_PROXY);
   const tokenResponse = await axios.post<OAuthProxyTokens>(
     `${oauthProxy}/google/refresh`,

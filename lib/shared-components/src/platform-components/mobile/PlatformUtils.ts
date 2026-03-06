@@ -7,7 +7,7 @@ export const handleOAuthError = (error: OAuthError): void => {
   Alert.alert('Sign In Failed', error.message, [{ text: 'OK' }]);
 };
 
-export const getInteractiveButtonProps = (isDisabled: boolean) => ({
+export const getInteractiveButtonProps = (_isDisabled: boolean) => ({
   // Mobile buttons don't need cursor styles
 });
 

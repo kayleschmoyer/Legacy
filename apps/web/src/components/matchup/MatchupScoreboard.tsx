@@ -90,7 +90,6 @@ export function MatchupScoreboard({
 
       const playerScore =
         player.games?.reduce(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return
           (sum, game) => sum + calculateGameScore(game),
           0,
         ) ?? 0;

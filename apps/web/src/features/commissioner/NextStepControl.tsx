@@ -60,7 +60,7 @@ export function NextStepControl({
   hasPendingSettingsChanges = false,
   onSuccess,
   onError,
-  onLeagueUpdate,
+  onLeagueUpdate: _onLeagueUpdate,
 }: NextStepControlProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loading, setLoading] = useState(false);

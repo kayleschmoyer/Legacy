@@ -84,7 +84,7 @@ async function getAppliedMigrations(
     const result = await db.execute(`
       SELECT hash FROM drizzle.__drizzle_migrations ORDER BY created_at ASC;
     `);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- raw SQL result lacks typed rows
     return (result as any).map((row: any) => row.hash);
   } catch {
     return [];
@@ -107,10 +107,7 @@ async function unrecordMigration(db: ReturnType<typeof drizzle>, hash: string) {
   `);
 }
 
-async function runRollbackCommand(
-  command: Command,
-  _options: string[] = [], // eslint-disable-line @typescript-eslint/no-unused-vars -- Reserved for future use
-) {
+async function runRollbackCommand(command: Command, _options: string[] = []) {
   try {
     LOGGER.info(
       `🔧 Legacy Sports Rollback Migration (${command.toUpperCase()})`,
@@ -201,14 +198,14 @@ async function runMigrationsUp(
       try {
         // Dynamic import the migration module - convert to file URL for Windows
         const fileUrl = `file://${migration.fullPath.replace(/\\/g, '/')}`;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- dynamic import of untyped migration file
         const migrationModule = await import(fileUrl);
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- checking for up() on untyped migration module
         if (migrationModule.up && typeof migrationModule.up === 'function') {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- calling untyped migration up()
           await migrationModule.up({ db, sql: _sql });
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+
           await recordMigration(db, migration.filename);
           appliedCount++;
           LOGGER.info(`✅ Applied: ${migration.filename}`);
@@ -260,14 +257,14 @@ async function runMigrationDown(
   try {
     // Dynamic import the migration module - convert to file URL for Windows
     const fileUrl = `file://${migrationToRollback.fullPath.replace(/\\/g, '/')}`;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- dynamic import of untyped migration file
     const migrationModule = await import(fileUrl);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- checking for down() on untyped migration module
     if (migrationModule.down && typeof migrationModule.down === 'function') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- calling untyped migration down()
       await migrationModule.down({ db, sql: _sql });
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+
       await unrecordMigration(db, migrationToRollback.filename);
       LOGGER.info(`✅ Rolled back: ${migrationToRollback.filename}`);
     } else {
@@ -286,7 +283,7 @@ async function runMigrationDown(
 
 async function runFreshMigrations(
   db: ReturnType<typeof drizzle>,
-  _sql: postgres.Sql, // eslint-disable-line @typescript-eslint/no-unused-vars -- Required for consistent function signature
+  _sql: postgres.Sql,
 ) {
   LOGGER.info('🧹 Rolling back all migrations...');
 
@@ -306,13 +303,13 @@ async function runFreshMigrations(
       try {
         // Dynamic import the migration module - convert to file URL for Windows
         const fileUrl = `file://${migration.fullPath.replace(/\\/g, '/')}`;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- dynamic import of untyped migration file
         const migrationModule = await import(fileUrl);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- checking for down() on untyped migration module
         if (migrationModule.down) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- calling untyped migration down()
           await migrationModule.down({ db });
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+
           await unrecordMigration(db, migration.filename);
           LOGGER.info(`✅ Rolled back: ${migration.filename}`);
         }

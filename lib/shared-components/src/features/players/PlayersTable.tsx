@@ -72,9 +72,9 @@ export function PlayersTable({
   selectable = false,
   compact = false,
   useCareerStats = false,
-  minGames,
-  minHomeRuns,
-  minRBI,
+  minGames: _minGames,
+  minHomeRuns: _minHomeRuns,
+  minRBI: _minRBI,
   projectedPoints,
   showProjections = false,
 }: PlayersTableProps): React.ReactElement {

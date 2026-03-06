@@ -105,7 +105,7 @@ function GameLogsTable({
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- fetch response.json() returns any
       const serverData: Record<
         string,
         Record<string, string | number>

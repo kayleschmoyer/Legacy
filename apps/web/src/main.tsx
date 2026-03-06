@@ -67,7 +67,6 @@ function ThemeAwareApp() {
         <AppProvider
           apolloClient={apolloClient}
           colorScheme={resolvedTheme}
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           tamaguiConfig={tamaguiConfig}
         >
           <App />
@@ -92,10 +91,7 @@ try {
     <StrictMode>
       <ErrorBoundary reportError={captureError}>
         <ThemeProvider>
-          <TamaguiProvider
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            config={tamaguiConfig}
-          >
+          <TamaguiProvider config={tamaguiConfig}>
             <AuthProvider
               config={authConfig}
               onUserSwitch={async () => {

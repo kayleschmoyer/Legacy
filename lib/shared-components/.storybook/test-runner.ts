@@ -25,7 +25,7 @@ const config = {
     );
 
     if (errors.length > 0) {
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- surfacing story-level errors in test runner output
       console.warn(`Console errors in story ${context.id}:`, errors);
     }
   },

@@ -7,7 +7,19 @@ import type { ButtonProps, ButtonRef } from '../types/ui';
 
 // Button component with stable types and consistent API
 export const Button = forwardRef<ButtonRef, ButtonProps>(
-  ({ children, title, variant = 'primary', size = 'medium', disabled = false, loading = false, onPress, ...props }, ref) => {
+  (
+    {
+      children,
+      title,
+      variant: _variant = 'primary',
+      size = 'medium',
+      disabled = false,
+      loading = false,
+      onPress,
+      ...props
+    },
+    ref,
+  ) => {
     // Map our variant to Tamagui variant
     const tamaguiVariant = React.useMemo(() => {
       // For now, Tamagui Button only supports 'outlined', so we use that consistently
@@ -65,38 +77,41 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
         {loading ? 'Loading...' : buttonContent}
       </TamaguiButton>
     );
-  }
+  },
 );
 
 Button.displayName = 'Button';
 
 // Specialized button variants
-export const PrimaryButton = forwardRef<ButtonRef, Omit<ButtonProps, 'variant'>>(
-  (props, ref) => <Button ref={ref} variant="primary" {...props} />
-);
+export const PrimaryButton = forwardRef<
+  ButtonRef,
+  Omit<ButtonProps, 'variant'>
+>((props, ref) => <Button ref={ref} variant="primary" {...props} />);
 
 PrimaryButton.displayName = 'PrimaryButton';
 
-export const SecondaryButton = forwardRef<ButtonRef, Omit<ButtonProps, 'variant'>>(
-  (props, ref) => <Button ref={ref} variant="secondary" {...props} />
-);
+export const SecondaryButton = forwardRef<
+  ButtonRef,
+  Omit<ButtonProps, 'variant'>
+>((props, ref) => <Button ref={ref} variant="secondary" {...props} />);
 
 SecondaryButton.displayName = 'SecondaryButton';
 
-export const OutlineButton = forwardRef<ButtonRef, Omit<ButtonProps, 'variant'>>(
-  (props, ref) => <Button ref={ref} variant="outline" {...props} />
-);
+export const OutlineButton = forwardRef<
+  ButtonRef,
+  Omit<ButtonProps, 'variant'>
+>((props, ref) => <Button ref={ref} variant="outline" {...props} />);
 
 OutlineButton.displayName = 'OutlineButton';
 
 export const GhostButton = forwardRef<ButtonRef, Omit<ButtonProps, 'variant'>>(
-  (props, ref) => <Button ref={ref} variant="ghost" {...props} />
+  (props, ref) => <Button ref={ref} variant="ghost" {...props} />,
 );
 
 GhostButton.displayName = 'GhostButton';
 
 export const LinkButton = forwardRef<ButtonRef, Omit<ButtonProps, 'variant'>>(
-  (props, ref) => <Button ref={ref} variant="link" {...props} />
+  (props, ref) => <Button ref={ref} variant="link" {...props} />,
 );
 
 LinkButton.displayName = 'LinkButton';

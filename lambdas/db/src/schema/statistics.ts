@@ -326,13 +326,13 @@ CareerBattingRef.implement({
 
           // Fallback: try parsing as string if it somehow comes as a string
           if (typeof positions === 'string') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- JSON.parse returns any
             const parsedPositions = JSON.parse(positions);
             if (
               typeof parsedPositions === 'object' &&
               parsedPositions !== null
             ) {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- JSON.parse result passed to Object.entries
               const positionEntries = Object.entries(parsedPositions);
               if (positionEntries.length === 0) return null;
 
@@ -404,7 +404,7 @@ const CareerBattingConnection = builder.connectionObject({
     totalCount: t.int({
       description:
         'Total number of career batting records matching the filters',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access -- Pothos connection totalCount typing gap
       resolve: (connection: any) => connection.totalCount || 0,
     }),
   }),

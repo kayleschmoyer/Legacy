@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- Apollo MockedResponse typing mismatch */
 /**
  * PlayerStatsDataGrid.test.tsx - Component Integration Tests
  *
@@ -104,7 +104,7 @@ const mockPlayerData: CareerBattingStatsRaw[] = [
 ];
 
 // Default mock with correct variable structure and Connection pattern response
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
 const defaultMock: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
@@ -146,7 +146,7 @@ const defaultMock: MockedResponse = {
 };
 
 // Mock for the base component render (page size 10, batting average order)
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
 const baseMock: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
@@ -162,7 +162,7 @@ const baseMock: MockedResponse = {
       searchTerm: '',
     },
   },
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
   result: {
     data: {
       careerBattingStats: {
@@ -189,7 +189,7 @@ const baseMock: MockedResponse = {
 };
 
 // Mock for page size 50 (used in page size test)
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
 const pageSize50Mock: MockedResponse = {
   request: {
     query: CAREER_BATTING_STATS_QUERY,
@@ -231,7 +231,7 @@ const pageSize50Mock: MockedResponse = {
 };
 
 // Mock for the PLAYERS_QUERY used by useCareerStatsWithNames
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
 const playersQueryMock: MockedResponse = {
   request: {
     query: PLAYERS_QUERY,
@@ -239,7 +239,7 @@ const playersQueryMock: MockedResponse = {
       first: 5000,
     },
   },
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
   result: {
     data: {
       players: [
@@ -262,10 +262,9 @@ const playersQueryMock: MockedResponse = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const emptyMock: MockedResponse = {
   ...defaultMock,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
   result: {
     data: {
       careerBattingStats: {
@@ -284,7 +283,6 @@ const emptyMock: MockedResponse = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const errorMock: MockedResponse = {
   ...defaultMock,
   error: new Error('Failed to load player statistics'),
@@ -641,7 +639,7 @@ describe('PlayerStatsDataGrid - Performance', () => {
     );
 
     // Create matching players data for the performance test
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     const performancePlayersQueryMock: MockedResponse = {
       request: {
         query: PLAYERS_QUERY,
@@ -649,7 +647,7 @@ describe('PlayerStatsDataGrid - Performance', () => {
           first: 5000,
         },
       },
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       result: {
         data: {
           players: Array.from({ length: 30 }, (_, index) => ({
@@ -662,10 +660,9 @@ describe('PlayerStatsDataGrid - Performance', () => {
       },
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const largeMock: MockedResponse = {
       ...defaultMock,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       result: {
         data: {
           careerBattingStats: {

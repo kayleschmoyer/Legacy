@@ -22,13 +22,11 @@ export class ConsoleLogger implements ILogger {
   }
 
   // Stub implementation - ConsoleLogger doesn't support dynamic destinations
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   addDestination(_destination: OutputDestination): void {
     // No-op: ConsoleLogger doesn't support dynamic destinations
   }
 
   // Stub implementation - ConsoleLogger doesn't support dynamic destinations
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   removeDestination(_destination: OutputDestination): void {
     // No-op: ConsoleLogger doesn't support dynamic destinations
   }

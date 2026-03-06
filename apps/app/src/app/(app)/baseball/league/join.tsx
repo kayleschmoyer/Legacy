@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- legacy mobile code pending type improvements */
+/* eslint-disable @typescript-eslint/no-unsafe-call -- legacy mobile code pending type improvements */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access -- legacy mobile code pending type improvements */
 import React, { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,9 +25,9 @@ const BRAND_GOLD_LIGHT = '#C5A55A';
 
 export default function JoinLeagueByCodeScreen(): React.JSX.Element {
   const router = useRouter();
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+
   const params = useLocalSearchParams();
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
   const urlInviteCode = params.inviteCode as string | undefined;
 
   const [inviteCode, setInviteCode] = useState('');
@@ -245,7 +245,6 @@ export default function JoinLeagueByCodeScreen(): React.JSX.Element {
               <Button
                 backgroundColor={BRAND_NAVY_LIGHT}
                 color="white"
-                // eslint-disable-next-line @typescript-eslint/no-misused-promises
                 onPress={handleSubmit}
                 disabled={
                   loading ||

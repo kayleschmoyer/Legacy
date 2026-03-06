@@ -1,4 +1,3 @@
-/* eslint-disable */
 import React, {
   useCallback,
   useEffect,
@@ -27,11 +26,11 @@ import {
   YStack,
 } from 'tamagui';
 import { Alert } from 'react-native';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   StartDraftMutation,
   useStartDraftMutation,
 } from '../../api/db/graphql.generated';
-import { LOGGER } from '@legacy-sports/logging';
 
 // Sport configurations
 const SPORT_CONFIGS = {
@@ -445,7 +444,7 @@ const DraftBoardPage: React.FC = () => {
     // TODO(LS-337): Get actual league ID from route parameters or component props
     const leagueId = 1; // Placeholder - replace with actual league ID
 
-    startDraft({
+    void startDraft({
       variables: {
         leagueId: leagueId,
         selectionMethod: 'random',

@@ -13,11 +13,11 @@
       addEventListener: jest.fn(),
       removeEventListener: jest.fn(),
     },eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-var-requires */
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access -- test setup mocks use any throughout */
+/* eslint-disable @typescript-eslint/no-unsafe-return -- test setup mocks use any throughout */
+/* eslint-disable @typescript-eslint/no-unsafe-call -- test setup mocks use any throughout */
+/* eslint-disable @typescript-eslint/no-var-requires -- test setup mocks use any throughout */
+/* eslint-disable @typescript-eslint/no-explicit-any -- test setup mocks use any throughout */
 import '@testing-library/jest-dom';
 
 // Set global test timeout to 30 seconds to prevent interruptions on slower CI runners
@@ -225,7 +225,7 @@ jest.mock('__PLATFORM_COMPONENTS__', () => {
 
 // Mock React Native SVG
 jest.mock('react-native-svg', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factory needs runtime require
   const React = require('react');
   return {
     Svg: ({ children, ...props }: any) =>

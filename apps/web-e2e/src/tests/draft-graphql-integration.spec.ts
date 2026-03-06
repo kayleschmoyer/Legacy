@@ -487,7 +487,7 @@ test.describe('Draft GraphQL Integration Tests', () => {
             type: 'request',
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             operation: body.operationName || 'Unknown',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             variables: body.variables,
             timestamp: Date.now(),
           });
@@ -497,7 +497,7 @@ test.describe('Draft GraphQL Integration Tests', () => {
       }
 
       const response = await route.fetch();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       const responseBody = await response.text();
 
       try {
@@ -505,11 +505,11 @@ test.describe('Draft GraphQL Integration Tests', () => {
         const parsedResponse = JSON.parse(responseBody);
         graphqlOperations.push({
           type: 'response',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
           operation:
             graphqlOperations[graphqlOperations.length - 1]?.operation ||
             'Unknown',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           data: parsedResponse.data,
           timestamp: Date.now(),
         });

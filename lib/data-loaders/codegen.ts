@@ -1,4 +1,4 @@
-/* eslint-disable @nx/enforce-module-boundaries */
+/* eslint-disable @nx/enforce-module-boundaries -- codegen config imports shared base */
 import config from '../codegen/codegen.base';
 
 // The base config now handles dynamic schema endpoint detection

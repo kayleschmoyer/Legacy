@@ -23,7 +23,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 ## Docs Index
 
 | Need                            | File                                                                       |
-| ------------------------------- | -------------------------------------------------------------------------- |
+| ------------------------------- | -------------------------------------------------------------------------- | --- | ------------------- | ----------------------------------------- | --- | ----------- | ------------------------------------ |
 | **Add secret / env var**        | `.github/skills/add-secret-or-env-var/SKILL.md`                            |
 | Architecture                    | `.github/skills/architecture/SKILL.md`                                     |
 | **AWS orphan cleanup**          | `.github/skills/aws-orphan-cleanup/SKILL.md`                               |
@@ -38,8 +38,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **Install packages**            | `.github/skills/install-packages/SKILL.md`                                 |
 | Lint errors                     | `.github/skills/fix-lint/SKILL.md`                                         |
 | **Never edit generated**        | `.github/skills/no-edit-generated/SKILL.md`                                |
-| **Never edit schema.graphql**   | `.github/skills/no-edit-schema-graphql/SKILL.md`                           |
-| **New app**                     | `.github/skills/create-app/SKILL.md`                                       |
+| **Never edit schema.graphql**   | `.github/skills/no-edit-schema-graphql/SKILL.md`                           |     | **No lint disable** | `.github/skills/no-lint-disable/SKILL.md` |     | **New app** | `.github/skills/create-app/SKILL.md` |
 | **New lambda**                  | `.github/skills/create-lambda/SKILL.md`                                    |
 | **New library**                 | `.github/skills/create-lib/SKILL.md`                                       |
 | **New skill**                   | `.github/skills/create-skill/SKILL.md`                                     |

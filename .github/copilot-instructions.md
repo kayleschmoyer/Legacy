@@ -1,35 +1,35 @@
-# Legacy Sports — Copilot Instructions
+﻿# Legacy Sports ΓÇö Copilot Instructions
 
-🚨 **NEVER commit to main** — create a worktree first: `twig worktree create LS-####/description`
+≡ƒÜ¿ **NEVER commit to main** ΓÇö create a worktree first: `twig worktree create LS-####/description`
 
 ## Workflow
 
-1. Ticket: create if needed: `acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json` → note `$key`
-2. **Jira "In Progress" immediately**: `acli jira workitem transition --key LS-#### --status "In Progress"` — do this as soon as you begin working, before any other steps.
-3. **Dependency check**: inspect the Jira ticket for linked issues or descriptions referencing another in-progress ticket. If a dependency exists, the worktree must branch from that parent — not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).
-4. Worktree: `twig worktree create $key/description` → `twig worktree list` (note path)
-5. Setup worktree: `make wt-setup WT=$wt` (or manually: `cd $wt` → `make install` → copy `.env` → junction `.twig`) → `code $wt`
-   5b. **Agent multi-root access** (optional): `make sync-worktrees` → `code legacy-sports.code-workspace` — gives agents search access across all worktrees in one window.
-6. **⚠️ All remaining work happens at the worktree path (`$wt`), NOT `D:\code\legacy-sports`.** Every file edit, terminal command, and git operation must target `$wt`.
+1. Ticket: create if needed: `acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json` ΓåÆ note `$key`
+2. **Jira "In Progress" immediately**: `acli jira workitem transition --key LS-#### --status "In Progress"` ΓÇö do this as soon as you begin working, before any other steps.
+3. **Dependency check**: inspect the Jira ticket for linked issues or descriptions referencing another in-progress ticket. If a dependency exists, the worktree must branch from that parent ΓÇö not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).
+4. Worktree: `twig worktree create $key/description` ΓåÆ `twig worktree list` (note path)
+5. Setup worktree: `make wt-setup WT=$wt` (or manually: `cd $wt` ΓåÆ `make install` ΓåÆ copy `.env` ΓåÆ junction `.twig`) ΓåÆ `code $wt`
+   5b. **Agent multi-root access** (optional): `make sync-worktrees` ΓåÆ `code legacy-sports.code-workspace` ΓÇö gives agents search access across all worktrees in one window.
+6. **ΓÜá∩╕Å All remaining work happens at the worktree path (`$wt`), NOT `D:\code\legacy-sports`.** Every file edit, terminal command, and git operation must target `$wt`.
 7. Code: `pnpm exec nx affected -t <target>` (never `pnpm run`)
-8. Commit: `git commit -m "type(scope): msg"` → `git push origin HEAD`
-9. Rebase onto parent: `git fetch origin ; twig rebase` — keeps branch current with its parent (main or a stacked branch)
-10. Validate: `make pc` — must pass before opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
-11. Ship: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` → Jira "In Review" (see `skills/create-pr/SKILL.md`)
-12. Cleanup: `twig worktree clean` → `git branch -d LS-####/description` → Jira "Done"
+8. Commit: `git commit -m "type(scope): msg"` ΓåÆ `git push origin HEAD`
+9. Rebase onto parent: `git fetch origin ; twig rebase` ΓÇö keeps branch current with its parent (main or a stacked branch)
+10. Validate: `make pc` ΓÇö must pass before opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
+11. Ship: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` ΓåÆ Jira "In Review" (see `skills/create-pr/SKILL.md`)
+12. Cleanup: `twig worktree clean` ΓåÆ `git branch -d LS-####/description` ΓåÆ Jira "Done"
 
 ## Rules
 
-- **Worktree-first**: always create a worktree for ticket work — never edit code in the main repo (`D:\code\legacy-sports`). After creating the worktree, all file edits and terminal commands must use the worktree path.
-- **Nx only**: `pnpm exec nx affected -t <target>` — never direct `pnpm run`
+- **Worktree-first**: always create a worktree for ticket work ΓÇö never edit code in the main repo (`D:\code\legacy-sports`). After creating the worktree, all file edits and terminal commands must use the worktree path.
+- **Nx only**: `pnpm exec nx affected -t <target>` ΓÇö never direct `pnpm run`
 - **PowerShell**: `;` to chain, `$env:` for vars
-- **No suppression**: fix root causes, no `@ts-ignore` / `eslint-disable`
+- **No suppression**: fix root causes, no `@ts-ignore` / `eslint-disable` (see `skills/no-lint-disable/SKILL.md`)
 - **No console.\***: use `LOGGER` from `@legacy-sports/logging` instead of `console.log/warn/error/debug`. Exceptions: `lib/logging/` (the logger itself), `apps/cli/`, migration files, and build-time scripts (`codegen.ts`, Vite plugins).
 - **Jira**: update status at each step
 
 ## Environment
 
-Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig branches
+Windows PowerShell ┬╖ Nx monorepo ┬╖ pnpm 9.12.1 ┬╖ Jira project LS ┬╖ twig branches
 
 ## Load When Needed
 

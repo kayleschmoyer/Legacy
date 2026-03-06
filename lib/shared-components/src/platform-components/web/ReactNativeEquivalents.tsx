@@ -85,13 +85,13 @@ const StyleSheet = {
 
 // Declare StyleSheet as a global for web platform
 if (typeof window !== 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- shimming RN global onto window
   (window as any).StyleSheet = StyleSheet;
 }
 
 // Also make it available on globalThis for better compatibility
 if (typeof globalThis !== 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- shimming RN global onto globalThis
   (globalThis as any).StyleSheet = StyleSheet;
 }
 
@@ -110,13 +110,12 @@ const Platform = {
     native?: T;
     default?: T;
   }): T {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     return (specifics.web ?? specifics.default) as T;
   },
 };
 
 const Dimensions = {
-  get: (dim: 'window' | 'screen') => ({
+  get: (_dim: 'window' | 'screen') => ({
     width: typeof window !== 'undefined' ? window.innerWidth : 375,
     height: typeof window !== 'undefined' ? window.innerHeight : 667,
     scale: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
@@ -151,7 +150,7 @@ const Dimensions = {
   ) => {
     if (typeof window !== 'undefined') {
       // Note: In a real implementation, you'd need to track the wrapped handlers
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+
       window.removeEventListener('resize', handler as unknown as EventListener);
     }
   },
@@ -272,11 +271,11 @@ function FlatList<ItemT>({
   ListEmptyComponent,
   showsHorizontalScrollIndicator = true,
   showsVerticalScrollIndicator = true,
-  columnWrapperStyle,
-  stickyHeaderIndices,
-  scrollEnabled = true,
-  keyboardShouldPersistTaps,
-  ItemSeparatorComponent,
+  columnWrapperStyle: _columnWrapperStyle,
+  stickyHeaderIndices: _stickyHeaderIndices,
+  scrollEnabled: _scrollEnabled = true,
+  keyboardShouldPersistTaps: _keyboardShouldPersistTaps,
+  ItemSeparatorComponent: _ItemSeparatorComponent,
 }: FlatListProps<ItemT>) {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -385,7 +384,7 @@ interface ModalProps extends React.PropsWithChildren {
 function Modal({
   visible,
   transparent = false,
-  animationType = 'none',
+  animationType: _animationType = 'none',
   onRequestClose,
   style,
   children,
@@ -636,7 +635,7 @@ const Alert = {
         }>,
     type?: 'default' | 'plain-text' | 'secure-text' | 'login-password',
     defaultValue?: string,
-    keyboardType?: string,
+    _keyboardType?: string,
   ) => {
     const result = window.prompt(`${title}\n${message || ''}`, defaultValue);
     if (typeof callbackOrButtons === 'function') {
@@ -711,9 +710,9 @@ interface KeyboardAvoidingViewProps {
 function KeyboardAvoidingView({
   style,
   children,
-  behavior = 'padding',
-  keyboardVerticalOffset = 0,
-  enabled = true,
+  behavior: _behavior = 'padding',
+  keyboardVerticalOffset: _keyboardVerticalOffset = 0,
+  enabled: _enabled = true,
   ...props
 }: KeyboardAvoidingViewProps) {
   // For web, we can just render a div since keyboard handling is different
@@ -1076,7 +1075,7 @@ export {
 const ReactNativeEquivalents = {
   ActivityIndicator,
   Alert,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
   Animated,
   Dimensions,
   FlatList,

@@ -1,4 +1,4 @@
-{
+﻿{
   "root": true,
   "ignorePatterns": ["**/*", "dist", "node_modules", "**/node_modules/**"],
   "plugins": ["@nx"],
@@ -46,6 +46,15 @@
       "plugins": ["eslint-plugin-import"],
       "rules": {
         "no-console": "error",
+        "@typescript-eslint/no-unused-vars": [
+          "error",
+          {
+            "argsIgnorePattern": "^_",
+            "varsIgnorePattern": "^_",
+            "destructuredArrayIgnorePattern": "^_",
+            "caughtErrorsIgnorePattern": "^_"
+          }
+        ],
         "@typescript-eslint/no-unsafe-assignment": "error",
         "@typescript-eslint/no-unsafe-member-access": "error",
         "@typescript-eslint/no-unsafe-call": "error",

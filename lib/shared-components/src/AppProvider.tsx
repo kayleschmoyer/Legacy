@@ -43,7 +43,6 @@ const NativeLayout = ({
       </TamaguiProvider>
     );
   } catch (error: unknown) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     LOGGER.warn('Failed to load native dependencies:', String(error));
     return <LoadingPanel />;
   }
@@ -86,7 +85,6 @@ const WebLayout = ({
       </TamaguiProvider>
     );
   } catch (error: unknown) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     LOGGER.warn('Failed to load Apollo client:', String(error));
     return <LoadingPanel />;
   }

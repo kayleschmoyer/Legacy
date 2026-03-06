@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-require-imports */
-/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any -- test mock props use any for simplicity */
+/* eslint-disable @typescript-eslint/no-unsafe-return -- mock factory returns untyped values */
+/* eslint-disable @typescript-eslint/no-require-imports -- jest.mock factory needs runtime require */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -31,9 +30,8 @@ jest.mock('@legacy-sports/shared-components', () => ({
 
 // Mock Tamagui styled components to div/input
 jest.mock('tamagui', () => {
-  const React = require('react');
   const filterDOMProps = (props: any) => {
-    const { children, onPress, ...rest } = props || {};
+    const { children, onPress } = props || {};
     // Drop all non-standard DOM props to reduce console noise
     return { children, onClick: onPress };
   };

@@ -1,17 +1,10 @@
 import React from 'react';
-import {
-  styled,
-  Button as TamaguiButton,
-  Text,
-  YStack,
-} from 'tamagui';
+import { styled, Button as TamaguiButton, Text, YStack } from 'tamagui';
 import { Icon } from './platform-components';
-import type {
-  IconButtonProps,
-} from './types/IconButton.types';
+import type { IconButtonProps } from './types/IconButton.types';
 
 // Styled button with gradient shadow effects
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const StyledIconButton = styled(TamaguiButton, {
   name: 'IconButton',
   borderRadius: 16,
@@ -20,7 +13,7 @@ const StyledIconButton = styled(TamaguiButton, {
   position: 'relative',
   cursor: 'pointer',
   userSelect: 'none',
-  
+
   variants: {
     size: {
       sm: {
@@ -39,7 +32,7 @@ const StyledIconButton = styled(TamaguiButton, {
         padding: 20,
       },
     },
-    
+
     variant: {
       default: {
         backgroundColor: '$color3',
@@ -86,7 +79,7 @@ const StyledIconButton = styled(TamaguiButton, {
         },
       },
     },
-    
+
     showGradient: {
       true: {
         // Enhanced shadow for gradient effect
@@ -95,7 +88,7 @@ const StyledIconButton = styled(TamaguiButton, {
         shadowOpacity: 0.3,
         shadowRadius: 12,
         elevation: 8,
-        
+
         hoverStyle: {
           shadowOffset: { width: 0, height: 12 },
           shadowOpacity: 0.4,
@@ -105,10 +98,10 @@ const StyledIconButton = styled(TamaguiButton, {
       },
     },
   },
-  
+
   // Animation configuration
   animation: 'quick',
-  
+
   // Default props
   defaultVariants: {
     size: 'md',
@@ -118,7 +111,7 @@ const StyledIconButton = styled(TamaguiButton, {
 });
 
 // Gradient overlay component for enhanced visual effects
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const GradientOverlay = styled(YStack, {
   name: 'GradientOverlay',
   position: 'absolute',
@@ -129,7 +122,7 @@ const GradientOverlay = styled(YStack, {
   borderRadius: 16,
   opacity: 0,
   zIndex: 1,
-  
+
   variants: {
     colorScheme: {
       blue: {
@@ -149,11 +142,11 @@ const GradientOverlay = styled(YStack, {
       },
     },
   },
-  
+
   hoverStyle: {
     opacity: 0.2,
   },
-  
+
   animation: 'quick',
 });
 
@@ -206,10 +199,8 @@ function IconButton({
         {...props}
       >
         {/* Gradient overlay for enhanced hover effects */}
-        {showGradient && (
-          <GradientOverlay colorScheme={colorScheme} />
-        )}
-        
+        {showGradient && <GradientOverlay colorScheme={colorScheme} />}
+
         {/* Icon content */}
         <YStack
           position="relative"
@@ -217,16 +208,12 @@ function IconButton({
           alignItems="center"
           justifyContent="center"
         >
-          <Icon
-            name={icon}
-            size={getIconSize()}
-            color="$color"
-          />
+          <Icon name={icon} size={getIconSize()} color="$color" />
         </YStack>
-        
+
         {children}
       </StyledIconButton>
-      
+
       {/* Optional label below the button */}
       {label && (
         <Text

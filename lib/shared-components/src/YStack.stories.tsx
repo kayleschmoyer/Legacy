@@ -6,7 +6,7 @@ import { Button } from './Button';
 // YStack Stories
 const YStackMeta: Meta<typeof YStack> = {
   title: 'Layout/YStack',
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Tamagui component type gap with Storybook Meta
   component: YStack,
   parameters: {
     layout: 'centered',

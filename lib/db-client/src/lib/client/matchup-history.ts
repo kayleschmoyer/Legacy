@@ -82,11 +82,11 @@ export async function queryHistoricalMatchups(
   // Filter by team participation
   if (filters.teamId !== undefined) {
     conditions.push(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- Drizzle `or` typing limitation with multiple conditions
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Drizzle `or` typing limitation with multiple conditions
       or(
         eq(Schema.matchups.team1Id, filters.teamId),
         eq(Schema.matchups.team2Id, filters.teamId),
-      ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
     );
   }
 
@@ -97,11 +97,9 @@ export async function queryHistoricalMatchups(
 
   // Filter by date range
   if (filters.startDate) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- sql template literal typing
     conditions.push(sql`${Schema.matchups.startTime} >= ${filters.startDate}`);
   }
   if (filters.endDate) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- sql template literal typing
     conditions.push(sql`${Schema.matchups.endTime} <= ${filters.endDate}`);
   }
 
@@ -129,7 +127,7 @@ export async function getHeadToHeadRecord(
       and(
         eq(Schema.matchups.leagueId, leagueId),
         eq(Schema.matchups.status, 'completed'),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- Drizzle `or` typing limitation with multiple conditions
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Drizzle `or` typing limitation with multiple conditions
         or(
           and(
             eq(Schema.matchups.team1Id, team1Id),
@@ -139,7 +137,7 @@ export async function getHeadToHeadRecord(
             eq(Schema.matchups.team1Id, team2Id),
             eq(Schema.matchups.team2Id, team1Id),
           ),
-        ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
       ),
     );
 
@@ -589,11 +587,11 @@ export async function getRecentMatchupsForTeam(
     .from(Schema.matchups)
     .where(
       and(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- Drizzle `or` typing limitation with multiple conditions
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Drizzle `or` typing limitation with multiple conditions
         or(
           eq(Schema.matchups.team1Id, teamId),
           eq(Schema.matchups.team2Id, teamId),
-        ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
         eq(Schema.matchups.status, 'completed'),
       ),
     )

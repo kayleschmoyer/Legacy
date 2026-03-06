@@ -329,7 +329,7 @@ const customConfig = {
 // web, mobile, and any other platforms using Tamagui
 
 // Create and export the Tamagui configuration
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- createTamagui returns loosely typed config
 export const tamaguiConfig: TamaguiConfig = createTamagui(customConfig);
 
 export default tamaguiConfig;

@@ -695,7 +695,7 @@ function RosterSection({
       </XStack>
 
       {/* Slot rows */}
-      {positions.map((position, index) => {
+      {positions.map((position, _index) => {
         const assigned = getAssignedPlayer(position);
         const mData = assigned?.playerId
           ? playerMatchupData?.get(assigned.playerId)

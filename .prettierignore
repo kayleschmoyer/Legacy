@@ -7,3 +7,5 @@
 static/environment.js
 static/main.js
 pnpm-lock.yaml
+# Migrations are append-only and immutable once merged — never reformat them
+lib/db-client/migrations/

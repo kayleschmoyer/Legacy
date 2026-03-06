@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
-
 // Simple test setup for app-e2e tests without Detox dependency
 console.log('🚀 App E2E Test Setup Initialized');
 console.log('✅ Jest environment configured for app-e2e tests');

@@ -31,7 +31,7 @@ export class SecureStorage implements ISecureStorage {
   setItem(
     key: string,
     value: string,
-    options?: SecureStorageOptions,
+    _options?: SecureStorageOptions,
   ): Promise<void> {
     try {
       if (typeof sessionStorage !== 'undefined') {

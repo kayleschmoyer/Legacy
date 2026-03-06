@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable no-restricted-imports, no-restricted-syntax, @typescript-eslint/no-floating-promises, @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-misused-promises -- legacy file with inline gql queries and unsafe types pending refactor */
 import {
   useGlobalSearchParams,
   useLocalSearchParams,
@@ -11,6 +11,7 @@ import { Tabs } from '@tamagui/tabs';
 import { Alert } from 'react-native';
 import { gql } from '@apollo/client';
 import { useLazyQuery } from '@apollo/client/react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   LeaguePositionFragment,
   StartDraftMutation,
@@ -102,11 +103,8 @@ export default function LeagueId(): React.JSX.Element {
     if (!isNaN(numLeagueId) && userInfo?.id) {
       getUserTeamId({
         variables: { leagueId: numLeagueId },
-        onCompleted: (data) => {
-          console.log('🏀 User team ID query completed:', data);
-        },
         onError: (error) => {
-          console.error('🚨 User team ID query error:', error);
+          LOGGER.error('User team ID query error:', String(error));
         },
       });
     }
@@ -126,24 +124,14 @@ export default function LeagueId(): React.JSX.Element {
     });
   }, [rawMatchups, userTeamId]);
 
-  console.log('🔍 Debug team data:', {
-    leagueData: leagueData?.league,
-    userTeamId,
-    userInfo,
-    message: 'Using proper userTeamId GraphQL query',
-  });
-
   const { data: teamMembersData, loading: teamMembersLoading } =
     useGetTeamMembersQuery({
       skip: !userTeamId,
       variables: {
         teamId: userTeamId || 0,
       },
-      onCompleted: (data) => {
-        console.log('🏀 Team members query completed:', data);
-      },
       onError: (error) => {
-        console.error('🚨 Team members query error:', error);
+        LOGGER.error('Team members query error:', String(error));
       },
     });
 
@@ -159,7 +147,7 @@ export default function LeagueId(): React.JSX.Element {
       getLeagueTeams({
         variables: { leagueId: numLeagueId },
         onError: (error) => {
-          console.error('🚨 Error fetching league teams:', error);
+          LOGGER.error('Error fetching league teams:', String(error));
         },
       });
     }
@@ -171,20 +159,14 @@ export default function LeagueId(): React.JSX.Element {
   const [startDraft, { loading: startDraftLoading }] = useStartDraftMutation({
     refetchQueries: ['GetLeagueById'],
     awaitRefetchQueries: true,
-    onCompleted: (data: StartDraftMutation) => {
-      console.log('✅ Draft mutation completed successfully:', data);
-      console.log(
-        '🎯 Returned League object with updated status:',
-        data.startDraft,
-      );
-      console.log('📊 Updated draft status:', data.startDraft?.draftStatus);
+    onCompleted: (_data: StartDraftMutation) => {
       Alert.alert(
         'Success',
         'Draft has been started and queued for processing!',
       );
     },
     onError: (error: any) => {
-      console.error('Error starting draft:', error);
+      LOGGER.error('Error starting draft:', String(error));
       Alert.alert('Error', error.message || 'Failed to start draft');
     },
   });
@@ -414,7 +396,6 @@ export default function LeagueId(): React.JSX.Element {
 }
 
 export function LeagueIdHeader(props: HeaderTitleProps): React.JSX.Element {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const params = useGlobalSearchParams();
   const leagueId = params.leagueId;
 

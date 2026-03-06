@@ -62,7 +62,7 @@ export interface QuickFiltersProps {
  */
 function FilterChip({
   label,
-  value,
+  value: _value,
   isSelected,
   onPress,
   variant = 'default',

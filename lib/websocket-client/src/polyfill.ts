@@ -1,4 +1,4 @@
-/**
+﻿/**
  * WebSocket Polyfill for Node.js environments
  *
  * In browsers and React Native, WebSocket is available globally.
@@ -7,7 +7,7 @@
 
 import { LOGGER } from '@legacy-sports/logging';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any -- globalThis cast needed for polyfill */
 
 // Check if we're in a Node.js environment (no window object)
 const isNode = typeof window === 'undefined';

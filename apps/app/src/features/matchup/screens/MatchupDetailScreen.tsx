@@ -14,12 +14,12 @@ import { useStandings } from '../hooks/useStandings';
  */
 export default function MatchupDetailScreen() {
   // expo-router types cannot be resolved in this project's TS config
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+
   const params = useLocalSearchParams();
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+
   const rawMatchupId = params.matchupId;
   const matchupId = rawMatchupId ? parseInt(rawMatchupId as string, 10) : null;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+
   const rawLeagueId = params.leagueId;
   const leagueId = rawLeagueId ? parseInt(rawLeagueId as string, 10) : null;
 

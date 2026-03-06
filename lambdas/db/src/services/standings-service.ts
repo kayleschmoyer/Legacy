@@ -63,7 +63,7 @@ export class StandingsService {
   ): Promise<TeamStanding[]> {
     const {
       leagueId,
-      season: _season, // eslint-disable-line @typescript-eslint/no-unused-vars
+      season: _season,
       sortBy = 'winPercentage',
       ascending = false,
     } = params;
@@ -111,7 +111,6 @@ export class StandingsService {
   static async getSeasonSummary(
     db: GenericDatabase<typeof PublicSchema>,
     leagueId: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _season: number | null,
   ): Promise<SeasonResults> {
     // Note: Season parameter preserved for API compatibility but ignored
@@ -172,7 +171,6 @@ export class StandingsService {
   static async getMatchupStats(
     db: GenericDatabase<typeof PublicSchema>,
     leagueId: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _season?: number | null,
   ): Promise<MatchupStatusCounts> {
     // Note: Season parameter preserved for API compatibility but ignored
@@ -186,7 +184,6 @@ export class StandingsService {
   static async getLeagueOverview(
     db: GenericDatabase<typeof PublicSchema>,
     leagueId: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _season?: number | null,
   ) {
     // Note: Season parameter preserved for API compatibility
@@ -241,7 +238,6 @@ export class StandingsService {
   static async getPowerRankings(
     db: GenericDatabase<typeof PublicSchema>,
     leagueId: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _season?: number | null,
   ): Promise<
     Array<

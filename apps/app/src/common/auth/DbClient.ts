@@ -26,7 +26,6 @@ export class DbClient {
   ): Promise<UserFragment | undefined | null> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const response = await this.apolloClient.query({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       query: GetUserById,
       variables: {
         id: id,

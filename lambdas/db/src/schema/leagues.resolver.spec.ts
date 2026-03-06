@@ -80,7 +80,7 @@ describe('League Mutations', () => {
     // Load the schema after mocks are set up
     // Note: Do NOT use jest.isolateModules() as it creates a separate module realm
     // which causes "Cannot use GraphQLSchema from another module or realm" errors
-    // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 

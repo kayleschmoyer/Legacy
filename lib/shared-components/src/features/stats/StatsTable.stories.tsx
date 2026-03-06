@@ -416,7 +416,7 @@ export const WithSorting: Story = {
     maxHeight: 400,
     onRowPress: fn(),
   },
-  play: async ({ args, canvasElement }) => {
+  play: async ({ args: _args, canvasElement }) => {
     const canvas = within(canvasElement);
 
     // Test sorting by clicking on a column header

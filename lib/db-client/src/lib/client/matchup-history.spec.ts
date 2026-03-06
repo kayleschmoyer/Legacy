@@ -2,7 +2,7 @@
  * Unit tests for matchup history and standings calculations
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- test mocks use any for DB interactions */
 // Test file uses any for mocking database interactions
 
 import type { PublicDb } from './PublicDbClient';
@@ -11,18 +11,15 @@ import {
   getHeadToHeadRecord,
   getMatchupStatusCounts,
   getPlayoffQualifications,
-  getRecentMatchupsForTeam,
   getSeasonResults,
   type MatchupHistoryFilters,
   queryHistoricalMatchups,
 } from './matchup-history';
-import * as Schema from '../../drizzle/public/schema';
 
 // Mock getScoringMultipliersForLeague to avoid DB calls for scoring profiles.
 // Uses h=1 as the only batting multiplier so desired scores map directly to hit counts.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- test mock
 jest.mock('./PublicDbClient', () => ({
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- test mock
   ...jest.requireActual('./PublicDbClient'),
   getScoringMultipliersForLeague: jest.fn().mockResolvedValue({
     batting: { h: 1 },
@@ -32,7 +29,7 @@ jest.mock('./PublicDbClient', () => ({
 }));
 
 // Helper to create a chainable mock database
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Test helper using jest mocks
+
 function createMockDbChain(finalResult: any): any {
   const chain = {
     select: jest.fn(),
@@ -55,7 +52,7 @@ function createMockDbChain(finalResult: any): any {
 }
 
 // Helper to create a mock DB that can return different results for consecutive queries
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Test helper using jest mocks
+
 function createMockDbWithMultipleQueries(results: any[]): any {
   let queryIndex = 0;
 

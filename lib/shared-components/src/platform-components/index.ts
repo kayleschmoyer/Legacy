@@ -38,7 +38,7 @@
  */
 
 // Import platform-specific module exports
-// eslint-disable-next-line @nx/enforce-module-boundaries
+// eslint-disable-next-line @nx/enforce-module-boundaries -- build-time platform module resolution
 import platformComponents from '__PLATFORM_COMPONENTS__';
 import { validatePlatformExports } from './types/platform-exports';
 

@@ -19,7 +19,12 @@ interface TimerBarProps {
   variant?: string;
 }
 
-const TimerBar = ({ time, maxTime, label, variant }: TimerBarProps) => {
+const TimerBar = ({
+  time,
+  maxTime: _maxTime,
+  label,
+  variant,
+}: TimerBarProps) => {
   const minutes = Math.floor(time / 60);
   const seconds = time % 60;
   const timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;

@@ -11,7 +11,6 @@ import { shuffleArray } from '@legacy-sports/utils';
 /**
  * Randomly distribute players across teams (currently unused but preserved).
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function randomlyAssignPlayers(
   db: PublicDb,
   leagueId: number,

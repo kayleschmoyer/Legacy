@@ -10,7 +10,7 @@
 import React from 'react';
 import { Card, styled } from 'tamagui';
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 export const PanelCard = styled(Card, {
   backgroundColor: '$surfacePanel',
   borderColor: '$surfacePanelBorder',

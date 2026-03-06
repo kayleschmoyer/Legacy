@@ -4,7 +4,7 @@ import { PlayersOverview, TableView } from './PlayersOverview';
 
 // Mock the UsefulTables components
 jest.mock('../stats/UsefulTables', () => {
-  /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires */
+  /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- jest.mock factory needs runtime require */
   const React = require('react') as typeof import('react');
   const { Text } = require('react-native') as typeof import('react-native');
   /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires */

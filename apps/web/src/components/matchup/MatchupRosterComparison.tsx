@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- Complex type mapping for scoring calculations */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument -- Complex type mapping for scoring calculations */
 import React, { useMemo, useState } from 'react';
 import { Card, H4, H5, Separator, Text, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';

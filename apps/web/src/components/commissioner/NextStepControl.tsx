@@ -49,7 +49,7 @@ export function NextStepControl({
   draftStatus,
   onSuccess,
   onError,
-  onLeagueUpdate,
+  onLeagueUpdate: _onLeagueUpdate,
 }: NextStepControlProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loading, setLoading] = useState(false);

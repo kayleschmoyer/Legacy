@@ -38,7 +38,7 @@ interface PendingTradeOffersProps {
 
 export function PendingTradeOffers({
   teamId,
-  leagueId,
+  leagueId: _leagueId,
 }: PendingTradeOffersProps) {
   const [actionLoading, setActionLoading] = React.useState<number | null>(null);
 

@@ -344,58 +344,8 @@ export const WithCustomStyle: Story = {
 };
 
 // Advanced Team Picker Stories
-// Used via StoryObj<typeof AdvancedMeta> type definition below
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Used as type parameter only
-const AdvancedMeta: Meta<typeof AdvancedTeamPicker> = {
-  title: 'Features/Teams/AdvancedTeamPicker',
-  component: AdvancedTeamPicker,
-  parameters: {
-    layout: 'centered',
-    docs: {
-      description: {
-        component:
-          'Advanced team picker with additional features like division grouping and league filtering.',
-      },
-    },
-  },
-  tags: ['autodocs', 'test'],
-  argTypes: {
-    selectedTeam: {
-      control: 'number',
-      description: 'ID of the currently selected team',
-    },
-    teams: {
-      control: 'object',
-      description: 'Array of team data objects',
-    },
-    onSelect: {
-      action: 'team-selected',
-      description: 'Callback when a team is selected',
-    },
-    placeholder: {
-      control: 'text',
-      description: 'Placeholder text when no team is selected',
-    },
-    showDivisions: {
-      control: 'boolean',
-      description: 'Show division information',
-    },
-    showLeagues: {
-      control: 'boolean',
-      description: 'Show league information',
-    },
-    groupByDivision: {
-      control: 'boolean',
-      description: 'Group teams by division',
-    },
-    disabled: {
-      control: 'boolean',
-      description: 'Disable the picker',
-    },
-  },
-};
-
-type AdvancedStory = StoryObj<typeof AdvancedMeta>;
+type _AdvancedMeta = Meta<typeof AdvancedTeamPicker>;
+type AdvancedStory = StoryObj<_AdvancedMeta>;
 
 export const AdvancedDefault: AdvancedStory = {
   args: {
@@ -462,7 +412,7 @@ export const WithInteraction: Story = {
 
     // For web implementation, test the select element
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Storybook args placeholder is loosely typed
       const selectElement = canvas.getByDisplayValue(args.placeholder);
       if (selectElement && selectElement.tagName === 'SELECT') {
         await userEvent.selectOptions(selectElement, '1');

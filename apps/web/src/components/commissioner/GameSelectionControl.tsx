@@ -26,7 +26,7 @@ export interface GameSelectionControlProps {
  * NOTE: Requires triggerGameSelection mutation to be implemented in GraphQL API
  */
 export function GameSelectionControl({
-  leagueId,
+  leagueId: _leagueId,
   matchupId,
   gamesPerMatchup,
   onSuccess,

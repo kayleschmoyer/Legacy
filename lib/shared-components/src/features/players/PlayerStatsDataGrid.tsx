@@ -874,7 +874,7 @@ export function PlayerStatsDataGrid({
                   >
                     {column.formatter
                       ? column.formatter(player[column.key])
-                      : // eslint-disable-next-line @typescript-eslint/no-base-to-string
+                      : // eslint-disable-next-line @typescript-eslint/no-base-to-string -- value is unknown; fallback stringify is safe
                         String(player[column.key] ?? '--')}
                   </Text>
                 </XStack>
