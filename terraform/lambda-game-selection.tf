@@ -183,6 +183,9 @@ resource "aws_lambda_function" "game_selection" {
       SENTRY_TRACES_SAMPLE_RATE = "0.1"
       SENTRY_DEBUG              = "false"
       SENTRY_RELEASE            = "legacy-sports-game-selection@${data.aws_ssm_parameter.game_selection_lambda_version.value}"
+
+      # Rollbar error tracking
+      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
     }
   }
 
