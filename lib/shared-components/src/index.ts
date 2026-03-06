@@ -3,14 +3,12 @@ import './types/tamagui.d.ts';
 export * from './Button';
 export * from './IconButton';
 export * from './Layout';
-// export * from './screens/SportsScreens'; // Deprecated - use features/sports/SportScreens instead
 export * from './screens/DraftBoardScreen';
 
 // New shared components
 export * from './ConditionalProviders';
 export * from './AppProvider';
 export * from './components/HolographicCard';
-// export * from './AppNavigator'; // Commented out due to parsing issues
 
 // Cross-platform components from new structure (star export except Button)
 export {
