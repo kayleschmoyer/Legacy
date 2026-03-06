@@ -80,6 +80,21 @@ $branchName = "$TicketKey/$Desc"
 $resolvedParent = Resolve-ParentBranch $Parent
 $ticketNumber = if ($TicketKey -match '\d+') { $Matches[0] } else { "" }
 
+# ---------------------------------------------------------------------------
+# Safety check: main repo must be on the 'main' branch.
+# If the user-testing skill (or a crash) left it on a feature branch,
+# worktree creation would use the wrong base.
+# ---------------------------------------------------------------------------
+$currentBranch = git branch --show-current 2>$null
+if ($currentBranch -and $currentBranch -ne 'main') {
+    Write-Host "" -ForegroundColor Red
+    Write-Host "[ERROR] Main repo is on '$currentBranch', not 'main'." -ForegroundColor Red
+    Write-Host "        Worktrees must be created from the main branch." -ForegroundColor Red
+    Write-Host "        Run:  git checkout main" -ForegroundColor Yellow
+    Write-Host ""
+    exit 1
+}
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Worktree Create" -ForegroundColor Cyan

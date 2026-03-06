@@ -144,10 +144,16 @@ git stash pop
 ### Step 7: Force-Push the Rebased Branch
 
 ```powershell
+# Guard: never force-push main
+$branch = git branch --show-current
+if ($branch -eq 'main') { Write-Error "ABORT: Cannot force-push main. Use git revert instead."; exit 1 }
+
 git push --force-with-lease origin HEAD
 ```
 
 > **Always use `--force-with-lease`** instead of `--force`. It prevents overwriting someone else's commits if they pushed to the same branch.
+> The branch guard above is a safety net — if you somehow end up on `main` after
+> a botched checkout, the script stops before rewriting public history.
 
 ### Step 8: Verify CI Passes
 

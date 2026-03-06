@@ -474,27 +474,31 @@ gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp
 
 ### If You Pushed to Main by Mistake
 
+> **⚠️ NEVER force-push main.** The `non_fast_forward` ruleset blocks it, and even
+> if you have admin bypass, force-pushing rewrites public history and can strip
+> other people's commits. Use `git revert` instead — it's safe regardless of
+> protection state.
+
 ```powershell
-# 1. Create branch from before your commit
-git checkout -b LS-1234/fix main~1
-
-# 2. Cherry-pick your commit
-git cherry-pick main
-
-# 3. Revert main to previous state
+# 1. Revert the accidental commit on main (creates a new commit that undoes it)
 git checkout main
-git reset --hard origin/main~1
-git push -f origin main
+git revert HEAD --no-edit
+git push origin main
 
-# 4. Push your branch
-git checkout LS-1234/fix
+# 2. Create a feature branch from before the revert
+git checkout -b LS-1234/fix HEAD~2   # the original good commit
+
+# 3. Cherry-pick the original work (skip the revert)
+git cherry-pick HEAD~1
+
+# 4. Push and open a PR
 git push origin HEAD
-
-# 5. Create PR (see create-pr skill for full template)
 gh pr create --title "LS-1234 fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 ```
 
-**⚠️ Only use force-push if no one else has pulled your changes**
+> **Why revert instead of force-push?** `git revert` adds a new commit and never
+> rewrites history. Force-pushing main can strip commits that others have already
+> pulled or that CI has built against.
 
 ---
 

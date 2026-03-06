@@ -8,7 +8,7 @@ security,pre_commit_checklist,CHECK,no_aws_credentials,No AWS account IDs or acc
 security,authentication_pattern,GOOD,environment_variables,Use environment variables with AuthProvider,"import.meta.env.VITE_OAUTH_PROXY_URL || 'http://localhost:5001'",""
 security,authentication_pattern,BAD,hardcoded_values,Never hardcode production URLs,"'https://api.example.com/oauth' // ❌",""
 security,credential_leak_response,EMERGENCY,immediate_revoke,Immediately revoke all exposed credentials,"Revoke OAuth clients, rotate AWS keys",""
-security,credential_leak_response,EMERGENCY,force_push_removal,Force push commit removing credentials,"git commit --amend; git push --force",""
+security,credential_leak_response,EMERGENCY,force_push_removal,Force push to remove credentials from FEATURE branch only (never main — use git revert for main),"git checkout <feature-branch>; git commit --amend; git push --force-with-lease origin HEAD",""
 security,credential_leak_response,EMERGENCY,rotate_secrets,Rotate all exposed secrets,"Update OAuth clients, AWS keys, JWT secrets",""
 security,development_workflow,SECURE,template_copying,Copy template for local development,"cp apps/web/.env.example apps/web/.env.local",""
 security,development_workflow,SECURE,verify_gitignore,Verify local files are ignored,"git status should not show .env.local",""
