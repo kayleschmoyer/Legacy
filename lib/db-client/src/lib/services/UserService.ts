@@ -11,7 +11,7 @@ import {
   or,
   SQL,
 } from 'drizzle-orm';
-import { DbOptions } from '@legacy-sports/utils';
+import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithInternalClient, runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
 import * as InternalSchema from '../../drizzle/internal/schema';

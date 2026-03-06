@@ -4,7 +4,7 @@ import {
   InternalSchema,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { eq, sql } from 'drizzle-orm';
 import { CommandArgs } from '../utils/loadEnvFile';
 

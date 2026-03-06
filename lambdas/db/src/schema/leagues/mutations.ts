@@ -12,7 +12,7 @@ import {
   DraftService,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import {
   DEFAULT_ROSTER_POSITIONS,

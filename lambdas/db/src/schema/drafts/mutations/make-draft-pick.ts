@@ -10,7 +10,7 @@ import {
   playerMeetsMinCareerSeasons,
   PublicSchema,
 } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, sql } from 'drizzle-orm';
 

@@ -48,7 +48,7 @@ import {
 } from '@tamagui/lucide-icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
-import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
+import { ClientNotificationType } from '@legacy-sports/utils';
 import {
   calculateMatchupProjection,
   computeScoring,

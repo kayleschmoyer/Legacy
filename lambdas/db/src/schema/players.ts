@@ -5,7 +5,7 @@ import {
 import { PublicSchema } from '@legacy-sports/db-client';
 import type { PlayerOrderBy } from '@legacy-sports/db-client';
 import { eq } from 'drizzle-orm';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { builder } from './builder';
 import { CareerBattingRef, CareerPitchingRef } from './statistics';
 

@@ -1,5 +1,5 @@
 import { and, count, eq, ilike, inArray, ne, or, sql, SQL } from 'drizzle-orm';
-import { DbOptions } from '@legacy-sports/utils';
+import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicDb, PublicSchema } from '../client/PublicDbClient';
 import { Player } from '../../types/DatabaseTypes';

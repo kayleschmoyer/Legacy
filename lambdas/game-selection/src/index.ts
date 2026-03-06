@@ -15,7 +15,7 @@ import {
   withSentry,
 } from '@legacy-sports/rollbar';
 import { createNotificationService } from '@legacy-sports/aws-utils';
-import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
+import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 import {
   getMissingMatchupRecords,
   PublicSchema,

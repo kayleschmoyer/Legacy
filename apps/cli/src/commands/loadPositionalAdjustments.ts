@@ -1,4 +1,4 @@
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '@legacy-sports/db-client';
 import type { PublicDb } from '@legacy-sports/db-client';
 import { sql } from 'drizzle-orm';

@@ -13,7 +13,7 @@ import {
   DEFAULT_FIELDING_SCORING,
   DEFAULT_PITCHING_SCORING,
 } from '@legacy-sports/scoring';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 
 interface HandleComputeScoringArgs {
   player: string;

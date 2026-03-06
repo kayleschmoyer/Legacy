@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { eq, sql } from 'drizzle-orm';
 import * as dotenv from 'dotenv';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import * as path from 'path';
 import { getPublicDbConnection } from '../index.js';
 import { PublicSchema } from '../index.js';

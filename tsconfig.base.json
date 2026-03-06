@@ -43,6 +43,7 @@
       "@legacy-sports/utils/help-content": [
         "lib/utils/src/lib/help-content.ts"
       ],
+      "@legacy-sports/utils/node": ["lib/utils/src/node.ts"],
       "@legacy-sports/utils/notification-types": [
         "lib/utils/src/lib/notification-types.ts"
       ],

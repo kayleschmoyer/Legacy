@@ -1,6 +1,6 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { resetDatabase } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 
 interface ResetDatabaseArgs {
   confirm?: boolean;

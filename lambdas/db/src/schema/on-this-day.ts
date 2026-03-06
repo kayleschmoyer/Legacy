@@ -9,7 +9,7 @@
  * table populated via the MLB Stats API.
  */
 import { createDatabaseService } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { builder } from './builder';
 
 const dbService = createDatabaseService(getDbOptions());

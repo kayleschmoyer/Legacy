@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { DbOptions } from '@legacy-sports/utils';
+import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithInternalClient, runWithPublicClient } from '../client/Helpers';
 
 export interface UserConsent {

@@ -1,5 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
 import { and, count, eq, sql } from 'drizzle-orm';
 

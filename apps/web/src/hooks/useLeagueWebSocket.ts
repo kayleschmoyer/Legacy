@@ -10,7 +10,7 @@
  * without causing re-subscriptions.
  */
 import { useEffect, useRef } from 'react';
-import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
+import { ClientNotificationType } from '@legacy-sports/utils';
 import type { LeagueChatMessageNotification } from '@legacy-sports/websocket-client';
 import { useLeagueWebSocketClient } from '../context/LeagueWebSocketContext';
 

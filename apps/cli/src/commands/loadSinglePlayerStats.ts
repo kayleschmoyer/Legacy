@@ -7,7 +7,7 @@ import {
   refreshPlayerEligiblePositions,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { EnvironmentVariable } from '../EnvironmentVariable';
 
 interface HandleLoadSinglePlayerStatsArgs {

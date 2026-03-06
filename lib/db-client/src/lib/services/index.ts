@@ -3,7 +3,7 @@
  * This is the main entry point for database operations
  */
 
-import { DbOptions } from '@legacy-sports/utils';
+import { DbOptions } from '@legacy-sports/utils/node';
 import { createPlayerService, PlayerService } from './PlayerService';
 import { createUserService, UserService } from './UserService';
 import {

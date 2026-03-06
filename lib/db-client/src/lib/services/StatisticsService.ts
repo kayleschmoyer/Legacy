@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, or, sql, SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
-import { DbOptions } from '@legacy-sports/utils';
+import { DbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';

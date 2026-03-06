@@ -1,6 +1,6 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { DatabaseService } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 
 export async function handleTestAddPlayer(): Promise<void> {
   LOGGER.info('Testing adding a single player...');

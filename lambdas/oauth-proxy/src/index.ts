@@ -7,7 +7,7 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/rollbar';
-import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
+import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 import {
   handleGoogleAuth,
   handleGoogleAuthorize,

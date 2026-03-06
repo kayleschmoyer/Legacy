@@ -1,4 +1,4 @@
-import type { DbOptions } from '@legacy-sports/utils';
+import type { DbOptions } from '@legacy-sports/utils/node';
 import { PlayerService } from './PlayerService';
 
 interface MockDb {

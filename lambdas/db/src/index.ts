@@ -5,7 +5,7 @@ import {
 } from '@legacy-sports/rollbar';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { createDatabaseService } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { createApolloHandler, createLambdaHandler } from './server';
 
 // Initialize Sentry

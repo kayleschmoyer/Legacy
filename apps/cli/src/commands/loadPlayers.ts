@@ -1,6 +1,6 @@
 import { getPlayers, Letter } from '@legacy-sports/bref-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   bulkCreatePlayers,
   runWithPublicClient,

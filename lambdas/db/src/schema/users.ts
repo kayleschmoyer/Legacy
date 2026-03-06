@@ -1,6 +1,6 @@
 import { sign } from 'jsonwebtoken';
 import { createDatabaseService } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { builder } from './builder';
 import { requireAuth } from './authorization';
 import { AuthenticationError, ForbiddenError } from './graphql-errors';

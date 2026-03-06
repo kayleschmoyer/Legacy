@@ -1,7 +1,7 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { and, count, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   addBreadcrumb,
   captureError,

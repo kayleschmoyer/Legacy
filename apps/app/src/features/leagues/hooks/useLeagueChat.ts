@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
 import type { NotificationData } from '@legacy-sports/websocket-client';
-import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
+import { ClientNotificationType } from '@legacy-sports/utils';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 import {
   GetLeagueMessages,

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 // Usage: pnpm exec tsx apps/cli/src/check-matchup-league13.ts
 import { runWithPublicClient } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { sql } from 'drizzle-orm';
 
 async function main() {

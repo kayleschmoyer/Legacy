@@ -3,7 +3,7 @@ import {
   runWithInternalClient,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { sql } from 'drizzle-orm';
 
 interface ExistsResult {

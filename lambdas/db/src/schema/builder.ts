@@ -6,7 +6,7 @@ import {
   createDatabaseService,
   type GenericDatabase,
 } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import type * as PublicSchema from '@legacy-sports/db-client/src/drizzle/public/schema';
 import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import { type Loaders } from './dataloaders';

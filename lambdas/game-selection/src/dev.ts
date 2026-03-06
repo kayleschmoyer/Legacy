@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { LOGGER } from '@legacy-sports/logging';
-import { proxySqsToExpress } from '@legacy-sports/utils';
+import { proxySqsToExpress } from '@legacy-sports/utils/node';
 import { handler as createMatchupHandler } from './handlers/create-matchup';
 import { handler as selectGameHandler } from './handlers/select-game';
 

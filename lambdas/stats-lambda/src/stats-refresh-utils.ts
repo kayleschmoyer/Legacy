@@ -1,5 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   getDbConnection,
   getPlayersNeedingStatsRefresh,
@@ -18,13 +18,15 @@ import {
 export async function getPlayersForRefresh(
   maxAgeHours = 24,
   limit?: number,
-): Promise<{
-  id: number;
-  firstName: string;
-  lastName: string;
-  brefId: string;
-  statsLastFetchedAt: Date | null;
-}[]> {
+): Promise<
+  {
+    id: number;
+    firstName: string;
+    lastName: string;
+    brefId: string;
+    statsLastFetchedAt: Date | null;
+  }[]
+> {
   const opts = getDbOptions();
   const connection = getDbConnection(opts, PublicSchema);
   await connection.initialize();
@@ -35,7 +37,7 @@ export async function getPlayersForRefresh(
       maxAgeHours,
       limit,
     );
-    
+
     LOGGER.info(`Found ${players.length} players needing stats refresh`);
     return players;
   } finally {
@@ -55,7 +57,7 @@ export async function getRefreshSummary(): Promise<{
 
   try {
     const summary = await getStatsRefreshSummary(connection.db);
-    
+
     LOGGER.info('Stats refresh summary:', summary);
     return summary;
   } finally {
@@ -63,22 +65,22 @@ export async function getRefreshSummary(): Promise<{
   }
 }
 
-export async function getPlayersWithoutAnyStats(
-  limit?: number,
-): Promise<{
-  id: number;
-  firstName: string;
-  lastName: string;
-  brefId: string;
-  statsLastFetchedAt: Date | null;
-}[]> {
+export async function getPlayersWithoutAnyStats(limit?: number): Promise<
+  {
+    id: number;
+    firstName: string;
+    lastName: string;
+    brefId: string;
+    statsLastFetchedAt: Date | null;
+  }[]
+> {
   const opts = getDbOptions();
   const connection = getDbConnection(opts, PublicSchema);
   await connection.initialize();
 
   try {
     const players = await getPlayersWithoutStats(connection.db, limit);
-    
+
     LOGGER.info(`Found ${players.length} players without any stats`);
     return players;
   } finally {
@@ -89,13 +91,15 @@ export async function getPlayersWithoutAnyStats(
 export async function getPlayersWithOldStats(
   beforeDate: Date,
   limit?: number,
-): Promise<{
-  id: number;
-  firstName: string;
-  lastName: string;
-  brefId: string;
-  statsLastFetchedAt: Date | null;
-}[]> {
+): Promise<
+  {
+    id: number;
+    firstName: string;
+    lastName: string;
+    brefId: string;
+    statsLastFetchedAt: Date | null;
+  }[]
+> {
   const opts = getDbOptions();
   const connection = getDbConnection(opts, PublicSchema);
   await connection.initialize();
@@ -106,7 +110,7 @@ export async function getPlayersWithOldStats(
       beforeDate,
       limit,
     );
-    
+
     LOGGER.info(
       `Found ${players.length} players with stats older than ${beforeDate.toISOString()}`,
     );

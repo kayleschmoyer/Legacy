@@ -2,7 +2,7 @@
 import { sql } from 'drizzle-orm';
 import { runWithPublicClient } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 
 export async function investigateLeague13() {
   LOGGER.info('🔍 Investigating League 13 Stats Issue');

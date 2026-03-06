@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
-import { DbOptions } from '@legacy-sports/utils';
+import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
 

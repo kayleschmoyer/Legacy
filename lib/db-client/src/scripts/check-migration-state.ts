@@ -9,7 +9,7 @@
 import { config } from 'dotenv';
 import { sql } from 'drizzle-orm';
 
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 
 import { resolve } from 'path';
 import { runWithPublicClient } from '../lib/client/Helpers';

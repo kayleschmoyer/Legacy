@@ -29,6 +29,7 @@ export default {
       '<rootDir>/../../lib/shared-components/src',
     '^@legacy-sports/logging$': '<rootDir>/../../lib/logging/src',
     '^@legacy-sports/utils$': '<rootDir>/../../lib/utils/src',
+    '^@legacy-sports/utils/node$': '<rootDir>/../../lib/utils/src/node.ts',
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/web',

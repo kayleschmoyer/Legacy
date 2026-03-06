@@ -22,7 +22,8 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions, shuffleArray } from '@legacy-sports/utils';
+import { shuffleArray } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { and, count, eq, lte, sql } from 'drizzle-orm';
 
 import {

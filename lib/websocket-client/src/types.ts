@@ -3,7 +3,7 @@
  * Framework-agnostic type definitions for WebSocket connections
  */
 
-import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
+import { ClientNotificationType } from '@legacy-sports/utils';
 
 /**
  * Notification data for different event types

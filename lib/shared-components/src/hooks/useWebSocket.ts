@@ -19,7 +19,7 @@ import {
   WebSocketClient,
   type WebSocketMessage,
 } from '@legacy-sports/websocket-client';
-import { ClientNotificationType } from '@legacy-sports/utils/notification-types';
+import { ClientNotificationType } from '@legacy-sports/utils';
 
 /**
  * Store a callback in a ref so that event subscriptions always call the

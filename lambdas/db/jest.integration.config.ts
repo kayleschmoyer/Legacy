@@ -43,6 +43,7 @@ const config: Config = {
     '^@legacy-sports/ui-abstractions$':
       '<rootDir>/../../lib/ui-abstractions/src/index.ts',
     '^@legacy-sports/utils$': '<rootDir>/../../lib/utils/src/index.ts',
+    '^@legacy-sports/utils/node$': '<rootDir>/../../lib/utils/src/node.ts',
   },
 
   // Run tests serially to avoid database conflicts

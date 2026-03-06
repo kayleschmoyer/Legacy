@@ -5,7 +5,7 @@ import {
 } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { addBreadcrumb, captureError } from '@legacy-sports/rollbar';
-import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
+import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 
 // CORS headers constant
 export const CORS_HEADERS = {

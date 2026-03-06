@@ -1,4 +1,4 @@
-import type { DbOptions } from '@legacy-sports/utils';
+import type { DbOptions } from '@legacy-sports/utils/node';
 import { GdprService } from './GdprService';
 
 jest.mock('../client/Helpers', () => ({

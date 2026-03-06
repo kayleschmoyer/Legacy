@@ -1,5 +1,5 @@
 import { PublicDb, runWithPublicClient } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 
 /**
  * Execute database operations with automatic connection management.

@@ -1,4 +1,4 @@
-import type { DbOptions } from '@legacy-sports/utils';
+import type { DbOptions } from '@legacy-sports/utils/node';
 import type { LeagueScoringMultiplierUpdate } from './ScoringService';
 import { ScoringService } from './ScoringService';
 import type {

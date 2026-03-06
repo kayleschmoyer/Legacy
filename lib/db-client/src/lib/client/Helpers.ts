@@ -1,6 +1,6 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { sql } from 'drizzle-orm';
-import { DbOptions } from '@legacy-sports/utils';
+import { DbOptions } from '@legacy-sports/utils/node';
 import { PgDbConnection } from './abstract/PgDbConnection';
 import { BaseDbConnection, GenericDatabase } from './abstract/BaseDbClient';
 import { PublicDb } from './PublicDbClient';

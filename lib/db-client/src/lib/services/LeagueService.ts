@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { DbOptions } from '@legacy-sports/utils';
+import { DbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';

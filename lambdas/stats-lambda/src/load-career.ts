@@ -1,7 +1,7 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { loadCareerStats } from '@legacy-sports/data-loaders';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   addBreadcrumb,
   captureError,

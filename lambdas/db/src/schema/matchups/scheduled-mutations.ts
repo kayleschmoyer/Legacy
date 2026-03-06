@@ -12,7 +12,7 @@ import {
   type GenericDatabase,
   PublicSchema,
 } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { and, eq, inArray, sql } from 'drizzle-orm';

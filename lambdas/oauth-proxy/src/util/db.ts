@@ -1,5 +1,5 @@
 import { InternalDb, runWithInternalClient } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 
 export interface DbCredentials {
   dbUser: string;

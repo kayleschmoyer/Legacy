@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 
 import { LOGGER } from '@legacy-sports/logging';
-import { proxySqsToExpress } from '@legacy-sports/utils';
+import { proxySqsToExpress } from '@legacy-sports/utils/node';
 import { handler } from './load-career';
 import {
   getPlayersForRefresh,
@@ -35,9 +35,13 @@ app.get('/refresh-summary', async (req, res) => {
 
 app.get('/players-needing-refresh', async (req, res) => {
   try {
-    const maxAgeHours = req.query.maxAgeHours ? parseInt(req.query.maxAgeHours as string) : 24;
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-    
+    const maxAgeHours = req.query.maxAgeHours
+      ? parseInt(req.query.maxAgeHours as string)
+      : 24;
+    const limit = req.query.limit
+      ? parseInt(req.query.limit as string)
+      : undefined;
+
     const players = await getPlayersForRefresh(maxAgeHours, limit);
     res.json(players);
   } catch (error) {
@@ -48,8 +52,10 @@ app.get('/players-needing-refresh', async (req, res) => {
 
 app.get('/players-without-stats', async (req, res) => {
   try {
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-    
+    const limit = req.query.limit
+      ? parseInt(req.query.limit as string)
+      : undefined;
+
     const players = await getPlayersWithoutAnyStats(limit);
     res.json(players);
   } catch (error) {
@@ -62,16 +68,20 @@ app.get('/players-with-old-stats', async (req, res) => {
   try {
     const beforeDateParam = req.query.beforeDate as string;
     if (!beforeDateParam) {
-      return res.status(400).json({ error: 'beforeDate query parameter is required' });
+      return res
+        .status(400)
+        .json({ error: 'beforeDate query parameter is required' });
     }
-    
+
     const beforeDate = new Date(beforeDateParam);
     if (isNaN(beforeDate.getTime())) {
       return res.status(400).json({ error: 'Invalid beforeDate format' });
     }
-    
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-    
+
+    const limit = req.query.limit
+      ? parseInt(req.query.limit as string)
+      : undefined;
+
     const players = await getPlayersWithOldStats(beforeDate, limit);
     res.json(players);
   } catch (error) {

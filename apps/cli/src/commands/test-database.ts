@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createDatabaseService } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 
 /**
  * Example CLI script demonstrating database service usage

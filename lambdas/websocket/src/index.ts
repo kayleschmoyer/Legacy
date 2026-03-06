@@ -25,13 +25,13 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/rollbar';
-import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils';
+import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 import {
   PublicDb,
   PublicSchema,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { and, eq } from 'drizzle-orm';
 
 // Initialize Sentry

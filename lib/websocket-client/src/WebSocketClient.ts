@@ -1,5 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging';
-import { wireToClientEventName } from '@legacy-sports/utils/notification-types';
+import { wireToClientEventName } from '@legacy-sports/utils';
 import type {
   ConnectionState,
   EventHandler,

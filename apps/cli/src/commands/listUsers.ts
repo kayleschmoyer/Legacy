@@ -3,7 +3,7 @@ import {
   InternalSchema,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { CommandArgs } from '../utils/loadEnvFile';
 
 interface ListUsersArgs extends CommandArgs {

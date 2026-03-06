@@ -5,7 +5,7 @@ import {
   SeasonDraftGameService,
 } from '@legacy-sports/db-client';
 import { loadCareerStats } from '@legacy-sports/data-loaders';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { eq } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';

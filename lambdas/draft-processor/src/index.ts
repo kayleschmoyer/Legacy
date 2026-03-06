@@ -3,15 +3,17 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   ALLOWED_POSITIONS,
   BATTING_POSITIONS,
-  formatVersionInfo,
-  getDbOptions,
-  getVersionInfo,
   isNegroLeague,
   MIN_SEASON_WITH_GAME_DATA,
   PITCHING_POSITIONS,
   SEASON_MATCHUP_MULTIPLIER,
   shuffleArray,
 } from '@legacy-sports/utils';
+import {
+  formatVersionInfo,
+  getDbOptions,
+  getVersionInfo,
+} from '@legacy-sports/utils/node';
 import {
   createNotificationService,
   DraftProcessingResult,

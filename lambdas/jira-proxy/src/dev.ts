@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { LOGGER } from '@legacy-sports/logging';
-import { proxyLambdaToExpress } from '@legacy-sports/utils';
+import { proxyLambdaToExpress } from '@legacy-sports/utils/node';
 import { baseHandler } from './index';
 
 const PORT = 5003;

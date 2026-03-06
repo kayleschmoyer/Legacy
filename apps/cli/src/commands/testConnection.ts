@@ -1,6 +1,6 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithPublicClient } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { sql } from 'drizzle-orm';
 
 export async function handleTestConnection(): Promise<void> {

@@ -24,7 +24,7 @@
 
 import { parse as parseHtml } from 'node-html-parser';
 import { LOGGER } from '@legacy-sports/logging';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '@legacy-sports/db-client';
 import type { PublicDb } from '@legacy-sports/db-client';
 import { getFromBaseballReference } from '@legacy-sports/bref-client';

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
-import { getDbOptions } from '@legacy-sports/utils';
+import { getDbOptions } from '@legacy-sports/utils/node';
 import { eq } from 'drizzle-orm';
 
 // Position types that match the database schema
