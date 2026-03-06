@@ -100,6 +100,35 @@ if ($netrc -match 'machine atlassian\.net\s+login\s+(\S+)\s+password\s+(\S+)') {
 
 > **Note:** The `.netrc` file at `~/.netrc` must contain an `atlassian.net` entry with your email and Jira API token. The `acli` attachment commands only support listing — not downloading — so the REST API approach above is required.
 
+### View Downloaded Images (Agent Only)
+
+After downloading an image attachment to `scratch/`, agents can **view it directly** using the Playwright MCP tools. Playwright blocks `file://` URLs, so you must serve the file over HTTP first:
+
+```powershell
+# 1. Start a temporary HTTP server in a background process
+Start-Process powershell -ArgumentList '-NoProfile', '-Command', `
+    'cd D:\code\legacy-sports\scratch; python -m http.server 8765'
+```
+
+Then use the Playwright MCP tools:
+
+```
+# 2. Navigate to the image
+mcp_microsoft_pla_browser_navigate → http://localhost:8765/<filename>.png
+
+# 3. Take a screenshot (returns image data inline to the agent)
+mcp_microsoft_pla_browser_take_screenshot → ref: <img ref from snapshot>, type: "png"
+```
+
+```powershell
+# 4. Clean up the HTTP server when done
+Get-Process python -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match '8765' } |
+    Stop-Process -Force
+```
+
+> **Why not `file://`?** Playwright's `browser_navigate` blocks `file:` protocol for security. The temp HTTP server is the simplest workaround. Use port 8765 to avoid conflicts with dev servers.
+
 ### Link Tickets
 
 ```powershell

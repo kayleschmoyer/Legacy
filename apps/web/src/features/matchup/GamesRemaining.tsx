@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, styled, Text, XStack, YStack } from 'tamagui';
-import { CheckCircle2, Circle } from '@tamagui/lucide-icons';
+import { CheckCircle2, Circle, Hourglass } from '@tamagui/lucide-icons';
 import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 
 export interface GamesRemainingProps {
@@ -98,14 +98,21 @@ export function GamesRemaining({
         >
           {Array.from({ length: totalGames }).map((_, i) => {
             const isCompleted = i < gamesCompleted;
+            const isCurrent = i === gamesCompleted && !allComplete;
             return (
               <GameDot
                 key={i}
-                backgroundColor={isCompleted ? '$green3' : '$gray3'}
-                borderColor={isCompleted ? '$green8' : '$gray6'}
+                backgroundColor={
+                  isCompleted ? '$green3' : isCurrent ? '$orange3' : '$gray3'
+                }
+                borderColor={
+                  isCompleted ? '$green8' : isCurrent ? '$orange8' : '$gray6'
+                }
               >
                 {isCompleted ? (
                   <CheckCircle2 size={14} color="var(--green10)" />
+                ) : isCurrent ? (
+                  <Hourglass size={14} color="var(--orange10)" />
                 ) : (
                   <Circle size={14} color="var(--gray8)" />
                 )}
