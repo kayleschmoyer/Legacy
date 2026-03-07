@@ -13,6 +13,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { insertActivityLog } from './activity-log';
+import { assertCapSpace, computeTeamPayroll } from './cap-service';
 import {
   addPlayerToRoster,
   checkRosterCapacity,
@@ -57,6 +58,7 @@ interface LeagueSalarySettings {
   salaryCapEnabled: boolean;
   minSalary: number;
   seasonNumber: number;
+  salaryCap: number | null;
 }
 
 // ── Service ────────────────────────────────────────────────────────────────
@@ -112,6 +114,7 @@ export class WaiverClaimProcessor {
               salaryCapEnabled: settings.salaryCapEnabled,
               minSalary: settings.minSalary,
               seasonNumber: settings.seasonNumber,
+              salaryCap: settings.salaryCap ?? null,
             }
           : null;
 
@@ -272,6 +275,7 @@ export class WaiverClaimProcessor {
         salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
         minSalary: PublicSchema.leagues.minSalary,
         seasonNumber: PublicSchema.leagues.seasonNumber,
+        salaryCap: PublicSchema.leagues.salaryCap,
       })
       .from(PublicSchema.leagues)
       .where(inArray(PublicSchema.leagues.id, leagueIds));
@@ -380,6 +384,34 @@ export class WaiverClaimProcessor {
           err instanceof Error ? err.message : 'Insufficient FAAB budget';
         await this.failClaim(claim.id, faabReason);
         return { outcome: 'failed', reason: faabReason };
+      }
+    }
+
+    // Salary cap enforcement at processing time (FAAB bid + current payroll ≤ cap).
+    // We re-validate here because payroll may have changed since submission.
+    if (
+      leagueSalarySettings?.salaryCapEnabled &&
+      leagueSalarySettings.salaryCap != null &&
+      waiverType === 'faab' &&
+      claim.faabBid != null
+    ) {
+      try {
+        const currentPayroll = await computeTeamPayroll(
+          this.db,
+          claim.teamId,
+          claim.leagueId,
+        );
+        assertCapSpace(
+          currentPayroll,
+          claim.faabBid,
+          0,
+          leagueSalarySettings.salaryCap,
+        );
+      } catch (capErr) {
+        const capReason =
+          capErr instanceof Error ? capErr.message : 'Salary cap exceeded';
+        await this.failClaim(claim.id, capReason);
+        return { outcome: 'failed', reason: capReason };
       }
     }
 

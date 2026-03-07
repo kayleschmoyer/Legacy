@@ -5,6 +5,8 @@
  * team, and waiver resolvers.
  */
 import type { Team as DbTeam } from '@legacy-sports/db-client';
+import { PublicSchema } from '@legacy-sports/db-client';
+import { and, eq, sql, sum } from 'drizzle-orm';
 import { builder } from '../builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from '../scoring';
 import { AuthenticationError } from '../graphql-errors';
@@ -176,6 +178,10 @@ export const Team = builder.objectRef<
     bannerUrl?: string | null;
     /** userId of the primary manager for this team (from leagueMembers). */
     managerId?: number | null;
+    /** Computed: sum of team_members.salary. Null in non-salary-cap leagues. (LS-644) */
+    totalPayroll?: number | null;
+    /** Computed: league.salaryCap - totalPayroll. Null if cap is not enabled. (LS-644) */
+    capSpace?: number | null;
   }
 >('Team');
 
@@ -224,6 +230,62 @@ Team.implement({
         'The userId of the primary manager for this team (from leagueMembers).',
       resolve: (parent) =>
         (parent as { managerId?: number | null }).managerId ?? null,
+    }),
+    totalPayroll: t.int({
+      nullable: true,
+      description:
+        'Total salary cap payroll for this team (sum of team_members.salary). ' +
+        'Null if the league does not have salary cap enabled.',
+      resolve: async (parent, _args, context) => {
+        const [capRow] = await context.db
+          .select({ salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, parent.leagueId))
+          .limit(1);
+        if (!capRow?.salaryCapEnabled) return null;
+        const [row] = await context.db
+          .select({
+            total: sql<number>`COALESCE(${sum(PublicSchema.teamMembers.salary)}, 0)`,
+          })
+          .from(PublicSchema.teamMembers)
+          .where(
+            and(
+              eq(PublicSchema.teamMembers.teamId, parent.id),
+              eq(PublicSchema.teamMembers.leagueId, parent.leagueId),
+            ),
+          );
+        return Number(row?.total ?? 0);
+      },
+    }),
+    capSpace: t.int({
+      nullable: true,
+      description:
+        'Remaining salary cap space for this team ' +
+        '(league.salaryCap - totalPayroll). Null if cap is not enabled or no cap limit is set.',
+      resolve: async (parent, _args, context) => {
+        const [capRow] = await context.db
+          .select({
+            salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+            salaryCap: PublicSchema.leagues.salaryCap,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, parent.leagueId))
+          .limit(1);
+        if (!capRow?.salaryCapEnabled || capRow.salaryCap == null) return null;
+        const [row] = await context.db
+          .select({
+            total: sql<number>`COALESCE(${sum(PublicSchema.teamMembers.salary)}, 0)`,
+          })
+          .from(PublicSchema.teamMembers)
+          .where(
+            and(
+              eq(PublicSchema.teamMembers.teamId, parent.id),
+              eq(PublicSchema.teamMembers.leagueId, parent.leagueId),
+            ),
+          );
+        const payroll = Number(row?.total ?? 0);
+        return capRow.salaryCap - payroll;
+      },
     }),
   }),
 });
@@ -278,6 +340,8 @@ export const TeamMember = builder.objectRef<{
   playerId: number;
   positionId: number | null;
   onTradeBlock: boolean;
+  /** Current salary cap hit. Null in non-salary-cap leagues. (LS-634) */
+  salary?: number | null;
 }>('TeamMember');
 
 TeamMember.implement({
@@ -289,6 +353,13 @@ TeamMember.implement({
     playerId: t.exposeInt('playerId'),
     positionId: t.exposeInt('positionId', { nullable: true }),
     onTradeBlock: t.exposeBoolean('onTradeBlock'),
+    salary: t.int({
+      nullable: true,
+      description:
+        'Current salary cap hit for this roster slot. Null in non-salary-cap leagues.',
+      resolve: (parent) =>
+        (parent as { salary?: number | null }).salary ?? null,
+    }),
     player: t.field({
       type: 'Player',
       nullable: true,

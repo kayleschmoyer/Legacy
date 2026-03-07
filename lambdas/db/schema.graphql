@@ -2459,6 +2459,11 @@ A team in a league
 type Team {
   avatarUrl: String
   bannerUrl: String
+
+  """
+  Remaining salary cap space for this team (league.salaryCap - totalPayroll). Null if cap is not enabled or no cap limit is set.
+  """
+  capSpace: Int
   createdAt: String
   divisionId: Int
   faabBudget: Int
@@ -2474,6 +2479,11 @@ type Team {
   name: String
   primaryColor: String
   secondaryColor: String
+
+  """
+  Total salary cap payroll for this team (sum of team_members.salary). Null if the league does not have salary cap enabled.
+  """
+  totalPayroll: Int
   updatedAt: String
   waiverOrder: Int
 }
@@ -2488,6 +2498,11 @@ type TeamMember {
   player: Player
   playerId: Int
   positionId: Int
+
+  """
+  Current salary cap hit for this roster slot. Null in non-salary-cap leagues.
+  """
+  salary: Int
   teamId: Int
 }
 

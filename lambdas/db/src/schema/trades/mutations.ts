@@ -13,6 +13,11 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
+import {
+  assertCapSpace,
+  computeTeamPayrollExcluding,
+  fetchPlayerSalaries,
+} from '../../services/cap-service';
 import { builder, type Context } from '../builder';
 import { insertActivityLog } from '../../services/activity-log';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
@@ -561,6 +566,64 @@ builder.mutationField('acceptTrade', (t) =>
       const toProposing = playerLegs
         .filter((leg) => leg.fromTeamId !== proposingTeamId)
         .map((leg) => leg.playerId);
+
+      // Salary cap enforcement — validate post-trade payroll for both teams.
+      const [leagueCapRow] = await db
+        .select({
+          salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+          salaryCap: PublicSchema.leagues.salaryCap,
+          minSalary: PublicSchema.leagues.minSalary,
+        })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, trade.leagueId))
+        .limit(1);
+
+      if (leagueCapRow?.salaryCapEnabled && leagueCapRow.salaryCap != null) {
+        const allPlayerIds = playerLegs.map((leg) => leg.playerId);
+        const salaryMap = await fetchPlayerSalaries(
+          db,
+          trade.leagueId,
+          allPlayerIds,
+          leagueCapRow.minSalary,
+        );
+
+        const incomingToReceivingSalary = toReceiving.reduce(
+          (sum, pid) => sum + (salaryMap.get(pid) ?? leagueCapRow.minSalary),
+          0,
+        );
+        const incomingToProposingSalary = toProposing.reduce(
+          (sum, pid) => sum + (salaryMap.get(pid) ?? leagueCapRow.minSalary),
+          0,
+        );
+
+        // Receiving team: gains toReceiving, loses toProposing
+        const receivingPayrollBase = await computeTeamPayrollExcluding(
+          db,
+          receivingTeamId,
+          trade.leagueId,
+          toProposing,
+        );
+        assertCapSpace(
+          receivingPayrollBase,
+          incomingToReceivingSalary,
+          0,
+          leagueCapRow.salaryCap,
+        );
+
+        // Proposing team: gains toProposing, loses toReceiving
+        const proposingPayrollBase = await computeTeamPayrollExcluding(
+          db,
+          proposingTeamId,
+          trade.leagueId,
+          toReceiving,
+        );
+        assertCapSpace(
+          proposingPayrollBase,
+          incomingToProposingSalary,
+          0,
+          leagueCapRow.salaryCap,
+        );
+      }
 
       await Promise.all([
         ...(toReceiving.length > 0

@@ -9,6 +9,7 @@ import { and, eq } from 'drizzle-orm';
 
 import { ProcessWaiverClaimsResult, WaiverClaim } from './types';
 import { validateFaabBudget } from './helpers';
+import { assertCapSpace, computeTeamPayroll } from '../../services/cap-service';
 import {
   checkRosterCapacity,
   isPlayerOnRoster,
@@ -169,6 +170,7 @@ builder.mutationField('claimFreeAgent', (t) =>
           waiverEnabled: PublicSchema.leagues.waiverEnabled,
           salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
           minSalary: PublicSchema.leagues.minSalary,
+          salaryCap: PublicSchema.leagues.salaryCap,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, leagueId))
@@ -221,6 +223,22 @@ builder.mutationField('claimFreeAgent', (t) =>
         if (resolvedFaabBid < minBid) {
           throw new Error(`Minimum FAAB bid for this player is $${minBid}`);
         }
+      }
+
+      // Salary cap enforcement: FAAB bid + current payroll must not exceed cap.
+      if (
+        leagueRow[0].salaryCapEnabled &&
+        leagueRow[0].salaryCap != null &&
+        leagueWaiverType === 'faab' &&
+        resolvedFaabBid != null
+      ) {
+        const currentPayroll = await computeTeamPayroll(db, teamId, leagueId);
+        assertCapSpace(
+          currentPayroll,
+          resolvedFaabBid,
+          0,
+          leagueRow[0].salaryCap,
+        );
       }
 
       const { isFull: rosterFull } = await checkRosterCapacity(

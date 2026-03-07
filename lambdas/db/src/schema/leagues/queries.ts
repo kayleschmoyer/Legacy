@@ -313,6 +313,7 @@ builder.queryField('teamMembers', (t) =>
             playerId: PublicSchema.teamMembers.playerId,
             positionId: PublicSchema.teamMembers.positionId,
             onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+            salary: PublicSchema.teamMembers.salary,
           })
           .from(PublicSchema.teamMembers)
           .where(eq(PublicSchema.teamMembers.teamId, teamId))
@@ -813,6 +814,7 @@ builder.queryField('leagueTradeBlock', (t) =>
             playerId: PublicSchema.teamMembers.playerId,
             positionId: PublicSchema.teamMembers.positionId,
             onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+            salary: PublicSchema.teamMembers.salary,
           })
           .from(PublicSchema.teamMembers)
           .where(
