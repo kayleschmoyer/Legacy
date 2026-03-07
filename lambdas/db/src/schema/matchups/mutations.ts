@@ -9,7 +9,7 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, not } from 'drizzle-orm';
 
 import {
   AdvanceLeagueWeekResponse,
@@ -285,6 +285,36 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
       }
 
       const db = context.db;
+
+      // Fetch the target player to find their matchup+team context
+      const [targetPlayer] = await db
+        .select({
+          matchupId: PublicSchema.matchupPlayers.matchupId,
+          teamId: PublicSchema.matchupPlayers.teamId,
+        })
+        .from(PublicSchema.matchupPlayers)
+        .where(eq(PublicSchema.matchupPlayers.id, args.matchupPlayerId))
+        .limit(1);
+
+      if (!targetPlayer) {
+        throw new Error('Matchup player not found');
+      }
+
+      // If assigning to a slot, evict any existing occupant first so only one
+      // player can occupy a given slot at a time.
+      if (args.positionId != null) {
+        await db
+          .update(PublicSchema.matchupPlayers)
+          .set({ positionId: null })
+          .where(
+            and(
+              eq(PublicSchema.matchupPlayers.matchupId, targetPlayer.matchupId),
+              eq(PublicSchema.matchupPlayers.teamId, targetPlayer.teamId),
+              eq(PublicSchema.matchupPlayers.positionId, args.positionId),
+              not(eq(PublicSchema.matchupPlayers.id, args.matchupPlayerId)),
+            ),
+          );
+      }
 
       // Update the position
       const updated = await db

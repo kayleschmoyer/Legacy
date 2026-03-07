@@ -120,6 +120,7 @@ export * from './features/baseball/PlayersOverview';
 export * from './features/baseball/MLBHome';
 
 // Roster management
+export * from './features/roster/rosterUtils';
 export * from './features/roster/LineupEditor';
 export * from './features/roster/MatchupRosterEditorView';
 

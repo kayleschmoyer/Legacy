@@ -229,7 +229,7 @@ export function MatchupDetailPage() {
       )}
 
       {/* Team Rosters & Player Matchups */}
-      <MatchupRosterComparison matchup={matchup} />
+      <MatchupRosterComparison matchup={matchup} userTeamId={userTeamId} />
     </YStack>
   );
 }

@@ -3,6 +3,7 @@ import { Card, Spinner, Text, XStack } from 'tamagui';
 import {
   type MatchupPlayerData,
   MatchupRosterEditorView,
+  POSITION_SLOT_ORDER,
 } from '@legacy-sports/shared-components';
 import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 import {
@@ -92,7 +93,11 @@ export function MatchupRosterEditor({
     () =>
       Array.from(positionMap.entries())
         .map(([id, type]) => ({ id, type }))
-        .sort((a, b) => a.type.localeCompare(b.type)),
+        .sort(
+          (a, b) =>
+            (POSITION_SLOT_ORDER[a.type] ?? 99) -
+            (POSITION_SLOT_ORDER[b.type] ?? 99),
+        ),
     [positionMap],
   );
 

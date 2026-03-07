@@ -824,8 +824,9 @@ export async function autoPopulateFirstMatchupLineup(
 
   const canFill = (playerId: number, slotType: string): boolean => {
     const eligible = playerEligMap.get(playerId);
-    // No eligibility data — allow the player to fill any slot
-    if (!eligible || eligible.size === 0) return true;
+    // No eligibility data — skip rather than wildcard to avoid placing a
+    // position player in a pitcher slot (or vice versa).
+    if (!eligible || eligible.size === 0) return false;
     const allowed = ALLOWED_POSITIONS[slotType];
     if (!allowed) return false;
     return allowed.some((pos) => eligible.has(pos));

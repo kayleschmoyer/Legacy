@@ -8,6 +8,11 @@ import {
   computeScoring,
   type SeasonStats,
 } from '@legacy-sports/scoring';
+import {
+  getPositionColors,
+  isPitcherPositionType,
+  POSITION_SLOT_ORDER,
+} from '@legacy-sports/shared-components';
 import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import {
@@ -30,49 +35,6 @@ import {
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 
 // ── Styled Components ─────────────────────────────────────────────────────────
-
-// ── Position Badge Color Helper ───────────────────────────────────────────────
-const getPositionColors = (
-  position: string | null | undefined,
-): { bg: string; text: string } => {
-  if (!position) return { bg: '$gray4', text: '$gray11' };
-  const pos = position.toUpperCase();
-  // Catchers
-  if (pos === 'C') return { bg: '$amber3', text: '$amber11' };
-  // Infield
-  if (['1B', '2B', '3B', 'SS', 'IF'].includes(pos))
-    return { bg: withAlpha(BRAND_NAVY_LIGHT, 0.18), text: BRAND_GOLD_LIGHT };
-  // Outfield
-  if (['LF', 'CF', 'RF', 'OF'].includes(pos))
-    return { bg: '$green3', text: '$green11' };
-  // Starting Pitcher
-  if (pos === 'SP') return { bg: '$amber6', text: '$amber12' };
-  // Relief Pitcher
-  if (pos === 'RP') return { bg: '$red3', text: '$red11' };
-  // DH / Utility
-  if (['DH', 'XDH', 'UT', 'UTIL'].includes(pos))
-    return { bg: '$red7', text: '$red12' };
-  return { bg: '$gray4', text: '$gray11' };
-};
-
-// Canonical display order for position slot types on the matchup page.
-// Batters follow standard lineup card order; pitchers SP before RP.
-const POSITION_SLOT_ORDER: Record<string, number> = {
-  C: 0,
-  '1B': 1,
-  '2B': 2,
-  SS: 3,
-  '3B': 4,
-  LF: 5,
-  CF: 6,
-  RF: 7,
-  OF: 8,
-  IF: 9,
-  DH: 10,
-  XDH: 11,
-  SP: 0,
-  RP: 1,
-};
 
 const RosterCard = styled(Card, {
   overflow: 'hidden',
@@ -569,6 +531,8 @@ function SkeletonLoading({
 
 export interface MatchupRosterComparisonProps {
   matchup: MatchupFragment;
+  /** The current user's team ID — if provided, their team is always shown on the left. */
+  userTeamId?: number | null;
 }
 
 /**
@@ -577,6 +541,7 @@ export interface MatchupRosterComparisonProps {
  */
 export function MatchupRosterComparison({
   matchup,
+  userTeamId,
 }: MatchupRosterComparisonProps) {
   // Bench toggle state
   const [showBench, setShowBench] = useState(false);
@@ -595,8 +560,11 @@ export function MatchupRosterComparison({
   const [selectedMatchupPlayerName, setSelectedMatchupPlayerName] =
     useState<string>('');
 
-  const team1Id = matchup.team1Id;
-  const team2Id = matchup.team2Id;
+  // Always show the current user's team on the left column. If the user is
+  // team2 in this matchup, swap so their slots line up with the roster editor.
+  const userIsTeam2 = userTeamId != null && userTeamId === matchup.team2Id;
+  const team1Id = userIsTeam2 ? matchup.team2Id : matchup.team1Id;
+  const team2Id = userIsTeam2 ? matchup.team1Id : matchup.team2Id;
   const leagueId = matchup.leagueId ?? 0;
   const gamesPerMatchup = matchup.gamesPerMatchup ?? 3;
 
@@ -621,11 +589,12 @@ export function MatchupRosterComparison({
     skip: !matchupId,
   });
 
-  // Fetch league positions to get position labels
-  const { data: positionsData } = useGetPositionsForLeagueQuery({
-    variables: { leagueId },
-    skip: !leagueId,
-  });
+  // Fetch league positions to get position labels + slot list
+  const { data: positionsData, loading: positionsLoading } =
+    useGetPositionsForLeagueQuery({
+      variables: { leagueId },
+      skip: !leagueId,
+    });
 
   // Fetch team names
   const { data: teamsData } = useGetLeagueTeamsQuery({
@@ -634,11 +603,12 @@ export function MatchupRosterComparison({
   });
 
   const team1Name = useMemo(() => {
-    if (!team1Id || !teamsData?.leagueTeams) return 'Team 1';
+    if (!team1Id || !teamsData?.leagueTeams)
+      return userTeamId ? 'Your Team' : 'Team 1';
     return (
       teamsData.leagueTeams.find((t) => t.id === team1Id)?.name ?? 'Team 1'
     );
-  }, [team1Id, teamsData]);
+  }, [team1Id, teamsData, userTeamId]);
 
   const team2Name = useMemo(() => {
     if (!team2Id || !teamsData?.leagueTeams) return 'Team 2';
@@ -775,10 +745,8 @@ export function MatchupRosterComparison({
     team1BenchFielders,
     team2Bullpen,
     team2BenchFielders,
-    team1Batters,
-    team1Pitchers,
-    team2Batters,
-    team2Pitchers,
+    batterSlotRows,
+    pitcherSlotRows,
     team1BatterTotals,
     team1PitcherTotals,
     team2BatterTotals,
@@ -897,18 +865,12 @@ export function MatchupRosterComparison({
         team2Bench: [],
         team2Bullpen: [],
         team2BenchFielders: [],
-        team1Batters: [],
-        team1Pitchers: [],
-        team2Batters: [],
-        team2Pitchers: [],
-        team1Totals: { projected: 0, actual: 0 },
-        team2Totals: { projected: 0, actual: 0 },
+        batterSlotRows: [],
+        pitcherSlotRows: [],
         team1BatterTotals: { projected: 0, actual: 0 },
         team1PitcherTotals: { projected: 0, actual: 0 },
         team2BatterTotals: { projected: 0, actual: 0 },
         team2PitcherTotals: { projected: 0, actual: 0 },
-        team1ExpectedForGamesPlayed: 0,
-        team2ExpectedForGamesPlayed: 0,
         calculatePlayerProjection,
         calculateGameScore,
       };
@@ -920,15 +882,6 @@ export function MatchupRosterComparison({
     const team2All = data.getMatchupPlayers.filter(
       (mp: MatchupPlayerFragment) => mp.teamId === team2Id,
     );
-
-    // Helper to check if a position is a pitcher position
-    const isPitcherPosition = (
-      positionId: number | null | undefined,
-    ): boolean => {
-      if (!positionId) return false;
-      const posType = positionMap.get(positionId);
-      return posType === 'SP' || posType === 'RP';
-    };
 
     // Separate starters (have positionId) from bench (positionId is null)
     const team1Starters = team1All.filter(
@@ -945,16 +898,15 @@ export function MatchupRosterComparison({
     );
 
     // Helper to check if a bench player is a pitcher based on eligiblePositions
-    const PITCHING_POSITIONS = new Set(['SP', 'RP']);
     const isBenchPitcher = (p: MatchupPlayerFragment): boolean => {
       const positions = p.player?.eligiblePositions;
       if (!positions || positions.length === 0) return false;
-      return positions.some((pos) => PITCHING_POSITIONS.has(pos));
+      return positions.some((pos) => isPitcherPositionType(pos));
     };
     const isBenchFielder = (p: MatchupPlayerFragment): boolean => {
       const positions = p.player?.eligiblePositions;
       if (!positions || positions.length === 0) return true; // default to bench if unknown
-      return positions.some((pos) => !PITCHING_POSITIONS.has(pos));
+      return positions.some((pos) => !isPitcherPositionType(pos));
     };
 
     // Split bench into bullpen (pitchers) and bench (fielders)
@@ -963,89 +915,120 @@ export function MatchupRosterComparison({
     const team2Bullpen = team2Bench.filter(isBenchPitcher);
     const team2BenchFielders = team2Bench.filter(isBenchFielder);
 
-    // Helper: sort matchup players by their assigned position slot
-    const byPositionSlot = (
-      a: MatchupPlayerFragment,
-      b: MatchupPlayerFragment,
-    ): number => {
-      const orderA =
-        a.positionId != null
-          ? (POSITION_SLOT_ORDER[positionMap.get(a.positionId) ?? ''] ?? 99)
-          : 99;
-      const orderB =
-        b.positionId != null
-          ? (POSITION_SLOT_ORDER[positionMap.get(b.positionId) ?? ''] ?? 99)
-          : 99;
-      return orderA - orderB;
+    // ── Slot-based starter rows ────────────────────────────────────────────
+    // Build one row per league position slot so empty slots are always visible.
+    type SlotRow = {
+      slotId: number;
+      slotType: string;
+      team1Player: MatchupPlayerFragment | undefined;
+      team2Player: MatchupPlayerFragment | undefined;
     };
 
-    // Further separate starters into batters and pitchers, ordered by position slot
-    const team1Batters = team1Starters
-      .filter((p: MatchupPlayerFragment) => !isPitcherPosition(p.positionId))
-      .sort(byPositionSlot);
-    const team1Pitchers = team1Starters
-      .filter((p: MatchupPlayerFragment) => isPitcherPosition(p.positionId))
-      .sort(byPositionSlot);
-    const team2Batters = team2Starters
-      .filter((p: MatchupPlayerFragment) => !isPitcherPosition(p.positionId))
-      .sort(byPositionSlot);
-    const team2Pitchers = team2Starters
-      .filter((p: MatchupPlayerFragment) => isPitcherPosition(p.positionId))
-      .sort(byPositionSlot);
+    const allLeagueSlots = (positionsData?.leaguePositions ?? []).map(
+      (pos: { id?: string | number | null; positionType?: string | null }) => ({
+        slotId:
+          pos.id == null
+            ? 0
+            : typeof pos.id === 'string'
+              ? parseInt(pos.id, 10)
+              : pos.id,
+        slotType: pos.positionType ?? '',
+      }),
+    );
 
-    // Calculate separate totals for batters and pitchers
+    const sortSlots = (a: { slotType: string }, b: { slotType: string }) =>
+      (POSITION_SLOT_ORDER[a.slotType] ?? 99) -
+      (POSITION_SLOT_ORDER[b.slotType] ?? 99);
+
+    // ── Build slot rows by rank (index within type), not by exact slot ID ────
+    //
+    // Multiple league slots can share the same positionType (e.g. 5 SP slots).
+    // Both teams share the same league_positions slot IDs — a slot belongs to
+    // the league, not to a team. Exact-ID matching is therefore correct.
+    const buildSlotRows = (
+      slotFilter: (s: { slotType: string }) => boolean,
+    ): SlotRow[] =>
+      allLeagueSlots
+        .filter(slotFilter)
+        .sort(sortSlots)
+        .map((s) => ({
+          ...s,
+          team1Player: team1All.find((p) => p.positionId === s.slotId),
+          team2Player: team2All.find((p) => p.positionId === s.slotId),
+        }));
+
+    const batterSlotRows: SlotRow[] = buildSlotRows(
+      (s) => !isPitcherPositionType(s.slotType),
+    );
+    const pitcherSlotRows: SlotRow[] = buildSlotRows((s) =>
+      isPitcherPositionType(s.slotType),
+    );
+
+    // Calculate separate totals for batter and pitcher slots (only assigned players score)
     const team1BatterTotals = {
-      actual: team1Batters.reduce((sum: any, p: MatchupPlayerFragment) => {
+      actual: batterSlotRows.reduce((sum: any, row) => {
         const gameSum =
-          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
-          0;
+          row.team1Player?.games?.reduce(
+            (s: any, g: any) => s + calculateGameScore(g),
+            0,
+          ) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: team1Batters.reduce(
-        (sum: any, p: MatchupPlayerFragment) =>
-          sum + calculatePlayerProjection(p),
+      projected: batterSlotRows.reduce(
+        (sum: any, row) =>
+          sum +
+          (row.team1Player ? calculatePlayerProjection(row.team1Player) : 0),
         0,
       ),
     };
 
     const team1PitcherTotals = {
-      actual: team1Pitchers.reduce((sum: any, p: MatchupPlayerFragment) => {
+      actual: pitcherSlotRows.reduce((sum: any, row) => {
         const gameSum =
-          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
-          0;
+          row.team1Player?.games?.reduce(
+            (s: any, g: any) => s + calculateGameScore(g),
+            0,
+          ) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: team1Pitchers.reduce(
-        (sum: any, p: MatchupPlayerFragment) =>
-          sum + calculatePlayerProjection(p),
+      projected: pitcherSlotRows.reduce(
+        (sum: any, row) =>
+          sum +
+          (row.team1Player ? calculatePlayerProjection(row.team1Player) : 0),
         0,
       ),
     };
 
     const team2BatterTotals = {
-      actual: team2Batters.reduce((sum: any, p: MatchupPlayerFragment) => {
+      actual: batterSlotRows.reduce((sum: any, row) => {
         const gameSum =
-          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
-          0;
+          row.team2Player?.games?.reduce(
+            (s: any, g: any) => s + calculateGameScore(g),
+            0,
+          ) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: team2Batters.reduce(
-        (sum: any, p: MatchupPlayerFragment) =>
-          sum + calculatePlayerProjection(p),
+      projected: batterSlotRows.reduce(
+        (sum: any, row) =>
+          sum +
+          (row.team2Player ? calculatePlayerProjection(row.team2Player) : 0),
         0,
       ),
     };
 
     const team2PitcherTotals = {
-      actual: team2Pitchers.reduce((sum: any, p: MatchupPlayerFragment) => {
+      actual: pitcherSlotRows.reduce((sum: any, row) => {
         const gameSum =
-          p.games?.reduce((s: any, g: any) => s + calculateGameScore(g), 0) ??
-          0;
+          row.team2Player?.games?.reduce(
+            (s: any, g: any) => s + calculateGameScore(g),
+            0,
+          ) ?? 0;
         return sum + gameSum;
       }, 0),
-      projected: team2Pitchers.reduce(
-        (sum: any, p: MatchupPlayerFragment) =>
-          sum + calculatePlayerProjection(p),
+      projected: pitcherSlotRows.reduce(
+        (sum: any, row) =>
+          sum +
+          (row.team2Player ? calculatePlayerProjection(row.team2Player) : 0),
         0,
       ),
     };
@@ -1059,10 +1042,8 @@ export function MatchupRosterComparison({
       team1BenchFielders,
       team2Bullpen,
       team2BenchFielders,
-      team1Batters,
-      team1Pitchers,
-      team2Batters,
-      team2Pitchers,
+      batterSlotRows,
+      pitcherSlotRows,
       team1BatterTotals,
       team1PitcherTotals,
       team2BatterTotals,
@@ -1078,6 +1059,7 @@ export function MatchupRosterComparison({
     seasonStatsMap,
     scoringSettings,
     positionMap,
+    positionsData,
   ]);
 
   if (!team1Id || !team2Id) {
@@ -1093,7 +1075,7 @@ export function MatchupRosterComparison({
     );
   }
 
-  if (loading) {
+  if (loading || positionsLoading) {
     return <SkeletonLoading team1Name={team1Name} team2Name={team2Name} />;
   }
 
@@ -1112,8 +1094,6 @@ export function MatchupRosterComparison({
     team1BenchFielders.length,
     team2BenchFielders.length,
   );
-  const maxBatterRows = Math.max(team1Batters.length, team2Batters.length);
-  const maxPitcherRows = Math.max(team1Pitchers.length, team2Pitchers.length);
 
   // Helper to render player row with position
   // Helper to format accumulated stats for display (only shows stats that contributed to this player's actual score)
@@ -1366,6 +1346,7 @@ export function MatchupRosterComparison({
     team2Player: MatchupPlayerFragment | undefined,
     index: number | string,
     rowIndex = 0,
+    slotType?: string,
   ) => {
     const team1Actual =
       team1Player?.games?.reduce(
@@ -1412,20 +1393,24 @@ export function MatchupRosterComparison({
         ? '$green10'
         : '$red10';
 
-    const team1Position = team1Player?.positionId
-      ? positionMap.get(team1Player.positionId)
-      : (team1Player?.player?.eligiblePositions?.[0] ?? null);
-    const team2Position = team2Player?.positionId
-      ? positionMap.get(team2Player.positionId)
-      : (team2Player?.player?.eligiblePositions?.[0] ?? null);
+    const team1Position =
+      slotType ??
+      (team1Player?.positionId
+        ? positionMap.get(team1Player.positionId)
+        : (team1Player?.player?.eligiblePositions?.[0] ?? null));
+    const team2Position =
+      slotType ??
+      (team2Player?.positionId
+        ? positionMap.get(team2Player.positionId)
+        : (team2Player?.player?.eligiblePositions?.[0] ?? null));
 
     // Get accumulated stats breakdown
     const team1Stats = formatAccumulatedStats(team1Player);
     const team2Stats = formatAccumulatedStats(team2Player);
 
-    // Position colors for badges
-    const team1PosBadge = getPositionColors(team1Position);
-    const team2PosBadge = getPositionColors(team2Position);
+    // Position colors — same badge for both sides of a slot row, independent for bench rows
+    const team1PosBadge = getPositionColors(team1Position ?? slotType);
+    const team2PosBadge = getPositionColors(team2Position ?? slotType);
 
     // Zebra stripe: alternate row background
     const isEvenRow = rowIndex % 2 === 0;
@@ -1448,8 +1433,8 @@ export function MatchupRosterComparison({
         <XStack width="47%" alignItems="center" gap="$2">
           {/* Team 1 Player - Flexible width */}
           <XStack flex={1} gap="$2" alignItems="center" minWidth={0}>
-            {/* Player Avatar */}
-            {team1Player && (
+            {/* Position badge — always shown for slot rows, only when player exists for bench rows */}
+            {(slotType !== undefined || team1Player !== undefined) && (
               <YStack
                 width={32}
                 height={32}
@@ -1460,7 +1445,7 @@ export function MatchupRosterComparison({
                 flexShrink={0}
               >
                 <Text fontSize="$1" fontWeight="800" color={team1PosBadge.text}>
-                  {team1Position || '?'}
+                  {(slotType ?? team1Position) || '?'}
                 </Text>
               </YStack>
             )}
@@ -1558,8 +1543,12 @@ export function MatchupRosterComparison({
                   )}
                 </>
               ) : (
-                <Text fontSize="$3" color="$gray8">
-                  —
+                <Text
+                  fontSize="$3"
+                  color="$gray8"
+                  fontStyle={slotType !== undefined ? 'italic' : undefined}
+                >
+                  {slotType !== undefined ? 'Empty' : '—'}
                 </Text>
               )}
             </YStack>
@@ -1779,13 +1768,18 @@ export function MatchupRosterComparison({
                   )}
                 </>
               ) : (
-                <Text fontSize="$3" color="$gray8">
-                  —
+                <Text
+                  fontSize="$3"
+                  color="$gray8"
+                  textAlign="right"
+                  fontStyle={slotType !== undefined ? 'italic' : undefined}
+                >
+                  {slotType !== undefined ? 'Empty' : '—'}
                 </Text>
               )}
             </YStack>
-            {/* Player Avatar */}
-            {team2Player && (
+            {/* Position badge — always shown for slot rows, only when player exists for bench rows */}
+            {(slotType !== undefined || team2Player !== undefined) && (
               <YStack
                 width={32}
                 height={32}
@@ -1796,7 +1790,7 @@ export function MatchupRosterComparison({
                 flexShrink={0}
               >
                 <Text fontSize="$1" fontWeight="800" color={team2PosBadge.text}>
-                  {team2Position || '?'}
+                  {(slotType ?? team2Position) || '?'}
                 </Text>
               </YStack>
             )}
@@ -1916,7 +1910,7 @@ export function MatchupRosterComparison({
                   Pos
                 </Text>
               </YStack>
-              <YStack flex={1} minWidth={0}>
+              <YStack flex={1} minWidth={0} gap="$1">
                 <Text
                   fontSize="$1"
                   fontWeight="700"
@@ -1926,6 +1920,19 @@ export function MatchupRosterComparison({
                 >
                   {team1Name}
                 </Text>
+                {userTeamId != null && (
+                  <XStack
+                    paddingHorizontal="$1.5"
+                    paddingVertical="$0.5"
+                    borderRadius="$10"
+                    backgroundColor="$blue3"
+                    alignSelf="flex-start"
+                  >
+                    <Text fontSize="$1" fontWeight="700" color="$blue10">
+                      YOU
+                    </Text>
+                  </XStack>
+                )}
               </YStack>
               <YStack width={60} flexShrink={0} alignItems="center">
                 <Text
@@ -2004,8 +2011,8 @@ export function MatchupRosterComparison({
             </XStack>
           </ColumnHeader>
 
-          {/* Batters Section */}
-          {(team1Batters.length > 0 || team2Batters.length > 0) && (
+          {/* Batters Section — one row per league batter slot (empty slots visible) */}
+          {batterSlotRows.length > 0 && (
             <>
               <SectionHeader backgroundColor="$green2">
                 <YStack
@@ -2024,12 +2031,13 @@ export function MatchupRosterComparison({
                 </Text>
               </SectionHeader>
               <YStack>
-                {Array.from({ length: maxBatterRows }).map((_, index) =>
+                {batterSlotRows.map((row, index) =>
                   renderPlayerRow(
-                    team1Batters[index],
-                    team2Batters[index],
-                    `batter-${index}`,
+                    row.team1Player,
+                    row.team2Player,
+                    `batter-${row.slotId}`,
                     index,
+                    row.slotType,
                   ),
                 )}
               </YStack>
@@ -2099,8 +2107,8 @@ export function MatchupRosterComparison({
           </TotalsRow>
         </SectionTable>
 
-        {/* Pitchers Section Table */}
-        {(team1Pitchers.length > 0 || team2Pitchers.length > 0) && (
+        {/* Pitchers Section Table — one row per league pitcher slot (empty slots visible) */}
+        {pitcherSlotRows.length > 0 && (
           <SectionTable marginTop="$4">
             <SectionHeader backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}>
               <YStack
@@ -2119,12 +2127,13 @@ export function MatchupRosterComparison({
               </Text>
             </SectionHeader>
             <YStack>
-              {Array.from({ length: maxPitcherRows }).map((_, index) =>
+              {pitcherSlotRows.map((row, index) =>
                 renderPlayerRow(
-                  team1Pitchers[index],
-                  team2Pitchers[index],
-                  `pitcher-${index}`,
+                  row.team1Player,
+                  row.team2Player,
+                  `pitcher-${row.slotId}`,
                   index,
+                  row.slotType,
                 ),
               )}
             </YStack>

@@ -9,6 +9,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { getPositionColors, POSITION_SLOT_ORDER } from './rosterUtils';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -70,26 +71,6 @@ export interface MatchupRosterEditorViewProps {
   ) => Promise<void>;
 }
 
-// ── Position badge color helper (tamagui tokens only) ─────────────────────────
-
-function getPositionColors(position: string | null | undefined): {
-  bg: string;
-  text: string;
-} {
-  if (!position) return { bg: '$gray4', text: '$gray11' };
-  const pos = position.toUpperCase();
-  if (pos === 'C') return { bg: '$amber3', text: '$amber11' };
-  if (['1B', '2B', '3B', 'SS', 'IF'].includes(pos))
-    return { bg: '$blue3', text: '$blue11' };
-  if (['LF', 'CF', 'RF', 'OF'].includes(pos))
-    return { bg: '$green3', text: '$green11' };
-  if (pos === 'SP') return { bg: '$amber6', text: '$amber12' };
-  if (pos === 'RP') return { bg: '$red3', text: '$red11' };
-  if (['DH', 'XDH', 'UT', 'UTIL'].includes(pos))
-    return { bg: '$red7', text: '$red12' };
-  return { bg: '$gray4', text: '$gray11' };
-}
-
 // ── Component ──────────────────────────────────────────────────────────────────
 
 /**
@@ -115,14 +96,29 @@ export function MatchupRosterEditorView({
     [players, selectedPlayerId],
   );
 
-  const starters = useMemo(
-    () => players.filter((p) => p.positionId !== null),
-    [players],
+  /** Position slots sorted in canonical display order (batters first, then pitchers). */
+  const sortedSlots = useMemo(
+    () =>
+      [...positionOptions].sort(
+        (a, b) =>
+          (POSITION_SLOT_ORDER[a.type] ?? 99) -
+          (POSITION_SLOT_ORDER[b.type] ?? 99),
+      ),
+    [positionOptions],
   );
 
   const bench = useMemo(
     () => players.filter((p) => p.positionId === null),
     [players],
+  );
+
+  /** Count of slots that currently have an assigned player. */
+  const filledSlotCount = useMemo(
+    () =>
+      positionOptions.filter((slot) =>
+        players.some((p) => p.positionId === slot.id),
+      ).length,
+    [positionOptions, players],
   );
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -161,6 +157,21 @@ export function MatchupRosterEditorView({
     [selectedPlayerId, selectedPlayer, mutating, onSwapPositions],
   );
 
+  /**
+   * Assign the currently-selected player to an empty slot.
+   * Called when the user taps an empty slot row in the starters section.
+   */
+  const handleAssignToSlot = useCallback(
+    (slotId: number) => {
+      if (mutating || !selectedPlayer) return;
+      void (async () => {
+        await onMoveToPosition(selectedPlayer.id, slotId);
+        setSelectedPlayerId(null);
+      })();
+    },
+    [mutating, selectedPlayer, onMoveToPosition],
+  );
+
   const handleMoveToBench = useCallback(
     (player: MatchupPlayerData) => {
       if (mutating) return;
@@ -184,6 +195,65 @@ export function MatchupRosterEditorView({
   );
 
   // ── Render helpers ─────────────────────────────────────────────────────────
+
+  /** Renders an empty slot row. Tappable when a player is currently selected. */
+  const renderEmptySlot = (slot: MatchupPositionOption) => {
+    const badge = getPositionColors(slot.type);
+    const canAssign = !locked && selectedPlayer !== null;
+    return (
+      <XStack
+        key={`empty-slot-${slot.id}`}
+        paddingVertical="$2.5"
+        paddingHorizontal="$3"
+        opacity={canAssign ? 1 : 0.45}
+        backgroundColor={canAssign ? '$green2' : undefined}
+        borderRadius="$3"
+        hoverStyle={
+          canAssign
+            ? { backgroundColor: '$green3', cursor: 'pointer' }
+            : undefined
+        }
+        pressStyle={canAssign ? { scale: 0.99 } : undefined}
+        animation="quick"
+        onPress={canAssign ? () => handleAssignToSlot(slot.id) : undefined}
+        alignItems="center"
+        gap="$2"
+      >
+        {/* Position badge */}
+        <YStack
+          width={36}
+          height={36}
+          borderRadius={18}
+          backgroundColor={badge.bg}
+          justifyContent="center"
+          alignItems="center"
+          flexShrink={0}
+        >
+          <Text fontSize="$2" fontWeight="800" color={badge.text}>
+            {slot.type}
+          </Text>
+        </YStack>
+
+        {/* Empty label */}
+        <YStack flex={1} minWidth={0}>
+          <Text
+            fontSize="$3"
+            fontWeight="400"
+            color="$gray8"
+            fontStyle="italic"
+          >
+            Empty
+          </Text>
+        </YStack>
+
+        {canAssign && (
+          <Text fontSize="$1" color="$green10" fontWeight="600">
+            Tap to assign
+          </Text>
+        )}
+      </XStack>
+    );
+  };
 
   const renderPlayerCard = (
     player: MatchupPlayerData,
@@ -383,7 +453,7 @@ export function MatchupRosterEditorView({
         </XStack>
       )}
 
-      {/* Starters section */}
+      {/* Starters section — one row per league position slot */}
       <YStack>
         <XStack
           padding="$2.5"
@@ -404,10 +474,18 @@ export function MatchupRosterEditorView({
             color="$yellow10"
             letterSpacing={0.3}
           >
-            STARTERS ({starters.length})
+            STARTERS ({filledSlotCount}/{sortedSlots.length})
           </Text>
         </XStack>
-        <YStack>{starters.map((p) => renderPlayerCard(p, 'starter'))}</YStack>
+        <YStack>
+          {sortedSlots.map((slot) => {
+            const player =
+              players.find((p) => p.positionId === slot.id) ?? null;
+            return player
+              ? renderPlayerCard(player, 'starter')
+              : renderEmptySlot(slot);
+          })}
+        </YStack>
       </YStack>
 
       <Separator />
