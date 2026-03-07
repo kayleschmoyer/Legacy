@@ -14,9 +14,8 @@
 7. Code: `pnpm exec nx affected -t <target>` (never `pnpm run`)
 8. Commit: `git commit -m "type(scope): msg"` ΓåÆ `git push origin HEAD`
 9. Rebase onto parent: `git fetch origin ; twig rebase` ΓÇö keeps branch current with its parent (main or a stacked branch)
-10. Validate: `make pc` ΓÇö must pass before opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
-11. Ship: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` ΓåÆ Jira "In Review" (see `skills/create-pr/SKILL.md`)
-12. Cleanup: `twig worktree clean` ΓåÆ `git branch -d LS-####/description` ΓåÆ Jira "Done"
+10. Validate: `make pc` ΓÇö must pass before opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.10b. **Migrations**: if any migration files were added, run `pnpm run db:up` from `lib/db-client` and confirm `Applied N new migrations`. (See `skills/db-migration-write/SKILL.md`)11. Ship: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` ΓåÆ Jira "In Review" (see `skills/create-pr/SKILL.md`)
+11. Cleanup: `twig worktree clean` ΓåÆ `git branch -d LS-####/description` ΓåÆ Jira "Done"
 
 ## Rules
 

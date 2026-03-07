@@ -191,7 +191,20 @@ make pc
 > git push origin HEAD
 > ```
 
-### Step 7c: User Testing (Optional)
+### Step 7c: Apply Pending Migrations 🚨
+
+If you added or modified any migration files under `lib/db-client/migrations/`, apply them now — **before** opening the PR:
+
+```powershell
+cd lib/db-client
+pnpm run db:up
+```
+
+Confirm the output shows `Applied N new migrations`. If it throws, fix the migration SQL before proceeding.
+
+> ⚠️ **Do not skip this step.** A PR with an unapplied migration leaves the local DB out of sync and means reviewers cannot run the app without manual intervention.
+
+### Step 7d: User Testing (Optional)
 
 If you want live UI verification before opening the PR, see the [user-testing skill](../user-testing/SKILL.md).
 This temporarily checks the branch out in the main repo (where dev servers run) so you can test changes
@@ -387,6 +400,7 @@ Before opening the PR, confirm every item:
 - [ ] Any unfinished scope has a **new follow-up Jira ticket** created and referenced in the PR description
 - [ ] `make pc` passes with no errors
 - [ ] Formatting changes from `make pc` are committed
+- [ ] If migration files were added: `pnpm run db:up` succeeded (`Applied N new migrations`)
 - [ ] PR title includes the ticket key (e.g. `LS-#### type(scope): description`)
 
 ## Quick Reference
@@ -428,6 +442,10 @@ git add -A
 git diff --cached --stat   # confirm only formatting changes
 git commit -m "style: fix code formatting"  # skip if nothing changed
 git push origin HEAD
+
+# 5c. Apply pending migrations (if any migration files were added)
+cd lib/db-client ; pnpm run db:up   # confirm "Applied N new migrations"
+cd $wt
 
 # 6. Create PR (see create-pr skill for full template)
 gh pr create --title "$key type(scope): description" --body-file ".github/tmp-pr-body.md" --base main

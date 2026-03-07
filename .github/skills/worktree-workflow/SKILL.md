@@ -266,7 +266,20 @@ Run the full validation suite before opening the PR. Fix any failures and push a
 make pc
 ```
 
-### Step 7b: User Testing (Optional)
+### Step 7b: Apply Pending Migrations 🚨
+
+If you added or modified any migration files under `lib/db-client/migrations/`, apply them now:
+
+```powershell
+cd lib/db-client
+pnpm run db:up
+```
+
+Confirm the output shows `Applied N new migrations`. If it throws, fix the migration SQL before proceeding.
+
+> ⚠️ **Do not skip this step.** A PR with an unapplied migration leaves the local DB out of sync.
+
+### Step 7c: User Testing (Optional)
 
 If you want to test the UI live against running dev servers before opening a PR,
 see the [user-testing skill](../user-testing/SKILL.md). This checks the branch out in the
@@ -413,6 +426,10 @@ git add . ; git commit -m "feat(scope): description (LS-####)" ; git push -u ori
 
 # 6. Pre-PR validation
 make pc
+
+# 6b. Apply pending migrations (if any migration files were added)
+cd lib/db-client ; pnpm run db:up   # confirm "Applied N new migrations"
+cd $wt
 
 # 7. PR + Jira (see create-pr skill for full template)
 gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
