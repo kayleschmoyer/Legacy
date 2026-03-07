@@ -398,12 +398,14 @@ export async function selectGamesForMatchup(
     const playerSeason = seasonMap.get(matchupPlayer.playerId);
 
     if (!playerSeason) {
-      LOGGER.error(
-        `No season assigned for player ${matchupPlayer.playerId} in league ${matchup.leagueId}, week ${matchup.weekNumber}`,
+      // A player can legitimately have no season when they were added via
+      // waivers mid-week but have insufficient historical game data to assign
+      // a season. Skip game selection for them rather than crashing the entire
+      // matchup — they will simply contribute no stats for this matchup.
+      LOGGER.warn(
+        `No season assigned for player ${matchupPlayer.playerId} in league ${matchup.leagueId}, week ${matchup.weekNumber} — skipping game selection`,
       );
-      throw new Error(
-        `Player ${matchupPlayer.playerId} does not have a season assigned for this matchup`,
-      );
+      continue;
     }
 
     // Determine the player's pitcher role from their roster position
