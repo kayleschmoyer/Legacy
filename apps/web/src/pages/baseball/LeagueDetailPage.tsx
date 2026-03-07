@@ -63,6 +63,7 @@ import { TradingCenter } from '../../features/baseball/TradingCenter';
 import { LeagueWebSocketContext } from '../../context/LeagueWebSocketContext';
 import { env } from '../../config/environment';
 import {
+  GetMatchupPlayers,
   LeagueFragment,
   LeaguePositionFragment,
   TeamMemberFragment,
@@ -1111,6 +1112,14 @@ export function LeagueDetailPage(): React.JSX.Element {
       try {
         const result = await updateTeamMemberPosition({
           variables: { teamMemberId: player.id, positionId: position.id },
+          ...(displayedMatchupIdNum && {
+            refetchQueries: [
+              {
+                query: GetMatchupPlayers,
+                variables: { matchupId: displayedMatchupIdNum },
+              },
+            ],
+          }),
         });
         const updated = result.data?.updateTeamMemberPosition;
         if (updated) {
@@ -1120,7 +1129,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         LOGGER.error('Error assigning player:', String(error));
       }
     },
-    [updateTeamMemberPosition, dispatch],
+    [updateTeamMemberPosition, dispatch, displayedMatchupIdNum],
   );
 
   const handlePlayerRemove = useCallback(
@@ -1132,6 +1141,14 @@ export function LeagueDetailPage(): React.JSX.Element {
         if (assignedPlayer?.id) {
           const result = await updateTeamMemberPosition({
             variables: { teamMemberId: assignedPlayer.id, positionId: null },
+            ...(displayedMatchupIdNum && {
+              refetchQueries: [
+                {
+                  query: GetMatchupPlayers,
+                  variables: { matchupId: displayedMatchupIdNum },
+                },
+              ],
+            }),
           });
           const updated = result.data?.updateTeamMemberPosition;
           if (updated) {
@@ -1142,7 +1159,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         LOGGER.error('Error removing player:', String(error));
       }
     },
-    [updateTeamMemberPosition, teamMembers, dispatch],
+    [updateTeamMemberPosition, teamMembers, dispatch, displayedMatchupIdNum],
   );
 
   const handlePlayerSwap = useCallback(
@@ -1184,6 +1201,14 @@ export function LeagueDetailPage(): React.JSX.Element {
             teamMemberIdB: displacedPlayer.id,
             positionIdB: displacedTargetPositionId,
           },
+          ...(displayedMatchupIdNum && {
+            refetchQueries: [
+              {
+                query: GetMatchupPlayers,
+                variables: { matchupId: displayedMatchupIdNum },
+              },
+            ],
+          }),
         });
 
         const swapped = result.data?.swapTeamMemberPositions;
@@ -1196,7 +1221,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         LOGGER.error('Error swapping players:', String(error));
       }
     },
-    [swapTeamMemberPositions, positions, dispatch],
+    [swapTeamMemberPositions, positions, dispatch, displayedMatchupIdNum],
   );
 
   const inviteUrl = useMemo(() => {

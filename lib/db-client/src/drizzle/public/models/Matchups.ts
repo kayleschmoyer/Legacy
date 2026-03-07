@@ -104,6 +104,12 @@ export const matchupPlayers = pgTable(
     teamId: integer('team_id').notNull(),
     /** Position assignment for this matchup (persisted separately from team_members) */
     positionId: integer('position_id'),
+    /**
+     * True when this row's positionId was explicitly set via the matchup
+     * lineup editor.  Rows with manuallyEdited = true are skipped during
+     * roster-tab propagation so intentional future-week edits are preserved.
+     */
+    manuallyEdited: boolean('manually_edited').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

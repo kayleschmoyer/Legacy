@@ -4,13 +4,102 @@
  * Mutations: updateTeamMemberPosition, swapTeamMemberPositions, renameTeam,
  *            inviteAssistantManager, removeAssistantManager
  */
-import { PublicSchema } from '@legacy-sports/db-client';
+import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, gte, inArray } from 'drizzle-orm';
 import { authorized, isTeamGeneralManager } from '../authorization';
 import { builder } from '../builder';
 import { LeagueMember, Team, TeamMember } from '../leagues/types';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * After a team member position change, mirror the new positionId onto the
+ * current active matchup week AND all future matchup weeks where the player's
+ * slot has NOT been manually edited via the matchup lineup editor.
+ *
+ * Rows where `manually_edited = true` are left untouched — those represent
+ * intentional future-week edits made by the user and should not be
+ * overwritten.
+ *
+ * Best-effort: logs a warning on failure rather than throwing, so a sync
+ * error never rolls back the already-committed team_members update.
+ */
+async function syncCurrentMatchupPositions(
+  db: PublicDb,
+  leagueId: number,
+  changes: Array<{
+    teamId: number;
+    playerId: number;
+    positionId: number | null;
+  }>,
+): Promise<void> {
+  if (changes.length === 0) return;
+
+  // 1. Find the current active matchup pointer for the league
+  const leagueRows = await db
+    .select({ currentMatchup: PublicSchema.leagues.currentMatchup })
+    .from(PublicSchema.leagues)
+    .where(eq(PublicSchema.leagues.id, leagueId))
+    .limit(1);
+  const currentMatchupId = leagueRows[0]?.currentMatchup;
+  if (!currentMatchupId) return; // No active matchup — nothing to sync
+
+  // 2. Resolve the current week number from the reference matchup
+  const refMatchup = await db
+    .select({ weekNumber: PublicSchema.matchups.weekNumber })
+    .from(PublicSchema.matchups)
+    .where(eq(PublicSchema.matchups.id, currentMatchupId))
+    .limit(1);
+  const weekNumber = refMatchup[0]?.weekNumber;
+  if (weekNumber == null) return;
+
+  // 3. Load all matchups for this league at or after the current week
+  //    and build a teamId+weekNumber → matchupId map.
+  const futureMatchups = await db
+    .select({
+      id: PublicSchema.matchups.id,
+      weekNumber: PublicSchema.matchups.weekNumber,
+      team1Id: PublicSchema.matchups.team1Id,
+      team2Id: PublicSchema.matchups.team2Id,
+    })
+    .from(PublicSchema.matchups)
+    .where(
+      and(
+        eq(PublicSchema.matchups.leagueId, leagueId),
+        gte(PublicSchema.matchups.weekNumber, weekNumber),
+      ),
+    );
+
+  // Build a set of matchup IDs relevant to each changed teamId
+  const matchupIdsByTeam = new Map<number, number[]>();
+  for (const m of futureMatchups) {
+    for (const teamId of [m.team1Id, m.team2Id]) {
+      if (!teamId) continue;
+      if (!matchupIdsByTeam.has(teamId)) matchupIdsByTeam.set(teamId, []);
+      matchupIdsByTeam.get(teamId)!.push(m.id);
+    }
+  }
+
+  // 4. For each change, update matchup_players rows where manuallyEdited = false
+  for (const change of changes) {
+    const matchupIds = matchupIdsByTeam.get(change.teamId);
+    if (!matchupIds || matchupIds.length === 0) continue;
+
+    await db
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: change.positionId })
+      .where(
+        and(
+          inArray(PublicSchema.matchupPlayers.matchupId, matchupIds),
+          eq(PublicSchema.matchupPlayers.playerId, change.playerId),
+          eq(PublicSchema.matchupPlayers.teamId, change.teamId),
+          eq(PublicSchema.matchupPlayers.manuallyEdited, false),
+        ),
+      );
+  }
+}
 
 // ── Mutation resolvers ─────────────────────────────────────────────────────
 
@@ -47,7 +136,34 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
             throw new Error('Failed to update team member position');
           }
 
-          return updated[0];
+          const member = updated[0];
+
+          // Mirror the position change onto matchup_players for the active week
+          if (member.teamId) {
+            try {
+              await syncCurrentMatchupPositions(db, member.leagueId, [
+                {
+                  teamId: member.teamId,
+                  playerId: member.playerId,
+                  positionId: positionId ?? null,
+                },
+              ]);
+            } catch (syncError) {
+              LOGGER.warn(
+                'Failed to sync matchup player position after roster update',
+                {
+                  teamMemberId,
+                  positionId,
+                  error:
+                    syncError instanceof Error
+                      ? syncError.message
+                      : String(syncError),
+                },
+              );
+            }
+          }
+
+          return member;
         } catch (error) {
           LOGGER.error('Error updating team member position', {
             teamMemberId,
@@ -131,6 +247,38 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
 
             return [updatedA[0], updatedB[0]];
           });
+
+          // Mirror both position changes onto matchup_players for the active week.
+          // Uses memberA's leagueId — both members belong to the same league.
+          const [memberA, memberB] = results;
+          if (memberA.teamId && memberB.teamId) {
+            try {
+              await syncCurrentMatchupPositions(db, memberA.leagueId, [
+                {
+                  teamId: memberA.teamId,
+                  playerId: memberA.playerId,
+                  positionId: positionIdA ?? null,
+                },
+                {
+                  teamId: memberB.teamId,
+                  playerId: memberB.playerId,
+                  positionId: positionIdB ?? null,
+                },
+              ]);
+            } catch (syncError) {
+              LOGGER.warn(
+                'Failed to sync matchup player positions after roster swap',
+                {
+                  teamMemberIdA,
+                  teamMemberIdB,
+                  error:
+                    syncError instanceof Error
+                      ? syncError.message
+                      : String(syncError),
+                },
+              );
+            }
+          }
 
           return results;
         } catch (error) {

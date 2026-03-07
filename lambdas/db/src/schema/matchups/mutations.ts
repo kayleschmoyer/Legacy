@@ -316,10 +316,11 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
           );
       }
 
-      // Update the position
+      // Update the position and mark as manually edited to protect from
+      // future roster-tab propagation overwriting this intentional choice.
       const updated = await db
         .update(PublicSchema.matchupPlayers)
-        .set({ positionId: args.positionId ?? null })
+        .set({ positionId: args.positionId ?? null, manuallyEdited: true })
         .where(eq(PublicSchema.matchupPlayers.id, args.matchupPlayerId))
         .returning({
           id: PublicSchema.matchupPlayers.id,
@@ -417,10 +418,11 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
             ]),
           );
 
-        // Assign new positions
+        // Assign new positions and mark both as manually edited so future
+        // roster-tab propagation does not overwrite these intentional choices.
         const updatedA = await tx
           .update(PublicSchema.matchupPlayers)
-          .set({ positionId: positionIdA ?? null })
+          .set({ positionId: positionIdA ?? null, manuallyEdited: true })
           .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdA))
           .returning({
             id: PublicSchema.matchupPlayers.id,
@@ -432,7 +434,7 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
 
         const updatedB = await tx
           .update(PublicSchema.matchupPlayers)
-          .set({ positionId: positionIdB ?? null })
+          .set({ positionId: positionIdB ?? null, manuallyEdited: true })
           .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdB))
           .returning({
             id: PublicSchema.matchupPlayers.id,
