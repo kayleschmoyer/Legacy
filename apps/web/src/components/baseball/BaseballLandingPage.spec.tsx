@@ -159,7 +159,9 @@ describe('BaseballLandingPage', () => {
     );
 
     fireEvent.click(screen.getByText(/Create League/i));
-    expect(screen.getByText(/Create a new league/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Configure your league settings/i),
+    ).toBeInTheDocument();
   });
 
   it('shows compact hero (not full hero) when user has leagues', () => {
