@@ -493,6 +493,21 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Resource = [
           "arn:aws:sns:${local.region}:${local.account_id}:${local.name_prefix}-*"
         ]
+      },
+      # CloudWatch Metric Alarm permissions for Terraform apply (DLQ monitoring alarms)
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricAlarm",
+          "cloudwatch:DeleteAlarms",
+          "cloudwatch:DescribeAlarms",
+          "cloudwatch:ListTagsForResource",
+          "cloudwatch:TagResource",
+          "cloudwatch:UntagResource"
+        ]
+        Resource = [
+          "arn:aws:cloudwatch:${local.region}:${local.account_id}:alarm:${local.name_prefix}-*"
+        ]
       }
     ]
   })
