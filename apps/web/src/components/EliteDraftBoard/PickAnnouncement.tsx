@@ -2,6 +2,7 @@ import React from 'react';
 import { type DraftPlayer } from './types';
 import { CONFETTI_COLORS } from './constants';
 import { getPositionColor } from './utils';
+import { BaseballCard } from './BaseballCard';
 
 // ---------------------------------------------------------------------------
 // Pick Announcement Sub-component
@@ -10,6 +11,8 @@ import { getPositionColor } from './utils';
 export function PickAnnouncement({
   player,
   pickNumber,
+  round,
+  roundPickNumber,
   isMyPick,
   isAuto,
   autoPickReason,
@@ -19,6 +22,8 @@ export function PickAnnouncement({
 }: {
   player: DraftPlayer;
   pickNumber: number;
+  round: number;
+  roundPickNumber: number;
   isMyPick: boolean;
   isAuto: boolean;
   autoPickReason?: string | null;
@@ -79,99 +84,17 @@ export function PickAnnouncement({
           {isAuto && autoPickReason && (
             <div className="d-announce-reason">{autoPickReason}</div>
           )}
-          <div className="d-announce-pick">
-            Pick #{pickNumber} &middot; Round {Math.ceil(pickNumber / 12)}
+
+          {/* Baseball card */}
+          <div className="bc-announce-wrapper">
+            <BaseballCard
+              player={player}
+              round={round}
+              pickNumber={roundPickNumber}
+              overallPick={pickNumber}
+            />
           </div>
-          <div className="d-announce-name">{player.name}</div>
-          <div className="d-announce-details">
-            <span className="d-announce-pos" style={{ background: posColor }}>
-              {player.position}
-            </span>
-            <span className="d-announce-team">
-              {player.games} G &middot; {player.hits} H
-            </span>
-          </div>
-          <div className="d-announce-stats">
-            {player.isPitcher ? (
-              <>
-                <div style={{ textAlign: 'center' }}>
-                  <span
-                    className="d-announce-stat-val"
-                    style={{ color: '#10b981' }}
-                  >
-                    {player.era?.toFixed(2) ?? '—'}
-                  </span>
-                  <span className="d-announce-stat-lbl">ERA</span>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span
-                    className="d-announce-stat-val"
-                    style={{ color: '#f59e0b' }}
-                  >
-                    {player.wins ?? 0}
-                  </span>
-                  <span className="d-announce-stat-lbl">W</span>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span
-                    className="d-announce-stat-val"
-                    style={{ color: '#3b82f6' }}
-                  >
-                    {player.strikeouts ?? 0}
-                  </span>
-                  <span className="d-announce-stat-lbl">K</span>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span
-                    className="d-announce-stat-val"
-                    style={{ color: '#8b5cf6' }}
-                  >
-                    {player.saves ?? 0}
-                  </span>
-                  <span className="d-announce-stat-lbl">SV</span>
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ textAlign: 'center' }}>
-                  <span
-                    className="d-announce-stat-val"
-                    style={{ color: '#10b981' }}
-                  >
-                    {player.avg.toFixed(3)}
-                  </span>
-                  <span className="d-announce-stat-lbl">AVG</span>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span
-                    className="d-announce-stat-val"
-                    style={{ color: '#f59e0b' }}
-                  >
-                    {player.hr}
-                  </span>
-                  <span className="d-announce-stat-lbl">HR</span>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span
-                    className="d-announce-stat-val"
-                    style={{ color: '#3b82f6' }}
-                  >
-                    {player.rbi}
-                  </span>
-                  <span className="d-announce-stat-lbl">RBI</span>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span
-                    className="d-announce-stat-val"
-                    style={{ color: '#8b5cf6' }}
-                  >
-                    {player.sb}
-                  </span>
-                  <span className="d-announce-stat-lbl">SB</span>
-                </div>
-              </>
-            )}
-          </div>
+
           {commentary && (
             <div className="d-announce-commentary">{commentary}</div>
           )}

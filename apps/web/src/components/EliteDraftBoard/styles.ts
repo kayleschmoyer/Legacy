@@ -1233,4 +1233,230 @@ export const CSS = `
   color: var(--d-accent);
   border-color: rgba(197, 165, 90, 0.5);
 }
+
+/* ===== Baseball Card (LS-628) ===== */
+
+/* Wrapper that centers the baseball card inside the announcement popup */
+.bc-announce-wrapper {
+  width: 220px;
+  margin: 4px auto 0;
+}
+
+/* 2-col grid for sidebar panel */
+.bc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding-top: 4px;
+}
+
+/* 3-col grid for wider contexts (e.g. post-draft screen) */
+.bc-wide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.bc-card {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--d-card);
+  border: 1px solid var(--d-border);
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.25s ease;
+}
+
+.bc-card:hover {
+  transform: translateY(-4px) rotate(0.6deg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(197, 165, 90, 0.3);
+  z-index: 2;
+}
+
+/* Shine sweep on hover */
+.bc-shine {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(197, 165, 90, 0.03) 75%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transform: skewX(-12deg);
+}
+.bc-card:hover .bc-shine {
+  animation: shineSlide 0.65s ease-out forwards;
+}
+
+/* Header band – position-colored */
+.bc-header {
+  padding: 6px 7px 5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  position: relative;
+}
+.bc-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.bc-pos-badge {
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.5px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+.bc-pick-badge {
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 700;
+  text-align: right;
+  line-height: 1.3;
+}
+
+/* Brand micro-text */
+.bc-brand {
+  text-align: center;
+  font-size: 6.5px;
+  letter-spacing: 1.2px;
+  color: rgba(248, 250, 252, 0.4);
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px 3px;
+  background: rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+
+/* Body */
+.bc-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 5px 7px 6px;
+}
+
+.bc-overall {
+  font-size: 8px;
+  color: var(--d-accent);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 1px;
+}
+
+.bc-name {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--d-text);
+  margin: 0 0 3px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bc-elig {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.bc-elig-badge {
+  font-size: 7.5px;
+  font-weight: 700;
+  color: #fff;
+  padding: 1px 3px;
+  border-radius: 2px;
+  opacity: 0.7;
+}
+
+.bc-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--d-border),
+    transparent
+  );
+  margin: 3px -7px 4px;
+}
+
+/* Stats 2×2 grid */
+.bc-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.bc-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 4px;
+  padding: 3px 2px;
+}
+
+.bc-stat-val {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--d-text);
+  line-height: 1;
+}
+
+.bc-stat-lbl {
+  font-size: 7.5px;
+  color: var(--d-text-muted);
+  margin-top: 1px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* PPG footer */
+.bc-ppg {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--d-accent-dim);
+  border: 1px solid rgba(197, 165, 90, 0.2);
+  border-radius: 4px;
+  padding: 3px 5px;
+  margin-top: auto;
+}
+
+.bc-ppg-lbl {
+  font-size: 8px;
+  color: var(--d-accent-light);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.bc-ppg-val {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--d-accent);
+}
 `;

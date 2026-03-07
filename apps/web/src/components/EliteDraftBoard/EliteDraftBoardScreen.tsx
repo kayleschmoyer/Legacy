@@ -34,6 +34,7 @@ import { getPositionColor, normalizeTeamId } from './utils';
 import { CSS } from './styles';
 import { CircularTimer } from './CircularTimer';
 import { PickAnnouncement } from './PickAnnouncement';
+import { BaseballCard } from './BaseballCard';
 import { PlayerCard } from './PlayerCard';
 import { SkeletonCard } from './SkeletonCard';
 import { DraftGrid } from './DraftGrid';
@@ -135,6 +136,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const [announcement, setAnnouncement] = useState<{
     player: DraftPlayer | AvailableDraftPlayer;
     pickNumber: number;
+    round: number;
+    roundPickNumber: number;
     isMyPick: boolean;
     isAuto: boolean;
   } | null>(null);
@@ -147,13 +150,22 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     (
       player: DraftPlayer | AvailableDraftPlayer,
       pickNumber: number,
+      round: number,
+      roundPickNumber: number,
       myPick: boolean,
       auto: boolean,
     ) => {
       if (announcementTimerRef.current)
         clearTimeout(announcementTimerRef.current);
       setAnnouncementLeaving(false);
-      setAnnouncement({ player, pickNumber, isMyPick: myPick, isAuto: auto });
+      setAnnouncement({
+        player,
+        pickNumber,
+        round,
+        roundPickNumber,
+        isMyPick: myPick,
+        isAuto: auto,
+      });
       announcementTimerRef.current = setTimeout(() => {
         setAnnouncementLeaving(true);
         setTimeout(() => {
@@ -754,6 +766,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           showAnnouncement(
             pickedPlayer,
             notification.overallPick,
+            notification.round,
+            notification.pickNumber,
             isMyTeamPick,
             false,
           );
@@ -1507,32 +1521,21 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               >
                 Your Roster ({myTeam.length} players)
               </div>
-              {myTeam.map((p) => (
-                <div key={p.id} className="d-roster-player">
-                  <div>
-                    <div
-                      style={{ fontWeight: 600, fontSize: 13, color: '#fff' }}
-                    >
-                      {p.name}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--d-text-muted)' }}>
-                      {p.position}
-                    </div>
-                  </div>
-                  <span
-                    style={{
-                      background: getPositionColor(p.position),
-                      padding: '2px 6px',
-                      borderRadius: 5,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: '#fff',
-                    }}
-                  >
-                    {p.position}
-                  </span>
-                </div>
-              ))}
+              <div className="bc-wide-grid">
+                {myTeamPicks.map((pick, i) => {
+                  const p = myTeam[i];
+                  if (!p) return null;
+                  return (
+                    <BaseballCard
+                      key={pick.id}
+                      player={p}
+                      round={pick.round}
+                      pickNumber={pick.pickNumber}
+                      overallPick={pick.overallPick}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
           {league?.isMockDraft ? (
@@ -2204,44 +2207,22 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               <div
                 role="region"
                 aria-labelledby="my-roster-heading"
-                style={{ maxHeight: 260, overflowY: 'auto' }}
+                style={{ maxHeight: 320, overflowY: 'auto' }}
               >
-                <div role="list">
-                  {myTeam.map((p) => (
-                    <div className="d-roster-player" role="listitem" key={p.id}>
-                      <div>
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            fontSize: 13,
-                            color: '#fff',
-                          }}
-                        >
-                          {p.name}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: 'var(--d-text-muted)',
-                          }}
-                        >
-                          {p.position} &middot; {p.games} G
-                        </div>
-                      </div>
-                      <span
-                        style={{
-                          background: getPositionColor(p.position),
-                          padding: '2px 6px',
-                          borderRadius: 5,
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: '#fff',
-                        }}
-                      >
-                        {p.position}
-                      </span>
-                    </div>
-                  ))}
+                <div className="bc-grid">
+                  {myTeamPicks.map((pick, i) => {
+                    const p = myTeam[i];
+                    if (!p) return null;
+                    return (
+                      <BaseballCard
+                        key={pick.id}
+                        player={p}
+                        round={pick.round}
+                        pickNumber={pick.pickNumber}
+                        overallPick={pick.overallPick}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             ) : (
@@ -2631,6 +2612,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         <PickAnnouncement
           player={announcement.player}
           pickNumber={announcement.pickNumber}
+          round={announcement.round}
+          roundPickNumber={announcement.roundPickNumber}
           isMyPick={announcement.isMyPick}
           isAuto={announcement.isAuto}
           leaving={announcementLeaving}
