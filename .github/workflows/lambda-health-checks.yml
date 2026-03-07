@@ -45,7 +45,7 @@ jobs:
         id: stats
         run: |
           STATE=$(aws lambda get-function-configuration \
-            --function-name "${{ env.LAMBDA_PREFIX }}-stats-lambda" \
+            --function-name "${{ env.LAMBDA_PREFIX }}-stats" \
             --region "${{ env.AWS_REGION }}" \
             --query "State" --output text 2>/dev/null || echo "unknown")
           echo "State: $STATE"
