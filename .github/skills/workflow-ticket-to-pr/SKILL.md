@@ -310,6 +310,40 @@ Write-Host "Created follow-up: $($result.key)"
 - Reference all follow-up ticket keys in the PR description under a "Follow-up work" section.
 - Do not mark the original ticket as Done if meaningful scope was punted — the follow-up must exist first.
 
+### ❌ MISTAKE 0: Editing Files in the Main Repo Before Creating a Worktree
+
+Reading files and running read-only commands (AWS CLI, `git log`, `gh run view`) from the main repo is fine. But **any file edit must happen inside a worktree**, even if you haven't committed yet.
+
+```powershell
+# WRONG - editing a file directly in the main repo
+cd D:\code\legacy-sports
+# ... open an editor, change a file ...
+# Even if you don't commit, this pollutes the main repo and requires cleanup.
+```
+
+**Fix if this happens:**
+
+```powershell
+# 1. Stash the edit so main is clean again
+cd D:\code\legacy-sports
+git stash
+
+# 2. Create a Jira ticket and worktree normally
+$key = (acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json).key
+acli jira workitem transition --key $key --status "In Progress"
+twig worktree create "$key/description"
+$wt = "<path from twig worktree list>"
+make wt-setup WT=$wt
+
+# 3. Re-apply the change inside the worktree
+cd $wt
+# Re-apply via your editor, or: git -C D:\code\legacy-sports stash show -p | git apply
+
+# 4. From this point forward all edits and commands target $wt only
+```
+
+> This mistake is especially easy to make during **investigation tasks** (e.g. debugging a CI workflow): you find the problem, instinctively fix the file, and only then realize you were in the main repo. Stash → worktree → re-apply is the recovery pattern.
+
 ### ❌ MISTAKE 1: Committing to Main
 
 ```powershell

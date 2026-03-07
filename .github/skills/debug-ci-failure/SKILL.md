@@ -278,7 +278,40 @@ Error: Cannot find module './resolvers/gameResolver'
 pnpm exec nx affected -t build
 ```
 
-### 5. Reproduce locally with `make pre-commit`
+### 5. Create a worktree before touching any files
+
+> 🚨 **DO NOT edit files in `D:\code\legacy-sports` (the main repo).** Investigation (reading logs, running read-only AWS/git commands) is fine from anywhere, but the moment you are ready to apply a fix you must be in a proper worktree.
+
+If you do not already have an open branch for this fix:
+
+```powershell
+# 1. Create a Jira ticket
+$key = (acli jira workitem create --summary "Fix: <one-line description>" --project LS --type Bug --json | ConvertFrom-Json).key
+acli jira workitem transition --key $key --status "In Progress"
+
+# 2. Create a worktree (from the main repo)
+cd D:\code\legacy-sports
+twig worktree create "$key/short-description"
+$wt = "<path from twig worktree list>"
+
+# 3. Set up the worktree
+make wt-setup WT=$wt   # or: cd $wt; make install; Copy-Item ...\.env .env
+
+# 4. All subsequent file edits and commands happen inside $wt
+```
+
+If you accidentally edited a file in the main repo before creating a worktree:
+
+```powershell
+# Stash the change, get into a worktree, then re-apply
+cd D:\code\legacy-sports
+git stash
+# ... create worktree as above ...
+cd $wt
+git stash pop   # or manually re-apply the diff
+```
+
+### 6. Reproduce locally with `make pre-commit`
 
 **Before running anything locally, confirm you have the evidence:** you should be able to state the specific error (file, line, error code/message) you found in step 4. If you cannot, go back to step 3 and fetch more logs.
 
