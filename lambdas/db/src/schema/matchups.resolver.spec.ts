@@ -278,7 +278,6 @@ describe('Matchup Queries', () => {
       const mockLeague = {
         currentWeek: 2,
         currentMatchup: 2,
-        currentWeek: 2,
       };
 
       const mockMatchup = {
