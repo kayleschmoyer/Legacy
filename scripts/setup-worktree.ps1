@@ -1,9 +1,10 @@
 # setup-worktree.ps1 - Smart worktree dependency setup
 #
-# Automates the three manual steps every worktree needs:
-#   1. node_modules  - junction to main repo when lockfiles match; full pnpm install otherwise
-#   2. .env          - copy from main repo
-#   3. .twig         - junction to main repo (shared branch-dependency state)
+# Automates the four manual steps every worktree needs:
+#   1. node_modules             - junction to main repo when lockfiles match; full pnpm install otherwise
+#   2. .env                     - copy from main repo
+#   3. terraform/secrets.auto.tfvars - copy from main repo (prevents interactive terraform prompts)
+#   4. .twig                    - junction to main repo (shared branch-dependency state)
 #
 # Usage (from any directory):
 #   .\scripts\setup-worktree.ps1 -WorktreePath <path>
@@ -193,7 +194,40 @@ else {
 }
 
 # ---------------------------------------------------------------------------
-# 3. .twig junction
+# 3. terraform/secrets.auto.tfvars
+# ---------------------------------------------------------------------------
+# Terraform requires secret variables (google_oauth_client_secret, jwt_secret_key,
+# oauth_proxy_cookie_secret, jira_credentials, rollbar_access_token) that are
+# never committed to git. They live in terraform/secrets.auto.tfvars in the main
+# repo. Copy them to the worktree so `terraform plan/apply` doesn't block on
+# interactive prompts or fail with "No value for required variable".
+
+Write-Step "terraform/secrets.auto.tfvars"
+
+$mainTfSecrets = Join-Path $MainRepoPath "terraform" "secrets.auto.tfvars"
+$wtTfSecrets   = Join-Path $WorktreePath "terraform" "secrets.auto.tfvars"
+
+if (-not (Test-Path $mainTfSecrets)) {
+    Write-Warn "No terraform/secrets.auto.tfvars in main repo -- skipping (run terraform setup first)"
+}
+elseif (Test-Path $wtTfSecrets) {
+    $mainHash = Get-FileHash256 $mainTfSecrets
+    $wtHash   = Get-FileHash256 $wtTfSecrets
+    if ($mainHash -eq $wtHash) {
+        Write-Ok "terraform/secrets.auto.tfvars already up to date"
+    }
+    else {
+        Copy-Item $mainTfSecrets $wtTfSecrets -Force
+        Write-Ok "terraform/secrets.auto.tfvars updated from main repo"
+    }
+}
+else {
+    Copy-Item $mainTfSecrets $wtTfSecrets
+    Write-Ok "terraform/secrets.auto.tfvars copied from main repo"
+}
+
+# ---------------------------------------------------------------------------
+# 4. .twig junction
 # ---------------------------------------------------------------------------
 
 Write-Step ".twig"

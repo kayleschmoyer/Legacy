@@ -226,9 +226,50 @@ terraform version
 # See required version in terraform/versions.tf
 ```
 
+### Issue: Terraform prompts for secrets interactively in a worktree
+
+**Symptom**: `terraform plan/apply` blocks asking for `var.google_oauth_client_secret`, `var.jira_credentials`, etc.
+**Cause**: `terraform/secrets.auto.tfvars` is gitignored and lives only in the main repo. It is **not** automatically present in a new worktree unless `make wt-setup` was run (which copies it as of this fix).
+**Solution**:
+
+```powershell
+# Option A: Re-run wt-setup from the main repo (preferred)
+make wt-setup WT=<path-to-worktree>
+
+# Option B: Copy manually
+Copy-Item D:\code\legacy-sports\terraform\secrets.auto.tfvars <worktree>\terraform\secrets.auto.tfvars
+```
+
+---
+
+### Issue: Piping `terraform apply` output causes orphaned state lock
+
+**Symptom**: Terraform acquires a lock, but after the command exits via a piped `Select-Object -Last N` the lock is **not released**. Subsequent commands fail with "Error acquiring the state lock".
+**Cause**: `Select-Object -First/-Last` terminates the pipeline early, sending an interrupt to Terraform before it can release the DynamoDB lock.
+**Solution**: **Never pipe `terraform apply` or `terraform plan` through output-truncating filters.** Let Terraform complete fully, or redirect to a file:
+
+```powershell
+# BAD — leaves a dangling lock:
+terraform apply -auto-approve 2>&1 | Select-Object -Last 20
+
+# GOOD — run to completion:
+terraform apply -auto-approve
+
+# GOOD — capture to file, then tail:
+terraform apply -auto-approve 2>&1 | Out-File scratch/tf-apply.txt
+Get-Content scratch/tf-apply.txt | Select-Object -Last 20
+```
+
+If you accidentally orphan a lock, clear it with:
+
+```powershell
+node scripts/terraform-unlock.js
+```
+
+---
+
 ### Issue: Lambda S3 package not found
 
-**Symptom**: "Error occurred while GetObject. S3 Error Code: NoSuchKey"
 **Solution**: Verify Lambda package is at expected S3 location
 
 ```powershell
