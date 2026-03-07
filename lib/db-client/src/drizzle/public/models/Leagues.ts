@@ -97,6 +97,16 @@ export const leagues = pgTable(
     frozenAt: timestamp('frozen_at', { withTimezone: true }),
     /** Monotonic season counter (1 = founding season, incremented on each renewal) */
     seasonNumber: integer('season_number').notNull().default(1),
+    // Salary cap settings (LS-634)
+    salaryCapEnabled: boolean('salary_cap_enabled').notNull().default(false),
+    salaryCap: integer('salary_cap'),
+    salaryFloor: integer('salary_floor'),
+    luxuryTaxThreshold: integer('luxury_tax_threshold'),
+    minSalary: integer('min_salary').notNull().default(1),
+    salaryEscalationPct: integer('salary_escalation_pct').notNull().default(10),
+    salaryDecayPct: integer('salary_decay_pct').notNull().default(25),
+    auctionBudget: integer('auction_budget').notNull().default(260),
+    auctionMinBid: integer('auction_min_bid').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -323,6 +333,8 @@ export const draftPicks = pgTable(
     pickedAt: timestamp('picked_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /** Winning auction bid amount. Null for non-auction drafts. (LS-634) */
+    bidAmount: integer('bid_amount'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -453,6 +465,8 @@ export const teamMembers = pgTable(
       'draft',
     ),
     onTradeBlock: boolean('on_trade_block').notNull().default(false),
+    /** Current salary cap hit for this player on this team. Null in non-salary-cap leagues. (LS-634) */
+    salary: integer('salary'),
   },
   (table) => {
     return {
