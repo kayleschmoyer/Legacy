@@ -2,12 +2,23 @@
  * Management Page UI Tests
  *
  * Covers the League Management page (/management).
- * Does not trigger destructive mutations — only validates static UI elements.
+ * Includes static UI, confirmation dialog flows, and mocked delete mutation.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
-test.describe('Management Page @regression', () => {
+/** URL predicate for the GraphQL API endpoint */
+function isGraphQLEndpoint(url: URL): boolean {
+  const s = url.toString();
+  return (
+    s.includes('/graphql') &&
+    !s.includes('/@fs/') &&
+    !s.includes('.ts') &&
+    !s.includes('.js')
+  );
+}
+
+test.describe('Management Page — static elements @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/management');
     await page.waitForLoadState('load');
@@ -38,20 +49,143 @@ test.describe('Management Page @regression', () => {
     ).toBeVisible({ timeout: 30000 });
   });
 
-  test('clicking Delete All Leagues opens a confirmation dialog', async ({
+  test('shows Information card with ownership note', async ({ page }) => {
+    await expect(
+      page.getByRole('heading', { name: /information/i }),
+    ).toBeVisible({ timeout: 30000 });
+    await expect(
+      page.getByText(/only leagues you own will be deleted/i),
+    ).toBeVisible({ timeout: 30000 });
+  });
+});
+
+test.describe('Management Page — delete all leagues dialogs @critical', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/management');
+    await page.waitForLoadState('load');
+    // Wait for the button to be ready
+    await expect(
+      page.getByRole('button', { name: /delete all leagues/i }),
+    ).toBeVisible({ timeout: 30000 });
+  });
+
+  test('clicking Delete All Leagues opens the first confirmation dialog', async ({
     page,
   }) => {
-    const deleteBtn = page.getByRole('button', {
-      name: /delete all leagues/i,
-    });
-    await deleteBtn.click();
+    await page.getByRole('button', { name: /delete all leagues/i }).click();
 
-    // A confirmation dialog / alert should appear (either native or custom)
-    // The component opens a confirm dialog or shows an inline confirm button
-    const confirmText = page
-      .getByText(/are you sure|confirm|cannot be undone/i)
-      .first();
-    await expect(confirmText).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('alertdialog')).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByText(/are you sure you want to delete all of your leagues/i),
+    ).toBeVisible({ timeout: 10000 });
+  });
+
+  test('first confirmation dialog lists affected data', async ({ page }) => {
+    await page.getByRole('button', { name: /delete all leagues/i }).click();
+
+    const dialog = page.getByRole('alertdialog').first();
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+
+    // Key data items listed in the dialog
+    await expect(dialog.getByText(/all leagues you own/i)).toBeVisible();
+    await expect(dialog.getByText(/all teams in those leagues/i)).toBeVisible();
+    await expect(dialog.getByText(/all roster data/i)).toBeVisible();
+  });
+
+  test('canceling from the first dialog closes it', async ({ page }) => {
+    await page.getByRole('button', { name: /delete all leagues/i }).click();
+
+    const dialog = page.getByRole('alertdialog').first();
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+
+    await dialog.getByRole('button', { name: /cancel/i }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
+  });
+
+  test('clicking Continue opens the final confirmation dialog', async ({
+    page,
+  }) => {
+    await page.getByRole('button', { name: /delete all leagues/i }).click();
+
+    const firstDialog = page.getByRole('alertdialog').first();
+    await expect(firstDialog).toBeVisible({ timeout: 10000 });
+
+    await firstDialog.getByRole('button', { name: /continue/i }).click();
+
+    // Final confirmation dialog should now be visible
+    await expect(page.getByRole('alertdialog')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/final confirmation/i)).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(
+      page.getByText(/this is your last chance to cancel/i),
+    ).toBeVisible({ timeout: 10000 });
+  });
+
+  test('canceling from the final confirmation dialog closes it', async ({
+    page,
+  }) => {
+    // Open first dialog
+    await page.getByRole('button', { name: /delete all leagues/i }).click();
+    const firstDialog = page.getByRole('alertdialog').first();
+    await expect(firstDialog).toBeVisible({ timeout: 10000 });
+
+    // Advance to second dialog
+    await firstDialog.getByRole('button', { name: /continue/i }).click();
+    await expect(page.getByText(/final confirmation/i)).toBeVisible({
+      timeout: 10000,
+    });
+
+    const finalDialog = page.getByRole('alertdialog').first();
+    await finalDialog.getByRole('button', { name: /cancel/i }).click();
+    await expect(finalDialog).not.toBeVisible({ timeout: 5000 });
+  });
+
+  test('completing both dialogs calls the deleteAllLeagues mutation', async ({
+    page,
+  }) => {
+    let mutationCalled = false;
+
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+      if (postData.includes('deleteallleagues')) {
+        mutationCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { deleteAllLeagues: 'All leagues deleted successfully' },
+          }),
+        });
+      } else {
+        await route.fallback();
+      }
+    });
+
+    // Step 1: click delete button
+    await page.getByRole('button', { name: /delete all leagues/i }).click();
+
+    // Step 2: confirm in first dialog
+    const firstDialog = page.getByRole('alertdialog').first();
+    await expect(firstDialog).toBeVisible({ timeout: 10000 });
+    await firstDialog.getByRole('button', { name: /continue/i }).click();
+
+    // Step 3: confirm in final dialog
+    await expect(page.getByText(/final confirmation/i)).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Handle the success alert that follows
+    page.once('dialog', (dialog) => void dialog.accept());
+
+    const finalDialog = page.getByRole('alertdialog').first();
+    await finalDialog
+      .getByRole('button', { name: /yes, delete everything/i })
+      .click();
+
+    // Mutation should have been called
+    await page.waitForTimeout(1000);
+    expect(mutationCalled).toBe(true);
   });
 });
 
