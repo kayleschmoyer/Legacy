@@ -83,26 +83,25 @@ All security vulnerabilities have been completely resolved. Run `pnpm audit` to 
 
 ### Security Verification
 
+```powershell
 # Verify no vulnerabilities
-
 pnpm audit
-
 # Expected output: found 0 vulnerabilities
 
 # Run comprehensive security check
-
 pnpm audit
-
-````
+```
 
 For complete security details, see: **[Security Audit Status](docs/security/security-audit-status.md)**
 
 ## �🚀 Quick Start
 
 ### 📚 Documentation Hub
+
 **👉 [Complete Documentation](docs/README.md)** - Central hub for all guides and references
 
 ### Essential Guides
+
 - **🛠️ [Development Setup](docs/guides/development-setup.md)** - Complete environment setup
 - **🔐 [Authentication Guide](docs/guides/authentication-guide.md)** - OAuth implementation and usage
 - **🛠️ [Troubleshooting](docs/guides/troubleshooting.md)** - Common issues and quick fixes
@@ -130,11 +129,11 @@ make install
 
 ### Available Applications
 
-| App                  | Description             | Command                                      |
-| -------------------- | ----------------------- | -------------------------------------------- |
-| **Mobile App**       | React Native CLI app    | `pnpm exec nx serve app`                     |
-| **Web App**          | Next.js web application | `pnpm exec nx dev web`                       |
-| **GraphQL Explorer** | API testing interface   | `pnpm exec nx serve graphql-explorer`        |
+| App                  | Description             | Command                               |
+| -------------------- | ----------------------- | ------------------------------------- |
+| **Mobile App**       | React Native CLI app    | `pnpm exec nx serve app`              |
+| **Web App**          | Next.js web application | `pnpm exec nx dev web`                |
+| **GraphQL Explorer** | API testing interface   | `pnpm exec nx serve graphql-explorer` |
 
 ### Quick Development Commands
 
@@ -445,4 +444,7 @@ The Legacy Sports backend runs on AWS serverless infrastructure managed with Ter
 ---
 
 Built with ❤️ using modern development tools and practices.
-````
+
+```
+
+```
