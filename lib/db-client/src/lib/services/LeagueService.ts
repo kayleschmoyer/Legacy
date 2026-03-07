@@ -82,6 +82,16 @@ export interface CreateLeagueOptions {
   waiverEnabled?: boolean;
   faabBudgetDefault?: number;
   isPublic?: boolean;
+  // ── Salary cap settings (LS-634/LS-646) ────────────────────────────
+  salaryCapEnabled?: boolean;
+  salaryCap?: number | null;
+  salaryFloor?: number | null;
+  luxuryTaxThreshold?: number | null;
+  minSalary?: number;
+  salaryEscalationPct?: number;
+  salaryDecayPct?: number;
+  auctionBudget?: number;
+  auctionMinBid?: number;
 }
 
 export interface CreateLeagueResult {
@@ -160,6 +170,15 @@ export class LeagueService {
       waiverEnabled = true,
       faabBudgetDefault = 100,
       isPublic = false,
+      salaryCapEnabled = false,
+      salaryCap = null,
+      salaryFloor = null,
+      luxuryTaxThreshold = null,
+      minSalary = 1,
+      salaryEscalationPct = 10,
+      salaryDecayPct = 25,
+      auctionBudget = 260,
+      auctionMinBid = 1,
     } = input;
 
     return runWithPublicClient(this.options, async (db) => {
@@ -186,6 +205,16 @@ export class LeagueService {
           schedulingStrategy,
           numberOfDivisions,
           isPublic,
+          // Salary cap settings
+          salaryCapEnabled,
+          salaryCap,
+          salaryFloor,
+          luxuryTaxThreshold,
+          minSalary,
+          salaryEscalationPct,
+          salaryDecayPct,
+          auctionBudget,
+          auctionMinBid,
         })
         .returning({
           id: PublicSchema.leagues.id,

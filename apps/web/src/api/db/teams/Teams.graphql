@@ -10,6 +10,9 @@ fragment Team on Team {
   secondaryColor
   avatarUrl
   bannerUrl
+  # Salary cap computed fields (LS-646)
+  totalPayroll
+  capSpace
 }
 
 fragment TeamMember on TeamMember {
@@ -19,6 +22,8 @@ fragment TeamMember on TeamMember {
   teamId
   leagueId
   onTradeBlock
+  # Salary cap (LS-646)
+  salary
   player {
     id
     firstName

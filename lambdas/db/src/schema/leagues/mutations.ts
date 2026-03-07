@@ -57,6 +57,16 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       waiverType: t.string({ required: false }), // 'standard' | 'faab' (optional, defaults to 'standard')
       faabBudgetDefault: t.int({ required: false }), // Default FAAB budget per team (defaults to 100)
       startDate: t.string({ required: false }), // ISO date string
+      // ── Salary cap settings (LS-646) ─────────────────────────────────
+      salaryCapEnabled: t.boolean({ required: false }),
+      salaryCap: t.int({ required: false }),
+      salaryFloor: t.int({ required: false }),
+      luxuryTaxThreshold: t.int({ required: false }),
+      minSalary: t.int({ required: false }),
+      salaryEscalationPct: t.int({ required: false }),
+      salaryDecayPct: t.int({ required: false }),
+      auctionBudget: t.int({ required: false }),
+      auctionMinBid: t.int({ required: false }),
     }),
   },
 );
@@ -169,6 +179,16 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         customEraStartYear: inputCustomEraStartYear,
         customEraEndYear: inputCustomEraEndYear,
         isPublic: inputIsPublic,
+        // Salary cap settings
+        salaryCapEnabled: inputSalaryCapEnabled,
+        salaryCap: inputSalaryCap,
+        salaryFloor: inputSalaryFloor,
+        luxuryTaxThreshold: inputLuxuryTaxThreshold,
+        minSalary: inputMinSalary,
+        salaryEscalationPct: inputSalaryEscalationPct,
+        salaryDecayPct: inputSalaryDecayPct,
+        auctionBudget: inputAuctionBudget,
+        auctionMinBid: inputAuctionMinBid,
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
@@ -214,6 +234,16 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           customEraStartYear: inputCustomEraStartYear ?? null,
           customEraEndYear: inputCustomEraEndYear ?? null,
           isPublic: inputIsPublic ?? false,
+          // Salary cap settings
+          salaryCapEnabled: inputSalaryCapEnabled ?? false,
+          salaryCap: inputSalaryCap ?? null,
+          salaryFloor: inputSalaryFloor ?? null,
+          luxuryTaxThreshold: inputLuxuryTaxThreshold ?? null,
+          minSalary: inputMinSalary ?? 1,
+          salaryEscalationPct: inputSalaryEscalationPct ?? 10,
+          salaryDecayPct: inputSalaryDecayPct ?? 25,
+          auctionBudget: inputAuctionBudget ?? 260,
+          auctionMinBid: inputAuctionMinBid ?? 1,
         });
 
         return result;
@@ -942,6 +972,16 @@ const UpdateLeagueSettingsInput = builder.inputType(
       bannerUrl: t.string({ required: false }),
       primaryColor: t.string({ required: false }),
       secondaryColor: t.string({ required: false }),
+      // ── Salary cap settings (LS-646) ─────────────────────────────────
+      salaryCapEnabled: t.boolean({ required: false }),
+      salaryCap: t.int({ required: false }),
+      salaryFloor: t.int({ required: false }),
+      luxuryTaxThreshold: t.int({ required: false }),
+      minSalary: t.int({ required: false }),
+      salaryEscalationPct: t.int({ required: false }),
+      salaryDecayPct: t.int({ required: false }),
+      auctionBudget: t.int({ required: false }),
+      auctionMinBid: t.int({ required: false }),
     }),
   },
 );
@@ -974,6 +1014,16 @@ builder.mutationField('updateLeagueSettings', (t) =>
         bannerUrl,
         primaryColor,
         secondaryColor,
+        // Salary cap settings
+        salaryCapEnabled,
+        salaryCap,
+        salaryFloor,
+        luxuryTaxThreshold,
+        minSalary,
+        salaryEscalationPct,
+        salaryDecayPct,
+        auctionBudget,
+        auctionMinBid,
       } = args.input;
       const userId = context.user.id;
 
@@ -1014,6 +1064,16 @@ builder.mutationField('updateLeagueSettings', (t) =>
         bannerUrl?: string | null;
         primaryColor?: string | null;
         secondaryColor?: string | null;
+        // Salary cap
+        salaryCapEnabled?: boolean;
+        salaryCap?: number | null;
+        salaryFloor?: number | null;
+        luxuryTaxThreshold?: number | null;
+        minSalary?: number;
+        salaryEscalationPct?: number;
+        salaryDecayPct?: number;
+        auctionBudget?: number;
+        auctionMinBid?: number;
       } = {};
 
       if (spStartsPerMatchup !== null && spStartsPerMatchup !== undefined) {
@@ -1191,6 +1251,53 @@ builder.mutationField('updateLeagueSettings', (t) =>
         changeDescriptions.push(
           `Playoff multi-week matchups: ${playoffMultiWeek ? 'enabled' : 'disabled'}`,
         );
+      }
+
+      // ── Salary cap settings ──────────────────────────────────────────
+      if (salaryCapEnabled !== null && salaryCapEnabled !== undefined) {
+        leagueUpdate.salaryCapEnabled = salaryCapEnabled;
+        changeDescriptions.push(
+          `Salary cap: ${salaryCapEnabled ? 'enabled' : 'disabled'}`,
+        );
+      }
+      if (salaryCap !== undefined) {
+        if (salaryCap !== null && salaryCap < 1) {
+          throw new Error('Salary cap must be a positive integer');
+        }
+        leagueUpdate.salaryCap = salaryCap ?? null;
+        if (salaryCap !== null)
+          changeDescriptions.push(`Salary cap set to $${salaryCap}`);
+      }
+      if (salaryFloor !== undefined) {
+        leagueUpdate.salaryFloor = salaryFloor ?? null;
+      }
+      if (luxuryTaxThreshold !== undefined) {
+        leagueUpdate.luxuryTaxThreshold = luxuryTaxThreshold ?? null;
+      }
+      if (minSalary !== null && minSalary !== undefined) {
+        if (minSalary < 1) throw new Error('Minimum salary must be at least 1');
+        leagueUpdate.minSalary = minSalary;
+      }
+      if (salaryEscalationPct !== null && salaryEscalationPct !== undefined) {
+        if (salaryEscalationPct < 0 || salaryEscalationPct > 100)
+          throw new Error('Salary escalation must be between 0 and 100');
+        leagueUpdate.salaryEscalationPct = salaryEscalationPct;
+      }
+      if (salaryDecayPct !== null && salaryDecayPct !== undefined) {
+        if (salaryDecayPct < 0 || salaryDecayPct > 100)
+          throw new Error('Salary decay must be between 0 and 100');
+        leagueUpdate.salaryDecayPct = salaryDecayPct;
+      }
+      if (auctionBudget !== null && auctionBudget !== undefined) {
+        if (auctionBudget < 1)
+          throw new Error('Auction budget must be a positive integer');
+        leagueUpdate.auctionBudget = auctionBudget;
+        changeDescriptions.push(`Auction budget set to $${auctionBudget}`);
+      }
+      if (auctionMinBid !== null && auctionMinBid !== undefined) {
+        if (auctionMinBid < 1)
+          throw new Error('Auction minimum bid must be at least 1');
+        leagueUpdate.auctionMinBid = auctionMinBid;
       }
 
       // Branding fields — set directly (no description logged for silent updates)

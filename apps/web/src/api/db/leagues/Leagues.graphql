@@ -30,6 +30,16 @@ fragment League on League {
   previousLeagueId
   frozenAt
   seasonNumber
+  # Salary cap settings (LS-646)
+  salaryCapEnabled
+  salaryCap
+  salaryFloor
+  luxuryTaxThreshold
+  minSalary
+  salaryEscalationPct
+  salaryDecayPct
+  auctionBudget
+  auctionMinBid
   userMembership {
     ...LeagueMember
   }
@@ -238,5 +248,61 @@ mutation JoinPublicLeague($leagueId: Int!, $teamName: String!) {
 mutation RenewLeague($leagueId: Int!, $keepRosters: Boolean!) {
   renewLeague(leagueId: $leagueId, keepRosters: $keepRosters) {
     ...League
+  }
+}
+
+# Auction draft types and operations (LS-646)
+fragment AuctionStateFragment on AuctionState {
+  draftId
+  nominatorTeam {
+    id
+    name
+  }
+  nominatedPlayer {
+    id
+    firstName
+    lastName
+  }
+  currentBid
+  currentBidder {
+    id
+    name
+  }
+  nominationDeadline
+  bidDeadline
+  nominationOrder
+}
+
+fragment AuctionBudgetFragment on AuctionBudget {
+  team {
+    id
+    name
+  }
+  remainingBudget
+  playersWon
+  maxBid
+}
+
+query GetAuctionState($draftId: Int!) {
+  auctionState(draftId: $draftId) {
+    ...AuctionStateFragment
+  }
+}
+
+query GetAuctionBudgets($draftId: Int!) {
+  auctionBudgets(draftId: $draftId) {
+    ...AuctionBudgetFragment
+  }
+}
+
+mutation NominatePlayer($draftId: Int!, $playerId: Int!) {
+  nominatePlayer(draftId: $draftId, playerId: $playerId) {
+    ...AuctionStateFragment
+  }
+}
+
+mutation PlaceBid($draftId: Int!, $amount: Int!) {
+  placeBid(draftId: $draftId, amount: $amount) {
+    ...AuctionStateFragment
   }
 }

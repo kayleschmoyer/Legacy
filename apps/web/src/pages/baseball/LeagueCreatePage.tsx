@@ -39,6 +39,11 @@ interface CreateLeagueFormData {
   hofOnly: boolean;
   customEraStartYear?: number;
   customEraEndYear?: number;
+  // Salary cap settings (LS-646)
+  salaryCapEnabled: boolean;
+  salaryCap?: number;
+  auctionBudget: number;
+  auctionMinBid: number;
 }
 
 // Team count options
@@ -130,6 +135,11 @@ export function LeagueCreatePage(): React.JSX.Element {
     isPublic: false,
     eraFilter: 'all',
     hofOnly: false,
+    // Salary cap defaults (LS-646)
+    salaryCapEnabled: false,
+    salaryCap: undefined,
+    auctionBudget: 200,
+    auctionMinBid: 1,
   });
 
   const [createLeagueAndTeams, { loading, error }] =
@@ -257,6 +267,19 @@ export function LeagueCreatePage(): React.JSX.Element {
             customEraEndYear:
               formData.eraFilter === 'custom'
                 ? formData.customEraEndYear
+                : undefined,
+            // Salary cap (LS-646)
+            salaryCapEnabled: formData.salaryCapEnabled,
+            salaryCap: formData.salaryCapEnabled
+              ? formData.salaryCap
+              : undefined,
+            auctionBudget:
+              formData.selectionMethod === 'auction'
+                ? formData.auctionBudget
+                : undefined,
+            auctionMinBid:
+              formData.selectionMethod === 'auction'
+                ? formData.auctionMinBid
                 : undefined,
           },
         },
@@ -1208,6 +1231,139 @@ export function LeagueCreatePage(): React.JSX.Element {
                   </Text>
                 </YStack>
               )}
+
+              {/* Salary Cap */}
+              <YStack space="$3">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Salary Cap
+                </Text>
+                <XStack
+                  alignItems="center"
+                  gap="$3"
+                  padding="$3"
+                  borderRadius="$4"
+                  borderWidth={1}
+                  borderColor={
+                    formData.salaryCapEnabled
+                      ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
+                      : '$borderColor'
+                  }
+                  backgroundColor={
+                    formData.salaryCapEnabled
+                      ? withAlpha(BRAND_NAVY_LIGHT, 0.08)
+                      : '$color1'
+                  }
+                  cursor="pointer"
+                  onPress={() =>
+                    handleInputChange(
+                      'salaryCapEnabled',
+                      !formData.salaryCapEnabled,
+                    )
+                  }
+                >
+                  <YStack
+                    width={24}
+                    height={24}
+                    borderRadius={12}
+                    borderWidth={2}
+                    borderColor={
+                      formData.salaryCapEnabled
+                        ? BRAND_NAVY_LIGHT
+                        : '$borderColor'
+                    }
+                    backgroundColor={
+                      formData.salaryCapEnabled
+                        ? BRAND_NAVY_LIGHT
+                        : 'transparent'
+                    }
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    {formData.salaryCapEnabled && (
+                      <Text fontSize={14} color="white" fontWeight="700">
+                        ✓
+                      </Text>
+                    )}
+                  </YStack>
+                  <YStack flex={1}>
+                    <Text fontWeight="600" color="$color12">
+                      Enable Salary Cap
+                    </Text>
+                    <Text size="$2" color="$gray10">
+                      Track player salaries and enforce roster spending limits
+                    </Text>
+                  </YStack>
+                </XStack>
+
+                {formData.salaryCapEnabled && (
+                  <YStack space="$2">
+                    <Text size="$3" fontWeight="600" color="$gray12">
+                      Salary Cap Limit
+                    </Text>
+                    <Input
+                      value={
+                        formData.salaryCap !== undefined
+                          ? String(formData.salaryCap)
+                          : ''
+                      }
+                      onChangeText={(text: string) => {
+                        const n = parseInt(text, 10);
+                        handleInputChange('salaryCap', isNaN(n) ? 0 : n);
+                      }}
+                      placeholder="e.g. 50000000"
+                      keyboardType="numeric"
+                      disabled={loading}
+                    />
+                    <Text size="$2" color="$gray10">
+                      Maximum total salary each team can spend on their roster
+                    </Text>
+                  </YStack>
+                )}
+
+                {formData.selectionMethod === 'auction' && (
+                  <>
+                    <YStack space="$2">
+                      <Text size="$3" fontWeight="600" color="$gray12">
+                        Auction Budget per Team
+                      </Text>
+                      <Input
+                        value={String(formData.auctionBudget)}
+                        onChangeText={(text: string) => {
+                          const n = parseInt(text, 10);
+                          handleInputChange(
+                            'auctionBudget',
+                            isNaN(n) ? 200 : n,
+                          );
+                        }}
+                        placeholder="200"
+                        keyboardType="numeric"
+                        disabled={loading}
+                      />
+                      <Text size="$2" color="$gray10">
+                        Each team's total budget for the auction draft
+                      </Text>
+                    </YStack>
+                    <YStack space="$2">
+                      <Text size="$3" fontWeight="600" color="$gray12">
+                        Minimum Bid
+                      </Text>
+                      <Input
+                        value={String(formData.auctionMinBid)}
+                        onChangeText={(text: string) => {
+                          const n = parseInt(text, 10);
+                          handleInputChange('auctionMinBid', isNaN(n) ? 1 : n);
+                        }}
+                        placeholder="1"
+                        keyboardType="numeric"
+                        disabled={loading}
+                      />
+                      <Text size="$2" color="$gray10">
+                        Minimum amount a team can bid on any player
+                      </Text>
+                    </YStack>
+                  </>
+                )}
+              </YStack>
 
               {/* Draft Date and Time */}
               <YStack space="$2">

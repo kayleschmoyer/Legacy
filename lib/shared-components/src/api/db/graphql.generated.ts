@@ -70,6 +70,28 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+/** Per-team budget tracking during an auction draft */
+export type AuctionBudget = {
+  __typename?: 'AuctionBudget';
+  maxBid?: Maybe<Scalars['Int']['output']>;
+  playersWon?: Maybe<Scalars['Int']['output']>;
+  remainingBudget?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Team>;
+};
+
+/** Live state of an auction draft in progress */
+export type AuctionState = {
+  __typename?: 'AuctionState';
+  bidDeadline?: Maybe<Scalars['String']['output']>;
+  currentBid?: Maybe<Scalars['Int']['output']>;
+  currentBidder?: Maybe<Team>;
+  draftId?: Maybe<Scalars['Int']['output']>;
+  nominatedPlayer?: Maybe<Player>;
+  nominationDeadline?: Maybe<Scalars['String']['output']>;
+  nominationOrder?: Maybe<Scalars['Int']['output']>;
+  nominatorTeam?: Maybe<Team>;
+};
+
 /** Result of the automated weekly matchup advancement across all active leagues */
 export type AutoAdvanceMatchupsResult = {
   __typename?: 'AutoAdvanceMatchupsResult';
@@ -319,6 +341,8 @@ export enum ConsentType {
 }
 
 export type CreateLeagueAndTeamsInput = {
+  auctionBudget?: InputMaybe<Scalars['Int']['input']>;
+  auctionMinBid?: InputMaybe<Scalars['Int']['input']>;
   customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
   customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
@@ -328,12 +352,19 @@ export type CreateLeagueAndTeamsInput = {
   hofOnly?: InputMaybe<Scalars['Boolean']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
   leagueName: Scalars['String']['input'];
+  luxuryTaxThreshold?: InputMaybe<Scalars['Int']['input']>;
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
   maxPitchers?: InputMaybe<Scalars['Int']['input']>;
   maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
+  minSalary?: InputMaybe<Scalars['Int']['input']>;
   numberOfDivisions?: InputMaybe<Scalars['Int']['input']>;
   numberOfTeams: Scalars['Int']['input'];
   playerPool: Scalars['String']['input'];
+  salaryCap?: InputMaybe<Scalars['Int']['input']>;
+  salaryCapEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  salaryDecayPct?: InputMaybe<Scalars['Int']['input']>;
+  salaryEscalationPct?: InputMaybe<Scalars['Int']['input']>;
+  salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   schedulingStrategy?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
   startDate?: InputMaybe<Scalars['String']['input']>;
@@ -661,6 +692,8 @@ export type JoinLeaguePayload = {
 /** A fantasy sports league */
 export type League = {
   __typename?: 'League';
+  auctionBudget?: Maybe<Scalars['Int']['output']>;
+  auctionMinBid?: Maybe<Scalars['Int']['output']>;
   bannerUrl?: Maybe<Scalars['String']['output']>;
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   currentWeek?: Maybe<Scalars['Int']['output']>;
@@ -676,9 +709,11 @@ export type League = {
   isPublic?: Maybe<Scalars['Boolean']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
   logoUrl?: Maybe<Scalars['String']['output']>;
+  luxuryTaxThreshold?: Maybe<Scalars['Int']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
   minCareerSeasons?: Maybe<Scalars['Int']['output']>;
+  minSalary?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
@@ -687,6 +722,11 @@ export type League = {
   playoffMultiWeek?: Maybe<Scalars['Boolean']['output']>;
   previousLeagueId?: Maybe<Scalars['Int']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
+  salaryCap?: Maybe<Scalars['Int']['output']>;
+  salaryCapEnabled?: Maybe<Scalars['Boolean']['output']>;
+  salaryDecayPct?: Maybe<Scalars['Int']['output']>;
+  salaryEscalationPct?: Maybe<Scalars['Int']['output']>;
+  salaryFloor?: Maybe<Scalars['Int']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
@@ -1052,7 +1092,9 @@ export type Mutation = {
   makeSeasonDraftPick?: Maybe<Scalars['Boolean']['output']>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
+  nominatePlayer?: Maybe<AuctionState>;
   pauseDraft?: Maybe<Draft>;
+  placeBid?: Maybe<AuctionState>;
   postLeagueAnnouncement?: Maybe<LeagueChatMessage>;
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
@@ -1337,8 +1379,18 @@ export type MutationMarkNotificationAsReadArgs = {
   notificationId: Scalars['Int']['input'];
 };
 
+export type MutationNominatePlayerArgs = {
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+};
+
 export type MutationPauseDraftArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationPlaceBidArgs = {
+  amount: Scalars['Int']['input'];
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationPostLeagueAnnouncementArgs = {
@@ -1818,6 +1870,8 @@ export type Query = {
   achievementRestrictions?: Maybe<Array<AchievementRestriction>>;
   /** List all badge definitions available in the system */
   allBadgeDefinitions?: Maybe<Array<BadgeDefinition>>;
+  auctionBudgets?: Maybe<Array<AuctionBudget>>;
+  auctionState?: Maybe<AuctionState>;
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
@@ -1937,6 +1991,14 @@ export type Query = {
 
 export type QueryAchievementRestrictionsArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryAuctionBudgetsArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryAuctionStateArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type QueryCareerBattingStatsArgs = {
@@ -2685,6 +2747,8 @@ export type Team = {
   __typename?: 'Team';
   avatarUrl?: Maybe<Scalars['String']['output']>;
   bannerUrl?: Maybe<Scalars['String']['output']>;
+  /** Remaining salary cap space for this team (league.salaryCap - totalPayroll). Null if cap is not enabled or no cap limit is set. */
+  capSpace?: Maybe<Scalars['Int']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   divisionId?: Maybe<Scalars['Int']['output']>;
   faabBudget?: Maybe<Scalars['Int']['output']>;
@@ -2697,6 +2761,8 @@ export type Team = {
   name?: Maybe<Scalars['String']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
+  /** Total salary cap payroll for this team (sum of team_members.salary). Null if the league does not have salary cap enabled. */
+  totalPayroll?: Maybe<Scalars['Int']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   waiverOrder?: Maybe<Scalars['Int']['output']>;
 };
@@ -2710,6 +2776,8 @@ export type TeamMember = {
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   positionId?: Maybe<Scalars['Int']['output']>;
+  /** Current salary cap hit for this roster slot. Null in non-salary-cap leagues. */
+  salary?: Maybe<Scalars['Int']['output']>;
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -2845,16 +2913,25 @@ export type UpdateLeagueScoringMultiplierInput = {
 };
 
 export type UpdateLeagueSettingsInput = {
+  auctionBudget?: InputMaybe<Scalars['Int']['input']>;
+  auctionMinBid?: InputMaybe<Scalars['Int']['input']>;
   bannerUrl?: InputMaybe<Scalars['String']['input']>;
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
   logoUrl?: InputMaybe<Scalars['String']['input']>;
+  luxuryTaxThreshold?: InputMaybe<Scalars['Int']['input']>;
   minCareerGames?: InputMaybe<Scalars['Int']['input']>;
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
+  minSalary?: InputMaybe<Scalars['Int']['input']>;
   playoffEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   playoffFormat?: InputMaybe<Scalars['String']['input']>;
   playoffMultiWeek?: InputMaybe<Scalars['Boolean']['input']>;
   primaryColor?: InputMaybe<Scalars['String']['input']>;
+  salaryCap?: InputMaybe<Scalars['Int']['input']>;
+  salaryCapEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  salaryDecayPct?: InputMaybe<Scalars['Int']['input']>;
+  salaryEscalationPct?: InputMaybe<Scalars['Int']['input']>;
+  salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   secondaryColor?: InputMaybe<Scalars['String']['input']>;
   spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;

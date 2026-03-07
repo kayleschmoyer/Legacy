@@ -11,6 +11,7 @@ import { PITCHING_POSITIONS } from '@legacy-sports/shared-components';
 import { H4, H5, Text } from 'tamagui';
 import {
   LeaguePositionFragment,
+  TeamFragment,
   TeamMemberFragment,
 } from '../../api/db/graphql.generated';
 import {
@@ -117,7 +118,7 @@ const getPositionAccent = (positionType: string): PositionAccent => {
   return baseAccent;
 };
 
-type SummaryTone = 'default' | 'positive' | 'warning';
+type SummaryTone = 'default' | 'positive' | 'warning' | 'danger';
 
 interface SummaryStatProps {
   label: string;
@@ -137,21 +138,27 @@ const SummaryStat = ({
       ? '$successMuted'
       : tone === 'warning'
         ? '$warningMuted'
-        : '$surfaceSubtle';
+        : tone === 'danger'
+          ? withAlpha(RED, 0.12)
+          : '$surfaceSubtle';
 
   const borderColor =
     tone === 'positive'
       ? '$green7'
       : tone === 'warning'
         ? '$amber7'
-        : '$outlineSubtle';
+        : tone === 'danger'
+          ? '$red6'
+          : '$outlineSubtle';
 
   const valueColor =
     tone === 'positive'
       ? '$green8'
       : tone === 'warning'
         ? '$amber8'
-        : '$color12';
+        : tone === 'danger'
+          ? '$red9'
+          : '$color12';
 
   return (
     <YStack
@@ -556,6 +563,15 @@ const BenchList = ({
                       Team Member ID: {player.id}
                     </Text>
                   </YStack>
+                  {(player.salary ?? 0) > 0 && (
+                    <Text
+                      fontSize="$3"
+                      fontWeight="700"
+                      color={BRAND_GOLD_LIGHT}
+                    >
+                      ${(player.salary ?? 0).toLocaleString()}
+                    </Text>
+                  )}
                   <Text
                     fontSize="$2"
                     color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}
@@ -576,6 +592,9 @@ const BenchList = ({
 export interface LeagueRosterManagementProps {
   positions: readonly LeaguePositionFragment[];
   teamPlayers: readonly TeamMemberFragment[];
+  team?: Pick<TeamFragment, 'totalPayroll' | 'capSpace'> | null;
+  salaryCapEnabled?: boolean | null;
+  salaryCap?: number | null;
   onPlayerAssign: (
     player: TeamMemberFragment,
     position: LeaguePositionFragment,
@@ -587,6 +606,9 @@ export interface LeagueRosterManagementProps {
 export function LeagueRosterManagement({
   positions,
   teamPlayers,
+  team,
+  salaryCapEnabled,
+  salaryCap,
   onPlayerAssign,
   onPlayerRemove,
   loading = false,
@@ -702,6 +724,37 @@ export function LeagueRosterManagement({
                         : 'Fill before first pitch'
                     }
                   />
+                  {salaryCapEnabled && team?.totalPayroll != null && (
+                    <SummaryStat
+                      label="Total Payroll"
+                      value={`$${team.totalPayroll.toLocaleString()}`}
+                      description={
+                        salaryCap != null
+                          ? `Cap: $${salaryCap.toLocaleString()}`
+                          : undefined
+                      }
+                    />
+                  )}
+                  {salaryCapEnabled && team?.capSpace != null && (
+                    <SummaryStat
+                      label="Cap Space"
+                      value={
+                        team.capSpace < 0
+                          ? `-$${Math.abs(team.capSpace).toLocaleString()}`
+                          : `$${team.capSpace.toLocaleString()}`
+                      }
+                      tone={
+                        team.capSpace < 0
+                          ? 'danger'
+                          : team.capSpace < (salaryCap ?? 0) * 0.1
+                            ? 'warning'
+                            : 'positive'
+                      }
+                      description={
+                        team.capSpace < 0 ? 'Over the cap' : 'Remaining space'
+                      }
+                    />
+                  )}
                 </XStack>
               </XStack>
               {selectedPlayer ? (

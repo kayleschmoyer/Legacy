@@ -64,6 +64,28 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+/** Per-team budget tracking during an auction draft */
+export type AuctionBudget = {
+  __typename?: 'AuctionBudget';
+  maxBid?: Maybe<Scalars['Int']['output']>;
+  playersWon?: Maybe<Scalars['Int']['output']>;
+  remainingBudget?: Maybe<Scalars['Int']['output']>;
+  team?: Maybe<Team>;
+};
+
+/** Live state of an auction draft in progress */
+export type AuctionState = {
+  __typename?: 'AuctionState';
+  bidDeadline?: Maybe<Scalars['String']['output']>;
+  currentBid?: Maybe<Scalars['Int']['output']>;
+  currentBidder?: Maybe<Team>;
+  draftId?: Maybe<Scalars['Int']['output']>;
+  nominatedPlayer?: Maybe<Player>;
+  nominationDeadline?: Maybe<Scalars['String']['output']>;
+  nominationOrder?: Maybe<Scalars['Int']['output']>;
+  nominatorTeam?: Maybe<Team>;
+};
+
 /** Result of the automated weekly matchup advancement across all active leagues */
 export type AutoAdvanceMatchupsResult = {
   __typename?: 'AutoAdvanceMatchupsResult';
@@ -313,6 +335,8 @@ export enum ConsentType {
 }
 
 export type CreateLeagueAndTeamsInput = {
+  auctionBudget?: InputMaybe<Scalars['Int']['input']>;
+  auctionMinBid?: InputMaybe<Scalars['Int']['input']>;
   customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
   customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
   draftMode?: InputMaybe<Scalars['String']['input']>;
@@ -322,12 +346,19 @@ export type CreateLeagueAndTeamsInput = {
   hofOnly?: InputMaybe<Scalars['Boolean']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
   leagueName: Scalars['String']['input'];
+  luxuryTaxThreshold?: InputMaybe<Scalars['Int']['input']>;
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
   maxPitchers?: InputMaybe<Scalars['Int']['input']>;
   maxRosterSize?: InputMaybe<Scalars['Int']['input']>;
+  minSalary?: InputMaybe<Scalars['Int']['input']>;
   numberOfDivisions?: InputMaybe<Scalars['Int']['input']>;
   numberOfTeams: Scalars['Int']['input'];
   playerPool: Scalars['String']['input'];
+  salaryCap?: InputMaybe<Scalars['Int']['input']>;
+  salaryCapEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  salaryDecayPct?: InputMaybe<Scalars['Int']['input']>;
+  salaryEscalationPct?: InputMaybe<Scalars['Int']['input']>;
+  salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   schedulingStrategy?: InputMaybe<Scalars['String']['input']>;
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
   startDate?: InputMaybe<Scalars['String']['input']>;
@@ -655,6 +686,8 @@ export type JoinLeaguePayload = {
 /** A fantasy sports league */
 export type League = {
   __typename?: 'League';
+  auctionBudget?: Maybe<Scalars['Int']['output']>;
+  auctionMinBid?: Maybe<Scalars['Int']['output']>;
   bannerUrl?: Maybe<Scalars['String']['output']>;
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   currentWeek?: Maybe<Scalars['Int']['output']>;
@@ -670,9 +703,11 @@ export type League = {
   isPublic?: Maybe<Scalars['Boolean']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
   logoUrl?: Maybe<Scalars['String']['output']>;
+  luxuryTaxThreshold?: Maybe<Scalars['Int']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
   minCareerSeasons?: Maybe<Scalars['Int']['output']>;
+  minSalary?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
@@ -681,6 +716,11 @@ export type League = {
   playoffMultiWeek?: Maybe<Scalars['Boolean']['output']>;
   previousLeagueId?: Maybe<Scalars['Int']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
+  salaryCap?: Maybe<Scalars['Int']['output']>;
+  salaryCapEnabled?: Maybe<Scalars['Boolean']['output']>;
+  salaryDecayPct?: Maybe<Scalars['Int']['output']>;
+  salaryEscalationPct?: Maybe<Scalars['Int']['output']>;
+  salaryFloor?: Maybe<Scalars['Int']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
@@ -1046,7 +1086,9 @@ export type Mutation = {
   makeSeasonDraftPick?: Maybe<Scalars['Boolean']['output']>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
+  nominatePlayer?: Maybe<AuctionState>;
   pauseDraft?: Maybe<Draft>;
+  placeBid?: Maybe<AuctionState>;
   postLeagueAnnouncement?: Maybe<LeagueChatMessage>;
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
@@ -1331,8 +1373,18 @@ export type MutationMarkNotificationAsReadArgs = {
   notificationId: Scalars['Int']['input'];
 };
 
+export type MutationNominatePlayerArgs = {
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+};
+
 export type MutationPauseDraftArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationPlaceBidArgs = {
+  amount: Scalars['Int']['input'];
+  draftId: Scalars['Int']['input'];
 };
 
 export type MutationPostLeagueAnnouncementArgs = {
@@ -1812,6 +1864,8 @@ export type Query = {
   achievementRestrictions?: Maybe<Array<AchievementRestriction>>;
   /** List all badge definitions available in the system */
   allBadgeDefinitions?: Maybe<Array<BadgeDefinition>>;
+  auctionBudgets?: Maybe<Array<AuctionBudget>>;
+  auctionState?: Maybe<AuctionState>;
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
@@ -1931,6 +1985,14 @@ export type Query = {
 
 export type QueryAchievementRestrictionsArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryAuctionBudgetsArgs = {
+  draftId: Scalars['Int']['input'];
+};
+
+export type QueryAuctionStateArgs = {
+  draftId: Scalars['Int']['input'];
 };
 
 export type QueryCareerBattingStatsArgs = {
@@ -2679,6 +2741,8 @@ export type Team = {
   __typename?: 'Team';
   avatarUrl?: Maybe<Scalars['String']['output']>;
   bannerUrl?: Maybe<Scalars['String']['output']>;
+  /** Remaining salary cap space for this team (league.salaryCap - totalPayroll). Null if cap is not enabled or no cap limit is set. */
+  capSpace?: Maybe<Scalars['Int']['output']>;
   createdAt?: Maybe<Scalars['String']['output']>;
   divisionId?: Maybe<Scalars['Int']['output']>;
   faabBudget?: Maybe<Scalars['Int']['output']>;
@@ -2691,6 +2755,8 @@ export type Team = {
   name?: Maybe<Scalars['String']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
+  /** Total salary cap payroll for this team (sum of team_members.salary). Null if the league does not have salary cap enabled. */
+  totalPayroll?: Maybe<Scalars['Int']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   waiverOrder?: Maybe<Scalars['Int']['output']>;
 };
@@ -2704,6 +2770,8 @@ export type TeamMember = {
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   positionId?: Maybe<Scalars['Int']['output']>;
+  /** Current salary cap hit for this roster slot. Null in non-salary-cap leagues. */
+  salary?: Maybe<Scalars['Int']['output']>;
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -2839,16 +2907,25 @@ export type UpdateLeagueScoringMultiplierInput = {
 };
 
 export type UpdateLeagueSettingsInput = {
+  auctionBudget?: InputMaybe<Scalars['Int']['input']>;
+  auctionMinBid?: InputMaybe<Scalars['Int']['input']>;
   bannerUrl?: InputMaybe<Scalars['String']['input']>;
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
   logoUrl?: InputMaybe<Scalars['String']['input']>;
+  luxuryTaxThreshold?: InputMaybe<Scalars['Int']['input']>;
   minCareerGames?: InputMaybe<Scalars['Int']['input']>;
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
+  minSalary?: InputMaybe<Scalars['Int']['input']>;
   playoffEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   playoffFormat?: InputMaybe<Scalars['String']['input']>;
   playoffMultiWeek?: InputMaybe<Scalars['Boolean']['input']>;
   primaryColor?: InputMaybe<Scalars['String']['input']>;
+  salaryCap?: InputMaybe<Scalars['Int']['input']>;
+  salaryCapEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  salaryDecayPct?: InputMaybe<Scalars['Int']['input']>;
+  salaryEscalationPct?: InputMaybe<Scalars['Int']['input']>;
+  salaryFloor?: InputMaybe<Scalars['Int']['input']>;
   secondaryColor?: InputMaybe<Scalars['String']['input']>;
   spStartsPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
@@ -3470,6 +3547,15 @@ export type LeagueFragment = {
   previousLeagueId?: number | null;
   frozenAt?: string | null;
   seasonNumber?: number | null;
+  salaryCapEnabled?: boolean | null;
+  salaryCap?: number | null;
+  salaryFloor?: number | null;
+  luxuryTaxThreshold?: number | null;
+  minSalary?: number | null;
+  salaryEscalationPct?: number | null;
+  salaryDecayPct?: number | null;
+  auctionBudget?: number | null;
+  auctionMinBid?: number | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -3533,6 +3619,15 @@ export type GetLeagueByIdQuery = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
+    salaryFloor?: number | null;
+    luxuryTaxThreshold?: number | null;
+    minSalary?: number | null;
+    salaryEscalationPct?: number | null;
+    salaryDecayPct?: number | null;
+    auctionBudget?: number | null;
+    auctionMinBid?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3584,6 +3679,15 @@ export type CreateLeagueAndTeamsMutation = {
       previousLeagueId?: number | null;
       frozenAt?: string | null;
       seasonNumber?: number | null;
+      salaryCapEnabled?: boolean | null;
+      salaryCap?: number | null;
+      salaryFloor?: number | null;
+      luxuryTaxThreshold?: number | null;
+      minSalary?: number | null;
+      salaryEscalationPct?: number | null;
+      salaryDecayPct?: number | null;
+      auctionBudget?: number | null;
+      auctionMinBid?: number | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -3632,6 +3736,15 @@ export type GetUserLeaguesQuery = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
+    salaryFloor?: number | null;
+    luxuryTaxThreshold?: number | null;
+    minSalary?: number | null;
+    salaryEscalationPct?: number | null;
+    salaryDecayPct?: number | null;
+    auctionBudget?: number | null;
+    auctionMinBid?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3712,6 +3825,15 @@ export type StartDraftMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
+    salaryFloor?: number | null;
+    luxuryTaxThreshold?: number | null;
+    minSalary?: number | null;
+    salaryEscalationPct?: number | null;
+    salaryDecayPct?: number | null;
+    auctionBudget?: number | null;
+    auctionMinBid?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3895,6 +4017,15 @@ export type UpdateLeagueSettingsMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
+    salaryFloor?: number | null;
+    luxuryTaxThreshold?: number | null;
+    minSalary?: number | null;
+    salaryEscalationPct?: number | null;
+    salaryDecayPct?: number | null;
+    auctionBudget?: number | null;
+    auctionMinBid?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3987,12 +4118,175 @@ export type RenewLeagueMutation = {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
+    salaryFloor?: number | null;
+    luxuryTaxThreshold?: number | null;
+    minSalary?: number | null;
+    salaryEscalationPct?: number | null;
+    salaryDecayPct?: number | null;
+    auctionBudget?: number | null;
+    auctionMinBid?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
       userId?: number | null;
       teamId?: number | null;
       permissionLevel?: string | null;
+    } | null;
+  } | null;
+};
+
+export type AuctionStateFragmentFragment = {
+  __typename?: 'AuctionState';
+  draftId?: number | null;
+  currentBid?: number | null;
+  nominationDeadline?: string | null;
+  bidDeadline?: string | null;
+  nominationOrder?: number | null;
+  nominatorTeam?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+  nominatedPlayer?: {
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null;
+  currentBidder?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+};
+
+export type AuctionBudgetFragmentFragment = {
+  __typename?: 'AuctionBudget';
+  remainingBudget?: number | null;
+  playersWon?: number | null;
+  maxBid?: number | null;
+  team?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+};
+
+export type GetAuctionStateQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type GetAuctionStateQuery = {
+  __typename?: 'Query';
+  auctionState?: {
+    __typename?: 'AuctionState';
+    draftId?: number | null;
+    currentBid?: number | null;
+    nominationDeadline?: string | null;
+    bidDeadline?: string | null;
+    nominationOrder?: number | null;
+    nominatorTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    nominatedPlayer?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+    currentBidder?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+  } | null;
+};
+
+export type GetAuctionBudgetsQueryVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+}>;
+
+export type GetAuctionBudgetsQuery = {
+  __typename?: 'Query';
+  auctionBudgets?: Array<{
+    __typename?: 'AuctionBudget';
+    remainingBudget?: number | null;
+    playersWon?: number | null;
+    maxBid?: number | null;
+    team?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type NominatePlayerMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type NominatePlayerMutation = {
+  __typename?: 'Mutation';
+  nominatePlayer?: {
+    __typename?: 'AuctionState';
+    draftId?: number | null;
+    currentBid?: number | null;
+    nominationDeadline?: string | null;
+    bidDeadline?: string | null;
+    nominationOrder?: number | null;
+    nominatorTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    nominatedPlayer?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+    currentBidder?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+  } | null;
+};
+
+export type PlaceBidMutationVariables = Exact<{
+  draftId: Scalars['Int']['input'];
+  amount: Scalars['Int']['input'];
+}>;
+
+export type PlaceBidMutation = {
+  __typename?: 'Mutation';
+  placeBid?: {
+    __typename?: 'AuctionState';
+    draftId?: number | null;
+    currentBid?: number | null;
+    nominationDeadline?: string | null;
+    bidDeadline?: string | null;
+    nominationOrder?: number | null;
+    nominatorTeam?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+    nominatedPlayer?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+    currentBidder?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
     } | null;
   } | null;
 };
@@ -6318,6 +6612,8 @@ export type TeamFragment = {
   secondaryColor?: string | null;
   avatarUrl?: string | null;
   bannerUrl?: string | null;
+  totalPayroll?: number | null;
+  capSpace?: number | null;
 };
 
 export type TeamMemberFragment = {
@@ -6328,6 +6624,7 @@ export type TeamMemberFragment = {
   teamId?: number | null;
   leagueId?: number | null;
   onTradeBlock?: boolean | null;
+  salary?: number | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -6357,6 +6654,7 @@ export type GetTeamMembersQuery = {
     teamId?: number | null;
     leagueId?: number | null;
     onTradeBlock?: boolean | null;
+    salary?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -6388,6 +6686,7 @@ export type UpdateTeamMemberPositionMutation = {
     teamId?: number | null;
     leagueId?: number | null;
     onTradeBlock?: boolean | null;
+    salary?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -6421,6 +6720,7 @@ export type SwapTeamMemberPositionsMutation = {
     teamId?: number | null;
     leagueId?: number | null;
     onTradeBlock?: boolean | null;
+    salary?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -6569,6 +6869,7 @@ export type SetTradeBlockMutation = {
     teamId?: number | null;
     leagueId?: number | null;
     onTradeBlock?: boolean | null;
+    salary?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -6599,6 +6900,7 @@ export type GetLeagueTradeBlockQuery = {
     teamId?: number | null;
     leagueId?: number | null;
     onTradeBlock?: boolean | null;
+    salary?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7081,6 +7383,15 @@ export const LeagueFragmentDoc = gql`
     previousLeagueId
     frozenAt
     seasonNumber
+    salaryCapEnabled
+    salaryCap
+    salaryFloor
+    luxuryTaxThreshold
+    minSalary
+    salaryEscalationPct
+    salaryDecayPct
+    auctionBudget
+    auctionMinBid
     userMembership {
       ...LeagueMember
     }
@@ -7092,6 +7403,39 @@ export const LeaguePositionFragmentDoc = gql`
     id
     leagueId
     positionType
+  }
+`;
+export const AuctionStateFragmentFragmentDoc = gql`
+  fragment AuctionStateFragment on AuctionState {
+    draftId
+    nominatorTeam {
+      id
+      name
+    }
+    nominatedPlayer {
+      id
+      firstName
+      lastName
+    }
+    currentBid
+    currentBidder {
+      id
+      name
+    }
+    nominationDeadline
+    bidDeadline
+    nominationOrder
+  }
+`;
+export const AuctionBudgetFragmentFragmentDoc = gql`
+  fragment AuctionBudgetFragment on AuctionBudget {
+    team {
+      id
+      name
+    }
+    remainingBudget
+    playersWon
+    maxBid
   }
 `;
 export const MatchupFragmentDoc = gql`
@@ -7395,6 +7739,8 @@ export const TeamFragmentDoc = gql`
     secondaryColor
     avatarUrl
     bannerUrl
+    totalPayroll
+    capSpace
   }
 `;
 export const TeamMemberFragmentDoc = gql`
@@ -7405,6 +7751,7 @@ export const TeamMemberFragmentDoc = gql`
     teamId
     leagueId
     onTradeBlock
+    salary
     player {
       id
       firstName
@@ -10411,6 +10758,289 @@ export type RenewLeagueMutationResult =
 export type RenewLeagueMutationOptions = BaseMutationOptions<
   RenewLeagueMutation,
   RenewLeagueMutationVariables
+>;
+export const GetAuctionState = gql`
+  query GetAuctionState($draftId: Int!) {
+    auctionState(draftId: $draftId) {
+      ...AuctionStateFragment
+    }
+  }
+  ${AuctionStateFragmentFragmentDoc}
+`;
+
+/**
+ * __useGetAuctionStateQuery__
+ *
+ * To run a query within a React component, call `useGetAuctionStateQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAuctionStateQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAuctionStateQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useGetAuctionStateQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetAuctionStateQuery,
+    GetAuctionStateQueryVariables
+  > &
+    (
+      | { variables: GetAuctionStateQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetAuctionStateQuery, GetAuctionStateQueryVariables>(
+    GetAuctionState,
+    options,
+  );
+}
+export function useGetAuctionStateLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetAuctionStateQuery,
+    GetAuctionStateQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetAuctionStateQuery,
+    GetAuctionStateQueryVariables
+  >(GetAuctionState, options);
+}
+export function useGetAuctionStateSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAuctionStateQuery,
+        GetAuctionStateQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetAuctionStateQuery,
+    GetAuctionStateQueryVariables
+  >(
+    GetAuctionState,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetAuctionStateQuery,
+          GetAuctionStateQueryVariables
+        >,
+  );
+}
+export type GetAuctionStateQueryHookResult = ReturnType<
+  typeof useGetAuctionStateQuery
+>;
+export type GetAuctionStateLazyQueryHookResult = ReturnType<
+  typeof useGetAuctionStateLazyQuery
+>;
+export type GetAuctionStateSuspenseQueryHookResult = ReturnType<
+  typeof useGetAuctionStateSuspenseQuery
+>;
+export type GetAuctionStateQueryResult = Apollo.QueryResult<
+  GetAuctionStateQuery,
+  GetAuctionStateQueryVariables
+>;
+export const GetAuctionBudgets = gql`
+  query GetAuctionBudgets($draftId: Int!) {
+    auctionBudgets(draftId: $draftId) {
+      ...AuctionBudgetFragment
+    }
+  }
+  ${AuctionBudgetFragmentFragmentDoc}
+`;
+
+/**
+ * __useGetAuctionBudgetsQuery__
+ *
+ * To run a query within a React component, call `useGetAuctionBudgetsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAuctionBudgetsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAuctionBudgetsQuery({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *   },
+ * });
+ */
+export function useGetAuctionBudgetsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetAuctionBudgetsQuery,
+    GetAuctionBudgetsQueryVariables
+  > &
+    (
+      | { variables: GetAuctionBudgetsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetAuctionBudgetsQuery,
+    GetAuctionBudgetsQueryVariables
+  >(GetAuctionBudgets, options);
+}
+export function useGetAuctionBudgetsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetAuctionBudgetsQuery,
+    GetAuctionBudgetsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetAuctionBudgetsQuery,
+    GetAuctionBudgetsQueryVariables
+  >(GetAuctionBudgets, options);
+}
+export function useGetAuctionBudgetsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAuctionBudgetsQuery,
+        GetAuctionBudgetsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetAuctionBudgetsQuery,
+    GetAuctionBudgetsQueryVariables
+  >(
+    GetAuctionBudgets,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetAuctionBudgetsQuery,
+          GetAuctionBudgetsQueryVariables
+        >,
+  );
+}
+export type GetAuctionBudgetsQueryHookResult = ReturnType<
+  typeof useGetAuctionBudgetsQuery
+>;
+export type GetAuctionBudgetsLazyQueryHookResult = ReturnType<
+  typeof useGetAuctionBudgetsLazyQuery
+>;
+export type GetAuctionBudgetsSuspenseQueryHookResult = ReturnType<
+  typeof useGetAuctionBudgetsSuspenseQuery
+>;
+export type GetAuctionBudgetsQueryResult = Apollo.QueryResult<
+  GetAuctionBudgetsQuery,
+  GetAuctionBudgetsQueryVariables
+>;
+export const NominatePlayer = gql`
+  mutation NominatePlayer($draftId: Int!, $playerId: Int!) {
+    nominatePlayer(draftId: $draftId, playerId: $playerId) {
+      ...AuctionStateFragment
+    }
+  }
+  ${AuctionStateFragmentFragmentDoc}
+`;
+export type NominatePlayerMutationFn = MutationFunction<
+  NominatePlayerMutation,
+  NominatePlayerMutationVariables
+>;
+
+/**
+ * __useNominatePlayerMutation__
+ *
+ * To run a mutation, you first call `useNominatePlayerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useNominatePlayerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [nominatePlayerMutation, { data, loading, error }] = useNominatePlayerMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useNominatePlayerMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    NominatePlayerMutation,
+    NominatePlayerMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    NominatePlayerMutation,
+    NominatePlayerMutationVariables
+  >(NominatePlayer, options);
+}
+export type NominatePlayerMutationHookResult = ReturnType<
+  typeof useNominatePlayerMutation
+>;
+export type NominatePlayerMutationResult =
+  Apollo.MutationResult<NominatePlayerMutation>;
+export type NominatePlayerMutationOptions = BaseMutationOptions<
+  NominatePlayerMutation,
+  NominatePlayerMutationVariables
+>;
+export const PlaceBid = gql`
+  mutation PlaceBid($draftId: Int!, $amount: Int!) {
+    placeBid(draftId: $draftId, amount: $amount) {
+      ...AuctionStateFragment
+    }
+  }
+  ${AuctionStateFragmentFragmentDoc}
+`;
+export type PlaceBidMutationFn = MutationFunction<
+  PlaceBidMutation,
+  PlaceBidMutationVariables
+>;
+
+/**
+ * __usePlaceBidMutation__
+ *
+ * To run a mutation, you first call `usePlaceBidMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `usePlaceBidMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [placeBidMutation, { data, loading, error }] = usePlaceBidMutation({
+ *   variables: {
+ *      draftId: // value for 'draftId'
+ *      amount: // value for 'amount'
+ *   },
+ * });
+ */
+export function usePlaceBidMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    PlaceBidMutation,
+    PlaceBidMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<PlaceBidMutation, PlaceBidMutationVariables>(
+    PlaceBid,
+    options,
+  );
+}
+export type PlaceBidMutationHookResult = ReturnType<typeof usePlaceBidMutation>;
+export type PlaceBidMutationResult = Apollo.MutationResult<PlaceBidMutation>;
+export type PlaceBidMutationOptions = BaseMutationOptions<
+  PlaceBidMutation,
+  PlaceBidMutationVariables
 >;
 export const InitializeLiveDraft = gql`
   mutation InitializeLiveDraft(

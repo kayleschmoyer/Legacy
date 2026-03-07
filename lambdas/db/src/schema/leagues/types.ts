@@ -81,6 +81,16 @@ export const League = builder.objectRef<{
   frozenAt?: string | null;
   /** Monotonic season counter (1 = founding, incremented on renewal) */
   seasonNumber?: number;
+  // ── Salary cap settings (LS-634/LS-646) ─────────────────────────────
+  salaryCapEnabled?: boolean;
+  salaryCap?: number | null;
+  salaryFloor?: number | null;
+  luxuryTaxThreshold?: number | null;
+  minSalary?: number;
+  salaryEscalationPct?: number;
+  salaryDecayPct?: number;
+  auctionBudget?: number;
+  auctionMinBid?: number;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -149,6 +159,16 @@ League.implement({
         return loadLeagueScoringConfig(parent.id);
       },
     }),
+    // ── Salary cap settings ──────────────────────────────────────────
+    salaryCapEnabled: t.exposeBoolean('salaryCapEnabled', { nullable: true }),
+    salaryCap: t.exposeInt('salaryCap', { nullable: true }),
+    salaryFloor: t.exposeInt('salaryFloor', { nullable: true }),
+    luxuryTaxThreshold: t.exposeInt('luxuryTaxThreshold', { nullable: true }),
+    minSalary: t.exposeInt('minSalary', { nullable: true }),
+    salaryEscalationPct: t.exposeInt('salaryEscalationPct', { nullable: true }),
+    salaryDecayPct: t.exposeInt('salaryDecayPct', { nullable: true }),
+    auctionBudget: t.exposeInt('auctionBudget', { nullable: true }),
+    auctionMinBid: t.exposeInt('auctionMinBid', { nullable: true }),
     userMembership: t.field({
       type: LeagueMember,
       nullable: true,

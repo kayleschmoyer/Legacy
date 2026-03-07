@@ -43,6 +43,30 @@ type AdvanceLeagueWeekResponse {
 }
 
 """
+Per-team budget tracking during an auction draft
+"""
+type AuctionBudget {
+  maxBid: Int
+  playersWon: Int
+  remainingBudget: Int
+  team: Team
+}
+
+"""
+Live state of an auction draft in progress
+"""
+type AuctionState {
+  bidDeadline: String
+  currentBid: Int
+  currentBidder: Team
+  draftId: Int
+  nominatedPlayer: Player
+  nominationDeadline: String
+  nominationOrder: Int
+  nominatorTeam: Team
+}
+
+"""
 Result of the automated weekly matchup advancement across all active leagues
 """
 type AutoAdvanceMatchupsResult {
@@ -350,6 +374,8 @@ enum ConsentType {
 }
 
 input CreateLeagueAndTeamsInput {
+  auctionBudget: Int
+  auctionMinBid: Int
   customEraEndYear: Int
   customEraStartYear: Int
   draftMode: String
@@ -359,12 +385,19 @@ input CreateLeagueAndTeamsInput {
   hofOnly: Boolean
   isPublic: Boolean
   leagueName: String!
+  luxuryTaxThreshold: Int
   maxBatters: Int
   maxPitchers: Int
   maxRosterSize: Int
+  minSalary: Int
   numberOfDivisions: Int
   numberOfTeams: Int!
   playerPool: String!
+  salaryCap: Int
+  salaryCapEnabled: Boolean
+  salaryDecayPct: Int
+  salaryEscalationPct: Int
+  salaryFloor: Int
   schedulingStrategy: String
   selectionMethod: String
   startDate: String
@@ -721,6 +754,8 @@ type JoinLeaguePayload {
 A fantasy sports league
 """
 type League {
+  auctionBudget: Int
+  auctionMinBid: Int
   bannerUrl: String
   currentMatchup: Int
   currentWeek: Int
@@ -739,9 +774,11 @@ type League {
   isPublic: Boolean
   lmNotes: String
   logoUrl: String
+  luxuryTaxThreshold: Int
   maxRosterSize: Int
   minCareerGames: Int
   minCareerSeasons: Int
+  minSalary: Int
   name: String
   owner: Int
   playerPool: String
@@ -750,6 +787,11 @@ type League {
   playoffMultiWeek: Boolean
   previousLeagueId: Int
   primaryColor: String
+  salaryCap: Int
+  salaryCapEnabled: Boolean
+  salaryDecayPct: Int
+  salaryEscalationPct: Int
+  salaryFloor: Int
   scoringProfile: ScoringConfig
   seasonNumber: Int
   secondaryColor: String
@@ -1315,7 +1357,9 @@ type Mutation {
   ): Boolean
   markAllNotificationsAsRead: Boolean
   markNotificationAsRead(notificationId: Int!): Boolean
+  nominatePlayer(draftId: Int!, playerId: Int!): AuctionState
   pauseDraft(leagueId: Int!): Draft
+  placeBid(amount: Int!, draftId: Int!): AuctionState
   postLeagueAnnouncement(
     leagueId: Int!
     messageText: String!
@@ -1819,6 +1863,8 @@ type Query {
   List all badge definitions available in the system
   """
   allBadgeDefinitions: [BadgeDefinition!]
+  auctionBudgets(draftId: Int!): [AuctionBudget!]
+  auctionState(draftId: Int!): AuctionState
   careerBattingStats(
     after: String
     first: Int
@@ -2646,16 +2692,25 @@ input UpdateLeagueScoringMultiplierInput {
 }
 
 input UpdateLeagueSettingsInput {
+  auctionBudget: Int
+  auctionMinBid: Int
   bannerUrl: String
   gamesPerMatchup: Int
   leagueId: Int!
   logoUrl: String
+  luxuryTaxThreshold: Int
   minCareerGames: Int
   minCareerSeasons: Int
+  minSalary: Int
   playoffEnabled: Boolean
   playoffFormat: String
   playoffMultiWeek: Boolean
   primaryColor: String
+  salaryCap: Int
+  salaryCapEnabled: Boolean
+  salaryDecayPct: Int
+  salaryEscalationPct: Int
+  salaryFloor: Int
   secondaryColor: String
   spStartsPerMatchup: Int
   totalMatchups: Int

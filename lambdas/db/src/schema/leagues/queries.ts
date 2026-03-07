@@ -55,6 +55,16 @@ builder.queryField('league', (t) =>
             waiverEnabled: PublicSchema.leagues.waiverEnabled,
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
             isPublic: PublicSchema.leagues.isPublic,
+            // Salary cap settings (LS-646)
+            salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+            salaryCap: PublicSchema.leagues.salaryCap,
+            salaryFloor: PublicSchema.leagues.salaryFloor,
+            luxuryTaxThreshold: PublicSchema.leagues.luxuryTaxThreshold,
+            minSalary: PublicSchema.leagues.minSalary,
+            salaryEscalationPct: PublicSchema.leagues.salaryEscalationPct,
+            salaryDecayPct: PublicSchema.leagues.salaryDecayPct,
+            auctionBudget: PublicSchema.leagues.auctionBudget,
+            auctionMinBid: PublicSchema.leagues.auctionMinBid,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -111,6 +121,16 @@ builder.queryField('league', (t) =>
           waiverEnabled: league.waiverEnabled,
           faabBudgetDefault: league.faabBudgetDefault,
           isPublic: league.isPublic,
+          // Salary cap settings
+          salaryCapEnabled: league.salaryCapEnabled,
+          salaryCap: league.salaryCap,
+          salaryFloor: league.salaryFloor,
+          luxuryTaxThreshold: league.luxuryTaxThreshold,
+          minSalary: league.minSalary,
+          salaryEscalationPct: league.salaryEscalationPct,
+          salaryDecayPct: league.salaryDecayPct,
+          auctionBudget: league.auctionBudget,
+          auctionMinBid: league.auctionMinBid,
           userMembership,
         };
       } catch (error) {
@@ -157,6 +177,16 @@ builder.queryField('userLeagues', (t) =>
             waiverEnabled: PublicSchema.leagues.waiverEnabled,
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
             isPublic: PublicSchema.leagues.isPublic,
+            // Salary cap settings (LS-646)
+            salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+            salaryCap: PublicSchema.leagues.salaryCap,
+            salaryFloor: PublicSchema.leagues.salaryFloor,
+            luxuryTaxThreshold: PublicSchema.leagues.luxuryTaxThreshold,
+            minSalary: PublicSchema.leagues.minSalary,
+            salaryEscalationPct: PublicSchema.leagues.salaryEscalationPct,
+            salaryDecayPct: PublicSchema.leagues.salaryDecayPct,
+            auctionBudget: PublicSchema.leagues.auctionBudget,
+            auctionMinBid: PublicSchema.leagues.auctionMinBid,
           })
           .from(PublicSchema.leagues)
           .innerJoin(
@@ -181,6 +211,16 @@ builder.queryField('userLeagues', (t) =>
           waiverEnabled: league.waiverEnabled,
           faabBudgetDefault: league.faabBudgetDefault,
           isPublic: league.isPublic,
+          // Salary cap settings
+          salaryCapEnabled: league.salaryCapEnabled,
+          salaryCap: league.salaryCap,
+          salaryFloor: league.salaryFloor,
+          luxuryTaxThreshold: league.luxuryTaxThreshold,
+          minSalary: league.minSalary,
+          salaryEscalationPct: league.salaryEscalationPct,
+          salaryDecayPct: league.salaryDecayPct,
+          auctionBudget: league.auctionBudget,
+          auctionMinBid: league.auctionMinBid,
         }));
       } catch (error) {
         LOGGER.error('Failed to fetch user leagues', {

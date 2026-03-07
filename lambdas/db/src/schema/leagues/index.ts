@@ -14,5 +14,8 @@ import './queries';
 // Mutation fields
 import './mutations';
 
+// Auction draft types, queries, and mutations (LS-646)
+import './auction';
+
 // Re-export types that other schema modules need
 export { Team, CommissionerAuditLog } from './types';

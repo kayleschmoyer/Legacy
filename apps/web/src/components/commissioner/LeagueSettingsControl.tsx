@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   H4,
+  Input,
   Separator,
   Spinner,
   Text,
@@ -23,6 +24,9 @@ export interface LeagueSettingsControlProps {
   currentPlayoffEnabled?: boolean;
   currentPlayoffFormat?: string;
   currentPlayoffMultiWeek?: boolean;
+  // Salary cap settings (LS-646)
+  currentSalaryCapEnabled?: boolean;
+  currentSalaryCap?: number | null;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
 }
@@ -86,6 +90,8 @@ export function LeagueSettingsControl({
   currentPlayoffEnabled = true,
   currentPlayoffFormat = '4-team',
   currentPlayoffMultiWeek = false,
+  currentSalaryCapEnabled = false,
+  currentSalaryCap = null,
   onSuccess,
   onError,
 }: LeagueSettingsControlProps) {
@@ -102,6 +108,12 @@ export function LeagueSettingsControl({
   const [playoffFormat, setPlayoffFormat] = useState(currentPlayoffFormat);
   const [playoffMultiWeek, setPlayoffMultiWeek] = useState(
     currentPlayoffMultiWeek,
+  );
+  const [salaryCapEnabled, setSalaryCapEnabled] = useState(
+    currentSalaryCapEnabled,
+  );
+  const [salaryCap, setSalaryCap] = useState<number | null | undefined>(
+    currentSalaryCap,
   );
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -374,6 +386,8 @@ export function LeagueSettingsControl({
             playoffEnabled,
             playoffFormat,
             playoffMultiWeek,
+            salaryCapEnabled,
+            salaryCap: salaryCapEnabled ? salaryCap : null,
           },
         },
         refetchQueries: ['GetLeagueById'],
@@ -398,6 +412,8 @@ export function LeagueSettingsControl({
     setPlayoffEnabled(currentPlayoffEnabled);
     setPlayoffFormat(currentPlayoffFormat);
     setPlayoffMultiWeek(currentPlayoffMultiWeek);
+    setSalaryCapEnabled(currentSalaryCapEnabled);
+    setSalaryCap(currentSalaryCap);
     setHasChanges(false);
   };
 
@@ -889,6 +905,78 @@ export function LeagueSettingsControl({
             </YStack>
           </>
         )}
+
+        {/* Salary Cap Settings (LS-646) */}
+        <Separator />
+        <YStack gap="$3">
+          <Text fontWeight="600" fontSize="$4">
+            Salary Cap
+          </Text>
+          <Text fontSize="$2" color="$gray10">
+            Control player salary limits and roster spending caps.
+          </Text>
+          <XStack
+            alignItems="center"
+            gap="$3"
+            padding="$3"
+            borderRadius="$4"
+            borderWidth={1}
+            borderColor={
+              salaryCapEnabled
+                ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
+                : '$borderColor'
+            }
+            backgroundColor={
+              salaryCapEnabled ? withAlpha(BRAND_NAVY_LIGHT, 0.08) : '$color1'
+            }
+            cursor="pointer"
+            onPress={() => {
+              setSalaryCapEnabled(!salaryCapEnabled);
+              setHasChanges(true);
+            }}
+          >
+            <YStack
+              width={24}
+              height={24}
+              borderRadius={12}
+              borderWidth={2}
+              borderColor={salaryCapEnabled ? BRAND_NAVY_LIGHT : '$borderColor'}
+              backgroundColor={
+                salaryCapEnabled ? BRAND_NAVY_LIGHT : 'transparent'
+              }
+              alignItems="center"
+              justifyContent="center"
+            >
+              {salaryCapEnabled && <Check size={14} color="white" />}
+            </YStack>
+            <YStack flex={1}>
+              <Text fontWeight="600">Enable Salary Cap</Text>
+              <Text fontSize="$2" color="$gray10">
+                Track player salaries and enforce roster spending limits
+              </Text>
+            </YStack>
+          </XStack>
+          {salaryCapEnabled && (
+            <YStack gap="$2">
+              <Text fontSize="$3" fontWeight="600">
+                Salary Cap Limit
+              </Text>
+              <Input
+                value={salaryCap != null ? String(salaryCap) : ''}
+                onChangeText={(text: string) => {
+                  const n = parseInt(text, 10);
+                  setSalaryCap(isNaN(n) ? null : n);
+                  setHasChanges(true);
+                }}
+                placeholder="e.g. 50000000"
+                keyboardType="numeric"
+              />
+              <Text fontSize="$2" color="$gray10">
+                Maximum total salary each team can spend
+              </Text>
+            </YStack>
+          )}
+        </YStack>
 
         {/* Validation warning */}
         {validationError && (
