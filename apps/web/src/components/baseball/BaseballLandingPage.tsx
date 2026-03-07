@@ -1163,7 +1163,7 @@ export function BaseballLandingPage() {
               boxShadow: `0 16px 48px ${withAlpha(BLACK, 0.3)}, 0 0 0 1px ${withAlpha(BRAND_NAVY, 0.12)}`,
             }}
           >
-            <YStack space="$4" flex={1} overflow="hidden">
+            <YStack space="$3" flex={1} overflow="hidden">
               <YStack>
                 <H2 size="$6" id="create-league-title">
                   Create League
@@ -1175,9 +1175,10 @@ export function BaseballLandingPage() {
               </YStack>
 
               <YStack flex={1} overflow="scroll">
-                <YStack space="$4" paddingBottom="$2">
-                  <YStack space="$3">
-                    <Text fontWeight="600" color="$gray12">
+                <YStack space="$3" paddingBottom="$2">
+                  {/* League Name */}
+                  <YStack space="$1.5">
+                    <Text fontWeight="600" fontSize="$3" color="$gray12">
                       League Name
                     </Text>
                     <Input
@@ -1185,19 +1186,21 @@ export function BaseballLandingPage() {
                       value={leagueName}
                       onChangeText={setLeagueName}
                       autoFocus
+                      size="$3"
                       aria-label="League name"
                     />
                   </YStack>
 
-                  <YStack space="$3">
-                    <Text fontWeight="600" color="$gray12">
+                  {/* Number of Teams */}
+                  <YStack space="$1.5">
+                    <Text fontWeight="600" fontSize="$3" color="$gray12">
                       Number of Teams
                     </Text>
-                    <XStack gap="$2" flexWrap="wrap">
+                    <XStack gap="$1.5" flexWrap="wrap">
                       {[4, 6, 8, 10, 12, 14, 16].map((n) => (
                         <Button
                           key={n}
-                          size="$3"
+                          size="$2"
                           variant={teamCount === n ? 'primary' : 'outlined'}
                           onPress={() => setTeamCount(n)}
                           backgroundColor={
@@ -1210,240 +1213,9 @@ export function BaseballLandingPage() {
                           aria-pressed={teamCount === n}
                           aria-label={`Select ${n} teams`}
                         >
-                          <Text color={teamCount === n ? BRAND_GOLD : '$color'}>
-                            {n}
-                          </Text>
-                        </Button>
-                      ))}
-                    </XStack>
-                  </YStack>
-
-                  <YStack space="$3">
-                    <Text fontWeight="600" color="$gray12">
-                      Number of Divisions
-                    </Text>
-                    <XStack gap="$2" flexWrap="wrap">
-                      {[1, 2, 3, 4].map((n) => (
-                        <Button
-                          key={n}
-                          size="$3"
-                          onPress={() => setNumberOfDivisions(n)}
-                          backgroundColor={
-                            numberOfDivisions === n
-                              ? BRAND_NAVY_LIGHT
-                              : '$color2'
-                          }
-                          borderColor={
-                            numberOfDivisions === n
-                              ? BRAND_NAVY_LIGHT
-                              : '$borderColor'
-                          }
-                          borderWidth={numberOfDivisions === n ? 2 : 1}
-                          aria-pressed={numberOfDivisions === n}
-                          aria-label={`${n} division${n === 1 ? '' : 's'}`}
-                        >
                           <Text
-                            color={
-                              numberOfDivisions === n ? BRAND_GOLD : '$color'
-                            }
-                          >
-                            {n === 1 ? 'No Divisions' : `${n} Divisions`}
-                          </Text>
-                        </Button>
-                      ))}
-                    </XStack>
-                  </YStack>
-
-                  <YStack space="$3">
-                    <Text fontWeight="600" color="$gray12">
-                      Player Pool
-                    </Text>
-                    <XStack gap="$2" flexWrap="wrap">
-                      {(
-                        [
-                          ['all', 'All MLB'],
-                          ['nl', 'NL Only'],
-                          ['al', 'AL Only'],
-                        ] as const
-                      ).map(([val, label]) => (
-                        <Button
-                          key={val}
-                          size="$3"
-                          onPress={() => setPlayerPool(val)}
-                          backgroundColor={
-                            playerPool === val ? BRAND_NAVY_LIGHT : '$color2'
-                          }
-                          borderColor={
-                            playerPool === val
-                              ? BRAND_NAVY_LIGHT
-                              : '$borderColor'
-                          }
-                          borderWidth={playerPool === val ? 2 : 1}
-                          aria-pressed={playerPool === val}
-                          aria-label={`Player pool: ${label}`}
-                        >
-                          <Text
-                            color={playerPool === val ? BRAND_GOLD : '$color'}
-                          >
-                            {label}
-                          </Text>
-                        </Button>
-                      ))}
-                    </XStack>
-                  </YStack>
-
-                  <YStack space="$3">
-                    <Text fontWeight="600" color="$gray12">
-                      Draft Mode
-                    </Text>
-                    <XStack gap="$2">
-                      {(
-                        [
-                          ['live', 'Live Draft'],
-                          ['automated', 'Auto Draft'],
-                        ] as const
-                      ).map(([val, label]) => (
-                        <Button
-                          key={val}
-                          size="$3"
-                          onPress={() => {
-                            setDraftMode(val);
-                            if (val === 'automated')
-                              setSelectionMethod('random');
-                          }}
-                          backgroundColor={
-                            draftMode === val ? BRAND_NAVY_LIGHT : '$color2'
-                          }
-                          borderColor={
-                            draftMode === val
-                              ? BRAND_NAVY_LIGHT
-                              : '$borderColor'
-                          }
-                          borderWidth={draftMode === val ? 2 : 1}
-                          aria-pressed={draftMode === val}
-                          aria-label={`Draft mode: ${label}`}
-                        >
-                          <Text
-                            color={draftMode === val ? BRAND_GOLD : '$color'}
-                          >
-                            {label}
-                          </Text>
-                        </Button>
-                      ))}
-                    </XStack>
-                  </YStack>
-
-                  <YStack space="$3">
-                    <Text fontWeight="600" color="$gray12">
-                      Selection Method
-                    </Text>
-                    <XStack gap="$2" flexWrap="wrap">
-                      {(
-                        [
-                          ['standard', 'Standard'],
-                          ['auction', 'Auction'],
-                          ['random', 'Random'],
-                        ] as const
-                      ).map(([val, label]) => (
-                        <Button
-                          key={val}
-                          size="$3"
-                          disabled={
-                            draftMode === 'automated' && val !== 'random'
-                          }
-                          onPress={() => setSelectionMethod(val)}
-                          backgroundColor={
-                            selectionMethod === val
-                              ? BRAND_NAVY_LIGHT
-                              : '$color2'
-                          }
-                          borderColor={
-                            selectionMethod === val
-                              ? BRAND_NAVY_LIGHT
-                              : '$borderColor'
-                          }
-                          borderWidth={selectionMethod === val ? 2 : 1}
-                          opacity={
-                            draftMode === 'automated' && val !== 'random'
-                              ? 0.4
-                              : 1
-                          }
-                          aria-pressed={selectionMethod === val}
-                          aria-label={`Selection method: ${label}`}
-                        >
-                          <Text
-                            color={
-                              selectionMethod === val ? BRAND_GOLD : '$color'
-                            }
-                          >
-                            {label}
-                          </Text>
-                        </Button>
-                      ))}
-                    </XStack>
-                  </YStack>
-
-                  <YStack space="$3">
-                    <Text fontWeight="600" color="$gray12">
-                      Draft Order
-                    </Text>
-                    <XStack gap="$2">
-                      {(
-                        [
-                          ['snake', 'Snake'],
-                          ['linear', 'Linear'],
-                        ] as const
-                      ).map(([val, label]) => (
-                        <Button
-                          key={val}
-                          size="$3"
-                          onPress={() => setDraftOrder(val)}
-                          backgroundColor={
-                            draftOrder === val ? BRAND_NAVY_LIGHT : '$color2'
-                          }
-                          borderColor={
-                            draftOrder === val
-                              ? BRAND_NAVY_LIGHT
-                              : '$borderColor'
-                          }
-                          borderWidth={draftOrder === val ? 2 : 1}
-                          aria-pressed={draftOrder === val}
-                          aria-label={`Draft order: ${label}`}
-                        >
-                          <Text
-                            color={draftOrder === val ? BRAND_GOLD : '$color'}
-                          >
-                            {label}
-                          </Text>
-                        </Button>
-                      ))}
-                    </XStack>
-                  </YStack>
-
-                  <YStack space="$3">
-                    <Text fontWeight="600" color="$gray12">
-                      Max Roster Size
-                    </Text>
-                    <XStack gap="$2" flexWrap="wrap">
-                      {[20, 22, 25, 30, 35, 40].map((n) => (
-                        <Button
-                          key={n}
-                          size="$3"
-                          onPress={() => setMaxRosterSize(n)}
-                          backgroundColor={
-                            maxRosterSize === n ? BRAND_NAVY_LIGHT : '$color2'
-                          }
-                          borderColor={
-                            maxRosterSize === n
-                              ? BRAND_NAVY_LIGHT
-                              : '$borderColor'
-                          }
-                          borderWidth={maxRosterSize === n ? 2 : 1}
-                          aria-pressed={maxRosterSize === n}
-                          aria-label={`Max roster size: ${n}`}
-                        >
-                          <Text
-                            color={maxRosterSize === n ? BRAND_GOLD : '$color'}
+                            fontSize="$2"
+                            color={teamCount === n ? BRAND_GOLD : '$color'}
                           >
                             {n}
                           </Text>
@@ -1452,39 +1224,288 @@ export function BaseballLandingPage() {
                     </XStack>
                   </YStack>
 
-                  <YStack space="$2">
-                    <XStack alignItems="center" justifyContent="space-between">
-                      <YStack>
-                        <Text fontWeight="600" color="$gray12">
-                          Public League
-                        </Text>
-                        <Text fontSize="$2" color="$gray10">
-                          Allow anyone to find and join
-                        </Text>
-                      </YStack>
-                      <Button
-                        size="$3"
-                        onPress={() => setIsPublic((p) => !p)}
-                        backgroundColor={
-                          isPublic ? BRAND_NAVY_LIGHT : '$color2'
-                        }
-                        borderColor={
-                          isPublic ? BRAND_NAVY_LIGHT : '$borderColor'
-                        }
-                        borderWidth={isPublic ? 2 : 1}
-                        aria-pressed={isPublic}
-                        aria-label={
-                          isPublic
-                            ? 'Public league (click to make private)'
-                            : 'Private league (click to make public)'
-                        }
+                  {/* Divisions + Player Pool — side by side */}
+                  <XStack gap="$3">
+                    <YStack space="$1.5" flex={1}>
+                      <Text fontWeight="600" fontSize="$3" color="$gray12">
+                        Divisions
+                      </Text>
+                      <XStack gap="$1.5" flexWrap="wrap">
+                        {[1, 2, 3, 4].map((n) => (
+                          <Button
+                            key={n}
+                            size="$2"
+                            onPress={() => setNumberOfDivisions(n)}
+                            backgroundColor={
+                              numberOfDivisions === n
+                                ? BRAND_NAVY_LIGHT
+                                : '$color2'
+                            }
+                            borderColor={
+                              numberOfDivisions === n
+                                ? BRAND_NAVY_LIGHT
+                                : '$borderColor'
+                            }
+                            borderWidth={numberOfDivisions === n ? 2 : 1}
+                            aria-pressed={numberOfDivisions === n}
+                            aria-label={`${n} division${n === 1 ? '' : 's'}`}
+                          >
+                            <Text
+                              fontSize="$2"
+                              color={
+                                numberOfDivisions === n ? BRAND_GOLD : '$color'
+                              }
+                            >
+                              {n === 1 ? 'None' : `${n}`}
+                            </Text>
+                          </Button>
+                        ))}
+                      </XStack>
+                    </YStack>
+
+                    <YStack space="$1.5" flex={1}>
+                      <Text fontWeight="600" fontSize="$3" color="$gray12">
+                        Player Pool
+                      </Text>
+                      <XStack gap="$1.5" flexWrap="wrap">
+                        {(
+                          [
+                            ['all', 'All MLB'],
+                            ['nl', 'NL'],
+                            ['al', 'AL'],
+                          ] as const
+                        ).map(([val, label]) => (
+                          <Button
+                            key={val}
+                            size="$2"
+                            onPress={() => setPlayerPool(val)}
+                            backgroundColor={
+                              playerPool === val ? BRAND_NAVY_LIGHT : '$color2'
+                            }
+                            borderColor={
+                              playerPool === val
+                                ? BRAND_NAVY_LIGHT
+                                : '$borderColor'
+                            }
+                            borderWidth={playerPool === val ? 2 : 1}
+                            aria-pressed={playerPool === val}
+                            aria-label={`Player pool: ${label}`}
+                          >
+                            <Text
+                              fontSize="$2"
+                              color={playerPool === val ? BRAND_GOLD : '$color'}
+                            >
+                              {label}
+                            </Text>
+                          </Button>
+                        ))}
+                      </XStack>
+                    </YStack>
+                  </XStack>
+
+                  {/* Draft Mode + Selection Method — side by side */}
+                  <XStack gap="$3">
+                    <YStack space="$1.5" flex={1}>
+                      <Text fontWeight="600" fontSize="$3" color="$gray12">
+                        Draft Mode
+                      </Text>
+                      <XStack gap="$1.5">
+                        {(
+                          [
+                            ['live', 'Live'],
+                            ['automated', 'Auto'],
+                          ] as const
+                        ).map(([val, label]) => (
+                          <Button
+                            key={val}
+                            size="$2"
+                            onPress={() => {
+                              setDraftMode(val);
+                              if (val === 'automated')
+                                setSelectionMethod('random');
+                            }}
+                            backgroundColor={
+                              draftMode === val ? BRAND_NAVY_LIGHT : '$color2'
+                            }
+                            borderColor={
+                              draftMode === val
+                                ? BRAND_NAVY_LIGHT
+                                : '$borderColor'
+                            }
+                            borderWidth={draftMode === val ? 2 : 1}
+                            aria-pressed={draftMode === val}
+                            aria-label={`Draft mode: ${label}`}
+                          >
+                            <Text
+                              fontSize="$2"
+                              color={draftMode === val ? BRAND_GOLD : '$color'}
+                            >
+                              {label}
+                            </Text>
+                          </Button>
+                        ))}
+                      </XStack>
+                    </YStack>
+
+                    <YStack space="$1.5" flex={1}>
+                      <Text fontWeight="600" fontSize="$3" color="$gray12">
+                        Selection Method
+                      </Text>
+                      <XStack gap="$1.5" flexWrap="wrap">
+                        {(
+                          [
+                            ['standard', 'Standard'],
+                            ['auction', 'Auction'],
+                            ['random', 'Random'],
+                          ] as const
+                        ).map(([val, label]) => (
+                          <Button
+                            key={val}
+                            size="$2"
+                            disabled={
+                              draftMode === 'automated' && val !== 'random'
+                            }
+                            onPress={() => setSelectionMethod(val)}
+                            backgroundColor={
+                              selectionMethod === val
+                                ? BRAND_NAVY_LIGHT
+                                : '$color2'
+                            }
+                            borderColor={
+                              selectionMethod === val
+                                ? BRAND_NAVY_LIGHT
+                                : '$borderColor'
+                            }
+                            borderWidth={selectionMethod === val ? 2 : 1}
+                            opacity={
+                              draftMode === 'automated' && val !== 'random'
+                                ? 0.4
+                                : 1
+                            }
+                            aria-pressed={selectionMethod === val}
+                            aria-label={`Selection method: ${label}`}
+                          >
+                            <Text
+                              fontSize="$2"
+                              color={
+                                selectionMethod === val ? BRAND_GOLD : '$color'
+                              }
+                            >
+                              {label}
+                            </Text>
+                          </Button>
+                        ))}
+                      </XStack>
+                    </YStack>
+                  </XStack>
+
+                  {/* Draft Order + Max Roster Size — side by side */}
+                  <XStack gap="$3">
+                    <YStack space="$1.5" flex={1}>
+                      <Text fontWeight="600" fontSize="$3" color="$gray12">
+                        Draft Order
+                      </Text>
+                      <XStack gap="$1.5">
+                        {(
+                          [
+                            ['snake', 'Snake'],
+                            ['linear', 'Linear'],
+                          ] as const
+                        ).map(([val, label]) => (
+                          <Button
+                            key={val}
+                            size="$2"
+                            onPress={() => setDraftOrder(val)}
+                            backgroundColor={
+                              draftOrder === val ? BRAND_NAVY_LIGHT : '$color2'
+                            }
+                            borderColor={
+                              draftOrder === val
+                                ? BRAND_NAVY_LIGHT
+                                : '$borderColor'
+                            }
+                            borderWidth={draftOrder === val ? 2 : 1}
+                            aria-pressed={draftOrder === val}
+                            aria-label={`Draft order: ${label}`}
+                          >
+                            <Text
+                              fontSize="$2"
+                              color={draftOrder === val ? BRAND_GOLD : '$color'}
+                            >
+                              {label}
+                            </Text>
+                          </Button>
+                        ))}
+                      </XStack>
+                    </YStack>
+
+                    <YStack space="$1.5" flex={1}>
+                      <Text fontWeight="600" fontSize="$3" color="$gray12">
+                        Max Roster Size
+                      </Text>
+                      <XStack gap="$1.5" flexWrap="wrap">
+                        {[20, 22, 25, 30, 35, 40].map((n) => (
+                          <Button
+                            key={n}
+                            size="$2"
+                            onPress={() => setMaxRosterSize(n)}
+                            backgroundColor={
+                              maxRosterSize === n ? BRAND_NAVY_LIGHT : '$color2'
+                            }
+                            borderColor={
+                              maxRosterSize === n
+                                ? BRAND_NAVY_LIGHT
+                                : '$borderColor'
+                            }
+                            borderWidth={maxRosterSize === n ? 2 : 1}
+                            aria-pressed={maxRosterSize === n}
+                            aria-label={`Max roster size: ${n}`}
+                          >
+                            <Text
+                              fontSize="$2"
+                              color={
+                                maxRosterSize === n ? BRAND_GOLD : '$color'
+                              }
+                            >
+                              {n}
+                            </Text>
+                          </Button>
+                        ))}
+                      </XStack>
+                    </YStack>
+                  </XStack>
+
+                  {/* Public League toggle */}
+                  <XStack alignItems="center" justifyContent="space-between">
+                    <YStack>
+                      <Text fontWeight="600" fontSize="$3" color="$gray12">
+                        Public League
+                      </Text>
+                      <Text fontSize="$1" color="$gray10">
+                        Allow anyone to find and join
+                      </Text>
+                    </YStack>
+                    <Button
+                      size="$2"
+                      onPress={() => setIsPublic((p) => !p)}
+                      backgroundColor={isPublic ? BRAND_NAVY_LIGHT : '$color2'}
+                      borderColor={isPublic ? BRAND_NAVY_LIGHT : '$borderColor'}
+                      borderWidth={isPublic ? 2 : 1}
+                      aria-pressed={isPublic}
+                      aria-label={
+                        isPublic
+                          ? 'Public league (click to make private)'
+                          : 'Private league (click to make public)'
+                      }
+                    >
+                      <Text
+                        fontSize="$2"
+                        color={isPublic ? BRAND_GOLD : '$color'}
                       >
-                        <Text color={isPublic ? BRAND_GOLD : '$color'}>
-                          {isPublic ? 'Public' : 'Private'}
-                        </Text>
-                      </Button>
-                    </XStack>
-                  </YStack>
+                        {isPublic ? 'Public' : 'Private'}
+                      </Text>
+                    </Button>
+                  </XStack>
                 </YStack>
               </YStack>
 
