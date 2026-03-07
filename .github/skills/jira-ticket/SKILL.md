@@ -1,6 +1,6 @@
 ---
 name: jira-ticket
-description: 'Manage Jira ticket statuses and metadata using the acli CLI; use when transitioning tickets to In Progress, In Review, or other workflow states.'
+description: 'Manage Jira ticket statuses and metadata using the acli CLI; use when transitioning tickets to In Progress, In Review, or other workflow states. Includes investigation ticket workflow: resolve immediately after creating a follow-up backlog ticket.'
 ---
 
 # Skill: Jira Ticket Management
@@ -182,6 +182,29 @@ acli jira workitem transition --key LS-1234 --status "In Progress"
 acli jira workitem view LS-1234
 ```
 
+## Investigation Tickets
+
+When an investigation ticket results in creating a new backlog ticket to resolve the issue, **resolve the investigation ticket immediately** — don't leave it open.
+
+### Workflow
+
+1. Transition the investigation ticket to **In Progress** when you begin
+2. Investigate and document findings
+3. Create a new backlog ticket for the fix (Task / Bug / Story)
+4. Link the new ticket back to the investigation: `acli jira workitem link create --out LS-NEW --in LS-ORIG --type Relates`
+5. Add a comment to the investigation ticket summarizing findings and referencing the new ticket
+6. Transition the investigation ticket to **Done** immediately
+
+```powershell
+# Example: investigation complete, new ticket created
+acli jira workitem comment create --key LS-100 `
+  --body "Investigation complete. Root cause: [summary]. Created LS-200 to address."
+acli jira workitem link create --out LS-200 --in LS-100 --type Relates
+acli jira workitem transition --key LS-100 --status "Done"
+```
+
+> **Rationale:** The investigation's deliverable is the findings + backlog ticket, not a code change. Once those exist, the investigation is complete and should be closed.
+
 ## Best Practices
 
 1. **Update status immediately** when state changes (start work, create PR, merge)
@@ -189,6 +212,7 @@ acli jira workitem view LS-1234
 3. **Assign to yourself** before starting work
 4. **Add to current sprint** for new tickets before implementation
 5. **Link related tickets** when de-scoping or splitting work
+6. **Close investigation tickets** as soon as a follow-up backlog ticket is created (see [Investigation Tickets](#investigation-tickets))
 
 ## Ticket Workflow States
 
