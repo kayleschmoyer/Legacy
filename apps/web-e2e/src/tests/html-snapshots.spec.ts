@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test.describe('HTML Snapshots', () => {
+test.describe('HTML Snapshots @visual', () => {
   test.beforeEach(async ({ page }) => {
     // Remove dynamic content that changes between test runs
     await page.addStyleTag({

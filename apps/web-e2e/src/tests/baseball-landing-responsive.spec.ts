@@ -1,7 +1,7 @@
 import { test } from '@playwright/test';
 import { SnapshotUtils } from '../support/snapshot-utils';
 
-test.describe('Baseball Landing Page - Responsive', () => {
+test.describe('Baseball Landing Page - Responsive @visual', () => {
   test('captures responsive snapshots for /baseball', async ({ page }) => {
     await page.goto('/baseball');
     await page.waitForLoadState('networkidle');

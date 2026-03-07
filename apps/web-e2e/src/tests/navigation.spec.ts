@@ -9,7 +9,7 @@
 
 import { expect, test } from '@playwright/test';
 
-test.describe('Navigation Header', () => {
+test.describe('Navigation Header @smoke', () => {
   test.beforeEach(async ({ page }) => {
     // /about renders without GraphQL — wait for page load
     await page.goto('/about');

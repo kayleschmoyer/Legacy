@@ -19,7 +19,7 @@ import { E2EAuth, E2EJwtUtil } from '../utils/jwt';
 // Regular user tests — uses default storageState (admin JWT from global setup)
 // ---------------------------------------------------------------------------
 
-test.describe('Regular User Tests', () => {
+test.describe('Regular User Tests @regression', () => {
   test('should load authenticated page without seeing login', async ({
     page,
   }) => {
@@ -35,7 +35,7 @@ test.describe('Regular User Tests', () => {
 // Admin tests — overrides storageState with an admin JWT
 // ---------------------------------------------------------------------------
 
-adminTest.describe('Admin User Tests', () => {
+adminTest.describe('Admin User Tests @regression', () => {
   adminTest(
     'should load authenticated page with admin JWT',
     async ({ page }) => {
@@ -57,7 +57,7 @@ const leagueManagerTest = createCustomAuthTest(
   'none',
 );
 
-leagueManagerTest.describe('League Manager Tests', () => {
+leagueManagerTest.describe('League Manager Tests @regression', () => {
   leagueManagerTest(
     'should load authenticated page with custom user JWT',
     async ({ page }) => {
@@ -74,7 +74,7 @@ leagueManagerTest.describe('League Manager Tests', () => {
 // Unauthenticated tests — verifies login page shows when no JWT
 // ---------------------------------------------------------------------------
 
-unauthTest.describe('Unauthenticated Tests', () => {
+unauthTest.describe('Unauthenticated Tests @regression', () => {
   unauthTest(
     'should show login page when not authenticated',
     async ({ page }) => {
@@ -93,7 +93,7 @@ unauthTest.describe('Unauthenticated Tests', () => {
 // Dynamic JWT generation within tests
 // ---------------------------------------------------------------------------
 
-test.describe('Dynamic JWT Tests', () => {
+test.describe('Dynamic JWT Tests @regression', () => {
   test('should switch user identity mid-test', async ({
     page,
     browserName,
@@ -122,10 +122,7 @@ test.describe('Dynamic JWT Tests', () => {
     await expect(page.locator('text=Sign in with Google')).not.toBeVisible();
   });
 
-  test('should show login after JWT expires', async ({
-    page,
-    browserName,
-  }) => {
+  test('should show login after JWT expires', async ({ page, browserName }) => {
     // WebKit blocks localStorage access via page.evaluate — SecurityError
     test.skip(
       browserName === 'webkit',
@@ -165,7 +162,7 @@ test.describe('Dynamic JWT Tests', () => {
 // JWT utility validation tests (no browser interaction needed)
 // ---------------------------------------------------------------------------
 
-test.describe('JWT Validation', () => {
+test.describe('JWT Validation @regression', () => {
   test('should validate JWT format', () => {
     const jwt = E2EAuth.generateUserJwt('5m');
 

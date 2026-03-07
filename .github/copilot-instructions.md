@@ -45,6 +45,7 @@ Windows PowerShell ┬╖ Nx monorepo ┬╖ pnpm 9.12.1 ┬╖ Jira project LS 
 | **Debug distributed processes** | `skills/debug-distributed/SKILL.md`       |
 | **Docker local stack**          | `skills/docker-local/SKILL.md`            |
 | **Dump RDS to S3**              | `skills/db-dump/SKILL.md`                 |
+| **E2E testing (Playwright)**    | `skills/e2e-testing/SKILL.md`             |
 | Full workflow (start here)      | `skills/workflow-ticket-to-pr/SKILL.md`   |
 | **Install packages**            | `skills/install-packages/SKILL.md`        |
 | Lint errors                     | `skills/fix-lint/SKILL.md`                |
@@ -69,5 +70,5 @@ Windows PowerShell ┬╖ Nx monorepo ┬╖ pnpm 9.12.1 ┬╖ Jira project LS 
 | **Rebase & conflicts**          | `skills/rebase-conflicts/SKILL.md`        |
 | **Resolve merge conflicts**     | `skills/resolve-merge-conflicts/SKILL.md` |
 | **Worktree workflow (default)** | `skills/worktree-workflow/SKILL.md`       |
-| All skills (59 guides)          | `skills/`                                 |
+| All skills (60 guides)          | `skills/`                                 |
 | CSV reference data              | `docs/agents/*.csv`                       |

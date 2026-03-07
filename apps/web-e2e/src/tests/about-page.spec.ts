@@ -7,7 +7,7 @@
 
 import { expect, test } from '@playwright/test';
 
-test.describe('About Page', () => {
+test.describe('About Page @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/about');
     await page.waitForLoadState('load');

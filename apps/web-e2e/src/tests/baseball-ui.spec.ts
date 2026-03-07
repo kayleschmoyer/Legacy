@@ -13,7 +13,7 @@ import { expect, test } from '../fixtures/auth';
 // Baseball Hub (/baseball)
 // ---------------------------------------------------------------------------
 
-test.describe('Baseball Hub Page', () => {
+test.describe('Baseball Hub Page @critical', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
@@ -80,7 +80,7 @@ test.describe('Baseball Hub Page', () => {
 // Create League Page (/baseball/league/create)
 // ---------------------------------------------------------------------------
 
-test.describe('League Creation Form', () => {
+test.describe('League Creation Form @critical', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
@@ -167,7 +167,7 @@ test.describe('League Creation Form', () => {
 // Join League By Code Page (/baseball/league/join)
 // ---------------------------------------------------------------------------
 
-test.describe('Join League By Code Form', () => {
+test.describe('Join League By Code Form @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/baseball/league/join');
     await page.waitForLoadState('load');

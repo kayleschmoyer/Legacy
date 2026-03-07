@@ -23,7 +23,7 @@ function isGraphQLEndpoint(url: URL): boolean {
   );
 }
 
-test.describe('League Creation', () => {
+test.describe('League Creation @critical', () => {
   test('should navigate to league creation page from homepage', async ({
     page,
   }) => {

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { SnapshotUtils } from '../support/snapshot-utils';
 
-test.describe('Sports App Snapshots', () => {
+test.describe('Sports App Snapshots @visual', () => {
   test('should capture complete sports application snapshots', async ({
     page,
   }) => {

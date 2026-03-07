@@ -7,7 +7,7 @@
 
 import { expect, test } from '@playwright/test';
 
-test.describe('Management Page', () => {
+test.describe('Management Page @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/management');
     await page.waitForLoadState('load');
@@ -59,7 +59,7 @@ test.describe('Management Page', () => {
 // Players Page (/players)
 // ---------------------------------------------------------------------------
 
-test.describe('Players Landing Page', () => {
+test.describe('Players Landing Page @smoke', () => {
   test('loads the players page', async ({ page }) => {
     await page.goto('/players');
     await page.waitForLoadState('load');
@@ -75,7 +75,7 @@ test.describe('Players Landing Page', () => {
 // Player Stats Page (/players/stats)
 // ---------------------------------------------------------------------------
 
-test.describe('Player Stats Page — static elements', () => {
+test.describe('Player Stats Page — static elements @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/players/stats');
     await page.waitForLoadState('load');
@@ -119,7 +119,7 @@ test.describe('Player Stats Page — static elements', () => {
 // 404 / Not Found — unknown routes
 // ---------------------------------------------------------------------------
 
-test.describe('Unknown Routes', () => {
+test.describe('Unknown Routes @regression', () => {
   test('navigating to an unknown route does not crash the app', async ({
     page,
   }) => {

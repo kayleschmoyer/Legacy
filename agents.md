@@ -34,6 +34,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **Debug distributed processes** | `.github/skills/debug-distributed/SKILL.md`                                |
 | **Docker local stack**          | `.github/skills/docker-local/SKILL.md`                                     |
 | **Dump RDS to S3**              | `.github/skills/db-dump/SKILL.md`                                          |
+| **E2E testing (Playwright)**    | `.github/skills/e2e-testing/SKILL.md`                                      |
 | Full workflow (start here)      | `.github/skills/workflow-ticket-to-pr/SKILL.md`                            |
 | **Install packages**            | `.github/skills/install-packages/SKILL.md`                                 |
 | Lint errors                     | `.github/skills/fix-lint/SKILL.md`                                         |
@@ -57,6 +58,6 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **Rebase & conflicts**          | `.github/skills/rebase-conflicts/SKILL.md`                                 |
 | **Resolve merge conflicts**     | `.github/skills/resolve-merge-conflicts/SKILL.md`                          |
 | **Worktree workflow (default)** | `.github/skills/worktree-workflow/SKILL.md`                                |
-| All skills (58 guides)          | `.github/skills/`                                                          |
+| All skills (59 guides)          | `.github/skills/`                                                          |
 | CSV reference data              | `docs/agents/*.csv`                                                        |
 | Tech stack                      | React Native · Next.js · Lambda · GraphQL · PostgreSQL/Drizzle · Terraform |

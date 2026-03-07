@@ -2,19 +2,19 @@ import { expect, test } from '../fixtures/auth';
 
 /**
  * E2E Tests for Draft Status Functionality in Web App
- * 
+ *
  * This test suite validates the startDraft functionality from the user's perspective
  * by interacting with the actual web UI and verifying the behavior matches what
  * users would experience.
- * 
+ *
  * Tests the complete flow:
  * 1. User navigates to league page
- * 2. User clicks "Start Draft" button  
+ * 2. User clicks "Start Draft" button
  * 3. Draft status updates to "queued" immediately
  * 4. Status persists on page refresh (critical test for the bug we fixed)
  */
 
-test.describe('Draft Status Web UI Tests', () => {
+test.describe('Draft Status Web UI Tests @critical', () => {
   // Test league ID - using the same one from our GraphQL E2E tests
   const testLeagueId = 1;
   const leagueUrl = `/baseball/league/${testLeagueId}`;
@@ -30,8 +30,13 @@ test.describe('Draft Status Web UI Tests', () => {
     await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Look for draft-related UI elements
-    const draftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
-    const draftStatusElement = page.locator('[data-testid="draft-status"], .draft-status').first();
+    const draftButton = page
+      .locator('button')
+      .filter({ hasText: /start.*draft/i })
+      .first();
+    const draftStatusElement = page
+      .locator('[data-testid="draft-status"], .draft-status')
+      .first();
 
     // Take screenshot of initial state
     await expect(page).toHaveScreenshot('league-page-initial.png');
@@ -40,9 +45,11 @@ test.describe('Draft Status Web UI Tests', () => {
     if (await draftButton.isVisible()) {
       const isDisabled = await draftButton.isDisabled();
       const buttonText = await draftButton.textContent();
-      
-      console.log(`Draft button found: "${buttonText}", disabled: ${isDisabled}`);
-      
+
+      console.log(
+        `Draft button found: "${buttonText}", disabled: ${isDisabled}`,
+      );
+
       // Button should be visible and potentially enabled
       expect(buttonText).toMatch(/draft/i);
     }
@@ -54,18 +61,28 @@ test.describe('Draft Status Web UI Tests', () => {
     }
   });
 
-  test('should update draft status when start draft button is clicked', async ({ page }) => {
+  test('should update draft status when start draft button is clicked', async ({
+    page,
+  }) => {
     // Wait for league data to load (the component renders <h1 id="league-title">)
     await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Find the start draft button
-    const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
-    
+    const startDraftButton = page
+      .locator('button')
+      .filter({ hasText: /start.*draft/i })
+      .first();
+
     // Check if button is available and enabled
     // SKIP-REASON: UI state - League already drafted or user lacks permissions
     // TODO: Add test data setup to ensure repeatable 'not-started' league state (LS-63)
-    if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
-      console.log('⚠️  Start draft button not available - league may already be drafted or user lacks permissions');
+    if (
+      !(await startDraftButton.isVisible()) ||
+      (await startDraftButton.isDisabled())
+    ) {
+      console.log(
+        '⚠️  Start draft button not available - league may already be drafted or user lacks permissions',
+      );
       test.skip();
     }
 
@@ -79,8 +96,13 @@ test.describe('Draft Status Web UI Tests', () => {
     await page.waitForTimeout(1000);
 
     // Look for updated draft status or button text
-    const updatedButton = page.locator('button').filter({ hasText: /queued|progress|completed/i }).first();
-    const draftStatusElement = page.locator('[data-testid="draft-status"], .draft-status').first();
+    const updatedButton = page
+      .locator('button')
+      .filter({ hasText: /queued|progress|completed/i })
+      .first();
+    const draftStatusElement = page
+      .locator('[data-testid="draft-status"], .draft-status')
+      .first();
 
     // Verify the UI has been updated
     let statusUpdated = false;
@@ -106,24 +128,39 @@ test.describe('Draft Status Web UI Tests', () => {
     await expect(page).toHaveScreenshot('after-start-draft.png');
   });
 
-  test('should maintain draft status after page refresh (persistence test)', async ({ page }) => {
+  test('should maintain draft status after page refresh (persistence test)', async ({
+    page,
+  }) => {
     // This is the critical test that validates our fix for the database persistence issue
 
     // Wait for league data to load (the component renders <h1 id="league-title">)
     await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Find and click start draft button (if available)
-    const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
-    
+    const startDraftButton = page
+      .locator('button')
+      .filter({ hasText: /start.*draft/i })
+      .first();
+
     // SKIP-REASON: UI state - Testing persistence requires either starting a draft or having one already queued
     // TODO: Ensure test data provides consistent starting state
-    if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
-      console.log('⚠️  Start draft button not available - checking if draft is already queued');
-      
+    if (
+      !(await startDraftButton.isVisible()) ||
+      (await startDraftButton.isDisabled())
+    ) {
+      console.log(
+        '⚠️  Start draft button not available - checking if draft is already queued',
+      );
+
       // Check if draft is already in progress/queued
-      const queuedButton = page.locator('button').filter({ hasText: /queued|progress/i }).first();
+      const queuedButton = page
+        .locator('button')
+        .filter({ hasText: /queued|progress/i })
+        .first();
       if (await queuedButton.isVisible()) {
-        console.log('✅ Draft already in queued/progress state - testing persistence');
+        console.log(
+          '✅ Draft already in queued/progress state - testing persistence',
+        );
       } else {
         // SKIP-REASON: UI state - No draft button available and no queued draft exists in test data
         // TODO: Provide consistent test data with either available draft button or pre-queued draft (LS-63)
@@ -137,14 +174,19 @@ test.describe('Draft Status Web UI Tests', () => {
 
     // Capture the draft status after starting
     let preRefreshStatus = '';
-    
-    const draftButton = page.locator('button').filter({ hasText: /draft|queued|progress/i }).first();
-    const draftStatusElement = page.locator('[data-testid="draft-status"], .draft-status').first();
+
+    const draftButton = page
+      .locator('button')
+      .filter({ hasText: /draft|queued|progress/i })
+      .first();
+    const draftStatusElement = page
+      .locator('[data-testid="draft-status"], .draft-status')
+      .first();
 
     if (await draftButton.isVisible()) {
       preRefreshStatus = (await draftButton.textContent()) || '';
     }
-    
+
     if (await draftStatusElement.isVisible()) {
       const statusText = (await draftStatusElement.textContent()) || '';
       if (statusText) preRefreshStatus = statusText;
@@ -164,13 +206,18 @@ test.describe('Draft Status Web UI Tests', () => {
     // Check the draft status after refresh
     let postRefreshStatus = '';
 
-    const refreshedDraftButton = page.locator('button').filter({ hasText: /draft|queued|progress/i }).first();
-    const refreshedStatusElement = page.locator('[data-testid="draft-status"], .draft-status').first();
+    const refreshedDraftButton = page
+      .locator('button')
+      .filter({ hasText: /draft|queued|progress/i })
+      .first();
+    const refreshedStatusElement = page
+      .locator('[data-testid="draft-status"], .draft-status')
+      .first();
 
     if (await refreshedDraftButton.isVisible()) {
       postRefreshStatus = (await refreshedDraftButton.textContent()) || '';
     }
-    
+
     if (await refreshedStatusElement.isVisible()) {
       const statusText = (await refreshedStatusElement.textContent()) || '';
       if (statusText) postRefreshStatus = statusText;
@@ -180,7 +227,7 @@ test.describe('Draft Status Web UI Tests', () => {
 
     // This is the key assertion that was failing before our fix
     expect(postRefreshStatus).toMatch(/queued|progress|completed/i);
-    
+
     // Status should be consistent (not reverted to "not-started")
     if (preRefreshStatus.includes('queued')) {
       expect(postRefreshStatus).toMatch(/queued|progress|completed/i);
@@ -189,7 +236,9 @@ test.describe('Draft Status Web UI Tests', () => {
     // Take final screenshot
     await expect(page).toHaveScreenshot('after-page-refresh.png');
 
-    console.log('✅ Draft status persistence test passed - status maintained after refresh');
+    console.log(
+      '✅ Draft status persistence test passed - status maintained after refresh',
+    );
   });
 
   test('should handle rapid interactions gracefully', async ({ page }) => {
@@ -197,23 +246,37 @@ test.describe('Draft Status Web UI Tests', () => {
 
     await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
-    const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
-    
+    const startDraftButton = page
+      .locator('button')
+      .filter({ hasText: /start.*draft/i })
+      .first();
+
     // SKIP-REASON: UI state - Need available draft button to test rapid interactions
     // TODO: Implement test fixture to reset league state before test (LS-63)
-    if (!(await startDraftButton.isVisible()) || (await startDraftButton.isDisabled())) {
-      console.log('⚠️  Start draft button not available for rapid interaction test');
+    if (
+      !(await startDraftButton.isVisible()) ||
+      (await startDraftButton.isDisabled())
+    ) {
+      console.log(
+        '⚠️  Start draft button not available for rapid interaction test',
+      );
       test.skip();
     }
 
     // Try rapid clicking (should be handled gracefully by the UI)
     await startDraftButton.click();
-    
+
     // Wait a short time and try clicking again (should be disabled or show different state)
     await page.waitForTimeout(500);
-    
-    const updatedButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
-    if (await updatedButton.isVisible() && !(await updatedButton.isDisabled())) {
+
+    const updatedButton = page
+      .locator('button')
+      .filter({ hasText: /start.*draft/i })
+      .first();
+    if (
+      (await updatedButton.isVisible()) &&
+      !(await updatedButton.isDisabled())
+    ) {
       // If button is still clickable, try clicking again
       await updatedButton.click();
     }
@@ -222,37 +285,50 @@ test.describe('Draft Status Web UI Tests', () => {
     await page.waitForTimeout(1000);
 
     // Verify UI is in a consistent state (not broken by rapid interactions)
-    const finalButton = page.locator('button').filter({ hasText: /draft|queued|progress/i }).first();
+    const finalButton = page
+      .locator('button')
+      .filter({ hasText: /draft|queued|progress/i })
+      .first();
     expect(await finalButton.isVisible()).toBe(true);
 
     console.log('✅ Rapid interaction test passed - UI remains consistent');
   });
 
-  test('should display appropriate error messages for invalid operations', async ({ page }) => {
+  test('should display appropriate error messages for invalid operations', async ({
+    page,
+  }) => {
     // Test error handling in the UI
 
     await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Look for any error messages or alerts that might appear
-    const errorAlert = page.locator('[role="alert"], .error, .alert-error').first();
+    const errorAlert = page
+      .locator('[role="alert"], .error, .alert-error')
+      .first();
     const successAlert = page.locator('.success, .alert-success').first();
 
     // Try to start draft (this might succeed or fail depending on league state)
-    const startDraftButton = page.locator('button').filter({ hasText: /start.*draft/i }).first();
-    
-    if (await startDraftButton.isVisible() && !(await startDraftButton.isDisabled())) {
+    const startDraftButton = page
+      .locator('button')
+      .filter({ hasText: /start.*draft/i })
+      .first();
+
+    if (
+      (await startDraftButton.isVisible()) &&
+      !(await startDraftButton.isDisabled())
+    ) {
       await startDraftButton.click();
-      
+
       // Wait for any alerts to appear
       await page.waitForTimeout(2000);
-      
+
       // Check for success or error messages
       if (await errorAlert.isVisible()) {
         const errorText = await errorAlert.textContent();
         console.log(`Error message displayed: "${errorText}"`);
         expect(errorText).toBeTruthy();
       }
-      
+
       if (await successAlert.isVisible()) {
         const successText = await successAlert.textContent();
         console.log(`Success message displayed: "${successText}"`);
@@ -269,16 +345,21 @@ test.describe('Draft Status Web UI Tests', () => {
     await page.waitForSelector('h1#league-title', { timeout: 15000 });
 
     // Check that draft button has proper accessibility attributes
-    const draftButton = page.locator('button').filter({ hasText: /draft/i }).first();
-    
+    const draftButton = page
+      .locator('button')
+      .filter({ hasText: /draft/i })
+      .first();
+
     if (await draftButton.isVisible()) {
       // Check for aria labels, roles, etc.
       const ariaLabel = await draftButton.getAttribute('aria-label');
       const role = await draftButton.getAttribute('role');
       const disabled = await draftButton.isDisabled();
-      
-      console.log(`Button accessibility - aria-label: "${ariaLabel}", role: "${role}", disabled: ${disabled}`);
-      
+
+      console.log(
+        `Button accessibility - aria-label: "${ariaLabel}", role: "${role}", disabled: ${disabled}`,
+      );
+
       // Button should be properly labeled for screen readers
       expect(await draftButton.textContent()).toBeTruthy();
     }
@@ -286,7 +367,7 @@ test.describe('Draft Status Web UI Tests', () => {
     // Test keyboard navigation
     await page.keyboard.press('Tab');
     const focusedElement = page.locator(':focus').first();
-    
+
     if (await focusedElement.isVisible()) {
       console.log('✅ Keyboard navigation working');
     }

@@ -28,7 +28,7 @@ interface GraphQLCapture {
  * This complements the UI tests by focusing on the data layer integration.
  */
 
-test.describe('Draft GraphQL Integration Tests', () => {
+test.describe('Draft GraphQL Integration Tests @critical', () => {
   const testLeagueId = 1;
   const leagueUrl = `/baseball/league/${testLeagueId}`;
 
