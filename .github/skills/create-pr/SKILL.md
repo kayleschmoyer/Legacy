@@ -61,6 +61,19 @@ If the branch does not contain a Jira ticket key:
 > key in the branch name is used to auto-populate the PR description and to
 > transition the ticket to "In Review" after the PR is created.
 
+### 3. Pending Migrations Must Be Applied
+
+If a migration file was added or modified as part of this work, apply it before creating the PR:
+
+```powershell
+# From the worktree root
+pnpm run db:migrate
+```
+
+Verify the output includes `✅ Applied N new migrations` (or `No pending migrations` if none exist). A PR that adds a migration file without applying it will cause runtime failures on the next deploy.
+
+> **When to run:** Any time a file exists under `lib/db-client/migrations/` that was created or modified in this branch.
+
 ## Command
 
 ```powershell
@@ -195,6 +208,7 @@ Technical explanation of why the issue occurred.
 - [ ] Unit tests pass
 - [ ] Manual testing completed
 - [ ] Pre-commit validation passes (`make pre-commit`)
+- [ ] Pending migrations applied (`pnpm run db:migrate`) — required if any migration files were added or changed
 - [ ] Screenshots included for all UI changes (if applicable)
 ```
 
