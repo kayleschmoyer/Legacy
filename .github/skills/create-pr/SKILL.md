@@ -61,6 +61,14 @@ If the branch does not contain a Jira ticket key:
 > key in the branch name is used to auto-populate the PR description and to
 > transition the ticket to "In Review" after the PR is created.
 
+> **Epic-level work**: If the branch contains artifacts that belong to a parent epic
+> (e.g., design docs spanning multiple child tickets), the branch should have been
+> created with the **epic's** ticket key — not a child task key. If you discover
+> epic-scoped work on a child-task branch, use the epic key in the PR title
+> (e.g., `LS-640 docs: salary cap design`) and reference the epic in the body.
+> Prefer avoiding this by creating a dedicated epic worktree upfront
+> (see worktree-workflow skill, "Epic-Level Work").
+
 ### 3. Pending Migrations Must Be Applied
 
 If a migration file was added or modified as part of this work, apply it before creating the PR:

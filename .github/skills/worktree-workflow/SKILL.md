@@ -32,6 +32,21 @@ D:\code\
 > requests it** (e.g., "no worktree" or "in-place"). If the user does not specify,
 > always default to a worktree.
 
+### Epic-Level Work
+
+If you need to commit **epic-level artifacts** (design docs, architecture decisions, shared
+config) that span multiple child tickets, create a **separate worktree for the epic ticket
+itself** — not a child task:
+
+```powershell
+# Epic LS-640 with child tasks LS-634, LS-642, etc.
+make worktree TICKET=640 DESC=salary-cap-design   # ← uses the epic key
+```
+
+This ensures the branch name, PR title, and Jira transition all reference the correct
+ticket. Do **not** commit epic-scoped work to a child task's branch — it misattributes the
+work and confuses traceability.
+
 ## Prerequisites
 
 - Main repo is on `main` and up to date
