@@ -1,13 +1,13 @@
 ---
 name: worktree-workflow
-description: 'Implement a Jira ticket using a git worktree so multiple tickets can be worked in parallel without switching branches; covers setup, directory structure, VS Code window, validation, PR creation, and cleanup. Use whenever starting work on any Jira ticket — worktrees are the default workflow, not an alternative.'
+description: 'Implement a Jira ticket using a git worktree so multiple tickets can be worked in parallel without switching branches; covers setup, directory structure, validation, PR creation, and cleanup. Use whenever starting work on any Jira ticket — worktrees are the default workflow, not an alternative.'
 ---
 
 # Skill: Implementing Tickets via Git Worktrees
 
 ## Overview
 
-Git worktrees let you check out multiple branches simultaneously in separate directories — one directory per ticket. The main repo stays on `main` and is used only for creating new worktrees. Each ticket gets its own folder and its own VS Code window.
+Git worktrees let you check out multiple branches simultaneously in separate directories — one directory per ticket. The main repo stays on `main` and is used only for creating new worktrees. Each ticket gets its own folder. All worktrees are available in the multi-root VS Code workspace.
 
 ## Worktree Directory Structure
 
@@ -165,15 +165,7 @@ cmd /c mklink /J "$wt\.twig" "D:\code\legacy-sports\.twig"
 
 > **Why junction not copy?** `.twig/state.json` tracks branch dependencies. Both the main repo and worktree must read/write the same file or twig commands (`twig tree`, `twig branch depend`, etc.) will diverge.
 
-### Step 4: Open in VS Code
-
-```powershell
-code $wt
-```
-
-This opens the worktree in a **new VS Code window**. Work exclusively in that window for this ticket.
-
-### Step 4b: Add to Multi-Root Workspace (Automatic for Agents)
+### Step 4: Add to Multi-Root Workspace
 
 If a `legacy-sports.code-workspace` file exists, **always** add the new worktree to it so agents
 have search access:
