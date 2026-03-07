@@ -228,7 +228,7 @@ runs:
         PLAYWRIGHT_CMD="$PLAYWRIGHT_BIN test"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --project=${{ inputs.browser }}"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep=\"${{ inputs.test-patterns }}\""
-        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --reporter=line,json"
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --reporter=line,json,blob"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output=test-results"
 
         if [ -n "${{ inputs.shard }}" ]; then

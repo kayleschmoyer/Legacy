@@ -359,6 +359,64 @@ jobs:
           should-run-e2e: ${{ needs.build-validation.outputs.artifacts-ready }}
           shard: ${{ matrix.shard }}
 
+      - name: "Upload Blob Report"
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-blob-${{ github.run_id }}-${{ strategy.job-index }}
+          path: apps/web-e2e/blob-report/
+          retention-days: 7
+          if-no-files-found: warn
+
+  # ============================================================================
+  # STAGE 4b — Merge E2E shard reports and deploy to GitHub Pages
+  # ============================================================================
+  deploy-playwright-report:
+    name: "Deploy Playwright Report"
+    needs: [e2e]
+    if: always() && needs.e2e.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Download All Blob Reports"
+        uses: actions/download-artifact@v8
+        with:
+          pattern: playwright-blob-${{ github.run_id }}-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: "Merge Playwright Reports"
+        run: pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+
+      - name: "Generate App Token"
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: bkrupa
+          repositories: legacy-sports-deploys
+
+      - name: "Deploy Playwright Report"
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ steps.app-token.outputs.token }}
+          external_repository: bkrupa/legacy-sports-deploys
+          publish_branch: gh-pages
+          publish_dir: ./playwright-report
+          destination_dir: playwright-report
+
   # ============================================================================
   # STAGE 5 — Summarize results (always runs — posts PR comment, updates badges)
   # ============================================================================
