@@ -2,9 +2,9 @@
 
 /**
  * Migration script to help update existing E2E tests to use CLI-generated JWTs
- * 
+ *
  * Usage: node migrate-to-cli-jwt.js
- * 
+ *
  * This script will:
  * 1. Scan existing test files
  * 2. Identify hardcoded JWT tokens
@@ -26,25 +26,26 @@ const FIXTURE_DIR = path.join(__dirname, '../fixtures');
 const JWT_PATTERN = /eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+/g;
 
 // Pattern to match localStorage.setItem with JWT
-const LOCALSTORAGE_PATTERN = /localStorage\.setItem\(['"`]auth_jwt['"`],\s*['"`]([^'"`]+)['"`]\)/g;
+const LOCALSTORAGE_PATTERN =
+  /localStorage\.setItem\(['"`]auth_jwt['"`],\s*['"`]([^'"`]+)['"`]\)/g;
 
 function scanTestFiles() {
   console.log('🔍 Scanning E2E test files for JWT usage...\n');
-  
+
   if (!fs.existsSync(TEST_DIR)) {
     console.error(`❌ Test directory not found: ${TEST_DIR}`);
     return;
   }
 
-  const testFiles = fs.readdirSync(TEST_DIR).filter(file => 
-    file.endsWith('.spec.ts') || file.endsWith('.test.ts')
-  );
+  const testFiles = fs
+    .readdirSync(TEST_DIR)
+    .filter((file) => file.endsWith('.spec.ts') || file.endsWith('.test.ts'));
 
   let totalFiles = 0;
   let filesWithJWT = 0;
   const suggestions = [];
 
-  testFiles.forEach(filename => {
+  testFiles.forEach((filename) => {
     const filePath = path.join(TEST_DIR, filename);
     const content = fs.readFileSync(filePath, 'utf8');
     totalFiles++;
@@ -56,7 +57,7 @@ function scanTestFiles() {
     if (jwtMatches || localStorageMatches) {
       filesWithJWT++;
       console.log(`📄 ${filename}:`);
-      
+
       if (jwtMatches) {
         console.log(`   🔑 Found ${jwtMatches.length} hardcoded JWT(s)`);
         jwtMatches.forEach((jwt, index) => {
@@ -65,7 +66,9 @@ function scanTestFiles() {
       }
 
       if (localStorageMatches) {
-        console.log(`   💾 Found ${localStorageMatches.length} localStorage JWT assignments`);
+        console.log(
+          `   💾 Found ${localStorageMatches.length} localStorage JWT assignments`,
+        );
       }
 
       // Generate migration suggestions
@@ -74,9 +77,9 @@ function scanTestFiles() {
         path: filePath,
         jwtCount: jwtMatches?.length || 0,
         storageCount: localStorageMatches?.length || 0,
-        content: content
+        content: content,
       });
-      
+
       console.log('');
     }
   });
@@ -84,86 +87,106 @@ function scanTestFiles() {
   console.log(`\n📊 Summary:`);
   console.log(`   Total test files: ${totalFiles}`);
   console.log(`   Files with hardcoded JWTs: ${filesWithJWT}`);
-  
+
   if (suggestions.length > 0) {
     console.log('\n💡 Migration suggestions:\n');
     generateMigrationSuggestions(suggestions);
   } else {
-    console.log('\n✅ No hardcoded JWTs found - you\'re all set!');
+    console.log("\n✅ No hardcoded JWTs found - you're all set!");
   }
 }
 
 function generateMigrationSuggestions(suggestions) {
-  suggestions.forEach(({ file, path: filePath, jwtCount, storageCount, content }) => {
-    console.log(`📝 ${file}:`);
-    
-    // Check current imports
-    const hasOldAuthImport = content.includes("from '../fixtures/auth'");
-    const hasNewAuthImport = content.includes("from '../fixtures/auth-enhanced'");
-    
-    if (!hasNewAuthImport) {
-      console.log('   1. Update imports:');
-      if (hasOldAuthImport) {
-        console.log('      Replace: import { test } from \'../fixtures/auth\';');
-        console.log('      With:    import { test } from \'../fixtures/auth-enhanced\';');
-      } else {
-        console.log('      Add: import { test, expect } from \'../fixtures/auth-enhanced\';');
+  suggestions.forEach(
+    ({ file, path: filePath, jwtCount, storageCount, content }) => {
+      console.log(`📝 ${file}:`);
+
+      // Check current imports
+      const hasOldAuthImport = content.includes("from '../fixtures/auth'");
+      const hasNewAuthImport = content.includes(
+        "from '../fixtures/auth-enhanced'",
+      );
+
+      if (!hasNewAuthImport) {
+        console.log('   1. Update imports:');
+        if (hasOldAuthImport) {
+          console.log(
+            "      Replace: import { test } from '../fixtures/auth';",
+          );
+          console.log(
+            "      With:    import { test } from '../fixtures/auth-enhanced';",
+          );
+        } else {
+          console.log(
+            "      Add: import { test, expect } from '../fixtures/auth-enhanced';",
+          );
+        }
       }
-    }
 
-    // Suggest removing hardcoded JWTs
-    if (jwtCount > 0) {
-      console.log('   2. Remove hardcoded JWTs:');
-      console.log('      The new auth fixture automatically generates fresh JWTs');
-      console.log('      You can remove the hardcoded JWT strings');
-    }
+      // Suggest removing hardcoded JWTs
+      if (jwtCount > 0) {
+        console.log('   2. Remove hardcoded JWTs:');
+        console.log(
+          '      The new auth fixture automatically generates fresh JWTs',
+        );
+        console.log('      You can remove the hardcoded JWT strings');
+      }
 
-    if (storageCount > 0) {
-      console.log('   3. Simplify localStorage setup:');
-      console.log('      Replace manual localStorage.setItem calls with fixture usage');
-      console.log('      The auth fixture handles JWT setup automatically');
-    }
+      if (storageCount > 0) {
+        console.log('   3. Simplify localStorage setup:');
+        console.log(
+          '      Replace manual localStorage.setItem calls with fixture usage',
+        );
+        console.log('      The auth fixture handles JWT setup automatically');
+      }
 
-    // Provide specific code examples
-    console.log('   📋 Example migration:');
-    console.log('      BEFORE:');
-    console.log('        test("my test", async ({ page }) => {');
-    console.log('          await page.addInitScript(() => {');
-    console.log('            localStorage.setItem("auth_jwt", "hardcoded-jwt-here");');
-    console.log('          });');
-    console.log('          // ... test logic');
-    console.log('        });');
-    console.log('');
-    console.log('      AFTER:');
-    console.log('        test("my test", async ({ page }) => {');
-    console.log('          // JWT is automatically set by the fixture');
-    console.log('          // ... test logic (no setup needed)');
-    console.log('        });');
-    console.log('');
-
-    // Advanced patterns
-    if (content.includes('admin') || content.includes('Admin')) {
-      console.log('   🎯 For admin tests, use:');
-      console.log('      import { adminTest } from \'../fixtures/auth-enhanced\';');
-      console.log('      adminTest("admin test", async ({ page }) => { ... });');
+      // Provide specific code examples
+      console.log('   📋 Example migration:');
+      console.log('      BEFORE:');
+      console.log('        test("my test", async ({ page }) => {');
+      console.log('          await page.addInitScript(() => {');
+      console.log(
+        '            localStorage.setItem("auth_jwt", "hardcoded-jwt-here");',
+      );
+      console.log('          });');
+      console.log('          // ... test logic');
+      console.log('        });');
       console.log('');
-    }
-  });
+      console.log('      AFTER:');
+      console.log('        test("my test", async ({ page }) => {');
+      console.log('          // JWT is automatically set by the fixture');
+      console.log('          // ... test logic (no setup needed)');
+      console.log('        });');
+      console.log('');
+
+      // Advanced patterns
+      if (content.includes('admin') || content.includes('Admin')) {
+        console.log('   🎯 For admin tests, use:');
+        console.log(
+          "      import { adminTest } from '../fixtures/auth-enhanced';",
+        );
+        console.log(
+          '      adminTest("admin test", async ({ page }) => { ... });',
+        );
+        console.log('');
+      }
+    },
+  );
 }
 
 function checkFixtureSetup() {
   console.log('\n🔧 Checking fixture setup...');
-  
+
   const enhancedFixturePath = path.join(FIXTURE_DIR, 'auth-enhanced.ts');
   const utilsPath = path.join(__dirname, '../utils/jwt.ts');
-  
+
   if (fs.existsSync(enhancedFixturePath)) {
     console.log('✅ Enhanced auth fixture is available');
   } else {
     console.log('❌ Enhanced auth fixture not found');
     console.log('   Run: Create the auth-enhanced.ts fixture file');
   }
-  
+
   if (fs.existsSync(utilsPath)) {
     console.log('✅ JWT utilities are available');
   } else {
@@ -174,7 +197,7 @@ function checkFixtureSetup() {
 
 function generateMigrationTemplate() {
   const templatePath = path.join(__dirname, '../MIGRATION_TEMPLATE.md');
-  
+
   const template = `# E2E JWT Migration Checklist
 
 ## Files to Update

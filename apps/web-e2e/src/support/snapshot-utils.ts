@@ -116,9 +116,10 @@ export class SnapshotUtils {
     name: string,
   ): Promise<void> {
     await this.preparePage(page);
-    const element = typeof selectorOrLocator === 'string'
-      ? page.locator(selectorOrLocator)
-      : selectorOrLocator;
+    const element =
+      typeof selectorOrLocator === 'string'
+        ? page.locator(selectorOrLocator)
+        : selectorOrLocator;
 
     if (await element.isVisible()) {
       await expect(element).toHaveScreenshot(name, {

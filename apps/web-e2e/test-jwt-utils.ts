@@ -20,7 +20,7 @@ async function testJwtGeneration() {
     const customJwt = E2EJwtUtil.generateJwt({
       email: 'custom@test.com',
       expiration: '10m',
-      accessLevel: 'none'
+      accessLevel: 'none',
     });
     console.log(`   ✅ Generated custom JWT: ${customJwt.substring(0, 30)}...`);
 
@@ -35,7 +35,7 @@ async function testJwtGeneration() {
     console.log(`   ✅ Decoded payload:`, {
       email: payload.email,
       accessLevel: payload.accessLevel,
-      exp: new Date(payload.exp * 1000).toISOString()
+      exp: new Date(payload.exp * 1000).toISOString(),
     });
 
     // Test bulk generation
@@ -53,12 +53,11 @@ async function testJwtGeneration() {
     console.log('     // JWT automatically set by fixture');
     console.log('     await page.goto("/dashboard");');
     console.log('   });');
-
   } catch (error) {
     console.error('\n❌ JWT generation test failed:', error);
     console.log('\n🔧 Troubleshooting:');
     console.log('   1. Ensure CLI generate-jwt command is working');
-    console.log('   2. Check that you\'re in the correct directory');
+    console.log("   2. Check that you're in the correct directory");
     console.log('   3. Verify Node.js and tsx are installed');
     process.exit(1);
   }
