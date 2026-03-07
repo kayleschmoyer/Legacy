@@ -462,6 +462,256 @@ function getPositionScore(
   return maxScore || 1; // Fallback to basic eligibility
 }
 
+// ── Shared player-pool builder ────────────────────────────────────────────────
+
+/** Result returned by buildPlayerPool */
+interface PlayerPoolResult {
+  enhancedPlayers: PlayerWithPositions[];
+  playersByPosition: PositionPlayerGroup;
+}
+
+/**
+ * Load, filter, and group the eligible player pool for any automated draft mode.
+ *
+ * Extracted so randomlyAssignPlayers and runAuctionDraft share the same player
+ * loading pipeline without duplication.
+ *
+ * @param db      A Drizzle database instance or transaction (both satisfy PublicDb).
+ * @param leagueId  League to draft for.
+ * @param numTeams  Number of teams participating.
+ * @param leaguePositions  Explicit roster positions for the league.
+ * @param config   League settings that control player eligibility.
+ */
+async function buildPlayerPool(
+  db: PublicDb,
+  leagueId: number,
+  numTeams: number,
+  leaguePositions: Array<{ id: number; positionType: string }>,
+  config: {
+    gamesPerMatchup: number | null;
+    playerPool: string;
+    minCareerGames: number;
+    minCareerSeasons: number;
+    hofOnly: boolean;
+    eraFilter: string;
+    customEraStartYear: number | null;
+    customEraEndYear: number | null;
+    maxRosterSize: number;
+  },
+): Promise<PlayerPoolResult> {
+  const gamesPerMatchup = config.gamesPerMatchup ?? 5;
+  const minGames = gamesPerMatchup * SEASON_MATCHUP_MULTIPLIER;
+  const {
+    playerPool,
+    minCareerGames,
+    minCareerSeasons,
+    hofOnly,
+    eraFilter,
+    customEraStartYear,
+    customEraEndYear,
+    maxRosterSize,
+  } = config;
+
+  // ── 1. Fetch candidate players ordered by stats availability ─────────────
+  const estimatedPlayersNeeded = numTeams * maxRosterSize * 2;
+  const candidatePlayers = await db
+    .select({
+      id: PublicSchema.players.id,
+      firstName: PublicSchema.players.firstName,
+      lastName: PublicSchema.players.lastName,
+      brefId: PublicSchema.players.brefId,
+      statsLastFetchedAt: PublicSchema.players.statsLastFetchedAt,
+    })
+    .from(PublicSchema.players)
+    .orderBy(
+      sql`CASE WHEN ${PublicSchema.players.statsLastFetchedAt} IS NOT NULL THEN 0 ELSE 1 END`,
+      sql`${PublicSchema.players.statsLastFetchedAt} DESC NULLS LAST`,
+      PublicSchema.players.id,
+    )
+    .limit(Math.max(estimatedPlayersNeeded, 2000));
+
+  LOGGER.info(
+    `[buildPlayerPool] ${candidatePlayers.length} candidates fetched for league ${leagueId}`,
+  );
+
+  // ── 2. Filter to players with at least one valid season ───────────────────
+  const candidatePlayerIds = candidatePlayers.map((p) => p.id);
+
+  const [battingStats, pitchingStats, fieldingStats] = await Promise.all([
+    db
+      .select({
+        playerId: PublicSchema.seasonBatting.playerId,
+        season: PublicSchema.seasonBatting.season,
+        g: PublicSchema.seasonBatting.g,
+        lgId: PublicSchema.seasonBatting.lgId,
+      })
+      .from(PublicSchema.seasonBatting)
+      .where(
+        and(
+          inArray(PublicSchema.seasonBatting.playerId, candidatePlayerIds),
+          gte(PublicSchema.seasonBatting.season, MIN_SEASON_WITH_GAME_DATA),
+        ),
+      )
+      .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+    db
+      .select({
+        playerId: PublicSchema.seasonPitching.playerId,
+        season: PublicSchema.seasonPitching.season,
+        g: PublicSchema.seasonPitching.g,
+        lgId: PublicSchema.seasonPitching.lgId,
+      })
+      .from(PublicSchema.seasonPitching)
+      .where(
+        and(
+          inArray(PublicSchema.seasonPitching.playerId, candidatePlayerIds),
+          gte(PublicSchema.seasonPitching.season, MIN_SEASON_WITH_GAME_DATA),
+        ),
+      )
+      .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+    db
+      .select({
+        playerId: PublicSchema.seasonFielding.playerId,
+        season: PublicSchema.seasonFielding.season,
+        g: PublicSchema.seasonFielding.g,
+        lgId: PublicSchema.seasonFielding.lgId,
+      })
+      .from(PublicSchema.seasonFielding)
+      .where(
+        and(
+          inArray(PublicSchema.seasonFielding.playerId, candidatePlayerIds),
+          gte(PublicSchema.seasonFielding.season, MIN_SEASON_WITH_GAME_DATA),
+        ),
+      )
+      .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+  ]);
+
+  const fieldingByPlayerSeason = new Map<string, number>();
+  for (const stat of fieldingStats) {
+    const key = `${stat.playerId}-${stat.season}`;
+    fieldingByPlayerSeason.set(
+      key,
+      (fieldingByPlayerSeason.get(key) ?? 0) + (stat.g ?? 0),
+    );
+  }
+
+  const playersWithValidSeasons = new Set<number>();
+  for (const stat of battingStats) {
+    if ((stat.g ?? 0) >= minGames) playersWithValidSeasons.add(stat.playerId);
+  }
+  for (const stat of pitchingStats) {
+    if ((stat.g ?? 0) >= minGames) playersWithValidSeasons.add(stat.playerId);
+  }
+  for (const [key, totalGames] of fieldingByPlayerSeason.entries()) {
+    if (totalGames >= minGames) {
+      playersWithValidSeasons.add(parseInt(key.split('-')[0]));
+    }
+  }
+
+  let players = candidatePlayers.filter((p) =>
+    playersWithValidSeasons.has(p.id),
+  );
+
+  LOGGER.info(
+    `[buildPlayerPool] ${players.length} players with valid seasons (≥${minGames} games)`,
+  );
+
+  // ── 3. Apply league eligibility settings ─────────────────────────────────
+  const eligibilityResult = await filterPlayerIdsByLeagueEligibility(
+    db,
+    players.map((p) => p.id),
+    {
+      playerPool,
+      minCareerGames,
+      minCareerSeasons,
+      hofOnly,
+      eraFilter,
+      customEraStartYear,
+      customEraEndYear,
+    },
+  );
+  players = players.filter((p) => eligibilityResult.eligibleIds.has(p.id));
+
+  LOGGER.info(
+    `[buildPlayerPool] ${players.length} eligible after filters ` +
+      `(pool: -${eligibilityResult.excludedByPool}, ` +
+      `career games: -${eligibilityResult.excludedByCareerGames}, ` +
+      `career seasons: -${eligibilityResult.excludedByCareerSeasons}, ` +
+      `hof: -${eligibilityResult.excludedByHofOnly}, ` +
+      `era: -${eligibilityResult.excludedByEraFilter})`,
+  );
+
+  if (players.length === 0) {
+    throw new Error('No players available for draft');
+  }
+
+  // ── 4. Load position eligibility data ────────────────────────────────────
+  const playerIds = players.map((p) => p.id);
+  const playersWithPositions = await loadAllPlayersWithPositions(db, playerIds);
+
+  const enhancedPlayers: PlayerWithPositions[] = players.map((player) => {
+    const positionData = playersWithPositions.get(player.id);
+    return {
+      ...player,
+      eligiblePositions: positionData?.eligiblePositions ?? [
+        '1B',
+        '2B',
+        '3B',
+        'OF',
+        'DH',
+      ],
+      isPitcher: positionData?.isPitcher ?? false,
+      positionDetails: positionData?.positionDetails,
+    };
+  });
+
+  // ── 5. Build per-position player pools with quality scoring ───────────────
+  const playersByPosition: PositionPlayerGroup = {};
+  for (const position of leaguePositions) {
+    const eligiblePlayers = enhancedPlayers
+      .filter((player) =>
+        canPlayerPlayPosition(player.eligiblePositions, position.positionType),
+      )
+      .map((player) => ({
+        ...player,
+        positionScore: player.statsLastFetchedAt
+          ? getPositionScore(
+              player.eligiblePositions,
+              position.positionType,
+              player.positionDetails,
+            )
+          : -1,
+      }))
+      .sort((a, b) => b.positionScore - a.positionScore);
+
+    // Group by score band and shuffle within each band for controlled randomness
+    const groupedByScore: PlayerWithPositions[][] = [];
+    let currentGroup: PlayerWithPositions[] = [];
+    let currentScore = -1;
+    for (const player of eligiblePlayers) {
+      const scoreGroup = Math.floor(player.positionScore * 10);
+      if (scoreGroup !== currentScore) {
+        if (currentGroup.length > 0)
+          groupedByScore.push(shuffleArray(currentGroup));
+        currentGroup = [player];
+        currentScore = scoreGroup;
+      } else {
+        currentGroup.push(player);
+      }
+    }
+    if (currentGroup.length > 0)
+      groupedByScore.push(shuffleArray(currentGroup));
+    playersByPosition[position.positionType] = groupedByScore.flat();
+  }
+
+  addBreadcrumb('Player pool built', {
+    leagueId,
+    totalPlayers: enhancedPlayers.length,
+    positionGroups: Object.keys(playersByPosition).length,
+  });
+
+  return { enhancedPlayers, playersByPosition };
+}
+
 /**
  * HEAVILY OPTIMIZED: Smart player assignment using positionsPlayed JSONB data
  *
@@ -512,6 +762,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
             eraFilter: PublicSchema.leagues.eraFilter,
             customEraStartYear: PublicSchema.leagues.customEraStartYear,
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -530,6 +781,7 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
       const eraFilter = leagueConfig[0]?.eraFilter ?? 'all';
       const customEraStartYear = leagueConfig[0]?.customEraStartYear ?? null;
       const customEraEndYear = leagueConfig[0]?.customEraEndYear ?? null;
+      const maxRosterSizeFromConfig = leagueConfig[0]?.maxRosterSize ?? 25;
 
       LOGGER.info('Draft season requirements', {
         gamesPerMatchup,
@@ -542,168 +794,6 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
         leagueId,
       });
 
-      // Calculate players needed and fetch with appropriate buffer
-      const estimatedPlayersNeeded = teams.length * leaguePositions.length * 2; // 2x buffer
-
-      // Step 1.5: Query ALL candidate players first (before filtering by valid seasons)
-      // Query explanation:
-      // 1. ORDER BY statsLastFetchedAt to prioritize players WITH stats
-      // 2. Most recently fetched stats appear first
-      // 3. Players with no stats (NULL) appear last
-      // 4. Secondary sort by player ID for consistent ordering
-      const candidatePlayers = await tx
-        .select({
-          id: PublicSchema.players.id,
-          firstName: PublicSchema.players.firstName,
-          lastName: PublicSchema.players.lastName,
-          brefId: PublicSchema.players.brefId,
-          statsLastFetchedAt: PublicSchema.players.statsLastFetchedAt,
-        })
-        .from(PublicSchema.players)
-        .orderBy(
-          sql`CASE WHEN ${PublicSchema.players.statsLastFetchedAt} IS NOT NULL THEN 0 ELSE 1 END`, // Players with stats first
-          sql`${PublicSchema.players.statsLastFetchedAt} DESC NULLS LAST`, // Most recently fetched stats first
-          PublicSchema.players.id, // Consistent tiebreaker
-        )
-        .limit(Math.max(estimatedPlayersNeeded, 2000)); // Larger buffer since we'll filter
-
-      LOGGER.info(
-        `Loaded ${candidatePlayers.length} candidate players before season filtering`,
-      );
-
-      // Step 1.6: Filter to only players with valid seasons (at least minGames in batting, pitching, OR fielding)
-      // Only consider seasons from 1901+ (Baseball-Reference has game-level data from 1901 onwards)
-      const candidatePlayerIds = candidatePlayers.map((p) => p.id);
-
-      // Query player stats to determine which players have valid seasons
-      const [battingStats, pitchingStats, fieldingStats] = await Promise.all([
-        tx
-          .select({
-            playerId: PublicSchema.seasonBatting.playerId,
-            season: PublicSchema.seasonBatting.season,
-            g: PublicSchema.seasonBatting.g,
-            lgId: PublicSchema.seasonBatting.lgId,
-          })
-          .from(PublicSchema.seasonBatting)
-          .where(
-            and(
-              inArray(PublicSchema.seasonBatting.playerId, candidatePlayerIds),
-              gte(PublicSchema.seasonBatting.season, MIN_SEASON_WITH_GAME_DATA),
-            ),
-          )
-          .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
-        tx
-          .select({
-            playerId: PublicSchema.seasonPitching.playerId,
-            season: PublicSchema.seasonPitching.season,
-            g: PublicSchema.seasonPitching.g,
-            lgId: PublicSchema.seasonPitching.lgId,
-          })
-          .from(PublicSchema.seasonPitching)
-          .where(
-            and(
-              inArray(PublicSchema.seasonPitching.playerId, candidatePlayerIds),
-              gte(
-                PublicSchema.seasonPitching.season,
-                MIN_SEASON_WITH_GAME_DATA,
-              ),
-            ),
-          )
-          .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
-        tx
-          .select({
-            playerId: PublicSchema.seasonFielding.playerId,
-            season: PublicSchema.seasonFielding.season,
-            g: PublicSchema.seasonFielding.g,
-            lgId: PublicSchema.seasonFielding.lgId,
-          })
-          .from(PublicSchema.seasonFielding)
-          .where(
-            and(
-              inArray(PublicSchema.seasonFielding.playerId, candidatePlayerIds),
-              gte(
-                PublicSchema.seasonFielding.season,
-                MIN_SEASON_WITH_GAME_DATA,
-              ),
-            ),
-          )
-          .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
-      ]);
-
-      // Identify players with at least one valid season
-      // Aggregate fielding stats by player+season (since fielding has multiple positions)
-      const fieldingByPlayerSeason = new Map<string, number>();
-      for (const stat of fieldingStats) {
-        const key = `${stat.playerId}-${stat.season}`;
-        const games = stat.g ?? 0;
-        fieldingByPlayerSeason.set(
-          key,
-          (fieldingByPlayerSeason.get(key) ?? 0) + games,
-        );
-      }
-
-      const playersWithValidSeasons = new Set<number>();
-
-      // Check batting seasons
-      for (const stat of battingStats) {
-        if ((stat.g ?? 0) >= minGames) {
-          playersWithValidSeasons.add(stat.playerId);
-        }
-      }
-
-      // Check pitching seasons
-      for (const stat of pitchingStats) {
-        if ((stat.g ?? 0) >= minGames) {
-          playersWithValidSeasons.add(stat.playerId);
-        }
-      }
-
-      // Check fielding seasons (aggregated)
-      for (const [key, totalGames] of fieldingByPlayerSeason.entries()) {
-        if (totalGames >= minGames) {
-          const playerId = parseInt(key.split('-')[0]);
-          playersWithValidSeasons.add(playerId);
-        }
-      }
-
-      // Filter to only players with valid seasons
-      let players = candidatePlayers.filter((p) =>
-        playersWithValidSeasons.has(p.id),
-      );
-
-      LOGGER.info(
-        `Filtered to ${players.length} players with valid seasons (≥${minGames} games)`,
-      );
-      LOGGER.info(
-        `Excluded ${candidatePlayers.length - players.length} players without valid seasons`,
-      );
-
-      // Step 1.7: Apply league eligibility settings (playerPool, minCareerGames, minCareerSeasons, hofOnly, eraFilter)
-      const preEligibilityCount = players.length;
-      const eligibilityResult = await filterPlayerIdsByLeagueEligibility(
-        tx,
-        players.map((p) => p.id),
-        {
-          playerPool,
-          minCareerGames,
-          minCareerSeasons,
-          hofOnly,
-          eraFilter,
-          customEraStartYear,
-          customEraEndYear,
-        },
-      );
-      players = players.filter((p) => eligibilityResult.eligibleIds.has(p.id));
-
-      LOGGER.info(
-        `League eligibility filters: ${preEligibilityCount} → ${players.length} players ` +
-          `(pool: -${eligibilityResult.excludedByPool}, ` +
-          `career games: -${eligibilityResult.excludedByCareerGames}, ` +
-          `career seasons: -${eligibilityResult.excludedByCareerSeasons}, ` +
-          `hof: -${eligibilityResult.excludedByHofOnly}, ` +
-          `era: -${eligibilityResult.excludedByEraFilter})`,
-      );
-
       if (teams.length === 0) {
         throw new Error(`No teams found for league ${leagueId}`);
       }
@@ -712,169 +802,31 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           `No positions found for league ${leagueId}. Make sure league positions are set up.`,
         );
       }
-      if (players.length === 0) {
-        throw new Error('No players available for draft');
-      }
 
-      // Log stats about player stats availability
-      const playersWithStats = players.filter(
-        (p) => p.statsLastFetchedAt !== null,
-      ).length;
-      const statsPercentage = Math.round(
-        (playersWithStats / players.length) * 100,
-      );
-
-      LOGGER.info(
-        `Draft data loaded: ${teams.length} teams, ${leaguePositions.length} positions, ${players.length} players`,
-      );
-      LOGGER.info(
-        `Player stats availability: ${playersWithStats}/${players.length} players (${statsPercentage}%) have loaded stats`,
-      );
-      addBreadcrumb('Basic draft data loaded', {
-        teamCount: teams.length,
-        positionCount: leaguePositions.length,
-        playerCount: players.length,
-        playersWithStats: playersWithStats,
-        statsPercentage: `${statsPercentage}%`,
-      });
-
-      // Step 2: Batch load all player positions and stats (eliminates N+1 queries)
-      const playerIds = players.map((p) => p.id);
-      const playersWithPositions = await loadAllPlayersWithPositions(
+      // Steps 1.5–3: Load eligible players and build per-position pools
+      // (shared with runAuctionDraft via buildPlayerPool)
+      const { enhancedPlayers, playersByPosition } = await buildPlayerPool(
         tx,
-        playerIds,
-      );
-
-      // Merge player data with position data
-      const enhancedPlayers: PlayerWithPositions[] = players.map((player) => {
-        const positionData = playersWithPositions.get(player.id);
-        const eligiblePositions = positionData?.eligiblePositions || [
-          '1B',
-          '2B',
-          '3B',
-          'OF',
-          'DH',
-        ];
-
-        // DEBUG: Log some sample player eligibility
-        if (players.indexOf(player) < 5) {
-          LOGGER.info(
-            `Sample player ${player.firstName} ${player.lastName}: eligible for ${eligiblePositions.join(',')}`,
-          );
-        }
-
-        return {
-          ...player,
-          eligiblePositions,
-          isPitcher: positionData?.isPitcher || false,
-        };
-      });
-
-      LOGGER.info(`Total enhanced players: ${enhancedPlayers.length}`);
-
-      // Step 3: Create OPTIMIZED position-based player groups with smart scoring
-      const playersByPosition: PositionPlayerGroup = {};
-      for (const position of leaguePositions) {
-        // DEBUG: Log position requirements and player eligibility
-        LOGGER.info(
-          `Processing position ${position.positionType} (id: ${position.id})`,
-        );
-
-        // Filter eligible players and add position scoring for smarter assignments
-        const eligiblePlayers = enhancedPlayers
-          .filter((player) => {
-            const canPlay = canPlayerPlayPosition(
-              player.eligiblePositions,
-              position.positionType,
-            );
-            if (!canPlay) {
-              LOGGER.debug(
-                `Player ${player.firstName} ${player.lastName} (${player.eligiblePositions.join(',')}) cannot play ${position.positionType}`,
-              );
-            }
-            return canPlay;
-          })
-          .map((player) => ({
-            ...player,
-            // Combine position score with stats availability
-            // Players without stats get -1, ensuring they always sort last
-            positionScore: player.statsLastFetchedAt
-              ? getPositionScore(
-                  player.eligiblePositions,
-                  position.positionType,
-                  player.positionDetails,
-                )
-              : -1, // Players without stats always go to the end
-          }))
-          // Sort by position score (best fits first) then shuffle within similar score ranges
-          .sort((a, b) => b.positionScore - a.positionScore);
-
-        LOGGER.info(
-          `Position ${position.positionType}: ${eligiblePlayers.length} eligible players found`,
-        );
-
-        // Add controlled randomness: shuffle players with similar scores to maintain draft fairness
-        const groupedByScore: PlayerWithPositions[][] = [];
-        let currentGroup: PlayerWithPositions[] = [];
-        let currentScore = -1;
-
-        for (const player of eligiblePlayers) {
-          const scoreGroup = Math.floor(player.positionScore * 10); // Group by 0.1 increments
-
-          if (scoreGroup !== currentScore) {
-            if (currentGroup.length > 0) {
-              groupedByScore.push(shuffleArray(currentGroup));
-            }
-            currentGroup = [player];
-            currentScore = scoreGroup;
-          } else {
-            currentGroup.push(player);
-          }
-        }
-
-        if (currentGroup.length > 0) {
-          groupedByScore.push(shuffleArray(currentGroup));
-        }
-
-        // Flatten back into single array maintaining score-based ordering with randomness
-        playersByPosition[position.positionType] = groupedByScore.flat();
-
-        LOGGER.debug(
-          `Position ${position.positionType}: ${playersByPosition[position.positionType].length} eligible players (smart-sorted)`,
-        );
-      }
-
-      // Enhanced performance monitoring with position quality metrics
-      const positionQualityMetrics = Object.entries(playersByPosition).map(
-        ([pos, players]) => {
-          const avgScore =
-            players.reduce((sum, p) => sum + (p.positionScore || 1), 0) /
-            players.length;
-          const highQualityPlayers = players.filter(
-            (p) => (p.positionScore || 1) > 1.2,
-          ).length;
-
-          return {
-            position: pos,
-            totalPlayers: players.length,
-            avgQualityScore: Math.round(avgScore * 100) / 100,
-            highQualityCount: highQualityPlayers,
-            highQualityPercentage: Math.round(
-              (highQualityPlayers / players.length) * 100,
-            ),
-          };
+        leagueId,
+        teams.length,
+        leaguePositions,
+        {
+          gamesPerMatchup: leagueConfig[0]?.gamesPerMatchup ?? null,
+          playerPool,
+          minCareerGames,
+          minCareerSeasons,
+          hofOnly,
+          eraFilter,
+          customEraStartYear,
+          customEraEndYear,
+          maxRosterSize: maxRosterSizeFromConfig,
         },
       );
 
-      addBreadcrumb('OPTIMIZED position groups created with quality scoring', {
-        positionGroups: Object.keys(playersByPosition).length,
-        totalEligibleAssignments: Object.values(playersByPosition).reduce(
-          (sum, players) => sum + players.length,
-          0,
-        ),
-        qualityMetrics: positionQualityMetrics,
-        improvementNote:
-          'Using positionsPlayed JSONB data for smarter assignments',
+      addBreadcrumb('Player pool ready', {
+        teamCount: teams.length,
+        positionCount: leaguePositions.length,
+        playerCount: enhancedPlayers.length,
       });
 
       // Step 4: Optimized assignment algorithm with batch operations
@@ -930,18 +882,8 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
       }
 
       // Step 4b: Fill remaining roster spots with bench players (no explicit positions)
-      // Get league's maxRosterSize to determine total roster spots
-      const leagueInfo = await tx
-        .select({ maxRosterSize: PublicSchema.leagues.maxRosterSize })
-        .from(PublicSchema.leagues)
-        .where(eq(PublicSchema.leagues.id, leagueId))
-        .limit(1);
-
-      if (leagueInfo.length === 0) {
-        throw new Error(`League ${leagueId} not found`);
-      }
-
-      const maxRosterSize = leagueInfo[0].maxRosterSize;
+      // maxRosterSize was already fetched as part of the league config in Step 1
+      const maxRosterSize = maxRosterSizeFromConfig;
       const explicitPositions = leaguePositions.length; // 20 explicit positions
       const benchSlots = maxRosterSize - explicitPositions; // remaining slots are bench
 
@@ -1070,6 +1012,439 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           assignmentCount - teams.length * explicitPositions,
         ),
         fillRate: `${Math.round((assignmentCount / expectedAssignments) * 100)}%`,
+      });
+    }); // End transaction
+  }); // End runWithPublicClient
+}
+
+/**
+ * Automated auction draft: simulates a complete auction and assigns all roster
+ * slots across every team in the league.
+ *
+ * Simulation strategy per position slot:
+ *   1. Nomination rotates round-robin through draftTeams ordered by draftOrder.
+ *   2. Best available player eligible for the current position slot is
+ *      auto-nominated.
+ *   3. Every team that still needs THIS position slot bids proportionally to
+ *      their remaining budget, with ±30% randomness to avoid determinism.
+ *   4. Budget constraint: max_bid = remaining − (remaining_slots − 1) × min_bid.
+ *      This ensures a team can always fill the rest of its roster at minimum cost.
+ *   5. Highest bidder wins; remaining_budget and slots_left are decremented.
+ *   6. player_salaries is upserted only when salary_cap_enabled = true.
+ *
+ * Database writes (all within a single transaction):
+ *   - team_members  (salary = winning bid)
+ *   - draft_picks   (bid_amount = winning bid)
+ *   - player_salaries (only when salary_cap_enabled)
+ *   - league_activity_log
+ *   - auction_budgets (final remaining_budget + players_won per team)
+ */
+async function runAuctionDraft(leagueId: number): Promise<void> {
+  await runWithPublicClient(getDbOptions(), async (db) => {
+    return await db.transaction(async (tx) => {
+      addBreadcrumb('Starting automated auction draft', { leagueId });
+
+      // ── 1. Load league config + draft record ─────────────────────────────
+      const [leagueRows, draftRows] = await Promise.all([
+        tx
+          .select({
+            maxRosterSize: PublicSchema.leagues.maxRosterSize,
+            auctionBudget: PublicSchema.leagues.auctionBudget,
+            auctionMinBid: PublicSchema.leagues.auctionMinBid,
+            salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+            seasonNumber: PublicSchema.leagues.seasonNumber,
+            gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+            playerPool: PublicSchema.leagues.playerPool,
+            minCareerGames: PublicSchema.leagues.minCareerGames,
+            minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+            hofOnly: PublicSchema.leagues.hofOnly,
+            eraFilter: PublicSchema.leagues.eraFilter,
+            customEraStartYear: PublicSchema.leagues.customEraStartYear,
+            customEraEndYear: PublicSchema.leagues.customEraEndYear,
+          })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1),
+        tx
+          .select({ id: PublicSchema.drafts.id })
+          .from(PublicSchema.drafts)
+          .where(eq(PublicSchema.drafts.leagueId, leagueId))
+          .limit(1),
+      ]);
+
+      if (leagueRows.length === 0) {
+        throw new Error(`League ${leagueId} not found`);
+      }
+      if (draftRows.length === 0) {
+        throw new Error(`No draft found for league ${leagueId}`);
+      }
+
+      const config = leagueRows[0];
+      const draftId = draftRows[0].id;
+      const { auctionBudget, auctionMinBid, maxRosterSize, seasonNumber } =
+        config;
+
+      addBreadcrumb('Auction config loaded', {
+        draftId,
+        auctionBudget,
+        auctionMinBid,
+        maxRosterSize,
+        salaryCapEnabled: config.salaryCapEnabled,
+      });
+
+      // ── 2. Load draft teams + league positions ────────────────────────────
+      const [draftTeamRows, leaguePositions] = await Promise.all([
+        tx
+          .select({
+            teamId: PublicSchema.draftTeams.teamId,
+            draftOrder: PublicSchema.draftTeams.draftOrder,
+          })
+          .from(PublicSchema.draftTeams)
+          .where(eq(PublicSchema.draftTeams.draftId, draftId))
+          .orderBy(PublicSchema.draftTeams.draftOrder),
+        tx
+          .select({
+            id: PublicSchema.leaguePosition.id,
+            positionType: PublicSchema.leaguePosition.positionType,
+          })
+          .from(PublicSchema.leaguePosition)
+          .where(eq(PublicSchema.leaguePosition.leagueId, leagueId))
+          .orderBy(PublicSchema.leaguePosition.id),
+      ]);
+
+      const numTeams = draftTeamRows.length;
+      if (numTeams === 0) {
+        throw new Error(
+          `No teams registered for draft ${draftId} in league ${leagueId}`,
+        );
+      }
+      if (leaguePositions.length === 0) {
+        throw new Error(
+          `No positions found for league ${leagueId}. Make sure league positions are set up.`,
+        );
+      }
+
+      const explicitPositionCount = leaguePositions.length;
+      const benchSlots = maxRosterSize - explicitPositionCount;
+
+      LOGGER.info('Auction draft: teams and positions loaded', {
+        numTeams,
+        explicitPositionCount,
+        benchSlots,
+        leagueId,
+      });
+
+      // ── 3. Initialize auction_budgets (one row per team) ─────────────────
+      await tx
+        .insert(PublicSchema.auctionBudgets)
+        .values(
+          draftTeamRows.map((t) => ({
+            draftId,
+            teamId: t.teamId,
+            remainingBudget: auctionBudget,
+            playersWon: 0,
+          })),
+        )
+        .onConflictDoNothing();
+
+      // In-memory tracking for the bidding simulation
+      const budgets = new Map<number, number>(
+        draftTeamRows.map((t) => [t.teamId, auctionBudget]),
+      );
+      // Remaining roster slots per team (for budget-constraint calculation)
+      const slotsLeft = new Map<number, number>(
+        draftTeamRows.map((t) => [t.teamId, maxRosterSize]),
+      );
+      // Which positionIds each team has already filled (prevents duplicate positionId per team)
+      const filledPositions = new Map<number, Set<number>>(
+        draftTeamRows.map((t) => [t.teamId, new Set()]),
+      );
+
+      // ── 4. Build eligible player pool ─────────────────────────────────────
+      const { enhancedPlayers, playersByPosition } = await buildPlayerPool(
+        tx,
+        leagueId,
+        numTeams,
+        leaguePositions,
+        {
+          gamesPerMatchup: config.gamesPerMatchup,
+          playerPool: config.playerPool,
+          minCareerGames: config.minCareerGames,
+          minCareerSeasons: config.minCareerSeasons,
+          hofOnly: config.hofOnly,
+          eraFilter: config.eraFilter,
+          customEraStartYear: config.customEraStartYear,
+          customEraEndYear: config.customEraEndYear,
+          maxRosterSize,
+        },
+      );
+
+      LOGGER.info('Auction draft: player pool ready', {
+        totalPlayers: enhancedPlayers.length,
+        leagueId,
+      });
+
+      // ── 5. Auction simulation ──────────────────────────────────────────────
+      interface AuctionResult {
+        teamId: number;
+        playerId: number;
+        bidAmount: number;
+        positionId: number | null;
+        overallPick: number;
+        round: number;
+        pickNumber: number;
+      }
+
+      const auctionResults: AuctionResult[] = [];
+      const usedPlayerIds = new Set<number>();
+      let overallPick = 0;
+      let nominationCycle = 0; // round-robin nominator index
+
+      /**
+       * Simulate a single-player auction among eligible bidders.
+       * Each team bids proportionally to (remaining / slotsLeft) ± 30%.
+       * Budget constraint: max_bid = remaining − (slotsLeft − 1) × min_bid.
+       * Returns the winning team ID and their bid amount.
+       */
+      function simulateBid(
+        eligibleBidders: typeof draftTeamRows,
+        fallbackTeamId: number,
+      ): { winner: number; bid: number } {
+        let winner = fallbackTeamId;
+        let winningBid = auctionMinBid;
+
+        for (const team of eligibleBidders) {
+          const remaining = budgets.get(team.teamId) ?? 0;
+          const slots = slotsLeft.get(team.teamId) ?? 0;
+          if (slots <= 0 || remaining < auctionMinBid) continue;
+
+          // Max bid keeps min_bid reserved for each remaining slot after this one
+          const maxBid = Math.max(
+            auctionMinBid,
+            remaining - Math.max(0, slots - 1) * auctionMinBid,
+          );
+          // Proportional bid with ±30% randomness, clamped to [min_bid, max_bid]
+          const targetBid = Math.ceil(remaining / slots);
+          const bid = Math.max(
+            auctionMinBid,
+            Math.min(
+              maxBid,
+              Math.round(targetBid * (0.7 + Math.random() * 0.6)),
+            ),
+          );
+          if (bid > winningBid) {
+            winningBid = bid;
+            winner = team.teamId;
+          }
+        }
+        return { winner, bid: winningBid };
+      }
+
+      // ── 5a. Explicit position slots ────────────────────────────────────────
+      for (const position of leaguePositions) {
+        const playersForPosition =
+          playersByPosition[position.positionType] ?? [];
+
+        // Auction one player per team needing this position
+        for (let slot = 0; slot < numTeams; slot++) {
+          // Teams that haven't filled this specific position yet
+          const stillNeeded = draftTeamRows.filter(
+            (t) => !filledPositions.get(t.teamId)?.has(position.id),
+          );
+          if (stillNeeded.length === 0) break;
+
+          overallPick++;
+
+          // Auto-nominate: best available player eligible for this position
+          const nominee = playersForPosition.find(
+            (p) => !usedPlayerIds.has(p.id),
+          );
+          if (!nominee) {
+            LOGGER.warn(
+              `No available player for position ${position.positionType}`,
+              { overallPick, leagueId },
+            );
+            nominationCycle++;
+            overallPick--; // revert the pick counter — no pick was recorded
+            continue;
+          }
+
+          const nominatorIdx = nominationCycle % stillNeeded.length;
+          const fallbackTeamId = stillNeeded[nominatorIdx].teamId;
+          nominationCycle++;
+
+          const { winner, bid } = simulateBid(stillNeeded, fallbackTeamId);
+
+          budgets.set(winner, (budgets.get(winner) ?? auctionBudget) - bid);
+          slotsLeft.set(winner, (slotsLeft.get(winner) ?? maxRosterSize) - 1);
+          filledPositions.get(winner)?.add(position.id);
+          usedPlayerIds.add(nominee.id);
+
+          auctionResults.push({
+            teamId: winner,
+            playerId: nominee.id,
+            bidAmount: bid,
+            positionId: position.id,
+            overallPick,
+            round: Math.ceil(overallPick / numTeams),
+            pickNumber: ((overallPick - 1) % numTeams) + 1,
+          });
+
+          LOGGER.debug(
+            `Pick ${overallPick}: team ${winner} wins ${nominee.firstName} ${nominee.lastName} (${position.positionType}) for $${bid}`,
+          );
+        }
+      }
+
+      // ── 5b. Bench slots ────────────────────────────────────────────────────
+      if (benchSlots > 0) {
+        const remainingPlayers = enhancedPlayers.filter(
+          (p) => !usedPlayerIds.has(p.id),
+        );
+
+        outer: for (let bench = 0; bench < benchSlots; bench++) {
+          for (let slot = 0; slot < numTeams; slot++) {
+            const nominee = remainingPlayers.find(
+              (p) => !usedPlayerIds.has(p.id),
+            );
+            if (!nominee) break outer; // no more players
+
+            const eligibleBidders = draftTeamRows.filter(
+              (t) => (slotsLeft.get(t.teamId) ?? 0) > 0,
+            );
+            if (eligibleBidders.length === 0) break outer;
+
+            overallPick++;
+            const fallbackTeamId =
+              eligibleBidders[nominationCycle % eligibleBidders.length].teamId;
+            nominationCycle++;
+
+            const { winner, bid } = simulateBid(
+              eligibleBidders,
+              fallbackTeamId,
+            );
+
+            budgets.set(winner, (budgets.get(winner) ?? auctionBudget) - bid);
+            slotsLeft.set(winner, (slotsLeft.get(winner) ?? maxRosterSize) - 1);
+            usedPlayerIds.add(nominee.id);
+
+            auctionResults.push({
+              teamId: winner,
+              playerId: nominee.id,
+              bidAmount: bid,
+              positionId: null,
+              overallPick,
+              round: Math.ceil(overallPick / numTeams),
+              pickNumber: ((overallPick - 1) % numTeams) + 1,
+            });
+          }
+        }
+      }
+
+      const expectedPicks = numTeams * maxRosterSize;
+      LOGGER.info(
+        `Auction simulation done: ${auctionResults.length}/${expectedPicks} picks`,
+        { leagueId },
+      );
+
+      if (auctionResults.length === 0) {
+        throw new Error('Auction draft produced no picks');
+      }
+
+      // ── 6. Batch database writes ───────────────────────────────────────────
+
+      // a) Team members with salary set to winning bid
+      await tx.insert(PublicSchema.teamMembers).values(
+        auctionResults.map((r) => ({
+          teamId: r.teamId,
+          leagueId,
+          playerId: r.playerId,
+          positionId: r.positionId,
+          salary: r.bidAmount,
+        })),
+      );
+
+      // b) Draft picks with bidAmount recorded
+      await tx.insert(PublicSchema.draftPicks).values(
+        auctionResults.map((r) => ({
+          draftId,
+          teamId: r.teamId,
+          playerId: r.playerId,
+          round: r.round,
+          pickNumber: r.pickNumber,
+          overallPick: r.overallPick,
+          bidAmount: r.bidAmount,
+        })),
+      );
+
+      // c) Player salaries — only when the league has salary cap enabled
+      if (config.salaryCapEnabled) {
+        await tx
+          .insert(PublicSchema.playerSalaries)
+          .values(
+            auctionResults.map((r) => ({
+              leagueId,
+              playerId: r.playerId,
+              currentSalary: r.bidAmount,
+              initialSalary: r.bidAmount,
+              acquisitionType: 'auction' as const,
+              yearAcquired: seasonNumber,
+              freeAgentYears: 0,
+            })),
+          )
+          .onConflictDoUpdate({
+            target: [
+              PublicSchema.playerSalaries.leagueId,
+              PublicSchema.playerSalaries.playerId,
+            ],
+            set: {
+              currentSalary: sql`EXCLUDED.current_salary`,
+              initialSalary: sql`EXCLUDED.initial_salary`,
+              acquisitionType: sql`EXCLUDED.acquisition_type`,
+              updatedAt: sql`now()`,
+            },
+          });
+      }
+
+      // d) Activity log
+      await tx.insert(PublicSchema.leagueActivityLog).values(
+        auctionResults.map((r) => ({
+          leagueId,
+          teamId: r.teamId,
+          actorUserId: null,
+          eventType: 'draft_pick_made' as const,
+          payload: {
+            playerId: r.playerId,
+            positionId: r.positionId,
+            overallPick: r.overallPick,
+            bidAmount: r.bidAmount,
+            wasAutoPick: true,
+            wasAuctionDraft: true,
+          },
+        })),
+      );
+
+      // e) Persist final auction_budgets state (remaining budget + players won per team)
+      for (const team of draftTeamRows) {
+        const finalBudget = budgets.get(team.teamId) ?? 0;
+        const playersWon = auctionResults.filter(
+          (r) => r.teamId === team.teamId,
+        ).length;
+        await tx
+          .update(PublicSchema.auctionBudgets)
+          .set({ remainingBudget: finalBudget, playersWon })
+          .where(
+            and(
+              eq(PublicSchema.auctionBudgets.draftId, draftId),
+              eq(PublicSchema.auctionBudgets.teamId, team.teamId),
+            ),
+          );
+      }
+
+      addBreadcrumb('Automated auction draft completed', {
+        totalPicks: auctionResults.length,
+        expectedPicks,
+        leagueId,
       });
     }); // End transaction
   }); // End runWithPublicClient
@@ -1233,8 +1608,8 @@ async function processDraftMessage(
           'Standard (pick-by-pick) draft processing not yet implemented in Lambda',
         );
       case 'auction':
-        // TODO(LS-328): Implement auction draft logic
-        throw new Error('Auction draft not yet implemented');
+        await runAuctionDraft(leagueId);
+        break;
       default:
         throw new Error(`Unknown selection method: ${String(selectionMethod)}`);
     }
