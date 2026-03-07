@@ -35,6 +35,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **Docker local stack**          | `.github/skills/docker-local/SKILL.md`                                     |
 | **Dump RDS to S3**              | `.github/skills/db-dump/SKILL.md`                                          |
 | **E2E testing (Playwright)**    | `.github/skills/e2e-testing/SKILL.md`                                      |
+| **Integration testing**         | `.github/skills/integration-testing/SKILL.md`                              |
 | Full workflow (start here)      | `.github/skills/workflow-ticket-to-pr/SKILL.md`                            |
 | **Install packages**            | `.github/skills/install-packages/SKILL.md`                                 |
 | Lint errors                     | `.github/skills/fix-lint/SKILL.md`                                         |
