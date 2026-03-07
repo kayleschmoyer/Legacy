@@ -752,6 +752,22 @@ export type LeaguePosition = {
   positionType?: Maybe<Scalars['String']['output']>;
 };
 
+/** A fantasy-league-specific seasonal award assigned by the commissioner to a player */
+export type LeagueSeasonAward = {
+  __typename?: 'LeagueSeasonAward';
+  /** One of: mvp | cy_young | rookie_of_the_year | gold_glove | silver_slugger */
+  awardType?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  notes?: Maybe<Scalars['String']['output']>;
+  playerFirstName?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerLastName?: Maybe<Scalars['String']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
 /** A head-to-head matchup between two teams in a league */
 export type Matchup = {
   __typename?: 'Matchup';
@@ -1003,6 +1019,8 @@ export type Mutation = {
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
+  /** Remove a season award from a league. Commissioner / General Manager access required. */
+  deleteLeagueSeasonAward?: Maybe<Scalars['Boolean']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: edit the scores of a past or current matchup. All edits are audit-logged. */
   editMatchupScore?: Maybe<CommissionerActionResult>;
@@ -1093,6 +1111,8 @@ export type Mutation = {
   updateUserRole?: Maybe<User>;
   /** Create or update a single achievement restriction for a league. Commissioner / General Manager access required. */
   upsertAchievementRestriction?: Maybe<AchievementRestriction>;
+  /** Create or update a season award for a player in a league. Commissioner / General Manager access required. */
+  upsertLeagueSeasonAward?: Maybe<LeagueSeasonAward>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
 };
@@ -1223,6 +1243,12 @@ export type MutationDeleteAchievementRestrictionArgs = {
 
 export type MutationDeleteLeagueArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationDeleteLeagueSeasonAwardArgs = {
+  awardType: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
 };
 
 export type MutationDisableDeviceTokenArgs = {
@@ -1527,6 +1553,10 @@ export type MutationUpdateUserRoleArgs = {
 
 export type MutationUpsertAchievementRestrictionArgs = {
   input: UpsertAchievementRestrictionInput;
+};
+
+export type MutationUpsertLeagueSeasonAwardArgs = {
+  input: UpsertLeagueSeasonAwardInput;
 };
 
 export type MutationVetoTradeArgs = {
@@ -1837,6 +1867,8 @@ export type Query = {
   leagueActivity?: Maybe<Array<LeagueActivityEvent>>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
+  /** Return all season awards for a league, optionally filtered by season */
+  leagueSeasonAwards?: Maybe<Array<LeagueSeasonAward>>;
   leagueTeams?: Maybe<Array<Team>>;
   /** Returns all roster entries explicitly listed on the trade block for the given league. */
   leagueTradeBlock?: Maybe<Array<TeamMember>>;
@@ -2122,6 +2154,11 @@ export type QueryLeaguePositionsArgs = {
 
 export type QueryLeagueScoringProfileArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryLeagueSeasonAwardsArgs = {
+  leagueId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryLeagueTeamsArgs = {
@@ -2826,6 +2863,14 @@ export type UpsertAchievementRestrictionInput = {
   rosterMin?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type UpsertLeagueSeasonAwardInput = {
+  awardType: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
+  notes?: InputMaybe<Scalars['String']['input']>;
+  playerId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+};
+
 export type User = {
   __typename?: 'User';
   accessLevel?: Maybe<Scalars['String']['output']>;
@@ -3160,6 +3205,74 @@ export type BulkDropTeamPlayersMutation = {
     success?: boolean | null;
     message?: string | null;
   } | null;
+};
+
+export type LeagueSeasonAwardFragment = {
+  __typename?: 'LeagueSeasonAward';
+  id?: number | null;
+  leagueId?: number | null;
+  season?: number | null;
+  playerId?: number | null;
+  playerFirstName?: string | null;
+  playerLastName?: string | null;
+  awardType?: string | null;
+  notes?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type GetLeagueSeasonAwardsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetLeagueSeasonAwardsQuery = {
+  __typename?: 'Query';
+  leagueSeasonAwards?: Array<{
+    __typename?: 'LeagueSeasonAward';
+    id?: number | null;
+    leagueId?: number | null;
+    season?: number | null;
+    playerId?: number | null;
+    playerFirstName?: string | null;
+    playerLastName?: string | null;
+    awardType?: string | null;
+    notes?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  }> | null;
+};
+
+export type UpsertLeagueSeasonAwardMutationVariables = Exact<{
+  input: UpsertLeagueSeasonAwardInput;
+}>;
+
+export type UpsertLeagueSeasonAwardMutation = {
+  __typename?: 'Mutation';
+  upsertLeagueSeasonAward?: {
+    __typename?: 'LeagueSeasonAward';
+    id?: number | null;
+    leagueId?: number | null;
+    season?: number | null;
+    playerId?: number | null;
+    playerFirstName?: string | null;
+    playerLastName?: string | null;
+    awardType?: string | null;
+    notes?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
+export type DeleteLeagueSeasonAwardMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
+  awardType: Scalars['String']['input'];
+}>;
+
+export type DeleteLeagueSeasonAwardMutation = {
+  __typename?: 'Mutation';
+  deleteLeagueSeasonAward?: boolean | null;
 };
 
 export type GetOnThisDayQueryVariables = Exact<{
@@ -6913,6 +7026,20 @@ export const CommissionerAuditLogFragmentDoc = gql`
     createdAt
   }
 `;
+export const LeagueSeasonAwardFragmentDoc = gql`
+  fragment LeagueSeasonAward on LeagueSeasonAward {
+    id
+    leagueId
+    season
+    playerId
+    playerFirstName
+    playerLastName
+    awardType
+    notes
+    createdAt
+    updatedAt
+  }
+`;
 export const LeagueMemberFragmentDoc = gql`
   fragment LeagueMember on LeagueMember {
     leagueId
@@ -8175,6 +8302,207 @@ export type BulkDropTeamPlayersMutationResult =
 export type BulkDropTeamPlayersMutationOptions = BaseMutationOptions<
   BulkDropTeamPlayersMutation,
   BulkDropTeamPlayersMutationVariables
+>;
+export const GetLeagueSeasonAwards = gql`
+  query GetLeagueSeasonAwards($leagueId: Int!, $season: Int) {
+    leagueSeasonAwards(leagueId: $leagueId, season: $season) {
+      ...LeagueSeasonAward
+    }
+  }
+  ${LeagueSeasonAwardFragmentDoc}
+`;
+
+/**
+ * __useGetLeagueSeasonAwardsQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueSeasonAwardsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueSeasonAwardsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueSeasonAwardsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      season: // value for 'season'
+ *   },
+ * });
+ */
+export function useGetLeagueSeasonAwardsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueSeasonAwardsQuery,
+    GetLeagueSeasonAwardsQueryVariables
+  > &
+    (
+      | { variables: GetLeagueSeasonAwardsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueSeasonAwardsQuery,
+    GetLeagueSeasonAwardsQueryVariables
+  >(GetLeagueSeasonAwards, options);
+}
+export function useGetLeagueSeasonAwardsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueSeasonAwardsQuery,
+    GetLeagueSeasonAwardsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueSeasonAwardsQuery,
+    GetLeagueSeasonAwardsQueryVariables
+  >(GetLeagueSeasonAwards, options);
+}
+export function useGetLeagueSeasonAwardsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueSeasonAwardsQuery,
+        GetLeagueSeasonAwardsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueSeasonAwardsQuery,
+    GetLeagueSeasonAwardsQueryVariables
+  >(
+    GetLeagueSeasonAwards,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueSeasonAwardsQuery,
+          GetLeagueSeasonAwardsQueryVariables
+        >,
+  );
+}
+export type GetLeagueSeasonAwardsQueryHookResult = ReturnType<
+  typeof useGetLeagueSeasonAwardsQuery
+>;
+export type GetLeagueSeasonAwardsLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueSeasonAwardsLazyQuery
+>;
+export type GetLeagueSeasonAwardsSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueSeasonAwardsSuspenseQuery
+>;
+export type GetLeagueSeasonAwardsQueryResult = Apollo.QueryResult<
+  GetLeagueSeasonAwardsQuery,
+  GetLeagueSeasonAwardsQueryVariables
+>;
+export const UpsertLeagueSeasonAward = gql`
+  mutation UpsertLeagueSeasonAward($input: UpsertLeagueSeasonAwardInput!) {
+    upsertLeagueSeasonAward(input: $input) {
+      ...LeagueSeasonAward
+    }
+  }
+  ${LeagueSeasonAwardFragmentDoc}
+`;
+export type UpsertLeagueSeasonAwardMutationFn = MutationFunction<
+  UpsertLeagueSeasonAwardMutation,
+  UpsertLeagueSeasonAwardMutationVariables
+>;
+
+/**
+ * __useUpsertLeagueSeasonAwardMutation__
+ *
+ * To run a mutation, you first call `useUpsertLeagueSeasonAwardMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpsertLeagueSeasonAwardMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [upsertLeagueSeasonAwardMutation, { data, loading, error }] = useUpsertLeagueSeasonAwardMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpsertLeagueSeasonAwardMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpsertLeagueSeasonAwardMutation,
+    UpsertLeagueSeasonAwardMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpsertLeagueSeasonAwardMutation,
+    UpsertLeagueSeasonAwardMutationVariables
+  >(UpsertLeagueSeasonAward, options);
+}
+export type UpsertLeagueSeasonAwardMutationHookResult = ReturnType<
+  typeof useUpsertLeagueSeasonAwardMutation
+>;
+export type UpsertLeagueSeasonAwardMutationResult =
+  Apollo.MutationResult<UpsertLeagueSeasonAwardMutation>;
+export type UpsertLeagueSeasonAwardMutationOptions = BaseMutationOptions<
+  UpsertLeagueSeasonAwardMutation,
+  UpsertLeagueSeasonAwardMutationVariables
+>;
+export const DeleteLeagueSeasonAward = gql`
+  mutation DeleteLeagueSeasonAward(
+    $leagueId: Int!
+    $season: Int!
+    $awardType: String!
+  ) {
+    deleteLeagueSeasonAward(
+      leagueId: $leagueId
+      season: $season
+      awardType: $awardType
+    )
+  }
+`;
+export type DeleteLeagueSeasonAwardMutationFn = MutationFunction<
+  DeleteLeagueSeasonAwardMutation,
+  DeleteLeagueSeasonAwardMutationVariables
+>;
+
+/**
+ * __useDeleteLeagueSeasonAwardMutation__
+ *
+ * To run a mutation, you first call `useDeleteLeagueSeasonAwardMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteLeagueSeasonAwardMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteLeagueSeasonAwardMutation, { data, loading, error }] = useDeleteLeagueSeasonAwardMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      season: // value for 'season'
+ *      awardType: // value for 'awardType'
+ *   },
+ * });
+ */
+export function useDeleteLeagueSeasonAwardMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    DeleteLeagueSeasonAwardMutation,
+    DeleteLeagueSeasonAwardMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    DeleteLeagueSeasonAwardMutation,
+    DeleteLeagueSeasonAwardMutationVariables
+  >(DeleteLeagueSeasonAward, options);
+}
+export type DeleteLeagueSeasonAwardMutationHookResult = ReturnType<
+  typeof useDeleteLeagueSeasonAwardMutation
+>;
+export type DeleteLeagueSeasonAwardMutationResult =
+  Apollo.MutationResult<DeleteLeagueSeasonAwardMutation>;
+export type DeleteLeagueSeasonAwardMutationOptions = BaseMutationOptions<
+  DeleteLeagueSeasonAwardMutation,
+  DeleteLeagueSeasonAwardMutationVariables
 >;
 export const GetOnThisDay = gql`
   query GetOnThisDay($month: Int!, $day: Int!, $limit: Int) {

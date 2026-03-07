@@ -758,6 +758,22 @@ export type LeaguePosition = {
   positionType?: Maybe<Scalars['String']['output']>;
 };
 
+/** A fantasy-league-specific seasonal award assigned by the commissioner to a player */
+export type LeagueSeasonAward = {
+  __typename?: 'LeagueSeasonAward';
+  /** One of: mvp | cy_young | rookie_of_the_year | gold_glove | silver_slugger */
+  awardType?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  notes?: Maybe<Scalars['String']['output']>;
+  playerFirstName?: Maybe<Scalars['String']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  playerLastName?: Maybe<Scalars['String']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
 /** A head-to-head matchup between two teams in a league */
 export type Matchup = {
   __typename?: 'Matchup';
@@ -1009,6 +1025,8 @@ export type Mutation = {
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
+  /** Remove a season award from a league. Commissioner / General Manager access required. */
+  deleteLeagueSeasonAward?: Maybe<Scalars['Boolean']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: edit the scores of a past or current matchup. All edits are audit-logged. */
   editMatchupScore?: Maybe<CommissionerActionResult>;
@@ -1099,6 +1117,8 @@ export type Mutation = {
   updateUserRole?: Maybe<User>;
   /** Create or update a single achievement restriction for a league. Commissioner / General Manager access required. */
   upsertAchievementRestriction?: Maybe<AchievementRestriction>;
+  /** Create or update a season award for a player in a league. Commissioner / General Manager access required. */
+  upsertLeagueSeasonAward?: Maybe<LeagueSeasonAward>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
 };
@@ -1229,6 +1249,12 @@ export type MutationDeleteAchievementRestrictionArgs = {
 
 export type MutationDeleteLeagueArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationDeleteLeagueSeasonAwardArgs = {
+  awardType: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
 };
 
 export type MutationDisableDeviceTokenArgs = {
@@ -1533,6 +1559,10 @@ export type MutationUpdateUserRoleArgs = {
 
 export type MutationUpsertAchievementRestrictionArgs = {
   input: UpsertAchievementRestrictionInput;
+};
+
+export type MutationUpsertLeagueSeasonAwardArgs = {
+  input: UpsertLeagueSeasonAwardInput;
 };
 
 export type MutationVetoTradeArgs = {
@@ -1843,6 +1873,8 @@ export type Query = {
   leagueActivity?: Maybe<Array<LeagueActivityEvent>>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
+  /** Return all season awards for a league, optionally filtered by season */
+  leagueSeasonAwards?: Maybe<Array<LeagueSeasonAward>>;
   leagueTeams?: Maybe<Array<Team>>;
   /** Returns all roster entries explicitly listed on the trade block for the given league. */
   leagueTradeBlock?: Maybe<Array<TeamMember>>;
@@ -2128,6 +2160,11 @@ export type QueryLeaguePositionsArgs = {
 
 export type QueryLeagueScoringProfileArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type QueryLeagueSeasonAwardsArgs = {
+  leagueId: Scalars['Int']['input'];
+  season?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryLeagueTeamsArgs = {
@@ -2830,6 +2867,14 @@ export type UpsertAchievementRestrictionInput = {
   repeatableRosterMax?: InputMaybe<Scalars['Int']['input']>;
   rosterMax?: InputMaybe<Scalars['Int']['input']>;
   rosterMin?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type UpsertLeagueSeasonAwardInput = {
+  awardType: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
+  notes?: InputMaybe<Scalars['String']['input']>;
+  playerId: Scalars['Int']['input'];
+  season: Scalars['Int']['input'];
 };
 
 export type User = {

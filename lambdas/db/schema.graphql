@@ -828,6 +828,25 @@ type LeaguePosition {
 }
 
 """
+A fantasy-league-specific seasonal award assigned by the commissioner to a player
+"""
+type LeagueSeasonAward {
+  """
+  One of: mvp | cy_young | rookie_of_the_year | gold_glove | silver_slugger
+  """
+  awardType: String
+  createdAt: String
+  id: Int
+  leagueId: Int
+  notes: String
+  playerFirstName: String
+  playerId: Int
+  playerLastName: String
+  season: Int
+  updatedAt: String
+}
+
+"""
 A head-to-head matchup between two teams in a league
 """
 type Matchup {
@@ -1206,6 +1225,15 @@ type Mutation {
   ): Boolean
   deleteAllLeagues: String
   deleteLeague(leagueId: Int!): String
+
+  """
+  Remove a season award from a league. Commissioner / General Manager access required.
+  """
+  deleteLeagueSeasonAward(
+    awardType: String!
+    leagueId: Int!
+    season: Int!
+  ): Boolean
   disableDeviceToken(deviceToken: String!): Boolean
 
   """
@@ -1478,6 +1506,13 @@ type Mutation {
   upsertAchievementRestriction(
     input: UpsertAchievementRestrictionInput!
   ): AchievementRestriction
+
+  """
+  Create or update a season award for a player in a league. Commissioner / General Manager access required.
+  """
+  upsertLeagueSeasonAward(
+    input: UpsertLeagueSeasonAwardInput!
+  ): LeagueSeasonAward
 
   """
   Commissioner-only: veto an accepted trade, reversing the player swap.
@@ -1909,6 +1944,11 @@ type Query {
   ): [LeagueActivityEvent!]
   leaguePositions(leagueId: Int!): [LeaguePosition!]
   leagueScoringProfile(leagueId: Int!): ScoringConfig
+
+  """
+  Return all season awards for a league, optionally filtered by season
+  """
+  leagueSeasonAwards(leagueId: Int!, season: Int): [LeagueSeasonAward!]
   leagueTeams(leagueId: Int!): [Team!]
 
   """
@@ -2613,6 +2653,14 @@ input UpsertAchievementRestrictionInput {
   repeatableRosterMax: Int
   rosterMax: Int
   rosterMin: Int
+}
+
+input UpsertLeagueSeasonAwardInput {
+  awardType: String!
+  leagueId: Int!
+  notes: String
+  playerId: Int!
+  season: Int!
 }
 
 type User {

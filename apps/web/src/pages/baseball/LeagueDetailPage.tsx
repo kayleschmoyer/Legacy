@@ -109,6 +109,7 @@ import { DraftOrderControl } from '../../components/commissioner/DraftOrderContr
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
 import { LeagueBrandingControl } from '../../components/commissioner/LeagueBrandingControl';
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
+import { SeasonAwardsControl } from '../../components/commissioner/SeasonAwardsControl';
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
 import { SeasonRenewalControl } from '../../features/commissioner/SeasonRenewalControl';
@@ -2483,6 +2484,22 @@ export function LeagueDetailPage(): React.JSX.Element {
             currentPlayoffEnabled={league.playoffEnabled ?? true}
             currentPlayoffFormat={league.playoffFormat ?? '4-team'}
             currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
+            onSuccess={(message) => {
+              setMatchupSuccessMessage(message);
+              setTimeout(() => setMatchupSuccessMessage(null), 5000);
+            }}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+          />
+        ),
+      },
+      {
+        id: 'season-awards',
+        title: 'Season Awards',
+        content: (
+          <SeasonAwardsControl
+            leagueId={leagueId}
             onSuccess={(message) => {
               setMatchupSuccessMessage(message);
               setTimeout(() => setMatchupSuccessMessage(null), 5000);

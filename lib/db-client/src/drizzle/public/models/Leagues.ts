@@ -752,3 +752,50 @@ export const commissionerAuditLog = pgTable(
     };
   },
 );
+
+// ─── Season Awards ──────────────────────────────────────────────────────────
+
+/**
+ * Commissioner-assigned season-long awards for fantasy league players.
+ *
+ * Awards such as League MVP, Cy Young, Gold Glove, etc. are assigned manually
+ * by the commissioner at the end of a season, based on in-league performance.
+ * These are NOT real MLB awards — they are fantasy-league-specific honors.
+ *
+ * One winner per award type per season per league.
+ */
+export const leagueSeasonAwards = pgTable(
+  'league_season_awards',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    season: integer('season').notNull(),
+    playerId: integer('player_id').notNull(),
+    awardType: varchar('award_type', { length: 50 }).notNull(),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      lsaLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'league_season_awards_league_fk',
+      }).onDelete('cascade'),
+      lsaUk: unique('league_season_awards_uk').on(
+        table.leagueId,
+        table.season,
+        table.awardType,
+      ),
+      lsaLeagueSeasonIdx: index('league_season_awards_league_season_idx').on(
+        table.leagueId,
+        table.season,
+      ),
+    };
+  },
+);

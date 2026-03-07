@@ -22,6 +22,7 @@ import './commissioner-tools';
 import './on-this-day';
 import './activity-log';
 import './season-draft-game';
+import './season-awards';
 
 // Export the final schema
 export const schema = builder.toSchema();
