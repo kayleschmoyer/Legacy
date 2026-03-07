@@ -202,10 +202,37 @@ jobs:
         with:
           path: ./dist/apps/web
 
+      - name: "📡 Rollbar Deploy Started"
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: production
+          status: started
+          comment: "Web deploy via GitHub Pages (run ${{ github.run_id }})"
+
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: "📡 Rollbar Deploy Succeeded"
+        if: github.ref == 'refs/heads/main' && success()
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: production
+          status: succeeded
+          comment: "Web deploy via GitHub Pages (run ${{ github.run_id }})"
+
+      - name: "📡 Rollbar Deploy Failed"
+        if: github.ref == 'refs/heads/main' && failure()
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: production
+          status: failed
+          comment: "Web deploy via GitHub Pages (run ${{ github.run_id }})"
 
       - name: Update Deployment Badge
         if: always()

@@ -200,6 +200,15 @@ jobs:
             --region us-east-1 2>&1 || true
           echo "✅ Lock released"
 
+      - name: "📡 Rollbar Deploy Started"
+        if: steps.plan.outputs.has_changes == 'true'
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: production
+          status: started
+          comment: "Lambda infrastructure apply (run ${{ github.run_id }})"
+
       - name: Apply Infrastructure Changes
         id: apply
         if: steps.plan.outputs.has_changes == 'true'
@@ -228,6 +237,24 @@ jobs:
             --key '{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}' \
             --region us-east-1 2>&1 || true
           echo "✅ Lock released"
+
+      - name: "📡 Rollbar Deploy Succeeded"
+        if: steps.apply.outcome == 'success'
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: production
+          status: succeeded
+          comment: "Lambda infrastructure apply (run ${{ github.run_id }})"
+
+      - name: "📡 Rollbar Deploy Failed"
+        if: always() && steps.apply.outcome == 'failure'
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: production
+          status: failed
+          comment: "Lambda infrastructure apply (run ${{ github.run_id }})"
 
       - name: Verify Deployment
         if: steps.plan.outputs.has_changes == 'true'

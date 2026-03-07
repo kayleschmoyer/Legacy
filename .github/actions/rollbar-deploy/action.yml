@@ -1,0 +1,104 @@
+name: "Rollbar Deploy Notification"
+description: "Reports deploy start/success/failure to Rollbar deploy tracking API"
+
+inputs:
+  rollbar-access-token:
+    description: "Rollbar post_server_item access token"
+    required: true
+  environment:
+    description: "Deployment environment (e.g., production, staging)"
+    required: true
+    default: "production"
+  status:
+    description: "Deploy status: started, succeeded, or failed"
+    required: true
+  local-username:
+    description: "Username / actor who triggered the deploy"
+    required: false
+    default: ${{ github.actor }}
+  revision:
+    description: "Git SHA of the deployed revision"
+    required: false
+    default: ${{ github.sha }}
+  rollbar-username:
+    description: "Rollbar username to associate (defaults to github.actor)"
+    required: false
+    default: ${{ github.actor }}
+  comment:
+    description: "Optional comment for the deploy (e.g., workflow name)"
+    required: false
+    default: ""
+
+outputs:
+  deploy-id:
+    description: "Rollbar deploy ID (returned on started/succeeded)"
+    value: ${{ steps.notify.outputs.deploy_id }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Notify Rollbar Deploy"
+      id: notify
+      shell: bash
+      run: |
+        STATUS="${{ inputs.status }}"
+        TOKEN="${{ inputs.rollbar-access-token }}"
+        ENV="${{ inputs.environment }}"
+        REVISION="${{ inputs.revision }}"
+        LOCAL_USER="${{ inputs.local-username }}"
+        ROLLBAR_USER="${{ inputs.rollbar-username }}"
+        COMMENT="${{ inputs.comment }}"
+
+        # Validate required inputs
+        if [ -z "$TOKEN" ]; then
+          echo "::warning::Rollbar access token not set — skipping deploy notification"
+          exit 0
+        fi
+
+        if [ -z "$STATUS" ]; then
+          echo "::error::Deploy status is required (started, succeeded, failed)"
+          exit 1
+        fi
+
+        echo "📡 Reporting deploy $STATUS to Rollbar (env=$ENV, rev=${REVISION:0:8})..."
+
+        # Build the JSON payload
+        PAYLOAD=$(jq -n \
+          --arg env "$ENV" \
+          --arg rev "$REVISION" \
+          --arg local_user "$LOCAL_USER" \
+          --arg rollbar_user "$ROLLBAR_USER" \
+          --arg comment "$COMMENT" \
+          --arg status "$STATUS" \
+          '{
+            environment: $env,
+            revision: $rev,
+            local_username: $local_user,
+            rollbar_username: $rollbar_user,
+            comment: $comment,
+            status: $status
+          }')
+
+        # POST to Rollbar Deploy API
+        HTTP_CODE=$(curl -s -o /tmp/rollbar-response.json -w "%{http_code}" \
+          -X POST "https://api.rollbar.com/api/1/deploy" \
+          -H "X-Rollbar-Access-Token: $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD")
+
+        RESPONSE=$(cat /tmp/rollbar-response.json 2>/dev/null || echo "{}")
+
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          DEPLOY_ID=$(echo "$RESPONSE" | jq -r '.data.deploy_id // empty')
+          echo "✅ Rollbar deploy notification sent (status=$STATUS, http=$HTTP_CODE)"
+          if [ -n "$DEPLOY_ID" ]; then
+            echo "   Deploy ID: $DEPLOY_ID"
+            echo "deploy_id=$DEPLOY_ID" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "::warning::Rollbar deploy notification failed (http=$HTTP_CODE)"
+          echo "   Response: $RESPONSE"
+          # Don't fail the workflow for a notification issue
+        fi
+
+        rm -f /tmp/rollbar-response.json
