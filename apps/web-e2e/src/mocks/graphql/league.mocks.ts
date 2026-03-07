@@ -186,3 +186,50 @@ export function updateLeagueBrandingResponse(patch?: {
     },
   };
 }
+
+// ── Join League by Code mock factories ────────────────────────────
+
+export interface MockInviteCodeInfo {
+  __typename: 'InviteCodeInfo';
+  leagueName: string;
+  totalSpots: number;
+  availableSpots: number;
+  isFull: boolean;
+}
+
+export function mockInviteCodeInfo(
+  overrides: Partial<MockInviteCodeInfo> = {},
+): MockInviteCodeInfo {
+  return {
+    __typename: 'InviteCodeInfo',
+    leagueName: 'Test League',
+    totalSpots: 10,
+    availableSpots: 4,
+    isFull: false,
+    ...overrides,
+  };
+}
+
+/** Mock response for ValidateInviteCode query — valid, available league. */
+export function validateInviteCodeResponse(info?: Partial<MockInviteCodeInfo>) {
+  return { data: { validateInviteCode: mockInviteCodeInfo(info) } };
+}
+
+/** Mock response for ValidateInviteCode query — unknown/invalid code. */
+export function validateInviteCodeNotFoundResponse() {
+  return { data: { validateInviteCode: null } };
+}
+
+/** Mock response for JoinLeagueByCode mutation — successful join. */
+export function joinLeagueByCodeResponse(leagueId = 999, teamId = 42) {
+  return {
+    data: {
+      joinLeagueByCode: {
+        __typename: 'Team' as const,
+        id: teamId,
+        name: 'My Test Team',
+        leagueId,
+      },
+    },
+  };
+}

@@ -5,6 +5,8 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * - /baseball/league/create
  * - /baseball/league/:id (detail)
  * - /baseball/leagues (discovery list)
+ * - /baseball/league/join (join by invite code)
+ * - /baseball/league/join/:inviteCode (deep link)
  */
 export class LeaguePage {
   readonly page: Page;
@@ -31,6 +33,17 @@ export class LeaguePage {
   readonly secondaryColorInput: Locator;
   readonly saveColorsButton: Locator;
   readonly resetColorsButton: Locator;
+
+  // Join by code form
+  readonly joinHeading: Locator;
+  readonly inviteCodeInput: Locator;
+  readonly teamNameInput: Locator;
+  readonly joinButton: Locator;
+  readonly cancelButton: Locator;
+  readonly deepLinkBanner: Locator;
+  readonly leagueFullBanner: Locator;
+  readonly inviteCodePreview: Locator;
+  readonly formErrorCard: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -71,6 +84,26 @@ export class LeaguePage {
       name: /save colors/i,
     });
     this.resetColorsButton = page.getByRole('button', { name: /reset/i });
+
+    // Join by code form
+    this.joinHeading = page.getByRole('heading', {
+      name: /Join League/i,
+      level: 1,
+    });
+    this.inviteCodeInput = page.getByPlaceholder('Enter 8-character code');
+    this.teamNameInput = page.getByPlaceholder('Enter your team name');
+    this.joinButton = page.getByRole('button', { name: /join league/i });
+    this.cancelButton = page.getByRole('button', { name: /cancel/i });
+    this.deepLinkBanner = page.getByText(/Invite code loaded from link/i);
+    this.leagueFullBanner = page.getByRole('alert').filter({
+      hasText: /league is full/i,
+    });
+    this.inviteCodePreview = page.getByRole('status').filter({
+      hasText: /spot/i,
+    });
+    this.formErrorCard = page.getByRole('alert').filter({
+      hasText: /❌/,
+    });
   }
 
   /** Navigate to the league creation page. */
@@ -91,6 +124,22 @@ export class LeaguePage {
     await this.page.waitForLoadState('networkidle');
   }
 
+  /** Navigate to the join-by-code page (optionally with a deep-link code). */
+  async gotoJoin(inviteCode?: string) {
+    const path = inviteCode
+      ? `/baseball/league/join/${inviteCode}`
+      : '/baseball/league/join';
+    await this.page.goto(path);
+    await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  /** Wait for the join form to be fully rendered. */
+  async expectJoinFormVisible() {
+    await expect(this.joinHeading).toBeVisible({ timeout: 15000 });
+    await expect(this.inviteCodeInput).toBeVisible();
+    await expect(this.teamNameInput).toBeVisible();
+  }
+
   /** Assert the creation form is loaded. */
   async expectCreateFormVisible() {
     await expect(this.createHeading).toBeVisible({ timeout: 30000 });
@@ -109,5 +158,12 @@ export class LeaguePage {
   async fillAndSubmitCreateForm(name: string) {
     await this.leagueNameInput.fill(name);
     await this.createButton.click();
+  }
+
+  /** Fill the join form and click the Join League button. */
+  async fillAndSubmitJoinForm(inviteCode: string, teamName: string) {
+    await this.inviteCodeInput.fill(inviteCode);
+    await this.teamNameInput.fill(teamName);
+    await this.joinButton.click();
   }
 }
