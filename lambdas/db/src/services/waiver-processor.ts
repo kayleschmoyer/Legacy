@@ -53,6 +53,12 @@ interface TeamSettings {
   faabBudget: number | null;
 }
 
+interface LeagueSalarySettings {
+  salaryCapEnabled: boolean;
+  minSalary: number;
+  seasonNumber: number;
+}
+
 // ── Service ────────────────────────────────────────────────────────────────
 
 export class WaiverClaimProcessor {
@@ -100,6 +106,14 @@ export class WaiverClaimProcessor {
       const settings = leagueSettingsMap.get(leagueId);
       const maxRoster = settings?.maxRosterSize ?? 25;
       const waiverType = settings?.waiverType ?? 'standard';
+      const leagueSalarySettings: LeagueSalarySettings | null =
+        settings != null
+          ? {
+              salaryCapEnabled: settings.salaryCapEnabled,
+              minSalary: settings.minSalary,
+              seasonNumber: settings.seasonNumber,
+            }
+          : null;
 
       const claimsByPlayer = this.groupByPlayer(leagueClaims);
 
@@ -119,6 +133,7 @@ export class WaiverClaimProcessor {
               claim,
               maxRoster,
               waiverType,
+              leagueSalarySettings,
             );
 
             if (result.outcome === 'failed') {
@@ -254,6 +269,9 @@ export class WaiverClaimProcessor {
         id: PublicSchema.leagues.id,
         maxRosterSize: PublicSchema.leagues.maxRosterSize,
         waiverType: PublicSchema.leagues.waiverType,
+        salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+        minSalary: PublicSchema.leagues.minSalary,
+        seasonNumber: PublicSchema.leagues.seasonNumber,
       })
       .from(PublicSchema.leagues)
       .where(inArray(PublicSchema.leagues.id, leagueIds));
@@ -334,6 +352,7 @@ export class WaiverClaimProcessor {
     claim: PendingClaim,
     maxRoster: number,
     waiverType: string,
+    leagueSalarySettings: LeagueSalarySettings | null = null,
   ): Promise<{ outcome: 'succeeded' | 'failed'; reason?: string }> {
     const { db } = this;
 
@@ -370,12 +389,51 @@ export class WaiverClaimProcessor {
       return { outcome: 'failed', reason: 'Roster or drop player issue' };
 
     // Add player to roster
+    // In salary-cap FAAB leagues the winning bid becomes the player's salary.
+    const rosterSalary =
+      leagueSalarySettings?.salaryCapEnabled &&
+      waiverType === 'faab' &&
+      claim.faabBid != null
+        ? claim.faabBid
+        : null;
     await addPlayerToRoster(db, {
       teamId: claim.teamId,
       leagueId: claim.leagueId,
       playerId: claim.playerId,
       acquisitionType: 'waiver',
+      salary: rosterSalary,
     });
+
+    // Salary cap: upsert player_salaries so the player's salary is tracked
+    // league-wide (covers free agents too, not just rostered players).
+    if (rosterSalary != null && leagueSalarySettings != null) {
+      await db
+        .insert(PublicSchema.playerSalaries)
+        .values({
+          leagueId: claim.leagueId,
+          playerId: claim.playerId,
+          currentSalary: rosterSalary,
+          initialSalary: rosterSalary,
+          acquisitionType: 'waiver',
+          yearAcquired: leagueSalarySettings.seasonNumber,
+          freeAgentYears: 0,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [
+            PublicSchema.playerSalaries.leagueId,
+            PublicSchema.playerSalaries.playerId,
+          ],
+          set: {
+            currentSalary: rosterSalary,
+            initialSalary: rosterSalary,
+            acquisitionType: 'waiver',
+            yearAcquired: leagueSalarySettings.seasonNumber,
+            freeAgentYears: 0,
+            updatedAt: new Date(),
+          },
+        });
+    }
 
     // Season selection + matchup_players insertion for current week
     try {

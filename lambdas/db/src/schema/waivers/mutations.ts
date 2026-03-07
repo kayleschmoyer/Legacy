@@ -167,6 +167,8 @@ builder.mutationField('claimFreeAgent', (t) =>
           maxRosterSize: PublicSchema.leagues.maxRosterSize,
           waiverType: PublicSchema.leagues.waiverType,
           waiverEnabled: PublicSchema.leagues.waiverEnabled,
+          salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+          minSalary: PublicSchema.leagues.minSalary,
         })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, leagueId))
@@ -192,6 +194,33 @@ builder.mutationField('claimFreeAgent', (t) =>
         // Validate FAAB budget (accounts for all committed pending bids)
         await validateFaabBudget(db, teamId, faabBid);
         resolvedFaabBid = faabBid;
+      }
+
+      // Salary cap minimum bid validation: in a salary-cap league the FAAB bid
+      // must be >= the player's current_salary in player_salaries (or
+      // leagues.min_salary if the player has never entered the salary system).
+      if (
+        leagueRow[0].salaryCapEnabled &&
+        leagueWaiverType === 'faab' &&
+        resolvedFaabBid != null
+      ) {
+        const salaryRow = await db
+          .select({ currentSalary: PublicSchema.playerSalaries.currentSalary })
+          .from(PublicSchema.playerSalaries)
+          .where(
+            and(
+              eq(PublicSchema.playerSalaries.leagueId, leagueId),
+              eq(PublicSchema.playerSalaries.playerId, playerId),
+            ),
+          )
+          .limit(1);
+        const minBid =
+          salaryRow.length > 0
+            ? salaryRow[0].currentSalary
+            : leagueRow[0].minSalary;
+        if (resolvedFaabBid < minBid) {
+          throw new Error(`Minimum FAAB bid for this player is $${minBid}`);
+        }
       }
 
       const { isFull: rosterFull } = await checkRosterCapacity(

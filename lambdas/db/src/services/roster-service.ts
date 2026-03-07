@@ -18,6 +18,8 @@ export interface AddPlayerToRosterParams {
   positionId?: number | null;
   draftRound?: number | null;
   draftPick?: number | null;
+  /** Salary cap hit for this roster slot. Null in non-salary-cap leagues. (LS-643) */
+  salary?: number | null;
 }
 
 // ── isPlayerOnRoster ───────────────────────────────────────────────────────
@@ -87,6 +89,7 @@ export async function addPlayerToRoster(
     positionId = null,
     draftRound = null,
     draftPick = null,
+    salary = null,
   } = params;
   await db.insert(PublicSchema.teamMembers).values({
     teamId,
@@ -96,5 +99,6 @@ export async function addPlayerToRoster(
     positionId,
     draftRound,
     draftPick,
+    salary,
   });
 }
