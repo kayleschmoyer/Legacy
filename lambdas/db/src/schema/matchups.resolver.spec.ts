@@ -64,6 +64,7 @@ describe('Matchup Queries', () => {
         leagues: {
           id: 'id',
           name: 'name',
+          currentWeek: 'currentWeek',
           currentMatchup: 'currentMatchup',
         },
         teamMembers: {
