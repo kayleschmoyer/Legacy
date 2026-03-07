@@ -46,8 +46,8 @@ export default defineConfig(({ mode }) => {
     - Commit SHA: ${commitSha}
   `);
 
-  // Always use root path since we have a custom domain
-  const basePath = '/';
+  // Use VITE_BASE_PATH for PR preview deploys, otherwise root path for custom domain
+  const basePath = process.env.VITE_BASE_PATH || '/';
 
   console.log(`📍 Base Path: ${basePath}`);
 

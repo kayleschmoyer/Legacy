@@ -1,0 +1,151 @@
+name: PR Preview Deploy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "apps/web/**"
+      - "lib/shared-components/**"
+      - "lib/ui-abstractions/**"
+      - ".github/workflows/deploy-pr-preview.yml"
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  DEPLOY_REPO: bkrupa/legacy-sports-deploys
+  PREVIEW_BASE_URL: https://bkrupa.github.io/legacy-sports-deploys
+
+jobs:
+  deploy-preview:
+    name: Deploy PR Preview
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NX_DAEMON: false
+      NX_SKIP_NX_CACHE: false
+      NODE_OPTIONS: "--max_old_space_size=4096"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: true
+          skip-system-deps: true
+
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: bkrupa
+          repositories: legacy-sports-deploys
+
+      - name: Build Web App
+        env:
+          VITE_BASE_PATH: /legacy-sports-deploys/pr-${{ github.event.pull_request.number }}/
+          VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
+          VITE_WEBSOCKET_URL: ${{ secrets.VITE_WEBSOCKET_URL }}
+          VITE_GA_MEASUREMENT_ID: ""
+          VITE_SENTRY_DSN: ""
+          VITE_GIPHY_API_KEY: ${{ secrets.VITE_GIPHY_API_KEY }}
+          VITE_JIRA_PROXY_URL: ${{ secrets.VITE_JIRA_PROXY_URL }}
+          VITE_ROLLBAR_ACCESS_TOKEN: ""
+          VITE_VERSION: "0.0.0-pr.${{ github.event.pull_request.number }}"
+          VITE_APP_VERSION: "0.0.0-pr.${{ github.event.pull_request.number }}"
+          VITE_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          VITE_BUILD_DATE: ${{ github.event.pull_request.updated_at }}
+          VITE_BRANCH: ${{ github.head_ref }}
+          NODE_ENV: production
+        run: pnpm exec nx build web --configuration=production
+
+      # SPA fallback: GitHub Pages serves 404.html for unknown paths
+      - name: Add SPA fallback
+        run: cp ./dist/apps/web/index.html ./dist/apps/web/404.html
+
+      - name: Deploy to Preview Repo
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ steps.app-token.outputs.token }}
+          external_repository: bkrupa/legacy-sports-deploys
+          publish_branch: gh-pages
+          publish_dir: ./dist/apps/web
+          destination_dir: pr-${{ github.event.pull_request.number }}
+
+      - name: Comment Preview URL
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: pr-preview
+          message: |
+            ## 🌐 PR Preview
+
+            | | |
+            |---|---|
+            | **URL** | [${{ env.PREVIEW_BASE_URL }}/pr-${{ github.event.pull_request.number }}/](${{ env.PREVIEW_BASE_URL }}/pr-${{ github.event.pull_request.number }}/) |
+            | **Branch** | `${{ github.head_ref }}` |
+            | **Commit** | `${{ github.event.pull_request.head.sha }}` |
+
+  cleanup-preview:
+    name: Cleanup PR Preview
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: bkrupa
+          repositories: legacy-sports-deploys
+
+      - name: Remove Preview Deploy
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+
+          git clone --depth 1 --branch gh-pages \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ env.DEPLOY_REPO }}.git" deploy-repo || {
+            echo "gh-pages branch not found, nothing to clean"
+            exit 0
+          }
+
+          cd deploy-repo
+
+          if [ -d "pr-$PR_NUM" ]; then
+            rm -rf "pr-$PR_NUM"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "cleanup: remove pr-$PR_NUM preview" || { echo "Nothing to commit"; exit 0; }
+            git push origin gh-pages
+            echo "✅ Cleaned up preview for PR #$PR_NUM"
+          else
+            echo "No preview found for PR #$PR_NUM, skipping"
+          fi
+
+      - name: Remove Preview Comment
+        if: always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: pr-preview
+          delete: true
