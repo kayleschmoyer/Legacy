@@ -27,10 +27,8 @@ query GetMatchupsForLeague($leagueId: Int!, $weekNumber: Int) {
   }
 }
 
-query GetCurrentMatchupForLeague($leagueId: Int!) {
-  getCurrentMatchupForLeague(leagueId: $leagueId) {
-    ...Matchup
-  }
+query GetCurrentWeekForLeague($leagueId: Int!) {
+  getCurrentWeekForLeague(leagueId: $leagueId)
 }
 
 query GetMatchupsByWeek($leagueId: Int!, $weekNumber: Int!) {

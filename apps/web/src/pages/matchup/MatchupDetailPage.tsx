@@ -14,7 +14,7 @@ import {
   useGetUserTeamIdQuery,
 } from '../../api/db/graphql.generated';
 import {
-  useCurrentMatchup,
+  useCurrentWeek,
   useMatchupById,
   useMatchupsForLeague,
 } from '../../hooks/useMatchup';
@@ -42,8 +42,8 @@ export function MatchupDetailPage() {
   // Fetch all matchups for the league to determine available weeks
   const { matchups: allLeagueMatchups } = useMatchupsForLeague(leagueIdNum);
 
-  // Fetch the league's current matchup to derive the real "current week" for badge
-  const { matchup: currentLeagueMatchup } = useCurrentMatchup(leagueIdNum);
+  // Fetch the league's current week number for badge and navigation
+  const { currentWeek } = useCurrentWeek(leagueIdNum);
 
   // Determine the current user's team in this league
   const { data: userTeamData } = useGetUserTeamIdQuery({
@@ -51,6 +51,18 @@ export function MatchupDetailPage() {
     skip: !leagueIdNum,
   });
   const userTeamId = userTeamData?.userTeamId ?? null;
+
+  // Derive the user's current matchup from allLeagueMatchups
+  const userCurrentMatchup = React.useMemo(() => {
+    if (!currentWeek || !userTeamId || !allLeagueMatchups.length) return null;
+    return (
+      allLeagueMatchups.find(
+        (m) =>
+          m.weekNumber === currentWeek &&
+          (m.team1Id === userTeamId || m.team2Id === userTeamId),
+      ) ?? null
+    );
+  }, [currentWeek, userTeamId, allLeagueMatchups]);
 
   if (loading) {
     return (
@@ -164,19 +176,19 @@ export function MatchupDetailPage() {
       {leagueIdNum && (
         <MatchupNavigationControls
           currentMatchup={matchup}
-          currentLeagueWeek={currentLeagueMatchup?.weekNumber ?? undefined}
+          currentLeagueWeek={currentWeek ?? undefined}
           leagueId={leagueIdNum}
           allMatchups={allLeagueMatchups}
           userTeamId={userTeamId}
           isViewingOther={
             matchup != null &&
-            currentLeagueMatchup != null &&
-            matchup.id !== currentLeagueMatchup.id
+            userCurrentMatchup != null &&
+            matchup.id !== userCurrentMatchup.id
           }
           onResetToDefault={() => {
-            if (currentLeagueMatchup?.id) {
+            if (userCurrentMatchup?.id) {
               navigate(
-                `/baseball/league/${leagueId}/matchups/${currentLeagueMatchup.id}`,
+                `/baseball/league/${leagueId}/matchups/${userCurrentMatchup.id}`,
               );
             }
           }}

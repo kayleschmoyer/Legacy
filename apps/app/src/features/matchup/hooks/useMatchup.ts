@@ -1,5 +1,5 @@
 import {
-  useGetCurrentMatchupForLeagueQuery,
+  useGetCurrentWeekForLeagueQuery,
   useGetMatchupByIdQuery,
   useGetMatchupsByWeekQuery,
   useGetMatchupsForLeagueQuery,
@@ -46,16 +46,16 @@ export function useMatchupsForLeague(
 }
 
 /**
- * Hook for fetching the current matchup for a league
+ * Hook for fetching the current week number for a league
  */
-export function useCurrentMatchup(leagueId: number | null | undefined) {
-  const { data, loading, error, refetch } = useGetCurrentMatchupForLeagueQuery({
+export function useCurrentWeek(leagueId: number | null | undefined) {
+  const { data, loading, error, refetch } = useGetCurrentWeekForLeagueQuery({
     variables: { leagueId: leagueId ?? 0 },
     skip: !leagueId,
   });
 
   return {
-    matchup: data?.getCurrentMatchupForLeague ?? null,
+    currentWeek: data?.getCurrentWeekForLeague ?? null,
     loading,
     error,
     refetch,
@@ -89,11 +89,11 @@ export function useMatchupsByWeek(
  * Combined hook that provides easy access to all matchup queries
  */
 export function useMatchup(leagueId: number | null | undefined) {
-  const current = useCurrentMatchup(leagueId);
+  const current = useCurrentWeek(leagueId);
   const all = useMatchupsForLeague(leagueId);
 
   return {
-    currentMatchup: current.matchup,
+    currentWeek: current.currentWeek,
     allMatchups: all.matchups,
     loading: current.loading || all.loading,
     error: current.error || all.error,

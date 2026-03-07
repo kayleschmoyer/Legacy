@@ -1784,7 +1784,7 @@ export type Query = {
   getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
   getChampionshipTrophies?: Maybe<Array<ChampionTrophy>>;
   getCurrentDraftPick?: Maybe<CurrentDraftPick>;
-  getCurrentMatchupForLeague?: Maybe<Matchup>;
+  getCurrentWeekForLeague?: Maybe<Scalars['Int']['output']>;
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
@@ -1944,7 +1944,7 @@ export type QueryGetCurrentDraftPickArgs = {
   draftId: Scalars['Int']['input'];
 };
 
-export type QueryGetCurrentMatchupForLeagueArgs = {
+export type QueryGetCurrentWeekForLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
@@ -3152,27 +3152,13 @@ export type GetMatchupsForLeagueQuery = {
   }> | null;
 };
 
-export type GetCurrentMatchupForLeagueQueryVariables = Exact<{
+export type GetCurrentWeekForLeagueQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
 
-export type GetCurrentMatchupForLeagueQuery = {
+export type GetCurrentWeekForLeagueQuery = {
   __typename?: 'Query';
-  getCurrentMatchupForLeague?: {
-    __typename?: 'Matchup';
-    id?: string | null;
-    weekNumber?: number | null;
-    leagueId?: number | null;
-    team1Id?: number | null;
-    team2Id?: number | null;
-    team1Score?: number | null;
-    team2Score?: number | null;
-    status?: MatchupStatus | null;
-    gamesPerMatchup?: number | null;
-    spStartsPerMatchup?: number | null;
-    startTime?: string | null;
-    endTime?: string | null;
-  } | null;
+  getCurrentWeekForLeague?: number | null;
 };
 
 export type GetMatchupsByWeekQueryVariables = Exact<{
@@ -5215,65 +5201,62 @@ export type GetMatchupsForLeagueQueryResult = Apollo.QueryResult<
   GetMatchupsForLeagueQuery,
   GetMatchupsForLeagueQueryVariables
 >;
-export const GetCurrentMatchupForLeague = gql`
-  query GetCurrentMatchupForLeague($leagueId: Int!) {
-    getCurrentMatchupForLeague(leagueId: $leagueId) {
-      ...Matchup
-    }
+export const GetCurrentWeekForLeague = gql`
+  query GetCurrentWeekForLeague($leagueId: Int!) {
+    getCurrentWeekForLeague(leagueId: $leagueId)
   }
-  ${MatchupFragmentDoc}
 `;
 
 /**
- * __useGetCurrentMatchupForLeagueQuery__
+ * __useGetCurrentWeekForLeagueQuery__
  *
- * To run a query within a React component, call `useGetCurrentMatchupForLeagueQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetCurrentMatchupForLeagueQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * To run a query within a React component, call `useGetCurrentWeekForLeagueQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetCurrentWeekForLeagueQuery` returns an object from Apollo Client that contains loading, error, and data properties
  * you can use to render your UI.
  *
  * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
  *
  * @example
- * const { data, loading, error } = useGetCurrentMatchupForLeagueQuery({
+ * const { data, loading, error } = useGetCurrentWeekForLeagueQuery({
  *   variables: {
  *      leagueId: // value for 'leagueId'
  *   },
  * });
  */
-export function useGetCurrentMatchupForLeagueQuery(
+export function useGetCurrentWeekForLeagueQuery(
   baseOptions: Apollo.QueryHookOptions<
-    GetCurrentMatchupForLeagueQuery,
-    GetCurrentMatchupForLeagueQueryVariables
+    GetCurrentWeekForLeagueQuery,
+    GetCurrentWeekForLeagueQueryVariables
   > &
     (
-      | { variables: GetCurrentMatchupForLeagueQueryVariables; skip?: boolean }
+      | { variables: GetCurrentWeekForLeagueQueryVariables; skip?: boolean }
       | { skip: boolean }
     ),
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useQuery<
-    GetCurrentMatchupForLeagueQuery,
-    GetCurrentMatchupForLeagueQueryVariables
-  >(GetCurrentMatchupForLeague, options);
+    GetCurrentWeekForLeagueQuery,
+    GetCurrentWeekForLeagueQueryVariables
+  >(GetCurrentWeekForLeague, options);
 }
-export function useGetCurrentMatchupForLeagueLazyQuery(
+export function useGetCurrentWeekForLeagueLazyQuery(
   baseOptions?: Apollo.LazyQueryHookOptions<
-    GetCurrentMatchupForLeagueQuery,
-    GetCurrentMatchupForLeagueQueryVariables
+    GetCurrentWeekForLeagueQuery,
+    GetCurrentWeekForLeagueQueryVariables
   >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
   return Apollo.useLazyQuery<
-    GetCurrentMatchupForLeagueQuery,
-    GetCurrentMatchupForLeagueQueryVariables
-  >(GetCurrentMatchupForLeague, options);
+    GetCurrentWeekForLeagueQuery,
+    GetCurrentWeekForLeagueQueryVariables
+  >(GetCurrentWeekForLeague, options);
 }
-export function useGetCurrentMatchupForLeagueSuspenseQuery(
+export function useGetCurrentWeekForLeagueSuspenseQuery(
   baseOptions?:
     | Apollo.SkipToken
     | Apollo.SuspenseQueryHookOptions<
-        GetCurrentMatchupForLeagueQuery,
-        GetCurrentMatchupForLeagueQueryVariables
+        GetCurrentWeekForLeagueQuery,
+        GetCurrentWeekForLeagueQueryVariables
       >,
 ) {
   const options =
@@ -5281,30 +5264,30 @@ export function useGetCurrentMatchupForLeagueSuspenseQuery(
       ? baseOptions
       : { ...defaultOptions, ...baseOptions };
   return Apollo.useSuspenseQuery<
-    GetCurrentMatchupForLeagueQuery,
-    GetCurrentMatchupForLeagueQueryVariables
+    GetCurrentWeekForLeagueQuery,
+    GetCurrentWeekForLeagueQueryVariables
   >(
-    GetCurrentMatchupForLeague,
+    GetCurrentWeekForLeague,
     options as
       | Apollo.SkipToken
       | Apollo.SuspenseQueryHookOptions<
-          GetCurrentMatchupForLeagueQuery,
-          GetCurrentMatchupForLeagueQueryVariables
+          GetCurrentWeekForLeagueQuery,
+          GetCurrentWeekForLeagueQueryVariables
         >,
   );
 }
-export type GetCurrentMatchupForLeagueQueryHookResult = ReturnType<
-  typeof useGetCurrentMatchupForLeagueQuery
+export type GetCurrentWeekForLeagueQueryHookResult = ReturnType<
+  typeof useGetCurrentWeekForLeagueQuery
 >;
-export type GetCurrentMatchupForLeagueLazyQueryHookResult = ReturnType<
-  typeof useGetCurrentMatchupForLeagueLazyQuery
+export type GetCurrentWeekForLeagueLazyQueryHookResult = ReturnType<
+  typeof useGetCurrentWeekForLeagueLazyQuery
 >;
-export type GetCurrentMatchupForLeagueSuspenseQueryHookResult = ReturnType<
-  typeof useGetCurrentMatchupForLeagueSuspenseQuery
+export type GetCurrentWeekForLeagueSuspenseQueryHookResult = ReturnType<
+  typeof useGetCurrentWeekForLeagueSuspenseQuery
 >;
-export type GetCurrentMatchupForLeagueQueryResult = Apollo.QueryResult<
-  GetCurrentMatchupForLeagueQuery,
-  GetCurrentMatchupForLeagueQueryVariables
+export type GetCurrentWeekForLeagueQueryResult = Apollo.QueryResult<
+  GetCurrentWeekForLeagueQuery,
+  GetCurrentWeekForLeagueQueryVariables
 >;
 export const GetMatchupsByWeek = gql`
   query GetMatchupsByWeek($leagueId: Int!, $weekNumber: Int!) {

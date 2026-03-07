@@ -69,10 +69,10 @@ builder.queryField('getMatchupsForLeague', (t) =>
   }),
 );
 
-// Query: getCurrentMatchupForLeague
-builder.queryField('getCurrentMatchupForLeague', (t) =>
+// Query: getCurrentWeekForLeague
+builder.queryField('getCurrentWeekForLeague', (t) =>
   t.field({
-    type: Matchup,
+    type: 'Int',
     nullable: true,
     args: {
       leagueId: t.arg.int({ required: true }),
@@ -96,35 +96,20 @@ builder.queryField('getCurrentMatchupForLeague', (t) =>
       const leagueRow = leagueResults[0];
       if (!leagueRow) return null;
 
-      let weekNumber: number | null = null;
       if (leagueRow.currentWeek != null) {
-        weekNumber = leagueRow.currentWeek;
-      } else if (leagueRow.currentMatchup) {
+        return leagueRow.currentWeek;
+      }
+
+      if (leagueRow.currentMatchup) {
         const refMatchup = await context.db
           .select({ weekNumber: PublicSchema.matchups.weekNumber })
           .from(PublicSchema.matchups)
           .where(eq(PublicSchema.matchups.id, leagueRow.currentMatchup))
           .limit(1);
-        weekNumber = refMatchup[0]?.weekNumber ?? null;
+        return refMatchup[0]?.weekNumber ?? null;
       }
 
-      if (weekNumber == null) return null;
-
-      // Return the first in-progress matchup for the current week.
-      // Callers that need the user-specific matchup should use
-      // getMatchupsByWeek and filter by teamId client-side.
-      const matchupResults = await context.db
-        .select()
-        .from(PublicSchema.matchups)
-        .where(
-          and(
-            eq(PublicSchema.matchups.leagueId, args.leagueId),
-            eq(PublicSchema.matchups.weekNumber, weekNumber),
-          ),
-        )
-        .limit(1);
-
-      return matchupResults[0] || null;
+      return null;
     },
   }),
 );

@@ -1831,7 +1831,7 @@ type Query {
   ): [DraftPlayer!]
   getChampionshipTrophies(leagueId: Int!): [ChampionTrophy!]
   getCurrentDraftPick(draftId: Int!): CurrentDraftPick
-  getCurrentMatchupForLeague(leagueId: Int!): Matchup
+  getCurrentWeekForLeague(leagueId: Int!): Int
   getDirectMessages(limit: Int, otherUserId: Int!): [DirectMessage!]
   getDraft(draftId: Int!): Draft
   getDraftPicks(draftId: Int!): [DraftPick!]

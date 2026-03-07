@@ -264,77 +264,49 @@ describe('Matchup Queries', () => {
     });
   });
 
-  describe('getCurrentMatchupForLeague query', () => {
-    const getCurrentMatchupQuery = `
-      query GetCurrentMatchup($leagueId: Int!) {
-        getCurrentMatchupForLeague(leagueId: $leagueId) {
-          id
-          weekNumber
-          status
-        }
-      }
-    `;
-
-    it('should return the current matchup in progress', async () => {
+  describe('getCurrentWeekForLeague query', () => {
+    it('should return the current week number', async () => {
       const mockLeague = {
         currentWeek: 2,
-        currentMatchup: 2,
+        currentMatchup: null,
       };
 
-      const mockMatchup = {
-        id: 2,
-        leagueId: 1,
-        weekNumber: 2,
-        status: 'in_progress',
-      };
-
-      // First query: get league's currentWeek (or fall back to currentMatchup FK)
-      mockDb.select.mockReturnValueOnce(mockDb).mockReturnValueOnce(mockDb); // Second query: get matchup details
-
+      mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
-
-      // First limit returns league with currentMatchup ID
-      mockDb.limit
-        .mockResolvedValueOnce([mockLeague])
-        // Second limit returns the actual matchup
-        .mockResolvedValueOnce([mockMatchup]);
+      mockDb.limit.mockResolvedValueOnce([mockLeague]);
 
       const queryType = schema.getQueryType();
-      const getCurrentMatchupForLeagueField =
-        queryType?.getFields().getCurrentMatchupForLeague;
-      if (!getCurrentMatchupForLeagueField?.resolve) {
-        throw new Error('getCurrentMatchupForLeague resolver not found');
+      const getCurrentWeekForLeagueField =
+        queryType?.getFields().getCurrentWeekForLeague;
+      if (!getCurrentWeekForLeagueField?.resolve) {
+        throw new Error('getCurrentWeekForLeague resolver not found');
       }
 
-      const result = await getCurrentMatchupForLeagueField.resolve(
+      const result = await getCurrentWeekForLeagueField.resolve(
         {},
         { leagueId: 1 },
         mockContext,
         undefined as never,
       );
 
-      expect(result).toMatchObject({
-        id: 2,
-        status: 'in_progress',
-      });
+      expect(result).toBe(2);
     });
 
-    it('should return null when no matchup is in progress', async () => {
+    it('should return null when league is not found', async () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
-      mockDb.orderBy.mockReturnValue(mockDb);
       mockDb.limit.mockResolvedValue([]);
 
       const queryType = schema.getQueryType();
-      const getCurrentMatchupForLeagueField =
-        queryType?.getFields().getCurrentMatchupForLeague;
-      if (!getCurrentMatchupForLeagueField?.resolve) {
-        throw new Error('getCurrentMatchupForLeague resolver not found');
+      const getCurrentWeekForLeagueField =
+        queryType?.getFields().getCurrentWeekForLeague;
+      if (!getCurrentWeekForLeagueField?.resolve) {
+        throw new Error('getCurrentWeekForLeague resolver not found');
       }
 
-      const result = await getCurrentMatchupForLeagueField.resolve(
+      const result = await getCurrentWeekForLeagueField.resolve(
         {},
         { leagueId: 1 },
         mockContext,

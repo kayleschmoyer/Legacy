@@ -67,7 +67,7 @@ export function NextStepControl({
 
   const [autoAdvanceMatchups] = useAutoAdvanceMatchupsMutation({
     refetchQueries: [
-      'GetCurrentMatchupForLeague',
+      'GetCurrentWeekForLeague',
       'GetMatchupsForLeague',
       'GetLeagueById',
     ],
@@ -79,7 +79,7 @@ export function NextStepControl({
       awaitRefetchQueries: true,
     });
   const [autoSelectGames] = useAutoSelectGamesMutation({
-    refetchQueries: ['GetCurrentMatchupForLeague', 'GetMatchupsForLeague'],
+    refetchQueries: ['GetCurrentWeekForLeague', 'GetMatchupsForLeague'],
     awaitRefetchQueries: true,
   });
 

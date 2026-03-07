@@ -1790,7 +1790,7 @@ export type Query = {
   getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
   getChampionshipTrophies?: Maybe<Array<ChampionTrophy>>;
   getCurrentDraftPick?: Maybe<CurrentDraftPick>;
-  getCurrentMatchupForLeague?: Maybe<Matchup>;
+  getCurrentWeekForLeague?: Maybe<Scalars['Int']['output']>;
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
@@ -1950,7 +1950,7 @@ export type QueryGetCurrentDraftPickArgs = {
   draftId: Scalars['Int']['input'];
 };
 
-export type QueryGetCurrentMatchupForLeagueArgs = {
+export type QueryGetCurrentWeekForLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
 

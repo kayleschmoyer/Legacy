@@ -169,12 +169,12 @@ export const test = base.extend({
               },
             }),
           });
-        } else if (postData.includes('getcurrentmatchupforleague')) {
+        } else if (postData.includes('getcurrentweekforleague')) {
           void route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
-              data: { currentMatchupForLeague: null },
+              data: { getCurrentWeekForLeague: null },
             }),
           });
         } else if (postData.includes('getmatchupsforleague')) {

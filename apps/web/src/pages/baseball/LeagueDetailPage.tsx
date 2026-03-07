@@ -112,7 +112,7 @@ import { AchievementRestrictionsControl } from '../../components/commissioner/Ac
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
 import {
-  useCurrentMatchup,
+  useCurrentWeek,
   useMatchupById,
   useMatchupsForLeague,
 } from '../../hooks/useMatchup';
@@ -384,9 +384,9 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const { user } = useAuth();
 
-  // Ref to hold refetchCurrentMatchup so WebSocket callbacks can call it
+  // Ref to hold refetchCurrentWeek so WebSocket callbacks can call it
   // without creating a hook-ordering dependency
-  const refetchCurrentMatchupRef = useRef<
+  const refetchCurrentWeekRef = useRef<
     (() => void | Promise<unknown>) | undefined
   >(undefined);
 
@@ -541,8 +541,8 @@ export function LeagueDetailPage(): React.JSX.Element {
     // Refetch team members in the background — do NOT clear redux teamMembers
     // to [] because that causes the page to flash a full-page spinner.
     void refetchTeamMembersRef.current?.();
-    // Refetch the current matchup so it reflects the newly drafted rosters.
-    void refetchCurrentMatchupRef.current?.();
+    // Refetch the current week so it reflects the newly drafted rosters.
+    void refetchCurrentWeekRef.current?.();
   }, [backgroundRefetch]);
 
   const handleDraftStarted = useCallback(() => {
@@ -556,7 +556,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const handleMatchupStatsComplete = useCallback(() => {
     void backgroundRefetch();
     // Also refetch matchup data so statsLoadingStatus updates and spinner clears
-    void refetchCurrentMatchupRef.current?.();
+    void refetchCurrentWeekRef.current?.();
   }, [backgroundRefetch]);
 
   // Create the single shared WebSocket connection for this league page.
@@ -854,16 +854,16 @@ export function LeagueDetailPage(): React.JSX.Element {
     refetch: refetchScoringProfile,
   } = useLeagueScoringSettings(leagueId);
 
-  // Current matchup (for default selection)
+  // Current week (for default selection)
   const {
-    matchup: currentMatchup,
-    loading: currentMatchupLoading,
-    error: currentMatchupError,
-    refetch: refetchCurrentMatchup,
-  } = useCurrentMatchup(!isNaN(leagueId) ? leagueId : null);
+    currentWeek,
+    loading: currentWeekLoading,
+    error: currentWeekError,
+    refetch: refetchCurrentWeek,
+  } = useCurrentWeek(!isNaN(leagueId) ? leagueId : null);
 
-  // Keep the ref in sync so WebSocket callbacks can trigger matchup refetch
-  refetchCurrentMatchupRef.current = refetchCurrentMatchup;
+  // Keep the ref in sync so WebSocket callbacks can trigger refetch
+  refetchCurrentWeekRef.current = refetchCurrentWeek;
 
   // Selected matchup state (null means show current matchup)
   // Initialize from URL route parameter if present
@@ -877,23 +877,19 @@ export function LeagueDetailPage(): React.JSX.Element {
   );
 
   // The user's own matchup for the current active week (may differ from the
-  // league-level currentMatchup pointer, since a league has one matchup *per
+  // league-level current week pointer, since a league has one matchup *per
   // team pair* each week).
   const userCurrentMatchup = useMemo(() => {
-    if (
-      !reduxUserTeamId ||
-      !allLeagueMatchups.length ||
-      !currentMatchup?.weekNumber
-    )
+    if (!reduxUserTeamId || !allLeagueMatchups.length || !currentWeek)
       return null;
     return (
       allLeagueMatchups.find(
         (m) =>
-          m.weekNumber === currentMatchup.weekNumber &&
+          m.weekNumber === currentWeek &&
           (m.team1Id === reduxUserTeamId || m.team2Id === reduxUserTeamId),
       ) ?? null
     );
-  }, [reduxUserTeamId, allLeagueMatchups, currentMatchup?.weekNumber]);
+  }, [reduxUserTeamId, allLeagueMatchups, currentWeek]);
 
   // Fetch selected matchup if user navigated away from current
   const {
@@ -905,21 +901,25 @@ export function LeagueDetailPage(): React.JSX.Element {
   );
 
   // Determine which matchup to display
-  const displayedMatchup = selectedMatchupId ? selectedMatchup : currentMatchup;
+  const displayedMatchup = selectedMatchupId
+    ? selectedMatchup
+    : (userCurrentMatchup ??
+      allLeagueMatchups.find((m) => m.weekNumber === currentWeek) ??
+      null);
   const matchupLoading = selectedMatchupId
     ? selectedMatchupLoading
-    : currentMatchupLoading;
+    : currentWeekLoading;
   const matchupError = selectedMatchupId
     ? selectedMatchupError
-    : currentMatchupError;
+    : currentWeekError;
   const refetchMatchup = useMemo(
     () =>
       selectedMatchupId
         ? () => {
-            void refetchCurrentMatchup();
+            void refetchCurrentWeek();
           }
-        : refetchCurrentMatchup,
-    [selectedMatchupId, refetchCurrentMatchup],
+        : refetchCurrentWeek,
+    [selectedMatchupId, refetchCurrentWeek],
   );
 
   // Sync selected matchup ID when URL param changes (e.g., when navigating via shared link)
@@ -931,12 +931,15 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   // Reset to current matchup when it changes (e.g., week advance)
   useEffect(() => {
-    if (currentMatchup?.id && !selectedMatchupId) {
+    if (userCurrentMatchup?.id && !selectedMatchupId) {
       // We're viewing current matchup and it changed, stay on current
-    } else if (currentMatchup?.id && selectedMatchupId === currentMatchup.id) {
+    } else if (
+      userCurrentMatchup?.id &&
+      selectedMatchupId === String(userCurrentMatchup.id)
+    ) {
       // We were viewing current, and it's still current, stay selected
     }
-  }, [currentMatchup?.id, selectedMatchupId]);
+  }, [userCurrentMatchup?.id, selectedMatchupId]);
 
   // ── Matchup Player Data (for scores, projections, and roster locking) ────
 
@@ -1487,13 +1490,13 @@ export function LeagueDetailPage(): React.JSX.Element {
                 Week
               </Text>
               <Text fontSize="$8" fontWeight="800" color="$color">
-                {currentMatchup?.weekNumber || '\u2014'}
+                {currentWeek || '\u2014'}
               </Text>
             </QuickStatCard>
           </XStack>
 
           {/* Matchup Preview */}
-          {currentMatchup && !matchupLoading && (
+          {userCurrentMatchup && !matchupLoading && (
             <Card
               backgroundColor="$surfacePanel"
               borderColor="$surfacePanelBorder"
@@ -1527,10 +1530,10 @@ export function LeagueDetailPage(): React.JSX.Element {
                 </Button>
               </XStack>
               <MatchupScoreboard
-                matchup={currentMatchup}
+                matchup={userCurrentMatchup}
                 gamesRemaining={
-                  (currentMatchup.gamesPerMatchup ?? 0) -
-                  (currentMatchup.selectedGamesCount ?? 0)
+                  (userCurrentMatchup.gamesPerMatchup ?? 0) -
+                  (userCurrentMatchup.selectedGamesCount ?? 0)
                 }
                 onTeamClick={handleViewTeamRoster}
               />
@@ -1541,7 +1544,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           <LeagueActivityFeed
             leagueId={leagueId}
             draftStatus={String(league.draftStatus)}
-            currentMatchup={currentMatchup?.weekNumber}
+            currentMatchup={currentWeek ?? undefined}
             teamCount={teamCount}
           />
 
@@ -1636,7 +1639,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   Week
                 </Text>
                 <Text color="$color" fontWeight="600" fontSize="$3">
-                  {currentMatchup?.weekNumber || 'Pre-season'}
+                  {currentWeek ?? 'Pre-season'}
                 </Text>
               </XStack>
               {isCommissioner && (
@@ -2398,8 +2401,8 @@ export function LeagueDetailPage(): React.JSX.Element {
         ) : (
           <NextStepControl
             leagueId={leagueId}
-            currentMatchup={currentMatchup}
-            gamesPerMatchup={currentMatchup?.gamesPerMatchup ?? 1}
+            currentMatchup={userCurrentMatchup}
+            gamesPerMatchup={userCurrentMatchup?.gamesPerMatchup ?? 1}
             draftStatus={league.draftStatus}
             hasPendingSettingsChanges={hasDraftSettingsChanges}
             onSuccess={handleMatchupSuccess}
@@ -2725,13 +2728,13 @@ export function LeagueDetailPage(): React.JSX.Element {
                     {formatDraftStatus(String(league.draftStatus))}
                   </Text>
                 </DraftBadge>
-                {currentMatchup?.weekNumber && (
+                {currentWeek && (
                   <>
                     <Text fontSize="$3" color={withAlpha(WHITE, 0.45)}>
                       |
                     </Text>
                     <Text fontSize="$3" color={withAlpha(WHITE, 0.75)}>
-                      Week {currentMatchup.weekNumber}
+                      Week {currentWeek}
                     </Text>
                   </>
                 )}
@@ -2985,7 +2988,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             >
               <LeagueFreeAgents
                 leagueId={leagueId}
-                gamesPerMatchup={currentMatchup?.gamesPerMatchup ?? 5}
+                gamesPerMatchup={userCurrentMatchup?.gamesPerMatchup ?? 5}
               />
             </YStack>
           )}
@@ -3042,14 +3045,13 @@ export function LeagueDetailPage(): React.JSX.Element {
                   {/* Matchup Navigation */}
                   <MatchupNavigationControls
                     currentMatchup={displayedMatchup}
-                    currentLeagueWeek={currentMatchup?.weekNumber ?? undefined}
+                    currentLeagueWeek={currentWeek ?? undefined}
                     leagueId={leagueId}
                     allMatchups={allLeagueMatchups}
                     userTeamId={reduxUserTeamId}
                     isViewingOther={
                       selectedMatchupId != null &&
-                      selectedMatchupId !==
-                        String(userCurrentMatchup?.id ?? currentMatchup?.id)
+                      selectedMatchupId !== String(userCurrentMatchup?.id)
                     }
                     onMatchupChange={(matchupId) => {
                       setSelectedMatchupId(matchupId);
@@ -3136,9 +3138,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   {allLeagueMatchups.length > 0 && (
                     <MatchupNavigationControls
                       currentMatchup={undefined}
-                      currentLeagueWeek={
-                        currentMatchup?.weekNumber ?? undefined
-                      }
+                      currentLeagueWeek={currentWeek ?? undefined}
                       leagueId={leagueId}
                       allMatchups={allLeagueMatchups}
                       userTeamId={reduxUserTeamId}

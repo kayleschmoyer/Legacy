@@ -445,10 +445,10 @@ export async function getMatchupsForLeague(
     .where(and(...conditions));
 }
 
-export async function getCurrentMatchupForLeague(
+export async function getCurrentWeekForLeague(
   db: PublicDb,
   leagueId: number,
-): Promise<Matchup | null> {
+): Promise<number | null> {
   // Prefer the authoritative currentWeek column; fall back to resolving
   // week number via the legacy currentMatchup FK.
   const leagueResults = await db
@@ -463,32 +463,20 @@ export async function getCurrentMatchupForLeague(
   const leagueRow = leagueResults[0];
   if (!leagueRow) return null;
 
-  let weekNumber: number | null = null;
   if (leagueRow.currentWeek != null) {
-    weekNumber = leagueRow.currentWeek;
-  } else if (leagueRow.currentMatchup) {
+    return leagueRow.currentWeek;
+  }
+
+  if (leagueRow.currentMatchup) {
     const refMatchup = await db
       .select({ weekNumber: Schema.matchups.weekNumber })
       .from(Schema.matchups)
       .where(eq(Schema.matchups.id, leagueRow.currentMatchup))
       .limit(1);
-    weekNumber = refMatchup[0]?.weekNumber ?? null;
+    return refMatchup[0]?.weekNumber ?? null;
   }
 
-  if (weekNumber == null) return null;
-
-  const matchupResults = await db
-    .select()
-    .from(Schema.matchups)
-    .where(
-      and(
-        eq(Schema.matchups.leagueId, leagueId),
-        eq(Schema.matchups.weekNumber, weekNumber),
-      ),
-    )
-    .limit(1);
-
-  return matchupResults[0] ?? null;
+  return null;
 }
 
 export async function createMatchup(

@@ -41,7 +41,7 @@ export function MatchupControl({
 
   const [autoAdvanceMatchups] = useAutoAdvanceMatchupsMutation({
     refetchQueries: [
-      'GetCurrentMatchupForLeague',
+      'GetCurrentWeekForLeague',
       'GetMatchupsForLeague',
       'GetLeagueById',
     ],

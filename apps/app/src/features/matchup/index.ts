@@ -3,7 +3,7 @@ export {
   useMatchup,
   useMatchupById,
   useMatchupsForLeague,
-  useCurrentMatchup,
+  useCurrentWeek,
   useMatchupsByWeek,
 } from './hooks/useMatchup';
 export { useStandings } from './hooks/useStandings';
