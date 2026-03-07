@@ -24,6 +24,7 @@ import {
 import { builder } from '../builder';
 import { adjustMatchupsForNewTotal } from '../matchups/mutations';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import { applyDecay, applyEscalation } from '../../services/salary-rollover';
 
 // League service instance for create operations
 const leagueService = createLeagueService(getDbOptions());
@@ -1619,6 +1620,21 @@ builder.mutationField('renewLeague', (t) =>
         }
       }
 
+      // 7b. Pre-load player_salaries for escalation/decay (salary cap leagues only)
+      const oldPlayerSalariesMap = new Map<
+        number,
+        typeof PublicSchema.playerSalaries.$inferSelect
+      >();
+      if (oldLeague.salaryCapEnabled) {
+        const oldSalaries = await context.db
+          .select()
+          .from(PublicSchema.playerSalaries)
+          .where(eq(PublicSchema.playerSalaries.leagueId, leagueId));
+        for (const row of oldSalaries) {
+          oldPlayerSalariesMap.set(row.playerId, row);
+        }
+      }
+
       // 8. Load old draft settings so the new league inherits them
       const [oldDraft] = await context.db
         .select()
@@ -1692,6 +1708,16 @@ builder.mutationField('renewLeague', (t) =>
           seasonNumber: (oldLeague.seasonNumber ?? 1) + 1,
           weekAdvanceStatus: 'idle',
           isMockDraft: false,
+          // Salary cap settings carried forward (LS-645)
+          salaryCapEnabled: oldLeague.salaryCapEnabled,
+          salaryCap: oldLeague.salaryCap,
+          salaryFloor: oldLeague.salaryFloor,
+          luxuryTaxThreshold: oldLeague.luxuryTaxThreshold,
+          minSalary: oldLeague.minSalary,
+          salaryEscalationPct: oldLeague.salaryEscalationPct,
+          salaryDecayPct: oldLeague.salaryDecayPct,
+          auctionBudget: oldLeague.auctionBudget,
+          auctionMinBid: oldLeague.auctionMinBid,
         })
         .returning();
 
@@ -1759,6 +1785,14 @@ builder.mutationField('renewLeague', (t) =>
           if (!newTeamId) continue;
           for (const m of members) {
             carriedOverPlayerIds.add(m.playerId);
+            const salaryRow = oldPlayerSalariesMap.get(m.playerId);
+            const escalatedSalary =
+              salaryRow != null
+                ? applyEscalation(
+                    salaryRow.currentSalary,
+                    oldLeague.salaryEscalationPct,
+                  )
+                : null;
             rosterRows.push({
               teamId: newTeamId,
               leagueId: newLeague.id,
@@ -1769,6 +1803,7 @@ builder.mutationField('renewLeague', (t) =>
                   : null,
               acquisitionType: 'rollover',
               onTradeBlock: false,
+              salary: escalatedSalary,
             });
           }
         }
@@ -1794,6 +1829,70 @@ builder.mutationField('renewLeague', (t) =>
         freeAgents: freeAgentPlayerIds.size,
         newLeagueId: newLeague.id,
       });
+
+      // 14c. Propagate player_salaries to the new league with escalation/decay
+      //   - Carried-over (rostered) players: salary escalates by salaryEscalationPct
+      //   - All others: salary decays by salaryDecayPct; freeAgentYears increments
+      if (oldLeague.salaryCapEnabled && oldPlayerSalariesMap.size > 0) {
+        const { salaryEscalationPct, salaryDecayPct, minSalary } = oldLeague;
+        const oldSeasonNumber = oldLeague.seasonNumber ?? 1;
+
+        const newSalaryRows: (typeof PublicSchema.playerSalaries.$inferInsert)[] =
+          [];
+        let escalatedCount = 0;
+        let decayedCount = 0;
+
+        for (const [playerId, row] of oldPlayerSalariesMap.entries()) {
+          if (carriedOverPlayerIds.has(playerId)) {
+            // Escalation: Math.ceil(current * (100 + pct) / 100)
+            const newSalary = applyEscalation(
+              row.currentSalary,
+              salaryEscalationPct,
+            );
+            newSalaryRows.push({
+              leagueId: newLeague.id,
+              playerId,
+              currentSalary: newSalary,
+              initialSalary: row.initialSalary,
+              acquisitionType: row.acquisitionType,
+              yearAcquired: row.yearAcquired,
+              lastRosteredSeason: oldSeasonNumber,
+              freeAgentYears: 0,
+            });
+            escalatedCount++;
+          } else {
+            // Decay: Math.max(minSalary, Math.floor(current * (100 - pct) / 100))
+            const newSalary = applyDecay(
+              row.currentSalary,
+              salaryDecayPct,
+              minSalary,
+            );
+            newSalaryRows.push({
+              leagueId: newLeague.id,
+              playerId,
+              currentSalary: newSalary,
+              initialSalary: row.initialSalary,
+              acquisitionType: row.acquisitionType,
+              yearAcquired: row.yearAcquired,
+              lastRosteredSeason: row.lastRosteredSeason,
+              freeAgentYears: row.freeAgentYears + 1,
+            });
+            decayedCount++;
+          }
+        }
+
+        if (newSalaryRows.length > 0) {
+          await context.db
+            .insert(PublicSchema.playerSalaries)
+            .values(newSalaryRows);
+        }
+
+        LOGGER.info('Salary escalation and decay applied', {
+          newLeagueId: newLeague.id,
+          escalated: escalatedCount,
+          decayed: decayedCount,
+        });
+      }
 
       // 15. Create a draft record for the new league
       await context.db.insert(PublicSchema.drafts).values({
