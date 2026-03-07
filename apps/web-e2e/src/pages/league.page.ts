@@ -25,6 +25,13 @@ export class LeaguePage {
   // League discovery
   readonly leaguesGrid: Locator;
 
+  // Commissioner branding section
+  readonly brandingHeading: Locator;
+  readonly primaryColorInput: Locator;
+  readonly secondaryColorInput: Locator;
+  readonly saveColorsButton: Locator;
+  readonly resetColorsButton: Locator;
+
   constructor(page: Page) {
     this.page = page;
 
@@ -53,6 +60,17 @@ export class LeaguePage {
 
     // Discovery list
     this.leaguesGrid = page.getByTestId('leagues-grid');
+
+    // Commissioner branding
+    this.brandingHeading = page.getByRole('heading', {
+      name: /League Branding/i,
+    });
+    this.primaryColorInput = page.locator('#primary-color');
+    this.secondaryColorInput = page.locator('#secondary-color');
+    this.saveColorsButton = page.getByRole('button', {
+      name: /save colors/i,
+    });
+    this.resetColorsButton = page.getByRole('button', { name: /reset/i });
   }
 
   /** Navigate to the league creation page. */

@@ -69,6 +69,10 @@ export const test = base.extend({
                   tradingEnabled: true,
                   waiverEnabled: true,
                   startDate: null,
+                  logoUrl: null,
+                  bannerUrl: null,
+                  primaryColor: null,
+                  secondaryColor: null,
                 },
               },
             }),
@@ -221,6 +225,24 @@ export const test = base.extend({
                     isPublic: false,
                   },
                 ],
+              },
+            }),
+          });
+        } else if (postData.includes('updateleaguebranding')) {
+          void route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              data: {
+                updateLeagueSettings: {
+                  __typename: 'League',
+                  id: 1,
+                  name: 'Test League',
+                  logoUrl: null,
+                  bannerUrl: null,
+                  primaryColor: null,
+                  secondaryColor: null,
+                },
               },
             }),
           });

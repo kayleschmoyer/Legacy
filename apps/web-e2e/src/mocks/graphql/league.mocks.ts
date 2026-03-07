@@ -25,6 +25,10 @@ export interface MockLeague {
   tradingEnabled: boolean;
   waiverEnabled: boolean;
   startDate: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
 }
 
 export function mockLeague(overrides: Partial<MockLeague> = {}): MockLeague {
@@ -48,6 +52,10 @@ export function mockLeague(overrides: Partial<MockLeague> = {}): MockLeague {
     tradingEnabled: true,
     waiverEnabled: true,
     startDate: null,
+    logoUrl: null,
+    bannerUrl: null,
+    primaryColor: null,
+    secondaryColor: null,
     ...overrides,
   };
 }
@@ -153,6 +161,27 @@ export function createLeagueResponse(league?: Partial<MockLeague>) {
       createLeagueAndTeams: {
         __typename: 'CreateLeagueAndTeamsPayload' as const,
         league: mockLeague({ id: 999, ...league }),
+      },
+    },
+  };
+}
+
+export function updateLeagueBrandingResponse(patch?: {
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+}) {
+  return {
+    data: {
+      updateLeagueSettings: {
+        __typename: 'League' as const,
+        id: 1,
+        name: 'Test League',
+        logoUrl: patch?.logoUrl ?? null,
+        bannerUrl: patch?.bannerUrl ?? null,
+        primaryColor: patch?.primaryColor ?? null,
+        secondaryColor: patch?.secondaryColor ?? null,
       },
     },
   };

@@ -106,6 +106,7 @@ import { AvatarImage, AvatarPicker } from '../../components/common';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
 import { DraftOrderControl } from '../../components/commissioner/DraftOrderControl';
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
+import { LeagueBrandingControl } from '../../components/commissioner/LeagueBrandingControl';
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
@@ -2408,6 +2409,27 @@ export function LeagueDetailPage(): React.JSX.Element {
           <DraftOrderControl
             leagueId={leagueId}
             draftStatus={league.draftStatus}
+            onSuccess={(message) => {
+              setMatchupSuccessMessage(message);
+              setTimeout(() => setMatchupSuccessMessage(null), 5000);
+            }}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+          />
+        ),
+      },
+      {
+        id: 'league-branding',
+        title: 'League Branding',
+        content: (
+          <LeagueBrandingControl
+            leagueId={leagueId}
+            leagueName={league.name}
+            currentLogoUrl={league.logoUrl}
+            currentBannerUrl={league.bannerUrl}
+            currentPrimaryColor={league.primaryColor}
+            currentSecondaryColor={league.secondaryColor}
             onSuccess={(message) => {
               setMatchupSuccessMessage(message);
               setTimeout(() => setMatchupSuccessMessage(null), 5000);
