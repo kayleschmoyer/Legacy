@@ -73,6 +73,12 @@ export const League = builder.objectRef<{
   bannerUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  /** FK to the previous season's league — null for founding seasons */
+  previousLeagueId?: number | null;
+  /** ISO timestamp set when the league is retired (frozen) at season end */
+  frozenAt?: string | null;
+  /** Monotonic season counter (1 = founding, incremented on renewal) */
+  seasonNumber?: number;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -112,6 +118,9 @@ League.implement({
     bannerUrl: t.exposeString('bannerUrl', { nullable: true }),
     primaryColor: t.exposeString('primaryColor', { nullable: true }),
     secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
+    previousLeagueId: t.exposeInt('previousLeagueId', { nullable: true }),
+    frozenAt: t.exposeString('frozenAt', { nullable: true }),
+    seasonNumber: t.exposeInt('seasonNumber', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,
       description: 'The current active week number for the league',

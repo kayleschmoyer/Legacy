@@ -27,6 +27,9 @@ fragment League on League {
   bannerUrl
   primaryColor
   secondaryColor
+  previousLeagueId
+  frozenAt
+  seasonNumber
   userMembership {
     ...LeagueMember
   }
@@ -229,5 +232,11 @@ mutation JoinPublicLeague($leagueId: Int!, $teamName: String!) {
     message
     leagueId
     teamId
+  }
+}
+
+mutation RenewLeague($leagueId: Int!, $keepRosters: Boolean!) {
+  renewLeague(leagueId: $leagueId, keepRosters: $keepRosters) {
+    ...League
   }
 }

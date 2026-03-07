@@ -731,6 +731,7 @@ type League {
   currentWeekNumber: Int
   draftStatus: String
   faabBudgetDefault: Int
+  frozenAt: String
   gamesPerMatchup: Int
   id: Int
   inviteCode: String
@@ -747,8 +748,10 @@ type League {
   playoffEnabled: Boolean
   playoffFormat: String
   playoffMultiWeek: Boolean
+  previousLeagueId: Int
   primaryColor: String
   scoringProfile: ScoringConfig
+  seasonNumber: Int
   secondaryColor: String
   spStartsPerMatchup: Int
   totalMatchups: Int
@@ -1321,6 +1324,7 @@ type Mutation {
   """
   removeFromDraftQueue(draftId: Int!, playerId: Int!): [DraftQueueEntry!]
   renameTeam(leagueId: Int!, newName: String!, teamId: Int!): Team
+  renewLeague(keepRosters: Boolean!, leagueId: Int!): League
 
   """
   Reorder the current user's draft queue. playerIds must contain the same players that are already queued — only the order changes.

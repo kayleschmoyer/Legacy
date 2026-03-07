@@ -111,6 +111,7 @@ import { LeagueBrandingControl } from '../../components/commissioner/LeagueBrand
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
+import { SeasonRenewalControl } from '../../features/commissioner/SeasonRenewalControl';
 import {
   useCurrentWeek,
   useMatchupById,
@@ -2535,6 +2536,25 @@ export function LeagueDetailPage(): React.JSX.Element {
             error={scoringError}
             onRefetch={async () => {
               await refetchScoringProfile({ leagueId });
+            }}
+          />
+        ),
+      },
+      {
+        id: 'season-renewal',
+        title: 'Start New Season',
+        content: (
+          <SeasonRenewalControl
+            leagueId={leagueId}
+            leagueName={league.name ?? 'Unknown League'}
+            draftStatus={league.draftStatus ?? ''}
+            frozenAt={league.frozenAt}
+            onSuccess={() => {
+              // Navigation to the new league is handled by SeasonRenewalControl
+            }}
+            onError={(renewError) => {
+              LOGGER.error('Renew league error:', String(renewError));
+              alert(`Error starting new season: ${renewError.message}`);
             }}
           />
         ),

@@ -1492,3 +1492,359 @@ builder.mutationField('joinPublicLeague', (t) =>
     },
   }),
 );
+
+// -- Season Renewal ---------------------------------------------------------
+
+/**
+ * Mutation: renewLeague
+ *
+ * Begins a new season by creating a brand-new league that carries forward all
+ * settings, members, and optionally rosters from the current league.  The
+ * original league is frozen (read-only) and linked to the new one via
+ * previousLeagueId, forming a lineage chain across seasons.
+ *
+ * keepRosters = true  ? copy team_members into the new league's teams
+ * keepRosters = false ? leave rosters empty so a new draft can be held
+ */
+builder.mutationField('renewLeague', (t) =>
+  t.field({
+    type: League,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      keepRosters: t.arg.boolean({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const { leagueId, keepRosters } = args;
+      const userId = context.user.id;
+
+      // 1. Verify caller is commissioner of the league
+      const [membership] = await context.db
+        .select({ permissionLevel: PublicSchema.leagueMembers.permissionLevel })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (!membership) {
+        throw ForbiddenError('You are not a member of this league');
+      }
+      if (membership.permissionLevel !== 'commissioner') {
+        throw ForbiddenError('Only the commissioner can start a new season');
+      }
+
+      // 2. Load full league record
+      const [oldLeague] = await context.db
+        .select()
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+
+      if (!oldLeague) {
+        throw new Error('League not found');
+      }
+      if (oldLeague.frozenAt) {
+        throw new Error(
+          'This league has already been retired for a new season',
+        );
+      }
+
+      // 3. Load current teams (preserving order)
+      const oldTeams = await context.db
+        .select()
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.leagueId, leagueId))
+        .orderBy(PublicSchema.teams.id);
+
+      // 4. Load league members
+      const oldMembers = await context.db
+        .select()
+        .from(PublicSchema.leagueMembers)
+        .where(eq(PublicSchema.leagueMembers.leagueId, leagueId));
+
+      // 5. Load roster position slots
+      const oldPositions = await context.db
+        .select()
+        .from(PublicSchema.leaguePosition)
+        .where(eq(PublicSchema.leaguePosition.leagueId, leagueId));
+
+      // 6. Load the active scoring profile (if any) for copying
+      const [oldProfile] = await context.db
+        .select()
+        .from(PublicSchema.leagueScoringProfiles)
+        .where(
+          and(
+            eq(PublicSchema.leagueScoringProfiles.leagueId, leagueId),
+            eq(PublicSchema.leagueScoringProfiles.status, 'active'),
+          ),
+        )
+        .limit(1);
+
+      let profileEntries: (typeof PublicSchema.leagueScoringProfileEntries.$inferSelect)[] =
+        [];
+      if (oldProfile) {
+        profileEntries = await context.db
+          .select()
+          .from(PublicSchema.leagueScoringProfileEntries)
+          .where(
+            eq(
+              PublicSchema.leagueScoringProfileEntries.profileId,
+              oldProfile.id,
+            ),
+          );
+      }
+
+      // 7. Load team_members if we are keeping rosters
+      const oldRostersByTeamId = new Map<
+        number,
+        (typeof PublicSchema.teamMembers.$inferSelect)[]
+      >();
+      if (keepRosters) {
+        const allRosters = await context.db
+          .select()
+          .from(PublicSchema.teamMembers)
+          .where(eq(PublicSchema.teamMembers.leagueId, leagueId));
+        for (const row of allRosters) {
+          if (row.teamId == null) continue;
+          const existing = oldRostersByTeamId.get(row.teamId) ?? [];
+          existing.push(row);
+          oldRostersByTeamId.set(row.teamId, existing);
+        }
+      }
+
+      // 8. Load old draft settings so the new league inherits them
+      const [oldDraft] = await context.db
+        .select()
+        .from(PublicSchema.drafts)
+        .where(eq(PublicSchema.drafts.leagueId, leagueId))
+        .orderBy(desc(PublicSchema.drafts.id))
+        .limit(1);
+
+      // -- All reads done; now write ---------------------------------------
+
+      // 9. Generate a unique invite code for the new league
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let newInviteCode = '';
+      for (let attempt = 0; attempt < 10; attempt++) {
+        let code = '';
+        for (let i = 0; i < 8; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const existing = await context.db
+          .select({ id: PublicSchema.leagues.id })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.inviteCode, code))
+          .limit(1);
+        if (existing.length === 0) {
+          newInviteCode = code;
+          break;
+        }
+      }
+      if (!newInviteCode) {
+        throw new Error('Failed to generate unique invite code');
+      }
+
+      // 10. Create the new league (copying all settings, linking lineage)
+      const [newLeague] = await context.db
+        .insert(PublicSchema.leagues)
+        .values({
+          name: oldLeague.name,
+          owner: oldLeague.owner,
+          maxRosterSize: oldLeague.maxRosterSize,
+          currentMatchup: null,
+          currentWeek: null,
+          draftStatus: keepRosters ? 'completed' : 'not-started',
+          inviteCode: newInviteCode,
+          minGamesPerSeason: oldLeague.minGamesPerSeason,
+          gamesPerMatchup: oldLeague.gamesPerMatchup,
+          tradeDeadlineWeek: oldLeague.tradeDeadlineWeek,
+          rosterLockTiming: oldLeague.rosterLockTiming,
+          schedulingStrategy: oldLeague.schedulingStrategy,
+          playerPool: oldLeague.playerPool,
+          eraFilter: oldLeague.eraFilter,
+          hofOnly: oldLeague.hofOnly,
+          customEraStartYear: oldLeague.customEraStartYear,
+          customEraEndYear: oldLeague.customEraEndYear,
+          waiverType: oldLeague.waiverType,
+          waiverEnabled: oldLeague.waiverEnabled,
+          faabBudgetDefault: oldLeague.faabBudgetDefault,
+          spStartsPerMatchup: oldLeague.spStartsPerMatchup,
+          minCareerGames: oldLeague.minCareerGames,
+          minCareerSeasons: oldLeague.minCareerSeasons,
+          totalMatchups: oldLeague.totalMatchups,
+          numberOfDivisions: oldLeague.numberOfDivisions,
+          playoffEnabled: oldLeague.playoffEnabled,
+          playoffFormat: oldLeague.playoffFormat,
+          playoffMultiWeek: oldLeague.playoffMultiWeek,
+          isPublic: oldLeague.isPublic,
+          logoUrl: oldLeague.logoUrl,
+          bannerUrl: oldLeague.bannerUrl,
+          primaryColor: oldLeague.primaryColor,
+          secondaryColor: oldLeague.secondaryColor,
+          previousLeagueId: leagueId,
+          seasonNumber: (oldLeague.seasonNumber ?? 1) + 1,
+          weekAdvanceStatus: 'idle',
+          isMockDraft: false,
+        })
+        .returning();
+
+      // 11. Create new teams � same names and division structure
+      const newTeams = await context.db
+        .insert(PublicSchema.teams)
+        .values(
+          oldTeams.map((team) => ({
+            name: team.name,
+            leagueId: newLeague.id,
+            divisionId: team.divisionId,
+            waiverOrder: team.waiverOrder,
+            faabBudget: oldLeague.faabBudgetDefault,
+            logoUrl: team.logoUrl,
+            primaryColor: team.primaryColor,
+            secondaryColor: team.secondaryColor,
+            avatarUrl: team.avatarUrl,
+          })),
+        )
+        .returning();
+
+      // Build a map from old teamId ? new teamId (positional, same order)
+      const teamIdMap = new Map<number, number>();
+      for (let i = 0; i < oldTeams.length; i++) {
+        teamIdMap.set(oldTeams[i].id, newTeams[i].id);
+      }
+
+      // 12. Copy league members (preserving permission levels and team assignments)
+      if (oldMembers.length > 0) {
+        await context.db.insert(PublicSchema.leagueMembers).values(
+          oldMembers.map((m) => ({
+            leagueId: newLeague.id,
+            userId: m.userId,
+            teamId: m.teamId != null ? (teamIdMap.get(m.teamId) ?? null) : null,
+            permissionLevel: m.permissionLevel,
+          })),
+        );
+      }
+
+      // 13. Copy roster position slots � get new IDs for the roster copy
+      const positionIdMap = new Map<number, number>();
+      if (oldPositions.length > 0) {
+        const newPositions = await context.db
+          .insert(PublicSchema.leaguePosition)
+          .values(
+            oldPositions.map((p) => ({
+              leagueId: newLeague.id,
+              positionType: p.positionType,
+            })),
+          )
+          .returning();
+
+        for (let i = 0; i < oldPositions.length; i++) {
+          positionIdMap.set(oldPositions[i].id, newPositions[i].id);
+        }
+      }
+
+      // 14. Copy rosters if keepRosters is requested
+      // Collects carriedOverPlayerIds so LS-645 can apply salary escalation
+      const carriedOverPlayerIds = new Set<number>();
+      if (keepRosters && oldRostersByTeamId.size > 0) {
+        const rosterRows: (typeof PublicSchema.teamMembers.$inferInsert)[] = [];
+        for (const [oldTeamId, members] of oldRostersByTeamId.entries()) {
+          const newTeamId = teamIdMap.get(oldTeamId);
+          if (!newTeamId) continue;
+          for (const m of members) {
+            carriedOverPlayerIds.add(m.playerId);
+            rosterRows.push({
+              teamId: newTeamId,
+              leagueId: newLeague.id,
+              playerId: m.playerId,
+              positionId:
+                m.positionId != null
+                  ? (positionIdMap.get(m.positionId) ?? null)
+                  : null,
+              acquisitionType: 'rollover',
+              onTradeBlock: false,
+            });
+          }
+        }
+        if (rosterRows.length > 0) {
+          await context.db.insert(PublicSchema.teamMembers).values(rosterRows);
+        }
+      }
+
+      // 14b. Identify free agents (previously rostered but not carried over)
+      // LS-645 will use this to apply salary decay and increment freeAgentYears
+      const allOldRosteredPlayerIds = new Set<number>();
+      for (const members of oldRostersByTeamId.values()) {
+        for (const m of members) allOldRosteredPlayerIds.add(m.playerId);
+      }
+      const freeAgentPlayerIds = new Set(
+        [...allOldRosteredPlayerIds].filter(
+          (id) => !carriedOverPlayerIds.has(id),
+        ),
+      );
+
+      LOGGER.info('Season renewal roster summary', {
+        carriedOver: carriedOverPlayerIds.size,
+        freeAgents: freeAgentPlayerIds.size,
+        newLeagueId: newLeague.id,
+      });
+
+      // 15. Create a draft record for the new league
+      await context.db.insert(PublicSchema.drafts).values({
+        leagueId: newLeague.id,
+        draftMode: oldDraft?.draftMode ?? 'live',
+        selectionMethod: oldDraft?.selectionMethod ?? 'standard',
+        draftOrder: oldDraft?.draftOrder ?? 'snake',
+      });
+
+      // 16. Copy the active scoring profile to the new league
+      if (oldProfile) {
+        const [newProfile] = await context.db
+          .insert(PublicSchema.leagueScoringProfiles)
+          .values({
+            leagueId: newLeague.id,
+            profileName: oldProfile.profileName,
+            status: 'active',
+            isDefault: true,
+            copiedFromProfileId: oldProfile.id,
+          })
+          .returning();
+
+        if (profileEntries.length > 0) {
+          await context.db
+            .insert(PublicSchema.leagueScoringProfileEntries)
+            .values(
+              profileEntries.map((e) => ({
+                profileId: newProfile.id,
+                statDefinitionId: e.statDefinitionId,
+                multiplier: e.multiplier,
+                isEnabled: e.isEnabled,
+              })),
+            );
+        }
+      }
+
+      // 17. Freeze the old league
+      await context.db
+        .update(PublicSchema.leagues)
+        .set({ frozenAt: new Date() })
+        .where(eq(PublicSchema.leagues.id, leagueId));
+
+      LOGGER.info('Season renewal complete', {
+        oldLeagueId: leagueId,
+        newLeagueId: newLeague.id,
+        keepRosters,
+        userId,
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Pothos resolver return type mismatch
+      return newLeague as any;
+    },
+  }),
+);

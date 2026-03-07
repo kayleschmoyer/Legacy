@@ -662,6 +662,7 @@ export type League = {
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
+  frozenAt?: Maybe<Scalars['String']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
@@ -678,8 +679,10 @@ export type League = {
   playoffEnabled?: Maybe<Scalars['Boolean']['output']>;
   playoffFormat?: Maybe<Scalars['String']['output']>;
   playoffMultiWeek?: Maybe<Scalars['Boolean']['output']>;
+  previousLeagueId?: Maybe<Scalars['Int']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
+  seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
@@ -1040,6 +1043,7 @@ export type Mutation = {
   /** Remove a player from the current user's draft queue. */
   removeFromDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   renameTeam?: Maybe<Team>;
+  renewLeague?: Maybe<League>;
   /** Reorder the current user's draft queue. playerIds must contain the same players that are already queued — only the order changes. */
   reorderDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
@@ -1353,6 +1357,11 @@ export type MutationRenameTeamArgs = {
   leagueId: Scalars['Int']['input'];
   newName: Scalars['String']['input'];
   teamId: Scalars['Int']['input'];
+};
+
+export type MutationRenewLeagueArgs = {
+  keepRosters: Scalars['Boolean']['input'];
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationReorderDraftQueueArgs = {

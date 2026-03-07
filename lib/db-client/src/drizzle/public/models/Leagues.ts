@@ -91,6 +91,12 @@ export const leagues = pgTable(
     bannerUrl: text('banner_url'),
     primaryColor: varchar('primary_color', { length: 7 }),
     secondaryColor: varchar('secondary_color', { length: 7 }),
+    /** Points to the previous season's league — used to build the lineage chain */
+    previousLeagueId: integer('previous_league_id'),
+    /** Set when the league is retired at the end of a season and becomes read-only */
+    frozenAt: timestamp('frozen_at', { withTimezone: true }),
+    /** Monotonic season counter (1 = founding season, incremented on each renewal) */
+    seasonNumber: integer('season_number').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -106,6 +112,9 @@ export const leagues = pgTable(
         table.currentMatchup,
       ),
       currentWeekIdx: index('leagues_current_week_idx').on(table.currentWeek),
+      previousLeagueIdIdx: index('leagues_previous_league_id_idx').on(
+        table.previousLeagueId,
+      ),
     };
   },
 );

@@ -662,6 +662,7 @@ export type League = {
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
+  frozenAt?: Maybe<Scalars['String']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
@@ -678,8 +679,10 @@ export type League = {
   playoffEnabled?: Maybe<Scalars['Boolean']['output']>;
   playoffFormat?: Maybe<Scalars['String']['output']>;
   playoffMultiWeek?: Maybe<Scalars['Boolean']['output']>;
+  previousLeagueId?: Maybe<Scalars['Int']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
   scoringProfile?: Maybe<ScoringConfig>;
+  seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
@@ -1040,6 +1043,7 @@ export type Mutation = {
   /** Remove a player from the current user's draft queue. */
   removeFromDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   renameTeam?: Maybe<Team>;
+  renewLeague?: Maybe<League>;
   /** Reorder the current user's draft queue. playerIds must contain the same players that are already queued — only the order changes. */
   reorderDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
@@ -1353,6 +1357,11 @@ export type MutationRenameTeamArgs = {
   leagueId: Scalars['Int']['input'];
   newName: Scalars['String']['input'];
   teamId: Scalars['Int']['input'];
+};
+
+export type MutationRenewLeagueArgs = {
+  keepRosters: Scalars['Boolean']['input'];
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationReorderDraftQueueArgs = {
@@ -3345,6 +3354,9 @@ export type LeagueFragment = {
   bannerUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  previousLeagueId?: number | null;
+  frozenAt?: string | null;
+  seasonNumber?: number | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -3405,6 +3417,9 @@ export type GetLeagueByIdQuery = {
     bannerUrl?: string | null;
     primaryColor?: string | null;
     secondaryColor?: string | null;
+    previousLeagueId?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3453,6 +3468,9 @@ export type CreateLeagueAndTeamsMutation = {
       bannerUrl?: string | null;
       primaryColor?: string | null;
       secondaryColor?: string | null;
+      previousLeagueId?: number | null;
+      frozenAt?: string | null;
+      seasonNumber?: number | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -3498,6 +3516,9 @@ export type GetUserLeaguesQuery = {
     bannerUrl?: string | null;
     primaryColor?: string | null;
     secondaryColor?: string | null;
+    previousLeagueId?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3575,6 +3596,9 @@ export type StartDraftMutation = {
     bannerUrl?: string | null;
     primaryColor?: string | null;
     secondaryColor?: string | null;
+    previousLeagueId?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3755,6 +3779,9 @@ export type UpdateLeagueSettingsMutation = {
     bannerUrl?: string | null;
     primaryColor?: string | null;
     secondaryColor?: string | null;
+    previousLeagueId?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3804,6 +3831,56 @@ export type JoinPublicLeagueMutation = {
     message?: string | null;
     leagueId?: number | null;
     teamId?: number | null;
+  } | null;
+};
+
+export type RenewLeagueMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  keepRosters: Scalars['Boolean']['input'];
+}>;
+
+export type RenewLeagueMutation = {
+  __typename?: 'Mutation';
+  renewLeague?: {
+    __typename?: 'League';
+    id?: number | null;
+    name?: string | null;
+    owner?: number | null;
+    maxRosterSize?: number | null;
+    currentMatchup?: number | null;
+    currentWeekNumber?: number | null;
+    draftStatus?: string | null;
+    inviteCode?: string | null;
+    playerPool?: string | null;
+    weekAdvanceStatus?: string | null;
+    waiverType?: string | null;
+    waiverEnabled?: boolean | null;
+    faabBudgetDefault?: number | null;
+    spStartsPerMatchup?: number | null;
+    gamesPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
+    totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
+    lmNotes?: string | null;
+    isMockDraft?: boolean | null;
+    isPublic?: boolean | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    previousLeagueId?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
+    userMembership?: {
+      __typename?: 'LeagueMember';
+      leagueId?: number | null;
+      userId?: number | null;
+      teamId?: number | null;
+      permissionLevel?: string | null;
+    } | null;
   } | null;
 };
 
@@ -6874,6 +6951,9 @@ export const LeagueFragmentDoc = gql`
     bannerUrl
     primaryColor
     secondaryColor
+    previousLeagueId
+    frozenAt
+    seasonNumber
     userMembership {
       ...LeagueMember
     }
@@ -9951,6 +10031,58 @@ export type JoinPublicLeagueMutationResult =
 export type JoinPublicLeagueMutationOptions = BaseMutationOptions<
   JoinPublicLeagueMutation,
   JoinPublicLeagueMutationVariables
+>;
+export const RenewLeague = gql`
+  mutation RenewLeague($leagueId: Int!, $keepRosters: Boolean!) {
+    renewLeague(leagueId: $leagueId, keepRosters: $keepRosters) {
+      ...League
+    }
+  }
+  ${LeagueFragmentDoc}
+`;
+export type RenewLeagueMutationFn = MutationFunction<
+  RenewLeagueMutation,
+  RenewLeagueMutationVariables
+>;
+
+/**
+ * __useRenewLeagueMutation__
+ *
+ * To run a mutation, you first call `useRenewLeagueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRenewLeagueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [renewLeagueMutation, { data, loading, error }] = useRenewLeagueMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      keepRosters: // value for 'keepRosters'
+ *   },
+ * });
+ */
+export function useRenewLeagueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RenewLeagueMutation,
+    RenewLeagueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<RenewLeagueMutation, RenewLeagueMutationVariables>(
+    RenewLeague,
+    options,
+  );
+}
+export type RenewLeagueMutationHookResult = ReturnType<
+  typeof useRenewLeagueMutation
+>;
+export type RenewLeagueMutationResult =
+  Apollo.MutationResult<RenewLeagueMutation>;
+export type RenewLeagueMutationOptions = BaseMutationOptions<
+  RenewLeagueMutation,
+  RenewLeagueMutationVariables
 >;
 export const InitializeLiveDraft = gql`
   mutation InitializeLiveDraft(

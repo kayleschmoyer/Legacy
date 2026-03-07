@@ -31,6 +31,9 @@ interface LeagueState {
     bannerUrl?: string | null;
     primaryColor?: string | null;
     secondaryColor?: string | null;
+    previousLeagueId?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
   } | null;
   positions: LeaguePositionFragment[];
   teamMembers: TeamMemberFragment[];
