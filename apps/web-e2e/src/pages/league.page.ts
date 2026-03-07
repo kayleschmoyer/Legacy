@@ -26,6 +26,12 @@ export class LeaguePage {
 
   // League discovery
   readonly leaguesGrid: Locator;
+  readonly discoveryHeading: Locator;
+  readonly discoverySearch: Locator;
+  readonly discoveryResultsCount: Locator;
+  readonly discoveryRefreshButton: Locator;
+  readonly discoveryEmptyHeading: Locator;
+  readonly discoveryFooterCta: Locator;
 
   // Commissioner branding section
   readonly brandingHeading: Locator;
@@ -73,6 +79,19 @@ export class LeaguePage {
 
     // Discovery list
     this.leaguesGrid = page.getByTestId('leagues-grid');
+    this.discoveryHeading = page.getByRole('heading', {
+      name: /Browse Public Leagues/i,
+      level: 1,
+    });
+    this.discoverySearch = page.getByPlaceholder('Search leagues by name…');
+    this.discoveryResultsCount = page.getByText(/\d+ leagues? found/i);
+    this.discoveryRefreshButton = page.getByRole('button', {
+      name: /Refresh/i,
+    });
+    this.discoveryEmptyHeading = page.getByRole('heading', {
+      name: /No public leagues found/i,
+    });
+    this.discoveryFooterCta = page.getByText(/Can't find the right league\?/i);
 
     // Commissioner branding
     this.brandingHeading = page.getByRole('heading', {
@@ -165,5 +184,52 @@ export class LeaguePage {
     await this.inviteCodeInput.fill(inviteCode);
     await this.teamNameInput.fill(teamName);
     await this.joinButton.click();
+  }
+
+  // ── Discovery helpers ────────────────────────────────────────────
+
+  /** Assert the discovery page is loaded. */
+  async expectDiscoveryLoaded() {
+    await expect(this.discoveryHeading).toBeVisible({ timeout: 15000 });
+    await expect(this.discoverySearch).toBeVisible();
+  }
+
+  /** Click a draft-status filter button by label text. */
+  async clickDraftStatusFilter(label: string) {
+    await this.page.getByRole('button', { name: label, exact: true }).click();
+  }
+
+  /** Click a player-pool filter button by label text. */
+  async clickPlayerPoolFilter(label: string) {
+    await this.page.getByRole('button', { name: label, exact: true }).click();
+  }
+
+  /** Return the locator for a league card by its displayed name. */
+  leagueCard(name: string): Locator {
+    return this.page.locator('*').filter({ hasText: name }).first();
+  }
+
+  /** Click the "Join League →" button on a specific league card. */
+  async clickJoinLeague(leagueName: string) {
+    await this.page
+      .locator('*')
+      .filter({ hasText: leagueName })
+      .getByRole('button', { name: /Join League/i })
+      .first()
+      .click();
+  }
+
+  /** Fill the inline team name input and submit join on a specific league card. */
+  async fillAndSubmitDiscoveryJoin(leagueName: string, teamName: string) {
+    const card = this.page
+      .locator('*')
+      .filter({ hasText: leagueName })
+      .filter({ hasText: /Choose a team name/i })
+      .first();
+    await card.getByPlaceholder('e.g. Shortstop Stars').fill(teamName);
+    await card
+      .getByRole('button', { name: /Join League/i })
+      .first()
+      .click();
   }
 }

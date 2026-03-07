@@ -233,3 +233,84 @@ export function joinLeagueByCodeResponse(leagueId = 999, teamId = 42) {
     },
   };
 }
+
+// ── Public League Discovery mock factories ────────────────────────
+
+export interface MockPublicLeague {
+  __typename: 'PublicLeagueInfo';
+  id: number;
+  name: string;
+  owner: number;
+  maxRosterSize: number;
+  draftStatus: string;
+  playerPool: string;
+  isPublic: boolean;
+  totalSpots: number;
+  availableSpots: number;
+  isFull: boolean;
+  isAlreadyMember: boolean;
+}
+
+export function mockPublicLeague(
+  overrides: Partial<MockPublicLeague> = {},
+): MockPublicLeague {
+  return {
+    __typename: 'PublicLeagueInfo',
+    id: 1,
+    name: 'Public Test League',
+    owner: 1,
+    maxRosterSize: 25,
+    draftStatus: 'not-started',
+    playerPool: 'all',
+    isPublic: true,
+    totalSpots: 10,
+    availableSpots: 6,
+    isFull: false,
+    isAlreadyMember: false,
+    ...overrides,
+  };
+}
+
+/** Mock response for GetPublicLeagues query. */
+export function publicLeaguesResponse(leagues?: Partial<MockPublicLeague>[]) {
+  return {
+    data: {
+      publicLeagues: (leagues ?? [{}]).map((l) => mockPublicLeague(l)),
+    },
+  };
+}
+
+/** Mock response for GetPublicLeagues query — empty results. */
+export function publicLeaguesEmptyResponse() {
+  return { data: { publicLeagues: [] } };
+}
+
+/** Mock response for JoinPublicLeague mutation — successful join. */
+export function joinPublicLeagueResponse(leagueId = 1) {
+  return {
+    data: {
+      joinPublicLeague: {
+        __typename: 'JoinLeaguePayload' as const,
+        success: true,
+        message: 'Successfully joined the league!',
+        leagueId,
+        teamId: 42,
+      },
+    },
+  };
+}
+
+/** Mock response for JoinPublicLeague mutation — error. */
+export function joinPublicLeagueErrorResponse(message = 'Failed to join') {
+  return {
+    data: {
+      joinPublicLeague: {
+        __typename: 'JoinLeaguePayload' as const,
+        success: false,
+        message,
+        leagueId: null,
+        teamId: null,
+      },
+    },
+  };
+}
