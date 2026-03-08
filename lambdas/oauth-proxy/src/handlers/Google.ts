@@ -554,7 +554,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
         },
       };
 
-      completeDeviceFlow(state, deviceTokenResponse);
+      await completeDeviceFlow(state, deviceTokenResponse);
       LOGGER.info(`Device flow completed for state: ${state}`);
 
       // For device flow, show success page instead of returning JWT directly

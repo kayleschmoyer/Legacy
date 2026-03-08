@@ -92,6 +92,69 @@ resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_rds" {
   role       = aws_iam_role.oauth_proxy_lambda.name
 }
 
+# DynamoDB table for persisting OAuth device-flow codes
+resource "aws_dynamodb_table" "oauth_device_flows" {
+  name         = "${local.name_prefix}-oauth-device-flows"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "deviceCode"
+
+  attribute {
+    name = "deviceCode"
+    type = "S"
+  }
+
+  attribute {
+    name = "userCode"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "userCode-index"
+    hash_key        = "userCode"
+    projection_type = "KEYS_ONLY"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  tags = local.common_tags
+}
+
+# IAM policy granting the OAuth Lambda read/write access to the device-flow table
+resource "aws_iam_policy" "oauth_proxy_lambda_dynamodb" {
+  name        = "${local.name_prefix}-oauth-proxy-lambda-dynamodb"
+  description = "IAM policy for OAuth Lambda to access the device-flow DynamoDB table"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query"
+        ]
+        Resource = [
+          aws_dynamodb_table.oauth_device_flows.arn,
+          "${aws_dynamodb_table.oauth_device_flows.arn}/index/*"
+        ]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_dynamodb" {
+  policy_arn = aws_iam_policy.oauth_proxy_lambda_dynamodb.arn
+  role       = aws_iam_role.oauth_proxy_lambda.name
+}
+
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "oauth_proxy_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-oauth-proxy"
@@ -150,6 +213,9 @@ resource "aws_lambda_function" "oauth_proxy" {
 
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
+
+      # Device-flow DynamoDB table
+      DEVICE_FLOW_TABLE_NAME = aws_dynamodb_table.oauth_device_flows.name
     }
   }
 
@@ -158,6 +224,7 @@ resource "aws_lambda_function" "oauth_proxy" {
     aws_iam_role_policy_attachment.oauth_proxy_lambda_vpc,
     aws_iam_role_policy_attachment.oauth_proxy_lambda_secrets,
     aws_iam_role_policy_attachment.oauth_proxy_lambda_rds,
+    aws_iam_role_policy_attachment.oauth_proxy_lambda_dynamodb,
     aws_cloudwatch_log_group.oauth_proxy_lambda
   ]
 

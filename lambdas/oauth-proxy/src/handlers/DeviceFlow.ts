@@ -1,4 +1,12 @@
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
+import {
+  DeleteItemCommand,
+  DynamoDBClient,
+  GetItemCommand,
+  PutItemCommand,
+  QueryCommand,
+  UpdateItemCommand,
+} from '@aws-sdk/client-dynamodb';
 import { LOGGER } from '@legacy-sports/logging';
 import crypto from 'crypto';
 import { parseEventBody } from '../util/lambda';
@@ -10,22 +18,6 @@ interface User {
   accessLevel: string;
 }
 
-/**
- * DEVELOPMENT ONLY: In-memory storage for device authorization flows
- *
- * ⚠️ LIMITATION: This implementation uses in-memory storage which is NOT suitable for production.
- *
- * Issues in production:
- * - Lambda cold starts clear all stored flows
- * - Multiple Lambda instances don't share state
- * - No persistence across deployments
- *
- * Production solution:
- * - Migrate to DynamoDB with TTL for automatic expiration
- * - Or use ElastiCache Redis for shared state
- *
- * Current usage: Development/testing only
- */
 interface DeviceAuthFlow {
   deviceCode: string;
   userCode: string;
@@ -40,25 +32,6 @@ interface DeviceAuthFlow {
   };
 }
 
-// Simple in-memory storage (DEV ONLY - would use DynamoDB in production)
-const deviceFlows = new Map<string, DeviceAuthFlow>();
-const userCodeToDeviceCode = new Map<string, string>();
-
-// Clean up expired flows periodically
-setInterval(
-  () => {
-    const now = Date.now();
-    for (const [deviceCode, flow] of deviceFlows.entries()) {
-      if (now > flow.expiresAt) {
-        deviceFlows.delete(deviceCode);
-        userCodeToDeviceCode.delete(flow.userCode);
-        LOGGER.debug(`Cleaned up expired device flow: ${deviceCode}`);
-      }
-    }
-  },
-  5 * 60 * 1000,
-); // Clean up every 5 minutes
-
 interface DeviceAuthRequest {
   client_type: string;
   device_name?: string;
@@ -68,11 +41,220 @@ interface DeviceTokenRequest {
   device_code: string;
 }
 
-/**
- * Generate a user-friendly code (shorter, easier to type)
- */
+export interface TokenResponse {
+  jwt: string;
+  user: User;
+  refreshToken?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Storage backend: DynamoDB when DEVICE_FLOW_TABLE_NAME is set; otherwise
+// in-memory Maps (local dev only — not safe for production multi-instance use).
+// ---------------------------------------------------------------------------
+
+const TABLE_NAME = process.env.DEVICE_FLOW_TABLE_NAME;
+
+// Lazy-initialised DynamoDB client — only created when the table name is set
+let dynamoClient: DynamoDBClient | null = null;
+
+function getDynamoClient(): DynamoDBClient {
+  if (!dynamoClient) {
+    dynamoClient = new DynamoDBClient({
+      region: process.env.AWS_REGION ?? 'us-east-1',
+    });
+  }
+  return dynamoClient;
+}
+
+// ---------------------------------------------------------------------------
+// In-memory fallback (local dev)
+// ---------------------------------------------------------------------------
+
+const inMemoryFlows = new Map<string, DeviceAuthFlow>();
+const inMemoryUserCodeIndex = new Map<string, string>(); // userCode → deviceCode
+
+// Clean up expired in-memory flows periodically (dev only)
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [deviceCode, flow] of inMemoryFlows.entries()) {
+      if (now > flow.expiresAt) {
+        inMemoryFlows.delete(deviceCode);
+        inMemoryUserCodeIndex.delete(flow.userCode);
+        LOGGER.debug(`Cleaned up expired device flow: ${deviceCode}`);
+      }
+    }
+  },
+  5 * 60 * 1000,
+);
+
+// ---------------------------------------------------------------------------
+// DynamoDB storage operations
+// ---------------------------------------------------------------------------
+
+async function dynamoPutFlow(flow: DeviceAuthFlow): Promise<void> {
+  const client = getDynamoClient();
+  // TTL must be epoch seconds; expiresAt is epoch milliseconds
+  const ttlSeconds = Math.floor(flow.expiresAt / 1000);
+
+  await client.send(
+    new PutItemCommand({
+      TableName: TABLE_NAME,
+      Item: {
+        deviceCode: { S: flow.deviceCode },
+        userCode: { S: flow.userCode },
+        clientType: { S: flow.clientType },
+        deviceName: { S: flow.deviceName },
+        expiresAt: { N: String(flow.expiresAt) },
+        ttl: { N: String(ttlSeconds) },
+        completed: { BOOL: flow.completed },
+      },
+    }),
+  );
+}
+
+async function dynamoGetFlow(
+  deviceCode: string,
+): Promise<DeviceAuthFlow | null> {
+  const client = getDynamoClient();
+  const response = await client.send(
+    new GetItemCommand({
+      TableName: TABLE_NAME,
+      Key: { deviceCode: { S: deviceCode } },
+    }),
+  );
+
+  const item = response.Item;
+  if (!item) return null;
+
+  return {
+    deviceCode: item.deviceCode.S ?? '',
+    userCode: item.userCode.S ?? '',
+    clientType: item.clientType.S ?? '',
+    deviceName: item.deviceName.S ?? '',
+    expiresAt: Number(item.expiresAt.N),
+    completed: item.completed.BOOL ?? false,
+    tokenResponse: item.tokenResponseJson?.S
+      ? (JSON.parse(item.tokenResponseJson.S) as TokenResponse)
+      : undefined,
+  };
+}
+
+async function dynamoDeleteFlow(
+  deviceCode: string,
+  userCode: string,
+): Promise<void> {
+  const client = getDynamoClient();
+  await client.send(
+    new DeleteItemCommand({
+      TableName: TABLE_NAME,
+      Key: { deviceCode: { S: deviceCode } },
+    }),
+  );
+  LOGGER.debug('Deleted device flow from DynamoDB', {
+    deviceCodePrefix: deviceCode.slice(0, 6),
+    userCode,
+  });
+}
+
+async function dynamoGetDeviceCodeByUserCode(
+  userCode: string,
+): Promise<string | null> {
+  const client = getDynamoClient();
+  const response = await client.send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      IndexName: 'userCode-index',
+      KeyConditionExpression: 'userCode = :uc',
+      ExpressionAttributeValues: { ':uc': { S: userCode } },
+      ProjectionExpression: 'deviceCode',
+      Limit: 1,
+    }),
+  );
+
+  const item = response.Items?.[0];
+  return item?.deviceCode?.S ?? null;
+}
+
+async function dynamoCompleteFlow(
+  deviceCode: string,
+  tokenResponse: TokenResponse,
+): Promise<void> {
+  const client = getDynamoClient();
+  await client.send(
+    new UpdateItemCommand({
+      TableName: TABLE_NAME,
+      Key: { deviceCode: { S: deviceCode } },
+      UpdateExpression: 'SET completed = :t, tokenResponseJson = :tr',
+      ConditionExpression: 'completed = :f AND expiresAt > :now',
+      ExpressionAttributeValues: {
+        ':t': { BOOL: true },
+        ':f': { BOOL: false },
+        ':tr': { S: JSON.stringify(tokenResponse) },
+        ':now': { N: String(Date.now()) },
+      },
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Unified storage API (dispatches to DynamoDB or in-memory)
+// ---------------------------------------------------------------------------
+
+async function storeFlow(flow: DeviceAuthFlow): Promise<void> {
+  if (TABLE_NAME) {
+    await dynamoPutFlow(flow);
+  } else {
+    inMemoryFlows.set(flow.deviceCode, flow);
+    inMemoryUserCodeIndex.set(flow.userCode, flow.deviceCode);
+  }
+}
+
+async function getFlow(deviceCode: string): Promise<DeviceAuthFlow | null> {
+  if (TABLE_NAME) {
+    return dynamoGetFlow(deviceCode);
+  }
+  return inMemoryFlows.get(deviceCode) ?? null;
+}
+
+async function deleteFlow(deviceCode: string, userCode: string): Promise<void> {
+  if (TABLE_NAME) {
+    await dynamoDeleteFlow(deviceCode, userCode);
+  } else {
+    inMemoryFlows.delete(deviceCode);
+    inMemoryUserCodeIndex.delete(userCode);
+  }
+}
+
+async function resolveDeviceCodeFromUserCode(
+  userCode: string,
+): Promise<string | null> {
+  if (TABLE_NAME) {
+    return dynamoGetDeviceCodeByUserCode(userCode);
+  }
+  return inMemoryUserCodeIndex.get(userCode) ?? null;
+}
+
+async function markFlowComplete(
+  deviceCode: string,
+  tokenResponse: TokenResponse,
+): Promise<void> {
+  if (TABLE_NAME) {
+    await dynamoCompleteFlow(deviceCode, tokenResponse);
+  } else {
+    const flow = inMemoryFlows.get(deviceCode);
+    if (flow && !flow.completed && Date.now() <= flow.expiresAt) {
+      flow.completed = true;
+      flow.tokenResponse = tokenResponse;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Code generators
+// ---------------------------------------------------------------------------
+
 function generateUserCode(): string {
-  // Generate 6-character alphanumeric code (excluding confusing characters)
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let result = '';
   for (let i = 0; i < 6; i++) {
@@ -81,19 +263,20 @@ function generateUserCode(): string {
   return result;
 }
 
-/**
- * Generate a secure device code
- */
 function generateDeviceCode(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// ---------------------------------------------------------------------------
+// Route handlers
+// ---------------------------------------------------------------------------
+
 /**
  * Handle device authorization request (step 1 of device flow)
  */
-export const handleDeviceAuthorize = (
+export const handleDeviceAuthorize = async (
   event: APIGatewayEvent,
-): APIGatewayProxyResult => {
+): Promise<APIGatewayProxyResult> => {
   LOGGER.info('Device authorization request received');
 
   try {
@@ -109,11 +292,9 @@ export const handleDeviceAuthorize = (
       };
     }
 
-    // Generate codes
     const deviceCode = generateDeviceCode();
     const userCode = generateUserCode();
 
-    // Store the authorization flow
     const expiresIn = 10 * 60; // 10 minutes
     const flow: DeviceAuthFlow = {
       deviceCode,
@@ -124,10 +305,8 @@ export const handleDeviceAuthorize = (
       completed: false,
     };
 
-    deviceFlows.set(deviceCode, flow);
-    userCodeToDeviceCode.set(userCode, deviceCode);
+    await storeFlow(flow);
 
-    // Get the base URL for the verification URI
     const baseUrl = getBaseUrl(event);
     const verificationUri = `${baseUrl}/oauth/device/verify`;
 
@@ -147,7 +326,7 @@ export const handleDeviceAuthorize = (
         verification_uri: verificationUri,
         verification_uri_complete: `${verificationUri}?user_code=${userCode}`,
         expires_in: expiresIn,
-        interval: 5, // Poll every 5 seconds
+        interval: 5,
       }),
     };
   } catch (error) {
@@ -168,15 +347,15 @@ export const handleDeviceAuthorize = (
 /**
  * Handle device token request (polling endpoint)
  */
-export const handleDeviceToken = (
+export const handleDeviceToken = async (
   event: APIGatewayEvent,
-): APIGatewayProxyResult => {
+): Promise<APIGatewayProxyResult> => {
   LOGGER.debug('Device token request received');
 
   try {
     const body = parseEventBody<DeviceTokenRequest>(event);
 
-    const flow = deviceFlows.get(body.device_code);
+    const flow = await getFlow(body.device_code);
     if (!flow) {
       return {
         statusCode: 400,
@@ -187,10 +366,8 @@ export const handleDeviceToken = (
       };
     }
 
-    // Check if expired
     if (Date.now() > flow.expiresAt) {
-      deviceFlows.delete(body.device_code);
-      userCodeToDeviceCode.delete(flow.userCode);
+      await deleteFlow(body.device_code, flow.userCode);
       return {
         statusCode: 400,
         body: JSON.stringify({
@@ -200,10 +377,9 @@ export const handleDeviceToken = (
       };
     }
 
-    // Check if user has completed authorization
     if (!flow.completed || !flow.tokenResponse) {
       return {
-        statusCode: 428, // Custom status for "authorization_pending"
+        statusCode: 428,
         body: JSON.stringify({
           error: 'authorization_pending',
           message: 'User has not completed authorization yet',
@@ -211,14 +387,11 @@ export const handleDeviceToken = (
       };
     }
 
-    // Authorization complete - return tokens
     LOGGER.info(
       `Device token granted (user ID: ${flow.tokenResponse.user.id})`,
     );
 
-    // Clean up the flow
-    deviceFlows.delete(body.device_code);
-    userCodeToDeviceCode.delete(flow.userCode);
+    await deleteFlow(body.device_code, flow.userCode);
 
     return {
       statusCode: 200,
@@ -245,82 +418,81 @@ export const handleDeviceToken = (
 /**
  * Handle device verification page (web interface for user to complete flow)
  */
-export const handleDeviceVerify = (
+export const handleDeviceVerify = async (
   event: APIGatewayEvent,
-): APIGatewayProxyResult => {
+): Promise<APIGatewayProxyResult> => {
   LOGGER.info('Device verification page requested');
 
   const userCode = event.queryStringParameters?.user_code;
 
   if (!userCode) {
-    // Show page with user code input
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'text/html',
-      },
+      headers: { 'Content-Type': 'text/html' },
       body: getVerificationHtml(),
     };
   }
 
-  // Check if user code is valid
-  const deviceCode = userCodeToDeviceCode.get(userCode.toUpperCase());
-  if (!deviceCode) {
+  try {
+    const deviceCode = await resolveDeviceCodeFromUserCode(
+      userCode.toUpperCase(),
+    );
+    if (!deviceCode) {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'text/html' },
+        body: getVerificationHtml('Invalid or expired code. Please try again.'),
+      };
+    }
+
+    const flow = await getFlow(deviceCode);
+    if (!flow || Date.now() > flow.expiresAt) {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'text/html' },
+        body: getVerificationHtml(
+          'Code has expired. Please restart authentication in your CLI.',
+        ),
+      };
+    }
+
+    const baseUrl = getBaseUrl(event);
+    const googleAuthUrl = `${baseUrl}/oauth/google/authorize?state=${deviceCode}`;
+
+    return {
+      statusCode: 302,
+      headers: { Location: googleAuthUrl },
+      body: '',
+    };
+  } catch (error) {
+    LOGGER.error(
+      'Device verify error:',
+      error instanceof Error ? error.message : String(error),
+    );
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'text/html',
-      },
-      body: getVerificationHtml('Invalid or expired code. Please try again.'),
+      headers: { 'Content-Type': 'text/html' },
+      body: getVerificationHtml('An error occurred. Please try again.'),
     };
   }
-
-  const flow = deviceFlows.get(deviceCode);
-  if (!flow || Date.now() > flow.expiresAt) {
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'text/html',
-      },
-      body: getVerificationHtml(
-        'Code has expired. Please restart authentication in your CLI.',
-      ),
-    };
-  }
-
-  // Redirect to OAuth flow with state parameter to track the device flow
-  const baseUrl = getBaseUrl(event);
-  const state = deviceCode; // Use device code as state parameter
-  const googleAuthUrl = `${baseUrl}/oauth/google/authorize?state=${state}`;
-
-  return {
-    statusCode: 302,
-    headers: {
-      Location: googleAuthUrl,
-    },
-    body: '',
-  };
 };
 
 /**
- * Complete device flow after OAuth success
- * This should be called from the main OAuth handler when it detects a device flow state
+ * Complete device flow after OAuth success.
+ * Called from the Google OAuth callback handler when it detects a device flow state.
  */
-interface TokenResponse {
-  jwt: string;
-  user: User;
-  refreshToken?: string;
-}
-
-export const completeDeviceFlow = (
+export const completeDeviceFlow = async (
   deviceCode: string,
   tokenResponse: TokenResponse,
-): void => {
-  const flow = deviceFlows.get(deviceCode);
-  if (flow && !flow.completed && Date.now() <= flow.expiresAt) {
-    flow.completed = true;
-    flow.tokenResponse = tokenResponse;
+): Promise<void> => {
+  try {
+    await markFlowComplete(deviceCode, tokenResponse);
     LOGGER.info(`Device flow completed (user ID: ${tokenResponse.user.id})`);
+  } catch (error) {
+    LOGGER.error(
+      'Failed to complete device flow:',
+      error instanceof Error ? error.message : String(error),
+    );
   }
 };
 
