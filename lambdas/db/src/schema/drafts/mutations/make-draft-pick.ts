@@ -459,11 +459,12 @@ builder.mutationField('makeDraftPick', (t) =>
 
                 // 1. Fetch undrafted player IDs (deterministic id-ascending order)
                 const undraftedRows = await apTx.execute(
-                  sql`SELECT id FROM players
-                      WHERE id NOT IN (
-                        SELECT player_id FROM draft_picks WHERE draft_id = ${draftId}
+                  sql`SELECT id FROM players p
+                      WHERE NOT EXISTS (
+                        SELECT 1 FROM draft_picks dp
+                        WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
                       )
-                      ORDER BY id ASC`,
+                      ORDER BY p.id ASC`,
                 );
                 const undraftedIds = undraftedRows.rows.map(
                   (r) => r.id as number,

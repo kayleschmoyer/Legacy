@@ -209,21 +209,14 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         .where(eq(PublicSchema.leagues.id, draft.leagueId))
         .limit(1);
 
-      // Get already-drafted player IDs for this draft
-      const drafted = await context.db
-        .select({ playerId: PublicSchema.draftPicks.playerId })
-        .from(PublicSchema.draftPicks)
-        .where(eq(PublicSchema.draftPicks.draftId, draftId));
-
-      const draftedIds = drafted.map((d) => d.playerId);
-
       // ---- Build raw SQL conditions (all reference table alias 'p') ----
       const sqlConditions: ReturnType<typeof sql>[] = [];
 
-      // Exclude already-drafted players
-      if (draftedIds.length > 0) {
-        sqlConditions.push(sql`p.id NOT IN (${sql.raw(draftedIds.join(','))})`);
-      }
+      // Exclude already-drafted players via NOT EXISTS (avoids growing literal list)
+      sqlConditions.push(sql`NOT EXISTS (
+        SELECT 1 FROM public.draft_picks dp
+        WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
+      )`);
 
       // Apply player pool filter (AL/NL restriction)
       if (league && league.playerPool !== 'all') {
@@ -600,7 +593,6 @@ builder.queryField('getDraftRecommendations', (t) =>
         .from(PublicSchema.draftPicks)
         .where(eq(PublicSchema.draftPicks.draftId, draftId));
 
-      const draftedIds = allPicks.map((p) => p.playerId);
       const teamPickedIds = allPicks
         .filter((p) => p.teamId === teamId)
         .map((p) => p.playerId);
@@ -648,10 +640,10 @@ builder.queryField('getDraftRecommendations', (t) =>
         pitcher_era: string | null;
       };
 
-      const excludeClause =
-        draftedIds.length > 0
-          ? sql`AND p.id NOT IN (${sql.raw(draftedIds.join(','))})`
-          : sql``;
+      const excludeClause = sql`AND NOT EXISTS (
+        SELECT 1 FROM public.draft_picks dp
+        WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
+      )`;
 
       const statsResult = await context.db.execute(sql`
         SELECT
