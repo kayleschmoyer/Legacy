@@ -209,6 +209,8 @@ export function PlayerDetailModal({
     skip: !playerId || !open,
   });
 
+  const eligiblePositions = data?.player?.eligiblePositions ?? [];
+
   // ------ Transform to season rows ------
   const seasonRows = useMemo((): SeasonRow[] => {
     if (!data) return [];
@@ -523,6 +525,20 @@ export function PlayerDetailModal({
                 No season statistics found
               </Text>
             </YStack>
+          )}
+
+          {/* ── Eligible positions ── */}
+          {!loading && !error && eligiblePositions.length > 0 && (
+            <XStack gap="$2" alignItems="center" flexWrap="wrap">
+              <Text fontSize="$2" fontWeight="600" color={TEXT_MUTED}>
+                Eligible Positions
+              </Text>
+              <XStack gap="$1.5" flexWrap="wrap">
+                {eligiblePositions.map((pos) => (
+                  <PositionBadge key={pos} position={pos} />
+                ))}
+              </XStack>
+            </XStack>
           )}
 
           {/* ── Hero stats + position avatar ── */}

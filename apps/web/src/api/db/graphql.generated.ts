@@ -6134,6 +6134,10 @@ export type GetAllPlayerSeasonStatsQueryVariables = Exact<{
 
 export type GetAllPlayerSeasonStatsQuery = {
   __typename?: 'Query';
+  player?: {
+    __typename?: 'Player';
+    eligiblePositions?: Array<string> | null;
+  } | null;
   playerSeasonBatting?: Array<{
     __typename?: 'SeasonBatting';
     season?: number | null;
@@ -15090,6 +15094,9 @@ export type MarkAllNotificationsAsReadMutationOptions = BaseMutationOptions<
 >;
 export const GetAllPlayerSeasonStats = gql`
   query GetAllPlayerSeasonStats($playerId: Int!) {
+    player(id: $playerId) {
+      eligiblePositions
+    }
     playerSeasonBatting(playerId: $playerId) {
       season
       team

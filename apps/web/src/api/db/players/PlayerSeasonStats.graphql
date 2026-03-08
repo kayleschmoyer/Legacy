@@ -1,4 +1,7 @@
 query GetAllPlayerSeasonStats($playerId: Int!) {
+  player(id: $playerId) {
+    eligiblePositions
+  }
   playerSeasonBatting(playerId: $playerId) {
     season
     team

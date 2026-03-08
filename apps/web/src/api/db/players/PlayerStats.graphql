@@ -1,5 +1,8 @@
 # Query to fetch ALL season stats for a player (batting, pitching, fielding) across all seasons
 query GetAllPlayerSeasonStats($playerId: Int!) {
+  player(id: $playerId) {
+    eligiblePositions
+  }
   playerSeasonBatting(playerId: $playerId) {
     season
     team
