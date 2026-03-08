@@ -397,7 +397,9 @@ jobs:
           merge-multiple: true
 
       - name: "Merge Playwright Reports"
-        run: pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+        run: |
+          mkdir -p all-blob-reports
+          pnpm exec playwright merge-reports --reporter html ./all-blob-reports
 
       - name: "Generate App Token"
         id: app-token
