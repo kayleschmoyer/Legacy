@@ -22,6 +22,7 @@ import {
   mapFieldingStats,
   mapPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
+import { outsToBaseballIP } from '../../lib/scoring/ipUtils';
 
 export interface MatchupRosterComparisonProps {
   matchup: MatchupFragment;
@@ -1253,8 +1254,7 @@ export function MatchupRosterComparison({
           0,
         );
         if (totalOuts > 0) {
-          const totalIP = totalOuts / 3;
-          pitchingParts.push(`${totalIP.toFixed(1)}IP`);
+          pitchingParts.push(`${outsToBaseballIP(totalOuts)}IP`);
         }
       }
 

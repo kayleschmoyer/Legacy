@@ -15,6 +15,7 @@ import { X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import { WHITE, withAlpha } from '../../constants/colors';
 import { useGetAllPlayerSeasonStatsQuery } from '../../api/db/graphql.generated';
+import { ipToDecimalInnings } from '../../lib/scoring/ipUtils';
 
 export interface PlayerSeasonStatsModalProps {
   /** Player ID to load stats for */
@@ -209,7 +210,9 @@ export function PlayerSeasonStatsModal({
         };
         const ip = pitching.inningsPitched ?? 0;
         const er = pitching.earnedRuns ?? 0;
-        const era = ip > 0 ? ((er * 9) / ip).toFixed(2) : '0.00';
+        const decimalInnings = ipToDecimalInnings(ip);
+        const era =
+          decimalInnings > 0 ? ((er * 9) / decimalInnings).toFixed(2) : '0.00';
 
         season.pitching = {
           games: pitching.games ?? 0,

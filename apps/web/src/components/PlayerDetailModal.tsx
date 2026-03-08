@@ -6,6 +6,11 @@ import { StatCard, type StatRowData } from './StatCard';
 import { StatTable } from './StatTable';
 import { useGetAllPlayerSeasonStatsQuery } from '../api/db/graphql.generated';
 import {
+  ipToDecimalInnings,
+  ipToOuts,
+  outsToBaseballIP,
+} from '../lib/scoring/ipUtils';
+import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
@@ -273,7 +278,9 @@ export function PlayerDetailModal({
         const row: SeasonRow = seasons.get(p.season) || { season: p.season };
         const ip = p.inningsPitched ?? 0;
         const er = p.earnedRuns ?? 0;
-        const era = ip > 0 ? ((er * 9) / ip).toFixed(2) : '0.00';
+        const decimalInnings = ipToDecimalInnings(ip);
+        const era =
+          decimalInnings > 0 ? ((er * 9) / decimalInnings).toFixed(2) : '0.00';
 
         row.pitching = {
           games: p.games ?? 0,
@@ -345,7 +352,11 @@ export function PlayerDetailModal({
     const pGames = pitching.reduce((s, r) => s + (r.pitching?.games ?? 0), 0);
     const pWins = pitching.reduce((s, r) => s + (r.pitching?.wins ?? 0), 0);
     const pLosses = pitching.reduce((s, r) => s + (r.pitching?.losses ?? 0), 0);
-    const pIP = pitching.reduce((s, r) => s + (r.pitching?.ip ?? 0), 0);
+    const pTotalOuts = pitching.reduce(
+      (s, r) => s + ipToOuts(r.pitching?.ip ?? 0),
+      0,
+    );
+    const pIP = outsToBaseballIP(pTotalOuts);
     const pSO = pitching.reduce((s, r) => s + (r.pitching?.so ?? 0), 0);
 
     return {
