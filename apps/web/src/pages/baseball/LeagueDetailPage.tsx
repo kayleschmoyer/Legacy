@@ -28,6 +28,7 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Copy,
   Edit3,
@@ -66,6 +67,7 @@ import {
   GetMatchupPlayers,
   LeagueFragment,
   LeaguePositionFragment,
+  MatchupPlayerFragment,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
   useGetLeagueTeamsLazyQuery,
@@ -116,6 +118,7 @@ import { SeasonRenewalControl } from '../../features/commissioner/SeasonRenewalC
 import {
   useCurrentWeek,
   useMatchupById,
+  useMatchupRoster,
   useMatchupsForLeague,
 } from '../../hooks/useMatchup';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
@@ -383,6 +386,11 @@ export function LeagueDetailPage(): React.JSX.Element {
   // ── Viewing Other Team State ──
   /** When set, the roster tab shows another team's roster in read-only mode */
   const [viewingTeamId, setViewingTeamId] = useState<number | null>(null);
+
+  // ── Roster Tab Week Selector ──
+  /** When set, the roster tab shows the lineup context for a specific week.
+   *  null = current week (default, editable). Past weeks are read-only. */
+  const [rosterViewWeek, setRosterViewWeek] = useState<number | null>(null);
 
   const { user } = useAuth();
 
@@ -962,6 +970,94 @@ export function LeagueDetailPage(): React.JSX.Element {
       // We were viewing current, and it's still current, stay selected
     }
   }, [userCurrentMatchup?.id, selectedMatchupId]);
+
+  // ── Roster Tab Week Context ─────────────────────────────────────────────
+
+  // Weeks that the user's team has a matchup in (sorted ascending)
+  const availableRosterWeeks = useMemo(() => {
+    if (!reduxUserTeamId || !allLeagueMatchups.length) return [];
+    const weeks = allLeagueMatchups
+      .filter(
+        (m) => m.team1Id === reduxUserTeamId || m.team2Id === reduxUserTeamId,
+      )
+      .map((m) => m.weekNumber)
+      .filter((w): w is number => w != null);
+    return [...new Set(weeks)].sort((a, b) => a - b);
+  }, [reduxUserTeamId, allLeagueMatchups]);
+
+  // The effective week being shown in the roster tab
+  const rosterSelectedWeek = rosterViewWeek ?? currentWeek ?? null;
+
+  // The user's matchup for the selected roster week
+  const rosterWeekMatchup = useMemo(() => {
+    if (!rosterSelectedWeek || !reduxUserTeamId) return null;
+    return (
+      allLeagueMatchups.find(
+        (m) =>
+          m.weekNumber === rosterSelectedWeek &&
+          (m.team1Id === reduxUserTeamId || m.team2Id === reduxUserTeamId),
+      ) ?? null
+    );
+  }, [rosterSelectedWeek, reduxUserTeamId, allLeagueMatchups]);
+
+  // True when viewing a completed past week — show frozen historical lineup
+  const isViewingHistoricalRosterWeek =
+    rosterSelectedWeek !== null &&
+    currentWeek !== null &&
+    rosterSelectedWeek < currentWeek;
+
+  const rosterMatchupIdNum = isViewingHistoricalRosterWeek
+    ? rosterWeekMatchup?.id
+      ? parseInt(rosterWeekMatchup.id, 10)
+      : null
+    : null;
+
+  const { roster: historicalRoster, loading: historicalRosterLoading } =
+    useMatchupRoster(
+      rosterMatchupIdNum,
+      isViewingHistoricalRosterWeek ? (userTeamId ?? null) : null,
+    );
+
+  // Map MatchupPlayerFragment → TeamMemberFragment shape for LeagueRosterManagement
+  const historicalTeamMembers = useMemo((): TeamMemberFragment[] => {
+    if (!isViewingHistoricalRosterWeek || !historicalRoster.length) return [];
+    return historicalRoster
+      .filter((mp): mp is NonNullable<MatchupPlayerFragment> => mp !== null)
+      .map(
+        (mp): TeamMemberFragment => ({
+          id: mp.id != null ? parseInt(mp.id, 10) : null,
+          playerId: mp.playerId ?? 0,
+          positionId: mp.positionId ?? null,
+          teamId: mp.teamId ?? 0,
+          leagueId,
+          onTradeBlock: false,
+          player: mp.player
+            ? {
+                id: mp.player.id,
+                firstName: mp.player.firstName,
+                lastName: mp.player.lastName,
+                brefId: mp.player.brefId,
+                eligiblePositions: mp.player.eligiblePositions ?? [],
+                careerBatting: null,
+                seasonsPlayed: null,
+              }
+            : null,
+        }),
+      );
+  }, [isViewingHistoricalRosterWeek, historicalRoster, leagueId]);
+
+  // Opponent team info for the roster week selector banner
+  const rosterOpponentTeamId = useMemo(() => {
+    if (!rosterWeekMatchup || !reduxUserTeamId) return null;
+    return rosterWeekMatchup.team1Id === reduxUserTeamId
+      ? rosterWeekMatchup.team2Id
+      : rosterWeekMatchup.team1Id;
+  }, [rosterWeekMatchup, reduxUserTeamId]);
+
+  const rosterOpponentTeam = useMemo(
+    () => leagueTeams.find((t) => t.id === rosterOpponentTeamId) ?? null,
+    [leagueTeams, rosterOpponentTeamId],
+  );
 
   // ── Matchup Player Data (for scores, projections, and roster locking) ────
 
@@ -1986,6 +2082,23 @@ export function LeagueDetailPage(): React.JSX.Element {
   const renderRosterManagement = () => {
     const isViewingOther = viewingTeamId !== null && !isViewingOwnTeam;
 
+    // Week stepper helpers (only shown when viewing own roster)
+    const weekStepperIndex = availableRosterWeeks.indexOf(
+      rosterSelectedWeek ?? -1,
+    );
+    const canGoPrevWeek = weekStepperIndex > 0;
+    const canGoNextWeek = weekStepperIndex < availableRosterWeeks.length - 1;
+    const isOnCurrentWeek =
+      rosterViewWeek === null || rosterViewWeek === currentWeek;
+
+    const teamPlayersToShow = isViewingOther
+      ? viewingTeamMembers
+      : isViewingHistoricalRosterWeek && historicalTeamMembers.length > 0
+        ? historicalTeamMembers
+        : teamMembers;
+
+    const rosterIsReadOnly = isViewingOther || isViewingHistoricalRosterWeek;
+
     return (
       <YStack
         gap="$5"
@@ -2025,17 +2138,208 @@ export function LeagueDetailPage(): React.JSX.Element {
           </XStack>
         )}
 
-        {!isViewingOther && userTeamId && (
+        {/* ── Week Selector (own roster only, when league has multiple weeks) ── */}
+        {!isViewingOther && availableRosterWeeks.length > 1 && (
+          <XStack
+            alignItems="center"
+            justifyContent="space-between"
+            backgroundColor="$surfacePanel"
+            borderColor="$surfacePanelBorder"
+            borderWidth={1}
+            borderRadius="$5"
+            paddingHorizontal="$4"
+            paddingVertical="$3"
+            gap="$3"
+          >
+            {/* Prev week */}
+            <XStack
+              alignItems="center"
+              justifyContent="center"
+              width={32}
+              height={32}
+              borderRadius="$4"
+              cursor={canGoPrevWeek ? 'pointer' : 'default'}
+              opacity={canGoPrevWeek ? 1 : 0.3}
+              hoverStyle={
+                canGoPrevWeek
+                  ? { backgroundColor: '$surfaceInteractive' }
+                  : undefined
+              }
+              pressStyle={canGoPrevWeek ? { scale: 0.95 } : undefined}
+              onPress={() => {
+                if (canGoPrevWeek) {
+                  setRosterViewWeek(
+                    availableRosterWeeks[weekStepperIndex - 1] ?? null,
+                  );
+                }
+              }}
+              aria-label="Previous week"
+            >
+              <ChevronLeft size={18} color="$textMuted" />
+            </XStack>
+
+            {/* Week label + matchup context */}
+            <YStack flex={1} alignItems="center" gap="$0.5">
+              <XStack alignItems="center" gap="$2">
+                <Text fontSize="$4" fontWeight="700" color="$text">
+                  {rosterSelectedWeek != null
+                    ? `Week ${rosterSelectedWeek}`
+                    : 'Current Week'}
+                </Text>
+                {isOnCurrentWeek && (
+                  <XStack
+                    backgroundColor="$green3"
+                    borderColor="$green7"
+                    borderWidth={1}
+                    borderRadius="$10"
+                    paddingHorizontal="$2"
+                    paddingVertical="$0.5"
+                  >
+                    <Text fontSize="$2" color="$green11" fontWeight="600">
+                      Current
+                    </Text>
+                  </XStack>
+                )}
+                {isViewingHistoricalRosterWeek && (
+                  <XStack
+                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.15)}
+                    borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.4)}
+                    borderWidth={1}
+                    borderRadius="$10"
+                    paddingHorizontal="$2"
+                    paddingVertical="$0.5"
+                  >
+                    <Text
+                      fontSize="$2"
+                      color={BRAND_GOLD_LIGHT}
+                      fontWeight="600"
+                    >
+                      Historical
+                    </Text>
+                  </XStack>
+                )}
+              </XStack>
+              {rosterWeekMatchup && rosterOpponentTeam && (
+                <Text fontSize="$3" color="$textMuted">
+                  vs {rosterOpponentTeam.name}
+                </Text>
+              )}
+              {rosterWeekMatchup && !rosterOpponentTeam && (
+                <Text fontSize="$3" color="$textMuted">
+                  Matchup week
+                </Text>
+              )}
+            </YStack>
+
+            {/* Reset to current week */}
+            {!isOnCurrentWeek && (
+              <XStack
+                alignItems="center"
+                gap="$1"
+                paddingHorizontal="$2"
+                paddingVertical="$1"
+                borderRadius="$4"
+                backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.15)}
+                borderWidth={1}
+                borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.4)}
+                cursor="pointer"
+                hoverStyle={{
+                  backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.22),
+                }}
+                pressStyle={{ scale: 0.97 }}
+                onPress={() => setRosterViewWeek(null)}
+                aria-label="Back to current week"
+              >
+                <ArrowLeftRight size={12} color={BRAND_GOLD_LIGHT} />
+                <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
+                  Current
+                </Text>
+              </XStack>
+            )}
+
+            {/* Next week */}
+            <XStack
+              alignItems="center"
+              justifyContent="center"
+              width={32}
+              height={32}
+              borderRadius="$4"
+              cursor={canGoNextWeek ? 'pointer' : 'default'}
+              opacity={canGoNextWeek ? 1 : 0.3}
+              hoverStyle={
+                canGoNextWeek
+                  ? { backgroundColor: '$surfaceInteractive' }
+                  : undefined
+              }
+              pressStyle={canGoNextWeek ? { scale: 0.95 } : undefined}
+              onPress={() => {
+                if (canGoNextWeek) {
+                  setRosterViewWeek(
+                    availableRosterWeeks[weekStepperIndex + 1] ?? null,
+                  );
+                }
+              }}
+              aria-label="Next week"
+            >
+              <ChevronRight size={18} color="$textMuted" />
+            </XStack>
+          </XStack>
+        )}
+
+        {/* Historical mode info banner */}
+        {!isViewingOther && isViewingHistoricalRosterWeek && (
+          <XStack
+            alignItems="center"
+            gap="$2"
+            paddingVertical="$2"
+            paddingHorizontal="$3"
+            backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.08)}
+            borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)}
+            borderWidth={1}
+            borderRadius="$4"
+          >
+            <Info size={14} color="$textMuted" />
+            <Text fontSize="$2" color="$textMuted">
+              Showing the frozen lineup used for Week {rosterSelectedWeek}.
+              Switch to the current week to edit your roster.
+            </Text>
+          </XStack>
+        )}
+
+        {/* Future week info banner */}
+        {!isViewingOther &&
+          !isViewingHistoricalRosterWeek &&
+          rosterViewWeek !== null &&
+          rosterViewWeek !== currentWeek && (
+            <XStack
+              alignItems="center"
+              gap="$2"
+              paddingVertical="$2"
+              paddingHorizontal="$3"
+              backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.08)}
+              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)}
+              borderWidth={1}
+              borderRadius="$4"
+            >
+              <Info size={14} color="$textMuted" />
+              <Text fontSize="$2" color="$textMuted">
+                Your current lineup will be used for Week {rosterViewWeek}. Any
+                changes you make here apply to all future matchups.
+              </Text>
+            </XStack>
+          )}
+
+        {!isViewingOther && userTeamId && isOnCurrentWeek && (
           <PendingWaiverClaims teamId={userTeamId} />
         )}
 
-        {!isViewingOther && userTeamId && (
+        {!isViewingOther && userTeamId && isOnCurrentWeek && (
           <PendingTradeOffers teamId={userTeamId} leagueId={leagueId} />
         )}
 
         <LeagueRosterManagement
           positions={positions}
-          teamPlayers={isViewingOther ? viewingTeamMembers : teamMembers}
+          teamPlayers={teamPlayersToShow}
           onPlayerAssign={(player, position) =>
             void handlePlayerAssign(player, position)
           }
@@ -2046,13 +2350,25 @@ export function LeagueDetailPage(): React.JSX.Element {
           loading={
             isViewingOther
               ? viewingTeamMembersLoading
-              : positionsLoading || teamMembersLoading || userTeamLoading
+              : isViewingHistoricalRosterWeek
+                ? historicalRosterLoading
+                : positionsLoading || teamMembersLoading || userTeamLoading
           }
-          playerMatchupData={playerMatchupDataMap}
-          readOnly={isViewingOther}
+          playerMatchupData={
+            isViewingHistoricalRosterWeek ? undefined : playerMatchupDataMap
+          }
+          readOnly={rosterIsReadOnly}
           teamName={isViewingOther ? viewingTeamName : undefined}
-          minCareerGames={league.minCareerGames ?? 50}
-          minCareerSeasons={league.minCareerSeasons ?? 3}
+          minCareerGames={
+            isViewingHistoricalRosterWeek
+              ? undefined
+              : (league.minCareerGames ?? 50)
+          }
+          minCareerSeasons={
+            isViewingHistoricalRosterWeek
+              ? undefined
+              : (league.minCareerSeasons ?? 3)
+          }
         />
       </YStack>
     );
