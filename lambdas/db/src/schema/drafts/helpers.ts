@@ -98,36 +98,29 @@ export async function getUnfilledPositionTypes(
     return [...new Set(leaguePositions.map((lp) => lp.positionType))];
   }
 
-  // 3. Career fielding data for already-drafted players
-  const fieldingRows = await tx
+  // 3. Position eligibility for already-drafted players from the mat view
+  const eligiblePositionRows = await tx
     .select({
-      playerId: PublicSchema.careerFielding.playerId,
-      positionsPlayed: PublicSchema.careerFielding.positionsPlayed,
+      playerId: PublicSchema.playerEligiblePositions.playerId,
+      position: PublicSchema.playerEligiblePositions.position,
     })
-    .from(PublicSchema.careerFielding)
-    .where(inArray(PublicSchema.careerFielding.playerId, teamPlayerIds));
+    .from(PublicSchema.playerEligiblePositions)
+    .where(
+      inArray(PublicSchema.playerEligiblePositions.playerId, teamPlayerIds),
+    );
 
-  // Build map: playerId â†’ set of slot types the player can fill
+  // Build map: playerId → set of slot types the player can fill
   const playerSlotMap = new Map<number, Set<string>>();
-  for (const row of fieldingRows) {
-    if (!row.playerId) continue;
-    const positionsPlayed = row.positionsPlayed as Record<
-      string,
-      unknown
-    > | null;
-    const playerStatPositions = positionsPlayed
-      ? Object.keys(positionsPlayed)
-      : [];
-
-    const coverableSlots = new Set<string>();
+  for (const row of eligiblePositionRows) {
+    const existing = playerSlotMap.get(row.playerId) ?? new Set<string>();
     for (const [slotType, allowedStatPositions] of Object.entries(
       ALLOWED_POSITIONS,
     )) {
-      if (allowedStatPositions.some((sp) => playerStatPositions.includes(sp))) {
-        coverableSlots.add(slotType);
+      if (allowedStatPositions.includes(row.position)) {
+        existing.add(slotType);
       }
     }
-    playerSlotMap.set(row.playerId, coverableSlots);
+    playerSlotMap.set(row.playerId, existing);
   }
 
   // 4. Greedily assign players to slots (most-specific slots first)

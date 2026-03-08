@@ -530,19 +530,9 @@ async function buildPlayerPool(
 }
 
 /**
- * HEAVILY OPTIMIZED: Smart player assignment using positionsPlayed JSONB data
- *
- * Performance Improvements:
- * - Single database query vs 3 separate queries (3x faster DB access)
- * - Uses career_fielding.positions_played JSONB field (same as GraphQL API)
- * - Smart position scoring based on actual games played at each position
- * - Enhanced fallback logic for players without complete stats
- * - Batched database operations and transaction management
- *
- * Quality Improvements:
- * - Players assigned to positions where they have most experience
- * - Controlled randomness maintains draft fairness while optimizing fit
- * - Better handling of multi-position players
+ * Assigns players to roster slots randomly while respecting position eligibility.
+ * Uses the player_eligible_positions materialized view as the single source of truth
+ * for which positions a player qualifies for.
  */
 async function randomlyAssignPlayers(leagueId: number): Promise<void> {
   await runWithPublicClient(getDbOptions(), async (db) => {

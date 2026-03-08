@@ -24,7 +24,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { shuffleArray } from '@legacy-sports/utils';
 import { getDbOptions } from '@legacy-sports/utils/node';
-import { and, count, eq, lte, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, lte, sql } from 'drizzle-orm';
 
 import {
   ALLOWED_POSITIONS_FOR_AUTO_PICK,
@@ -343,7 +343,6 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               const statsRows = await context.db.execute(
                 sql`SELECT
                   p.id AS player_id,
-                  cf.positions_played,
                   (
                     CASE WHEN COALESCE(cb.g, 0) > 0 THEN
                       (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
@@ -374,6 +373,28 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 ORDER BY projected_fpg DESC`,
               );
 
+              // Fetch position eligibility from the mat view (same source of truth as the UI)
+              const positionRows = await context.db
+                .select({
+                  playerId: PublicSchema.playerEligiblePositions.playerId,
+                  position: PublicSchema.playerEligiblePositions.position,
+                })
+                .from(PublicSchema.playerEligiblePositions)
+                .where(
+                  inArray(
+                    PublicSchema.playerEligiblePositions.playerId,
+                    eligibleIds,
+                  ),
+                );
+
+              const eligiblePositionsByPlayer = new Map<number, string[]>();
+              for (const row of positionRows) {
+                const positions =
+                  eligiblePositionsByPlayer.get(row.playerId) ?? [];
+                positions.push(row.position);
+                eligiblePositionsByPlayer.set(row.playerId, positions);
+              }
+
               // Build player info map: id → { fpg, positions } (passed into tx via closure)
               const playerDraftInfo = new Map<
                 number,
@@ -383,15 +404,9 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               const rankedEligibleIds: number[] = [];
               for (const row of statsRows.rows) {
                 const playerId = row.player_id as number;
-                const positionsPlayed = row.positions_played as Record<
-                  string,
-                  unknown
-                > | null;
                 playerDraftInfo.set(playerId, {
                   fpg: Number(row.projected_fpg) || 0,
-                  positions: positionsPlayed
-                    ? Object.keys(positionsPlayed)
-                    : [],
+                  positions: eligiblePositionsByPlayer.get(playerId) ?? [],
                 });
                 rankedEligibleIds.push(playerId);
               }
