@@ -226,6 +226,26 @@ export async function refreshPlayerEligiblePositions(
   );
 }
 
+/**
+ * Refresh the player_scoring_cache table for a given league (or the default
+ * NULL baseline).
+ *
+ * Pass leagueId = null  → recompute default rows (used after career stat refresh)
+ * Pass leagueId = X     → recompute only rows for league X (used after scoring
+ *                         profile update)
+ *
+ * Calls the DB-side refresh_player_scoring_cache() PL/pgSQL function which
+ * does a DELETE + INSERT from compute_career_scores() internally.
+ */
+export async function refreshPlayerScoringCache(
+  db: PublicDb,
+  leagueId: number | null = null,
+): Promise<void> {
+  await db.execute(
+    sql`SELECT public.refresh_player_scoring_cache(${leagueId})`,
+  );
+}
+
 export async function bulkCreatePlayers(
   db: PublicDb,
   players: CreatePlayerInput[],

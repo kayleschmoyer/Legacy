@@ -341,8 +341,12 @@ export class PlayerService {
   }
 
   /**
-   * Internal: query players with a lateral join to the compute_career_scores
-   * SQL function, enabling ORDER BY on any scoring column.
+   * Internal: query players joined against the player_scoring_cache table,
+   * enabling ORDER BY on any scoring column without invoking the expensive
+   * compute_career_scores() function at query time (LS-696).
+   *
+   * Falls back to the default (league_id = NULL) cache rows for leagues that
+   * have not had custom scoring configured.
    */
   private async getPlayersWithScoringSort(
     queryOptions: PlayerQueryOptions,
@@ -379,16 +383,18 @@ export class PlayerService {
         const careerStatJoin = isCareerStatSort
           ? sql`LEFT JOIN public.career_batting cb ON p.id = cb.player_id`
           : sql``;
+        // ORDER BY references SELECT aliases defined in the scoringQuery below,
+        // which COALESCE league-specific and default cache rows.
         const orderByClause =
           orderByKey === 'hitterScore'
-            ? sql`COALESCE(cs.batting_score + cs.fielding_score, 0) ${sortDir}`
+            ? sql`hitter_score ${sortDir}`
             : orderByKey === 'hitterAvgPointsPerGame'
-              ? sql`COALESCE(CASE WHEN cs.career_games > 0 THEN (cs.batting_score + cs.fielding_score) / cs.career_games ELSE 0 END, 0) ${sortDir}`
+              ? sql`hitter_avg_ppg ${sortDir}`
               : orderByKey === 'pitchingAvgPointsPerGame'
-                ? sql`COALESCE(CASE WHEN cs.career_games > 0 THEN cs.pitching_score / cs.career_games ELSE 0 END, 0) ${sortDir}`
+                ? sql`pitching_avg_ppg ${sortDir}`
                 : isCareerStatSort
                   ? sql`cb.${sql.raw(careerBattingColumnMap[orderByKey])} ${sortDir} NULLS LAST`
-                  : sql`COALESCE(cs.${sql.raw(scoringColumnMap[orderByKey] || 'avg_ppg')}, 0) ${sortDir}`;
+                  : sql`${sql.raw(scoringColumnMap[orderByKey] || 'avg_ppg')} ${sortDir}`;
 
         // Build WHERE conditions using raw SQL (must reference alias "p",
         // not the Drizzle column refs which would emit "players"."col").
@@ -480,24 +486,42 @@ export class PlayerService {
           ? sql`OFFSET ${sql.raw(String(queryOptions.offset))}`
           : sql``;
 
+        // Join against player_scoring_cache (LS-696):
+        //   cs_league — league-specific pre-computed scores (matched by league_id)
+        //   cs_default — default (NULL league_id) pre-computed scores as fallback
+        // COALESCE prefers league-specific; falls back to default when no custom
+        // scoring profile exists for this league.
         const scoringQuery = sql`
           SELECT
             p.id, p.first_name, p.last_name, p.bref_id, p.stats_last_fetched_at,
             p.all_star_selections, p.gold_gloves, p.silver_sluggers,
             p.mvp_awards, p.cy_young_awards, p.world_series_rings,
             p.hall_of_fame, p.rookie_of_the_year, p.total_games,
-            COALESCE(cs.batting_score, 0) AS batting_score,
-            COALESCE(cs.pitching_score, 0) AS pitching_score,
-            COALESCE(cs.fielding_score, 0) AS fielding_score,
-            COALESCE(cs.batting_score, 0) + COALESCE(cs.fielding_score, 0) AS hitter_score,
-            COALESCE(cs.total_score, 0) AS total_score,
-            COALESCE(cs.career_games, 0) AS career_games,
-            COALESCE(cs.avg_ppg, 0) AS avg_ppg,
-            CASE WHEN cs.career_games > 0 THEN (cs.batting_score + cs.fielding_score) / cs.career_games ELSE 0 END AS hitter_avg_ppg,
-            CASE WHEN cs.career_games > 0 THEN cs.pitching_score / cs.career_games ELSE 0 END AS pitching_avg_ppg
+            COALESCE(cs_league.batting_score, cs_default.batting_score, 0) AS batting_score,
+            COALESCE(cs_league.pitching_score, cs_default.pitching_score, 0) AS pitching_score,
+            COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0) AS fielding_score,
+            COALESCE(cs_league.batting_score, cs_default.batting_score, 0) + COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0) AS hitter_score,
+            COALESCE(cs_league.total_score, cs_default.total_score, 0) AS total_score,
+            COALESCE(cs_league.career_games, cs_default.career_games, 0) AS career_games,
+            COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, 0) AS avg_ppg,
+            CASE
+              WHEN COALESCE(cs_league.career_games, cs_default.career_games, 0) > 0
+              THEN (COALESCE(cs_league.batting_score, cs_default.batting_score, 0)
+                  + COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0))
+                   / COALESCE(cs_league.career_games, cs_default.career_games, 0)
+              ELSE 0
+            END AS hitter_avg_ppg,
+            CASE
+              WHEN COALESCE(cs_league.career_games, cs_default.career_games, 0) > 0
+              THEN COALESCE(cs_league.pitching_score, cs_default.pitching_score, 0)
+                   / COALESCE(cs_league.career_games, cs_default.career_games, 0)
+              ELSE 0
+            END AS pitching_avg_ppg
           FROM public.players p
-          LEFT JOIN public.compute_career_scores(${leagueIdParam}) cs
-            ON p.id = cs.player_id
+          LEFT JOIN public.player_scoring_cache cs_league
+            ON cs_league.player_id = p.id AND cs_league.league_id = ${leagueIdParam}
+          LEFT JOIN public.player_scoring_cache cs_default
+            ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
           ${careerStatJoin}
           ${whereClause}
           ORDER BY ${orderByClause}

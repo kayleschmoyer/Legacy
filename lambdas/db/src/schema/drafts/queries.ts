@@ -285,20 +285,37 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
 
       // ---- Determine ORDER BY strategy ----
       // Scoring column expressions reference the 'cs' alias from compute_career_scores
+      // Scoring ORDER BY expressions — reference SELECT aliases defined below (LS-696).
+      // cs_league = league-specific cache; cs_default = default (NULL) cache fallback.
       const scoringColMap: Record<string, string> = {
         hitterAvgPointsPerGame:
-          'CASE WHEN cs.career_games > 0 THEN (cs.batting_score + cs.fielding_score) / cs.career_games ELSE 0 END',
+          'CASE WHEN COALESCE(cs_league.career_games, cs_default.career_games, 0) > 0' +
+          ' THEN (COALESCE(cs_league.batting_score, cs_default.batting_score, 0)' +
+          '      + COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0))' +
+          '     / COALESCE(cs_league.career_games, cs_default.career_games, 0)' +
+          ' ELSE 0 END',
         pitchingAvgPointsPerGame:
-          'CASE WHEN cs.career_games > 0 THEN cs.pitching_score / cs.career_games ELSE 0 END',
+          'CASE WHEN COALESCE(cs_league.career_games, cs_default.career_games, 0) > 0' +
+          ' THEN COALESCE(cs_league.pitching_score, cs_default.pitching_score, 0)' +
+          '     / COALESCE(cs_league.career_games, cs_default.career_games, 0)' +
+          ' ELSE 0 END',
         hitterScore:
-          'COALESCE(cs.batting_score, 0) + COALESCE(cs.fielding_score, 0)',
-        pitchingScore: 'COALESCE(cs.pitching_score, 0)',
-        battingScore: 'COALESCE(cs.batting_score, 0)',
-        fieldingScore: 'COALESCE(cs.fielding_score, 0)',
-        totalScore: 'COALESCE(cs.total_score, 0)',
-        avgPointsPerGame: 'COALESCE(cs.avg_ppg, 0)',
+          'COALESCE(cs_league.batting_score, cs_default.batting_score, 0)' +
+          ' + COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0)',
+        pitchingScore:
+          'COALESCE(cs_league.pitching_score, cs_default.pitching_score, 0)',
+        battingScore:
+          'COALESCE(cs_league.batting_score, cs_default.batting_score, 0)',
+        fieldingScore:
+          'COALESCE(cs_league.fielding_score, cs_default.fielding_score, 0)',
+        totalScore:
+          'COALESCE(cs_league.total_score, cs_default.total_score, 0)',
+        avgPointsPerGame: 'COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, 0)',
       };
 
+      // Base SELECT joined against player_scoring_cache (LS-696).
+      // cs_league matches league-specific rows; cs_default is the NULL-league fallback
+      // for leagues without a custom scoring profile.
       const basePlayerSelect = sql`
         SELECT
           p.id, p.first_name, p.last_name, p.bref_id,
@@ -306,6 +323,20 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           p.silver_sluggers, p.mvp_awards, p.cy_young_awards,
           p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year
         FROM public.players p
+      `;
+
+      // Scoring-joined SELECT used for all scoring-based sorts.
+      const basePlayerSelectWithScoring = sql`
+        SELECT
+          p.id, p.first_name, p.last_name, p.bref_id,
+          p.stats_last_fetched_at, p.all_star_selections, p.gold_gloves,
+          p.silver_sluggers, p.mvp_awards, p.cy_young_awards,
+          p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year
+        FROM public.players p
+        LEFT JOIN public.player_scoring_cache cs_league
+          ON cs_league.player_id = p.id AND cs_league.league_id = ${draft.leagueId}
+        LEFT JOIN public.player_scoring_cache cs_default
+          ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
       `;
 
       type RawPlayerRow = {
@@ -369,13 +400,12 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         return (result.rows as unknown as RawPlayerRow[]).map(mapRow);
       }
 
-      // Default and remaining scoring sorts: join compute_career_scores
+      // Scoring sorts: join player_scoring_cache (LS-696 — replaces compute_career_scores)
       const scoringCol = sql.raw(
         scoringColMap[orderByKey] ?? scoringColMap['hitterAvgPointsPerGame'],
       );
       const rawQuery = sql`
-        ${basePlayerSelect}
-        LEFT JOIN public.compute_career_scores(${draft.leagueId}) cs ON p.id = cs.player_id
+        ${basePlayerSelectWithScoring}
         ${whereClause}
         ORDER BY COALESCE(${scoringCol}, 0) DESC
         LIMIT ${limitVal} OFFSET ${offsetVal}

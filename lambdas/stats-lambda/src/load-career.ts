@@ -14,6 +14,7 @@ import {
   PublicDb,
   refreshCareerStats,
   refreshPlayerEligiblePositions,
+  refreshPlayerScoringCache,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 
@@ -162,6 +163,24 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         );
         captureError(refreshError as Error, {
           tags: { operation: 'refresh_player_eligible_positions' },
+        });
+      }
+
+      // Refresh default (NULL league) scoring cache so player browse / draft
+      // pool picks up updated career stat totals without calling the expensive
+      // compute_career_scores() function at query time (LS-696).
+      try {
+        addBreadcrumb('Refreshing player_scoring_cache (default scoring)');
+        await refreshPlayerScoringCache(db, null);
+        LOGGER.debug('player_scoring_cache (default) refreshed');
+      } catch (refreshError) {
+        // Non-fatal: stale cached scores are preferable to losing the batch result.
+        LOGGER.error(
+          'Failed to refresh player_scoring_cache:',
+          refreshError as Error,
+        );
+        captureError(refreshError as Error, {
+          tags: { operation: 'refresh_player_scoring_cache' },
         });
       }
     }

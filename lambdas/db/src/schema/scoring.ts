@@ -3,6 +3,7 @@ import {
   createDatabaseService,
   PublicDb,
   PublicSchema,
+  refreshPlayerScoringCache,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
@@ -506,6 +507,18 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
         })),
         context.user.id,
       );
+
+      // Invalidate the player scoring cache for this league so the next
+      // player browse / draft pool request sees updated scores (LS-696).
+      await refreshPlayerScoringCache(
+        context.db as unknown as PublicDb,
+        args.leagueId,
+      ).catch((err: unknown) => {
+        LOGGER.warn(
+          'Failed to refresh player scoring cache after scoring update',
+          { err },
+        );
+      });
 
       const config = await loadLeagueScoringConfig(args.leagueId);
 
