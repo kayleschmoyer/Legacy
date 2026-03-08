@@ -80,163 +80,54 @@ interface PlayerWithPositions {
 }
 
 /**
- * OPTIMIZED: Batch load player positions using career_fielding positionsPlayed JSONB data
+ * Load player position eligibility from the player_eligible_positions materialized view.
  *
- * ARCHITECTURE: Uses the same positionsPlayed data structure as the GraphQL API but
- * accesses it directly from the database for maximum performance:
- *
- * ✅ Uses career_fielding.positions_played JSONB field (same as GraphQL positionsPlayed resolver)
- * ✅ Same ALLOWED_POSITIONS mapping (verified by test-position-consistency.ts)
- * ✅ Enhanced position eligibility logic with games/gamesStarted thresholds
- * ✅ Single database query instead of multiple views for better Lambda performance
- *
- * Performance improvements:
- * - Single query vs 3 separate queries (3x faster database access)
- * - JSONB position data includes games played for smarter eligibility decisions
- * - Direct database access eliminates GraphQL resolution overhead
+ * This is the single source of truth for position eligibility — the same view consumed
+ * by the GraphQL API and the UI. Using it here ensures the draft-processor and the
+ * roster management UI always agree on which positions a player qualifies for.
  */
 async function loadAllPlayersWithPositions(
   db: PublicDb,
   playerIds: number[],
 ): Promise<Map<number, PlayerWithPositions>> {
   const startTime = Date.now();
-  addBreadcrumb('Loading optimized player positions and stats', {
-    playerCount: playerIds.length,
-  });
+  addBreadcrumb(
+    'Loading player positions from player_eligible_positions view',
+    {
+      playerCount: playerIds.length,
+    },
+  );
 
-  // Single optimized query: Get career fielding data with positions_played JSONB
-  // and career pitching data in one go using LEFT JOINs
-  const playerData = await db
+  const rows = await db
     .select({
-      playerId: PublicSchema.careerFielding.playerId,
-      positionsPlayed: PublicSchema.careerFielding.positionsPlayed,
-      fieldingGames: PublicSchema.careerFielding.g,
-      pitchingGames: PublicSchema.careerPitching.g,
-      pitchingGamesStarted: PublicSchema.careerPitching.gs,
+      playerId: PublicSchema.playerEligiblePositions.playerId,
+      position: PublicSchema.playerEligiblePositions.position,
     })
-    .from(PublicSchema.careerFielding)
-    .leftJoin(
-      PublicSchema.careerPitching,
-      eq(
-        PublicSchema.careerFielding.playerId,
-        PublicSchema.careerPitching.playerId,
-      ),
-    )
-    .where(inArray(PublicSchema.careerFielding.playerId, playerIds));
+    .from(PublicSchema.playerEligiblePositions)
+    .where(inArray(PublicSchema.playerEligiblePositions.playerId, playerIds));
 
-  const queryTime = Date.now() - startTime;
-  addBreadcrumb('Database query completed', {
-    queryTimeMs: queryTime,
-    recordsFound: playerData.length,
-  });
+  // Group positions by player
+  const positionsByPlayer = new Map<number, string[]>();
+  for (const row of rows) {
+    const positions = positionsByPlayer.get(row.playerId) ?? [];
+    positions.push(row.position);
+    positionsByPlayer.set(row.playerId, positions);
+  }
 
-  // Create enhanced player map with detailed position data
   const playerMap = new Map<number, PlayerWithPositions>();
   let playersWithPositionData = 0;
   let playersWithFallbackData = 0;
 
-  for (const record of playerData) {
-    const playerId = record.playerId;
-    let eligiblePositions: string[] = [];
-    let positionDetails: Record<
-      string,
-      { games: number; gamesStarted: number; position: string }
-    > = {};
+  for (const playerId of playerIds) {
+    const eligiblePositions = positionsByPlayer.get(playerId) ?? [];
 
-    // Parse positions_played JSONB data (same format as GraphQL API)
-    if (record.positionsPlayed && typeof record.positionsPlayed === 'object') {
-      try {
-        const positions = record.positionsPlayed as Record<
-          string,
-          { games: number; gamesStarted: number; position: string }
-        >;
-        positionDetails = positions;
-
-        // Extract eligible positions based on game thresholds
-        // Use same logic as GraphQL API but with performance optimizations
-        for (const [pos, data] of Object.entries(positions)) {
-          if (
-            data &&
-            typeof data === 'object' &&
-            typeof data.games === 'number'
-          ) {
-            // Apply smart thresholds based on position type
-            let threshold = 25; // Default threshold for field positions
-
-            // Higher thresholds for specialized positions (same as player_eligible_positions view)
-            if (['C'].includes(pos)) threshold = 50; // Catcher needs more experience
-            if (['SP', 'RP'].includes(pos)) threshold = 10; // Pitchers have lower threshold
-
-            if (data.games >= threshold) {
-              eligiblePositions.push(pos);
-            }
-          }
-        }
-
-        playersWithPositionData++;
-        addBreadcrumb('Parsed position data from JSONB', {
-          playerId,
-          positionCount: Object.keys(positions).length,
-          eligibleCount: eligiblePositions.length,
-          totalFieldingGames: record.fieldingGames || 0,
-        });
-      } catch (error) {
-        addBreadcrumb('Failed to parse positions_played JSONB', {
-          playerId,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          rawData: record.positionsPlayed,
-        });
-      }
-    }
-
-    // Apply enhanced fallback logic if no positions found from JSONB
-    if (eligiblePositions.length === 0) {
+    if (eligiblePositions.length > 0) {
+      playersWithPositionData++;
+    } else {
+      // Player has no rows in the mat view — no tracked position history.
+      // Fall back to DH (most flexible slot) so they still land on a roster.
       playersWithFallbackData++;
-
-      // Check pitching stats first (most reliable indicator)
-      if (record.pitchingGames && record.pitchingGames > 10) {
-        if (record.pitchingGamesStarted && record.pitchingGamesStarted > 10) {
-          eligiblePositions = ['SP']; // Starting pitcher
-        } else {
-          eligiblePositions = ['RP']; // Relief pitcher
-        }
-        addBreadcrumb('Applied pitching fallback positions', {
-          playerId,
-          pitchingGames: record.pitchingGames,
-          pitchingGamesStarted: record.pitchingGamesStarted || 0,
-          assignedPositions: eligiblePositions,
-        });
-      }
-      // Check fielding games as secondary indicator
-      else if (record.fieldingGames && record.fieldingGames > 25) {
-        // Assign broad field positions for players with fielding experience
-        eligiblePositions = [
-          '1B',
-          '2B',
-          '3B',
-          'SS',
-          'LF',
-          'CF',
-          'RF',
-          'C',
-          'DH',
-        ];
-        addBreadcrumb('Applied fielding fallback positions', {
-          playerId,
-          fieldingGames: record.fieldingGames,
-          assignedPositions: eligiblePositions,
-        });
-      }
-      // Final fallback: make player eligible for flexible positions
-      else {
-        eligiblePositions = ['DH']; // DH is the most flexible position slot
-        addBreadcrumb('Applied default fallback position', {
-          playerId,
-          fieldingGames: record.fieldingGames || 0,
-          pitchingGames: record.pitchingGames || 0,
-          assignedPositions: eligiblePositions,
-        });
-      }
+      eligiblePositions.push('DH');
     }
 
     const isPitcher = eligiblePositions.some((pos) =>
@@ -245,96 +136,22 @@ async function loadAllPlayersWithPositions(
 
     playerMap.set(playerId, {
       id: playerId,
-      firstName: '', // Will be filled from main player query
+      firstName: '',
       lastName: '',
       brefId: '',
-      statsLastFetchedAt: null, // Will be filled from main player query
+      statsLastFetchedAt: null,
       eligiblePositions,
       isPitcher,
-      positionDetails,
     });
-  }
-
-  // Handle players not found in career_fielding — they may still be pure pitchers
-  // who never accumulated fielding records. Query career_pitching before falling
-  // back to DH so that pitchers are not incorrectly drafted into batting slots.
-  const missingPlayerIds = playerIds.filter((id) => !playerMap.has(id));
-
-  if (missingPlayerIds.length > 0) {
-    const pitcherRows = await db
-      .select({
-        playerId: PublicSchema.careerPitching.playerId,
-        pitchingGames: PublicSchema.careerPitching.g,
-        pitchingGamesStarted: PublicSchema.careerPitching.gs,
-      })
-      .from(PublicSchema.careerPitching)
-      .where(inArray(PublicSchema.careerPitching.playerId, missingPlayerIds));
-
-    const pitcherLookup = new Map(pitcherRows.map((r) => [r.playerId, r]));
-
-    for (const playerId of missingPlayerIds) {
-      playersWithFallbackData++;
-      const pitcherRecord = pitcherLookup.get(playerId);
-
-      let eligiblePositions: string[];
-      let isPitcher: boolean;
-
-      if (pitcherRecord && (pitcherRecord.pitchingGames ?? 0) > 10) {
-        // Pure pitcher — never had a fielding record but has pitching stats
-        if ((pitcherRecord.pitchingGamesStarted ?? 0) > 10) {
-          eligiblePositions = ['SP'];
-        } else {
-          eligiblePositions = ['RP'];
-        }
-        isPitcher = true;
-        addBreadcrumb(
-          'Pure pitcher (no fielding record) assigned pitching position',
-          {
-            playerId,
-            pitchingGames: pitcherRecord.pitchingGames,
-            pitchingGamesStarted: pitcherRecord.pitchingGamesStarted ?? 0,
-            assignedPositions: eligiblePositions,
-          },
-        );
-      } else {
-        // Truly no usable stats — assign the most flexible slot as a last resort
-        eligiblePositions = ['DH'];
-        isPitcher = false;
-        addBreadcrumb(
-          'Player not found in career stats, assigned default position',
-          {
-            playerId,
-            assignedPositions: ['DH'],
-          },
-        );
-      }
-
-      playerMap.set(playerId, {
-        id: playerId,
-        firstName: '',
-        lastName: '',
-        brefId: '',
-        statsLastFetchedAt: null,
-        eligiblePositions,
-        isPitcher,
-        positionDetails: {},
-      });
-    }
   }
 
   const processingTime = Date.now() - startTime;
 
-  // Enhanced performance tracking
-  addBreadcrumb('Optimized position assignment completed', {
+  addBreadcrumb('Position loading completed', {
     totalPlayers: playerMap.size,
     playersWithPositionData,
     playersWithFallbackData,
-    fallbackPercentage: Math.round(
-      (playersWithFallbackData / playerMap.size) * 100,
-    ),
     totalProcessingTimeMs: processingTime,
-    avgProcessingTimePerPlayer:
-      Math.round((processingTime / playerMap.size) * 100) / 100,
   });
 
   return playerMap;

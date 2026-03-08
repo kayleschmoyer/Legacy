@@ -89,7 +89,8 @@
     "Out-Null": true,
     "Tee-Object": true,
     "Test-Path": true,
-    "Get-Item": true
+    "Get-Item": true,
+    "Set-Content": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {
