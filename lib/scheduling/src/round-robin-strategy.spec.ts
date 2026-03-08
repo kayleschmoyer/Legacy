@@ -124,4 +124,71 @@ describe('RoundRobinStrategy', () => {
   it('should have correct strategy name', () => {
     expect(strategy.getName()).toBe('round-robin');
   });
+
+  it('should produce correct matchups for all weeks in seasons longer than two full cycles', () => {
+    // 10 teams = 9 rounds per cycle. A 20-week season spans slightly more than 2 full cycles.
+    // Bug: `week % baseSchedule.length` uses 45 (total pairing objects) instead of 9 (unique weeks),
+    // so weeks 19-20 receive no matchups.
+    const teams: TeamInfo[] = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      name: `Team ${i + 1}`,
+      leagueId: 1,
+    }));
+
+    const numberOfWeeks = 20;
+    const pairings = strategy.generatePairings(teams, numberOfWeeks);
+
+    // Every week must have exactly 5 matchups (10 teams / 2)
+    for (let week = 1; week <= numberOfWeeks; week++) {
+      const weekPairings = pairings.filter((p) => p.weekNumber === week);
+      expect(weekPairings.length).toBe(5);
+    }
+  });
+
+  it('should never schedule the same team pair in consecutive weeks', () => {
+    const teams: TeamInfo[] = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      name: `Team ${i + 1}`,
+      leagueId: 1,
+    }));
+
+    const numberOfWeeks = 20;
+    const pairings = strategy.generatePairings(teams, numberOfWeeks);
+
+    for (let week = 1; week < numberOfWeeks; week++) {
+      const thisWeekPairs = pairings
+        .filter((p) => p.weekNumber === week)
+        .map((p) => [p.team1Id, p.team2Id].sort().join('-'));
+
+      const nextWeekPairs = pairings
+        .filter((p) => p.weekNumber === week + 1)
+        .map((p) => [p.team1Id, p.team2Id].sort().join('-'));
+
+      for (const pair of thisWeekPairs) {
+        expect(nextWeekPairs).not.toContain(pair);
+      }
+    }
+  });
+
+  it('should correctly repeat schedule for a 4-team league over 3 full cycles (12 weeks)', () => {
+    // 4 teams = 3 rounds per cycle. 12 weeks = exactly 4 full cycles.
+    const teams: TeamInfo[] = [
+      { id: 1, name: 'Team 1', leagueId: 1 },
+      { id: 2, name: 'Team 2', leagueId: 1 },
+      { id: 3, name: 'Team 3', leagueId: 1 },
+      { id: 4, name: 'Team 4', leagueId: 1 },
+    ];
+
+    const numberOfWeeks = 12;
+    const pairings = strategy.generatePairings(teams, numberOfWeeks);
+
+    // Every week must have exactly 2 matchups (4 teams / 2)
+    for (let week = 1; week <= numberOfWeeks; week++) {
+      const weekPairings = pairings.filter((p) => p.weekNumber === week);
+      expect(weekPairings.length).toBe(2);
+    }
+
+    // Total matchups should be 12 weeks * 2 = 24
+    expect(pairings.length).toBe(24);
+  });
 });

@@ -86,7 +86,11 @@ export class RoundRobinStrategy implements SchedulingStrategy {
       const baseSchedule = [...pairings];
 
       for (let week = 0; week < remainingWeeks; week++) {
-        const sourceWeek = (week % baseSchedule.length) + 1;
+        // Cycle through weeks 1..totalRounds (totalRounds = one full round-robin cycle).
+        // Using baseSchedule.length here was a bug: that value is
+        // totalRounds * matchesPerRound, so it overshot and produced empty
+        // weeks once week > totalRounds.
+        const sourceWeek = (week % totalRounds) + 1;
         const sourcePairings = baseSchedule.filter(
           (p) => p.weekNumber === sourceWeek,
         );
