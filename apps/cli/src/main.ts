@@ -52,6 +52,7 @@ import { handleLoadWobaWeights } from './commands/loadWobaWeights';
 import { handleLoadBrParkFactors } from './commands/loadBrParkFactors';
 import { handleLoadPositionalAdjustments } from './commands/loadPositionalAdjustments';
 import { handleLoadOnThisDayEvents } from './commands/loadOnThisDayEvents';
+import { handleCleanupTestLeagues } from './commands/cleanupTestLeagues';
 
 // Initialize Sentry for CLI
 const sentryConfig = getSentryConfigFromEnv();
@@ -562,6 +563,27 @@ async function run(): Promise<void> {
         delay?: number;
         upsert?: boolean;
       }) => handleLoadOnThisDayEvents(options),
+    );
+
+  program
+    .command('cleanup-test-leagues')
+    .description(
+      'Bulk-delete test leagues created by e2e/integration tests and the CLI test-workflow command',
+    )
+    .option('--dry-run', 'List matching leagues without deleting them')
+    .option('--all', 'Target ALL leagues (not just test-named ones)')
+    .option(
+      '--pattern <regex>',
+      'Custom regex to match league names (overrides default test patterns)',
+    )
+    .option('--yes', 'Skip confirmation prompt and proceed with deletion')
+    .action(
+      (options: {
+        dryRun?: boolean;
+        all?: boolean;
+        pattern?: string;
+        yes?: boolean;
+      }) => handleCleanupTestLeagues(options),
     );
 
   await program.parseAsync(process.argv);
