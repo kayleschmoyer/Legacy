@@ -1174,7 +1174,7 @@ export function BaseballLandingPage() {
                 </Paragraph>
               </YStack>
 
-              <YStack flex={1} overflow="scroll">
+              <YStack flex={1} overflow="auto">
                 <YStack space="$3" paddingBottom="$2">
                   {/* League Name */}
                   <YStack space="$1.5">
