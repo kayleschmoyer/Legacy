@@ -2740,7 +2740,9 @@ export function LeagueDetailPage(): React.JSX.Element {
           <NextStepControl
             leagueId={leagueId}
             currentMatchup={userCurrentMatchup}
-            gamesPerMatchup={userCurrentMatchup?.gamesPerMatchup ?? 1}
+            gamesPerMatchup={
+              userCurrentMatchup?.gamesPerMatchup ?? league.gamesPerMatchup ?? 1
+            }
             draftStatus={league.draftStatus}
             hasPendingSettingsChanges={hasDraftSettingsChanges}
             onSuccess={handleMatchupSuccess}
