@@ -1,6 +1,6 @@
 ---
 name: integration-testing
-description: 'Write, run, and debug Playwright integration tests that validate distributed flows end-to-end against deployed (or local) services; covers async polling with expect.poll(), WebSocket message verification, GraphQL API assertions, long-running Lambda chain waits, test tagging, and Playwright config for integration projects. Load this skill before creating or modifying any integration test that hits real services or waits for async backends.'
+description: 'Write, run, and debug Playwright integration tests that validate distributed flows end-to-end against deployed (or local) services; covers async polling with expect.poll(), WebSocket message verification, GraphQL API assertions, long-running Lambda chain waits, UI browser integration tests for comprehensive user stories, test tagging, and Playwright config for integration projects. Load this skill before creating or modifying any integration test that hits real services or waits for async backends.'
 ---
 
 # Skill: Integration Testing (Playwright — Distributed Flows)
@@ -9,15 +9,28 @@ description: 'Write, run, and debug Playwright integration tests that validate d
 
 Integration tests validate **real end-to-end flows** across deployed services: Lambda chains, SQS queues, WebSocket notifications, and database state changes. Unlike E2E tests (which mock GraphQL via MSW), integration tests hit **real APIs** and wait for **real async processes** to complete.
 
-These tests use Playwright's `APIRequestContext` for headless API-only tests and browser contexts when verifying WebSocket delivery to the UI.
+There are two modes:
+
+- **API-only** (`APIRequestContext`): headless, no browser. Best for distributed Lambda chains, SQS flows, and backend-only smoke checks.
+- **UI browser integration** (`fixtures/ui.ts` browser contexts): full browser with real JWTs. Best for comprehensive user story flows that span multiple roles (commissioner + manager) and must verify that the UI correctly drives and reflects real backend state.
 
 ## When to Use
 
-- Testing a distributed flow (draft → SQS → draft-processor → WebSocket notification)
+### Use API-only integration tests when:
+
+- Testing a distributed backend flow (draft → SQS → draft-processor → WebSocket notification)
 - Verifying async Lambda chains complete correctly (game selection → stats loading → matchup completion)
 - Confirming WebSocket messages arrive at the client after backend processing
 - Validating EventBridge-triggered cron flows against a deployed environment
 - Writing smoke tests for deployed infrastructure (staging/production health checks)
+
+### Use UI browser integration tests when:
+
+- The user story spans **multiple user roles** (e.g., commissioner creates, manager sees)
+- The feature requires **real browser rendering** to verify correct conditional display (show/hide logic that depends on real user identity from a live JWT)
+- You need to confirm that a UI action **persists to the database** and is then visible to a different user
+- The mocked E2E test covers the component in isolation but cannot prove the full create→persist→display→role-restriction chain works against the real API
+- The user story is **comprehensive** — multiple sequential steps that together constitute a complete workflow (e.g., create league → join → post announcement → verify persistence → member sees it → member cannot compose)
 
 ## Prerequisites
 
@@ -32,16 +45,20 @@ apps/web-e2e/
 ├── src/
 │   ├── integration/                    # Integration test directory
 │   │   ├── fixtures/
-│   │   │   └── api.ts                  # APIRequestContext fixture with auth
+│   │   │   ├── api.ts                  # APIRequestContext fixture with auth
+│   │   │   └── ui.ts                   # Browser context fixtures (commissionerPage, managerJwt1-3, ...)
 │   │   ├── helpers/
 │   │   │   ├── graphql.ts              # Typed GraphQL request helper
 │   │   │   ├── poll.ts                 # Reusable polling helpers
 │   │   │   └── websocket.ts            # WebSocket connection + message helpers
 │   │   └── tests/
-│   │       ├── draft-flow.spec.ts      # Draft → processor → WS notification
-│   │       ├── game-selection.spec.ts  # Game select → stats load → completion
-│   │       ├── matchup-advance.spec.ts # Matchup advancement flow
-│   │       └── health-check.spec.ts    # Basic API + WS connectivity smoke
+│   │       ├── draft-flow.spec.ts               # API-only: Draft → SQS → processor
+│   │       ├── live-draft-ui.spec.ts            # UI: Multi-user live draft
+│   │       ├── full-season-ui.spec.ts           # UI: Full season workflow
+│   │       ├── commissioner-announcements-ui.spec.ts  # UI: Create→post→member sees
+│   │       ├── game-selection.spec.ts           # API-only: game select → stats load
+│   │       ├── matchup-advance.spec.ts          # API-only: matchup advancement
+│   │       └── health-check.spec.ts             # API-only: smoke checks
 │   └── ...
 ├── playwright.integration.config.ts    # Separate Playwright config for integration
 ```
@@ -277,7 +294,189 @@ test('draft completion delivers WS notification', async ({ api }) => {
 });
 ```
 
-### 6. Test Steps for Readability
+### 6. UI Browser Integration Tests — Comprehensive User Stories
+
+For user stories that span multiple roles and require real browser rendering, use the `ui.ts` fixtures instead of `api.ts`. This gives you browser contexts authenticated as real users (commissioner + managers via impersonation) while still hitting the live API.
+
+#### When to write a UI integration test
+
+A feature warrants a UI integration test (in addition to its mocked E2E test) when **all three** of the following are true:
+
+1. The feature involves **two or more user roles** with different capabilities (e.g., commissioner can compose; member can only read)
+2. The feature **writes state to the DB** that must then be visible to another user
+3. The mocked E2E test cannot fully prove the flow because it uses fake GraphQL responses rather than real persistence
+
+#### Structure: serial phases
+
+UI integration tests follow a **serial phase pattern**: each `test()` inside `test.describe.serial()` builds on the state from prior phases. Share state via a typed module-level object.
+
+```typescript
+// apps/web-e2e/src/integration/tests/my-feature-ui.spec.ts
+import type { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from '../fixtures/ui';
+
+interface FeatureState {
+  leagueId: number;
+  inviteCode: string;
+  leagueName: string;
+  createdItemText: string; // whatever the feature creates
+}
+
+let state: FeatureState;
+
+async function switchUser(page: Page, jwt: string, url?: string) {
+  if (url) {
+    await page.goto(url);
+    await page.waitForLoadState('domcontentloaded');
+    await page.evaluate(
+      (token) => localStorage.setItem('auth_jwt', token),
+      jwt,
+    );
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+  } else {
+    await page.evaluate(
+      (token) => localStorage.setItem('auth_jwt', token),
+      jwt,
+    );
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+  }
+}
+
+test.describe
+  .serial('My Feature UI (Live Backend) @integration @critical', () => {
+  test.describe.configure({ retries: 0 });
+
+  test.beforeAll(() => {
+    state = {
+      leagueId: 0,
+      inviteCode: '',
+      leagueName: '',
+      createdItemText: '',
+    };
+  });
+
+  test('Phase 1: Commissioner creates a league', async ({
+    commissionerPage: page,
+  }) => {
+    // ... create league, extract id + invite code into state
+  });
+
+  test('Phase 2: Manager joins the league', async ({
+    commissionerPage: page,
+    commissionerJwt,
+    managerJwt1,
+  }) => {
+    // switchUser(page, managerJwt1, joinUrl) → join → switchUser back to commissioner
+  });
+
+  test('Phase 3: Commissioner performs the action via UI', async ({
+    commissionerPage: page,
+  }) => {
+    // Navigate, click, fill, submit — assert result appears in the UI
+  });
+
+  test('Phase 4: API verification — action persists to the backend', async ({
+    commissionerJwt,
+  }) => {
+    // Use expect.poll() + a raw gqlFetch to confirm DB state
+    await expect
+      .poll(
+        async () => {
+          /* query backend */
+        },
+        { timeout: 15_000, intervals: [1_000, 2_000, 3_000] },
+      )
+      .toContain(state.createdItemText);
+  });
+
+  test('Phase 5: Member sees the result', async ({
+    commissionerPage: page,
+    managerJwt1,
+  }) => {
+    await switchUser(
+      page,
+      managerJwt1,
+      `/baseball/league/${state.leagueId}/overview`,
+    );
+    // Assert the created item is visible to a different user
+  });
+
+  test('Phase 6: Member cannot perform the commissioner-only action', async ({
+    commissionerPage: page,
+    commissionerJwt,
+    managerJwt1,
+  }) => {
+    await switchUser(
+      page,
+      managerJwt1,
+      `/baseball/league/${state.leagueId}/overview`,
+    );
+    // Assert compose/admin button is absent
+    await switchUser(page, commissionerJwt); // restore
+  });
+});
+```
+
+#### Raw API helper (for Phase 4 verification)
+
+UI integration tests sometimes need a direct API call outside the browser context (e.g., to poll backend state). Add a typed `gqlFetch` helper at the top of the spec:
+
+```typescript
+const GQL_URL =
+  (
+    process.env.INTEGRATION_BASE_URL ??
+    'https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/'
+  ).replace(/\/?$/, '/') + 'graphql';
+
+async function gqlFetch<T>(
+  jwt: string,
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(GQL_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const json = (await res.json()) as {
+    data?: T;
+    errors?: Array<{ message: string }>;
+  };
+  if (json.errors?.length)
+    throw new Error(`GraphQL error: ${json.errors[0].message}`);
+  if (!json.data) throw new Error('GraphQL response contained no data');
+  return json.data;
+}
+```
+
+#### Real-world examples
+
+| Spec                                    | User story covered                                                                                                                          |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `commissioner-announcements-ui.spec.ts` | Create league → manager joins → commissioner posts announcement → API persistence verified → manager sees it → member has no compose button |
+| `live-draft-ui.spec.ts`                 | Create league → 3 managers join → start live draft → multi-user picks → roster verification                                                 |
+| `full-season-ui.spec.ts`                | Full season: create → draft → select games → matchups → waivers → standings                                                                 |
+
+#### What belongs in mocked E2E vs UI integration
+
+| Scenario                                         | Mocked E2E (`src/tests/`) | UI Integration (`src/integration/tests/`) |
+| ------------------------------------------------ | ------------------------- | ----------------------------------------- |
+| UI renders correctly with known data             | ✅                        |                                           |
+| Empty state, loading state, error state          | ✅                        |                                           |
+| Button disabled when input empty                 | ✅                        |                                           |
+| Cancel / dismiss interactions                    | ✅                        |                                           |
+| Data written to DB and visible to another user   |                           | ✅                                        |
+| Role-based access verified against real identity |                           | ✅                                        |
+| Multi-step workflow across multiple users        |                           | ✅                                        |
+| Backend async processes complete correctly       |                           | ✅                                        |
+
+### 7. Test Steps for Readability
 
 Long integration flows should use `test.step()` to break into labeled sections in reports:
 

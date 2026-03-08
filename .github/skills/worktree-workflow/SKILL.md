@@ -247,6 +247,11 @@ code legacy-sports.code-workspace
 
 ### Step 5: Implement the Ticket
 
+> **🚨 ALL edits happen in the worktree — never in `D:\code\legacy-sports`.**
+> File edits, terminal commands, and git operations must target `$wt`. Editing files in
+> the main repo (even without committing) leaves behind staged or unstaged changes that
+> are easy to miss and cannot be pushed to a PR branch.
+
 All commands run from within the worktree directory (`cd $wt`). Write code, add tests, update docs.
 
 ### Step 6: Commit and Push
@@ -331,14 +336,15 @@ twig worktree list  # verify
 
 ## Key Rules
 
-| Rule                        | Detail                                                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Main stays on main**      | Never check out a feature branch in the main repo — it's the base for new worktrees                                            |
-| **One worktree per branch** | Git prevents two worktrees sharing the same branch                                                                             |
-| **Don't run from inside**   | `git worktree move/remove` must be run from outside the target worktree                                                        |
-| **Run make install**        | `node_modules` and Python deps are absent in a fresh worktree — always run `make install` inside it                            |
-| **Separate VS Code window** | Open each worktree in its own VS Code window for clean file watching                                                           |
-| **Multi-root for agents**   | Run `make sync-worktrees TICKETS=501,493` then open `legacy-sports.code-workspace` — limit to 3-4 worktrees for TS performance |
+| Rule                        | Detail                                                                                                                                                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Main stays on main**      | Never check out a feature branch in the main repo — it's the base for new worktrees                                                                                                                                                   |
+| **No edits in main**        | Never edit, stage, or commit files in `D:\code\legacy-sports` for ticket work. All file edits must happen inside `$wt`. Staging changes there and "forgetting" them is a common source of phantom diffs that linger until discovered. |
+| **One worktree per branch** | Git prevents two worktrees sharing the same branch                                                                                                                                                                                    |
+| **Don't run from inside**   | `git worktree move/remove` must be run from outside the target worktree                                                                                                                                                               |
+| **Run make install**        | `node_modules` and Python deps are absent in a fresh worktree — always run `make install` inside it                                                                                                                                   |
+| **Separate VS Code window** | Open each worktree in its own VS Code window for clean file watching                                                                                                                                                                  |
+| **Multi-root for agents**   | Run `make sync-worktrees TICKETS=501,493` then open `legacy-sports.code-workspace` — limit to 3-4 worktrees for TS performance                                                                                                        |
 
 ## Troubleshooting
 

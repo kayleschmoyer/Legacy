@@ -17,6 +17,26 @@ End-to-end tests for the web app live in `apps/web-e2e/` and use [Playwright](ht
 - Running E2E tests locally or understanding CI behavior
 - Adding page objects for new routes
 
+## Mocked E2E vs. True UI Integration Tests
+
+Mocked E2E tests (this skill) cover a component or page in **isolation** using `page.route()` to return controlled data. They are fast, deterministic, and require no running backend.
+
+**For comprehensive user stories that involve multiple roles, real persistence, or cross-user visibility, also write a UI integration test** (see `skills/integration-testing/SKILL.md`). Use this table to decide:
+
+| Scenario                                                   | Here (mocked E2E) | integration-testing skill |
+| ---------------------------------------------------------- | ----------------- | ------------------------- |
+| UI renders correctly with known data                       | ✅                |                           |
+| Empty/loading/error states                                 | ✅                |                           |
+| Button disabled when input empty                           | ✅                |                           |
+| Cancel/dismiss interactions                                | ✅                |                           |
+| Post button enables after typing, form closes after submit | ✅                |                           |
+| Data written to DB and visible to a different user         |                   | ✅                        |
+| Role-based access verified against a real JWT identity     |                   | ✅                        |
+| Multi-step workflow across commissioner + manager          |                   | ✅                        |
+| Async backend processes complete end-to-end                |                   | ✅                        |
+
+> A feature does **not** need both unless its user story includes cross-user visibility or backend persistence that mocks cannot prove. Simple display features only need a mocked E2E test.
+
 ## File Layout
 
 ```
