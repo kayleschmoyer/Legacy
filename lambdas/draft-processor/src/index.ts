@@ -733,6 +733,23 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
     return await db.transaction(async (tx) => {
       addBreadcrumb('Starting optimized draft process', { leagueId });
 
+      // Idempotency guard: if team members already exist for this league, a prior
+      // invocation already committed the assignment. This can happen when the draft
+      // Lambda fails *after* this step (e.g. during matchup creation) and SQS
+      // retries the same START_DRAFT message.
+      const existingMembersCheck = await tx
+        .select({ count: sql<number>`count(*)` })
+        .from(PublicSchema.teamMembers)
+        .where(eq(PublicSchema.teamMembers.leagueId, leagueId));
+
+      if (Number(existingMembersCheck[0]?.count) > 0) {
+        LOGGER.warn(
+          `Team members already assigned for league ${leagueId} — skipping random assignment (idempotency guard)`,
+          { leagueId, existingCount: Number(existingMembersCheck[0]?.count) },
+        );
+        return;
+      }
+
       // Step 1: Batch fetch all required data in parallel (including league config)
       const [teams, leaguePositions, leagueConfig] = await Promise.all([
         tx
