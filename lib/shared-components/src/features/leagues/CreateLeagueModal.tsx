@@ -165,6 +165,7 @@ function CreateLeagueModal({
           padding="$6"
           width={Platform.OS === 'web' ? 400 : '90%'}
           maxHeight="80%"
+          overflow="hidden"
         >
           <Dialog.Title
             fontSize="$6"
@@ -181,7 +182,7 @@ function CreateLeagueModal({
             </Dialog.Description>
           </VisuallyHidden>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView showsVerticalScrollIndicator={false} flex={1}>
             {/* League Name Input */}
             <YStack marginBottom="$4">
               <Text
