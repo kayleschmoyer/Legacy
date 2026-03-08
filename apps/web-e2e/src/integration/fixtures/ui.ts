@@ -31,6 +31,12 @@ export interface UIIntegrationFixtures {
   managerJwt2: string;
   /** Raw JWT for impersonated Manager 3. */
   managerJwt3: string;
+  /** Separate browser context page authenticated as Manager 1. */
+  managerPage1: Page;
+  /** Separate browser context page authenticated as Manager 2. */
+  managerPage2: Page;
+  /** Separate browser context page authenticated as Manager 3. */
+  managerPage3: Page;
 }
 
 const WEB_BASE =
@@ -210,6 +216,60 @@ export const test = base.extend<UIIntegrationFixtures>({
     const [, , mgr3Id] = await getManagerUserIds(adminJwt);
     const jwt = await impersonate(adminJwt, mgr3Id);
     await use(jwt);
+  },
+
+  managerPage1: async ({ browser, managerJwt1 }, use) => {
+    const context = await browser.newContext({
+      baseURL: WEB_BASE,
+      storageState: {
+        cookies: [],
+        origins: [
+          {
+            origin: WEB_BASE,
+            localStorage: [{ name: 'auth_jwt', value: managerJwt1 }],
+          },
+        ],
+      },
+    });
+    const page = await context.newPage();
+    await use(page);
+    await context.close();
+  },
+
+  managerPage2: async ({ browser, managerJwt2 }, use) => {
+    const context = await browser.newContext({
+      baseURL: WEB_BASE,
+      storageState: {
+        cookies: [],
+        origins: [
+          {
+            origin: WEB_BASE,
+            localStorage: [{ name: 'auth_jwt', value: managerJwt2 }],
+          },
+        ],
+      },
+    });
+    const page = await context.newPage();
+    await use(page);
+    await context.close();
+  },
+
+  managerPage3: async ({ browser, managerJwt3 }, use) => {
+    const context = await browser.newContext({
+      baseURL: WEB_BASE,
+      storageState: {
+        cookies: [],
+        origins: [
+          {
+            origin: WEB_BASE,
+            localStorage: [{ name: 'auth_jwt', value: managerJwt3 }],
+          },
+        ],
+      },
+    });
+    const page = await context.newPage();
+    await use(page);
+    await context.close();
   },
 });
 
