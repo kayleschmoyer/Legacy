@@ -398,6 +398,13 @@ export function LeagueDetailPage(): React.JSX.Element {
     (() => void | Promise<unknown>) | undefined
   >(undefined);
 
+  // Ref to hold refetchMatchups so WebSocket callbacks can trigger a matchup
+  // list refresh (game selection start/complete) without creating a hook-ordering
+  // dependency (query is declared later).
+  const refetchMatchupsRef = useRef<
+    (() => void | Promise<unknown>) | undefined
+  >(undefined);
+
   // Ref that always holds the latest draftStatus so the WS reconnect effect
   // can read it without adding it to the dependency array.
   const leagueDraftStatusRef = useRef<string | null | undefined>(undefined);
@@ -559,7 +566,15 @@ export function LeagueDetailPage(): React.JSX.Element {
     void backgroundRefetch();
     // Also refetch matchup data so statsLoadingStatus updates and spinner clears
     void refetchCurrentWeekRef.current?.();
+    void refetchMatchupsRef.current?.();
   }, [backgroundRefetch]);
+
+  const handlePlayerStatsLoading = useCallback(() => {
+    // Game selection has started — immediately reload matchup data so the
+    // matchup tab reflects the freshly-assigned games and updated scores.
+    void refetchMatchupsRef.current?.();
+    void refetchCurrentWeekRef.current?.();
+  }, []);
 
   // Create the single shared WebSocket connection for this league page.
   // All child components (chat, trades, roster) subscribe via
@@ -622,6 +637,9 @@ export function LeagueDetailPage(): React.JSX.Element {
       wsClient.on(ClientNotificationType.MATCHUP_STATS_COMPLETE, () =>
         handleMatchupStatsComplete(),
       ),
+      wsClient.on(ClientNotificationType.PLAYER_STATS_LOADING, () =>
+        handlePlayerStatsLoading(),
+      ),
     ];
     return () => unsubs.forEach((fn) => fn());
   }, [
@@ -630,6 +648,7 @@ export function LeagueDetailPage(): React.JSX.Element {
     handleDraftStarted,
     handleRosterUpdate,
     handleMatchupStatsComplete,
+    handlePlayerStatsLoading,
   ]);
 
   useEffect(() => {
@@ -874,9 +893,10 @@ export function LeagueDetailPage(): React.JSX.Element {
   );
 
   // Fetch all matchups for navigation
-  const { matchups: allLeagueMatchups } = useMatchupsForLeague(
-    !isNaN(leagueId) ? leagueId : null,
-  );
+  const { matchups: allLeagueMatchups, refetch: refetchMatchups } =
+    useMatchupsForLeague(!isNaN(leagueId) ? leagueId : null);
+  // Keep the ref in sync so WebSocket callbacks can trigger matchup refetch
+  refetchMatchupsRef.current = refetchMatchups;
 
   // The user's own matchup for the current active week (may differ from the
   // league-level current week pointer, since a league has one matchup *per
