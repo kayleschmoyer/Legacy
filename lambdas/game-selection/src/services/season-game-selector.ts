@@ -1,6 +1,6 @@
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, isNotNull, notInArray, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, notInArray, or, sql } from 'drizzle-orm';
 
 export interface GameSelectionResult {
   gameIdentifier: string | null;
@@ -79,6 +79,17 @@ async function selectGameIdentifier(
   if (pitcherRole === 'SP' || pitcherRole === 'RP') {
     const gsValue = pitcherRole === 'SP' ? 1 : 0;
 
+    // For RP, include games where gs=0 OR gs IS NULL.
+    // Historical game logs (pre-1973) may not have the player_game_span column parsed,
+    // leaving gs=NULL even for legitimate relief appearances.
+    const gsCondition =
+      pitcherRole === 'RP'
+        ? or(
+            eq(PublicSchema.gamePitching.gs, 0),
+            isNull(PublicSchema.gamePitching.gs),
+          )
+        : eq(PublicSchema.gamePitching.gs, gsValue);
+
     // Join game_batting with game_pitching to filter by GS
     const availableGames = await db
       .selectDistinct({
@@ -99,9 +110,7 @@ async function selectGameIdentifier(
           eq(PublicSchema.gameBatting.season, PublicSchema.gamePitching.season),
         ),
       )
-      .where(
-        and(...battingConditions, eq(PublicSchema.gamePitching.gs, gsValue)),
-      );
+      .where(and(...battingConditions, gsCondition));
 
     if (availableGames.length === 0) {
       LOGGER.warn(
@@ -129,6 +138,57 @@ async function selectGameIdentifier(
 }
 
 /**
+ * Select a random game_identifier directly from game_pitching (no batting join).
+ * Used for DH-era pitchers who have no game_batting rows.
+ *
+ * - SP: only games where GS = 1
+ * - RP: games where GS = 0 OR GS IS NULL (NULL handles historical data with unparsed spans)
+ */
+async function selectGameIdentifierFromPitching(
+  db: PublicDb,
+  playerId: number,
+  season: number,
+  excludeGameIdentifiers: string[],
+  pitcherRole: 'SP' | 'RP',
+): Promise<string | null> {
+  const conditions = [
+    eq(PublicSchema.gamePitching.playerId, playerId),
+    eq(PublicSchema.gamePitching.season, season),
+  ];
+
+  if (excludeGameIdentifiers.length > 0) {
+    conditions.push(
+      notInArray(
+        PublicSchema.gamePitching.gameIdentifier,
+        excludeGameIdentifiers,
+      ),
+    );
+  }
+
+  const gsCondition =
+    pitcherRole === 'RP'
+      ? or(
+          eq(PublicSchema.gamePitching.gs, 0),
+          isNull(PublicSchema.gamePitching.gs),
+        )
+      : eq(PublicSchema.gamePitching.gs, 1);
+
+  const availableGames = await db
+    .selectDistinct({
+      gameIdentifier: PublicSchema.gamePitching.gameIdentifier,
+    })
+    .from(PublicSchema.gamePitching)
+    .where(and(...conditions, gsCondition));
+
+  if (availableGames.length === 0) {
+    return null;
+  }
+
+  const randomIndex = Math.floor(Math.random() * availableGames.length);
+  return availableGames[randomIndex].gameIdentifier;
+}
+
+/**
  * Select a game for a single matchup player using a real game_identifier.
  * If stats are cached in the DB, picks a random game from the cache.
  * If not cached, returns null gameIdentifier so stats loading can be queued.
@@ -138,7 +198,8 @@ async function selectGameIdentifier(
  *
  * For pitchers:
  * - SP: only games where GS=1 are eligible
- * - RP: only games where GS=0 are eligible
+ * - RP: only games where GS=0 or GS IS NULL are eligible (NULL covers historical data
+ *   where the game_span column was unparseable)
  */
 export async function selectGamesForMatchupPlayer(
   db: PublicDb,
@@ -162,6 +223,81 @@ export async function selectGamesForMatchupPlayer(
   const fieldingPos = await getPrimaryFieldingPosition(db, playerId, season);
 
   if (cachedCheck.length === 0) {
+    // For pitchers in the DH era (post-1972 AL, post-1997 interleague, post-2022 NL),
+    // batting stats may not exist. Fall back to checking gamePitching so we can
+    // treat the stats as cached and select a game from the pitching log.
+    if (pitcherRole === 'SP' || pitcherRole === 'RP') {
+      const pitchingCheck = await db
+        .select({ gameIdentifier: PublicSchema.gamePitching.gameIdentifier })
+        .from(PublicSchema.gamePitching)
+        .where(
+          and(
+            eq(PublicSchema.gamePitching.playerId, playerId),
+            eq(PublicSchema.gamePitching.season, season),
+          ),
+        )
+        .limit(1);
+
+      if (pitchingCheck.length === 0) {
+        LOGGER.info(
+          `No cached stats for pitcher ${playerId} season ${season}. Stats loading needed.`,
+        );
+        return {
+          gameIdentifier: null,
+          fieldingGamePos: fieldingPos,
+          statsAreCached: false,
+        };
+      }
+
+      // Pitching stats are cached — select a game directly from game_pitching
+      LOGGER.info(
+        `Player ${playerId} season ${season} has no batting stats; selecting game from pitching log (DH-era pitcher).`,
+      );
+      const usedGames = await db
+        .select({
+          gameIdentifier: PublicSchema.matchupPlayerGames.gameIdentifier,
+        })
+        .from(PublicSchema.matchupPlayerGames)
+        .where(
+          and(
+            eq(
+              PublicSchema.matchupPlayerGames.matchupPlayerId,
+              matchupPlayerId,
+            ),
+            isNotNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+          ),
+        );
+
+      const excludeIds = usedGames
+        .map((g) => g.gameIdentifier)
+        .filter((id): id is string => id !== null);
+
+      const gameIdentifier = await selectGameIdentifierFromPitching(
+        db,
+        playerId,
+        season,
+        excludeIds,
+        pitcherRole,
+      );
+
+      if (!gameIdentifier) {
+        LOGGER.warn(
+          `No available ${pitcherRole} games for pitcher ${playerId} season ${season} (${excludeIds.length} already used)`,
+        );
+        return {
+          gameIdentifier: null,
+          fieldingGamePos: fieldingPos,
+          statsAreCached: true,
+        };
+      }
+
+      return {
+        gameIdentifier,
+        fieldingGamePos: fieldingPos,
+        statsAreCached: true,
+      };
+    }
+
     LOGGER.info(
       `No cached stats for player ${playerId} season ${season}. Stats loading needed.`,
     );

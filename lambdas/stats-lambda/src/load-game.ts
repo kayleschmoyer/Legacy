@@ -77,9 +77,9 @@ async function selectAndAssignGameIdentifiers(
     `Selecting game identifiers for matchup player ${matchupPlayerId}`,
   );
 
-  // Get all unique game identifiers for this player/season from batting stats
-  // (batting is the most reliable - every player bats)
-  const allUniqueGames = await db
+  // Get all unique game identifiers for this player/season from batting stats.
+  // Falls back to pitching stats for DH-era pitchers who have no batting rows.
+  const allUniqueBattingGames = await db
     .selectDistinct({ gameIdentifier: PublicSchema.gameBatting.gameIdentifier })
     .from(PublicSchema.gameBatting)
     .where(
@@ -90,13 +90,35 @@ async function selectAndAssignGameIdentifiers(
     );
 
   // Filter out empty string game_identifiers (stale data from pre-refactor scrapes)
-  const uniqueGames = allUniqueGames.filter(
+  let uniqueGames = allUniqueBattingGames.filter(
     (g) => g.gameIdentifier !== '' && g.gameIdentifier !== null,
   );
 
   if (uniqueGames.length === 0) {
+    // Batting stats are absent (DH-era pitcher) or all stale — try pitching stats
+    LOGGER.info(
+      `No valid batting game identifiers for player ${playerId} season ${season}, falling back to pitching stats`,
+    );
+    const allUniquePitchingGames = await db
+      .selectDistinct({
+        gameIdentifier: PublicSchema.gamePitching.gameIdentifier,
+      })
+      .from(PublicSchema.gamePitching)
+      .where(
+        and(
+          eq(PublicSchema.gamePitching.playerId, playerId),
+          eq(PublicSchema.gamePitching.season, season),
+        ),
+      );
+
+    uniqueGames = allUniquePitchingGames.filter(
+      (g) => g.gameIdentifier !== '' && g.gameIdentifier !== null,
+    );
+  }
+
+  if (uniqueGames.length === 0) {
     LOGGER.warn(
-      `No valid game identifiers found for player ${playerId} season ${season} (${allUniqueGames.length} total, all empty), cannot select games`,
+      `No valid game identifiers found for player ${playerId} season ${season} (checked batting and pitching), cannot select games`,
     );
     return;
   }
