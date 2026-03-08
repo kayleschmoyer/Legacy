@@ -36,7 +36,7 @@ function StatRow({ label, value, accent = false }: StatRowData) {
     <XStack
       justifyContent="space-between"
       paddingVertical="$2"
-      paddingHorizontal="$3"
+      paddingHorizontal="$4"
       borderBottomWidth={1}
       borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
     >

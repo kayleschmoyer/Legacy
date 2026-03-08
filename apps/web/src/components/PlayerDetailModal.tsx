@@ -583,7 +583,7 @@ export function PlayerDetailModal({
 
           {/* ── Career summary cards ── */}
           {!loading && !error && careerTotals && (
-            <XStack gap="$3" flexWrap="wrap">
+            <XStack gap="$3" flexWrap="wrap" alignItems="flex-start">
               {battingCardRows.length > 0 && (
                 <YStack flex={1} minWidth={280}>
                   <StatCard title="Career Batting" rows={battingCardRows} />
