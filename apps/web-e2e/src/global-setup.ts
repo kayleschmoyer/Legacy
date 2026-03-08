@@ -170,7 +170,7 @@ async function runDeviceFlow(): Promise<string> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      client_type: 'e2e',
+      client_type: 'cli',
       device_name: `E2E-${process.env.COMPUTERNAME || 'test'}`,
     }),
   });

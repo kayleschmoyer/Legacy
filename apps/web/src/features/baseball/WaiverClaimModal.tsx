@@ -298,6 +298,10 @@ export const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
                             backgroundColor: isSelected ? '$red3' : '$color3',
                           }}
                           cursor="pointer"
+                          testID={`drop-player-${mp.id}`}
+                          role="option"
+                          aria-selected={isSelected}
+                          aria-label={`Drop ${memberName}`}
                           onPress={() =>
                             setDropPlayerId(isSelected ? null : (mp.id ?? null))
                           }

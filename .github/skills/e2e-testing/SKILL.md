@@ -315,3 +315,32 @@ The CI action supports inputs: `test-patterns`, `browser`, `timeout-minutes`, `r
 | Snapshots differ on CI vs local | CI uses Linux Chromium — update snapshots via the GH Action |
 | GraphQL mock not intercepting   | Check the URL filter excludes `/@fs/` and `.ts`/`.js` paths |
 | `route.continue()` conflicts    | Use `route.fallback()` instead to allow handler chaining    |
+
+## Tamagui / Custom Component Pitfalls
+
+### Custom dialog backdrops intercept Playwright clicks
+
+Tamagui custom dialogs (not `<Dialog>`) that use a `position: fixed` backdrop `YStack` will intercept Playwright's hit test via `elementFromPoint()`. Even with proper `zIndex`, Playwright sees the backdrop, not the dialog content.
+
+**Fix for the component:** Add `onPress={(e) => e.stopPropagation()}` to the inner dialog panel, plus `role="dialog"`, `aria-modal`, and `aria-label` for testability.
+
+**Fix for the test:** Use `{ force: true }` on clicks inside the dialog, but **always scope locators to the dialog first**:
+
+```typescript
+const dialog = page.getByRole('dialog', { name: 'My Dialog' });
+await dialog.getByRole('button', { name: /confirm/i }).click({ force: true });
+```
+
+> **Warning:** Unscoped `page.getByRole('button')` with `force: true` can match navigation buttons outside the dialog, causing it to close or navigate away.
+
+### Adding testID for selection UIs
+
+When Tamagui components lack semantic roles (e.g., player selection rows), add `testID` which renders as `data-testid` on web:
+
+```tsx
+<XStack testID={`item-${id}`} role="option" aria-label={`Select ${name}`}>
+```
+
+### Collapsed accordion sections
+
+Accordion-style sections render children but keep them hidden. Always expand the accordion (click the header) before asserting on or clicking elements inside it.

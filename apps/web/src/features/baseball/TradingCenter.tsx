@@ -586,6 +586,9 @@ function ProposeTradeDialog({
       onPress={onDismiss}
     >
       <YStack
+        role="dialog"
+        aria-modal
+        aria-label="Propose Trade"
         backgroundColor="$surfacePanel"
         borderColor="$surfacePanelBorder"
         borderWidth={1}
@@ -595,6 +598,7 @@ function ProposeTradeDialog({
         maxWidth="95vw"
         maxHeight="85vh"
         gap="$4"
+        onPress={(e: { stopPropagation: () => void }) => e.stopPropagation()}
       >
         {/* Dialog header */}
         <XStack alignItems="center" justifyContent="space-between">

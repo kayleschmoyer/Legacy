@@ -472,3 +472,95 @@ pnpm exec nx integration web-e2e
 ### `expect.poll()` passes but data is wrong
 
 The poll succeeded (condition met) but downstream assertions fail — the async process completed with incorrect data. This is a real bug. Follow `skills/debug-distributed/SKILL.md` to root-cause.
+
+## UI Integration Test Patterns (Browser-Based)
+
+For full lifecycle tests that drive the real UI against live backends (not mocked), these additional patterns apply:
+
+### Switching Users via localStorage JWT
+
+When swapping identities in a single browser context, **always navigate first, then set the JWT, then reload**:
+
+```typescript
+async function switchUser(page: Page, jwt: string, url?: string) {
+  if (url) {
+    // Navigate first to establish correct origin (avoids SecurityError on about:blank)
+    await page.goto(url);
+    await page.waitForLoadState('domcontentloaded');
+    // Set JWT, then reload so the app loads with the new identity
+    await page.evaluate((t) => localStorage.setItem('auth_jwt', t), jwt);
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+  } else {
+    await page.evaluate((t) => localStorage.setItem('auth_jwt', t), jwt);
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+  }
+}
+```
+
+**Common mistake:** Setting localStorage before any navigation fails with `SecurityError: Access is denied` because the page is on `about:blank` (no origin). And navigating + setting JWT _without reloading_ leaves the app using the old identity's cached data.
+
+### Custom Dialog Backdrop Interception
+
+Tamagui custom dialogs (not `<Dialog>`) often use a `position: fixed` `YStack` backdrop with `onPress={onDismiss}`. This causes two Playwright problems:
+
+1. **Event bubbling** — Clicks inside the dialog bubble to the backdrop, closing it. Fix: add `onPress={(e) => e.stopPropagation()}` to the inner dialog panel.
+2. **Hit test interception** — Playwright's `elementFromPoint()` returns the backdrop overlay, not the dialog content, even with `zIndex`. Fix: use `{ force: true }` on clicks inside the dialog.
+
+When using `force: true`, **always scope locators to the dialog element** to prevent clicking page-level buttons:
+
+```typescript
+// ✅ GOOD — scoped to dialog
+const dialog = page.getByRole('dialog', { name: 'Propose Trade' });
+await dialog.getByRole('button', { name: /Submit/i }).click({ force: true });
+
+// ❌ BAD — unscoped, may click a nav button outside the dialog
+await page.getByRole('button', { name: /Submit/i }).click({ force: true });
+```
+
+To make dialogs testable, add `role="dialog"`, `aria-modal`, and `aria-label` to the component:
+
+```tsx
+<YStack role="dialog" aria-modal aria-label="Propose Trade"
+  onPress={(e) => e.stopPropagation()}>
+```
+
+### Collapsed Accordion Sections
+
+Commissioner panel sections (e.g., "Waiver Processing") may render as collapsed accordions. Always **expand the section before looking for buttons inside it**:
+
+```typescript
+// Click accordion header to expand
+const accordion = page.getByText('Waiver Processing');
+await accordion.click();
+// Now the button inside is visible
+await page.getByRole('button', { name: /Process Waivers/i }).click();
+```
+
+### Auto-Created Resources
+
+Some resources are created automatically by backend processes. Don't try to create them via UI if they already exist — verify existence instead:
+
+```typescript
+// ❌ BAD — matchups were already auto-created after draft
+await page.getByRole('button', { name: /Create Week 1 Matchups/i }).click();
+
+// ✅ GOOD — verify they exist
+await expect(page.getByText(/Week 1/i)).toBeVisible({ timeout: 10000 });
+```
+
+### Adding testID for Complex Selection UIs
+
+When selection UIs have no accessible role/name (e.g., player rows in a claim modal), add `testID` to the Tamagui component. This renders as `data-testid` on web:
+
+```tsx
+<XStack testID={`drop-player-${playerId}`} role="option" aria-label={`Drop ${name}`}>
+```
+
+Then in the test:
+
+```typescript
+const row = page.locator('[data-testid^="drop-player-"]').first();
+await row.click();
+```
