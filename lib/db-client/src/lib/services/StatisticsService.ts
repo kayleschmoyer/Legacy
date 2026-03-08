@@ -435,7 +435,8 @@ export class StatisticsService {
       queryOptions,
     );
     return runWithPublicClient(this.options, async (db) => {
-      const queryBuilder = db.select().from(PublicSchema.seasonBatting);
+      // Drizzle query methods return new objects (immutable) — must reassign.
+      let q = db.select().from(PublicSchema.seasonBatting);
 
       // Build WHERE clause
       const conditions = queryOptions.filters
@@ -464,32 +465,32 @@ export class StatisticsService {
             validConditions.length === 1
               ? validConditions[0]
               : and(...validConditions);
-          queryBuilder.where(whereClause);
+          q = q.where(whereClause) as typeof q;
         }
       }
 
       if (queryOptions.orderBy) {
         const column = getBattingColumn(queryOptions.orderBy);
         if (column) {
-          queryBuilder.orderBy(
+          q = q.orderBy(
             orderDirection === 'asc' ? asc(column) : desc(column),
-          );
+          ) as typeof q;
         }
       }
 
       if (queryOptions.limit) {
-        queryBuilder.limit(queryOptions.limit);
+        q = q.limit(queryOptions.limit) as typeof q;
       }
 
       if (queryOptions.offset) {
-        queryBuilder.offset(queryOptions.offset);
+        q = q.offset(queryOptions.offset) as typeof q;
       }
 
       // Log the SQL query being generated
-      const querySQL = queryBuilder.toSQL();
+      const querySQL = q.toSQL();
       LOGGER.debug('[StatisticsService.getSeasonBattingStats] SQL:', querySQL);
 
-      const results = await queryBuilder;
+      const results = await q;
       LOGGER.debug(
         '[StatisticsService.getSeasonBattingStats] results count:',
         results.length,
@@ -511,7 +512,8 @@ export class StatisticsService {
     queryOptions: SeasonStatisticsQueryOptions = {},
   ): Promise<SeasonPitching[]> {
     return runWithPublicClient(this.options, async (db) => {
-      const queryBuilder = db.select().from(PublicSchema.seasonPitching);
+      // Drizzle query methods return new objects (immutable) — must reassign.
+      let q = db.select().from(PublicSchema.seasonPitching);
 
       // Build WHERE clause
       const conditions = queryOptions.filters
@@ -531,28 +533,28 @@ export class StatisticsService {
             validConditions.length === 1
               ? validConditions[0]
               : and(...validConditions);
-          queryBuilder.where(whereClause);
+          q = q.where(whereClause) as typeof q;
         }
       }
 
       if (queryOptions.orderBy) {
         const column = getPitchingColumn(queryOptions.orderBy);
         if (column) {
-          queryBuilder.orderBy(
+          q = q.orderBy(
             orderDirection === 'asc' ? asc(column) : desc(column),
-          );
+          ) as typeof q;
         }
       }
 
       if (queryOptions.limit) {
-        queryBuilder.limit(queryOptions.limit);
+        q = q.limit(queryOptions.limit) as typeof q;
       }
 
       if (queryOptions.offset) {
-        queryBuilder.offset(queryOptions.offset);
+        q = q.offset(queryOptions.offset) as typeof q;
       }
 
-      return queryBuilder;
+      return q;
     });
   }
 
@@ -563,7 +565,8 @@ export class StatisticsService {
     queryOptions: SeasonStatisticsQueryOptions = {},
   ): Promise<SeasonFielding[]> {
     return runWithPublicClient(this.options, async (db) => {
-      const queryBuilder = db.select().from(PublicSchema.seasonFielding);
+      // Drizzle query methods return new objects (immutable) — must reassign.
+      let q = db.select().from(PublicSchema.seasonFielding);
 
       // Build WHERE clause
       const conditions = queryOptions.filters
@@ -583,28 +586,28 @@ export class StatisticsService {
             validConditions.length === 1
               ? validConditions[0]
               : and(...validConditions);
-          queryBuilder.where(whereClause);
+          q = q.where(whereClause) as typeof q;
         }
       }
 
       if (queryOptions.orderBy) {
         const column = getFieldingColumn(queryOptions.orderBy);
         if (column) {
-          queryBuilder.orderBy(
+          q = q.orderBy(
             orderDirection === 'asc' ? asc(column) : desc(column),
-          );
+          ) as typeof q;
         }
       }
 
       if (queryOptions.limit) {
-        queryBuilder.limit(queryOptions.limit);
+        q = q.limit(queryOptions.limit) as typeof q;
       }
 
       if (queryOptions.offset) {
-        queryBuilder.offset(queryOptions.offset);
+        q = q.offset(queryOptions.offset) as typeof q;
       }
 
-      return queryBuilder;
+      return q;
     });
   }
 

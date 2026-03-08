@@ -155,20 +155,25 @@ export const createSeasonBattingLoader = (
         return { playerId, season };
       });
 
-      // Fetch all stats in a single batched query
-      const allStats = await db
-        .select()
-        .from(PublicSchema.seasonBatting)
-        .where(
-          or(
-            ...lookups.map(({ playerId, season }) =>
-              and(
-                eq(PublicSchema.seasonBatting.playerId, playerId),
-                eq(PublicSchema.seasonBatting.season, season),
+      // Chunk into batches of 50 to avoid unbounded OR conditions on large leagues.
+      // Each chunk generates: WHERE (pid=A AND season=B) OR (pid=C AND season=D) OR ...
+      const allStats: (typeof PublicSchema.seasonBatting.$inferSelect)[] = [];
+      for (const batch of chunk(lookups, 50)) {
+        const rows = await db
+          .select()
+          .from(PublicSchema.seasonBatting)
+          .where(
+            or(
+              ...batch.map(({ playerId, season }) =>
+                and(
+                  eq(PublicSchema.seasonBatting.playerId, playerId),
+                  eq(PublicSchema.seasonBatting.season, season),
+                ),
               ),
             ),
-          ),
-        );
+          );
+        allStats.push(...rows);
+      }
 
       // Create a map for fast lookup
       const statsMap = new Map<
@@ -202,20 +207,24 @@ export const createSeasonPitchingLoader = (
       return { playerId, season };
     });
 
-    // Fetch all stats in a single batched query
-    const allStats = await db
-      .select()
-      .from(PublicSchema.seasonPitching)
-      .where(
-        or(
-          ...lookups.map(({ playerId, season }) =>
-            and(
-              eq(PublicSchema.seasonPitching.playerId, playerId),
-              eq(PublicSchema.seasonPitching.season, season),
+    // Chunk into batches of 50 to avoid unbounded OR conditions on large leagues.
+    const allStats: (typeof PublicSchema.seasonPitching.$inferSelect)[] = [];
+    for (const batch of chunk(lookups, 50)) {
+      const rows = await db
+        .select()
+        .from(PublicSchema.seasonPitching)
+        .where(
+          or(
+            ...batch.map(({ playerId, season }) =>
+              and(
+                eq(PublicSchema.seasonPitching.playerId, playerId),
+                eq(PublicSchema.seasonPitching.season, season),
+              ),
             ),
           ),
-        ),
-      );
+        );
+      allStats.push(...rows);
+    }
 
     // Create a map for fast lookup
     const statsMap = new Map<
@@ -248,20 +257,24 @@ export const createSeasonFieldingLoader = (
       return { playerId, season };
     });
 
-    // Fetch all stats in a single batched query
-    const allStats = await db
-      .select()
-      .from(PublicSchema.seasonFielding)
-      .where(
-        or(
-          ...lookups.map(({ playerId, season }) =>
-            and(
-              eq(PublicSchema.seasonFielding.playerId, playerId),
-              eq(PublicSchema.seasonFielding.season, season),
+    // Chunk into batches of 50 to avoid unbounded OR conditions on large leagues.
+    const allStats: (typeof PublicSchema.seasonFielding.$inferSelect)[] = [];
+    for (const batch of chunk(lookups, 50)) {
+      const rows = await db
+        .select()
+        .from(PublicSchema.seasonFielding)
+        .where(
+          or(
+            ...batch.map(({ playerId, season }) =>
+              and(
+                eq(PublicSchema.seasonFielding.playerId, playerId),
+                eq(PublicSchema.seasonFielding.season, season),
+              ),
             ),
           ),
-        ),
-      );
+        );
+      allStats.push(...rows);
+    }
 
     // Create a map for fast lookup
     const statsMap = new Map<
