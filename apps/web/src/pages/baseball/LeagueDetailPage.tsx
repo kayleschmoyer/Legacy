@@ -103,6 +103,9 @@ import {
   mapBattingStats,
   mapFieldingStats,
   mapPitchingStats,
+  mapSeasonBattingStats,
+  mapSeasonFieldingStats,
+  mapSeasonPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
 import { AvatarImage, AvatarPicker } from '../../components/common';
@@ -1116,13 +1119,19 @@ export function LeagueDetailPage(): React.JSX.Element {
       const gamesRemaining = playerTotalGames - gamesPlayed;
       let projection = actualScore;
       if (gamesRemaining > 0) {
-        // Try season stats projection first
+        // Try season stats projection first.
+        // mapSeason*Stats converts the GraphQL camelCase field names (e.g. "homeRuns",
+        // "games") to the short DB column names (e.g. "hr", "g") that
+        // calculateMatchupProjection / computeAverageScoring expect.
+        const mappedBatting = mapSeasonBattingStats(mp.seasonBatting);
+        const mappedPitching = mapSeasonPitchingStats(mp.seasonPitching);
+        const mappedFielding = mapSeasonFieldingStats(mp.seasonFielding);
         const seasonStats: SeasonStats = {
           playerId: pid,
           season: mp.season ?? new Date().getFullYear(),
-          battingStats: mp.seasonBatting ?? undefined,
-          pitchingStats: mp.seasonPitching ?? undefined,
-          fieldingStats: mp.seasonFielding ?? undefined,
+          battingStats: mappedBatting ?? undefined,
+          pitchingStats: mappedPitching ?? undefined,
+          fieldingStats: mappedFielding ?? undefined,
         };
         if (
           seasonStats.battingStats ||
