@@ -939,6 +939,24 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           `Executing batch insert of ${assignments.length} team member assignments`,
         );
 
+        // Idempotency guard: if a prior SQS delivery committed team_members but
+        // a later step (createLeagueMatchupsAfterDraft / finalizeDraftAndStatus)
+        // failed, the message is retried and this insert would hit a duplicate-key
+        // error on the (team_id, position_id) unique constraint.  Deleting
+        // within this same transaction is safe: on success both the delete and
+        // the insert commit atomically; on failure everything rolls back.
+        await tx
+          .delete(PublicSchema.teamMembers)
+          .where(eq(PublicSchema.teamMembers.leagueId, leagueId));
+        await tx
+          .delete(PublicSchema.leagueActivityLog)
+          .where(
+            and(
+              eq(PublicSchema.leagueActivityLog.leagueId, leagueId),
+              eq(PublicSchema.leagueActivityLog.eventType, 'draft_pick_made'),
+            ),
+          );
+
         await tx.insert(PublicSchema.teamMembers).values(
           assignments.map((assignment) => ({
             teamId: assignment.teamId,
