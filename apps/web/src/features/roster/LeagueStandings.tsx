@@ -90,6 +90,7 @@ export function LeagueStandings({
         winPercentage: null as number | null,
         pointsFor: null as number | null,
         pointsAgainst: null as number | null,
+        divisionId: null as number | null,
       }));
     }
     // Build a map from teamId → standings record
@@ -114,6 +115,7 @@ export function LeagueStandings({
         winPercentage: s.winPercentage ?? null,
         pointsFor: s.pointsFor ?? null,
         pointsAgainst: s.pointsAgainst ?? null,
+        divisionId: s.divisionId ?? null,
       };
     });
 
@@ -133,12 +135,34 @@ export function LeagueStandings({
           winPercentage: null,
           pointsFor: null,
           pointsAgainst: null,
+          divisionId: null,
         });
       }
     }
 
     return merged;
   }, [teams, standings, leagueId]);
+
+  // Group teams by division when multiple divisions exist
+  const divisionGroups = useMemo(() => {
+    const uniqueDivisions = new Set(
+      rankedTeams
+        .map((t) => t.divisionId)
+        .filter((d): d is number => d != null),
+    );
+    // If 0 or 1 division, no grouping needed
+    if (uniqueDivisions.size <= 1) return null;
+
+    const groups = new Map<number, typeof rankedTeams>();
+    for (const team of rankedTeams) {
+      const divId = team.divisionId ?? 0;
+      const group = groups.get(divId) ?? [];
+      group.push(team);
+      groups.set(divId, group);
+    }
+    // Return sorted by division ID
+    return [...groups.entries()].sort(([a], [b]) => a - b);
+  }, [rankedTeams]);
 
   const isLoading = loading || standingsLoading;
 
@@ -148,6 +172,150 @@ export function LeagueStandings({
     } else {
       navigate(`/baseball/team/${teamId}`);
     }
+  };
+
+  type RankedTeam = (typeof rankedTeams)[number];
+
+  const renderTeamRow = (team: RankedTeam, index: number, total: number) => {
+    const isUserTeam = userTeamId === team.id;
+    const rank = index + 1;
+    const rankStyle = getRankStyle(rank);
+    const isEven = index % 2 === 0;
+
+    return (
+      <React.Fragment key={team.id}>
+        <XStack
+          paddingHorizontal="$4"
+          paddingVertical="$2.5"
+          backgroundColor={
+            isUserTeam
+              ? withAlpha(BRAND_NAVY_LIGHT, 0.12)
+              : isEven
+                ? '$background'
+                : '$surfaceSubtle'
+          }
+          borderLeftWidth={3}
+          borderLeftColor={isUserTeam ? BRAND_NAVY_LIGHT : 'transparent'}
+          role="listitem"
+          cursor="pointer"
+          hoverStyle={{
+            backgroundColor: isUserTeam
+              ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
+              : '$surfaceSubtle',
+          }}
+          pressStyle={{ scale: 0.995, opacity: 0.9 }}
+          onPress={() => handleTeamClick(team.id)}
+          alignItems="center"
+          animation="quick"
+          minHeight={48}
+          style={
+            isUserTeam
+              ? {
+                  boxShadow: `inset 0 0 24px ${withAlpha(BRAND_NAVY_LIGHT, 0.1)}`,
+                }
+              : rank <= 3
+                ? {
+                    boxShadow: `inset 0 0 20px ${withAlpha(AMBER, 0.06)}`,
+                  }
+                : undefined
+          }
+        >
+          {/* Rank */}
+          <YStack width={44} alignItems="flex-start">
+            <RankBadge
+              backgroundColor={rankStyle.bg}
+              borderColor={rankStyle.border}
+              borderWidth={1}
+            >
+              <Text fontSize="$2" fontWeight="800" color={rankStyle.color}>
+                {rank}
+              </Text>
+            </RankBadge>
+          </YStack>
+
+          {/* Team info */}
+          <YStack flex={2} gap="$0.5">
+            <XStack alignItems="center" gap="$2">
+              <AvatarImage
+                url={team.logoUrl}
+                username={team.name}
+                size={24}
+                borderRadius={4}
+              />
+              <Text
+                fontSize="$3"
+                fontWeight={isUserTeam ? '700' : '500'}
+                color="$color"
+                numberOfLines={1}
+              >
+                {team.name}
+              </Text>
+              {isUserTeam && (
+                <Text
+                  fontSize={10}
+                  fontWeight="800"
+                  color={BRAND_GOLD_LIGHT}
+                  backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                  paddingHorizontal="$1.5"
+                  paddingVertical={1}
+                  borderRadius="$2"
+                >
+                  YOU
+                </Text>
+              )}
+            </XStack>
+          </YStack>
+
+          {/* Waiver Info */}
+          <Text
+            width={60}
+            fontSize="$3"
+            fontWeight="500"
+            color="$textMuted"
+            textAlign="center"
+            display="none"
+            $gtSm={{ display: 'flex' }}
+          >
+            {waiverType === 'faab'
+              ? team.faabBudget != null
+                ? `$${team.faabBudget}`
+                : '—'
+              : team.waiverOrder != null
+                ? `#${team.waiverOrder}`
+                : '—'}
+          </Text>
+
+          {/* Record (W-L-T) */}
+          <Text
+            width={80}
+            fontSize="$3"
+            fontWeight="600"
+            color="$color"
+            textAlign="center"
+          >
+            {team.wins != null
+              ? `${team.wins}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}`
+              : '—'}
+          </Text>
+
+          {/* Points */}
+          <Text
+            width={70}
+            fontSize="$3"
+            fontWeight="600"
+            color="$textMuted"
+            textAlign="right"
+          >
+            {team.pointsFor != null
+              ? (Math.round(team.pointsFor * 10) / 10).toLocaleString()
+              : '—'}
+          </Text>
+        </XStack>
+        {index < total - 1 && (
+          <Separator borderColor="$outlineSubtle" marginVertical={0} />
+        )}
+      </React.Fragment>
+    );
   };
 
   if (isLoading) {
@@ -301,153 +469,44 @@ export function LeagueStandings({
       </XStack>
 
       {/* Team Rows */}
-      <YStack role="list">
-        {rankedTeams.map((team, index) => {
-          const isUserTeam = userTeamId === team.id;
-          const rank = index + 1;
-          const rankStyle = getRankStyle(rank);
-          const isEven = index % 2 === 0;
-
-          return (
-            <React.Fragment key={team.id}>
-              <XStack
-                paddingHorizontal="$4"
-                paddingVertical="$2.5"
-                backgroundColor={
-                  isUserTeam
-                    ? withAlpha(BRAND_NAVY_LIGHT, 0.12)
-                    : isEven
-                      ? '$background'
-                      : '$surfaceSubtle'
-                }
-                borderLeftWidth={3}
-                borderLeftColor={isUserTeam ? BRAND_NAVY_LIGHT : 'transparent'}
-                role="listitem"
-                cursor="pointer"
-                hoverStyle={{
-                  backgroundColor: isUserTeam
-                    ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
-                    : '$surfaceSubtle',
-                }}
-                pressStyle={{ scale: 0.995, opacity: 0.9 }}
-                onPress={() => handleTeamClick(team.id)}
-                alignItems="center"
-                animation="quick"
-                minHeight={48}
-                style={
-                  isUserTeam
-                    ? {
-                        boxShadow: `inset 0 0 24px ${withAlpha(BRAND_NAVY_LIGHT, 0.1)}`,
-                      }
-                    : rank <= 3
-                      ? {
-                          boxShadow: `inset 0 0 20px ${withAlpha(AMBER, 0.06)}`,
-                        }
-                      : undefined
-                }
+      {divisionGroups ? (
+        divisionGroups.map(([divId, divTeams], groupIdx) => (
+          <YStack key={divId} role="list">
+            {/* Division Header */}
+            <XStack
+              paddingHorizontal="$4"
+              paddingVertical="$2"
+              backgroundColor={withAlpha(SURFACE_SUBTLE, 0.8)}
+              borderTopWidth={groupIdx > 0 ? 1 : 0}
+              borderTopColor="$outlineSubtle"
+              borderBottomWidth={1}
+              borderBottomColor="$outlineSubtle"
+            >
+              <Text
+                fontSize="$2"
+                fontWeight="800"
+                color="$textMuted"
+                textTransform="uppercase"
+                letterSpacing={0.8}
               >
-                {/* Rank */}
-                <YStack width={44} alignItems="flex-start">
-                  <RankBadge
-                    backgroundColor={rankStyle.bg}
-                    borderColor={rankStyle.border}
-                    borderWidth={1}
-                  >
-                    <Text
-                      fontSize="$2"
-                      fontWeight="800"
-                      color={rankStyle.color}
-                    >
-                      {rank}
-                    </Text>
-                  </RankBadge>
-                </YStack>
-
-                {/* Team info */}
-                <YStack flex={2} gap="$0.5">
-                  <XStack alignItems="center" gap="$2">
-                    <AvatarImage
-                      url={team.logoUrl}
-                      username={team.name}
-                      size={24}
-                      borderRadius={4}
-                    />
-                    <Text
-                      fontSize="$3"
-                      fontWeight={isUserTeam ? '700' : '500'}
-                      color="$color"
-                      numberOfLines={1}
-                    >
-                      {team.name}
-                    </Text>
-                    {isUserTeam && (
-                      <Text
-                        fontSize={10}
-                        fontWeight="800"
-                        color={BRAND_GOLD_LIGHT}
-                        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
-                        paddingHorizontal="$1.5"
-                        paddingVertical={1}
-                        borderRadius="$2"
-                      >
-                        YOU
-                      </Text>
-                    )}
-                  </XStack>
-                </YStack>
-
-                {/* Waiver Info */}
-                <Text
-                  width={60}
-                  fontSize="$3"
-                  fontWeight="500"
-                  color="$textMuted"
-                  textAlign="center"
-                  display="none"
-                  $gtSm={{ display: 'flex' }}
-                >
-                  {waiverType === 'faab'
-                    ? team.faabBudget != null
-                      ? `$${team.faabBudget}`
-                      : '—'
-                    : team.waiverOrder != null
-                      ? `#${team.waiverOrder}`
-                      : '—'}
-                </Text>
-
-                {/* Record (W-L-T) */}
-                <Text
-                  width={80}
-                  fontSize="$3"
-                  fontWeight="600"
-                  color="$color"
-                  textAlign="center"
-                >
-                  {team.wins != null
-                    ? `${team.wins}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}`
-                    : '—'}
-                </Text>
-
-                {/* Points */}
-                <Text
-                  width={70}
-                  fontSize="$3"
-                  fontWeight="600"
-                  color="$textMuted"
-                  textAlign="right"
-                >
-                  {team.pointsFor != null
-                    ? (Math.round(team.pointsFor * 10) / 10).toLocaleString()
-                    : '—'}
-                </Text>
-              </XStack>
-              {index < rankedTeams.length - 1 && (
-                <Separator borderColor="$outlineSubtle" marginVertical={0} />
-              )}
-            </React.Fragment>
-          );
-        })}
-      </YStack>
+                Division {divId}
+              </Text>
+              <Text fontSize="$2" color="$textMuted" marginLeft="$2">
+                ({divTeams.length} {divTeams.length === 1 ? 'team' : 'teams'})
+              </Text>
+            </XStack>
+            {divTeams.map((team, index) =>
+              renderTeamRow(team, index, divTeams.length),
+            )}
+          </YStack>
+        ))
+      ) : (
+        <YStack role="list">
+          {rankedTeams.map((team, index) =>
+            renderTeamRow(team, index, rankedTeams.length),
+          )}
+        </YStack>
+      )}
     </Card>
   );
 }
