@@ -72,6 +72,7 @@ import {
   useGetLeagueByIdQuery,
   useGetLeagueTeamsLazyQuery,
   useGetMatchupPlayersQuery,
+  useGetPlayoffBracketQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersLazyQuery,
   useGetTeamMembersQuery,
@@ -95,6 +96,7 @@ import { canPlayerPlayPosition } from '../../features/roster/LeagueRosterManagem
 import { PendingWaiverClaims } from '../../features/roster/PendingWaiverClaims';
 import { PendingTradeOffers } from '../../features/roster/PendingTradeOffers';
 import { LeagueStandings } from '../../features/roster/LeagueStandings';
+import { PlayoffBracketDisplay } from '../../components/matchup/PlayoffBracketDisplay';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import { CommissionerAnnouncementsPanel } from '../../features/baseball/CommissionerAnnouncementsPanel';
 import { LeagueFreeAgents } from '../../features/baseball/LeagueFreeAgents';
@@ -533,6 +535,13 @@ export function LeagueDetailPage(): React.JSX.Element {
       void getLeagueTeams({ variables: { leagueId } });
     }
   }, [leagueId, reduxLeagueTeams.length, getLeagueTeams, dispatch]);
+
+  // Fetch playoff bracket for the standings tab
+  const { data: bracketData, loading: bracketLoading } =
+    useGetPlayoffBracketQuery({
+      variables: { leagueId },
+      skip: isNaN(leagueId) || activeTab !== 'standings',
+    });
 
   // ── WebSocket: listen for draft lifecycle events ──
 
@@ -3366,6 +3375,7 @@ export function LeagueDetailPage(): React.JSX.Element {
               role="tabpanel"
               id="panel-standings"
               aria-labelledby="tab-standings"
+              gap="$4"
             >
               <LeagueStandings
                 leagueId={leagueId}
@@ -3375,6 +3385,20 @@ export function LeagueDetailPage(): React.JSX.Element {
                 waiverType={league?.waiverType}
                 onTeamClick={handleViewTeamRoster}
               />
+              {(bracketLoading || bracketData?.getPlayoffBracket) && (
+                <>
+                  <Separator />
+                  {bracketLoading ? (
+                    <XStack justifyContent="center" padding="$4">
+                      <Spinner size="small" />
+                    </XStack>
+                  ) : bracketData?.getPlayoffBracket ? (
+                    <PlayoffBracketDisplay
+                      bracket={bracketData.getPlayoffBracket}
+                    />
+                  ) : null}
+                </>
+              )}
             </YStack>
           )}
           {activeTab === 'matchup' && (
