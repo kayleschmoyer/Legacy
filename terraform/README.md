@@ -63,7 +63,8 @@ Manage your custom domain with Terraform:
 
 Central entry point for all API requests:
 
-- **Base URL**: `https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev`
+- **Custom Domain**: `https://api.legacy-fantasy.com` (ACM cert + Route53 alias + API GW custom domain)
+- **Internal URL**: `https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev`
 - **Endpoints**:
   - `/graphql` - GraphQL API
   - `/oauth` - Authentication and user management

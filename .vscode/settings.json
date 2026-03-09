@@ -90,7 +90,30 @@
     "Tee-Object": true,
     "Test-Path": true,
     "Get-Item": true,
-    "Set-Content": true
+    "Set-Content": true,
+    "/^node node_modules/nx/bin/nx\\.js run web-e2e:typecheck$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^cd \"D:\\\\code\\\\legacy-sports-worktrees\\\\LS-595-matchup-detail-integration-test\" ; node \"D:\\\\code\\\\legacy-sports\\\\node_modules\\\\typescript\\\\bin\\\\tsc\" --noEmit -p apps/web-e2e/tsconfig\\.app\\.json 2>&1 \\| Select-Object -Last 25$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^cd \"D:\\\\code\\\\legacy-sports\" ; node node_modules/nx/bin/nx\\.js run web-e2e:lint --files=\"apps/web-e2e/src/integration/tests/matchup-detail-ui\\.spec\\.ts\" 2>&1 \\| Select-Object -Last 25$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "git reset": true,
+    "git worktree": true,
+    "git -C \"D:\\code\\legacy-sports\"": true,
+    "/^node scripts/terraform-unlock\\.js 2>&1$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "terraform": true,
+    "git stash": true,
+    "aws": true,
+    "Rename-Item": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {

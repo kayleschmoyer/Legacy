@@ -240,6 +240,14 @@ make wt-setup WT=<path-to-worktree>
 Copy-Item D:\code\legacy-sports\terraform\secrets.auto.tfvars <worktree>\terraform\secrets.auto.tfvars
 ```
 
+> **Note on `jira_credentials`**: This variable is **not** in `secrets.auto.tfvars` — it is managed via the `TF_VAR_jira_credentials` environment variable (set from GitHub Actions secret `JIRA_CREDENTIALS` in CI). For local apply, fetch it from AWS Secrets Manager:
+>
+> ```powershell
+> $env:TF_VAR_jira_credentials = aws secretsmanager get-secret-value `
+>   --secret-id "legacy-sports-dev-jira-credentials" `
+>   --query SecretString --output text
+> ```
+
 ---
 
 ### Issue: Piping `terraform apply` output causes orphaned state lock
@@ -300,6 +308,28 @@ terraform apply -auto-approve
 5. **Use workspaces** - Separate dev/staging/prod
 6. **Review changes** - Understand what will change
 7. **Apply incrementally** - Use -target for large changes
+8. **Update CI/CD IAM when adding new resource types** — see section below
+
+## CI/CD IAM Permission Checklist
+
+When Terraform changes introduce a **new AWS resource type** (e.g., ACM certificates, API Gateway custom domains), the GitHub Actions IAM role may lack permissions for it.
+
+**File**: `terraform/github-actions-oidc.tf` — inline policy `github_actions_additional`
+
+**Checklist when adding resources**:
+
+1. **Check existing statements** — does the policy already cover the service?
+2. **Add actions** — create a new `statement` block for the service (e.g., `acm:*`, `route53:ChangeResourceRecordSets`)
+3. **Add resource ARNs** — add the new resource ARN patterns to both read and write resource lists as needed
+4. **Principle of least privilege** — scope to the specific resources, not `*`
+
+**Common additions and their required permissions**:
+
+| Resource Type   | Actions Needed                                                                                                                                                                                  | Resource ARN Pattern                                                                   |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| ACM Certificate | `acm:RequestCertificate`, `acm:DescribeCertificate`, `acm:DeleteCertificate`, `acm:ListCertificates`, `acm:ListTagsForCertificate`, `acm:AddTagsToCertificate`, `acm:RemoveTagsFromCertificate` | `arn:aws:acm:*:ACCOUNT:certificate/*`                                                  |
+| Route53 Write   | `route53:ChangeResourceRecordSets`, `route53:GetChange`                                                                                                                                         | `arn:aws:route53:::hostedzone/*`, `arn:aws:route53:::change/*`                         |
+| API GW Domain   | (add to existing apigateway resource paths)                                                                                                                                                     | `arn:aws:apigateway:REGION::/domainnames`, `arn:aws:apigateway:REGION::/domainnames/*` |
 
 ## Pre-apply Checklist
 

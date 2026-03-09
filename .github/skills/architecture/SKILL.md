@@ -106,6 +106,7 @@ See [db-schema.md](db-schema.md) for full schema reference and [db-query.md](db-
 ## GraphQL API
 
 - **Framework**: Apollo Server + Pothos schema builder
+- **Custom domain**: `https://api.legacy-fantasy.com` (ACM cert + API GW custom domain + Route53 alias)
 - **Type generation**: Codegen from schema → TypeScript types
 - **Service layer**: `LeagueService`, `PlayerService`, `StatisticsService`, `ScoringService`, `DraftService`
 - **Location**: `lambdas/db/` (the "db" lambda is the GraphQL Lambda)
