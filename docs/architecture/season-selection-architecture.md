@@ -1,5 +1,7 @@
 # Season Selection Architecture
 
+> This doc is accurate for the season-selection subsystem. For the full end-to-end league lifecycle, see [`docs/guides/league-flow-complete-guide.md`](../guides/league-flow-complete-guide.md).
+
 ## Overview
 
 The Legacy Sports system uses **per-player season selection** rather than a single season per matchup. This allows different players in the same matchup to play games from their different career years.

@@ -1,880 +1,427 @@
-# Complete League Flow Guide
+﻿# Complete League Flow Guide
 
-A comprehensive guide to the Legacy Sports league lifecycle, from creation to championship.
+> **Last verified:** March 2026 ΓÇö validated against actual codebase schema and mutations.
+
+A comprehensive guide to the Legacy Sports league lifecycle, from creation through season rollover. Written for AI agents and developers.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Phase 1: League Creation](#phase-1-league-creation)
-- [Phase 2: Draft Process](#phase-2-draft-process)
-- [Phase 3: Weekly Matchups](#phase-3-weekly-matchups)
-- [Phase 4: Game Selection](#phase-4-game-selection)
-- [Phase 5: Scoring & Results](#phase-5-scoring--results)
-- [Phase 6: Weekly Progression](#phase-6-weekly-progression)
+- [Phase 2: User Assignment](#phase-2-user-assignment)
+- [Phase 3: Draft](#phase-3-draft)
+- [Phase 4: Matchup & Season Generation](#phase-4-matchup--season-generation)
+- [Phase 5: Game Selection](#phase-5-game-selection)
+- [Phase 6: Stats Loading & Scoring](#phase-6-stats-loading--scoring)
+- [Phase 7: Weekly Progression](#phase-7-weekly-progression)
+- [Phase 8: Free Agency & Waivers](#phase-8-free-agency--waivers)
+- [Phase 9: Season End & Playoffs](#phase-9-season-end--playoffs)
+- [Phase 10: Season Renewal](#phase-10-season-renewal)
 - [Technical Architecture](#technical-architecture)
+- [Status Enums Reference](#status-enums-reference)
+- [Key Tables Reference](#key-tables-reference)
 
 ---
 
 ## Overview
 
-Legacy Sports uses a unique season-based fantasy system where players select historical seasons and games from those seasons to compete head-to-head.
+Legacy Sports is a fantasy baseball platform where teams draft historical baseball players and compete head-to-head using real game-by-game stats from those players' careers. Each drafted player is randomly assigned a historical season, and each week random games from that season are selected and scored.
 
 ### High-Level Flow
 
 ```
-┌─────────────────┐
-│ League Creation │ Commissioner creates league with settings + teams
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ User Assignment │ Users are assigned to teams
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Draft Process  │ Team managers draft players and select seasons
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Matchup Created │ Pairings set for each week
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Game Selection  │ Commissioner triggers game-by-game selection
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Stats Loading   │ Baseball Reference stats loaded automatically
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Score Calculate │ Points calculated based on league settings
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Winner Declared │ Higher score wins the week
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Week Complete  │ Record winner, update standings
-└────────┬────────┘
-         │
-         ├─── Week < 20? ───┐
-         │                  │
-         │ YES              │ NO
-         │                  │
-         ▼                  ▼
-  ┌─────────────┐    ┌──────────────┐
-  │ Next Week   │    │Championship  │
-  │ Generated   │    │  Complete    │
-  └──────┬──────┘    └──────────────┘
-         │
-         └─── Loop back to Matchup Created
-              (Repeat for weeks 2-20)
+League Creation ΓåÆ User Assignment ΓåÆ Draft ΓåÆ Matchup Generation
+       ΓåÆ Game Selection ΓåÆ Stats Loading ΓåÆ Scoring
+       ΓåÆ Weekly Progression (repeat) ΓåÆ Playoffs ΓåÆ Season Renewal
 ```
+
+### Key Concepts
+
+- **Per-player seasons**: Each player gets a randomly assigned historical season (not one season per matchup). Stored in `league_week_player_seasons`.
+- **Commissioner-driven progression**: The commissioner triggers game selection and matchup advancement via the Next Step control.
+- **SQS pipeline**: Game selection ΓåÆ stats loading ΓåÆ scoring flows through FIFO SQS queues across multiple Lambdas.
+- **Seasons are assigned after draft, not during**: The draft only assigns players to teams. Season assignment happens automatically when matchups are generated post-draft.
 
 ---
 
 ## Phase 1: League Creation
 
-### Commissioner Actions
+### Mutation: `createLeagueAndTeams`
 
-The commissioner creates a league and configures all settings.
+The commissioner creates a league with all settings configured upfront.
 
-```
-┌──────────────────────────────────────────────────────┐
-│              LEAGUE CREATION FORM                    │
-├──────────────────────────────────────────────────────┤
-│                                                      │
-│  League Name: ___________________                    │
-│                                                      │
-│  Number of Teams: [12] ▼                            │
-│                                                      │
-│  Games Per Matchup: [5] ▼                           │
-│    (How many games each player selects per week)     │
-│                                                      │
-│  Min Games Per Season: [100] ▼                      │
-│    (Minimum games to qualify as a valid season)      │
-│                                                      │
-│  Weeks in Season: [20] ▼                            │
-│                                                      │
-│  Roster Positions:                                   │
-│    Batters: [10]  Pitchers: [5]  Bench: [10]       │
-│                                                      │
-│  Scoring Settings:                                   │
-│    HR: [3]  RBI: [1]  R: [1]  H: [1]  ...          │
-│    W: [2]   SO: [1]   SV: [2]  ...                 │
-│                                                      │
-│              [Create League]                         │
-│                                                      │
-└──────────────────────────────────────────────────────┘
-```
+**Key settings:**
 
-### Database State After Creation
+| Setting | Column | Default | Description |
+|---------|--------|---------|-------------|
+| Team count | `teams` created | ΓÇö | Number of teams (creates N team rows) |
+| Games per matchup | `gamesPerMatchup` | 5 | How many games each player plays per week |
+| Min games per season | `minGamesPerSeason` | 10 | Minimum games for a season to be eligible |
+| Total matchups | `totalMatchups` | 10 | Number of weeks in the regular season |
+| Roster size | `maxRosterSize` | 25 | Max players per team |
+| SP starts per matchup | `spStartsPerMatchup` | 1 | Starting pitcher starts per week |
+| Waiver type | `waiverType` | `'standard'` | `'standard'` or `'faab'` |
+| FAAB budget | `faabBudgetDefault` | 100 | Starting budget for FAAB leagues |
+| Player pool | `playerPool` | `'all'` | `'all'`, `'nl'`, or `'al'` |
+| Era filter | `eraFilter` | `'all'` | Historical era restriction |
+| Scheduling | `schedulingStrategy` | `'round-robin'` | `'round-robin'`, `'divisional'`, `'random'` |
+| Salary cap | `salaryCapEnabled` | false | Enable salary cap mode |
+
+### What gets created
+
+1. **League** row with unique `inviteCode` (8 chars)
+2. **N teams** with auto-generated names, `manager_id = NULL`
+3. **League members** entry for the owner (commissioner permission)
+4. **Draft** record with default settings (`draftStatus = 'not-started'`)
+5. **Roster positions** (league_positions) based on configuration
+6. **Scoring settings** (league-specific stat multipliers)
+
+### Database state
 
 ```
-leagues
-┌────┬──────────────┬────────────┬──────────────────┬──────┐
-│ id │     name     │ num_teams  │ games_per_matchup│ ... │
-├────┼──────────────┼────────────┼──────────────────┼──────┤
-│ 2  │ My League    │    12      │        5         │ ... │
-└────┴──────────────┴────────────┴──────────────────┴──────┘
-
-teams (Auto-created with league)
-┌────┬───────────────────┬────────────┬────────────┐
-│ id │       name        │ manager_id │ league_id  │
-├────┼───────────────────┼────────────┼────────────┤
-│ 11 │ Team 1            │    NULL    │     2      │
-│ 12 │ Team 2            │    NULL    │     2      │
-│ 13 │ Team 3            │    NULL    │     2      │
-│ ...│ ...               │    NULL    │     2      │
-│ 22 │ Team 12           │    NULL    │     2      │
-└────┴───────────────────┴────────────┴────────────┘
-
-scoring_settings
-┌────────────┬──────────┬───────┐
-│ league_id  │  stat    │ value │
-├────────────┼──────────┼───────┤
-│     2      │   hr     │   3   │
-│     2      │   rbi    │   1   │
-│     2      │   w      │   2   │
-└────────────┴──────────┴───────┘
+leagues: { id, name, draftStatus='not-started', currentWeek=NULL, inviteCode='ABC12345' }
+teams:   { id, name='Team 1', leagueId, managerId=NULL } ├ù N
+drafts:  { id, leagueId, draftMode='live', draftStatus via league }
 ```
 
 ---
 
-## Phase 2: User Assignment & Draft
+## Phase 2: User Assignment
 
-### Step 1: User Assignment to Teams
+### How users join
 
-Users are assigned to teams by the commissioner or can claim available teams.
+- **Invite code**: User calls `joinLeague(inviteCode, teamName)` ΓÇö claims first unassigned team
+- **Public league**: User calls `joinPublicLeague(leagueId, teamName)` ΓÇö no code needed
+- **Commissioner assignment**: Commissioner can assign users to specific teams
 
-```
-┌─────────────────────────────────────────────────────────┐
-│              TEAM ASSIGNMENT                            │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  Available Teams:                                       │
-│                                                         │
-│  ┌─────────────────────────────────────────────────┐  │
-│  │ Team 1  [Unassigned]  [Assign User] [Rename]   │  │
-│  │ Team 2  [Unassigned]  [Assign User] [Rename]   │  │
-│  │ Team 3  [John Smith]  [Remove] [Rename]        │  │
-│  │ Team 4  [Unassigned]  [Assign User] [Rename]   │  │
-│  │ ...                                              │  │
-│  └─────────────────────────────────────────────────┘  │
-│                                                         │
-│  User can:                                              │
-│  • Rename their team (e.g., "The Bronx Bombers")      │
-│  • Upload team logo                                     │
-│  • View league settings                                 │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+### What happens on join
 
-Database After Assignment:
-teams
-┌────┬───────────────────┬────────────┬────────────┐
-│ id │       name        │ manager_id │ league_id  │
-├────┼───────────────────┼────────────┼────────────┤
-│ 11 │ The Bronx Bombers │     5      │     2      │ ← John assigned & renamed
-│ 12 │ Cubs Forever      │     6      │     2      │ ← Jane assigned & renamed
-│ 13 │ Team 3            │    NULL    │     2      │ ← Still unassigned
-│ ...│                   │            │            │
-└────┴───────────────────┴────────────┴────────────┘
-```
+1. User claims an unassigned team (`teams.managerId` set to user ID via `league_members`)
+2. `league_members` row created: `{ leagueId, userId, teamId, permissionLevel='general_manager' }`
+3. User can rename team, upload logo, set colors
 
-### Step 2: Draft Execution
+---
 
-#### Snake Draft Order
+## Phase 3: Draft
 
-```
-Round 1:  Team 1 → Team 2 → Team 3 → ... → Team 12
-          (Pick 1) (Pick 2) (Pick 3)        (Pick 12)
+### Draft configuration
 
-Round 2:  Team 12 → Team 11 → ... → Team 2 → Team 1
-          (Pick 13) (Pick 14)        (Pick 23) (Pick 24)
+| Setting | Values | Default |
+|---------|--------|---------|
+| Draft mode | `'live'`, `'automated'` | `'live'` |
+| Selection method | `'standard'`, `'auction'`, `'random'` | `'standard'` |
+| Draft order | `'snake'`, `'linear'` | `'snake'` |
+| Pick time limit | 30ΓÇô3600 seconds | 120s |
+| Player pool | `'all'`, `'nl'`, `'al'` | `'all'` |
 
-Round 3:  Team 1 → Team 2 → ... → Team 12
-          (Pick 25)                  (Pick 36)
-```
+### Commissioner starts the draft
 
-#### Draft Pick Flow
+**Mutation: `startDraft(leagueId)`**
 
-```
-┌──────────────────────────────────────────────────────────┐
-│              DRAFT PICK INTERFACE                        │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  Round 5, Pick 53                                        │
-│  Your Turn: The Bronx Bombers                           │
-│                                                          │
-│  Select Player:                                          │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │ Search: [Babe Ruth______________________] [Search]│ │
-│  └────────────────────────────────────────────────────┘ │
-│                                                          │
-│  Available Players:                                      │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │ • Babe Ruth (1927)         Career BA: .342        │ │
-│  │ • Ted Williams (1941)      Career BA: .344        │ │
-│  │ • Barry Bonds (2001)       Career BA: .298        │ │
-│  │ ...                                                │ │
-│  └────────────────────────────────────────────────────┘ │
-│                                                          │
-│  ⭐ SEASON SELECTION (Critical Choice!)                 │
-│  Select Season for Babe Ruth:                           │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │ • 1927: 60 HR, .356 BA, 165 RBI (151 games) ✓    │ │
-│  │ • 1921: 59 HR, .378 BA, 171 RBI (152 games)      │ │
-│  │ • 1928: 54 HR, .323 BA, 142 RBI (154 games)      │ │
-│  └────────────────────────────────────────────────────┘ │
-│                                                          │
-│  This season will be used for ALL 20 weeks!             │
-│  Random games will be selected from this season.        │
-│                                                          │
-│           [Confirm Pick: Babe Ruth 1927]                │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-```
+1. Validates all teams have managers
+2. Creates `draft_teams` records with draft order positions
+3. Sets `leagues.draftStatus ΓåÆ 'queued'`
+4. Sends SQS message to `{prefix}-automatic-drafts.fifo` queue
+5. Draft processor Lambda picks up the message
+6. Sets `draftStatus ΓåÆ 'in-progress'`, `draftStartedAt = now()`
+7. Sets initial `currentPickDeadline = now() + pickTimeLimitSeconds`
 
-#### Database State During Draft
+### Draft modes
 
-```
-team_members
-┌────┬─────────┬───────────┬────────┬────────────────┬────────┐
-│ id │ team_id │ player_id │position│ draft_position │ season │
-├────┼─────────┼───────────┼────────┼────────────────┼────────┤
-│ 1  │   11    │   2239    │   OF   │       1        │  1927  │ ← Babe Ruth
-│ 2  │   12    │   3075    │   SS   │       2        │  1941  │ ← Honus Wagner
-│ 3  │   13    │   2593    │   2B   │       3        │  1991  │ ← Rogers Hornsby
-└────┴─────────┴───────────┴────────┴────────────────┴────────┘
+**Live draft** (`draftMode = 'live'`):
+- Real-time picking via UI; each team owner picks in turn
+- `makeDraftPick(draftId, playerId)` ΓÇö only accepts player ID; **no season parameter**
+- Snake order: Round 1 goes 1ΓåÆN, Round 2 goes NΓåÆ1, etc.
+- Pick timer: `currentPickDeadline` enforced by EventBridge cron (1-minute poll)
+- Auto-pick on timeout: Best available player (position-aware) is selected automatically
 
-league_week_player_seasons (Created during draft)
-┌────┬───────────┬─────────────┬───────────┬────────┐
-│ id │ league_id │ week_number │ player_id │ season │
-├────┼───────────┼─────────────┼───────────┼────────┤
-│ 1  │     2     │      1      │   2239    │  1927  │ ← Week 1, Babe Ruth
-│ 2  │     2     │      1      │   3075    │  1941  │ ← Week 1, Honus Wagner
-│ 3  │     2     │      1      │   2593    │  1991  │ ← Week 1, Rogers Hornsby
-│ ... (repeated for all 20 weeks)                    │
-└────┴───────────┴─────────────┴───────────┴────────┘
-```
+**Automated draft** (`draftMode = 'automated'`):
+- System auto-picks all players using the draft queue or best-available logic
+- Runs to completion without user interaction
 
-### League Status Tracking
+### What a draft pick does
 
-The league progresses through various statuses:
+**Mutation: `makeDraftPick(draftId, playerId)`**
+
+1. Validates it's the user's turn (authorization check)
+2. Validates player not already drafted
+3. Creates `draft_picks` row: `{ draftId, teamId, playerId, round, pickNumber, overallPick }`
+4. Creates `team_members` row: `{ teamId, playerId, acquisitionType='draft', draftRound, draftPick }`
+5. Advances `drafts.currentPick`
+6. Sets new `currentPickDeadline` for next pick
+7. Sends `DRAFT_PICK_MADE` WebSocket notification
+
+**Important**: Seasons are NOT selected during the draft. The draft only assigns players to teams.
+
+### Draft completion
+
+When the last pick is made:
+
+1. `drafts.draftCompletedAt = now()`
+2. `leagues.draftStatus ΓåÆ 'completed'`
+3. Sends `DRAFT_COMPLETED` WebSocket notification
+4. Matchup generation is now available (Phase 4)
+
+---
+
+## Phase 4: Matchup & Season Generation
+
+### Trigger
+
+After draft completion, the commissioner clicks "Select Games" in the Next Step control, which triggers `autoSelectGames`. Before games can be selected, matchups must be created.
+
+**Mutation: `createAllMatchups(leagueId)`**
+
+This is called as part of the post-draft flow and generates the entire season structure.
+
+### What happens
+
+1. **Generate matchup pairings** for all weeks (1 through `totalMatchups`)
+   - Uses `schedulingStrategy` (round-robin, divisional, or random)
+   - Each team plays a different opponent each week
+2. **Create `matchups` rows** for every week
+3. **Populate `matchup_players`** ΓÇö link each team's roster to their matchups
+4. **Assign random seasons per player** via `selectSeasonsForPlayers()`:
+   - For each player, queries `season_batting`, `season_pitching`, `season_fielding`
+   - Filters to seasons with ΓëÑ `minGamesPerSeason` games
+   - Randomly picks one eligible season per player
+   - Inserts into `league_week_player_seasons` for every week
+
+### Season assignment details
+
+- **Per-player**: Each player gets their own random season (e.g., Babe RuthΓåÆ1927, Ted WilliamsΓåÆ1941)
+- **Same season all weeks**: A player uses the same season for the entire regular season
+- **Stored in**: `league_week_player_seasons(leagueId, weekNumber, playerId, season)`
+- **Not stored on**: `team_members` or `matchups` (no `selected_season` column on matchups)
+
+### Database state after generation
 
 ```
-leagues
-┌────┬──────────┬────────────┐
-│ id │   name   │   status   │
-├────┼──────────┼────────────┤
-│ 2  │My League │ 'drafting' │ ← During draft
-└────┴──────────┴────────────┘
+matchups:
+  { leagueId, weekNumber=1, team1Id, team2Id, status='scheduled', statsLoadingStatus='not_started' }
+  ... (repeated for all weeks ├ù all matchup pairings)
 
-Status Flow:
-  'setup'     → League created, teams assigned
-  'drafting'  → Draft in progress
-  'active'    → Season started, matchups ongoing
-  'completed' → All weeks finished
+matchup_players:
+  { matchupId, playerId, teamId } for each player in each matchup
+
+league_week_player_seasons:
+  { leagueId, weekNumber=1, playerId=2239, season=1927 }  ΓåÉ Babe Ruth
+  { leagueId, weekNumber=1, playerId=3075, season=1941 }  ΓåÉ Ted Williams
+  ... (same season value repeated for weeks 1 through totalMatchups)
 ```
 
 ---
 
-## Phase 3: Weekly Matchups
+## Phase 5: Game Selection
 
-### Matchup Creation
+### Commissioner triggers game selection
 
-The system automatically creates head-to-head pairings for each week.
+The commissioner uses the **Next Step control** (`NextStepControl.tsx`) which shows a "Select Next Game" button.
+
+**Mutation: `autoSelectGames`**
+
+1. Finds all active leagues with matchups ready for the next game
+2. For each matchup, invokes the **Game Selection Lambda** via SQS (`{prefix}-select-game.fifo`)
+
+### Game Selection Lambda
+
+**Entry:** `lambdas/game-selection/src/index.ts`
+**Core logic:** `lambdas/game-selection/src/services/season-game-selector.ts` ΓåÆ `selectGamesForMatchup()`
+
+For each matchup:
+
+1. Look up each player's assigned season from `league_week_player_seasons`
+2. For each player, randomly select a unique `game_identifier` from their season (actual Baseball Reference game IDs)
+3. Create `matchup_player_games` record: `{ matchupPlayerId, gameNum, gameIdentifier }`
+4. Queue stats loading: sends batch SQS messages (8 players per message) to `{prefix}-load-game-stats.fifo`
+5. Update `matchups.statsLoadingStatus ΓåÆ 'queued'`
+6. Send `PLAYER_STATS_LOADING` WebSocket notification
+
+### Game selection happens one game at a time
+
+Games are selected incrementally (game 1, then game 2, etc. up to `gamesPerMatchup`). Each time the commissioner clicks "Select Next Game", one game is selected for all players in all active matchups. This creates a progressive reveal experience.
 
 ```
-Week 1 Matchups:
-┌─────────────────────────────────────────────┐
-│  Team 1 (The Bronx Bombers)                │
-│           VS                                │
-│  Team 2 (Cubs Forever)                     │
-├─────────────────────────────────────────────┤
-│  Team 3 (Red Sox Nation)                   │
-│           VS                                │
-│  Team 4 (Dodgers Dynasty)                  │
-├─────────────────────────────────────────────┤
-│  Team 5 (Yankees Empire)                   │
-│           VS                                │
-│  Team 6 (Giants Glory)                     │
-└─────────────────────────────────────────────┘
-```
-
-### Database State
-
-```
-matchups
-┌────┬───────────┬─────────────┬──────────┬──────────┬────────┬────────────┬────────────┐
-│ id │ league_id │ week_number │ team1_id │ team2_id │ status │ team1_score│ team2_score│
-├────┼───────────┼─────────────┼──────────┼──────────┼────────┼────────────┼────────────┤
-│ 1  │     2     │      1      │    11    │    12    │pending │    NULL    │    NULL    │
-│ 2  │     2     │      1      │    13    │    14    │pending │    NULL    │    NULL    │
-│ 3  │     2     │      1      │    15    │    16    │pending │    NULL    │    NULL    │
-└────┴───────────┴─────────────┴──────────┴──────────┴────────┴────────────┴────────────┘
-
-matchup_players (Links players to matchups)
-┌────┬────────────┬───────────┬─────────┐
-│ id │ matchup_id │ player_id │ team_id │
-├────┼────────────┼───────────┼─────────┤
-│ 1  │     1      │   2239    │   11    │ ← Babe Ruth on Team 11
-│ 2  │     1      │   3075    │   11    │ ← Another player on Team 11
-│ 3  │     1      │   2593    │   12    │ ← Player on Team 12
-└────┴────────────┴───────────┴─────────┘
+Game 1: Commissioner clicks ΓåÆ games selected ΓåÆ stats loaded ΓåÆ scores updated
+Game 2: Commissioner clicks ΓåÆ games selected ΓåÆ stats loaded ΓåÆ scores updated
+...
+Game N: Commissioner clicks ΓåÆ games selected ΓåÆ stats loaded ΓåÆ scores completed
 ```
 
 ---
 
-## Phase 4: Game Selection
+## Phase 6: Stats Loading & Scoring
 
-This is where the magic happens! The commissioner triggers game selection, and the system randomly picks historical games from each player's selected season.
+### Stats Lambda
 
-### Commissioner View with Status Tracking
+**Entry:** `lambdas/stats-lambda/src/index.ts`
+**Handler:** `lambdas/stats-lambda/src/load-game.ts`
 
-```
-┌──────────────────────────────────────────────────────────┐
-│              MATCHUP MANAGEMENT                          │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  Week 1: The Bronx Bombers vs Cubs Forever              │
-│                                                          │
-│  Games Selected: 0 / 5                                   │
-│  ████░░░░░░░░░░░░░░░░░░░ 0%                            │
-│                                                          │
-│  Status: pending                                         │
-│    ↳ No games selected yet                              │
-│                                                          │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │                                                    │ │
-│  │        [Select Game #1]                           │ │
-│  │                                                    │ │
-│  │  This will randomly select 1 game from each       │ │
-│  │  player's chosen season (e.g., random game        │ │
-│  │  from Babe Ruth's 1927 season)                   │ │
-│  │                                                    │ │
-│  └────────────────────────────────────────────────────┘ │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
+Triggered by SQS messages from `{prefix}-load-game-stats.fifo`.
 
-Matchup Status Values:
-  'pending'          → No games selected yet
-  'selecting_games'  → Game selection in progress (game_num < games_per_matchup)
-  'loading_stats'    → Games selected, stats being loaded from Baseball Reference
-  'calculating'      → Stats loaded, scores being calculated
-  'completed'        → All done, final scores available
-```
+For each player in the batch:
 
-### Game Selection Process (Behind the Scenes)
+1. **Check cache**: Have we already scraped this player+season from Baseball Reference?
+2. **If not cached**: Scrape Baseball Reference:
+   - `getAllGameBattingStats(player, season)` via `@legacy-sports/bref-client`
+   - `getAllGamePitchingStats(player, season)`
+   - `getAllGameFieldingStats(player, season)`
+   - Stores ALL games from the season in `game_batting`, `game_pitching`, `game_fielding`
+3. **Select game**: Match `game_identifier` to actual game stats
+4. **Send WebSocket**: `PLAYER_STATS_UPDATED` per player
 
-#### Step 1: Commissioner Triggers Game #1
+### Score calculation
+
+**Handler:** `lambdas/stats-lambda/src/handlers/calculate-matchup-scores.ts`
+**Library:** `lib/scoring/src/matchup-scoring.ts` ΓåÆ `calculateMatchupScore()`
+
+After all player stats are loaded for a matchup:
+
+1. Aggregate batting + pitching + fielding stats per player
+2. Apply league scoring settings (stat ├ù multiplier)
+3. Sum player scores into team totals
+4. Update `matchups.team1Score` and `matchups.team2Score`
+5. Update `matchups.statsLoadingStatus ΓåÆ 'completed'`
+6. Send `MATCHUP_STATS_COMPLETE` WebSocket notification
+
+### Status transitions during pipeline
 
 ```
-Commissioner clicks "Select Game #1"
-         │
-         ▼
-┌─────────────────────────────────────────────────┐
-│  game-selection Lambda triggered                │
-├─────────────────────────────────────────────────┤
-│  Status Update: 'pending' → 'selecting_games'   │
-│                                                 │
-│  For each player in matchup:                    │
-│    1. Get player's season (from draft)          │
-│       Query: league_week_player_seasons         │
-│       WHERE league_id=2 AND week_number=1       │
-│                                                 │
-│    2. Generate random game number (1-162)       │
-│                                                 │
-│    3. Store in matchup_player_games             │
-│                                                 │
-│    4. Queue stats loading job                   │
-│                                                 │
-│  Status Update: 'selecting_games' →             │
-│                 'loading_stats'                 │
-│                                                 │
-└─────────────────────────────────────────────────┘
-```
-
-#### Step 2: Random Game Number Selection
-
-```
-Example for Babe Ruth (1927 season):
-
-1927 Season: 151 games played
-
-Random Selection:
-┌──────────────────────────────────────────┐
-│  Game #1 through Game #151               │
-│  ████████████████████████████████████    │
-│                                          │
-│  Random Pick: Game #87 ✓                │
-│                                          │
-│  (This was June 30, 1927 vs Tigers)     │
-│  Result: 3-for-4, 1 HR, 3 RBI          │
-└──────────────────────────────────────────┘
-
-Database Record Created:
-matchup_player_games
-┌────┬───────────────────┬──────────┬──────────────────┬───────────────────┬───────────────────┐
-│ id │ matchup_player_id │ game_num │ batting_game_num │ pitching_game_num │ fielding_game_num │
-├────┼───────────────────┼──────────┼──────────────────┼───────────────────┼───────────────────┤
-│ 1  │        1          │    1     │       87         │       NULL        │        87         │
-└────┴───────────────────┴──────────┴──────────────────┴───────────────────┴───────────────────┘
-```
-
-#### Step 3: Stats Loading (Automatic)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  SQS Message Queued to load-game-stats queue                │
-├─────────────────────────────────────────────────────────────┤
-│  Status: 'loading_stats'                                    │
-│                                                             │
-│  {                                                          │
-│    "matchupId": 1,                                         │
-│    "gameNum": 1,                                           │
-│    "players": [                                            │
-│      {                                                     │
-│        "playerId": 2239,                                   │
-│        "brefId": "ruthba01",                              │
-│        "season": 1927,                                    │
-│        "battingGameNum": 87,                              │
-│        "fieldingGameNum": 87                              │
-│      },                                                     │
-│      ...                                                   │
-│    ]                                                        │
-│  }                                                          │
-└─────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────┐
-│  stats-lambda Triggered by SQS                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  For each player:                                          │
-│    1. Check if stats already exist (cache check)           │
-│                                                             │
-│    2. If not cached, fetch from Baseball Reference         │
-│       https://baseball-reference.com/players/              │
-│       gl.fcgi?id=ruthba01&t=b&year=1927                   │
-│                                                             │
-│    3. Parse ALL 151 games from HTML                        │
-│       (Full season cached for future use)                  │
-│                                                             │
-│    4. Store in database:                                   │
-│       - game_batting (all 151 games)                       │
-│       - game_pitching (all 151 games)                      │
-│       - game_fielding (all 151 games)                      │
-│                                                             │
-│  Status Update: 'loading_stats' → 'calculating'            │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-#### Step 4: Stats Stored
-
-```
-game_batting
-┌───────────┬────────┬─────────────┬────┬────┬───┬────┬─────┬────┐
-│ player_id │ season │ game_number │ pa │ ab │ h │ hr │ rbi │ r  │
-├───────────┼────────┼─────────────┼────┼────┼───┼────┼─────┼────┤
-│   2239    │  1927  │     87      │ 4  │ 4  │ 3 │ 1  │  3  │ 2  │ ← Babe's game #87
-└───────────┴────────┴─────────────┴────┴────┴───┴────┴─────┴────┘
-
-game_fielding
-┌───────────┬────────┬─────────┬─────────┬───────┬────┬────┬──────┐
-│ player_id │ season │game_num │ inn_def │chances│ po │ a  │e_def │
-├───────────┼────────┼─────────┼─────────┼───────┼────┼────┼──────┤
-│   2239    │  1927  │   87    │   9.0   │   2   │ 2  │ 0  │  0   │
-└───────────┴────────┴─────────┴─────────┴───────┴────┴────┴──────┘
-```
-
-### Repeated for Each Game
-
-```
-Game #1: [pending] → Commissioner clicks → [selecting_games] →
-         [loading_stats] → [calculating] → [selecting_games]
-              (Back to selecting_games for next game)
-   ↓
-Game #2: [selecting_games] → Commissioner clicks → [loading_stats] →
-         [calculating] → [selecting_games]
-   ↓
-Game #3: [selecting_games] → Commissioner clicks → [loading_stats] →
-         [calculating] → [selecting_games]
-   ↓
-Game #4: [selecting_games] → Commissioner clicks → [loading_stats] →
-         [calculating] → [selecting_games]
-   ↓
-Game #5: [selecting_games] → Commissioner clicks → [loading_stats] →
-         [calculating] → [completed]
-              (All games done, final status)
-   ↓
-Matchup Complete! Status: 'completed'
-
-Database tracking:
-matchups
-┌────┬─────────────┬────────┬────────────────┬──────────────────┐
-│ id │ week_number │game_num│     status     │ updated_at       │
-├────┼─────────────┼────────┼────────────────┼──────────────────┤
-│ 1  │      1      │   5    │  'completed'   │ 2026-02-05 14:32 │
-└────┴─────────────┴────────┴────────────────┴──────────────────┘
-
-game_num tracks how many games have been selected (0-5)
-status tracks the current processing state
-```
-
-### Progress View for Users
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│         THE BRONX BOMBERS  vs  CUBS FOREVER                  │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  Games: 3 / 5 Complete                                       │
-│  ████████████████████░░░░░░░░░ 60%                         │
-│                                                              │
-│  Current Scores:                                             │
-│  ┌──────────────────┬──────────────────┐                   │
-│  │  Bronx Bombers   │  Cubs Forever    │                   │
-│  │                  │                  │                   │
-│  │      127         │       98         │                   │
-│  │   (Leading)      │                  │                   │
-│  └──────────────────┴──────────────────┘                   │
-│                                                              │
-│  Top Performers:                                             │
-│  • Babe Ruth: 42 pts (3 games)                             │
-│  • Ted Williams: 38 pts (3 games)                          │
-│  • Barry Bonds: 35 pts (3 games)                           │
-│                                                              │
-│  Games Remaining: 2                                          │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
+matchups.status:       'scheduled' ΓåÆ 'in_progress' (first game selected) ΓåÆ 'completed' (all games done)
+matchups.statsLoadingStatus: 'not_started' ΓåÆ 'queued' ΓåÆ 'loading' ΓåÆ 'completed'
+                             (or ΓåÆ 'failed' ΓåÆ 'retry')
 ```
 
 ---
 
-## Phase 5: Scoring & Results
+## Phase 7: Weekly Progression
 
-### Score Calculation
+### When all games are selected and scored
 
-Once all stats are loaded, scores are calculated automatically.
+After all `gamesPerMatchup` games are selected and all matchup stats are loaded, the commissioner can advance to the next week.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│           SCORE CALCULATION FLOW                            │
-└─────────────────────────────────────────────────────────────┘
+### Commissioner triggers advancement
 
-For Babe Ruth (1927), Game #87:
-┌──────────────────────────────────────┐
-│  Raw Stats:                          │
-│  • 3 Hits (H)                       │
-│  • 1 Home Run (HR)                  │
-│  • 3 RBI                            │
-│  • 2 Runs (R)                       │
-└──────────────────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────────┐
-│  Apply League Scoring Settings:      │
-│  • H:   3 × 1  =  3 points          │
-│  • HR:  1 × 3  =  3 points          │
-│  • RBI: 3 × 1  =  3 points          │
-│  • R:   2 × 1  =  2 points          │
-│                                      │
-│  Game #87 Total: 11 points          │
-└──────────────────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────────┐
-│  Repeat for all 5 games              │
-│  Game #87:  11 points                │
-│  Game #12:   8 points                │
-│  Game #145: 14 points                │
-│  Game #3:    6 points                │
-│  Game #99:  12 points                │
-│                                      │
-│  TOTAL: 51 points (5 games)         │
-└──────────────────────────────────────┘
-```
+**Mutation: `autoAdvanceMatchups`** (via Next Step control "Advance Matchups" button)
 
-### Team Aggregation
+1. Verify all matchups for current week are `status = 'completed'`
+2. Increment `leagues.currentWeek`
+3. Next week's matchups are already generated (from Phase 4)
+4. Reset `matchups.statsLoadingStatus ΓåÆ 'not_started'` for the new week's matchups
+5. Send `WEEK_ADVANCED` WebSocket notification
+6. Next Step control now shows "Select Next Game" for the new week
+
+### Week advancement state machine
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│              TEAM SCORING BREAKDOWN                         │
-├─────────────────────────────────────────────────────────────┤
-│  The Bronx Bombers (Team 11)                               │
-│                                                             │
-│  Batters:                                                   │
-│  • Babe Ruth (OF):        51 pts                           │
-│  • Lou Gehrig (1B):       48 pts                           │
-│  • Ted Williams (OF):     45 pts                           │
-│  • Barry Bonds (OF):      44 pts                           │
-│  • Hank Aaron (OF):       42 pts                           │
-│  • Willie Mays (OF):      40 pts                           │
-│  • Mickey Mantle (OF):    38 pts                           │
-│  • Stan Musial (OF):      36 pts                           │
-│  • Ty Cobb (OF):          35 pts                           │
-│  • Rogers Hornsby (2B):   34 pts                           │
-│                       Subtotal: 413 pts                     │
-│                                                             │
-│  Pitchers:                                                  │
-│  • Sandy Koufax:          28 pts                           │
-│  • Pedro Martinez:        26 pts                           │
-│  • Randy Johnson:         24 pts                           │
-│  • Bob Gibson:            22 pts                           │
-│  • Greg Maddux:           20 pts                           │
-│                       Subtotal: 120 pts                     │
-│                                                             │
-│  ═══════════════════════════════════════                   │
-│  TEAM TOTAL:              533 pts                          │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+leagues.weekAdvanceStatus: 'idle' ΓåÆ 'queued' ΓåÆ 'processing' ΓåÆ 'success' ΓåÆ 'idle'
+                                                            ΓåÆ 'failed'
 ```
 
-### Final Matchup Result
+### Progressive reveal per week
+
+Each week follows the same cycle:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                   WEEK 1 RESULTS                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│         THE BRONX BOMBERS  vs  CUBS FOREVER                 │
-│                                                             │
-│  ┌─────────────────────┬─────────────────────┐            │
-│  │   Bronx Bombers     │   Cubs Forever      │            │
-│  │                     │                     │            │
-│  │       533           │       487           │            │
-│  │    👑 WINNER        │                     │            │
-│  └─────────────────────┴─────────────────────┘            │
-│                                                             │
-│  Margin of Victory: 46 points                              │
-│                                                             │
-│  Game Ball 🏆                                              │
-│  Babe Ruth - 51 points (3 HR, 15 RBI, 15 H)              │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-
-Database Updated:
-matchups
-┌────┬───────────┬─────────────┬──────────┬──────────┬───────────┬────────────┬────────────┐
-│ id │ league_id │ week_number │ team1_id │ team2_id │  status   │ team1_score│ team2_score│
-├────┼───────────┼─────────────┼──────────┼──────────┼───────────┼────────────┼────────────┤
-│ 1  │     2     │      1      │    11    │    12    │ completed │    533     │    487     │
-└────┴───────────┴─────────────┴──────────┴──────────┴───────────┴────────────┴────────────┘
+Week N: Select Game 1 ΓåÆ Stats ΓåÆ Score
+        Select Game 2 ΓåÆ Stats ΓåÆ Score
+        ...
+        Select Game gamesPerMatchup ΓåÆ Stats ΓåÆ Score ΓåÆ Completed
+        ΓåÆ Advance to Week N+1
 ```
+
+Same player seasons, different random games each week.
 
 ---
 
-## Phase 6: Weekly Progression
+## Phase 8: Free Agency & Waivers
 
-### Completing a Week
+### Waiver system
 
-Once all matchups for a week are completed, the system advances to the next week.
+Waivers allow teams to pick up undrafted players (free agents) mid-season.
 
-```
-┌──────────────────────────────────────────────────────────┐
-│              WEEK 1 COMPLETION CHECK                     │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  League: My League (12 teams, 20 weeks)                 │
-│                                                          │
-│  Week 1 Status:                                          │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │ Matchup 1: COMPLETED ✓                            │ │
-│  │ Matchup 2: COMPLETED ✓                            │ │
-│  │ Matchup 3: COMPLETED ✓                            │ │
-│  │ Matchup 4: COMPLETED ✓                            │ │
-│  │ Matchup 5: COMPLETED ✓                            │ │
-│  │ Matchup 6: COMPLETED ✓                            │ │
-│  └────────────────────────────────────────────────────┘ │
-│                                                          │
-│  All matchups completed!                                 │
-│                                                          │
-│  [Advance to Week 2]                                     │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-```
+**Waiver types:**
 
-### Generating the Next Week
+| Type | Column value | How it works |
+|------|-------------|--------------|
+| Standard | `'standard'` | Claims processed by `teams.waiverOrder` (lower = higher priority) |
+| FAAB | `'faab'` | Blind-bid auction; highest `faabBid` wins. Budget tracked in `teams.faabBudget` |
 
-When the commissioner or system advances to the next week:
+### Claiming a free agent
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│           WEEK 2 GENERATION PROCESS                         │
-└─────────────────────────────────────────────────────────────┘
+**Mutation: `claimFreeAgent`**
 
-Step 1: Update League State
-  leagues.current_week: 1 → 2
+1. Creates `waiver_claims` row: `{ leagueId, teamId, playerId, dropPlayerId?, faabBid?, status='pending' }`
+2. Optional `dropPlayerId` ΓÇö if roster is full, specify who to drop
+3. For FAAB: `faabBid` validated against `teams.faabBudget`
 
-Step 2: Generate New Matchups
-  Algorithm: Rotate teams to create new pairings
-  (Ensures each team plays different opponents)
+### Waiver processing
 
-  Week 1 Pairings:        Week 2 Pairings:
-  Team 1 vs Team 2   →    Team 1 vs Team 3
-  Team 3 vs Team 4   →    Team 2 vs Team 4
-  Team 5 vs Team 6   →    Team 5 vs Team 7
-  ...                     ...
+**Service:** `lambdas/db/src/services/waiver-processor.ts` ΓåÆ `WaiverClaimProcessor`
 
-Step 3: Create Matchup Records
-  INSERT INTO matchups (league_id, week_number, team1_id, team2_id, status)
-  VALUES (2, 2, 11, 13, 'pending'),
-         (2, 2, 12, 14, 'pending'),
-         ...
+Processing runs periodically (or on commissioner trigger via `processWaiverClaims`):
 
-Step 4: Link Players to Matchups
-  For each matchup:
-    - Get all players from team1 roster
-    - Get all players from team2 roster
-    - Create matchup_players records
+1. Fetch all `waiver_claims` with `status = 'pending'`, grouped by league
+2. Sort claims:
+   - **Standard**: by `teams.waiverOrder` ASC
+   - **FAAB**: by `faabBid` DESC (highest bid wins)
+3. For each claim in priority order:
+   - Validate player is still available and drop target is valid
+   - Execute: create `team_members` row (`acquisitionType = 'waiver'`), deduct FAAB budget
+   - Create `league_week_player_seasons` entry for the claimed player (random eligible season)
+   - Add player to current matchup via `addClaimedPlayerToCurrentMatchup()`
+   - Update `waiver_claims.status ΓåÆ 'completed'`
+   - Send `ROSTER_UPDATE` WebSocket notification
+4. Failed claims: `status ΓåÆ 'failed'` with `errorMessage`
 
-Step 5: Ready for Game Selection
-  Commissioner can now select games for Week 2
-  (Uses SAME seasons from draft, different random games)
-```
+### Waiver claim statuses
 
-### Database State After Week Advancement
+`'pending'` ΓåÆ `'processing'` ΓåÆ `'completed'` | `'failed'` | `'cancelled'`
 
-```
-leagues
-┌────┬───────────┬──────────────┬────────┐
-│ id │   name    │ current_week │ status │
-├────┼───────────┼──────────────┼────────┤
-│ 2  │ My League │      2       │'active'│ ← Advanced to Week 2
-└────┴───────────┴──────────────┴────────┘
+---
 
-matchups (Week 1 - Completed)
-┌────┬───────────┬─────────────┬──────────┬──────────┬────────────┬────────────┬────────────┐
-│ id │ league_id │ week_number │ team1_id │ team2_id │   status   │ team1_score│ team2_score│
-├────┼───────────┼─────────────┼──────────┼──────────┼────────────┼────────────┼────────────┤
-│ 1  │     2     │      1      │    11    │    12    │'completed' │    533     │    487     │
-│ 2  │     2     │      1      │    13    │    14    │'completed' │    456     │    512     │
-│ 3  │     2     │      1      │    15    │    16    │'completed' │    478     │    491     │
-└────┴───────────┴─────────────┴──────────┴──────────┴────────────┴────────────┴────────────┘
+## Phase 9: Season End & Playoffs
 
-matchups (Week 2 - Just Created)
-┌────┬───────────┬─────────────┬──────────┬──────────┬──────────┬────────────┬────────────┐
-│ id │ league_id │ week_number │ team1_id │ team2_id │  status  │ team1_score│ team2_score│
-├────┼───────────┼─────────────┼──────────┼──────────┼──────────┼────────────┼────────────┤
-│ 7  │     2     │      2      │    11    │    13    │'pending' │    NULL    │    NULL    │
-│ 8  │     2     │      2      │    12    │    14    │'pending' │    NULL    │    NULL    │
-│ 9  │     2     │      2      │    15    │    17    │'pending' │    NULL    │    NULL    │
-└────┴───────────┴─────────────┴──────────┴──────────┴──────────┴────────────┴────────────┘
-```
+### Regular season completion
 
-### Key Points About Weekly Progression
+After all `totalMatchups` weeks are played, the regular season ends.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  🔄 SAME SEASONS, DIFFERENT GAMES                           │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ✓ Player seasons are locked from the draft                │
-│    Babe Ruth is ALWAYS using his 1927 season               │
-│                                                             │
-│  ✓ league_week_player_seasons table has records for        │
-│    ALL 20 weeks with the same season values                │
-│                                                             │
-│  ✓ Each week, NEW random games are selected from the       │
-│    same season                                              │
-│                                                             │
-│  Example:                                                   │
-│    Week 1: Babe Ruth games #87, #12, #145, #3, #99        │
-│    Week 2: Babe Ruth games #45, #128, #71, #112, #8       │
-│    Week 3: Babe Ruth games #156, #34, #91, #67, #140      │
-│                                                             │
-│    All from 1927 season, but different random games!       │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+### Playoffs
 
-### Season-Long View
+If `leagues.playoffEnabled = true`:
 
-```
- Week 1  │████████████│ Complete  │ 6 matchups finished
- Week 2  │████████████│ Complete  │ 6 matchups finished
- Week 3  │████████████│ Complete  │ 6 matchups finished
- Week 4  │████████████│ Complete  │ 6 matchups finished
- Week 5  │████████░░░░│ In Progress │ 4/6 matchups done
- Week 6  │░░░░░░░░░░░░│ Pending   │ Not started
- Week 7  │░░░░░░░░░░░░│ Pending   │ Not started
- Week 8  │░░░░░░░░░░░░│ Pending   │ Not started
-   ...
- Week 20 │░░░░░░░░░░░░│ Pending   │ Not started
+1. `autoAdvanceMatchups` detects season is complete
+2. Generates playoff bracket based on `playoffFormat` (e.g., `'4-team'`)
+3. Seeds teams by regular-season record
+4. Sends `PLAYOFF_BRACKET_CREATED` WebSocket notification
+5. Playoff matchups follow the same game selection ΓåÆ stats ΓåÆ scoring pipeline
 
-Standings:
-┌──────┬───────────────────┬──────┬────────┬────────┐
-│ Rank │       Team        │ Wins │ Losses │ Points │
-├──────┼───────────────────┼──────┼────────┼────────┤
-│  1   │ The Bronx Bombers │  4   │   0    │  2134  │
-│  2   │ Cubs Forever      │  3   │   1    │  1987  │
-│  3   │ Red Sox Nation    │  3   │   1    │  1956  │
-│  4   │ Dodgers Dynasty   │  2   │   2    │  1845  │
-│  5   │ Yankees Empire    │  2   │   2    │  1823  │
-│  6   │ Giants Glory      │  1   │   3    │  1756  │
-│ ...  │                   │      │        │        │
-└──────┴───────────────────┴──────┴────────┴────────┘
-```
+---
 
-### Complete 20-Week Cycle
+## Phase 10: Season Renewal
 
-```
-       START: Draft Complete
-             │
-             ▼
-       ┌─────────────┐
-    ┌─→│  Week N     │
-    │  │  (1 to 20)  │
-    │  └──────┬──────┘
-    │         │
-    │         ▼
-    │  ┌──────────────────┐
-    │  │ Create Matchups  │ Generate pairings
-    │  └────────┬─────────┘
-    │           │
-    │           ▼
-    │  ┌──────────────────┐
-    │  │ Commissioner     │ Select games 1-5
-    │  │ Selects Games    │ (one at a time)
-    │  └────────┬─────────┘
-    │           │
-    │           ▼
-    │  ┌──────────────────┐
-    │  │ Stats Loaded     │ Baseball Reference
-    │  └────────┬─────────┘
-    │           │
-    │           ▼
-    │  ┌──────────────────┐
-    │  │ Scores Calculated│ Apply league settings
-    │  └────────┬─────────┘
-    │           │
-    │           ▼
-    │  ┌──────────────────┐
-    │  │ Winners Declared │ Update standings
-    │  └────────┬─────────┘
-    │           │
-    │           ▼
-    │      Week < 20?
-    │           │
-    │      YES  │  NO
-    │           │  │
-    └───────────┘  ▼
-             ┌─────────────┐
-             │ SEASON END  │
-             │ Champion    │
-             └─────────────┘
-```
+### Starting a new season
+
+**Mutation: `renewLeague(leagueId)`**
+
+Creates a **new league** that is a continuation of the old one. The old league is frozen (read-only).
+
+### What happens
+
+1. **Freeze** old league: `frozenAt = now()` (becomes read-only archive)
+2. **Create new league** with copied settings:
+   - `previousLeagueId` ΓåÆ old league ID (creates a lineage chain)
+   - `seasonNumber` ΓåÆ old `seasonNumber + 1`
+   - All configuration copied (scoring, roster positions, waiver settings, etc.)
+   - `draftStatus ΓåÆ 'not-started'`
+3. **Create new teams** for the new league (same count)
+4. **Copy league_members**: Users mapped to new teams
+5. **For salary cap leagues**: Apply salary escalation/decay:
+   - Rostered players: `newSalary = ceil(salary ├ù (100 + salaryEscalationPct) / 100)`
+   - Free agents: `newSalary = ceil(salary ├ù (100 - salaryDecayPct) / 100)` (minimum: `minSalary`)
+6. **New draft required**: Teams must draft again for the new season
+
+The lifecycle then restarts from Phase 3 (Draft).
 
 ---
 
@@ -883,367 +430,197 @@ Standings:
 ### System Components
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        USER INTERFACE                           │
-│                      (Next.js Web App)                          │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      API GATEWAY                                │
-│                   (GraphQL Endpoint)                            │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      GraphQL Lambda                             │
-│              (Handles queries & mutations)                      │
-└────────────┬────────────────────────────────┬───────────────────┘
-             │                                │
-             ▼                                ▼
-┌────────────────────────┐      ┌────────────────────────────┐
-│  Database (RDS)        │      │  Game Selection Lambda     │
-│  • leagues             │      │  Triggered by GraphQL      │
-│  • teams               │      └─────────────┬──────────────┘
-│  • team_members        │                    │
-│  • matchups            │                    ▼
-│  • matchup_players     │      ┌────────────────────────────┐
-│  • matchup_player_games│      │  SQS Queue                 │
-│  • game_batting        │      │  (load-game-stats.fifo)    │
-│  • game_pitching       │      └─────────────┬──────────────┘
-│  • game_fielding       │                    │
-└────────────────────────┘                    ▼
-                               ┌────────────────────────────┐
-                               │  Stats Lambda              │
-                               │  • Scrapes Baseball Ref    │
-                               │  • Loads game stats        │
-                               │  • Stores in database      │
-                               └─────────────┬──────────────┘
-                                             │
-                                             ▼
-                               ┌────────────────────────────┐
-                               │  Calculate Scores Lambda   │
-                               │  • Aggregates stats        │
-                               │  • Applies scoring rules   │
-                               │  • Updates matchup scores  │
-                               └────────────────────────────┘
+ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+Γöé                     Next.js Web App                          Γöé
+Γöé                  (apps/web)                                   Γöé
+ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+                           Γöé GraphQL
+                           Γû╝
+ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+Γöé                   DB Lambda (lambdas/db)                      Γöé
+Γöé          GraphQL resolvers, mutations, services               Γöé
+ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+       Γöé              Γöé              Γöé
+       Γû╝              Γû╝              Γû╝
+ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+Γöé  RDS       Γöé Γöé SQS Queues  Γöé Γöé WebSocket LambdaΓöé
+Γöé PostgreSQL Γöé Γöé (FIFO)      Γöé Γöé (notifications) Γöé
+ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+                      Γöé
+          ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+          Γû╝           Γû╝           Γû╝
+   ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+   ΓöéGame Select Γöé Γöé Stats  Γöé Γöé  Draft   Γöé
+   Γöé  Lambda    Γöé Γöé Lambda Γöé ΓöéProcessor Γöé
+   ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
 ```
 
-### Data Flow for Game Selection
+### SQS Queues (all FIFO)
+
+| Queue | Connects | Purpose |
+|-------|----------|---------|
+| `{prefix}-automatic-drafts.fifo` | DB Lambda ΓåÆ Draft Processor | Queued draft execution |
+| `{prefix}-select-game.fifo` | DB Lambda ΓåÆ Game Selection Lambda | Game selection jobs |
+| `{prefix}-load-game-stats.fifo` | Game Selection ΓåÆ Stats Lambda | Stats scraping + scoring |
+| `{prefix}-load-season-stats.fifo` | DB Lambda ΓåÆ Stats Lambda | Career stats loading |
+
+Each queue has a corresponding DLQ (`-dlq.fifo`) for failed messages.
+
+### WebSocket Notifications
+
+| Event | When sent | Payload includes |
+|-------|-----------|-----------------|
+| `DRAFT_STARTED` | Draft begins | leagueId, draftId |
+| `DRAFT_PICK_MADE` | Each pick | leagueId, playerId, teamId, round, wasAutoPick |
+| `DRAFT_COMPLETED` | Last pick made | leagueId, draftId |
+| `PLAYER_STATS_LOADING` | Game selection starts | matchupId, leagueId |
+| `PLAYER_STATS_UPDATED` | Individual player done | playerId, matchupId |
+| `MATCHUP_STATS_COMPLETE` | All stats loaded | matchupId, leagueId |
+| `WEEK_ADVANCED` | Week incremented | leagueId, currentWeek |
+| `ROSTER_UPDATE` | Waiver/trade completed | leagueId, teamId |
+| `PLAYOFF_BRACKET_CREATED` | Season ends | leagueId |
+
+### Commissioner Next Step Control
+
+**File:** `apps/web/src/features/commissioner/NextStepControl.tsx`
+
+The commissioner sees exactly one action button at a time:
+
+| State | Button | Mutation called |
+|-------|--------|----------------|
+| `draftStatus = 'not-started'` | "Start Draft" | `initializeDraft` ΓåÆ `startDraft` |
+| Draft completed, no games selected | "Select Next Game" | `autoSelectGames` |
+| Games in progress (not all selected) | "Select Next Game" | `autoSelectGames` |
+| All games selected + stats loaded | "Advance Matchups" | `autoAdvanceMatchups` |
+| After advancement | "Select Next Game" (next week) | `autoSelectGames` |
+
+### Data Flow: Game Selection Pipeline
 
 ```
-Step 1: Commissioner Action
-┌──────────────┐
-│   Browser    │
-│ [Select Game]│
-└──────┬───────┘
-       │ GraphQL Mutation: triggerGameSelection(matchupId, gameNum)
-       ▼
-┌──────────────────┐
-│  GraphQL Lambda  │
-│  Validates input │
-└──────┬───────────┘
-       │ Invokes game-selection Lambda
-       ▼
-┌─────────────────────────────────────────────────────┐
-│  Game Selection Lambda                              │
-├─────────────────────────────────────────────────────┤
-│  1. Query matchup_players (50 players)              │
-│  2. For each player:                                │
-│     - Get season from league_week_player_seasons    │
-│     - Generate random game numbers (1-162)          │
-│     - Create matchup_player_games record            │
-│  3. Batch insert all 50 records                     │
-│  4. Queue SQS message for stats loading             │
-└──────┬──────────────────────────────────────────────┘
-       │ SQS Message
-       ▼
-┌─────────────────────────────────────────────────────┐
-│  SQS Queue: legacy-sports-dev-load-game-stats.fifo  │
-│  Message Group ID: matchup-{matchupId}              │
-│  FIFO ensures sequential processing                 │
-└──────┬──────────────────────────────────────────────┘
-       │ Lambda triggered by SQS
-       ▼
-┌─────────────────────────────────────────────────────┐
-│  Stats Lambda                                       │
-├─────────────────────────────────────────────────────┤
-│  For each player (processed in batches of 10):     │
-│                                                     │
-│  1. Check if stats already cached:                 │
-│     SELECT * FROM game_batting                     │
-│     WHERE player_id = X AND season = Y             │
-│                                                     │
-│  2. If not cached, scrape Baseball Reference:      │
-│     GET https://baseball-reference.com/players/    │
-│         gl.fcgi?id={brefId}&t=b&year={season}      │
-│                                                     │
-│  3. Parse HTML and extract all 162 games           │
-│                                                     │
-│  4. Insert into database:                          │
-│     INSERT INTO game_batting VALUES (...)          │
-│     INSERT INTO game_pitching VALUES (...)         │
-│     INSERT INTO game_fielding VALUES (...)         │
-│                                                     │
-│  5. Update matchup status:                         │
-│     UPDATE matchups SET stats_loading_status =     │
-│       'completed' WHERE id = matchupId             │
-│                                                     │
-└──────┬──────────────────────────────────────────────┘
-       │ All stats loaded
-       ▼
-┌─────────────────────────────────────────────────────┐
-│  Calculate Scores Lambda (auto-triggered)           │
-├─────────────────────────────────────────────────────┤
-│  1. Query all game stats for matchup:              │
-│     SELECT * FROM game_batting                     │
-│     JOIN matchup_player_games ...                  │
-│                                                     │
-│  2. Aggregate stats per player:                    │
-│     SUM(h), SUM(hr), SUM(rbi), etc.                │
-│                                                     │
-│  3. Apply scoring settings:                        │
-│     score = (h * 1) + (hr * 3) + (rbi * 1) ...    │
-│                                                     │
-│  4. Sum team totals:                               │
-│     team1_score = SUM(all player scores)           │
-│                                                     │
-│  5. Update matchup table:                          │
-│     UPDATE matchups SET                            │
-│       team1_score = X, team2_score = Y             │
-│     WHERE id = matchupId                           │
-│                                                     │
-└──────┬──────────────────────────────────────────────┘
-       │ Scores calculated
-       ▼
-┌──────────────┐
-│   Browser    │
-│ Displays new │
-│   scores     │
-└──────────────┘
-```
-
-### Status Tracking Throughout the System
-
-#### League-Level Status
-
-```
-leagues.status:
-  'setup'     → League created, waiting for user assignments
-  'drafting'  → Draft in progress
-  'active'    → Season underway, matchups being played
-  'completed' → All 20 weeks finished
-  'paused'    → Commissioner paused the league
-```
-
-#### Matchup-Level Status
-
-```
-matchups.status:
-  'pending'          → Matchup created, no games selected
-  'selecting_games'  → Game selection in progress (game_num < games_per_matchup)
-  'loading_stats'    → All games selected, waiting for stats from Baseball Reference
-  'calculating'      → Stats loaded, calculating final scores
-  'completed'        → Final scores calculated, winner determined
-
-matchups.game_num:
-  Tracks how many games have been selected (0 to games_per_matchup)
-  Example: If games_per_matchup = 5:
-    game_num = 0 → No games selected yet
-    game_num = 1 → Game #1 selected
-    game_num = 3 → Games #1, #2, #3 selected
-    game_num = 5 → All games selected
-```
-
-#### Status Flow Example
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  WEEK 1 MATCHUP: The Bronx Bombers vs Cubs Forever         │
-└─────────────────────────────────────────────────────────────┘
-
-Initial State:
-  matchups: { id: 1, status: 'pending', game_num: 0 }
-
-Commissioner selects Game #1:
-  1. Status: 'pending' → 'selecting_games'
-  2. Random games generated for all 50 players
-  3. Records inserted into matchup_player_games
-  4. game_num: 0 → 1
-  5. Status: 'selecting_games' → 'loading_stats'
-  6. SQS message queued
-
-Stats Lambda processes:
-  7. Status remains: 'loading_stats'
-  8. Scrapes Baseball Reference (if not cached)
-  9. Inserts into game_batting, game_pitching, game_fielding
-  10. Status: 'loading_stats' → 'calculating'
-
-Scoring calculation:
-  11. Aggregates all game stats
-  12. Applies league scoring settings
-  13. Updates matchups.team1_score and team2_score
-  14. Status: 'calculating' → 'selecting_games'
-      (Ready for next game)
-
-After Game #5:
-  15. game_num: 4 → 5
-  16. Status: 'calculating' → 'completed'
-      (No more games to select)
-  17. Winner determined
-
-Final State:
-  matchups: {
-    id: 1,
-    status: 'completed',
-    game_num: 5,
-    team1_score: 533,
-    team2_score: 487
-  }
-```
-
-#### Checking Current State
-
-```sql
--- What's the current state of all Week 1 matchups?
-SELECT
-  m.id,
-  m.week_number,
-  m.status,
-  m.game_num,
-  l.games_per_matchup,
-  CONCAT(m.game_num, ' / ', l.games_per_matchup) as progress
-FROM matchups m
-JOIN leagues l ON m.league_id = l.id
-WHERE m.league_id = 2 AND m.week_number = 1;
-
--- Result:
-┌────┬─────────────┬────────────────┬──────────┬──────────────────┬──────────┐
-│ id │ week_number │     status     │ game_num │games_per_matchup │ progress │
-├────┼─────────────┼────────────────┼──────────┼──────────────────┼──────────┤
-│ 1  │      1      │'selecting_games'│    2     │        5         │  2 / 5   │
-│ 2  │      1      │'completed'      │    5     │        5         │  5 / 5   │
-│ 3  │      1      │'loading_stats'  │    3     │        5         │  3 / 5   │
-└────┴─────────────┴────────────────┴──────────┴──────────────────┴──────────┘
+Commissioner clicks "Select Next Game"
+  Γöé
+  Γû╝
+autoSelectGames mutation (DB Lambda)
+  Γöé  Sends SQS message per matchup
+  Γû╝
+{prefix}-select-game.fifo
+  Γöé
+  Γû╝
+Game Selection Lambda
+  Γöé  1. Look up player seasons from league_week_player_seasons
+  Γöé  2. Randomly select game_identifiers
+  Γöé  3. Insert matchup_player_games records
+  Γöé  4. Send batch SQS messages (8 players each)
+  Γû╝
+{prefix}-load-game-stats.fifo
+  Γöé
+  Γû╝
+Stats Lambda
+  Γöé  1. Scrape Baseball Reference (cached per player+season)
+  Γöé  2. Store in game_batting/pitching/fielding
+  Γöé  3. Calculate matchup scores
+  Γöé  4. Update matchups.team1Score, team2Score
+  Γöé  5. Send MATCHUP_STATS_COMPLETE WebSocket
+  Γû╝
+Frontend receives notification ΓåÆ refetches matchup data ΓåÆ displays scores
 ```
 
 ---
 
-### Database Schema (Simplified)
+## Status Enums Reference
 
-```
-┌─────────────┐
-│   leagues   │
-│─────────────│
-│ id          │──┐
-│ name        │  │
-│ num_teams   │  │
-│ games_per...│  │
-└─────────────┘  │
-                 │
-                 │  ┌──────────────────┐
-                 └─→│ scoring_settings │
-                    │──────────────────│
-                    │ league_id (FK)   │
-                    │ stat_name        │
-                    │ multiplier       │
-                    └──────────────────┘
+### `leagues.draftStatus`
 
-┌─────────────┐
-│    teams    │
-│─────────────│
-│ id          │──┐
-│ name        │  │
-│ league_id   │←─┘
-│ manager_id  │
-└─────────────┘
-       │
-       │  ┌──────────────┐
-       └─→│ team_members │
-          │──────────────│
-          │ team_id (FK) │
-          │ player_id(FK)│──┐
-          │ position     │  │
-          │ season       │  │
-          └──────────────┘  │
-                            │
-          ┌─────────────┐   │
-          │   players   │←──┘
-          │─────────────│
-          │ id          │
-          │ first_name  │
-          │ last_name   │
-          │ bref_id     │
-          └─────────────┘
+| Value | Meaning |
+|-------|---------|
+| `'not-started'` | League created, draft not yet begun |
+| `'queued'` | Draft queued for processing via SQS |
+| `'in-progress'` | Draft actively running (picks being made) |
+| `'paused'` | Draft paused by commissioner |
+| `'completed'` | All picks made, rosters filled |
 
-┌──────────────────────────┐
-│ league_week_player_seasons│
-│──────────────────────────│
-│ league_id (FK)           │
-│ week_number              │
-│ player_id (FK)           │
-│ season                   │──┐
-└──────────────────────────┘  │
-                              │
-┌─────────────┐               │
-│  matchups   │               │
-│─────────────│               │
-│ id          │──┐            │
-│ league_id   │  │            │
-│ week_number │  │            │
-│ team1_id    │  │            │
-│ team2_id    │  │            │
-│ team1_score │  │            │
-│ team2_score │  │            │
-└─────────────┘  │            │
-                 │            │
-                 │  ┌──────────────────┐
-                 └─→│ matchup_players  │
-                    │──────────────────│
-                    │ matchup_id (FK)  │
-                    │ player_id (FK)   │──┐
-                    │ team_id (FK)     │  │
-                    └──────────────────┘  │
-                           │              │
-                           │  ┌────────────────────────┐
-                           └─→│ matchup_player_games   │
-                              │────────────────────────│
-                              │ matchup_player_id (FK) │
-                              │ game_num               │
-                              │ batting_game_num       │──┐
-                              │ pitching_game_num      │  │
-                              │ fielding_game_num      │  │
-                              └────────────────────────┘  │
-                                                          │
-       ┌──────────────────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│  game_batting   │  │  game_pitching   │  │  game_fielding   │
-│─────────────────│  │──────────────────│  │──────────────────│
-│ player_id (FK)  │  │ player_id (FK)   │  │ player_id (FK)   │
-│ season          │  │ season           │  │ season           │
-│ game_number     │  │ game_num         │  │ game_num         │
-│ pa, ab, h, hr...│  │ w, l, so, ip...  │  │ po, a, e_def...  │
-└─────────────────┘  └──────────────────┘  └──────────────────┘
-```
+### `matchups.status`
+
+| Value | Meaning |
+|-------|---------|
+| `'scheduled'` | Matchup created, no games selected yet |
+| `'in_progress'` | At least one game selected, not all complete |
+| `'completed'` | All games selected and scored |
+| `'cancelled'` | Matchup cancelled |
+
+### `matchups.statsLoadingStatus`
+
+| Value | Meaning |
+|-------|---------|
+| `'not_started'` | No stats loading requested yet |
+| `'queued'` | SQS message sent for stats loading |
+| `'loading'` | Stats Lambda actively scraping/processing |
+| `'completed'` | All player stats loaded and scores calculated |
+| `'failed'` | Stats loading failed (will be retried) |
+| `'retry'` | Queued for retry after failure |
+
+### `leagues.weekAdvanceStatus`
+
+| Value | Meaning |
+|-------|---------|
+| `'idle'` | No advancement in progress |
+| `'queued'` | Advancement requested |
+| `'processing'` | Backend processing week transition |
+| `'success'` | Advancement complete |
+| `'failed'` | Advancement failed |
+
+### `waiver_claims.status`
+
+| Value | Meaning |
+|-------|---------|
+| `'pending'` | Claim submitted, awaiting processing |
+| `'processing'` | Currently being evaluated |
+| `'completed'` | Player successfully claimed |
+| `'failed'` | Claim failed (player unavailable, budget exceeded, etc.) |
+| `'cancelled'` | Claim cancelled by user |
 
 ---
 
-## Summary
+## Key Tables Reference
 
-The Legacy Sports flow creates a unique fantasy experience by:
+### Core tables
 
-1. **Historical Seasons**: Players draft real players and choose specific seasons from their careers (chosen once during draft)
-2. **Weekly Matchups**: New matchups are generated each week with rotating opponents
-3. **Random Game Selection**: Each week, 5 new random games from the same chosen season are selected
-4. **Real Stats**: Actual game-by-game statistics are loaded from Baseball Reference
-5. **Head-to-Head Competition**: Teams compete directly against each other weekly
-6. **Progressive Season**: After each week completes, the league advances to the next week (up to 20 weeks)
-7. **Season-Long Standings**: Wins and losses accumulate throughout the 20-week season
+| Table | Purpose | Key columns |
+|-------|---------|-------------|
+| `leagues` | League configuration | `id`, `name`, `draftStatus`, `currentWeek`, `totalMatchups`, `gamesPerMatchup`, `waiverType`, `seasonNumber`, `previousLeagueId`, `frozenAt` |
+| `teams` | Teams within a league | `id`, `name`, `leagueId`, `waiverOrder`, `faabBudget`, `isLocked` |
+| `league_members` | User Γåö team Γåö league mapping | `leagueId`, `userId`, `teamId`, `permissionLevel` |
+| `team_members` | Player roster assignments | `id`, `teamId`, `playerId`, `positionId`, `acquisitionType`, `salary` |
 
-This creates unpredictability while maintaining historical accuracy - you drafted 1927 Babe Ruth once, but:
+### Draft tables
 
-- **Week 1** might use games #87, #12, #145, #3, #99 from his 1927 season
-- **Week 2** might use games #45, #128, #71, #112, #8 from the same 1927 season
-- And so on for all 20 weeks, always from 1927 but with different random games each week!
+| Table | Purpose | Key columns |
+|-------|---------|-------------|
+| `drafts` | Draft configuration and state | `id`, `leagueId`, `draftMode`, `selectionMethod`, `draftOrder`, `currentPick`, `pickTimeLimitSeconds`, `currentPickDeadline` |
+| `draft_picks` | Individual picks made | `id`, `draftId`, `teamId`, `playerId`, `round`, `overallPick`, `bidAmount` |
+| `draft_teams` | Team participation + order | `draftId`, `teamId`, `draftOrder`, `autoPick` |
+| `draft_queue` | Auto-pick priority queue | `draftId`, `teamId`, `playerId`, `priority` |
+
+### Matchup tables
+
+| Table | Purpose | Key columns |
+|-------|---------|-------------|
+| `matchups` | Weekly matchup pairings + scores | `id`, `leagueId`, `weekNumber`, `team1Id`, `team2Id`, `team1Score`, `team2Score`, `status`, `statsLoadingStatus`, `gamesPerMatchup` |
+| `matchup_players` | Players linked to matchups | `id`, `matchupId`, `playerId`, `teamId`, `positionId` |
+| `matchup_player_games` | Selected games per player | `id`, `matchupPlayerId`, `gameNum`, `gameIdentifier`, `statsLoadingStatus` |
+| `league_week_player_seasons` | Player season assignments | `leagueId`, `weekNumber`, `playerId`, `season` (UNIQUE per league+week+player) |
+
+### Waiver tables
+
+| Table | Purpose | Key columns |
+|-------|---------|-------------|
+| `waiver_claims` | Pending and processed claims | `id`, `leagueId`, `teamId`, `playerId`, `dropPlayerId`, `faabBid`, `status`, `errorMessage` |
+
+### Stats tables
+
+| Table | Purpose |
+|-------|---------|
+| `game_batting` | Per-game batting stats (scraped from Baseball Reference) |
+| `game_pitching` | Per-game pitching stats |
+| `game_fielding` | Per-game fielding stats |
+| `player_scoring_cache` | Materialized career scoring data (LS-696 optimization) |
