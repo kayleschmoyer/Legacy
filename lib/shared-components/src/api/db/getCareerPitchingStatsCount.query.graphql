@@ -1,0 +1,12 @@
+# Query to fetch the total count of career pitching records matching filter criteria
+query GetCareerPitchingStatsCount(
+  $minGames: Int
+  $minWins: Int
+  $minStrikeouts: Int
+) {
+  careerPitchingStatsCount(
+    minGames: $minGames
+    minWins: $minWins
+    minStrikeouts: $minStrikeouts
+  )
+}

@@ -285,6 +285,7 @@ export type CareerPitching = {
   losses?: Maybe<Scalars['Int']['output']>;
   outRate?: Maybe<Scalars['Int']['output']>;
   outsRecorded?: Maybe<Scalars['Int']['output']>;
+  player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   runs?: Maybe<Scalars['Int']['output']>;
   saves?: Maybe<Scalars['Int']['output']>;
@@ -1875,6 +1876,7 @@ export type Query = {
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
+  careerPitchingStatsCount?: Maybe<Scalars['Int']['output']>;
   /** Commissioner: fetch the audit log for all commissioner actions in a league. */
   commissionerAuditLogs?: Maybe<Array<CommissionerAuditLog>>;
   defaultScoringProfile?: Maybe<ScoringConfig>;
@@ -2029,6 +2031,12 @@ export type QueryCareerPitchingStatsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryCareerPitchingStatsCountArgs = {
+  minGames?: InputMaybe<Scalars['Int']['input']>;
+  minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  minWins?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryCommissionerAuditLogsArgs = {
@@ -3107,6 +3115,12 @@ export type CareerPitchingFragment = {
   outRate?: number | null;
   era?: string | null;
   winPercentage?: number | null;
+  player?: {
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null;
 };
 
 export type CreateSeasonDraftGameMutationVariables = Exact<{
@@ -3245,7 +3259,24 @@ export type GetCareerPitchingStatsQuery = {
     outRate?: number | null;
     era?: string | null;
     winPercentage?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
   }> | null;
+};
+
+export type GetCareerPitchingStatsCountQueryVariables = Exact<{
+  minGames?: InputMaybe<Scalars['Int']['input']>;
+  minWins?: InputMaybe<Scalars['Int']['input']>;
+  minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetCareerPitchingStatsCountQuery = {
+  __typename?: 'Query';
+  careerPitchingStatsCount?: number | null;
 };
 
 export type GetSeasonDraftGameQueryVariables = Exact<{
@@ -3525,6 +3556,11 @@ export const CareerPitchingFragmentDoc = gql`
     outRate
     era
     winPercentage
+    player {
+      id
+      firstName
+      lastName
+    }
   }
 `;
 export const PlayerFragmentDoc = gql`
@@ -4031,6 +4067,100 @@ export type GetCareerPitchingStatsSuspenseQueryHookResult = ReturnType<
 export type GetCareerPitchingStatsQueryResult = Apollo.QueryResult<
   GetCareerPitchingStatsQuery,
   GetCareerPitchingStatsQueryVariables
+>;
+export const GetCareerPitchingStatsCount = gql`
+  query GetCareerPitchingStatsCount(
+    $minGames: Int
+    $minWins: Int
+    $minStrikeouts: Int
+  ) {
+    careerPitchingStatsCount(
+      minGames: $minGames
+      minWins: $minWins
+      minStrikeouts: $minStrikeouts
+    )
+  }
+`;
+
+/**
+ * __useGetCareerPitchingStatsCountQuery__
+ *
+ * To run a query within a React component, call `useGetCareerPitchingStatsCountQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetCareerPitchingStatsCountQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetCareerPitchingStatsCountQuery({
+ *   variables: {
+ *      minGames: // value for 'minGames'
+ *      minWins: // value for 'minWins'
+ *      minStrikeouts: // value for 'minStrikeouts'
+ *   },
+ * });
+ */
+export function useGetCareerPitchingStatsCountQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetCareerPitchingStatsCountQuery,
+    GetCareerPitchingStatsCountQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetCareerPitchingStatsCountQuery,
+    GetCareerPitchingStatsCountQueryVariables
+  >(GetCareerPitchingStatsCount, options);
+}
+export function useGetCareerPitchingStatsCountLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetCareerPitchingStatsCountQuery,
+    GetCareerPitchingStatsCountQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetCareerPitchingStatsCountQuery,
+    GetCareerPitchingStatsCountQueryVariables
+  >(GetCareerPitchingStatsCount, options);
+}
+export function useGetCareerPitchingStatsCountSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetCareerPitchingStatsCountQuery,
+        GetCareerPitchingStatsCountQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetCareerPitchingStatsCountQuery,
+    GetCareerPitchingStatsCountQueryVariables
+  >(
+    GetCareerPitchingStatsCount,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetCareerPitchingStatsCountQuery,
+          GetCareerPitchingStatsCountQueryVariables
+        >,
+  );
+}
+export type GetCareerPitchingStatsCountQueryHookResult = ReturnType<
+  typeof useGetCareerPitchingStatsCountQuery
+>;
+export type GetCareerPitchingStatsCountLazyQueryHookResult = ReturnType<
+  typeof useGetCareerPitchingStatsCountLazyQuery
+>;
+export type GetCareerPitchingStatsCountSuspenseQueryHookResult = ReturnType<
+  typeof useGetCareerPitchingStatsCountSuspenseQuery
+>;
+export type GetCareerPitchingStatsCountQueryResult = Apollo.QueryResult<
+  GetCareerPitchingStatsCountQuery,
+  GetCareerPitchingStatsCountQueryVariables
 >;
 export const GetSeasonDraftGame = gql`
   query GetSeasonDraftGame($gameId: Int!) {

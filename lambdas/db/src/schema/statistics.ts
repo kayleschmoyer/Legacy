@@ -472,6 +472,15 @@ CareerPitchingRef.implement({
         return totalDecisions === 0 ? null : stats.w / totalDecisions;
       },
     }),
+    // Player relationship
+    player: t.field({
+      type: 'Player',
+      nullable: true,
+      resolve: async (stats, _args, context) => {
+        if (!stats.playerId) return null;
+        return context.loaders.players.load(stats.playerId);
+      },
+    }),
   }),
 });
 
@@ -898,6 +907,25 @@ builder.queryField('careerPitchingStats', (t) =>
           minWins: args.minWins || undefined,
           minStrikeouts: args.minStrikeouts || undefined,
         },
+      });
+    },
+  }),
+);
+
+// Count career pitching records (used by PitchingStatsDataGrid for pagination)
+builder.queryField('careerPitchingStatsCount', (t) =>
+  t.field({
+    type: 'Int',
+    args: {
+      minGames: t.arg.int({ required: false }),
+      minWins: t.arg.int({ required: false }),
+      minStrikeouts: t.arg.int({ required: false }),
+    },
+    resolve: async (root, args) => {
+      return dbService.statistics.countCareerPitchingStats({
+        minGames: args.minGames || undefined,
+        minWins: args.minWins || undefined,
+        minStrikeouts: args.minStrikeouts || undefined,
       });
     },
   }),

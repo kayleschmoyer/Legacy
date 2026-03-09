@@ -19,6 +19,7 @@ import { Button, H2, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   type CareerPitchingFragment,
   type GetCareerPitchingStatsQueryVariables,
+  useGetCareerPitchingStatsCountQuery,
   useGetCareerPitchingStatsQuery,
 } from '../../api/db/graphql.generated';
 
@@ -89,13 +90,13 @@ export interface PitchingStatsDataGridProps {
 
 export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
   {
-    key: 'playerId',
-    label: 'Player ID',
-    sortable: true,
-    width: '100px',
+    key: 'playerName' as unknown as string,
+    label: 'Player',
+    sortable: false,
+    width: '200px',
     align: 'left',
     priority: 'high',
-    description: 'Player identifier',
+    description: 'Player name',
   },
   {
     key: 'games',
@@ -132,6 +133,12 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
     align: 'center',
     priority: 'high',
     description: 'Earned run average',
+    formatter: (value: unknown) =>
+      value != null &&
+      (typeof value === 'string' || typeof value === 'number') &&
+      value !== ''
+        ? parseFloat(String(value)).toFixed(2)
+        : '-',
   },
   {
     key: 'gamesStarted',
@@ -270,7 +277,17 @@ export function PitchingStatsDataGrid({
   });
 
   const pitchingData = data?.careerPitchingStats ?? [];
-  const totalCount = pitchingData.length; // Note: Basic implementation, needs count query
+
+  const { data: countData } = useGetCareerPitchingStatsCountQuery({
+    variables: {
+      minGames: queryParams.minGames,
+      minWins: queryParams.minWins,
+      minStrikeouts: queryParams.minStrikeouts,
+    },
+    errorPolicy: 'all',
+    fetchPolicy: 'cache-and-network',
+  });
+  const totalCount = countData?.careerPitchingStatsCount ?? pitchingData.length;
 
   // =============================================================================
   // Event Handlers
@@ -675,13 +692,20 @@ export function PitchingStatsDataGrid({
                       numberOfLines={1}
                       style={{ color: TEXT_HIGH_CONTRAST }}
                     >
-                      {column.formatter
-                        ? column.formatter(
-                            player?.[column.key as keyof typeof player],
-                          )
-                        : String(
-                            player?.[column.key as keyof typeof player] ?? '-',
-                          )}
+                      {column.key === 'playerName'
+                        ? `${player?.player?.firstName ?? ''} ${player?.player?.lastName ?? ''}`.trim() ||
+                          `Player ${player?.playerId ?? '-'}`
+                        : column.formatter
+                          ? column.formatter(
+                              player?.[column.key as keyof typeof player],
+                            )
+                          : (() => {
+                              const rawVal =
+                                player?.[column.key as keyof typeof player];
+                              return typeof rawVal === 'object'
+                                ? '-'
+                                : String(rawVal ?? '-');
+                            })()}
                     </Text>
                   </XStack>
                 ))}

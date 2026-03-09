@@ -24,4 +24,9 @@ fragment CareerPitching on CareerPitching {
   outRate
   era
   winPercentage
+  player {
+    id
+    firstName
+    lastName
+  }
 }

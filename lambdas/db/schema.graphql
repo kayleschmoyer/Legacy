@@ -315,6 +315,7 @@ type CareerPitching {
   losses: Int
   outRate: Int
   outsRecorded: Int
+  player: Player
   playerId: Int
   runs: Int
   saves: Int
@@ -1892,6 +1893,7 @@ type Query {
     orderBy: String
     orderDirection: String
   ): [CareerPitching!]
+  careerPitchingStatsCount(minGames: Int, minStrikeouts: Int, minWins: Int): Int
 
   """
   Commissioner: fetch the audit log for all commissioner actions in a league.
