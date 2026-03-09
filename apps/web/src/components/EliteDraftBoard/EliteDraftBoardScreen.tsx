@@ -41,6 +41,7 @@ import { DraftGrid } from './DraftGrid';
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
 import { getDraftCommentary } from './draftUtils';
+import { DEFAULT_NUM_TEAMS } from '../../constants/league';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import {
   AddToDraftQueue as ADD_TO_DRAFT_QUEUE,
@@ -1339,7 +1340,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const announcementCommentary = useMemo(() => {
     if (!announcement || !('name' in announcement.player)) return undefined;
     const player = announcement.player;
-    const teamCount = leagueTeams.length > 0 ? leagueTeams.length : 12;
+    const teamCount =
+      leagueTeams.length > 0 ? leagueTeams.length : DEFAULT_NUM_TEAMS;
     const announcementRound = Math.ceil(announcement.pickNumber / teamCount);
     return getDraftCommentary(
       player,

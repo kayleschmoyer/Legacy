@@ -21,6 +21,10 @@ import {
 } from 'tamagui';
 import type { League } from './LeagueCard';
 import {
+  DEFAULT_NUM_DIVISIONS,
+  DEFAULT_NUM_TEAMS,
+} from '../../constants/league';
+import {
   GetUserLeagues,
   GetUserLeaguesQuery,
   useCreateLeagueAndTeamsMutation,
@@ -582,7 +586,7 @@ export function BaseballLandingPage() {
   const auth = useAuth();
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [leagueName, setLeagueName] = React.useState('');
-  const [teamCount, setTeamCount] = React.useState<number>(10);
+  const [teamCount, setTeamCount] = React.useState<number>(DEFAULT_NUM_TEAMS);
   const [playerPool, setPlayerPool] = React.useState<'all' | 'nl' | 'al'>(
     'all',
   );
@@ -596,7 +600,9 @@ export function BaseballLandingPage() {
     'snake',
   );
   const [maxRosterSize, setMaxRosterSize] = React.useState<number>(25);
-  const [numberOfDivisions, setNumberOfDivisions] = React.useState<number>(2);
+  const [numberOfDivisions, setNumberOfDivisions] = React.useState<number>(
+    DEFAULT_NUM_DIVISIONS,
+  );
   const [isPublic, setIsPublic] = React.useState(false);
   const [search, setSearch] = React.useState('');
 

@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Card, H1, H2, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  DEFAULT_NUM_DIVISIONS,
+  DEFAULT_NUM_TEAMS,
+} from '../../constants/league';
 import { PageMeta } from '../../components/PageMeta';
 import {
   GetUserLeagues,
@@ -121,8 +125,8 @@ export function LeagueCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
-    numberOfTeams: 12,
-    numberOfDivisions: 2,
+    numberOfTeams: DEFAULT_NUM_TEAMS,
+    numberOfDivisions: DEFAULT_NUM_DIVISIONS,
     schedulingStrategy: 'divisional',
     playerPool: 'all',
     draftMode: 'live',
