@@ -77,42 +77,9 @@ exports[`App FootballScreen should match complete football page layout snapshot 
               </div>
             </button>
           </a>
-          <a
-            href="/about"
-            style="text-decoration: none;"
-          >
-            <button>
-              <div
-                alignitems="center"
-                gap="$2"
-              >
-                Info
-                <p
-                  marginbottom="0"
-                >
-                  About
-                </p>
-              </div>
-            </button>
-          </a>
-          <a
-            href="/help"
-            style="text-decoration: none;"
-          >
-            <button>
-              <div
-                alignitems="center"
-                gap="$2"
-              >
-                HelpCircle
-                <p
-                  marginbottom="0"
-                >
-                  Help
-                </p>
-              </div>
-            </button>
-          </a>
+          <div>
+            Help Dropdown
+          </div>
         </div>
         <div
           alignitems="center"
@@ -227,42 +194,9 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
               </div>
             </button>
           </a>
-          <a
-            href="/about"
-            style="text-decoration: none;"
-          >
-            <button>
-              <div
-                alignitems="center"
-                gap="$2"
-              >
-                Info
-                <p
-                  marginbottom="0"
-                >
-                  About
-                </p>
-              </div>
-            </button>
-          </a>
-          <a
-            href="/help"
-            style="text-decoration: none;"
-          >
-            <button>
-              <div
-                alignitems="center"
-                gap="$2"
-              >
-                HelpCircle
-                <p
-                  marginbottom="0"
-                >
-                  Help
-                </p>
-              </div>
-            </button>
-          </a>
+          <div>
+            Help Dropdown
+          </div>
         </div>
         <div
           alignitems="center"
@@ -375,42 +309,9 @@ exports[`App Navigation should render navigation with correct links 1`] = `
               </div>
             </button>
           </a>
-          <a
-            href="/about"
-            style="text-decoration: none;"
-          >
-            <button>
-              <div
-                alignitems="center"
-                gap="$2"
-              >
-                Info
-                <p
-                  marginbottom="0"
-                >
-                  About
-                </p>
-              </div>
-            </button>
-          </a>
-          <a
-            href="/help"
-            style="text-decoration: none;"
-          >
-            <button>
-              <div
-                alignitems="center"
-                gap="$2"
-              >
-                HelpCircle
-                <p
-                  marginbottom="0"
-                >
-                  Help
-                </p>
-              </div>
-            </button>
-          </a>
+          <div>
+            Help Dropdown
+          </div>
         </div>
         <div
           alignitems="center"

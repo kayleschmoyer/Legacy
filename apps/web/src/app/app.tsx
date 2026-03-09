@@ -27,6 +27,7 @@ import HomePage from '../pages/home/HomePage';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { SportsDropdown } from '../components/layout/SportsDropdown';
 import { PlayersDropdown } from '../components/layout/PlayersDropdown';
+import { HelpDropdown } from '../components/layout/HelpDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
 import { BaseballScreen } from '../components/baseball';
 
@@ -287,31 +288,7 @@ function Navigation() {
               </NavLinkButton>
             </Link>
 
-            <Link
-              to="/about"
-              style={{ textDecoration: 'none' }}
-              aria-current={isActive('/about') ? 'page' : undefined}
-            >
-              <NavLinkButton active={isActive('/about')}>
-                <XStack alignItems="center" gap="$2">
-                  <Info size={15} />
-                  <Paragraph marginBottom={0}>About</Paragraph>
-                </XStack>
-              </NavLinkButton>
-            </Link>
-
-            <Link
-              to="/help"
-              style={{ textDecoration: 'none' }}
-              aria-current={isActive('/help') ? 'page' : undefined}
-            >
-              <NavLinkButton active={isActive('/help')}>
-                <XStack alignItems="center" gap="$2">
-                  <HelpCircle size={15} />
-                  <Paragraph marginBottom={0}>Help</Paragraph>
-                </XStack>
-              </NavLinkButton>
-            </Link>
+            <HelpDropdown />
           </NavLinks>
 
           {/* ── Right section ── */}
@@ -388,24 +365,44 @@ function Navigation() {
               <Paragraph marginBottom={0}>Games</Paragraph>
             </MobileNavLink>
           </Link>
-          <Link to="/about" style={{ textDecoration: 'none' }}>
-            <MobileNavLink
-              active={isActive('/about')}
-              onPress={() => setMobileOpen(false)}
+          {/* Help & Info group */}
+          <YStack
+            borderTopWidth={1}
+            borderTopColor="$borderColor"
+            paddingTop="$2"
+            marginTop="$1"
+            gap="$1"
+          >
+            <Paragraph
+              size="$2"
+              color="$colorPress"
+              paddingHorizontal="$3"
+              paddingVertical="$1"
+              fontWeight="600"
+              textTransform="uppercase"
+              letterSpacing={0.8}
             >
-              <Info size={16} />
-              <Paragraph marginBottom={0}>About</Paragraph>
-            </MobileNavLink>
-          </Link>
-          <Link to="/help" style={{ textDecoration: 'none' }}>
-            <MobileNavLink
-              active={isActive('/help')}
-              onPress={() => setMobileOpen(false)}
-            >
-              <HelpCircle size={16} />
-              <Paragraph marginBottom={0}>Help</Paragraph>
-            </MobileNavLink>
-          </Link>
+              Help &amp; Info
+            </Paragraph>
+            <Link to="/about" style={{ textDecoration: 'none' }}>
+              <MobileNavLink
+                active={isActive('/about')}
+                onPress={() => setMobileOpen(false)}
+              >
+                <Info size={16} />
+                <Paragraph marginBottom={0}>About</Paragraph>
+              </MobileNavLink>
+            </Link>
+            <Link to="/help" style={{ textDecoration: 'none' }}>
+              <MobileNavLink
+                active={isActive('/help')}
+                onPress={() => setMobileOpen(false)}
+              >
+                <HelpCircle size={16} />
+                <Paragraph marginBottom={0}>Help</Paragraph>
+              </MobileNavLink>
+            </Link>
+          </YStack>
         </MobileNavPanel>
       )}
     </YStack>
