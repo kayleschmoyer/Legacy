@@ -21,6 +21,10 @@ export interface DateTimePickerProps {
    * Set to false to always use custom picker popup
    */
   useNativeInput?: boolean;
+  /** Extra CSS class applied to the native <input> on web (e.g. for pseudo-element styling). */
+  inputClassName?: string;
+  /** Inline style overrides merged onto the native <input> on web. */
+  inputStyle?: React.CSSProperties;
 }
 
 export function DateTimePicker({
@@ -31,6 +35,8 @@ export function DateTimePicker({
   minDate,
   maxDate,
   useNativeInput = true,
+  inputClassName,
+  inputStyle,
 }: DateTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(
@@ -162,6 +168,7 @@ export function DateTimePicker({
       <YStack>
         <input
           type="datetime-local"
+          className={inputClassName}
           value={value ? formatInputDateTime(value) : ''}
           onChange={(e) => {
             const parsedDate = parseInputDateTime(e.target.value);
@@ -174,13 +181,19 @@ export function DateTimePicker({
           min={minDate ? formatInputDateTime(minDate) : undefined}
           max={maxDate ? formatInputDateTime(maxDate) : undefined}
           style={{
+            colorScheme: 'dark',
+            fontFamily: 'inherit',
             width: '100%',
-            padding: '12px 16px',
-            fontSize: '16px',
-            border: '1px solid var(--color-borderColor)',
+            padding: '10px 14px',
+            fontSize: '14px',
+            border: '1px solid var(--gray7)',
             borderRadius: '8px',
-            backgroundColor: 'var(--color-color1)',
-            color: 'var(--color-color)',
+            backgroundColor: 'var(--gray4)',
+            color: 'var(--color)',
+            opacity: disabled ? 0.5 : 1,
+            cursor: disabled ? 'not-allowed' : 'default',
+            outline: 'none',
+            ...inputStyle,
           }}
         />
       </YStack>

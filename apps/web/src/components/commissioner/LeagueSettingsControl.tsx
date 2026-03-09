@@ -10,12 +10,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { AlertTriangle, Check, Settings } from '@tamagui/lucide-icons';
+import { AlertTriangle, Check, Lock, Settings } from '@tamagui/lucide-icons';
 import { useUpdateLeagueSettingsMutation } from '../../api/db/graphql.generated';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
 
 export interface LeagueSettingsControlProps {
   leagueId: number;
+  draftStatus?: string | null;
   currentGamesPerMatchup: number;
   currentSpStartsPerMatchup: number;
   currentMinCareerGames?: number;
@@ -82,6 +83,7 @@ const PLAYOFF_FORMAT_OPTIONS = [
  */
 export function LeagueSettingsControl({
   leagueId,
+  draftStatus,
   currentGamesPerMatchup,
   currentSpStartsPerMatchup,
   currentMinCareerGames = 50,
@@ -117,6 +119,7 @@ export function LeagueSettingsControl({
   );
   const [hasChanges, setHasChanges] = useState(false);
 
+  const isLocked = draftStatus === 'completed';
   const [updateLeagueSettings, { loading: saving }] =
     useUpdateLeagueSettingsMutation();
 
@@ -427,573 +430,610 @@ export function LeagueSettingsControl({
       <YStack gap="$4">
         {/* Header */}
         <XStack alignItems="center" gap="$2">
-          <Settings size={20} color={BRAND_NAVY_LIGHT} />
+          {isLocked ? (
+            <Lock size={20} color="var(--gray10)" />
+          ) : (
+            <Settings size={20} color={BRAND_NAVY_LIGHT} />
+          )}
           <YStack>
             <H4 margin={0}>League Settings</H4>
             <Text fontSize="$2" color="$gray10">
-              Configure matchup settings for the league. Changes apply to future
-              scheduled matchups.
+              {isLocked
+                ? 'Settings are locked — the season is in progress.'
+                : 'Configure matchup settings for the league. Changes apply to future scheduled matchups.'}
             </Text>
           </YStack>
         </XStack>
 
-        {/* Games Per Matchup */}
-        <YStack gap="$2">
-          <YStack gap="$1">
-            <Text fontSize="$3" fontWeight="600" color="$color">
-              Games Per Matchup
-            </Text>
-            <Text fontSize="$2" color="$gray10">
-              Total number of games in each matchup week. All non-pitcher and RP
-              players play every game. Changes apply to scheduled matchups only.
-            </Text>
-          </YStack>
-          <XStack gap="$2" flexWrap="wrap">
-            {GAMES_PER_MATCHUP_OPTIONS.map((option) => {
-              const isSelected = gamesPerMatchup === option.value;
-              return (
-                <Button
-                  key={option.value}
-                  size="$3"
-                  theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={
-                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
-                  }
-                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                  borderWidth={1}
-                  borderRadius="$3"
-                  onPress={() => handleGamesChange(option.value)}
-                  disabled={saving}
-                  opacity={saving ? 0.5 : 1}
-                  icon={isSelected ? <Check size={14} /> : undefined}
-                  aria-pressed={isSelected}
-                  aria-label={`Games per matchup: ${option.label}`}
-                  hoverStyle={
-                    saving
-                      ? undefined
-                      : {
-                          backgroundColor: isSelected
-                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                            : '$gray4',
-                        }
-                  }
-                >
-                  <Text
-                    fontSize="$2"
-                    fontWeight={isSelected ? '700' : '400'}
-                    color={isSelected ? 'white' : '$color'}
-                  >
-                    {option.label}
-                  </Text>
-                </Button>
-              );
-            })}
-          </XStack>
-        </YStack>
-
-        <Separator />
-
-        {/* SP Starts Per Matchup */}
-        <YStack gap="$2">
-          <YStack gap="$1">
-            <Text fontSize="$3" fontWeight="600" color="$color">
-              SP Starts Per Matchup
-            </Text>
-            <Text fontSize="$2" color="$gray10">
-              How many games starting pitchers play each matchup (cannot exceed
-              games per matchup). Relief pitchers always play every game.
-            </Text>
-          </YStack>
-          <XStack gap="$2" flexWrap="wrap">
-            {GAMES_PER_MATCHUP_OPTIONS.filter(
-              (o) => o.value <= gamesPerMatchup,
-            ).map((option) => {
-              const isSelected = spStarts === option.value;
-              return (
-                <Button
-                  key={option.value}
-                  size="$3"
-                  theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={
-                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
-                  }
-                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                  borderWidth={1}
-                  borderRadius="$3"
-                  onPress={() => handleSpStartsChange(option.value)}
-                  disabled={saving}
-                  opacity={saving ? 0.5 : 1}
-                  icon={isSelected ? <Check size={14} /> : undefined}
-                  aria-pressed={isSelected}
-                  aria-label={`SP starts per matchup: ${option.label}`}
-                  hoverStyle={
-                    saving
-                      ? undefined
-                      : {
-                          backgroundColor: isSelected
-                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                            : '$gray4',
-                        }
-                  }
-                >
-                  <Text
-                    fontSize="$2"
-                    fontWeight={isSelected ? '700' : '400'}
-                    color={isSelected ? 'white' : '$color'}
-                  >
-                    {option.label}
-                  </Text>
-                </Button>
-              );
-            })}
-          </XStack>
-        </YStack>
-
-        <Separator />
-
-        {/* Min Career Games */}
-        <YStack gap="$2">
-          <YStack gap="$1">
-            <Text fontSize="$3" fontWeight="600" color="$color">
-              Minimum Career Games
-            </Text>
-            <Text fontSize="$2" color="$gray10">
-              Players with fewer career MLB games than this threshold are
-              excluded from the draft pool, free agent pool, and cannot hold a
-              starting roster spot. Set to "Off" to disable.
-            </Text>
-          </YStack>
-          <XStack gap="$2" flexWrap="wrap">
-            {MIN_CAREER_GAMES_OPTIONS.map((option) => {
-              const isSelected = minCareerGames === option.value;
-              return (
-                <Button
-                  key={option.value}
-                  size="$3"
-                  theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={
-                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
-                  }
-                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                  borderWidth={1}
-                  borderRadius="$3"
-                  onPress={() => handleMinCareerGamesChange(option.value)}
-                  disabled={saving}
-                  opacity={saving ? 0.5 : 1}
-                  icon={isSelected ? <Check size={14} /> : undefined}
-                  aria-pressed={isSelected}
-                  aria-label={`Minimum career games: ${option.label}`}
-                  hoverStyle={
-                    saving
-                      ? undefined
-                      : {
-                          backgroundColor: isSelected
-                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                            : '$gray4',
-                        }
-                  }
-                >
-                  <Text
-                    fontSize="$2"
-                    fontWeight={isSelected ? '700' : '400'}
-                    color={isSelected ? 'white' : '$color'}
-                  >
-                    {option.label}
-                  </Text>
-                </Button>
-              );
-            })}
-          </XStack>
-        </YStack>
-
-        <Separator />
-
-        {/* Min Career Seasons */}
-        <YStack gap="$2">
-          <YStack gap="$1">
-            <Text fontSize="$3" fontWeight="600" color="$color">
-              Minimum Career Seasons
-            </Text>
-            <Text fontSize="$2" color="$gray10">
-              Players with fewer distinct MLB seasons (AL/NL) than this
-              threshold are excluded from the draft pool, free agent pool, and
-              cannot hold a starting roster spot. Set to "Off" to disable.
-            </Text>
-          </YStack>
-          <XStack gap="$2" flexWrap="wrap">
-            {MIN_CAREER_SEASONS_OPTIONS.map((option) => {
-              const isSelected = minCareerSeasons === option.value;
-              return (
-                <Button
-                  key={option.value}
-                  size="$3"
-                  theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={
-                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
-                  }
-                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                  borderWidth={1}
-                  borderRadius="$3"
-                  onPress={() => handleMinCareerSeasonsChange(option.value)}
-                  disabled={saving}
-                  opacity={saving ? 0.5 : 1}
-                  icon={isSelected ? <Check size={14} /> : undefined}
-                  aria-pressed={isSelected}
-                  aria-label={`Minimum career seasons: ${option.label}`}
-                  hoverStyle={
-                    saving
-                      ? undefined
-                      : {
-                          backgroundColor: isSelected
-                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                            : '$gray4',
-                        }
-                  }
-                >
-                  <Text
-                    fontSize="$2"
-                    fontWeight={isSelected ? '700' : '400'}
-                    color={isSelected ? 'white' : '$color'}
-                  >
-                    {option.label}
-                  </Text>
-                </Button>
-              );
-            })}
-          </XStack>
-        </YStack>
-
-        <Separator />
-
-        {/* Total Matchups */}
-        <YStack gap="$2">
-          <YStack gap="$1">
-            <Text fontSize="$3" fontWeight="600" color="$color">
-              Total Matchups
-            </Text>
-            <Text fontSize="$2" color="$gray10">
-              Total number of matchup weeks in a season. Adding weeks creates
-              new scheduled matchups. Removing weeks only removes future
-              unplayed (scheduled) matchups.
-            </Text>
-          </YStack>
-          <XStack gap="$2" flexWrap="wrap">
-            {TOTAL_MATCHUPS_OPTIONS.map((option) => {
-              const isSelected = totalMatchups === option.value;
-              return (
-                <Button
-                  key={option.value}
-                  size="$3"
-                  theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={
-                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
-                  }
-                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                  borderWidth={1}
-                  borderRadius="$3"
-                  onPress={() => handleTotalMatchupsChange(option.value)}
-                  disabled={saving}
-                  opacity={saving ? 0.5 : 1}
-                  icon={isSelected ? <Check size={14} /> : undefined}
-                  aria-pressed={isSelected}
-                  aria-label={`Total matchups: ${option.label}`}
-                  hoverStyle={
-                    saving
-                      ? undefined
-                      : {
-                          backgroundColor: isSelected
-                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                            : '$gray4',
-                        }
-                  }
-                >
-                  <Text
-                    fontSize="$2"
-                    fontWeight={isSelected ? '700' : '400'}
-                    color={isSelected ? 'white' : '$color'}
-                  >
-                    {option.label}
-                  </Text>
-                </Button>
-              );
-            })}
-          </XStack>
-        </YStack>
-
-        <Separator />
-
-        {/* Playoff Settings */}
-        <YStack gap="$2">
-          <YStack gap="$1">
-            <Text fontSize="$3" fontWeight="600" color="$color">
-              Playoffs
-            </Text>
-            <Text fontSize="$2" color="$gray10">
-              Enable a playoff bracket at the end of the regular season. The
-              bracket is created automatically after the final matchup week.
-            </Text>
-          </YStack>
-          <XStack gap="$2" flexWrap="wrap">
-            {(
-              [
-                { label: 'Enabled', value: true },
-                { label: 'Disabled', value: false },
-              ] as const
-            ).map((option) => {
-              const isSelected = playoffEnabled === option.value;
-              return (
-                <Button
-                  key={String(option.value)}
-                  size="$3"
-                  theme={isSelected ? 'active' : 'alt2'}
-                  backgroundColor={
-                    isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
-                  }
-                  borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                  borderWidth={1}
-                  borderRadius="$3"
-                  onPress={() => handlePlayoffEnabledChange(option.value)}
-                  disabled={saving}
-                  opacity={saving ? 0.5 : 1}
-                  icon={isSelected ? <Check size={14} /> : undefined}
-                  aria-pressed={isSelected}
-                  aria-label={`Playoffs: ${option.label}`}
-                  hoverStyle={
-                    saving
-                      ? undefined
-                      : {
-                          backgroundColor: isSelected
-                            ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                            : '$gray4',
-                        }
-                  }
-                >
-                  <Text
-                    fontSize="$2"
-                    fontWeight={isSelected ? '700' : '400'}
-                    color={isSelected ? 'white' : '$color'}
-                  >
-                    {option.label}
-                  </Text>
-                </Button>
-              );
-            })}
-          </XStack>
-        </YStack>
-
-        {playoffEnabled && (
-          <>
-            <Separator />
-
-            {/* Playoff Format */}
-            <YStack gap="$2">
-              <YStack gap="$1">
-                <Text fontSize="$3" fontWeight="600" color="$color">
-                  Playoff Format
-                </Text>
-                <Text fontSize="$2" color="$gray10">
-                  Number of teams that qualify for the playoffs. 6-team includes
-                  a wildcard round; 8-team has two wildcard rounds.
-                </Text>
-              </YStack>
-              <XStack gap="$2" flexWrap="wrap">
-                {PLAYOFF_FORMAT_OPTIONS.map((option) => {
-                  const isSelected = playoffFormat === option.value;
-                  return (
-                    <Button
-                      key={option.value}
-                      size="$3"
-                      theme={isSelected ? 'active' : 'alt2'}
-                      backgroundColor={
-                        isSelected
-                          ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
-                          : '$gray3'
-                      }
-                      borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                      borderWidth={1}
-                      borderRadius="$3"
-                      onPress={() => handlePlayoffFormatChange(option.value)}
-                      disabled={saving}
-                      opacity={saving ? 0.5 : 1}
-                      icon={isSelected ? <Check size={14} /> : undefined}
-                      aria-pressed={isSelected}
-                      aria-label={`Playoff format: ${option.label}`}
-                      hoverStyle={
-                        saving
-                          ? undefined
-                          : {
-                              backgroundColor: isSelected
-                                ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                                : '$gray4',
-                            }
-                      }
-                    >
-                      <Text
-                        fontSize="$2"
-                        fontWeight={isSelected ? '700' : '400'}
-                        color={isSelected ? 'white' : '$color'}
-                      >
-                        {option.label}
-                      </Text>
-                    </Button>
-                  );
-                })}
-              </XStack>
-            </YStack>
-
-            <Separator />
-
-            {/* Playoff Multi-Week Matchups */}
-            <YStack gap="$2">
-              <YStack gap="$1">
-                <Text fontSize="$3" fontWeight="600" color="$color">
-                  Multi-Week Playoff Matchups
-                </Text>
-                <Text fontSize="$2" color="$gray10">
-                  When enabled, each playoff round spans two weeks instead of
-                  one. This increases the sample size for each matchup.
-                </Text>
-              </YStack>
-              <XStack gap="$2" flexWrap="wrap">
-                {(
-                  [
-                    { label: 'Single week', value: false },
-                    { label: 'Two weeks', value: true },
-                  ] as const
-                ).map((option) => {
-                  const isSelected = playoffMultiWeek === option.value;
-                  return (
-                    <Button
-                      key={String(option.value)}
-                      size="$3"
-                      theme={isSelected ? 'active' : 'alt2'}
-                      backgroundColor={
-                        isSelected
-                          ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
-                          : '$gray3'
-                      }
-                      borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                      borderWidth={1}
-                      borderRadius="$3"
-                      onPress={() => handlePlayoffMultiWeekChange(option.value)}
-                      disabled={saving}
-                      opacity={saving ? 0.5 : 1}
-                      icon={isSelected ? <Check size={14} /> : undefined}
-                      aria-pressed={isSelected}
-                      aria-label={`Multi-week playoffs: ${option.label}`}
-                      hoverStyle={
-                        saving
-                          ? undefined
-                          : {
-                              backgroundColor: isSelected
-                                ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                                : '$gray4',
-                            }
-                      }
-                    >
-                      <Text
-                        fontSize="$2"
-                        fontWeight={isSelected ? '700' : '400'}
-                        color={isSelected ? 'white' : '$color'}
-                      >
-                        {option.label}
-                      </Text>
-                    </Button>
-                  );
-                })}
-              </XStack>
-            </YStack>
-          </>
-        )}
-
-        {/* Salary Cap Settings (LS-646) */}
-        <Separator />
-        <YStack gap="$3">
-          <Text fontWeight="600" fontSize="$4">
-            Salary Cap
-          </Text>
-          <Text fontSize="$2" color="$gray10">
-            Control player salary limits and roster spending caps.
-          </Text>
+        {isLocked ? (
           <XStack
-            alignItems="center"
-            gap="$3"
-            padding="$3"
-            borderRadius="$4"
-            borderWidth={1}
-            borderColor={
-              salaryCapEnabled
-                ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
-                : '$borderColor'
-            }
-            backgroundColor={
-              salaryCapEnabled ? withAlpha(BRAND_NAVY_LIGHT, 0.08) : '$color1'
-            }
-            cursor="pointer"
-            onPress={() => {
-              setSalaryCapEnabled(!salaryCapEnabled);
-              setHasChanges(true);
-            }}
-          >
-            <YStack
-              width={24}
-              height={24}
-              borderRadius={12}
-              borderWidth={2}
-              borderColor={salaryCapEnabled ? BRAND_NAVY_LIGHT : '$borderColor'}
-              backgroundColor={
-                salaryCapEnabled ? BRAND_NAVY_LIGHT : 'transparent'
-              }
-              alignItems="center"
-              justifyContent="center"
-            >
-              {salaryCapEnabled && <Check size={14} color="white" />}
-            </YStack>
-            <YStack flex={1}>
-              <Text fontWeight="600">Enable Salary Cap</Text>
-              <Text fontSize="$2" color="$gray10">
-                Track player salaries and enforce roster spending limits
-              </Text>
-            </YStack>
-          </XStack>
-          {salaryCapEnabled && (
-            <YStack gap="$2">
-              <Text fontSize="$3" fontWeight="600">
-                Salary Cap Limit
-              </Text>
-              <Input
-                value={salaryCap != null ? String(salaryCap) : ''}
-                onChangeText={(text: string) => {
-                  const n = parseInt(text, 10);
-                  setSalaryCap(isNaN(n) ? null : n);
-                  setHasChanges(true);
-                }}
-                placeholder="e.g. 50000000"
-                keyboardType="numeric"
-              />
-              <Text fontSize="$2" color="$gray10">
-                Maximum total salary each team can spend
-              </Text>
-            </YStack>
-          )}
-        </YStack>
-
-        {/* Validation warning */}
-        {validationError && (
-          <Card
             backgroundColor="$yellow2"
             borderColor="$yellow6"
+            borderWidth={1}
             padding="$3"
             borderRadius="$4"
+            alignItems="center"
+            gap="$2"
           >
-            <XStack alignItems="center" gap="$2">
-              <AlertTriangle size={16} color="var(--yellow11)" />
-              <Text fontSize="$3" color="$yellow11" fontWeight="600">
-                {validationError}
+            <Lock size={16} color="var(--yellow11)" />
+            <Text fontSize="$3" color="$yellow11" fontWeight="600">
+              League settings are locked while the season is in progress.
+              Settings can only be changed before the draft starts.
+            </Text>
+          </XStack>
+        ) : null}
+
+        <YStack
+          gap="$4"
+          style={{
+            opacity: isLocked ? 0.5 : 1,
+            pointerEvents: isLocked ? 'none' : undefined,
+          }}
+        >
+          {/* Games Per Matchup */}
+          <YStack gap="$2">
+            <YStack gap="$1">
+              <Text fontSize="$3" fontWeight="600" color="$color">
+                Games Per Matchup
               </Text>
+              <Text fontSize="$2" color="$gray10">
+                Total number of games in each matchup week. All non-pitcher and
+                RP players play every game. Changes apply to scheduled matchups
+                only.
+              </Text>
+            </YStack>
+            <XStack gap="$2" flexWrap="wrap">
+              {GAMES_PER_MATCHUP_OPTIONS.map((option) => {
+                const isSelected = gamesPerMatchup === option.value;
+                return (
+                  <Button
+                    key={option.value}
+                    size="$3"
+                    theme={isSelected ? 'active' : 'alt2'}
+                    backgroundColor={
+                      isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                    }
+                    borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                    borderWidth={1}
+                    borderRadius="$3"
+                    onPress={() => handleGamesChange(option.value)}
+                    disabled={saving}
+                    opacity={saving ? 0.5 : 1}
+                    icon={isSelected ? <Check size={14} /> : undefined}
+                    aria-pressed={isSelected}
+                    aria-label={`Games per matchup: ${option.label}`}
+                    hoverStyle={
+                      saving
+                        ? undefined
+                        : {
+                            backgroundColor: isSelected
+                              ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                              : '$gray4',
+                          }
+                    }
+                  >
+                    <Text
+                      fontSize="$2"
+                      fontWeight={isSelected ? '700' : '400'}
+                      color={isSelected ? 'white' : '$color'}
+                    >
+                      {option.label}
+                    </Text>
+                  </Button>
+                );
+              })}
             </XStack>
-          </Card>
-        )}
+          </YStack>
+
+          <Separator />
+
+          {/* SP Starts Per Matchup */}
+          <YStack gap="$2">
+            <YStack gap="$1">
+              <Text fontSize="$3" fontWeight="600" color="$color">
+                SP Starts Per Matchup
+              </Text>
+              <Text fontSize="$2" color="$gray10">
+                How many games starting pitchers play each matchup (cannot
+                exceed games per matchup). Relief pitchers always play every
+                game.
+              </Text>
+            </YStack>
+            <XStack gap="$2" flexWrap="wrap">
+              {GAMES_PER_MATCHUP_OPTIONS.filter(
+                (o) => o.value <= gamesPerMatchup,
+              ).map((option) => {
+                const isSelected = spStarts === option.value;
+                return (
+                  <Button
+                    key={option.value}
+                    size="$3"
+                    theme={isSelected ? 'active' : 'alt2'}
+                    backgroundColor={
+                      isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                    }
+                    borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                    borderWidth={1}
+                    borderRadius="$3"
+                    onPress={() => handleSpStartsChange(option.value)}
+                    disabled={saving}
+                    opacity={saving ? 0.5 : 1}
+                    icon={isSelected ? <Check size={14} /> : undefined}
+                    aria-pressed={isSelected}
+                    aria-label={`SP starts per matchup: ${option.label}`}
+                    hoverStyle={
+                      saving
+                        ? undefined
+                        : {
+                            backgroundColor: isSelected
+                              ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                              : '$gray4',
+                          }
+                    }
+                  >
+                    <Text
+                      fontSize="$2"
+                      fontWeight={isSelected ? '700' : '400'}
+                      color={isSelected ? 'white' : '$color'}
+                    >
+                      {option.label}
+                    </Text>
+                  </Button>
+                );
+              })}
+            </XStack>
+          </YStack>
+
+          <Separator />
+
+          {/* Min Career Games */}
+          <YStack gap="$2">
+            <YStack gap="$1">
+              <Text fontSize="$3" fontWeight="600" color="$color">
+                Minimum Career Games
+              </Text>
+              <Text fontSize="$2" color="$gray10">
+                Players with fewer career MLB games than this threshold are
+                excluded from the draft pool, free agent pool, and cannot hold a
+                starting roster spot. Set to "Off" to disable.
+              </Text>
+            </YStack>
+            <XStack gap="$2" flexWrap="wrap">
+              {MIN_CAREER_GAMES_OPTIONS.map((option) => {
+                const isSelected = minCareerGames === option.value;
+                return (
+                  <Button
+                    key={option.value}
+                    size="$3"
+                    theme={isSelected ? 'active' : 'alt2'}
+                    backgroundColor={
+                      isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                    }
+                    borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                    borderWidth={1}
+                    borderRadius="$3"
+                    onPress={() => handleMinCareerGamesChange(option.value)}
+                    disabled={saving}
+                    opacity={saving ? 0.5 : 1}
+                    icon={isSelected ? <Check size={14} /> : undefined}
+                    aria-pressed={isSelected}
+                    aria-label={`Minimum career games: ${option.label}`}
+                    hoverStyle={
+                      saving
+                        ? undefined
+                        : {
+                            backgroundColor: isSelected
+                              ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                              : '$gray4',
+                          }
+                    }
+                  >
+                    <Text
+                      fontSize="$2"
+                      fontWeight={isSelected ? '700' : '400'}
+                      color={isSelected ? 'white' : '$color'}
+                    >
+                      {option.label}
+                    </Text>
+                  </Button>
+                );
+              })}
+            </XStack>
+          </YStack>
+
+          <Separator />
+
+          {/* Min Career Seasons */}
+          <YStack gap="$2">
+            <YStack gap="$1">
+              <Text fontSize="$3" fontWeight="600" color="$color">
+                Minimum Career Seasons
+              </Text>
+              <Text fontSize="$2" color="$gray10">
+                Players with fewer distinct MLB seasons (AL/NL) than this
+                threshold are excluded from the draft pool, free agent pool, and
+                cannot hold a starting roster spot. Set to "Off" to disable.
+              </Text>
+            </YStack>
+            <XStack gap="$2" flexWrap="wrap">
+              {MIN_CAREER_SEASONS_OPTIONS.map((option) => {
+                const isSelected = minCareerSeasons === option.value;
+                return (
+                  <Button
+                    key={option.value}
+                    size="$3"
+                    theme={isSelected ? 'active' : 'alt2'}
+                    backgroundColor={
+                      isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                    }
+                    borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                    borderWidth={1}
+                    borderRadius="$3"
+                    onPress={() => handleMinCareerSeasonsChange(option.value)}
+                    disabled={saving}
+                    opacity={saving ? 0.5 : 1}
+                    icon={isSelected ? <Check size={14} /> : undefined}
+                    aria-pressed={isSelected}
+                    aria-label={`Minimum career seasons: ${option.label}`}
+                    hoverStyle={
+                      saving
+                        ? undefined
+                        : {
+                            backgroundColor: isSelected
+                              ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                              : '$gray4',
+                          }
+                    }
+                  >
+                    <Text
+                      fontSize="$2"
+                      fontWeight={isSelected ? '700' : '400'}
+                      color={isSelected ? 'white' : '$color'}
+                    >
+                      {option.label}
+                    </Text>
+                  </Button>
+                );
+              })}
+            </XStack>
+          </YStack>
+
+          <Separator />
+
+          {/* Total Matchups */}
+          <YStack gap="$2">
+            <YStack gap="$1">
+              <Text fontSize="$3" fontWeight="600" color="$color">
+                Total Matchups
+              </Text>
+              <Text fontSize="$2" color="$gray10">
+                Total number of matchup weeks in a season. Adding weeks creates
+                new scheduled matchups. Removing weeks only removes future
+                unplayed (scheduled) matchups.
+              </Text>
+            </YStack>
+            <XStack gap="$2" flexWrap="wrap">
+              {TOTAL_MATCHUPS_OPTIONS.map((option) => {
+                const isSelected = totalMatchups === option.value;
+                return (
+                  <Button
+                    key={option.value}
+                    size="$3"
+                    theme={isSelected ? 'active' : 'alt2'}
+                    backgroundColor={
+                      isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                    }
+                    borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                    borderWidth={1}
+                    borderRadius="$3"
+                    onPress={() => handleTotalMatchupsChange(option.value)}
+                    disabled={saving}
+                    opacity={saving ? 0.5 : 1}
+                    icon={isSelected ? <Check size={14} /> : undefined}
+                    aria-pressed={isSelected}
+                    aria-label={`Total matchups: ${option.label}`}
+                    hoverStyle={
+                      saving
+                        ? undefined
+                        : {
+                            backgroundColor: isSelected
+                              ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                              : '$gray4',
+                          }
+                    }
+                  >
+                    <Text
+                      fontSize="$2"
+                      fontWeight={isSelected ? '700' : '400'}
+                      color={isSelected ? 'white' : '$color'}
+                    >
+                      {option.label}
+                    </Text>
+                  </Button>
+                );
+              })}
+            </XStack>
+          </YStack>
+
+          <Separator />
+
+          {/* Playoff Settings */}
+          <YStack gap="$2">
+            <YStack gap="$1">
+              <Text fontSize="$3" fontWeight="600" color="$color">
+                Playoffs
+              </Text>
+              <Text fontSize="$2" color="$gray10">
+                Enable a playoff bracket at the end of the regular season. The
+                bracket is created automatically after the final matchup week.
+              </Text>
+            </YStack>
+            <XStack gap="$2" flexWrap="wrap">
+              {(
+                [
+                  { label: 'Enabled', value: true },
+                  { label: 'Disabled', value: false },
+                ] as const
+              ).map((option) => {
+                const isSelected = playoffEnabled === option.value;
+                return (
+                  <Button
+                    key={String(option.value)}
+                    size="$3"
+                    theme={isSelected ? 'active' : 'alt2'}
+                    backgroundColor={
+                      isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
+                    }
+                    borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                    borderWidth={1}
+                    borderRadius="$3"
+                    onPress={() => handlePlayoffEnabledChange(option.value)}
+                    disabled={saving}
+                    opacity={saving ? 0.5 : 1}
+                    icon={isSelected ? <Check size={14} /> : undefined}
+                    aria-pressed={isSelected}
+                    aria-label={`Playoffs: ${option.label}`}
+                    hoverStyle={
+                      saving
+                        ? undefined
+                        : {
+                            backgroundColor: isSelected
+                              ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                              : '$gray4',
+                          }
+                    }
+                  >
+                    <Text
+                      fontSize="$2"
+                      fontWeight={isSelected ? '700' : '400'}
+                      color={isSelected ? 'white' : '$color'}
+                    >
+                      {option.label}
+                    </Text>
+                  </Button>
+                );
+              })}
+            </XStack>
+          </YStack>
+
+          {playoffEnabled && (
+            <>
+              <Separator />
+
+              {/* Playoff Format */}
+              <YStack gap="$2">
+                <YStack gap="$1">
+                  <Text fontSize="$3" fontWeight="600" color="$color">
+                    Playoff Format
+                  </Text>
+                  <Text fontSize="$2" color="$gray10">
+                    Number of teams that qualify for the playoffs. 6-team
+                    includes a wildcard round; 8-team has two wildcard rounds.
+                  </Text>
+                </YStack>
+                <XStack gap="$2" flexWrap="wrap">
+                  {PLAYOFF_FORMAT_OPTIONS.map((option) => {
+                    const isSelected = playoffFormat === option.value;
+                    return (
+                      <Button
+                        key={option.value}
+                        size="$3"
+                        theme={isSelected ? 'active' : 'alt2'}
+                        backgroundColor={
+                          isSelected
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                            : '$gray3'
+                        }
+                        borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                        borderWidth={1}
+                        borderRadius="$3"
+                        onPress={() => handlePlayoffFormatChange(option.value)}
+                        disabled={saving}
+                        opacity={saving ? 0.5 : 1}
+                        icon={isSelected ? <Check size={14} /> : undefined}
+                        aria-pressed={isSelected}
+                        aria-label={`Playoff format: ${option.label}`}
+                        hoverStyle={
+                          saving
+                            ? undefined
+                            : {
+                                backgroundColor: isSelected
+                                  ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                                  : '$gray4',
+                              }
+                        }
+                      >
+                        <Text
+                          fontSize="$2"
+                          fontWeight={isSelected ? '700' : '400'}
+                          color={isSelected ? 'white' : '$color'}
+                        >
+                          {option.label}
+                        </Text>
+                      </Button>
+                    );
+                  })}
+                </XStack>
+              </YStack>
+
+              <Separator />
+
+              {/* Playoff Multi-Week Matchups */}
+              <YStack gap="$2">
+                <YStack gap="$1">
+                  <Text fontSize="$3" fontWeight="600" color="$color">
+                    Multi-Week Playoff Matchups
+                  </Text>
+                  <Text fontSize="$2" color="$gray10">
+                    When enabled, each playoff round spans two weeks instead of
+                    one. This increases the sample size for each matchup.
+                  </Text>
+                </YStack>
+                <XStack gap="$2" flexWrap="wrap">
+                  {(
+                    [
+                      { label: 'Single week', value: false },
+                      { label: 'Two weeks', value: true },
+                    ] as const
+                  ).map((option) => {
+                    const isSelected = playoffMultiWeek === option.value;
+                    return (
+                      <Button
+                        key={String(option.value)}
+                        size="$3"
+                        theme={isSelected ? 'active' : 'alt2'}
+                        backgroundColor={
+                          isSelected
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                            : '$gray3'
+                        }
+                        borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                        borderWidth={1}
+                        borderRadius="$3"
+                        onPress={() =>
+                          handlePlayoffMultiWeekChange(option.value)
+                        }
+                        disabled={saving}
+                        opacity={saving ? 0.5 : 1}
+                        icon={isSelected ? <Check size={14} /> : undefined}
+                        aria-pressed={isSelected}
+                        aria-label={`Multi-week playoffs: ${option.label}`}
+                        hoverStyle={
+                          saving
+                            ? undefined
+                            : {
+                                backgroundColor: isSelected
+                                  ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                                  : '$gray4',
+                              }
+                        }
+                      >
+                        <Text
+                          fontSize="$2"
+                          fontWeight={isSelected ? '700' : '400'}
+                          color={isSelected ? 'white' : '$color'}
+                        >
+                          {option.label}
+                        </Text>
+                      </Button>
+                    );
+                  })}
+                </XStack>
+              </YStack>
+            </>
+          )}
+
+          {/* Salary Cap Settings (LS-646) */}
+          <Separator />
+          <YStack gap="$3">
+            <Text fontWeight="600" fontSize="$4">
+              Salary Cap
+            </Text>
+            <Text fontSize="$2" color="$gray10">
+              Control player salary limits and roster spending caps.
+            </Text>
+            <XStack
+              alignItems="center"
+              gap="$3"
+              padding="$3"
+              borderRadius="$4"
+              borderWidth={1}
+              borderColor={
+                salaryCapEnabled
+                  ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
+                  : '$borderColor'
+              }
+              backgroundColor={
+                salaryCapEnabled ? withAlpha(BRAND_NAVY_LIGHT, 0.08) : '$color1'
+              }
+              cursor="pointer"
+              onPress={() => {
+                setSalaryCapEnabled(!salaryCapEnabled);
+                setHasChanges(true);
+              }}
+            >
+              <YStack
+                width={24}
+                height={24}
+                borderRadius={12}
+                borderWidth={2}
+                borderColor={
+                  salaryCapEnabled ? BRAND_NAVY_LIGHT : '$borderColor'
+                }
+                backgroundColor={
+                  salaryCapEnabled ? BRAND_NAVY_LIGHT : 'transparent'
+                }
+                alignItems="center"
+                justifyContent="center"
+              >
+                {salaryCapEnabled && <Check size={14} color="white" />}
+              </YStack>
+              <YStack flex={1}>
+                <Text fontWeight="600">Enable Salary Cap</Text>
+                <Text fontSize="$2" color="$gray10">
+                  Track player salaries and enforce roster spending limits
+                </Text>
+              </YStack>
+            </XStack>
+            {salaryCapEnabled && (
+              <YStack gap="$2">
+                <Text fontSize="$3" fontWeight="600">
+                  Salary Cap Limit
+                </Text>
+                <Input
+                  value={salaryCap != null ? String(salaryCap) : ''}
+                  onChangeText={(text: string) => {
+                    const n = parseInt(text, 10);
+                    setSalaryCap(isNaN(n) ? null : n);
+                    setHasChanges(true);
+                  }}
+                  placeholder="e.g. 50000000"
+                  keyboardType="numeric"
+                />
+                <Text fontSize="$2" color="$gray10">
+                  Maximum total salary each team can spend
+                </Text>
+              </YStack>
+            )}
+          </YStack>
+
+          {/* Validation warning */}
+          {validationError && (
+            <Card
+              backgroundColor="$yellow2"
+              borderColor="$yellow6"
+              padding="$3"
+              borderRadius="$4"
+            >
+              <XStack alignItems="center" gap="$2">
+                <AlertTriangle size={16} color="var(--yellow11)" />
+                <Text fontSize="$3" color="$yellow11" fontWeight="600">
+                  {validationError}
+                </Text>
+              </XStack>
+            </Card>
+          )}
+        </YStack>
 
         {/* Action buttons */}
         <XStack gap="$3" justifyContent="flex-end" flexWrap="wrap">
@@ -1001,8 +1041,8 @@ export function LeagueSettingsControl({
             theme="alt2"
             size="$3"
             onPress={handleReset}
-            disabled={!hasChanges || saving}
-            opacity={!hasChanges ? 0.5 : 1}
+            disabled={isLocked || !hasChanges || saving}
+            opacity={isLocked || !hasChanges ? 0.5 : 1}
           >
             Reset
           </Button>
@@ -1010,8 +1050,8 @@ export function LeagueSettingsControl({
             theme="blue"
             size="$3"
             onPress={() => void handleSave()}
-            disabled={!hasChanges || saving || !!validationError}
-            opacity={!hasChanges || !!validationError ? 0.5 : 1}
+            disabled={isLocked || !hasChanges || saving || !!validationError}
+            opacity={isLocked || !hasChanges || !!validationError ? 0.5 : 1}
             icon={saving ? <Spinner size="small" /> : undefined}
           >
             {saving ? 'Saving...' : 'Save Settings'}

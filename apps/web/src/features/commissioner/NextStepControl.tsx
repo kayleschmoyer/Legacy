@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Button,
   Card,
   Dialog,
   H4,
+  Label,
+  RadioGroup,
   Spinner,
   Text,
   XStack,
@@ -19,6 +21,7 @@ import {
   useGetLeagueDraftQuery,
   useGetMatchupsForLeagueQuery,
   useInitializeDraftMutation,
+  useRenewLeagueMutation,
 } from '../../api/db/graphql.generated';
 import {
   BRAND_GOLD_LIGHT,
@@ -36,6 +39,9 @@ export interface NextStepControlProps {
   /** When true, the "Start Draft" button is blocked because draft settings
    * have unsaved changes that must be saved first. */
   hasPendingSettingsChanges?: boolean;
+  leagueName?: string;
+  frozenAt?: string | null;
+  totalMatchups?: number;
   onSuccess?: (
     actionType?: 'selectGame' | 'advance' | 'draft' | 'createWeek1',
   ) => void;
@@ -58,12 +64,21 @@ export function NextStepControl({
   gamesPerMatchup,
   draftStatus,
   hasPendingSettingsChanges = false,
+  leagueName = 'this league',
+  frozenAt,
+  totalMatchups,
   onSuccess,
   onError,
   onLeagueUpdate: _onLeagueUpdate,
 }: NextStepControlProps) {
+  const navigate = useNavigate();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showRenewalDialog, setShowRenewalDialog] = useState(false);
+  const [keepRosters, setKeepRosters] = useState<'keep' | 'draft'>('draft');
+  const [renewalLoading, setRenewalLoading] = useState(false);
+
+  const [renewLeague] = useRenewLeagueMutation();
 
   const [autoAdvanceMatchups] = useAutoAdvanceMatchupsMutation({
     refetchQueries: [
@@ -122,6 +137,38 @@ export function NextStepControl({
   // which would wrongly display "Current Matchup: Week 10".
   const currentWeek = currentMatchup?.weekNumber ?? highestWeek;
   const nextWeek = currentWeek + 1;
+
+  // Season is fully complete when all scheduled weeks have been played and there
+  // is no longer an active matchup.
+  const isSeasonComplete =
+    draftStatus === 'completed' &&
+    !frozenAt &&
+    highestWeek > 0 &&
+    totalMatchups != null &&
+    highestWeek >= totalMatchups &&
+    !hasCurrentMatchup;
+
+  const handleRenewalConfirm = async () => {
+    setRenewalLoading(true);
+    try {
+      const result = await renewLeague({
+        variables: { leagueId, keepRosters: keepRosters === 'keep' },
+        refetchQueries: ['GetUserLeagues'],
+        awaitRefetchQueries: true,
+      });
+      setRenewalLoading(false);
+      setShowRenewalDialog(false);
+      const newLeagueId = result.data?.renewLeague?.id;
+      if (newLeagueId) {
+        navigate(`/baseball/league/${newLeagueId}`);
+      }
+    } catch (err) {
+      setRenewalLoading(false);
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unknown error occurred';
+      onError?.(new Error(errorMessage));
+    }
+  };
 
   // Get selected games count from matchup data
   const selectedGamesCount = currentMatchup?.selectedGamesCount ?? 0;
@@ -507,6 +554,36 @@ export function NextStepControl({
           <Text fontSize="$2" color="$gray10">
             {getDescriptionText()}
           </Text>
+
+          {isSeasonComplete && (
+            <YStack
+              gap="$3"
+              borderTopWidth={1}
+              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)}
+              paddingTop="$3"
+              marginTop="$1"
+            >
+              <Text fontWeight="600" fontSize="$3" color={BRAND_GOLD_LIGHT}>
+                Season Complete
+              </Text>
+              <Text color="$gray11" fontSize="$2">
+                All weeks have been played. Ready to start a new season? A new
+                league will be created preserving all settings and members. This
+                league will be archived as a historical record.
+              </Text>
+              <XStack>
+                <Button
+                  backgroundColor={BRAND_NAVY_LIGHT}
+                  color="white"
+                  pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                  hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                  onPress={() => setShowRenewalDialog(true)}
+                >
+                  Start New Season
+                </Button>
+              </XStack>
+            </YStack>
+          )}
         </YStack>
       </Card>
 
@@ -553,6 +630,106 @@ export function NextStepControl({
                 onPress={handleConfirm}
               >
                 Confirm
+              </Button>
+            </XStack>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog>
+
+      {/* Season Renewal Dialog */}
+      <Dialog open={showRenewalDialog} onOpenChange={setShowRenewalDialog}>
+        <Dialog.Portal>
+          <Dialog.Overlay
+            key="renewal-overlay"
+            animation="quick"
+            opacity={0.5}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
+          <Dialog.Content
+            bordered
+            elevate
+            key="renewal-content"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="season-renewal-title"
+            aria-describedby="season-renewal-description"
+            animateOnly={['transform', 'opacity']}
+            animation={[
+              'quick',
+              {
+                opacity: {
+                  overshootClamping: true,
+                },
+              },
+            ]}
+            enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
+            exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+            gap="$4"
+            padding="$4"
+            width={520}
+          >
+            <Dialog.Title id="season-renewal-title">
+              Start New Season for "{leagueName}"?
+            </Dialog.Title>
+            <Dialog.Description id="season-renewal-description">
+              A new league will be created with all settings and members carried
+              forward. This league will be frozen and kept as a historical
+              record.
+            </Dialog.Description>
+
+            <YStack space="$3">
+              <Text fontSize="$3" fontWeight="bold">
+                How should rosters be handled?
+              </Text>
+              <RadioGroup
+                value={keepRosters}
+                onValueChange={(val) => setKeepRosters(val as 'keep' | 'draft')}
+              >
+                <YStack space="$2">
+                  <XStack alignItems="center" gap="$2">
+                    <RadioGroup.Item value="draft" id="roster-draft">
+                      <RadioGroup.Indicator />
+                    </RadioGroup.Item>
+                    <Label htmlFor="roster-draft" fontSize="$3">
+                      Hold a new draft — start with empty rosters
+                    </Label>
+                  </XStack>
+                  <XStack alignItems="center" gap="$2">
+                    <RadioGroup.Item value="keep" id="roster-keep">
+                      <RadioGroup.Indicator />
+                    </RadioGroup.Item>
+                    <Label htmlFor="roster-keep" fontSize="$3">
+                      Keep same rosters — carry over all player assignments
+                    </Label>
+                  </XStack>
+                </YStack>
+              </RadioGroup>
+              <Text fontSize="$2" color="$gray10">
+                {keepRosters === 'draft'
+                  ? 'All team rosters will be cleared. The commissioner can configure the draft before it begins.'
+                  : 'All current player assignments will be copied to the new season. No draft will be needed.'}
+              </Text>
+            </YStack>
+
+            <XStack gap="$3" justifyContent="flex-end">
+              <Dialog.Close displayWhenAdapted asChild>
+                <Button theme="alt2" disabled={renewalLoading}>
+                  Cancel
+                </Button>
+              </Dialog.Close>
+              <Button
+                backgroundColor={BRAND_NAVY_LIGHT}
+                color="white"
+                pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                onPress={handleRenewalConfirm}
+                disabled={renewalLoading}
+                icon={renewalLoading ? <Spinner /> : undefined}
+              >
+                {renewalLoading
+                  ? 'Creating new season...'
+                  : 'Confirm New Season'}
               </Button>
             </XStack>
           </Dialog.Content>

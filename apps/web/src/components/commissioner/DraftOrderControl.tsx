@@ -9,7 +9,24 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { ArrowDown, ArrowUp, List, Lock, Shuffle } from '@tamagui/lucide-icons';
+import { GripVertical, List, Lock, Shuffle } from '@tamagui/lucide-icons';
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
 import {
   useGetDraftTeamOrderQuery,
@@ -27,14 +44,89 @@ export interface DraftOrderControlProps {
 
 type DraftTeam = { teamId: number; teamName: string; draftOrder: number };
 
+function SortableTeamRow({
+  team,
+  index,
+  isBusy,
+  hasCustomOrder,
+}: {
+  team: DraftTeam;
+  index: number;
+  isBusy: boolean;
+  hasCustomOrder: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: team.teamId, disabled: isBusy });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+    position: 'relative',
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <XStack
+        alignItems="center"
+        gap="$3"
+        paddingVertical="$2"
+        paddingHorizontal="$3"
+        borderRadius="$3"
+        backgroundColor={
+          hasCustomOrder ? withAlpha(BRAND_NAVY_LIGHT, 0.08) : '$gray2'
+        }
+      >
+        {/* Drag handle */}
+        <XStack
+          {...attributes}
+          {...listeners}
+          cursor="grab"
+          padding="$1"
+          opacity={isBusy ? 0.3 : 0.5}
+          hoverStyle={{ opacity: 1 }}
+          aria-label={`Drag to reorder ${team.teamName}`}
+        >
+          <GripVertical size={16} color="var(--gray10)" />
+        </XStack>
+
+        {/* Slot number badge */}
+        <XStack
+          width={28}
+          height={28}
+          alignItems="center"
+          justifyContent="center"
+          borderRadius="$10"
+          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)}
+        >
+          <Text fontSize="$2" fontWeight="700" color={BRAND_NAVY_LIGHT}>
+            {index + 1}
+          </Text>
+        </XStack>
+
+        {/* Team name */}
+        <Text flex={1} fontSize="$3" fontWeight="500" color="$color">
+          {team.teamName}
+        </Text>
+      </XStack>
+    </div>
+  );
+}
+
 /**
  * DraftOrderControl — Commissioner control for setting or randomizing the
  * draft pick order.
  *
- * Visible only when the draft is `in-progress` and no picks have been made
- * yet (`currentPick === 0`). Allows the commissioner to:
- *  - Re-randomize the draft order with one click
- *  - Manually reorder teams using up/down controls, then save
+ * Editable only before the draft starts (not-started / queued). Once the
+ * draft is in-progress the order is locked. Supports drag-and-drop
+ * reordering via @dnd-kit/sortable.
  */
 export function DraftOrderControl({
   leagueId,
@@ -42,31 +134,32 @@ export function DraftOrderControl({
   onSuccess,
   onError,
 }: DraftOrderControlProps) {
-  // Fetch the draft to get draftId + currentPick
+  // Fetch the draft to get draftId (skip only when completed — not needed post-season)
   const { data: draftData } = useGetLeagueDraftQuery({
     variables: { leagueId },
     fetchPolicy: 'cache-and-network',
-    skip: draftStatus !== 'in-progress',
+    skip: draftStatus === 'completed',
   });
 
   const draftId = draftData?.getLeagueDraft?.id ?? null;
-  const currentPick = draftData?.getLeagueDraft?.currentPick ?? 0;
 
+  // Order is only editable before the draft starts (not-started or queued).
+  // Once in-progress, picks may begin at any time — the order is locked.
   const isOrderLocked =
-    draftStatus !== 'in-progress' || Number(currentPick) !== 0;
+    draftStatus !== 'not-started' && draftStatus !== 'queued';
 
-  // Fetch current draft team order
+  // Fetch current draft team order (whenever we have a draftId)
   const { data, loading, refetch } = useGetDraftTeamOrderQuery({
     variables: { draftId: draftId ?? 0 },
     fetchPolicy: 'cache-and-network',
-    skip: !draftId || draftStatus !== 'in-progress',
+    skip: !draftId,
   });
 
   const [setDraftOrder, { loading: settingOrder }] = useSetDraftOrderMutation();
   const [randomizeDraftOrder, { loading: randomizing }] =
     useRandomizeDraftOrderMutation();
 
-  // Local ordered list for manual re-ordering
+  // Local ordered list for drag-to-reorder
   const [localOrder, setLocalOrder] = useState<DraftTeam[]>([]);
   const [hasCustomOrder, setHasCustomOrder] = useState(false);
 
@@ -84,25 +177,21 @@ export function DraftOrderControl({
     }
   }, [data]);
 
-  const moveUp = (index: number) => {
-    if (index === 0) return;
-    const newOrder = [...localOrder];
-    [newOrder[index - 1], newOrder[index]] = [
-      newOrder[index],
-      newOrder[index - 1],
-    ];
-    setLocalOrder(newOrder);
-    setHasCustomOrder(true);
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
-  const moveDown = (index: number) => {
-    if (index === localOrder.length - 1) return;
-    const newOrder = [...localOrder];
-    [newOrder[index], newOrder[index + 1]] = [
-      newOrder[index + 1],
-      newOrder[index],
-    ];
-    setLocalOrder(newOrder);
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setLocalOrder((prev) => {
+      const oldIndex = prev.findIndex((t) => t.teamId === active.id);
+      const newIndex = prev.findIndex((t) => t.teamId === over.id);
+      return arrayMove(prev, oldIndex, newIndex);
+    });
     setHasCustomOrder(true);
   };
 
@@ -158,9 +247,26 @@ export function DraftOrderControl({
 
   const isBusy = settingOrder || randomizing;
 
-  // Don't render at all when the draft hasn't been initialized yet
-  if (draftStatus !== 'in-progress') {
-    return null;
+  // Post-draft: season is active, order is permanently locked
+  if (draftStatus === 'completed') {
+    return (
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$surfacePanelBorder"
+        padding="$5"
+        borderRadius="$6"
+      >
+        <XStack alignItems="center" gap="$2">
+          <Lock size={20} color="var(--gray9)" />
+          <YStack>
+            <H4 margin={0}>Draft Pick Order</H4>
+            <Text fontSize="$2" color="$gray10">
+              The draft is complete — pick order is permanently locked.
+            </Text>
+          </YStack>
+        </XStack>
+      </Card>
+    );
   }
 
   return (
@@ -183,8 +289,8 @@ export function DraftOrderControl({
               <H4 margin={0}>Draft Pick Order</H4>
               <Text fontSize="$2" color="$gray10">
                 {isOrderLocked
-                  ? 'Pick order is locked — the draft has already begun.'
-                  : 'Set or randomize the order in which teams make their picks.'}
+                  ? 'Pick order is locked — the draft is underway.'
+                  : 'Drag to reorder, or randomize the pick order.'}
               </Text>
             </YStack>
           </XStack>
@@ -206,8 +312,8 @@ export function DraftOrderControl({
           )}
         </XStack>
 
-        {/* Locked banner */}
-        {isOrderLocked && Number(currentPick ?? 0) > 0 && (
+        {/* Locked banner — shown when the draft is in-progress */}
+        {isOrderLocked && draftStatus === 'in-progress' && (
           <Card
             backgroundColor="$yellow2"
             borderColor="$yellow6"
@@ -217,7 +323,7 @@ export function DraftOrderControl({
             <XStack alignItems="center" gap="$2">
               <Lock size={16} color="var(--yellow11)" />
               <Text fontSize="$3" color="$yellow11" fontWeight="600">
-                The draft order is locked because picks have been made.
+                The draft is underway — pick order can no longer be changed.
               </Text>
             </XStack>
           </Card>
@@ -233,10 +339,13 @@ export function DraftOrderControl({
         ) : localOrder.length === 0 ? (
           <YStack alignItems="center" padding="$4">
             <Text color="$gray10">
-              No draft order found. Initialize the draft first.
+              {isOrderLocked
+                ? 'No draft order recorded.'
+                : 'No teams yet. Add teams to the league to configure draft order.'}
             </Text>
           </YStack>
-        ) : (
+        ) : isOrderLocked ? (
+          // Read-only list when locked
           <YStack gap="$2">
             {localOrder.map((team, index) => (
               <XStack
@@ -246,11 +355,8 @@ export function DraftOrderControl({
                 paddingVertical="$2"
                 paddingHorizontal="$3"
                 borderRadius="$3"
-                backgroundColor={
-                  hasCustomOrder ? withAlpha(BRAND_NAVY_LIGHT, 0.08) : '$gray2'
-                }
+                backgroundColor="$gray2"
               >
-                {/* Slot number badge */}
                 <XStack
                   width={28}
                   height={28}
@@ -263,69 +369,63 @@ export function DraftOrderControl({
                     {index + 1}
                   </Text>
                 </XStack>
-
-                {/* Team name */}
                 <Text flex={1} fontSize="$3" fontWeight="500" color="$color">
                   {team.teamName}
                 </Text>
-
-                {/* Up / Down controls */}
-                {!isOrderLocked && (
-                  <XStack gap="$1">
-                    <Button
-                      size="$2"
-                      theme="alt2"
-                      borderRadius="$3"
-                      icon={<ArrowUp size={14} />}
-                      onPress={() => moveUp(index)}
-                      disabled={index === 0 || isBusy}
-                      opacity={index === 0 ? 0.3 : 1}
-                      aria-label={`Move ${team.teamName} up`}
-                    />
-                    <Button
-                      size="$2"
-                      theme="alt2"
-                      borderRadius="$3"
-                      icon={<ArrowDown size={14} />}
-                      onPress={() => moveDown(index)}
-                      disabled={index === localOrder.length - 1 || isBusy}
-                      opacity={index === localOrder.length - 1 ? 0.3 : 1}
-                      aria-label={`Move ${team.teamName} down`}
-                    />
-                  </XStack>
-                )}
               </XStack>
             ))}
+          </YStack>
+        ) : (
+          // Sortable list with drag handles
+          <YStack gap="$2">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={localOrder.map((t) => t.teamId)}
+                strategy={verticalListSortingStrategy}
+              >
+                {localOrder.map((team, index) => (
+                  <SortableTeamRow
+                    key={team.teamId}
+                    team={team}
+                    index={index}
+                    isBusy={isBusy}
+                    hasCustomOrder={hasCustomOrder}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
 
             {/* Save / Reset row */}
-            {!isOrderLocked && (
-              <XStack
-                gap="$3"
-                justifyContent="flex-end"
-                flexWrap="wrap"
-                paddingTop="$2"
+            <XStack
+              gap="$3"
+              justifyContent="flex-end"
+              flexWrap="wrap"
+              paddingTop="$2"
+            >
+              <Button
+                theme="alt2"
+                size="$3"
+                onPress={handleReset}
+                disabled={!hasCustomOrder || isBusy}
+                opacity={!hasCustomOrder ? 0.5 : 1}
               >
-                <Button
-                  theme="alt2"
-                  size="$3"
-                  onPress={handleReset}
-                  disabled={!hasCustomOrder || isBusy}
-                  opacity={!hasCustomOrder ? 0.5 : 1}
-                >
-                  Reset
-                </Button>
-                <Button
-                  theme="blue"
-                  size="$3"
-                  onPress={() => void handleSaveOrder()}
-                  disabled={!hasCustomOrder || isBusy}
-                  opacity={!hasCustomOrder ? 0.5 : 1}
-                  icon={settingOrder ? <Spinner size="small" /> : undefined}
-                >
-                  {settingOrder ? 'Saving…' : 'Save Order'}
-                </Button>
-              </XStack>
-            )}
+                Reset
+              </Button>
+              <Button
+                theme="blue"
+                size="$3"
+                onPress={() => void handleSaveOrder()}
+                disabled={!hasCustomOrder || isBusy}
+                opacity={!hasCustomOrder ? 0.5 : 1}
+                icon={settingOrder ? <Spinner size="small" /> : undefined}
+              >
+                {settingOrder ? 'Saving…' : 'Save Order'}
+              </Button>
+            </XStack>
           </YStack>
         )}
       </YStack>

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Card, H4, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Check, Lock, Settings } from '@tamagui/lucide-icons';
 import {
+  DateTimePicker,
   DRAFT_MODES,
   DRAFT_ORDERS,
   ERA_FILTERS,
@@ -554,21 +555,25 @@ export function DraftSettingsControl({
                 </Text>
               </YStack>
               <XStack gap="$2" alignItems="center">
-                <input
-                  type="datetime-local"
-                  value={scheduledAt}
-                  min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
-                  disabled={isDraftLocked || saving}
-                  onChange={(e) => {
-                    handleScheduledAtChange(e.target.value);
+                <DateTimePicker
+                  value={scheduledAt ? new Date(scheduledAt) : undefined}
+                  onChange={(date) => {
+                    // Reconstruct local-time string (YYYY-MM-DDTHH:MM) to match
+                    // the datetime-local input convention; the component treats
+                    // this string as UTC (the label says "All times are in UTC").
+                    const pad = (n: number) => String(n).padStart(2, '0');
+                    const localStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+                    handleScheduledAtChange(localStr);
                   }}
-                  style={{
-                    background: isDraftLocked ? 'var(--gray3)' : 'var(--gray3)',
-                    border: `1px solid ${scheduledAt ? BRAND_NAVY_LIGHT : 'var(--gray6)'}`,
-                    borderRadius: 8,
-                    color: isDraftLocked ? 'var(--gray10)' : 'var(--color)',
-                    fontSize: 13,
-                    opacity: isDraftLocked || saving ? 0.5 : 1,
+                  minDate={new Date(Date.now() + 60_000)}
+                  disabled={isDraftLocked || saving}
+                  inputClassName="draft-schedule-input"
+                  inputStyle={{
+                    background: isDraftLocked ? 'var(--gray3)' : 'var(--gray4)',
+                    border: `1px solid ${
+                      scheduledAt ? BRAND_NAVY_LIGHT : 'var(--gray7)'
+                    }`,
+                    fontSize: '13px',
                     padding: '6px 10px',
                     cursor: isDraftLocked ? 'not-allowed' : 'default',
                   }}

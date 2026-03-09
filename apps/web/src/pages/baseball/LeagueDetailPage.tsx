@@ -117,7 +117,6 @@ import { AchievementRestrictionsControl } from '../../components/commissioner/Ac
 import { SeasonAwardsControl } from '../../components/commissioner/SeasonAwardsControl';
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
-import { SeasonRenewalControl } from '../../features/commissioner/SeasonRenewalControl';
 import {
   useCurrentWeek,
   useMatchupById,
@@ -2754,6 +2753,9 @@ export function LeagueDetailPage(): React.JSX.Element {
             }
             draftStatus={league.draftStatus}
             hasPendingSettingsChanges={hasDraftSettingsChanges}
+            leagueName={league.name ?? 'Unknown League'}
+            frozenAt={league.frozenAt}
+            totalMatchups={league.totalMatchups ?? undefined}
             onSuccess={handleMatchupSuccess}
             onError={handleMatchupError}
             onLeagueUpdate={handleLeagueUpdate}
@@ -2823,6 +2825,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         content: (
           <LeagueSettingsControl
             leagueId={leagueId}
+            draftStatus={league.draftStatus}
             currentGamesPerMatchup={league.gamesPerMatchup ?? 5}
             currentSpStartsPerMatchup={league.spStartsPerMatchup ?? 1}
             currentMinCareerGames={league.minCareerGames ?? 50}
@@ -2895,30 +2898,12 @@ export function LeagueDetailPage(): React.JSX.Element {
         content: (
           <LeagueScoringEditor
             leagueId={leagueId}
+            draftStatus={league.draftStatus}
             profile={scoringProfile}
             loading={scoringLoading}
             error={scoringError}
             onRefetch={async () => {
               await refetchScoringProfile({ leagueId });
-            }}
-          />
-        ),
-      },
-      {
-        id: 'season-renewal',
-        title: 'Start New Season',
-        content: (
-          <SeasonRenewalControl
-            leagueId={leagueId}
-            leagueName={league.name ?? 'Unknown League'}
-            draftStatus={league.draftStatus ?? ''}
-            frozenAt={league.frozenAt}
-            onSuccess={() => {
-              // Navigation to the new league is handled by SeasonRenewalControl
-            }}
-            onError={(renewError) => {
-              LOGGER.error('Renew league error:', String(renewError));
-              alert(`Error starting new season: ${renewError.message}`);
             }}
           />
         ),

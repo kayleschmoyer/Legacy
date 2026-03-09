@@ -8,6 +8,7 @@ import {
 import {
   ChevronDown,
   ChevronUp,
+  Lock,
   RotateCcw,
   Save,
   Settings2,
@@ -100,6 +101,7 @@ interface LeagueScoringEditorProps {
   loading: boolean;
   error?: Error | null;
   onRefetch: () => Promise<void>;
+  draftStatus?: string | null;
 }
 
 function formatMultiplier(value: number): string {
@@ -273,7 +275,7 @@ function valuesToUpdates(stats: ProfileStat[], values: FormValueState) {
 export function LeagueScoringEditor(
   props: LeagueScoringEditorProps,
 ): React.JSX.Element {
-  const { leagueId, profile, loading, error, onRefetch } = props;
+  const { leagueId, profile, loading, error, onRefetch, draftStatus } = props;
 
   const stats = useMemo(() => collectProfileStats(profile), [profile]);
   const groupedStats = useMemo(() => {
@@ -339,8 +341,13 @@ export function LeagueScoringEditor(
     [stats, formValues],
   );
 
+  const isLocked = draftStatus === 'completed';
   const canSave =
-    !loading && !saving && !hasValidationErrors && pendingUpdates.length > 0;
+    !isLocked &&
+    !loading &&
+    !saving &&
+    !hasValidationErrors &&
+    pendingUpdates.length > 0;
 
   const handleValueChange = (statId: number, nextValue: string) => {
     setFormValues((prev) => ({ ...prev, [statId]: nextValue }));
@@ -487,6 +494,7 @@ export function LeagueScoringEditor(
             onChangeText={(text: string) => handleValueChange(statId, text)}
             keyboardType="decimal-pad"
             inputMode="decimal"
+            disabled={isLocked}
             width={72}
             textAlign="right"
             fontSize="$3"
@@ -523,6 +531,8 @@ export function LeagueScoringEditor(
             borderRadius="$3"
             paddingHorizontal="$1.5"
             onPress={() => handleResetStat(statId)}
+            disabled={isLocked}
+            opacity={isLocked ? 0.5 : 1}
             hoverStyle={{ backgroundColor: '$gray3', borderColor: '$gray7' }}
             pressStyle={{ scale: 0.97 }}
             aria-label={`Reset ${stat.displayName} multiplier`}
@@ -597,14 +607,20 @@ export function LeagueScoringEditor(
             boxShadow: `0 0 16px ${withAlpha(BRAND_NAVY_LIGHT, 0.25)}`,
           }}
         >
-          <Settings2 size={20} color={BRAND_NAVY_LIGHT} />
+          {isLocked ? (
+            <Lock size={20} color="var(--gray10)" />
+          ) : (
+            <Settings2 size={20} color={BRAND_NAVY_LIGHT} />
+          )}
         </XStack>
         <YStack flex={1}>
           <Text fontSize="$5" fontWeight="700" color="$color12">
             Scoring Settings
           </Text>
           <Text fontSize="$2" color="$gray9">
-            Fine-tune how stats translate into fantasy points
+            {isLocked
+              ? 'Scoring is locked — the season is in progress.'
+              : 'Fine-tune how stats translate into fantasy points'}
           </Text>
         </YStack>
         {pendingUpdates.length > 0 && (
@@ -627,6 +643,23 @@ export function LeagueScoringEditor(
       </XStack>
 
       <YStack padding="$4" space="$3">
+        {isLocked ? (
+          <XStack
+            backgroundColor="$yellow2"
+            borderColor="$yellow6"
+            borderWidth={1}
+            padding="$3"
+            borderRadius="$4"
+            alignItems="center"
+            gap="$2"
+          >
+            <Lock size={16} color="var(--yellow11)" />
+            <Text fontSize="$3" color="$yellow11" fontWeight="600">
+              Scoring settings are locked while the season is in progress.
+              Changes can only be made before the draft is started.
+            </Text>
+          </XStack>
+        ) : null}
         {error ? (
           <YStack
             backgroundColor="$red2"
@@ -817,7 +850,7 @@ export function LeagueScoringEditor(
               color="$gray11"
               borderRadius="$4"
               onPress={handleResetAll}
-              disabled={loading || saving}
+              disabled={isLocked || loading || saving}
               hoverStyle={{ backgroundColor: '$gray3', borderColor: '$gray8' }}
               pressStyle={{ scale: 0.97 }}
               animation="quick"
