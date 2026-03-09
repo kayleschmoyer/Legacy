@@ -107,6 +107,14 @@ export function NextStepControl({
       0,
     ) ?? 0;
 
+  // LS-702: use gamesPerMatchup from the internal matchups query as the
+  // authoritative source. The prop falls back to 1 when the commissioner has
+  // no personal team matchup and league.gamesPerMatchup hasn't loaded yet.
+  const effectiveGamesPerMatchup =
+    allMatchupsData?.getMatchupsForLeague?.find(
+      (m: { gamesPerMatchup?: number | null }) => m.gamesPerMatchup != null,
+    )?.gamesPerMatchup ?? gamesPerMatchup;
+
   const hasCurrentMatchup = !!currentMatchup && !!currentMatchup.id;
   // LS-509: derive currentWeek from the actual currentMatchup (which reflects
   // leagues.currentMatchup → week-1 after generation), NOT from max(weekNumber).
@@ -118,7 +126,7 @@ export function NextStepControl({
   // Get selected games count from matchup data
   const selectedGamesCount = currentMatchup?.selectedGamesCount ?? 0;
   const nextGameNumber = selectedGamesCount + 1;
-  const allGamesSelected = selectedGamesCount >= gamesPerMatchup;
+  const allGamesSelected = selectedGamesCount >= effectiveGamesPerMatchup;
 
   // Determine action type:
   // - If no matchups (week 0) and draft not completed -> start draft only
@@ -235,7 +243,7 @@ export function NextStepControl({
         }
       } else {
         if (errorMessage.includes('Game number must be between')) {
-          errorMessage = `Invalid game number. Please select a game between 1 and ${gamesPerMatchup}.`;
+          errorMessage = `Invalid game number. Please select a game between 1 and ${effectiveGamesPerMatchup}.`;
         }
       }
 
@@ -255,7 +263,7 @@ export function NextStepControl({
     } else if (actionType === 'createWeek1') {
       return 'Create Week 1 Matchups';
     } else if (actionType === 'selectGame') {
-      return `Select Game ${nextGameNumber} of ${gamesPerMatchup}`;
+      return `Select Game ${nextGameNumber} of ${effectiveGamesPerMatchup}`;
     } else {
       return 'Advance League Week';
     }
@@ -303,7 +311,10 @@ export function NextStepControl({
     } else if (actionType === 'createWeek1') {
       return 'Draft complete! Next: Create matchups for Week 1.';
     } else if (actionType === 'selectGame') {
-      return `Next: Select game ${nextGameNumber} of ${gamesPerMatchup} for all matchups in the current week.`;
+      const draftPrefix = isDraftCompleted
+        ? 'Draft complete! All season matchups were created automatically. '
+        : '';
+      return `${draftPrefix}Next: Select game ${nextGameNumber} of ${effectiveGamesPerMatchup} for all matchups in the current week.`;
     } else {
       return 'All games selected! Next: Advance to the next league week.';
     }
@@ -325,7 +336,8 @@ export function NextStepControl({
                 Current Matchup: Week {currentWeek}
               </Text>
               <Text color="$gray11" fontSize="$3">
-                Games Selected: {selectedGamesCount} of {gamesPerMatchup}
+                Games Selected: {selectedGamesCount} of{' '}
+                {effectiveGamesPerMatchup}
               </Text>
               <Text color="$gray11" fontSize="$3">
                 Status: {currentMatchup.status}
