@@ -26,8 +26,16 @@ export function CircularTimer({
       : seconds <= 30
         ? 'url(#timerWarn)'
         : 'url(#timerSafe)';
-  const mins = Math.floor(seconds / 60);
+  // Format display: show hours for slow-mode timers (>= 1 hour)
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
+  const isSlowMode = pickTimeLimitSeconds >= 3600;
+  const timeDisplay = noLimit
+    ? '∞'
+    : isSlowMode
+      ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+      : `${Math.floor(seconds / 60)}:${secs.toString().padStart(2, '0')}`;
 
   return (
     <div
@@ -70,7 +78,7 @@ export function CircularTimer({
           transform="rotate(-90 60 60)"
         />
         <text className="d-timer-text" x="60" y="56">
-          {noLimit ? '∞' : `${mins}:${secs.toString().padStart(2, '0')}`}
+          {timeDisplay}
         </text>
         <text className="d-timer-label" x="60" y="74">
           {isMyPick ? 'YOUR PICK' : 'WAITING'}

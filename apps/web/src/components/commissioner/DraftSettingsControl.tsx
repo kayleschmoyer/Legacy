@@ -146,7 +146,7 @@ export function DraftSettingsControl({
   const [hofOnlyLocal, setHofOnlyLocal] = useState(false);
   /** ISO-8601 string (YYYY-MM-DDTHH:MM) for the datetime-local input, or '' for no schedule */
   const [scheduledAt, setScheduledAt] = useState('');
-  const [pickTimeLimitSeconds, setPickTimeLimitSeconds] = useState(120);
+  const [pickTimeLimitSeconds, setPickTimeLimitSeconds] = useState('120');
   const [hasChanges, setHasChanges] = useState(false);
 
   // Notify parent when dirty state changes
@@ -161,7 +161,7 @@ export function DraftSettingsControl({
       setDraftMode(String(draft.draftMode ?? 'live'));
       setSelectionMethod(String(draft.selectionMethod ?? 'standard'));
       setDraftOrder(String(draft.draftOrder ?? 'snake'));
-      setPickTimeLimitSeconds(draft.pickTimeLimitSeconds ?? 120);
+      setPickTimeLimitSeconds(String(draft.pickTimeLimitSeconds ?? 120));
       // Sync scheduledAt: convert ISO-8601 to datetime-local (UTC slice for input)
       setScheduledAt(
         draft.scheduledAt
@@ -195,7 +195,7 @@ export function DraftSettingsControl({
       ef: string,
       hof: boolean,
       sa: string,
-      ptls: number,
+      ptl: string,
     ) => {
       const originalDraftMode = String(
         draftData?.getLeagueDraft?.draftMode ?? 'live',
@@ -214,8 +214,9 @@ export function DraftSettingsControl({
             .toISOString()
             .slice(0, 16)
         : '';
-      const originalPickTimeLimitSeconds =
-        draftData?.getLeagueDraft?.pickTimeLimitSeconds ?? 120;
+      const originalPickTimeLimitSeconds = String(
+        draftData?.getLeagueDraft?.pickTimeLimitSeconds ?? 120,
+      );
 
       setHasChanges(
         dm !== originalDraftMode ||
@@ -225,7 +226,7 @@ export function DraftSettingsControl({
           ef !== originalEraFilter ||
           hof !== originalHofOnly ||
           sa !== originalScheduledAt ||
-          ptls !== originalPickTimeLimitSeconds,
+          ptl !== originalPickTimeLimitSeconds,
       );
     },
     [draftData, leaguePlayerPool, eraFilter, hofOnly],
@@ -345,9 +346,8 @@ export function DraftSettingsControl({
     );
   };
 
-  const handlePickTimeLimitSecondsChange = (value: string) => {
-    const seconds = parseInt(value, 10);
-    setPickTimeLimitSeconds(seconds);
+  const handlePickTimeLimitChange = (value: string) => {
+    setPickTimeLimitSeconds(value);
     checkChanges(
       draftMode,
       selectionMethod,
@@ -356,7 +356,7 @@ export function DraftSettingsControl({
       eraFilterLocal,
       hofOnlyLocal,
       scheduledAt,
-      seconds,
+      value,
     );
   };
 
@@ -370,9 +370,9 @@ export function DraftSettingsControl({
             selectionMethod,
             draftOrder,
             playerPool,
+            pickTimeLimitSeconds: parseInt(pickTimeLimitSeconds, 10),
             eraFilter: eraFilterLocal,
             hofOnly: hofOnlyLocal,
-            pickTimeLimitSeconds,
             // LS-423: send null to clear the schedule, ISO-8601 string to set it
             scheduledAt: scheduledAt
               ? new Date(scheduledAt).toISOString()
@@ -415,7 +415,7 @@ export function DraftSettingsControl({
     setDraftOrder(originalDraftOrder);
     setPlayerPool(originalPlayerPool);
     setPickTimeLimitSeconds(
-      draftData?.getLeagueDraft?.pickTimeLimitSeconds ?? 120,
+      String(draftData?.getLeagueDraft?.pickTimeLimitSeconds ?? 120),
     );
     setEraFilterLocal(eraFilter ?? 'all');
     setHofOnlyLocal(hofOnly ?? false);
@@ -511,16 +511,14 @@ export function DraftSettingsControl({
             />
 
             {/* Pick Timer */}
-            {draftMode === 'live' && (
-              <OptionSelector
-                label="Seconds Per Pick"
-                description="How long each manager has to make their pick before auto-pick activates. Applies to live drafts only."
-                options={PICK_TIME_OPTIONS}
-                value={String(pickTimeLimitSeconds)}
-                onChange={handlePickTimeLimitSecondsChange}
-                disabled={isDraftLocked || saving}
-              />
-            )}
+            <OptionSelector
+              label="Pick Timer"
+              description="Time each manager has per pick. Use slow-mode (24h / 48h) for asynchronous email-pace drafts."
+              options={PICK_TIME_OPTIONS}
+              value={pickTimeLimitSeconds}
+              onChange={handlePickTimeLimitChange}
+              disabled={isDraftLocked || saving}
+            />
 
             {/* Player Pool */}
             <OptionSelector

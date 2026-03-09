@@ -6,7 +6,7 @@ The draft system includes a **deadline-based pick timer** that automatically pic
 
 ## How It Works
 
-1. **Pick Timer**: Each draft has a configurable `pickTimeLimitSeconds` (default: 120s, range: 30–3600s)
+1. **Pick Timer**: Each draft has a configurable `pickTimeLimitSeconds` (default: 120s, range: 30–172800s)
 2. **Deadline Tracking**: When a pick starts, `currentPickDeadline` is set to `NOW() + pickTimeLimitSeconds`
 3. **EventBridge Polling**: A 1-minute EventBridge cron checks all in-progress drafts for expired deadlines
 4. **Auto-Pick**: When deadline expires, the system auto-picks the best available player (position-aware, with eligibility filtering)
@@ -209,7 +209,7 @@ mutation UpdatePickTimer {
 }
 ```
 
-Valid range: 30–3600 seconds. Default: 120 seconds (2 minutes).
+Valid range: 30–172800 seconds. Default: 120 seconds (2 minutes).
 
 ## Infrastructure
 

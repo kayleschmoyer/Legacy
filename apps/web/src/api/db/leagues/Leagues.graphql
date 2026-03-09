@@ -186,6 +186,7 @@ mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
     selectionMethod
     draftOrder
     currentPick
+    pickTimeLimitSeconds
     playerPool
     pickTimeLimitSeconds
     draftStartedAt

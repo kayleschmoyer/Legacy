@@ -136,9 +136,9 @@ builder.mutationField('updateDraftSettings', (t) =>
           pickTimeLimitSeconds !== undefined &&
           pickTimeLimitSeconds !== null
         ) {
-          if (pickTimeLimitSeconds < 30 || pickTimeLimitSeconds > 3600) {
+          if (pickTimeLimitSeconds < 30 || pickTimeLimitSeconds > 172800) {
             throw new Error(
-              'Pick time limit must be between 30 and 3600 seconds',
+              'Pick time limit must be between 30 and 172800 seconds',
             );
           }
         }

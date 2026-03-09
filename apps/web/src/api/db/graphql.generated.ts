@@ -3964,8 +3964,8 @@ export type UpdateDraftSettingsMutation = {
     selectionMethod?: string | null;
     draftOrder?: string | null;
     currentPick?: number | null;
-    playerPool?: string | null;
     pickTimeLimitSeconds?: number | null;
+    playerPool?: string | null;
     draftStartedAt?: string | null;
     draftCompletedAt?: string | null;
     scheduledAt?: string | null;
@@ -10401,6 +10401,7 @@ export const UpdateDraftSettings = gql`
       selectionMethod
       draftOrder
       currentPick
+      pickTimeLimitSeconds
       playerPool
       pickTimeLimitSeconds
       draftStartedAt

@@ -111,7 +111,7 @@ drafts:  { id, leagueId, draftMode='live', draftStatus via league }
 | Draft mode | `'live'`, `'automated'` | `'live'` |
 | Selection method | `'standard'`, `'auction'`, `'random'` | `'standard'` |
 | Draft order | `'snake'`, `'linear'` | `'snake'` |
-| Pick time limit | 30ΓÇô3600 seconds | 120s |
+| Pick time limit | 30–172800 seconds | 120s |
 | Player pool | `'all'`, `'nl'`, `'al'` | `'all'` |
 
 ### Commissioner starts the draft

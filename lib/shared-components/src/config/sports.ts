@@ -107,7 +107,9 @@ export const DRAFT_ORDERS = Object.freeze([
   { label: 'Linear', value: 'linear' },
 ]);
 
-/** Seconds-per-pick options for the live draft pick timer. */
+/** Seconds-per-pick options for the draft pick timer.
+ * Includes slow-mode options (24h, 48h) for asynchronous email-pace drafts.
+ */
 export const PICK_TIME_OPTIONS = Object.freeze([
   { label: '30s', value: '30' },
   { label: '1 min', value: '60' },
@@ -116,6 +118,9 @@ export const PICK_TIME_OPTIONS = Object.freeze([
   { label: '3 min', value: '180' },
   { label: '5 min', value: '300' },
   { label: '10 min', value: '600' },
+  { label: '1 hour', value: '3600' },
+  { label: '24 hours', value: '86400' },
+  { label: '48 hours', value: '172800' },
 ]);
 
 export const DIVISION_COUNTS = Object.freeze([
