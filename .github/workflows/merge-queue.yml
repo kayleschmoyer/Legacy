@@ -307,13 +307,17 @@ jobs:
               try {
                 console.log(`🚀 Merging PR #${pr.number}...`);
                 
+                // Sanitize commit message: remove null bytes and other control characters
+                // that cause GitHub's merge API to return HTTP 500.
+                const sanitize = (s) => (s || '').replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '');
+                
                 const mergeResult = await github.rest.pulls.merge({
                   owner,
                   repo,
                   pull_number: pr.number,
                   merge_method: 'squash',
-                  commit_title: pr.title + " (#" + pr.number + ")",
-                  commit_message: "Merged via automated merge queue\n\n" + (pr.body || '')
+                  commit_title: sanitize(pr.title + " (#" + pr.number + ")"),
+                  commit_message: sanitize("Merged via automated merge queue\n\n" + (pr.body || ''))
                 });
                 
                 console.log(`✅ Successfully merged PR #${pr.number}`);

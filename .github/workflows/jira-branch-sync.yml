@@ -112,7 +112,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Get available transitions
         id: transitions
-        if: steps.guard.outputs.skip != 'true'
+        if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
         env:
           JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
           TICKET: ${{ steps.ticket.outputs.key }}
