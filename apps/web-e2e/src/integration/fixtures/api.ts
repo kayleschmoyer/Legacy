@@ -1,5 +1,5 @@
 import { type APIRequestContext, test as base } from '@playwright/test';
-import { E2EJwtUtil } from '../../utils/jwt';
+import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
 
 export interface IntegrationFixtures {
   api: APIRequestContext;
@@ -13,7 +13,7 @@ export const test = base.extend<IntegrationFixtures>({
   api: async ({ playwright }, use) => {
     const jwt =
       process.env.INTEGRATION_JWT ||
-      E2EJwtUtil.generateJwt({ email: 'manager1@test.com', expiration: '2h' });
+      (await getTestUserJwt(TEST_USERS.MANAGER_1));
 
     const api = await playwright.request.newContext({
       baseURL:
@@ -31,7 +31,7 @@ export const test = base.extend<IntegrationFixtures>({
   api2: async ({ playwright }, use) => {
     const jwt =
       process.env.INTEGRATION_JWT_2 ||
-      E2EJwtUtil.generateJwt({ email: 'manager2@test.com', expiration: '2h' });
+      (await getTestUserJwt(TEST_USERS.MANAGER_2));
 
     const api2 = await playwright.request.newContext({
       baseURL:
@@ -49,10 +49,7 @@ export const test = base.extend<IntegrationFixtures>({
   apiCommissioner: async ({ playwright }, use) => {
     const jwt =
       process.env.INTEGRATION_JWT_COMMISSIONER ||
-      E2EJwtUtil.generateJwt({
-        email: 'commissioner@test.com',
-        expiration: '2h',
-      });
+      (await getTestUserJwt(TEST_USERS.COMMISSIONER));
 
     const api = await playwright.request.newContext({
       baseURL:

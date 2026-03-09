@@ -21,13 +21,14 @@ export class E2EJwtUtil {
     email: string;
     expiration?: string;
     accessLevel?: 'none' | 'admin';
+    id?: number;
   }): string {
-    const { email, expiration = '1h', accessLevel = 'none' } = options;
+    const { email, expiration = '1h', accessLevel = 'none', id = 1 } = options;
     const secret = process.env.JWT_SECRET || DEV_JWT_SECRET;
 
     return sign(
       {
-        id: 1,
+        id,
         email,
         username: email.split('@')[0],
         accessLevel,

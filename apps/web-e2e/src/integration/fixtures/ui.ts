@@ -2,6 +2,7 @@ import { test as base, type Page } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
 
 /**
  * Fixtures for live-backend UI E2E tests.
@@ -52,39 +53,34 @@ interface CliAuthData {
 
 /**
  * Read the admin JWT from the CLI auth store (~/.legacy-sports/auth.json).
- * Falls back to INTEGRATION_JWT env var for CI.
+ * Falls back to INTEGRATION_JWT env var for CI, or registers a local test user.
  */
-function getAuthJwt(): string {
+async function getAuthJwt(): Promise<string> {
   if (process.env.INTEGRATION_JWT) {
     return process.env.INTEGRATION_JWT;
   }
 
   const authPath = path.join(os.homedir(), '.legacy-sports', 'auth.json');
 
-  if (!fs.existsSync(authPath)) {
-    throw new Error(
-      'No CLI auth token found. Run `./ls-cli.ps1 auth login` first.',
-    );
+  if (fs.existsSync(authPath)) {
+    try {
+      const data = JSON.parse(
+        fs.readFileSync(authPath, 'utf-8'),
+      ) as CliAuthData;
+
+      const user = data.defaultUser;
+      const entry = user ? data.tokens[user] : undefined;
+
+      if (entry?.jwt && (!entry.expiresAt || entry.expiresAt >= Date.now())) {
+        return entry.jwt;
+      }
+    } catch {
+      // Fall through to local register
+    }
   }
 
-  const data = JSON.parse(fs.readFileSync(authPath, 'utf-8')) as CliAuthData;
-
-  const user = data.defaultUser;
-  const entry = user ? data.tokens[user] : undefined;
-
-  if (!entry?.jwt) {
-    throw new Error(
-      'No valid token in ~/.legacy-sports/auth.json. Run `./ls-cli.ps1 auth login`.',
-    );
-  }
-
-  if (entry.expiresAt && entry.expiresAt < Date.now()) {
-    throw new Error(
-      'CLI auth token expired. Run `./ls-cli.ps1 auth login` to refresh.',
-    );
-  }
-
-  return entry.jwt;
+  // No CLI auth or env var — register/login a test commissioner via local auth
+  return getTestUserJwt(TEST_USERS.COMMISSIONER);
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +170,7 @@ async function getManagerUserIds(
 
 export const test = base.extend<UIIntegrationFixtures>({
   commissionerPage: async ({ browser }, use) => {
-    const jwt = getAuthJwt();
+    const jwt = await getAuthJwt();
 
     const context = await browser.newContext({
       baseURL: WEB_BASE,
@@ -194,25 +190,25 @@ export const test = base.extend<UIIntegrationFixtures>({
   },
 
   commissionerJwt: async ({}, use) => {
-    await use(getAuthJwt());
+    await use(await getAuthJwt());
   },
 
   managerJwt1: async ({}, use) => {
-    const adminJwt = getAuthJwt();
+    const adminJwt = await getAuthJwt();
     const [mgr1Id] = await getManagerUserIds(adminJwt);
     const jwt = await impersonate(adminJwt, mgr1Id);
     await use(jwt);
   },
 
   managerJwt2: async ({}, use) => {
-    const adminJwt = getAuthJwt();
+    const adminJwt = await getAuthJwt();
     const [, mgr2Id] = await getManagerUserIds(adminJwt);
     const jwt = await impersonate(adminJwt, mgr2Id);
     await use(jwt);
   },
 
   managerJwt3: async ({}, use) => {
-    const adminJwt = getAuthJwt();
+    const adminJwt = await getAuthJwt();
     const [, , mgr3Id] = await getManagerUserIds(adminJwt);
     const jwt = await impersonate(adminJwt, mgr3Id);
     await use(jwt);
