@@ -52,16 +52,19 @@ resource "aws_route53_record" "www" {
   records = ["${var.github_username}.github.io"]
 }
 
-# API subdomain pointing to API Gateway (optional but recommended)
-# This creates api.yourdomain.com for your backend
+# API subdomain pointing to the API Gateway custom domain
 resource "aws_route53_record" "api" {
   count = var.domain_name != "" ? 1 : 0
 
   zone_id = aws_route53_zone.main[0].zone_id
   name    = "api"
-  type    = "CNAME"
-  ttl     = 300
-  records = ["${aws_api_gateway_rest_api.main.id}.execute-api.${var.aws_region}.amazonaws.com"]
+  type    = "A"
+
+  alias {
+    name                   = aws_api_gateway_domain_name.api[0].regional_domain_name
+    zone_id                = aws_api_gateway_domain_name.api[0].regional_zone_id
+    evaluate_target_health = true
+  }
 }
 
 # CAA records for SSL/TLS certificate authority authorization
@@ -75,7 +78,9 @@ resource "aws_route53_record" "caa" {
   ttl     = 300
   records = [
     "0 issue \"letsencrypt.org\"",
-    "0 issuewild \"letsencrypt.org\""
+    "0 issuewild \"letsencrypt.org\"",
+    "0 issue \"amazon.com\"",
+    "0 issuewild \"amazon.com\""
   ]
 }
 
@@ -112,4 +117,9 @@ output "web_url" {
 output "api_url" {
   description = "API endpoint URL with custom domain"
   value       = var.domain_name != "" ? "https://api.${var.domain_name}" : "https://${aws_api_gateway_rest_api.main.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}"
+}
+
+output "api_custom_domain" {
+  description = "API Gateway custom domain name (api.<domain>)"
+  value       = var.domain_name != "" ? aws_api_gateway_domain_name.api[0].domain_name : null
 }
