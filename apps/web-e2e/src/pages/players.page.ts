@@ -22,6 +22,19 @@ export class PlayersPage {
   readonly playerName: Locator;
   readonly playerPosition: Locator;
 
+  // Player Detail Modal
+  readonly detailModal: Locator;
+  readonly detailModalCloseButton: Locator;
+  readonly detailModalLoading: Locator;
+  readonly detailModalError: Locator;
+  readonly detailModalEmpty: Locator;
+  readonly detailModalEligiblePositions: Locator;
+  readonly detailModalBattingTab: Locator;
+  readonly detailModalPitchingTab: Locator;
+  readonly detailModalFieldingTab: Locator;
+  readonly detailModalCareerBattingCard: Locator;
+  readonly detailModalCareerPitchingCard: Locator;
+
   constructor(page: Page) {
     this.page = page;
 
@@ -41,6 +54,32 @@ export class PlayersPage {
     this.playerPosition = page
       .locator('[data-testid="player-position"]')
       .first();
+
+    // Player Detail Modal
+    this.detailModal = page.getByRole('dialog');
+    this.detailModalCloseButton = this.detailModal.getByRole('button', {
+      name: 'Close',
+    });
+    this.detailModalLoading = page.getByText('Loading player statistics…');
+    this.detailModalError = this.detailModal.getByText('Error loading stats');
+    this.detailModalEmpty = this.detailModal.getByText(
+      'No season statistics found',
+    );
+    this.detailModalEligiblePositions =
+      this.detailModal.getByText('Eligible Positions');
+    this.detailModalBattingTab = this.detailModal.getByText('Batting', {
+      exact: true,
+    });
+    this.detailModalPitchingTab = this.detailModal.getByText('Pitching', {
+      exact: true,
+    });
+    this.detailModalFieldingTab = this.detailModal.getByText('Fielding', {
+      exact: true,
+    });
+    this.detailModalCareerBattingCard =
+      this.detailModal.getByText('Career Batting');
+    this.detailModalCareerPitchingCard =
+      this.detailModal.getByText('Career Pitching');
   }
 
   /** Navigate to the player stats page. */

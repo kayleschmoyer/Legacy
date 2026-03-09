@@ -3,7 +3,8 @@
  *
  * Covers: player, playerByBrefId, careerBattingStats, careerPitchingStats,
  *         careerFieldingStats, playerSeasonBatting, playerSeasonPitching,
- *         seasonBattingStats, seasonPitchingStats, searchPlayers.
+ *         seasonBattingStats, seasonPitchingStats, searchPlayers,
+ *         getAllPlayerSeasonStats (PlayerDetailModal).
  */
 
 export interface MockPlayer {
@@ -147,6 +148,170 @@ export function searchPlayersResponse(players?: Partial<MockPlayer>[]) {
   return {
     data: {
       searchPlayers: (players ?? [mockPlayer()]).map((p) => mockPlayer(p)),
+    },
+  };
+}
+
+// ── PlayerDetailModal (GetAllPlayerSeasonStats) ────────────────────────────────
+
+export interface MockSeasonBatting {
+  __typename: 'SeasonBatting';
+  season: number;
+  team: string;
+  games: number;
+  plateAppearances: number;
+  atBats: number;
+  runs: number;
+  hits: number;
+  doubles: number;
+  triples: number;
+  homeRuns: number;
+  rbi: number;
+  stolenBases: number;
+  caughtStealing: number;
+  baseOnBalls: number;
+  strikeouts: number;
+  battingAverage: number;
+  onBasePercentage: number;
+  sluggingPercentage: number;
+}
+
+export function mockSeasonBatting(
+  overrides: Partial<MockSeasonBatting> = {},
+): MockSeasonBatting {
+  return {
+    __typename: 'SeasonBatting',
+    season: 2024,
+    team: 'LAA',
+    games: 145,
+    plateAppearances: 620,
+    atBats: 550,
+    runs: 95,
+    hits: 165,
+    doubles: 30,
+    triples: 2,
+    homeRuns: 28,
+    rbi: 85,
+    stolenBases: 12,
+    caughtStealing: 3,
+    baseOnBalls: 60,
+    strikeouts: 110,
+    battingAverage: 0.3,
+    onBasePercentage: 0.37,
+    sluggingPercentage: 0.52,
+    ...overrides,
+  };
+}
+
+export interface MockSeasonPitching {
+  __typename: 'SeasonPitching';
+  season: number;
+  team: string;
+  games: number;
+  wins: number;
+  losses: number;
+  gamesStarted: number;
+  completeGames: number;
+  shutouts: number;
+  saves: number;
+  inningsPitched: number;
+  hits: number;
+  runs: number;
+  earnedRuns: number;
+  homeRuns: number;
+  baseOnBalls: number;
+  strikeouts: number;
+  earnedRunAverage: string;
+  whip: number;
+}
+
+export function mockSeasonPitching(
+  overrides: Partial<MockSeasonPitching> = {},
+): MockSeasonPitching {
+  return {
+    __typename: 'SeasonPitching',
+    season: 2024,
+    team: 'LAD',
+    games: 32,
+    wins: 15,
+    losses: 5,
+    gamesStarted: 32,
+    completeGames: 2,
+    shutouts: 1,
+    saves: 0,
+    inningsPitched: 210,
+    hits: 155,
+    runs: 55,
+    earnedRuns: 50,
+    homeRuns: 12,
+    baseOnBalls: 45,
+    strikeouts: 245,
+    earnedRunAverage: '2.14',
+    whip: 0.95,
+    ...overrides,
+  };
+}
+
+export interface MockSeasonFielding {
+  __typename: 'SeasonFielding';
+  season: number;
+  team: string;
+  position: string;
+  games: number;
+  gamesStarted: number;
+  inningsDefended: number;
+  putouts: number;
+  assists: number;
+  errors: number;
+  doublePlays: number;
+  fieldingPercentage: number;
+}
+
+export function mockSeasonFielding(
+  overrides: Partial<MockSeasonFielding> = {},
+): MockSeasonFielding {
+  return {
+    __typename: 'SeasonFielding',
+    season: 2024,
+    team: 'LAA',
+    position: 'CF',
+    games: 140,
+    gamesStarted: 138,
+    inningsDefended: 1260,
+    putouts: 380,
+    assists: 8,
+    errors: 2,
+    doublePlays: 3,
+    fieldingPercentage: 0.995,
+    ...overrides,
+  };
+}
+
+/**
+ * Build a GetAllPlayerSeasonStats response for a batter/fielder.
+ * Pass empty arrays to omit batting or fielding sections.
+ */
+export function allPlayerSeasonStatsResponse(opts?: {
+  eligiblePositions?: string[];
+  batting?: Partial<MockSeasonBatting>[];
+  pitching?: Partial<MockSeasonPitching>[];
+  fielding?: Partial<MockSeasonFielding>[];
+}) {
+  return {
+    data: {
+      player: {
+        __typename: 'Player',
+        eligiblePositions: opts?.eligiblePositions ?? ['CF', 'OF'],
+      },
+      playerSeasonBatting: (opts?.batting ?? [mockSeasonBatting()]).map((b) =>
+        mockSeasonBatting(b),
+      ),
+      playerSeasonPitching: (opts?.pitching ?? []).map((p) =>
+        mockSeasonPitching(p),
+      ),
+      playerSeasonFielding: (opts?.fielding ?? [mockSeasonFielding()]).map(
+        (f) => mockSeasonFielding(f),
+      ),
     },
   };
 }
