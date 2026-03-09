@@ -83,7 +83,7 @@ CareerAchievementsRef.implement({
   }),
 });
 
-const PlayerRef = builder.objectRef<PlayerShape>('Player');
+export const PlayerRef = builder.objectRef<PlayerShape>('Player');
 
 // Average per-season stats type
 const AverageSeasonBattingRef = builder.objectRef<{

@@ -1908,6 +1908,7 @@ type Query {
   Get a complete export of all personal data for the authenticated user
   """
   exportMyData: UserDataExport
+  freeAgents(leagueId: Int!): [Player!]
   getAvailableDraftPlayers(
     draftId: Int!
     limit: Int
