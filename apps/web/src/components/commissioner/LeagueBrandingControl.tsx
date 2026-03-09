@@ -212,6 +212,7 @@ export function LeagueBrandingControl({
                 />
                 <Input
                   id="primary-color"
+                  data-testid="primary-color"
                   flex={1}
                   placeholder="#1A2B3C"
                   value={primaryColor}
@@ -248,6 +249,7 @@ export function LeagueBrandingControl({
                 />
                 <Input
                   id="secondary-color"
+                  data-testid="secondary-color"
                   flex={1}
                   placeholder="#FFFFFF"
                   value={secondaryColor}

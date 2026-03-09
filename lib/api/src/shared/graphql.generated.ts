@@ -279,6 +279,7 @@ export type CareerPitching = {
   losses?: Maybe<Scalars['Int']['output']>;
   outRate?: Maybe<Scalars['Int']['output']>;
   outsRecorded?: Maybe<Scalars['Int']['output']>;
+  player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   runs?: Maybe<Scalars['Int']['output']>;
   saves?: Maybe<Scalars['Int']['output']>;
@@ -1869,6 +1870,7 @@ export type Query = {
   careerBattingStats?: Maybe<CareerBattingConnection>;
   careerFieldingStats?: Maybe<Array<CareerFielding>>;
   careerPitchingStats?: Maybe<Array<CareerPitching>>;
+  careerPitchingStatsCount?: Maybe<Scalars['Int']['output']>;
   /** Commissioner: fetch the audit log for all commissioner actions in a league. */
   commissionerAuditLogs?: Maybe<Array<CommissionerAuditLog>>;
   defaultScoringProfile?: Maybe<ScoringConfig>;
@@ -2023,6 +2025,12 @@ export type QueryCareerPitchingStatsArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type QueryCareerPitchingStatsCountArgs = {
+  minGames?: InputMaybe<Scalars['Int']['input']>;
+  minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  minWins?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryCommissionerAuditLogsArgs = {

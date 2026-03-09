@@ -71,6 +71,7 @@ const WebLayout = ({
         <Theme name={colorScheme === 'dark' ? 'dark' : 'light'}>
           <div
             className={`app-container ${colorScheme || 'dark'}`}
+            data-testid="app-container"
             style={{
               minHeight: '100vh',
               backgroundColor: colorScheme === 'light' ? '#F7F9FC' : '#0A0F1A',

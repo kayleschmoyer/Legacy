@@ -200,7 +200,7 @@ test.describe
       await expect(page.getByText(/spot(s)?\s+available/i).first()).toBeVisible(
         { timeout: 15_000 },
       );
-      await page.locator('#team-name').fill(teamName);
+      await page.getByTestId('team-name').fill(teamName);
       const joinBtn = page.getByRole('button', { name: /Join League/i });
       await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
       await joinBtn.click();

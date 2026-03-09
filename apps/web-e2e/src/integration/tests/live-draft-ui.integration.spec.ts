@@ -159,7 +159,7 @@ test.describe
         { timeout: 15000 },
       );
 
-      await page.locator('#team-name').fill(teamName);
+      await page.getByTestId('team-name').fill(teamName);
       const joinBtn = page.getByRole('button', { name: /Join League/i });
       await expect(joinBtn).toBeEnabled({ timeout: 5000 });
       await joinBtn.click();

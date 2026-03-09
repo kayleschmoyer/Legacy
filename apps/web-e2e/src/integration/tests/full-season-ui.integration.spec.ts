@@ -179,7 +179,7 @@ test.describe
         ).toBeVisible({ timeout: 15000 });
 
         // Fill team name and join
-        await page.locator('#team-name').fill(teamName);
+        await page.getByTestId('team-name').fill(teamName);
         const joinBtn = page.getByRole('button', {
           name: /Join League/i,
         });

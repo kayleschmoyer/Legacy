@@ -428,9 +428,7 @@ test.describe('Draft GraphQL Integration Tests @critical', () => {
     await page.waitForTimeout(2000);
 
     // Look for error messages in the UI
-    const errorElements = await page
-      .locator('[role="alert"], .error, .alert-error')
-      .all();
+    const errorElements = await page.locator('[role="alert"]').all();
     const alertMessages: string[] = [];
 
     for (const element of errorElements) {

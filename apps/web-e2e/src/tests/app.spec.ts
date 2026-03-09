@@ -75,13 +75,11 @@ test.describe('Web Application @smoke', () => {
 
     // Capture snapshots of specific components if they exist
     const components = [
-      'header',
-      'main',
-      'footer',
+      '[role="banner"]',
+      '[role="main"]',
+      '[role="contentinfo"]',
       '[data-testid="sports-list"]',
       '[data-testid="game-selection"]',
-      '.card',
-      '.button',
     ];
 
     for (const selector of components) {

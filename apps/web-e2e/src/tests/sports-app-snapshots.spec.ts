@@ -24,8 +24,7 @@ test.describe('Sports App Snapshots @visual', () => {
     await page.waitForLoadState('networkidle');
 
     // Sports list component
-    const sportsListSelector =
-      '[data-testid="sports-list"], .sports-list, .sport-selection';
+    const sportsListSelector = '[data-testid="sports-list"]';
     if (await page.locator(sportsListSelector).isVisible()) {
       await SnapshotUtils.captureComponentStates(
         page,
@@ -40,8 +39,7 @@ test.describe('Sports App Snapshots @visual', () => {
     }
 
     // Game card components
-    const gameCardSelector =
-      '[data-testid="game-card"], .game-card, .match-card';
+    const gameCardSelector = '[data-testid="game-card"]';
     if (await page.locator(gameCardSelector).isVisible()) {
       await SnapshotUtils.captureComponentStates(
         page,
@@ -56,8 +54,7 @@ test.describe('Sports App Snapshots @visual', () => {
     }
 
     // Team selector
-    const teamSelectorSelector =
-      '[data-testid="team-selector"], .team-selector, .team-picker';
+    const teamSelectorSelector = '[data-testid="team-selector"]';
     if (await page.locator(teamSelectorSelector).isVisible()) {
       await SnapshotUtils.captureComponentStates(
         page,
@@ -67,8 +64,7 @@ test.describe('Sports App Snapshots @visual', () => {
     }
 
     // Score display
-    const scoreDisplaySelector =
-      '[data-testid="score-display"], .score, .scoreboard';
+    const scoreDisplaySelector = '[data-testid="score-display"]';
     if (await page.locator(scoreDisplaySelector).isVisible()) {
       await SnapshotUtils.takeComponentScreenshot(
         page,
@@ -101,9 +97,7 @@ test.describe('Sports App Snapshots @visual', () => {
       );
 
       // Mobile navigation (if exists)
-      const mobileMenuToggle = page.locator(
-        '[data-testid="mobile-menu"], .mobile-menu-toggle, .hamburger',
-      );
+      const mobileMenuToggle = page.locator('[data-testid="mobile-menu"]');
       if (await mobileMenuToggle.isVisible()) {
         await mobileMenuToggle.click();
         await page.waitForTimeout(300); // Wait for animation
@@ -208,7 +202,7 @@ test.describe('Sports App Snapshots @visual', () => {
 
     // Try to find and activate dark mode
     const darkModeToggle = page.locator(
-      '[data-testid="dark-mode"], [data-testid="theme-toggle"], .dark-mode-toggle',
+      '[data-testid="dark-mode"], [data-testid="theme-toggle"]',
     );
     if (await darkModeToggle.isVisible()) {
       await darkModeToggle.click();

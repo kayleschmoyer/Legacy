@@ -14,8 +14,7 @@ test.describe('Baseball Landing Page - Responsive @visual', () => {
     );
 
     // Capture league grid component if present
-    const gridSelector =
-      '[data-testid="leagues-grid"], .leagues-grid, [role="list"]';
+    const gridSelector = '[data-testid="leagues-grid"]';
     if (await page.locator(gridSelector).first().isVisible()) {
       await SnapshotUtils.captureComponentStates(
         page,

@@ -71,7 +71,7 @@ test.describe('HTML Snapshots @visual', () => {
     await page.waitForLoadState('networkidle');
 
     const mainContent = await page
-      .locator('main, [role="main"], .main-content, body > div')
+      .locator('[data-testid="main-content"], main, [role="main"]')
       .first()
       .innerHTML();
     expect(mainContent).toMatchSnapshot('main-content.html');
@@ -81,7 +81,7 @@ test.describe('HTML Snapshots @visual', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const navigation = page.locator('nav, header, [role="navigation"]').first();
+    const navigation = page.locator('[role="navigation"]').first();
     if (await navigation.isVisible()) {
       const navContent = await navigation.innerHTML();
       expect(navContent).toMatchSnapshot('navigation.html');
@@ -98,9 +98,8 @@ test.describe('HTML Snapshots @visual', () => {
       '[data-testid="game-card"]',
       '[data-testid="team-selector"]',
       '[data-testid="score-display"]',
-      '.card',
-      '.button',
-      'form',
+      '[data-testid="app-container"]',
+      '[role="form"]',
     ];
 
     for (const selector of componentSelectors) {

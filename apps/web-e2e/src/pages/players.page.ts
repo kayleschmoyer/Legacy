@@ -51,9 +51,7 @@ export class PlayersPage {
 
     // Player detail
     this.playerName = page.getByRole('heading', { level: 1 }).first();
-    this.playerPosition = page
-      .locator('[data-testid="player-position"]')
-      .first();
+    this.playerPosition = page.getByTestId('player-position');
 
     // Player Detail Modal
     this.detailModal = page.getByRole('dialog');

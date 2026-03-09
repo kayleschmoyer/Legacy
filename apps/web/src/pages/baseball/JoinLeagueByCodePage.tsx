@@ -259,6 +259,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                 borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
                 disabled={loading}
                 id="team-name"
+                data-testid="team-name"
                 aria-labelledby="team-name-label"
                 aria-describedby={`team-name-help${error?.toLowerCase().includes('team name') ? ' team-name-error' : ''}`}
                 aria-required="true"

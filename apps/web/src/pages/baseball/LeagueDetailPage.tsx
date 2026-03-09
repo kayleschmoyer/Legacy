@@ -1810,6 +1810,7 @@ export function LeagueDetailPage(): React.JSX.Element {
               borderWidth={1}
               borderRadius="$6"
               padding="$5"
+              data-testid="league-teams"
             >
               <XStack
                 justifyContent="space-between"
@@ -3081,6 +3082,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             <YStack gap="$1">
               <H1
                 id="league-title"
+                data-testid="league-title"
                 fontSize="$8"
                 fontWeight="800"
                 color="white"
@@ -3099,6 +3101,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   |
                 </Text>
                 <DraftBadge
+                  data-testid="draft-status"
                   backgroundColor={draftColors.bg}
                   borderColor={draftColors.border}
                 >

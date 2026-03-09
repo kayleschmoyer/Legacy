@@ -102,7 +102,7 @@ export function DraftQueuePanel({ draftId }: DraftQueuePanelProps) {
   const busy = removing || reordering;
 
   return (
-    <div className="d-panel d-queue-panel">
+    <div className="d-panel d-queue-panel" data-testid="draft-queue">
       <h3 className="d-panel-title a-orange" id="draft-queue-heading">
         <span role="img" aria-label="queue">
           📋

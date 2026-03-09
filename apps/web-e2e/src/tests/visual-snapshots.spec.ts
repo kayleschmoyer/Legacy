@@ -94,7 +94,7 @@ test.describe('Visual Snapshots @visual', () => {
 
     // Try to enable dark mode if available
     const darkModeToggle = page.locator(
-      '[data-testid="dark-mode-toggle"], .dark-mode-toggle, [aria-label*="dark"], [aria-label*="theme"]',
+      '[data-testid="dark-mode-toggle"], [aria-label*="dark"], [aria-label*="theme"]',
     );
     if (await darkModeToggle.isVisible()) {
       await darkModeToggle.click();
@@ -129,29 +129,20 @@ test.describe('Visual Snapshots @visual', () => {
     // Common component selectors to snapshot
     const componentSelectors = [
       // Navigation components
-      'nav',
-      'header',
       '[role="navigation"]',
-      '.navbar',
-      '.nav',
+      '[role="banner"]',
 
       // Content components
-      'main',
-      '.main-content',
       '[role="main"]',
+      '[data-testid="main-content"]',
 
       // UI components
+      '[role="button"]',
       'button',
-      '.btn',
-      '.button',
       'input',
-      '.form-control',
-      '.input',
 
       // Cards and containers
-      '.card',
-      '.container',
-      '.box',
+      '[data-testid="app-container"]',
 
       // Sports-specific components
       '[data-testid="sports-list"]',
@@ -160,8 +151,8 @@ test.describe('Visual Snapshots @visual', () => {
       '[data-testid="score-display"]',
 
       // Footer
+      '[role="contentinfo"]',
       'footer',
-      '.footer',
     ];
 
     for (const selector of componentSelectors) {
@@ -233,9 +224,7 @@ test.describe('Visual Snapshots @visual', () => {
     await page.waitForLoadState('networkidle');
 
     // Look for error messages or states
-    const errorElements = page.locator(
-      '.error, .alert-error, [data-testid="error"], .text-red-500',
-    );
+    const errorElements = page.locator('[data-testid="error"], [role="alert"]');
     if (await errorElements.first().isVisible()) {
       await expect(page).toHaveScreenshot('error-state.png', {
         animations: 'disabled',

@@ -439,6 +439,7 @@ function App() {
       <a
         href="#main-content"
         className="skip-link sr-only"
+        data-testid="skip-link"
         onClick={(e) => {
           // Improve focus behavior across browsers
           const target = document.getElementById('main-content');
@@ -460,6 +461,7 @@ function App() {
         padding="$4"
         $sm={{ padding: '$2' }}
         id="main-content"
+        data-testid="main-content"
         role="main"
         tabIndex={-1}
       >

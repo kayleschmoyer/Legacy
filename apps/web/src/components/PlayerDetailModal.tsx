@@ -117,6 +117,7 @@ function TabButton({
 function PositionBadge({ position }: { position: string }) {
   return (
     <Text
+      data-testid="player-position"
       fontSize="$2"
       fontWeight="700"
       color={WHITE}

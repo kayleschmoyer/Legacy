@@ -5,7 +5,7 @@
  *  - Preferences page renders the theme chip group
  *  - Selecting a theme persists the value to localStorage immediately
  *  - Selected theme survives a page reload (persistence)
- *  - .app-container CSS class reflects the active theme
+ *  - data-testid="app-container" element reflects the active theme
  *  - Dark mode applies a dark background colour
  *  - Light mode applies a light background colour
  *  - Text colour in dark mode provides sufficient contrast against the bg
@@ -197,7 +197,7 @@ test.describe('Dark mode – component rendering @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).toBeVisible({ timeout: 15000 });
     await expect(container).toHaveClass(/\bdark\b/);
   });
@@ -208,7 +208,7 @@ test.describe('Dark mode – component rendering @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).toBeVisible({ timeout: 15000 });
 
     const bgColor = await container.evaluate(
@@ -223,7 +223,7 @@ test.describe('Dark mode – component rendering @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).not.toHaveClass(/\blight\b/);
   });
 });
@@ -250,7 +250,7 @@ test.describe('Light mode – component rendering @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).toBeVisible({ timeout: 15000 });
     await expect(container).toHaveClass(/\blight\b/);
   });
@@ -261,7 +261,7 @@ test.describe('Light mode – component rendering @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).toBeVisible({ timeout: 15000 });
 
     const bgColor = await container.evaluate(
@@ -276,7 +276,7 @@ test.describe('Light mode – component rendering @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).not.toHaveClass(/\bdark\b/);
   });
 });
@@ -305,7 +305,7 @@ test.describe('Contrast check – dark mode @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).toBeVisible({ timeout: 15000 });
 
     const textColor = await container.evaluate(
@@ -329,7 +329,7 @@ test.describe('Contrast check – dark mode @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).toBeVisible({ timeout: 15000 });
 
     const { textColor, bgColor } = await container.evaluate((el) => {
@@ -367,7 +367,7 @@ test.describe('Contrast check – light mode @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).toBeVisible({ timeout: 15000 });
 
     const textColor = await container.evaluate(
@@ -391,7 +391,7 @@ test.describe('Contrast check – light mode @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).toBeVisible({ timeout: 15000 });
 
     const { textColor, bgColor } = await container.evaluate((el) => {
@@ -425,7 +425,7 @@ test.describe('Theme change takes effect immediately without reload @regression'
     await page.waitForLoadState('load');
 
     // The app-container should reflect dark mode
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).toBeVisible({ timeout: 15000 });
     await expect(container).toHaveClass(/\bdark\b/);
   });
@@ -467,7 +467,7 @@ test.describe('Theme change takes effect immediately without reload @regression'
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const container = page.locator('.app-container');
+    const container = page.getByTestId('app-container');
     await expect(container).toBeVisible({ timeout: 15000 });
     await expect(container).toHaveClass(/\blight\b/);
   });

@@ -1863,6 +1863,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           {/* Draft status */}
           <div
             className="d-status"
+            data-testid="draft-status"
             style={
               draftPaused
                 ? {
@@ -1996,7 +1997,11 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
           {/* Whose Turn */}
           {currentPickInfo ? (
-            <div className="d-panel" style={{ textAlign: 'center' }}>
+            <div
+              className="d-panel"
+              data-testid="current-pick"
+              style={{ textAlign: 'center' }}
+            >
               <div
                 style={{
                   fontSize: 11,
@@ -2356,7 +2361,12 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         {/* ============================================================== */}
         {/* CENTER – PLAYER BOARD                                          */}
         {/* ============================================================== */}
-        <div className="d-main" role="main" aria-label="Player draft board">
+        <div
+          className="d-main"
+          role="main"
+          aria-label="Player draft board"
+          data-testid="draft-board"
+        >
           {/* Controls */}
           <div className="d-controls">
             {/* Search */}
@@ -2530,6 +2540,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           {viewMode !== 'board' && (
             <div
               className="d-player-grid"
+              data-testid="player-pool"
               style={{ gridTemplateColumns: gridCols }}
             >
               {filteredPlayers.map((player, idx) => (

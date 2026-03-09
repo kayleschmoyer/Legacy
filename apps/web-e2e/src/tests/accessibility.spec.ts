@@ -24,19 +24,19 @@ test.describe('Skip Link @smoke', () => {
   });
 
   test('skip link exists in the DOM', async ({ page }) => {
-    const skipLink = page.locator('a.skip-link');
+    const skipLink = page.getByTestId('skip-link');
     await expect(skipLink).toBeAttached();
     await expect(skipLink).toHaveText('Skip to main content');
   });
 
   test('skip link href points to #main-content', async ({ page }) => {
-    const skipLink = page.locator('a.skip-link');
+    const skipLink = page.getByTestId('skip-link');
     await expect(skipLink).toHaveAttribute('href', '#main-content');
   });
 
   test('skip link is visually hidden before focus', async ({ page }) => {
     // sr-only hides it offscreen; the bounding box is ~1x1 px
-    const skipLink = page.locator('a.skip-link');
+    const skipLink = page.getByTestId('skip-link');
     const box = await skipLink.boundingBox();
     expect(box).not.toBeNull();
     // sr-only clips to 1px × 1px — any dimension ≤ 4 px is "hidden"
@@ -47,7 +47,7 @@ test.describe('Skip Link @smoke', () => {
     // Tab once — the skip link is the first focusable element
     await page.keyboard.press('Tab');
 
-    const skipLink = page.locator('a.skip-link');
+    const skipLink = page.getByTestId('skip-link');
     await expect(skipLink).toBeFocused({ timeout: 5000 });
 
     // After focus the .skip-link:focus rule overrides sr-only so the element
@@ -62,10 +62,10 @@ test.describe('Skip Link @smoke', () => {
     page,
   }) => {
     await page.keyboard.press('Tab');
-    await expect(page.locator('a.skip-link')).toBeFocused({ timeout: 5000 });
+    await expect(page.getByTestId('skip-link')).toBeFocused({ timeout: 5000 });
     await page.keyboard.press('Enter');
 
-    const main = page.locator('#main-content');
+    const main = page.getByTestId('main-content');
     await expect(main).toBeFocused({ timeout: 5000 });
   });
 });
@@ -97,7 +97,7 @@ test.describe('ARIA Landmarks @smoke', () => {
   test('main content has id="main-content" and tabIndex=-1', async ({
     page,
   }) => {
-    const main = page.locator('#main-content');
+    const main = page.getByTestId('main-content');
     await expect(main).toBeAttached();
     // tabIndex=-1 allows programmatic focus (skip link target)
     const tabIndex = await main.getAttribute('tabindex');
@@ -306,7 +306,7 @@ test.describe('Keyboard Navigation @regression', () => {
   test('Tab key moves focus through interactive elements', async ({ page }) => {
     // First Tab → skip link
     await page.keyboard.press('Tab');
-    const skipLink = page.locator('a.skip-link');
+    const skipLink = page.getByTestId('skip-link');
     await expect(skipLink).toBeFocused({ timeout: 5000 });
 
     // Subsequent Tabs move into navigable elements without getting stuck

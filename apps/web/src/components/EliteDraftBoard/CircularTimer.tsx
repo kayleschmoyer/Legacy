@@ -30,7 +30,10 @@ export function CircularTimer({
   const secs = seconds % 60;
 
   return (
-    <div className={`d-timer-wrap${!noLimit && seconds <= 10 ? ' warn' : ''}`}>
+    <div
+      className={`d-timer-wrap${!noLimit && seconds <= 10 ? ' warn' : ''}`}
+      data-testid="pick-timer"
+    >
       <svg
         viewBox="0 0 120 120"
         width="140"

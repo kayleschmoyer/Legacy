@@ -55,16 +55,14 @@ export class LeaguePage {
     this.page = page;
 
     // Detail page
-    this.leagueTitle = page.locator('h1#league-title');
+    this.leagueTitle = page.getByTestId('league-title');
     this.leagueName = page.getByRole('heading', { level: 1 }).first();
-    this.draftStatusBadge = page
-      .locator('[data-testid="draft-status"], .draft-status')
-      .first();
+    this.draftStatusBadge = page.getByTestId('draft-status');
     this.startDraftButton = page
       .locator('button')
       .filter({ hasText: /start.*draft/i })
       .first();
-    this.leagueTeams = page.locator('[data-testid="league-teams"]');
+    this.leagueTeams = page.getByTestId('league-teams');
 
     // Create form
     this.createHeading = page.getByRole('heading', {
@@ -97,8 +95,8 @@ export class LeaguePage {
     this.brandingHeading = page.getByRole('heading', {
       name: /League Branding/i,
     });
-    this.primaryColorInput = page.locator('#primary-color');
-    this.secondaryColorInput = page.locator('#secondary-color');
+    this.primaryColorInput = page.getByTestId('primary-color');
+    this.secondaryColorInput = page.getByTestId('secondary-color');
     this.saveColorsButton = page.getByRole('button', {
       name: /save colors/i,
     });
@@ -167,7 +165,7 @@ export class LeaguePage {
 
   /** Assert the league detail page loaded with the title. */
   async expectDetailLoaded() {
-    await this.page.waitForSelector('h1#league-title', { timeout: 15000 });
+    await expect(this.leagueTitle).toBeVisible({ timeout: 15000 });
   }
 
   /**

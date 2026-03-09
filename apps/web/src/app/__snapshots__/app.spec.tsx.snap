@@ -7,6 +7,7 @@ exports[`App FootballScreen should match complete football page layout snapshot 
   </div>
   <a
     class="skip-link sr-only"
+    data-testid="skip-link"
     href="#main-content"
   >
     Skip to main content
@@ -100,6 +101,7 @@ exports[`App FootballScreen should match complete football page layout snapshot 
     </div>
   </div>
   <div
+    data-testid="main-content"
     flex="1"
     id="main-content"
     padding="$4"
@@ -124,6 +126,7 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
   </div>
   <a
     class="skip-link sr-only"
+    data-testid="skip-link"
     href="#main-content"
   >
     Skip to main content
@@ -217,6 +220,7 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
     </div>
   </div>
   <div
+    data-testid="main-content"
     flex="1"
     id="main-content"
     padding="$4"
@@ -239,6 +243,7 @@ exports[`App Navigation should render navigation with correct links 1`] = `
   </div>
   <a
     class="skip-link sr-only"
+    data-testid="skip-link"
     href="#main-content"
   >
     Skip to main content
@@ -332,6 +337,7 @@ exports[`App Navigation should render navigation with correct links 1`] = `
     </div>
   </div>
   <div
+    data-testid="main-content"
     flex="1"
     id="main-content"
     padding="$4"

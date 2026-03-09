@@ -29,12 +29,10 @@ export class DraftPage {
   constructor(page: Page) {
     this.page = page;
 
-    this.draftBoard = page.locator('[data-testid="draft-board"], .draft-board');
-    this.playerPool = page.locator('[data-testid="player-pool"], .player-pool');
-    this.draftQueue = page.locator('[data-testid="draft-queue"], .draft-queue');
-    this.currentPick = page.locator(
-      '[data-testid="current-pick"], .current-pick',
-    );
+    this.draftBoard = page.getByTestId('draft-board');
+    this.playerPool = page.getByTestId('player-pool');
+    this.draftQueue = page.getByTestId('draft-queue');
+    this.currentPick = page.getByTestId('current-pick');
 
     this.draftPlayerButton = page.getByRole('button', {
       name: /draft.*player|pick.*player/i,
@@ -44,11 +42,9 @@ export class DraftPage {
 
     this.playerSearch = page.getByPlaceholder(/search.*player/i);
 
-    this.draftStatus = page.locator('[data-testid="draft-status"]').first();
+    this.draftStatus = page.getByTestId('draft-status');
     this.roundIndicator = page.getByText(/round \d+/i).first();
-    this.pickTimer = page
-      .locator('[data-testid="pick-timer"], .pick-timer')
-      .first();
+    this.pickTimer = page.getByTestId('pick-timer');
   }
 
   /** Navigate to a league's draft board. */

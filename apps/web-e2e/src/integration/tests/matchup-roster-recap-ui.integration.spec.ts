@@ -28,12 +28,12 @@
  *     src/integration/tests/matchup-roster-recap-ui.integration.spec.ts
  */
 
+import type { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import type { Page } from '@playwright/test';
-import { expect } from '@playwright/test';
 import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
