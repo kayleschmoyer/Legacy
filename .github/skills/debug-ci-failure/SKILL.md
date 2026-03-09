@@ -717,8 +717,7 @@ ci-orchestrator.yml  (triggered by PR / push / merge_group / schedule)
 │   ├── build-validation   ← web / mobile / lambda builds
 │   ├── e2e                ← Playwright tests
 │   └── summarize          ← PR comment + badges
-├── security-scanning.yml  ← conditional
-└── test-android-compatibility.yml  ← conditional
+└── security-scanning.yml  ← conditional
 ```
 
 **Key environment variables in CI:**

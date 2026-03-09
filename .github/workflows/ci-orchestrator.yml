@@ -2,8 +2,7 @@ name: "🧠 Legacy Sports CI Orchestrator"
 
 # Central orchestrator for pull requests, integration branches, and scheduled
 # health checks. Determines which pipelines need to
-# run, then dispatches reusable workflows for CI, security scanning, and Android
-# compatibility testing.
+# run, then dispatches reusable workflows for CI and security scanning.
 
 on:
   pull_request:
@@ -13,7 +12,6 @@ on:
   merge_group:
   schedule:
     - cron: "0 2 * * 1" # Weekly security scan (Mondays 02:00 UTC)
-    - cron: "0 2 * * 0" # Weekly Android compatibility run (Sundays 02:00 UTC)
   workflow_dispatch:
     inputs:
       debug_mode:
@@ -31,30 +29,8 @@ on:
           - dependencies-only
           - sast-only
           - secrets-only
-      matrix_type:
-        description: "Android matrix type"
-        required: false
-        default: "production"
-        type: choice
-        options:
-          - production
-          - compatibility
-          - full
-      build_type:
-        description: "Android build type"
-        required: false
-        default: "debug"
-        type: choice
-        options:
-          - debug
-          - release
       run_security:
         description: "Force security scanning"
-        required: false
-        default: true
-        type: boolean
-      run_android:
-        description: "Force Android compatibility"
         required: false
         default: true
         type: boolean
@@ -91,7 +67,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run-security: ${{ steps.scope.outputs.run-security }}
-      run-android: ${{ steps.scope.outputs.run-android }}
 
     steps:
       - name: "🚀 Checkout Repository"
@@ -107,30 +82,22 @@ jobs:
           event='${{ github.event_name }}'
           schedule='${{ github.event.schedule || '' }}'
           manual_security='${{ github.event_name == 'workflow_dispatch' && (inputs.run_security && 'true' || 'false') }}'
-          manual_android='${{ github.event_name == 'workflow_dispatch' && (inputs.run_android && 'true' || 'false') }}'
 
           run_security=false
-          run_android=false
 
           if [ "$event" = "schedule" ]; then
             case "$schedule" in
               "0 2 * * 1")
                 run_security=true
                 ;;
-              "0 2 * * 0")
-                run_android=true
-                ;;
               *)
                 run_security=true
-                run_android=true
                 ;;
             esac
           elif [ "$event" = "workflow_dispatch" ]; then
             run_security="$manual_security"
-            run_android="$manual_android"
           elif [ "$event" = "merge_group" ]; then
             run_security=true
-            run_android=true
           else
             base_ref=""
             if [ "$event" = "pull_request" ]; then
@@ -164,20 +131,6 @@ jobs:
               if echo "$changed_files" | grep -Eq "$SECURITY_PATHS"; then
                 run_security=true
               fi
-
-              # Android build is only affected by: mobile app code, mobile-relevant libs,
-              # root config files that affect the RN/Expo build, and the workflow itself.
-              # Direct lib deps of apps/app (from Nx graph): env-utilities, logging,
-              # rollbar, scoring, shared-components, tamagui-config, utils, websocket-client.
-              # Also includes ui-abstractions (transitive via shared-components).
-              # Excludes backend-only libs: aws-utils, db-client, data-loaders, scheduling,
-              # bref-client, codegen, narrative, test-fixtures, sentry, analytics, api.
-              MOBILE_LIBS='^lib\/(env-utilities|logging|rollbar|scoring|shared-components|tamagui-config|ui-abstractions|utils|websocket-client)\/'
-              if echo "$changed_files" | grep -Eq \
-                '^apps\/app\/|^app\.json$|^babel\.config\.json$|^(package\.json|pnpm-lock\.yaml)$|^\.github\/workflows\/test-android-compatibility\.yml$' || \
-                 echo "$changed_files" | grep -E "$MOBILE_LIBS" | grep -Eqv '\.(spec|test)\.(ts|tsx|js|jsx)$|__tests__\/'; then
-                run_android=true
-              fi
             fi
           fi
 
@@ -185,12 +138,7 @@ jobs:
             run_security=false
           fi
 
-          if [ "$run_android" != "true" ]; then
-            run_android=false
-          fi
-
           echo "run-security=$run_security" >> "$GITHUB_OUTPUT"
-          echo "run-android=$run_android" >> "$GITHUB_OUTPUT"
 
   ci-pipeline:
     name: "🚀 CI Pipeline"
@@ -208,14 +156,4 @@ jobs:
     with:
       # PRs get a lightweight dependency-only scan; comprehensive runs weekly
       scan_type: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_type || (github.event_name == 'pull_request' && 'dependencies-only' || 'comprehensive') }}
-    secrets: inherit
-
-  android-compatibility:
-    name: "📱 Android Compatibility"
-    needs: [determine-scope]
-    if: ${{ needs.determine-scope.outputs.run-android == 'true' }}
-    uses: ./.github/workflows/test-android-compatibility.yml
-    with:
-      matrix_type: ${{ github.event_name == 'workflow_dispatch' && inputs.matrix_type || 'production' }}
-      build_type: ${{ github.event_name == 'workflow_dispatch' && inputs.build_type || 'debug' }}
     secrets: inherit

@@ -712,8 +712,7 @@ ci-orchestrator.yml  ← entry point for PRs / pushes / merge_group
 │   ├── build-validation      (Job: build-validation)
 │   ├── e2e                   (Job: e2e)
 │   └── summarize             (Job: summarize)
-├── security-scanning.yml     (conditional)
-└── test-android-compatibility.yml (conditional)
+└── security-scanning.yml     (conditional)
 
 deploy-web.yml       ← triggered on push to main (web paths)
 ├── setup
