@@ -1876,6 +1876,7 @@ export type Query = {
   defaultScoringProfile?: Maybe<ScoringConfig>;
   /** Get a complete export of all personal data for the authenticated user */
   exportMyData?: Maybe<UserDataExport>;
+  freeAgents?: Maybe<Array<Player>>;
   getAvailableDraftPlayers?: Maybe<Array<DraftPlayer>>;
   getChampionshipTrophies?: Maybe<Array<ChampionTrophy>>;
   getCurrentDraftPick?: Maybe<CurrentDraftPick>;
@@ -2036,6 +2037,10 @@ export type QueryCareerPitchingStatsCountArgs = {
 export type QueryCommissionerAuditLogsArgs = {
   leagueId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryFreeAgentsArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type QueryGetAvailableDraftPlayersArgs = {

@@ -1,5 +1,5 @@
 export * from './lib/allowed-positions';
-export { shuffleArray } from './lib/utils';
+export { shuffleArray, cryptoRandomInt, cryptoRandomFloat } from './lib/utils';
 export * from './lib/ErrorHandling';
 export * from './lib/league-utils';
 export * from './lib/notification-types';

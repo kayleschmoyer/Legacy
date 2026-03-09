@@ -7,7 +7,7 @@
  * - Balanced home/away distribution
  */
 
-import { shuffleArray } from '@legacy-sports/utils';
+import { cryptoRandomFloat, shuffleArray } from '@legacy-sports/utils';
 import type { SchedulingStrategy } from './strategy-interface';
 import type { MatchupPairing, TeamInfo } from '../types';
 
@@ -52,7 +52,7 @@ export class RandomStrategy implements SchedulingStrategy {
           awayTeam = team1;
         } else {
           // Equal counts - random choice
-          if (Math.random() < 0.5) {
+          if (cryptoRandomFloat() < 0.5) {
             homeTeam = team1;
             awayTeam = team2;
           } else {

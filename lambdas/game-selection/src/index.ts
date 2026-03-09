@@ -21,7 +21,10 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import type { PublicDb } from '@legacy-sports/db-client';
-import { MIN_SEASON_WITH_GAME_DATA } from '@legacy-sports/utils';
+import {
+  cryptoRandomInt,
+  MIN_SEASON_WITH_GAME_DATA,
+} from '@legacy-sports/utils';
 import { and, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import { handler as selectGameHandler } from './handlers/select-game';
 
@@ -637,7 +640,7 @@ async function createMatchupForLeagueWeek(
         }
 
         // Randomly select a season
-        const seasonIdx = Math.floor(Math.random() * availableSeasons.length);
+        const seasonIdx = cryptoRandomInt(availableSeasons.length);
         selectedSeason = availableSeasons[seasonIdx];
 
         // Queue for batch insert

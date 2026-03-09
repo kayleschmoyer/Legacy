@@ -8,7 +8,10 @@
  * - Only seasons from 1901+ (Baseball-Reference has game-level data from 1901 onwards)
  */
 
-import { MIN_SEASON_WITH_GAME_DATA } from '@legacy-sports/utils';
+import {
+  cryptoRandomInt,
+  MIN_SEASON_WITH_GAME_DATA,
+} from '@legacy-sports/utils';
 import type { PlayerGameCount, SeasonInfo, TeamRoster } from './types';
 
 export interface SeasonEligibilityParams {
@@ -134,12 +137,12 @@ export function selectRandomSeason(
     );
 
     // Random selection from least-used seasons
-    const randomIndex = Math.floor(Math.random() * leastUsedSeasons.length);
+    const randomIndex = cryptoRandomInt(leastUsedSeasons.length);
     return leastUsedSeasons[randomIndex].season;
   }
 
   // No usage tracking - pure random selection
-  const randomIndex = Math.floor(Math.random() * validSeasons.length);
+  const randomIndex = cryptoRandomInt(validSeasons.length);
   return validSeasons[randomIndex].season;
 }
 

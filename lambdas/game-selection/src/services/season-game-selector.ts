@@ -1,5 +1,6 @@
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { cryptoRandomFloat, cryptoRandomInt } from '@legacy-sports/utils';
 import { and, eq, isNotNull, isNull, notInArray, or, sql } from 'drizzle-orm';
 
 export interface GameSelectionResult {
@@ -119,7 +120,7 @@ async function selectGameIdentifier(
       return null;
     }
 
-    const randomIndex = Math.floor(Math.random() * availableGames.length);
+    const randomIndex = cryptoRandomInt(availableGames.length);
     return availableGames[randomIndex].gameIdentifier;
   }
 
@@ -133,7 +134,7 @@ async function selectGameIdentifier(
     return null;
   }
 
-  const randomIndex = Math.floor(Math.random() * availableGames.length);
+  const randomIndex = cryptoRandomInt(availableGames.length);
   return availableGames[randomIndex].gameIdentifier;
 }
 
@@ -184,7 +185,7 @@ async function selectGameIdentifierFromPitching(
     return null;
   }
 
-  const randomIndex = Math.floor(Math.random() * availableGames.length);
+  const randomIndex = cryptoRandomInt(availableGames.length);
   return availableGames[randomIndex].gameIdentifier;
 }
 
@@ -422,7 +423,7 @@ function shouldSelectSpGame(
 
   // Probabilistic selection
   const probability = startsNeeded / gamesRemaining;
-  const roll = Math.random();
+  const roll = cryptoRandomFloat();
   return roll < probability;
 }
 
