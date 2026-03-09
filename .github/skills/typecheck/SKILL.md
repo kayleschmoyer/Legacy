@@ -19,8 +19,10 @@ Run TypeScript type checking across affected projects in the Nx monorepo.
 ## Command
 
 ```powershell
-pnpm exec nx affected -t typecheck
+make typecheck
 ```
+
+> **Always prefer `make typecheck`** — it sets the `NODE_OPTIONS` windowsHide patch on Windows. The underlying command is `pnpm exec nx affected -t typecheck`.
 
 ## Alternative Commands
 

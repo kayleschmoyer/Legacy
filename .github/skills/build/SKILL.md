@@ -19,8 +19,10 @@ Build affected projects in the Nx monorepo, compiling TypeScript and bundling as
 ## Command
 
 ```powershell
-pnpm exec nx affected -t build
+make build
 ```
+
+> **Always prefer `make build`** — it sets the `NODE_OPTIONS` windowsHide patch on Windows. The underlying command is `pnpm exec nx affected -t build`.
 
 ## Alternative Commands
 

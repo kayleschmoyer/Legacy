@@ -11,7 +11,7 @@
 5. Setup worktree: `make wt-setup WT=$wt` (or manually: `cd $wt` ΓåÆ `make install` ΓåÆ copy `.env` ΓåÆ junction `.twig`)
    5b. **Agent multi-root access** (optional): `make sync-worktrees` ΓåÆ `code legacy-sports.code-workspace` ΓÇö gives agents search access across all worktrees in one window.
 6. **ΓÜá∩╕Å All remaining work happens at the worktree path (`$wt`), NOT `D:\code\legacy-sports`.** Every file edit, terminal command, and git operation must target `$wt`.
-7. Code: `pnpm exec nx affected -t <target>` (never `pnpm run`)
+7. Code: `make <target>` (e.g. `make test`, `make build`, `make typecheck`, `make lint-fix`). For project-specific targets: `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly.
 8. Commit: `git commit -m "type(scope): msg"` ΓåÆ `git push origin HEAD`
 9. Rebase onto parent: `git fetch origin ; twig rebase` ΓÇö keeps branch current with its parent (main or a stacked branch)
 10. Validate: `make pc` ΓÇö must pass before opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.10b. **Migrations**: if any migration files were added, run `pnpm run db:up` from `lib/db-client` and confirm `Applied N new migrations`. (See `skills/db-migration-write/SKILL.md`)11. Ship: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` ΓåÆ Jira "In Review" (see `skills/create-pr/SKILL.md`)
@@ -20,7 +20,7 @@
 ## Rules
 
 - **Worktree-first**: always create a worktree for ticket work ΓÇö never edit code in the main repo (`D:\code\legacy-sports`). After creating the worktree, all file edits and terminal commands must use the worktree path.
-- **Nx only**: `pnpm exec nx affected -t <target>` ΓÇö never direct `pnpm run`
+- **Make first**: prefer `make <target>` over raw `pnpm exec nx` — it sets `NODE_OPTIONS` for the Windows windowsHide patch and is cross-platform safe. For project-specific targets use `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly. See `skills/makefile/SKILL.md` for the full target list.
 - **PowerShell**: `;` to chain, `$env:` for vars
 - **No suppression**: fix root causes, no `@ts-ignore` / `eslint-disable` (see `skills/no-lint-disable/SKILL.md`)
 - **No console.\***: use `LOGGER` from `@legacy-sports/logging` instead of `console.log/warn/error/debug`. Exceptions: `lib/logging/` (the logger itself), `apps/cli/`, migration files, and build-time scripts (`codegen.ts`, Vite plugins).
@@ -69,6 +69,7 @@ Windows PowerShell ┬╖ Nx monorepo ┬╖ pnpm 9.12.1 ┬╖ Jira project LS 
 | **WebSocket refetch UX**        | `skills/websocket-refetch-ux/SKILL.md`    |
 | **Rebase & conflicts**          | `skills/rebase-conflicts/SKILL.md`        |
 | **Resolve merge conflicts**     | `skills/resolve-merge-conflicts/SKILL.md` |
+| **Makefile reference**          | `skills/makefile/SKILL.md`                |
 | **Worktree workflow (default)** | `skills/worktree-workflow/SKILL.md`       |
 | All skills (60 guides)          | `skills/`                                 |
 | CSV reference data              | `docs/agents/*.csv`                       |

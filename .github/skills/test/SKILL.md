@@ -19,8 +19,10 @@ Run Jest tests across affected projects in the Nx monorepo.
 ## Command
 
 ```powershell
-pnpm exec nx affected -t test
+make test
 ```
+
+> **Always prefer `make test`** — it sets the `NODE_OPTIONS` windowsHide patch on Windows. The underlying command is `pnpm exec nx affected -t test`.
 
 ## Alternative Commands
 

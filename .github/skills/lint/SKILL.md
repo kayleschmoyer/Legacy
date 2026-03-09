@@ -19,15 +19,17 @@ Run ESLint across affected projects with automatic fixing capabilities.
 ## Command
 
 ```powershell
-pnpm exec nx affected -t lint --fix
+make lint-fix
 ```
+
+> **Always prefer `make lint-fix`** — it sets the `NODE_OPTIONS` windowsHide patch on Windows. The underlying command is `pnpm exec nx affected -t lint --fix`.
 
 ## Alternative Commands
 
 ### Lint without auto-fix (dry run)
 
 ```powershell
-pnpm exec nx affected -t lint
+make lint
 ```
 
 ### Lint specific project
