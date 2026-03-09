@@ -403,7 +403,26 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:route53:::hostedzone/*"
         ]
       },
-      # API Gateway read permissions (REST API + WebSocket/HTTP API v2)
+      # Route 53 write permissions for ACM DNS validation and API Gateway custom domain
+      {
+        Effect = "Allow"
+        Action = [
+          "route53:ChangeResourceRecordSets"
+        ]
+        Resource = [
+          "arn:aws:route53:::hostedzone/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "route53:GetChange"
+        ]
+        Resource = [
+          "arn:aws:route53:::change/*"
+        ]
+      },
+      # API Gateway read permissions (REST API + WebSocket/HTTP API v2 + custom domains)
       {
         Effect = "Allow"
         Action = [
@@ -413,10 +432,12 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:apigateway:${local.region}::/restapis",
           "arn:aws:apigateway:${local.region}::/restapis/*",
           "arn:aws:apigateway:${local.region}::/apis",
-          "arn:aws:apigateway:${local.region}::/apis/*"
+          "arn:aws:apigateway:${local.region}::/apis/*",
+          "arn:aws:apigateway:${local.region}::/domainnames",
+          "arn:aws:apigateway:${local.region}::/domainnames/*"
         ]
       },
-      # API Gateway write permissions for Terraform apply (integration responses, methods, etc.)
+      # API Gateway write permissions for Terraform apply (integration responses, methods, domains, etc.)
       {
         Effect = "Allow"
         Action = [
@@ -427,7 +448,9 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:apigateway:${local.region}::/restapis/*",
-          "arn:aws:apigateway:${local.region}::/apis/*"
+          "arn:aws:apigateway:${local.region}::/apis/*",
+          "arn:aws:apigateway:${local.region}::/domainnames",
+          "arn:aws:apigateway:${local.region}::/domainnames/*"
         ]
       },
       # Lambda read permissions
@@ -508,6 +531,37 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Resource = [
           "arn:aws:cloudwatch:${local.region}:${local.account_id}:alarm:${local.name_prefix}-*"
         ]
+      },
+      # ACM permissions for API Gateway custom domain certificate
+      {
+        Effect = "Allow"
+        Action = [
+          "acm:DescribeCertificate",
+          "acm:ListTagsForCertificate",
+          "acm:GetCertificate"
+        ]
+        Resource = [
+          "arn:aws:acm:${local.region}:${local.account_id}:certificate/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "acm:RequestCertificate",
+          "acm:DeleteCertificate",
+          "acm:AddTagsToCertificate",
+          "acm:RemoveTagsFromCertificate"
+        ]
+        Resource = [
+          "arn:aws:acm:${local.region}:${local.account_id}:certificate/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "acm:ListCertificates"
+        ]
+        Resource = "*"
       }
     ]
   })
