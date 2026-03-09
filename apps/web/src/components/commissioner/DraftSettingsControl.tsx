@@ -6,6 +6,7 @@ import {
   DRAFT_MODES,
   DRAFT_ORDERS,
   ERA_FILTERS,
+  PICK_TIME_OPTIONS,
   PLAYER_POOLS,
   SELECTION_METHODS,
 } from '@legacy-sports/shared-components';
@@ -145,6 +146,7 @@ export function DraftSettingsControl({
   const [hofOnlyLocal, setHofOnlyLocal] = useState(false);
   /** ISO-8601 string (YYYY-MM-DDTHH:MM) for the datetime-local input, or '' for no schedule */
   const [scheduledAt, setScheduledAt] = useState('');
+  const [pickTimeLimitSeconds, setPickTimeLimitSeconds] = useState(120);
   const [hasChanges, setHasChanges] = useState(false);
 
   // Notify parent when dirty state changes
@@ -159,6 +161,7 @@ export function DraftSettingsControl({
       setDraftMode(String(draft.draftMode ?? 'live'));
       setSelectionMethod(String(draft.selectionMethod ?? 'standard'));
       setDraftOrder(String(draft.draftOrder ?? 'snake'));
+      setPickTimeLimitSeconds(draft.pickTimeLimitSeconds ?? 120);
       // Sync scheduledAt: convert ISO-8601 to datetime-local (UTC slice for input)
       setScheduledAt(
         draft.scheduledAt
@@ -192,6 +195,7 @@ export function DraftSettingsControl({
       ef: string,
       hof: boolean,
       sa: string,
+      ptls: number,
     ) => {
       const originalDraftMode = String(
         draftData?.getLeagueDraft?.draftMode ?? 'live',
@@ -210,6 +214,8 @@ export function DraftSettingsControl({
             .toISOString()
             .slice(0, 16)
         : '';
+      const originalPickTimeLimitSeconds =
+        draftData?.getLeagueDraft?.pickTimeLimitSeconds ?? 120;
 
       setHasChanges(
         dm !== originalDraftMode ||
@@ -218,7 +224,8 @@ export function DraftSettingsControl({
           pp !== originalPlayerPool ||
           ef !== originalEraFilter ||
           hof !== originalHofOnly ||
-          sa !== originalScheduledAt,
+          sa !== originalScheduledAt ||
+          ptls !== originalPickTimeLimitSeconds,
       );
     },
     [draftData, leaguePlayerPool, eraFilter, hofOnly],
@@ -237,6 +244,7 @@ export function DraftSettingsControl({
         eraFilterLocal,
         hofOnlyLocal,
         scheduledAt,
+        pickTimeLimitSeconds,
       );
     } else {
       checkChanges(
@@ -247,6 +255,7 @@ export function DraftSettingsControl({
         eraFilterLocal,
         hofOnlyLocal,
         scheduledAt,
+        pickTimeLimitSeconds,
       );
     }
   };
@@ -261,6 +270,7 @@ export function DraftSettingsControl({
       eraFilterLocal,
       hofOnlyLocal,
       scheduledAt,
+      pickTimeLimitSeconds,
     );
   };
 
@@ -274,6 +284,7 @@ export function DraftSettingsControl({
       eraFilterLocal,
       hofOnlyLocal,
       scheduledAt,
+      pickTimeLimitSeconds,
     );
   };
 
@@ -287,6 +298,7 @@ export function DraftSettingsControl({
       eraFilterLocal,
       hofOnlyLocal,
       scheduledAt,
+      pickTimeLimitSeconds,
     );
   };
 
@@ -300,6 +312,7 @@ export function DraftSettingsControl({
       value,
       hofOnlyLocal,
       scheduledAt,
+      pickTimeLimitSeconds,
     );
   };
 
@@ -313,6 +326,7 @@ export function DraftSettingsControl({
       eraFilterLocal,
       value,
       scheduledAt,
+      pickTimeLimitSeconds,
     );
   };
 
@@ -327,6 +341,22 @@ export function DraftSettingsControl({
       eraFilterLocal,
       hofOnlyLocal,
       value,
+      pickTimeLimitSeconds,
+    );
+  };
+
+  const handlePickTimeLimitSecondsChange = (value: string) => {
+    const seconds = parseInt(value, 10);
+    setPickTimeLimitSeconds(seconds);
+    checkChanges(
+      draftMode,
+      selectionMethod,
+      draftOrder,
+      playerPool,
+      eraFilterLocal,
+      hofOnlyLocal,
+      scheduledAt,
+      seconds,
     );
   };
 
@@ -342,6 +372,7 @@ export function DraftSettingsControl({
             playerPool,
             eraFilter: eraFilterLocal,
             hofOnly: hofOnlyLocal,
+            pickTimeLimitSeconds,
             // LS-423: send null to clear the schedule, ISO-8601 string to set it
             scheduledAt: scheduledAt
               ? new Date(scheduledAt).toISOString()
@@ -383,6 +414,9 @@ export function DraftSettingsControl({
     setSelectionMethod(originalSelectionMethod);
     setDraftOrder(originalDraftOrder);
     setPlayerPool(originalPlayerPool);
+    setPickTimeLimitSeconds(
+      draftData?.getLeagueDraft?.pickTimeLimitSeconds ?? 120,
+    );
     setEraFilterLocal(eraFilter ?? 'all');
     setHofOnlyLocal(hofOnly ?? false);
     setScheduledAt(originalScheduledAt);
@@ -475,6 +509,18 @@ export function DraftSettingsControl({
               onChange={handleDraftOrderChange}
               disabled={isDraftLocked || saving}
             />
+
+            {/* Pick Timer */}
+            {draftMode === 'live' && (
+              <OptionSelector
+                label="Seconds Per Pick"
+                description="How long each manager has to make their pick before auto-pick activates. Applies to live drafts only."
+                options={PICK_TIME_OPTIONS}
+                value={String(pickTimeLimitSeconds)}
+                onChange={handlePickTimeLimitSecondsChange}
+                disabled={isDraftLocked || saving}
+              />
+            )}
 
             {/* Player Pool */}
             <OptionSelector

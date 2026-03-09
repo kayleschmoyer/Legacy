@@ -3943,6 +3943,7 @@ export type GetLeagueDraftQuery = {
     selectionMethod?: string | null;
     draftOrder?: string | null;
     currentPick?: number | null;
+    pickTimeLimitSeconds?: number | null;
     draftStartedAt?: string | null;
     draftCompletedAt?: string | null;
     scheduledAt?: string | null;
@@ -3964,6 +3965,7 @@ export type UpdateDraftSettingsMutation = {
     draftOrder?: string | null;
     currentPick?: number | null;
     playerPool?: string | null;
+    pickTimeLimitSeconds?: number | null;
     draftStartedAt?: string | null;
     draftCompletedAt?: string | null;
     scheduledAt?: string | null;
@@ -10300,6 +10302,7 @@ export const GetLeagueDraft = gql`
       selectionMethod
       draftOrder
       currentPick
+      pickTimeLimitSeconds
       draftStartedAt
       draftCompletedAt
       scheduledAt
@@ -10399,6 +10402,7 @@ export const UpdateDraftSettings = gql`
       draftOrder
       currentPick
       playerPool
+      pickTimeLimitSeconds
       draftStartedAt
       draftCompletedAt
       scheduledAt

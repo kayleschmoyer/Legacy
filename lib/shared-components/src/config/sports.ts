@@ -107,6 +107,17 @@ export const DRAFT_ORDERS = Object.freeze([
   { label: 'Linear', value: 'linear' },
 ]);
 
+/** Seconds-per-pick options for the live draft pick timer. */
+export const PICK_TIME_OPTIONS = Object.freeze([
+  { label: '30s', value: '30' },
+  { label: '1 min', value: '60' },
+  { label: '90s', value: '90' },
+  { label: '2 min', value: '120' },
+  { label: '3 min', value: '180' },
+  { label: '5 min', value: '300' },
+  { label: '10 min', value: '600' },
+]);
+
 export const DIVISION_COUNTS = Object.freeze([
   { label: '1 Division', value: '1' },
   { label: '2 Divisions', value: '2' },
