@@ -154,12 +154,28 @@ jobs:
             fi
 
             if [ -n "$changed_files" ]; then
-              if echo "$changed_files" | grep -Eq '(^|/)package\.json$|(^|/)package-lock\.json$|^apps\/.*\.(ts|tsx|js|jsx)$|^lib\/.*\.(ts|tsx|js|jsx)$|^lambdas\/.*\.(ts|js)$|^tools\/.*\.(ts|js)$|^\.github\/workflows\/security-scanning\.yml$|^tsconfig.*\.json$|^\.npmrc$'; then
+              SECURITY_PATHS='(^|/)package\.json$|(^|/)package-lock\.json$'
+              SECURITY_PATHS="$SECURITY_PATHS|^apps\/.*\.(ts|tsx|js|jsx)$"
+              SECURITY_PATHS="$SECURITY_PATHS|^lib\/.*\.(ts|tsx|js|jsx)$"
+              SECURITY_PATHS="$SECURITY_PATHS|^lambdas\/.*\.(ts|js)$"
+              SECURITY_PATHS="$SECURITY_PATHS|^tools\/.*\.(ts|js)$"
+              SECURITY_PATHS="$SECURITY_PATHS|^\.github\/workflows\/security-scanning\.yml$"
+              SECURITY_PATHS="$SECURITY_PATHS|^tsconfig.*\.json$|^\.npmrc$"
+              if echo "$changed_files" | grep -Eq "$SECURITY_PATHS"; then
                 run_security=true
               fi
 
-              if echo "$changed_files" | grep -Eq '^apps\/app\/android\/|^apps\/app\/src\/|^package\.json$|^package-lock\.json$|^\.github\/workflows\/test-android-compatibility\.yml$' || \
-                 echo "$changed_files" | grep -E '^lib\/' | grep -Eqv '\.(spec|test)\.(ts|tsx|js|jsx)$|__tests__\/'; then
+              # Android build is only affected by: mobile app code, mobile-relevant libs,
+              # root config files that affect the RN/Expo build, and the workflow itself.
+              # Direct lib deps of apps/app (from Nx graph): env-utilities, logging,
+              # rollbar, scoring, shared-components, tamagui-config, utils, websocket-client.
+              # Also includes ui-abstractions (transitive via shared-components).
+              # Excludes backend-only libs: aws-utils, db-client, data-loaders, scheduling,
+              # bref-client, codegen, narrative, test-fixtures, sentry, analytics, api.
+              MOBILE_LIBS='^lib\/(env-utilities|logging|rollbar|scoring|shared-components|tamagui-config|ui-abstractions|utils|websocket-client)\/'
+              if echo "$changed_files" | grep -Eq \
+                '^apps\/app\/|^app\.json$|^babel\.config\.json$|^(package\.json|pnpm-lock\.yaml)$|^\.github\/workflows\/test-android-compatibility\.yml$' || \
+                 echo "$changed_files" | grep -E "$MOBILE_LIBS" | grep -Eqv '\.(spec|test)\.(ts|tsx|js|jsx)$|__tests__\/'; then
                 run_android=true
               fi
             fi
