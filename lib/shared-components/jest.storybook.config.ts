@@ -2,7 +2,7 @@ import type { Config } from 'jest';
 
 const config: Config = {
   displayName: 'shared-components-storybook',
-  testMatch: ['<rootDir>/.storybook/**/*.test.{js,ts,tsx}'],
+  testMatch: ['<rootDir>/.storybook/**/*.spec.{js,ts,tsx}'],
   setupFilesAfterEnv: ['<rootDir>/.storybook/jest-setup.ts'],
   testEnvironment: 'jsdom',
   transform: {

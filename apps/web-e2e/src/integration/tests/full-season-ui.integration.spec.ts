@@ -16,7 +16,7 @@
  *
  * Run:
  *   pnpm exec playwright test --config apps/web-e2e/playwright.integration.config.ts \
- *     src/integration/tests/full-season-ui.spec.ts
+ *     src/integration/tests/full-season-ui.integration.spec.ts
  */
 
 import { expect } from '@playwright/test';

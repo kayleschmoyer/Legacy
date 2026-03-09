@@ -2,7 +2,7 @@
  * Full-Season UI E2E Test
  *
  * Browser-based companion to the API integration test in
- * `integration/tests/full-season.spec.ts`. Drives the web UI through every
+ * `integration/tests/full-season.integration.spec.ts`. Drives the web UI through every
  * major team-manager action from league creation to season-end renewal.
  *
  * All GraphQL responses are **mocked** so no live backend is required — the

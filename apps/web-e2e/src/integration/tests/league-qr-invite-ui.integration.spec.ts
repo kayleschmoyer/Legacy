@@ -17,7 +17,7 @@
  * Run:
  *   cd D:\code\legacy-sports-worktrees\LS-592-league-qr-invite-integration-test
  *   pnpm exec playwright test --config apps/web-e2e/playwright.integration.config.ts \
- *     src/integration/tests/league-qr-invite-ui.spec.ts
+ *     src/integration/tests/league-qr-invite-ui.integration.spec.ts
  */
 
 import type { Page } from '@playwright/test';

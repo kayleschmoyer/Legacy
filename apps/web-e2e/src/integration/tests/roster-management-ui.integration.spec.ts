@@ -28,7 +28,7 @@
  *
  * Run:
  *   pnpm exec playwright test --config apps/web-e2e/playwright.integration.config.ts \
- *     src/integration/tests/roster-management-ui.spec.ts
+ *     src/integration/tests/roster-management-ui.integration.spec.ts
  */
 
 import { expect } from '@playwright/test';

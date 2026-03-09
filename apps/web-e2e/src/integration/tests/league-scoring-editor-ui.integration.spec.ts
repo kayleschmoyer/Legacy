@@ -15,7 +15,7 @@
  * Run:
  *   cd apps/web-e2e
  *   pnpm exec playwright test --config playwright.integration.config.ts \
- *     src/integration/tests/league-scoring-editor-ui.spec.ts
+ *     src/integration/tests/league-scoring-editor-ui.integration.spec.ts
  */
 
 import type { Page } from '@playwright/test';

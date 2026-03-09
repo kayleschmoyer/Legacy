@@ -26,7 +26,7 @@
  * Run:
  *   cd apps/web-e2e
  *   pnpm exec playwright test --config playwright.integration.config.ts \
- *     src/integration/tests/matchup-detail-ui.spec.ts
+ *     src/integration/tests/matchup-detail-ui.integration.spec.ts
  */
 
 import type { Page } from '@playwright/test';

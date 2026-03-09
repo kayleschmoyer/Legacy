@@ -52,13 +52,13 @@ apps/web-e2e/
 │   │   │   ├── poll.ts                 # Reusable polling helpers
 │   │   │   └── websocket.ts            # WebSocket connection + message helpers
 │   │   └── tests/
-│   │       ├── draft-flow.spec.ts               # API-only: Draft → SQS → processor
-│   │       ├── live-draft-ui.spec.ts            # UI: Multi-user live draft
-│   │       ├── full-season-ui.spec.ts           # UI: Full season workflow
-│   │       ├── commissioner-announcements-ui.spec.ts  # UI: Create→post→member sees
-│   │       ├── game-selection.spec.ts           # API-only: game select → stats load
-│   │       ├── matchup-advance.spec.ts          # API-only: matchup advancement
-│   │       └── health-check.spec.ts             # API-only: smoke checks
+│   │       ├── draft-flow.integration.spec.ts               # API-only: Draft → SQS → processor
+│   │       ├── live-draft-ui.integration.spec.ts            # UI: Multi-user live draft
+│   │       ├── full-season-ui.integration.spec.ts           # UI: Full season workflow
+│   │       ├── commissioner-announcements-ui.integration.spec.ts  # UI: Create→post→member sees
+│   │       ├── game-selection.integration.spec.ts           # API-only: game select → stats load
+│   │       ├── matchup-advance.integration.spec.ts          # API-only: matchup advancement
+│   │       └── health-check.integration.spec.ts             # API-only: smoke checks
 │   └── ...
 ├── playwright.integration.config.ts    # Separate Playwright config for integration
 ```
@@ -306,12 +306,34 @@ A feature warrants a UI integration test (in addition to its mocked E2E test) wh
 2. The feature **writes state to the DB** that must then be visible to another user
 3. The mocked E2E test cannot fully prove the flow because it uses fake GraphQL responses rather than real persistence
 
+#### UI-first rule
+
+In `*-ui.integration.spec.ts` tests, **all state-changing operations that have a corresponding UI flow must be performed through browser interactions** — not via direct API calls. This ensures the tests validate the same code paths a real user would exercise.
+
+Direct API calls (`gqlFetch`) are permitted **only** for:
+
+1. **Read-only verification** of backend persistence (e.g., polling `leagueTeams` to confirm a rename stuck)
+2. **Querying IDs or state** needed for navigation (e.g., discovering a `matchupId` to build a URL)
+3. **Polling async backend processes** that have no UI indicator (e.g., waiting for a Lambda chain to complete)
+
+```typescript
+// ❌ BAD — creating a league via API when a UI flow exists
+const result = await gqlFetch(jwt, createLeagueMutation, { input });
+state.leagueId = result.createLeague.id;
+
+// ✅ GOOD — drive the real UI
+await page.goto('/baseball/league/create');
+await page.getByPlaceholder('Enter your league name').fill(leagueName);
+await page.getByRole('button', { name: /create league/i }).click();
+await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
+```
+
 #### Structure: serial phases
 
 UI integration tests follow a **serial phase pattern**: each `test()` inside `test.describe.serial()` builds on the state from prior phases. Share state via a typed module-level object.
 
 ```typescript
-// apps/web-e2e/src/integration/tests/my-feature-ui.spec.ts
+// apps/web-e2e/src/integration/tests/my-feature-ui.integration.spec.ts
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { test } from '../fixtures/ui';
@@ -457,11 +479,11 @@ async function gqlFetch<T>(
 
 #### Real-world examples
 
-| Spec                                    | User story covered                                                                                                                          |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `commissioner-announcements-ui.spec.ts` | Create league → manager joins → commissioner posts announcement → API persistence verified → manager sees it → member has no compose button |
-| `live-draft-ui.spec.ts`                 | Create league → 3 managers join → start live draft → multi-user picks → roster verification                                                 |
-| `full-season-ui.spec.ts`                | Full season: create → draft → select games → matchups → waivers → standings                                                                 |
+| Spec                                                | User story covered                                                                                                                          |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `commissioner-announcements-ui.integration.spec.ts` | Create league → manager joins → commissioner posts announcement → API persistence verified → manager sees it → member has no compose button |
+| `live-draft-ui.integration.spec.ts`                 | Create league → 3 managers join → start live draft → multi-user picks → roster verification                                                 |
+| `full-season-ui.integration.spec.ts`                | Full season: create → draft → select games → matchups → waivers → standings                                                                 |
 
 #### What belongs in mocked E2E vs UI integration
 

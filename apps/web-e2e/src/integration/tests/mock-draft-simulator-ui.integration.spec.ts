@@ -16,7 +16,7 @@
  * Run:
  *   cd apps/web-e2e
  *   pnpm exec playwright test --config playwright.integration.config.ts \
- *     src/integration/tests/mock-draft-simulator-ui.spec.ts
+ *     src/integration/tests/mock-draft-simulator-ui.integration.spec.ts
  *
  * Timing note:
  *   The mock draft uses a 90-second pick timer.  With 4 teams and 5 rounds

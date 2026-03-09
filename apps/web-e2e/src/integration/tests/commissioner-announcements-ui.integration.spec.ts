@@ -15,7 +15,7 @@
  * Run:
  *   cd apps/web-e2e
  *   pnpm exec playwright test --config playwright.integration.config.ts \
- *     src/integration/tests/commissioner-announcements-ui.spec.ts
+ *     src/integration/tests/commissioner-announcements-ui.integration.spec.ts
  */
 
 import type { Page } from '@playwright/test';

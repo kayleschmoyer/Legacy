@@ -16,14 +16,14 @@
  *   • Search textbox (aria-label)
  *   • Watchlist buttons: aria-pressed toggle
  *
- * Pre-requisites (shared with live-draft-ui.spec.ts):
+ * Pre-requisites (shared with live-draft-ui.integration.spec.ts):
  *   - CLI auth: `./ls-cli.ps1 auth login`
  *   - At least 3 non-admin users in the database
  *
  * Run:
  *   cd apps/web-e2e
  *   pnpm exec playwright test --config playwright.integration.config.ts \
- *     src/integration/tests/draft-board-a11y-ui.spec.ts
+ *     src/integration/tests/draft-board-a11y-ui.integration.spec.ts
  */
 
 import type { Page } from '@playwright/test';
@@ -43,7 +43,7 @@ interface A11yState {
 let state: A11yState;
 
 // ---------------------------------------------------------------------------
-// Helpers (same pattern as live-draft-ui.spec.ts)
+// Helpers (same pattern as live-draft-ui.integration.spec.ts)
 // ---------------------------------------------------------------------------
 
 async function switchUser(

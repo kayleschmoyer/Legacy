@@ -12,7 +12,7 @@
  *   7. Manager verifies their roster via their own browser context
  *
  * Run:
- *   pnpm exec playwright test apps/web-e2e/src/integration/tests/live-draft-ui.spec.ts
+ *   pnpm exec playwright test apps/web-e2e/src/integration/tests/live-draft-ui.integration.spec.ts
  */
 
 import { expect } from '@playwright/test';

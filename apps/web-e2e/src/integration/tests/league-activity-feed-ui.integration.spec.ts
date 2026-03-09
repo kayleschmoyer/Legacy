@@ -20,7 +20,7 @@
  * Run:
  *   cd apps/web-e2e
  *   pnpm exec playwright test --config playwright.integration.config.ts \
- *     src/integration/tests/league-activity-feed-ui.spec.ts
+ *     src/integration/tests/league-activity-feed-ui.integration.spec.ts
  */
 
 import type { Page } from '@playwright/test';

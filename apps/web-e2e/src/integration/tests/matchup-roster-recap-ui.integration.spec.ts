@@ -25,7 +25,7 @@
  * Run:
  *   pnpm exec playwright test \
  *     --config apps/web-e2e/playwright.integration.config.ts \
- *     src/integration/tests/matchup-roster-recap-ui.spec.ts
+ *     src/integration/tests/matchup-roster-recap-ui.integration.spec.ts
  */
 
 import fs from 'fs';
