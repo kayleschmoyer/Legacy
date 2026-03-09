@@ -69,6 +69,8 @@ const StatusChip = styled(XStack, {
 
 const TeamPanel = styled(YStack, {
   flex: 1,
+  flexBasis: 0,
+  minWidth: 0,
   alignItems: 'center',
   justifyContent: 'center',
   paddingVertical: '$5',
