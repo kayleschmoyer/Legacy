@@ -50,7 +50,7 @@ const DropdownContent = styled(YStack, {
   borderRadius: '$5',
   borderWidth: 1,
   borderColor: '$borderColor',
-  padding: '$3',
+  padding: '$4',
   space: '$2',
   minWidth: 240,
   shadowColor: '$shadowColor',

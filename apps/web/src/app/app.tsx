@@ -86,13 +86,13 @@ const NavContent = styled(XStack, {
   width: '100%',
   alignSelf: 'center',
   paddingHorizontal: '$5',
-  paddingVertical: '$3',
+  paddingVertical: '$4',
   gap: '$4',
 });
 
 const NavLinks = styled(XStack, {
   alignItems: 'center',
-  gap: '$2',
+  gap: '$3',
   flex: 1,
   justifyContent: 'center',
 });
