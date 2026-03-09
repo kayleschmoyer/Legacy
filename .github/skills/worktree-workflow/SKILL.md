@@ -47,6 +47,29 @@ This ensures the branch name, PR title, and Jira transition all reference the co
 ticket. Do **not** commit epic-scoped work to a child task's branch — it misattributes the
 work and confuses traceability.
 
+## Design Rationale: One Worktree per Branch
+
+This project uses **one worktree per branch** rather than a pool of static, reusable worktrees. Here's why:
+
+**Why one-per-branch wins for async workflows:**
+
+- **Instant context switching** — Multiple tickets sit in-flight simultaneously. Switch by changing directories, not by stashing, checking out, and reinstalling.
+- **Full isolation** — No risk of stale build artifacts, cached Nx state, or leftover generated files bleeding between unrelated tickets.
+- **Stacked branches are trivial** — Each dependent branch lives in its own tree rooted on its parent. No manual branch juggling.
+- **Clean teardown** — `twig worktree clean` removes worktrees whose branches have been merged or deleted.
+
+**Why reusable static worktrees would hurt:**
+
+- Every branch swap requires a full clean: `git checkout`, potentially `pnpm install` (if the lockfile diverged), Nx cache invalidation, `.env` re-copy, and generated file rebuild — most of `make wt-setup` anyway.
+- You lose the ability to park 3-4 tickets mid-work and resume any of them instantly.
+- Leftover Nx cache from a previous branch can cause subtle build bugs that are hard to diagnose.
+
+**Disk cost is minimal:**
+
+- `make wt-setup` junctions `node_modules` to the main repo when lockfiles match, so worktrees share the ~1.8 GB `node_modules` with zero extra disk.
+- pnpm's content-addressable store deduplicates packages globally — multiple worktrees don't multiply download or storage costs.
+- The only per-worktree disk cost is the source files themselves (~50 MB), which is negligible.
+
 ## Prerequisites
 
 - Main repo is on `main` and up to date
@@ -401,6 +424,48 @@ make wt-setup WT=$wt
 cd $wt   # path from twig worktree list
 make install
 ```
+
+## Maintenance & Cleanup Cadence
+
+Worktrees accumulate over time. Periodic cleanup keeps the workspace lean and prevents confusion from stale branches.
+
+### After Every PR Merge
+
+```powershell
+cd "D:\code\legacy-sports"
+make sync-worktrees-remove TICKET=####   # remove from VS Code workspace
+twig worktree clean                     # removes worktrees with merged/deleted branches
+git branch -d "LS-####/description"     # delete the local branch
+```
+
+### Weekly Housekeeping
+
+Run this periodically (e.g., start of week) to catch any missed cleanups:
+
+```powershell
+cd "D:\code\legacy-sports"
+
+# List all active worktrees — review for any that are done
+twig worktree list
+
+# Clean up merged/deleted branch worktrees
+twig worktree clean
+
+# Prune remote-tracking branches that no longer exist
+git fetch --prune
+
+# Check disk usage of the worktrees directory
+Get-ChildItem "D:\code\legacy-sports-worktrees" -Directory |
+  ForEach-Object { $size = (Get-ChildItem $_.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB; [PSCustomObject]@{ Name = $_.Name; SizeMB = [math]::Round($size, 1) } } |
+  Sort-Object SizeMB -Descending | Format-Table -AutoSize
+```
+
+### Signs You Should Clean Up
+
+- `twig worktree list` shows worktrees for tickets that are already "Done" in Jira
+- `git branch` shows branches with no corresponding open PR
+- VS Code workspace has more than 3-4 worktrees (TypeScript performance degrades — see Step 4)
+- Disk usage on the worktrees directory exceeds expectations
 
 ## Quick Reference
 
