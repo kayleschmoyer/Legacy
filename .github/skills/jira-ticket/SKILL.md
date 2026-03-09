@@ -181,6 +181,18 @@ $r = Invoke-RestMethod `
 Write-Host "Parent: $($r.fields.parent.key)"
 ```
 
+### Add Ticket to Current Sprint
+
+```powershell
+# Find the active sprint ID for the LS board
+acli jira sprint list --board-id LS --state active
+
+# Add a ticket to the active sprint
+acli jira sprint add --sprint-id <id> --issue LS-1234
+```
+
+> **Tip:** Always add newly created tickets to the current sprint before starting work. You can add up to 50 issues at once.
+
 ### Search Tickets with JQL
 
 ```powershell
@@ -275,7 +287,7 @@ acli jira workitem transition --key LS-100 --status "Done"
 1. **Update status immediately** when state changes (start work, create PR, merge)
 2. **Add comments** when blocked or making significant changes
 3. **Assign to yourself** before starting work
-4. **Add to current sprint** for new tickets before implementation
+4. **Add to current sprint** for new tickets before implementation — use `acli jira sprint add --sprint-id <id> --issue LS-1234`
 5. **Link related tickets** when de-scoping or splitting work
 6. **Close investigation tickets** as soon as a follow-up backlog ticket is created (see [Investigation Tickets](#investigation-tickets))
 
@@ -299,7 +311,8 @@ acli jira workitem view LS-1234
 # 2. Assign to yourself (if not already)
 acli jira workitem assign --key LS-1234 --assignee @me
 
-# 3. Move to current sprint (in Jira UI)
+# 3. Add to current sprint
+acli jira sprint add --sprint-id <id> --issue LS-1234
 
 # 4. Update status to "In Progress"
 acli jira workitem transition --key LS-1234 --status "In Progress"
