@@ -134,6 +134,65 @@ Get-Process python -ErrorAction SilentlyContinue |
 ```powershell
 # Link related tickets
 acli jira workitem link create --out LS-NEW --in LS-ORIG --type Relates
+
+# Link as duplicate
+acli jira workitem link create --out LS-NEW --in LS-ORIG --type Duplicate
+```
+
+### Create Epics and Child Tickets
+
+```powershell
+# Create an epic
+acli jira workitem create --project LS --type "Epic" \
+  --summary "E2E Test Coverage: Mocked Playwright Tests"
+
+# Create a ticket with a parent epic (at creation time)
+acli jira workitem create --project LS --type "Task" \
+  --summary "Add E2E test for trade flow" \
+  --parent LS-722
+```
+
+### Set Parent Epic on Existing Tickets (REST API)
+
+The `acli` CLI does **not** support setting the `parent` field on existing tickets. Use the Jira REST API directly:
+
+```powershell
+# 1. Build auth headers from .netrc (same as attachment download)
+$netrc = Get-Content "$env:USERPROFILE\.netrc" -Raw
+if ($netrc -match 'machine atlassian\.net\s+login\s+(\S+)\s+password\s+(\S+)') {
+    $base64 = [Convert]::ToBase64String(
+        [Text.Encoding]::ASCII.GetBytes("$($Matches[1]):$($Matches[2])")
+    )
+    $headers = @{ Authorization = "Basic $base64" }
+}
+
+# 2. Set parent epic on an existing ticket
+Invoke-RestMethod `
+  -Uri "https://bkrupa.atlassian.net/rest/api/3/issue/LS-598" `
+  -Method PUT `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"fields":{"parent":{"key":"LS-722"}}}'
+
+# 3. Verify the parent was set
+$r = Invoke-RestMethod `
+  -Uri "https://bkrupa.atlassian.net/rest/api/3/issue/LS-598?fields=parent" `
+  -Headers $headers
+Write-Host "Parent: $($r.fields.parent.key)"
+```
+
+### Search Tickets with JQL
+
+```powershell
+# Search for all open tickets in an epic
+acli jira workitem search \
+  --jql "project = LS AND parent = LS-722 AND status != Done" \
+  --fields "key,summary,status" --csv
+
+# Search for test-related tickets
+acli jira workitem search \
+  --jql "project = LS AND (summary ~ 'test' OR summary ~ 'e2e') AND status != Done" \
+  --fields "key,summary,status,parent" --csv
 ```
 
 ## Expected Output
@@ -143,6 +202,12 @@ acli jira workitem link create --out LS-NEW --in LS-ORIG --type Relates
 - **Create**: New ticket key (e.g., LS-1234)
 
 ## Common Issues
+
+### Issue: `acli jira workitem create --json` creates duplicate tickets
+
+**Problem**: Using the `--json` flag on `create` sometimes creates the ticket twice (two different keys, identical content).
+
+**Solution**: Don't use `--json` on `create` commands. Parse the plain text output instead, or use `--parent` at creation time rather than editing afterward.
 
 ### Issue: acli command not found
 

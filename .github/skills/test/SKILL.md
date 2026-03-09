@@ -94,9 +94,20 @@ pnpm exec nx run-many -t test
 
 ## Test Types in Project
 
-- **Unit tests**: Individual function/component tests
-- **Integration tests**: Multiple components working together
-- **E2E tests**: Full application flows (separate command)
+- **Unit tests** (`*.spec.ts`): Individual function/component tests — fast, no external dependencies
+- **Integration tests** (`*.integration.spec.ts`): Tests with real DB setup/teardown — use this suffix for resolver tests that connect to a real database
+- **E2E tests** (Playwright): Full application flows (separate command — see [E2E Testing](../e2e-testing/SKILL.md) and [Integration Testing](../integration-testing/SKILL.md))
+
+### File Naming Convention
+
+| Test Type                           | File Pattern                            | Example                                |
+| ----------------------------------- | --------------------------------------- | -------------------------------------- |
+| Unit test                           | `*.spec.ts`                             | `scoring.spec.ts`                      |
+| Integration test (Jest + DB)        | `*.integration.spec.ts`                 | `leagues.resolver.integration.spec.ts` |
+| Mocked E2E (Playwright)             | `*.spec.ts` in `src/tests/`             | `league-overview.spec.ts`              |
+| Full-stack integration (Playwright) | `*.spec.ts` in `src/integration/tests/` | `live-draft-ui.spec.ts`                |
+
+The `*.integration.spec.ts` suffix is used for Jest resolver tests that start a real database, not for Playwright integration tests (which are separated by directory).
 
 ## Integration with Workflow
 
