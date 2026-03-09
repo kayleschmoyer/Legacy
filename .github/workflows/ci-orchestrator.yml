@@ -158,7 +158,8 @@ jobs:
                 run_security=true
               fi
 
-              if echo "$changed_files" | grep -Eq '^apps\/app\/android\/|^apps\/app\/src\/|^lib\/|^package\.json$|^package-lock\.json$|^\.github\/workflows\/test-android-compatibility\.yml$'; then
+              if echo "$changed_files" | grep -Eq '^apps\/app\/android\/|^apps\/app\/src\/|^package\.json$|^package-lock\.json$|^\.github\/workflows\/test-android-compatibility\.yml$' || \
+                 echo "$changed_files" | grep -E '^lib\/' | grep -Eqv '\.(spec|test)\.(ts|tsx|js|jsx)$|__tests__\/'; then
                 run_android=true
               fi
             fi
