@@ -70,6 +70,27 @@
         }
       }
     },
+    "integration": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --config=playwright.integration.config.ts",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "integration:ui-driven": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --config=playwright.integration.config.ts ui.integration",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "integration:ui": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --config=playwright.integration.config.ts --ui",
+        "cwd": "{projectRoot}"
+      }
+    },
     "lint": {
       "executor": "@nx/eslint:lint",
       "outputs": ["{options.outputFile}"],

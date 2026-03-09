@@ -113,7 +113,8 @@
     "terraform": true,
     "git stash": true,
     "aws": true,
-    "Rename-Item": true
+    "Rename-Item": true,
+    "poetry": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {

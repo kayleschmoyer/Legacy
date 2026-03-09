@@ -302,6 +302,12 @@ test.describe
       let pickCount = 0;
       const maxPicks = 200;
       let consecutiveMisses = 0;
+      // Track players drafted this session so we never click a button for an
+      // already-drafted player whose card is still visible due to WebSocket /
+      // Apollo update lag.  Without this guard the test can get a false
+      // wasAccepted=true (because "YOUR PICK" briefly hides during a
+      // concurrent refetch re-render) and log a duplicate pick.
+      const draftedPlayers = new Set<string>();
 
       while (pickCount < maxPicks) {
         // Check if draft is complete on any page
@@ -331,17 +337,37 @@ test.describe
             .catch(() => false);
           if (!isMyTurn) continue;
 
-          // This page is on the clock — click the first DRAFT NOW button
-          const draftBtn = page
-            .getByRole('button', { name: /Draft .* now/i })
-            .first();
-          const btnReady = await draftBtn
-            .isVisible({ timeout: 3000 })
-            .catch(() => false);
-          if (!btnReady) continue;
+          // Find the first DRAFT NOW button whose player has not yet been
+          // drafted in this session.  Stale player cards (visible but already
+          // picked by another manager) must be skipped to avoid a duplicate
+          // pick attempt that would be rejected server-side.
+          const allDraftBtns = page.getByRole('button', {
+            name: /Draft .* now/i,
+          });
+          const btnCount = await allDraftBtns.count().catch(() => 0);
+          let draftBtnIdx = -1;
+          let ariaLabel: string | null = null;
+          for (let i = 0; i < btnCount; i++) {
+            const btn = allDraftBtns.nth(i);
+            // Give the first button a full 3 s to appear; subsequent buttons
+            // are already rendered so a short timeout is fine.
+            const visible = await btn
+              .isVisible({ timeout: i === 0 ? 3000 : 200 })
+              .catch(() => false);
+            if (!visible) continue;
+            const btnLabel = await btn.getAttribute('aria-label');
+            const playerName = btnLabel
+              ?.replace(/^Draft\s+/i, '')
+              .replace(/\s+now$/i, '');
+            if (playerName && draftedPlayers.has(playerName)) continue;
+            draftBtnIdx = i;
+            ariaLabel = btnLabel;
+            break;
+          }
+          // No undrafted button found on this page — wait for UI to refresh
+          if (draftBtnIdx < 0) continue;
 
-          const ariaLabel = await draftBtn.getAttribute('aria-label');
-          await draftBtn.click({ force: true });
+          await allDraftBtns.nth(draftBtnIdx).click({ force: true });
 
           // Verify the pick was accepted by checking the turn advanced:
           // "YOUR PICK" must disappear from this page, meaning the server
@@ -370,6 +396,7 @@ test.describe
               ?.replace(/^Draft\s+/i, '')
               .replace(/\s+now$/i, '');
             if (playerName) {
+              draftedPlayers.add(playerName);
               if (label === 'Commissioner')
                 state.commissionerPicks.push(playerName);
               else if (label === 'Manager 1')
