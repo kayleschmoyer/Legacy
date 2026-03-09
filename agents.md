@@ -6,7 +6,9 @@
 
 ## 🚨 CRITICAL
 
-**NEVER commit to main** branch first: `twig worktree create LS-####/description`
+**NEVER commit to main** — create a worktree first: `twig worktree create LS-####/description`
+
+**ALWAYS drive to PR** — your work is NOT complete until `gh pr create` is run and Jira is moved to "In Review". Passing `make pc` is a checkpoint, not the finish line. Stopping after code changes or after `make pc` without opening a PR is the single most common agent failure mode.
 
 ## Workflow
 
@@ -14,6 +16,7 @@
 
 ## Rules
 
+**Drive to PR** — code → `make pc` → commit → push → `gh pr create` → Jira "In Review". Do NOT stop before PR is created.
 Nx only (`pnpm exec nx affected -t <target>`) PowerShell (`;` chains) Fix root causes Update Jira No `console.*` — use `LOGGER` from `@legacy-sports/logging` (exceptions: `lib/logging/`, `apps/cli/`, migrations, build scripts)
 
 ## Environment

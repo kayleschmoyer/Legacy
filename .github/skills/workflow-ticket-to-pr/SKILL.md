@@ -191,6 +191,10 @@ make pc
 > git push origin HEAD
 > ```
 
+> 🚨 **DO NOT STOP HERE.** Passing `make pc` is a checkpoint, not the finish line. You **must**
+> continue to Step 8 (create PR) and Step 9 (Jira "In Review"). Stopping after validation
+> without opening a PR is the single most common agent failure mode.
+
 ### Step 7c: Apply Pending Migrations 🚨
 
 If you added or modified any migration files under `lib/db-client/migrations/`, apply them now — **before** opening the PR:
@@ -398,7 +402,12 @@ git push origin HEAD
 
 ### ❌ MISTAKE 4: No PR Created
 
-All work must go through PR review, even for documentation.
+All work must go through PR review, even for documentation. **This is the #1 agent failure mode**: agents write code, run `make pc`, and stop — thinking the task is done. Your work is **not complete** until:
+
+1. `gh pr create` has been run and the PR URL is visible
+2. Jira has been moved to "In Review"
+
+If you find yourself about to end your turn after `make pc`: **STOP and keep going.**
 
 ## Branch Naming Convention
 
@@ -437,6 +446,11 @@ Before opening the PR, confirm every item:
 - [ ] If migration files were added: `pnpm run db:up` succeeded (`Applied N new migrations`)
 - [ ] PR title includes the ticket key (e.g. `LS-#### type(scope): description`)
 
+After the PR is created (work is NOT done without these):
+
+- [ ] `gh pr create` has been run and a PR URL exists
+- [ ] Jira ticket has been moved to "In Review"
+
 ## Quick Reference
 
 ```powershell
@@ -470,6 +484,9 @@ git push origin HEAD
 
 # 5. Pre-PR validation
 make pc
+
+# 🚨 DO NOT STOP HERE — make pc passing is a checkpoint, not the finish line.
+# You MUST continue to step 6 (PR) and step 7 (Jira). Stopping here is the #1 agent failure mode.
 
 # 5b. Commit any formatting changes make pc auto-fixed (REQUIRED)
 git add -A

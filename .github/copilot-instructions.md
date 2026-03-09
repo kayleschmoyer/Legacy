@@ -14,11 +14,14 @@
 7. Code: `make <target>` (e.g. `make test`, `make build`, `make typecheck`, `make lint-fix`). For project-specific targets: `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly.
 8. Commit: `git commit -m "type(scope): msg"` ΓåÆ `git push origin HEAD`
 9. Rebase onto parent: `git fetch origin ; twig rebase` ΓÇö keeps branch current with its parent (main or a stacked branch)
-10. Validate: `make pc` ΓÇö must pass before opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.10b. **Migrations**: if any migration files were added, run `pnpm run db:up` from `lib/db-client` and confirm `Applied N new migrations`. (See `skills/db-migration-write/SKILL.md`)11. Ship: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` ΓåÆ Jira "In Review" (see `skills/create-pr/SKILL.md`)
-11. Cleanup: `twig worktree clean` ΓåÆ `git branch -d LS-####/description` ΓåÆ Jira "Done"
+10. Validate: `make pc` ΓÇö must pass before opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
+11. **Migrations**: if any migration files were added, run `pnpm run db:up` from `lib/db-client` and confirm `Applied N new migrations`. (See `skills/db-migration-write/SKILL.md`)
+12. **Ship (REQUIRED ΓÇö do NOT stop before this step)**: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` ΓåÆ Jira "In Review" (see `skills/create-pr/SKILL.md`)
+13. Cleanup: `twig worktree clean` ΓåÆ `git branch -d LS-####/description` ΓåÆ Jira "Done"
 
 ## Rules
 
+- **Drive to PR**: your work is **NOT complete** until a PR is created and Jira is moved to "In Review". Passing `make pc` is a checkpoint, not the finish line. After validation passes, you **must** continue to: commit ΓåÆ push ΓåÆ `gh pr create` ΓåÆ Jira "In Review". Stopping after code changes or after `make pc` without opening a PR is the single most common agent failure mode.
 - **Worktree-first**: always create a worktree for ticket work ΓÇö never edit code in the main repo (`D:\code\legacy-sports`). After creating the worktree, all file edits and terminal commands must use the worktree path.
 - **Make first**: prefer `make <target>` over raw `pnpm exec nx` — it sets `NODE_OPTIONS` for the Windows windowsHide patch and is cross-platform safe. For project-specific targets use `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly. See `skills/makefile/SKILL.md` for the full target list.
 - **PowerShell**: `;` to chain, `$env:` for vars

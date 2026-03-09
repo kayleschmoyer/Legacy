@@ -294,6 +294,10 @@ Run the full validation suite before opening the PR. Fix any failures and push a
 make pc
 ```
 
+> 🚨 **DO NOT STOP HERE.** Passing `make pc` is a checkpoint, not the finish line. You **must**
+> continue to Step 8 (create PR) and Step 9 (Jira "In Review"). Stopping after validation
+> without opening a PR is the single most common agent failure mode.
+
 ### Step 7b: Apply Pending Migrations 🚨
 
 If you added or modified any migration files under `lib/db-client/migrations/`, apply them now:
@@ -497,6 +501,9 @@ git add . ; git commit -m "feat(scope): description (LS-####)" ; git push -u ori
 
 # 6. Pre-PR validation
 make pc
+
+# 🚨 DO NOT STOP HERE — make pc passing is a checkpoint, not the finish line.
+# You MUST continue to step 7 (PR + Jira). Stopping here is the #1 agent failure mode.
 
 # 6b. Apply pending migrations (if any migration files were added)
 cd lib/db-client ; pnpm run db:up   # confirm "Applied N new migrations"
