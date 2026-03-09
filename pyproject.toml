@@ -1,0 +1,11 @@
+[project]
+name = "legacy-sports-scripts"
+version = "0.1.0"
+description = "Python scripts and agent utilities for the Legacy Sports monorepo"
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4>=4.12",
+]
+
+[tool.poetry]
+package-mode = false

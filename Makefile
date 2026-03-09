@@ -29,7 +29,7 @@ ifeq ($(OS),Windows_NT)
 	KILL_NODE := taskkill /f /im node.exe $(NULL_REDIRECT) || echo No node processes
 	KILL_ESBUILD := taskkill /f /im esbuild.exe $(NULL_REDIRECT) || echo No esbuild processes
 	KILL_VSCODE := taskkill /f /im Code.exe $(NULL_REDIRECT) || echo VS Code not running
-	CHECK_POETRY := where poetry $(NULL_REDIRECT) && poetry install --sync || echo Poetry not found, skipping
+	CHECK_POETRY := where poetry $(NULL_REDIRECT) && poetry sync || echo Poetry not found, skipping
 	PATH_SEP := \\
 	WORKSPACE_PATH_WIN := $(subst /,\,$(WORKSPACE_PATH))
 	KILL_WORKSPACE_PROCS := powershell -NoProfile -Command "$$workspace = '$(WORKSPACE_PATH_WIN)'; $$escaped = [regex]::Escape($$workspace); $$currentPid = $$PID; $$currentProc = Get-CimInstance Win32_Process -Filter \"ProcessId = $$currentPid\"; $$parentPid = if ($$currentProc) { $$currentProc.ParentProcessId } else { $null }; $$procs = Get-CimInstance Win32_Process | Where-Object { $$_.CommandLine -and $$_.CommandLine -match $$escaped -and $$_.ProcessId -ne $$currentPid -and $$_.ProcessId -ne $$parentPid }; if ($$procs) { $$procs | ForEach-Object { Write-Host ('Stopping {0} ({1})' -f $$_.Name, $$_.ProcessId); Stop-Process -Id $$_.ProcessId -Force } } else { Write-Host 'No workspace processes running'; }"
@@ -42,7 +42,7 @@ else
 	KILL_NODE := pkill -f node $(NULL_REDIRECT) || echo No node processes
 	KILL_ESBUILD := pkill -f esbuild $(NULL_REDIRECT) || echo No esbuild processes
 	KILL_VSCODE := pkill -f code $(NULL_REDIRECT) || echo VS Code not running
-	CHECK_POETRY := command -v poetry $(NULL_REDIRECT) && poetry install --sync || echo Poetry not found, skipping
+	CHECK_POETRY := command -v poetry $(NULL_REDIRECT) && poetry sync || echo Poetry not found, skipping
 	PATH_SEP := /
 	KILL_WORKSPACE_PROCS := workspace='$(WORKSPACE_PATH)'; pids=$$(pgrep -f "$$workspace" || true); if [ -n "$$pids" ]; then echo "Stopping workspace processes: $$pids"; kill $$pids || true; else echo "No workspace processes running"; fi
 endif
@@ -123,7 +123,7 @@ install-node: ## Install only Node.js dependencies
 
 install-python: ## Install only Python dependencies
 	@$(call echo_blue,Installing Python dependencies...)
-	poetry install --sync
+	poetry sync
 
 setup: install ## Alias for install
 
