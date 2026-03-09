@@ -9,7 +9,10 @@ export default defineConfig({
   testDir: './src/integration/tests',
   timeout: 120_000,
   retries: 1,
-  workers: 1,
+  // Run up to 3 spec files in parallel (each file runs its phases sequentially,
+  // enforced by fullyParallel:false below). Each file creates its own isolated
+  // league, so there are no DB collisions between workers.
+  workers: 3,
   fullyParallel: false,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
