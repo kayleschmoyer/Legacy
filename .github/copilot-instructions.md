@@ -6,7 +6,10 @@
 
 1. Ticket: create if needed: `acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json` ΓåÆ note `$key`
 2. **Jira "In Progress" immediately**: `acli jira workitem transition --key LS-#### --status "In Progress"` ΓÇö do this as soon as you begin working, before any other steps.
-3. **Dependency check**: inspect the Jira ticket for linked issues or descriptions referencing another in-progress ticket. If a dependency exists, the worktree must branch from that parent ΓÇö not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).
+3. **Dependency check**: inspect the Jira ticket for "blocked-by" linked issues. Query their status before proceeding:
+   - **Blocker is not In Review or Done → STOP.** Do not proceed with the ticket. Inform the user that the blocking ticket must reach at least "In Review" before work can begin.
+   - **Blocker is In Review → use its branch as the parent.** The worktree must branch from that ticket's branch, not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).
+   - **Blocker is Done (or no blockers) → base off `origin/main`.**
 4. Worktree: `twig worktree create $key/description` ΓåÆ `twig worktree list` (note path)
 5. Setup worktree: `make wt-setup WT=$wt` (or manually: `cd $wt` ΓåÆ `make install` ΓåÆ copy `.env` ΓåÆ junction `.twig`)
    5b. **Agent multi-root access** (optional): `make sync-worktrees` ΓåÆ `code legacy-sports.code-workspace` ΓÇö gives agents search access across all worktrees in one window.

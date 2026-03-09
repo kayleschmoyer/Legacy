@@ -126,9 +126,12 @@ code $wt   # open in a new VS Code window; do all work there
 > twig switch LS-1234 -p=current
 > ```
 
-> **⚠️ DEPENDENCY CHECK**: Before branching, check the Jira ticket for linked issues
-> or descriptions that indicate a dependency on another in-progress ticket.
-> Always verify with `twig tree` that the new branch appears under the right parent.
+> **⚠️ DEPENDENCY CHECK**: Before branching, check the Jira ticket for "blocked-by" linked issues and query their status:
+>
+> - **Blocker not In Review or Done → 🛑 STOP.** Do not proceed — the blocking ticket must reach at least "In Review" first.
+> - **Blocker In Review → branch from the blocker's branch** (use the dependent path above).
+> - **Blocker Done (or no blockers) → branch from `origin/main`** (use the independent path).
+>   Always verify with `twig tree` that the new branch appears under the right parent.
 
 ### Step 5: Make Your Changes
 

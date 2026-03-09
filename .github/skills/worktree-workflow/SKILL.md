@@ -89,14 +89,23 @@ This project uses **one worktree per branch** rather than a pool of static, reus
 
 ### Step 0: Check for Parent Dependencies
 
-Before creating the worktree, **inspect the Jira ticket** for linked issues or descriptions that reference another in-progress (unmerged) ticket. This determines which branch the worktree should be based on:
+Before creating the worktree, **inspect the Jira ticket** for "blocked-by" linked issues. Query the status of each blocker to decide how to proceed:
 
-| Situation                                    | Parent               | How                              |
-| -------------------------------------------- | -------------------- | -------------------------------- |
-| Independent ticket (no dependency)           | `main`               | Use the default path in Step 1   |
-| Depends on an unmerged ticket (e.g. LS-XXXX) | That ticket's branch | Use the dependent path in Step 1 |
+```powershell
+# List linked issues for the ticket
+acli jira workitem link list --key LS-####
+# Then check the status of any "blocked-by" ticket
+acli jira workitem view --key LS-XXXX --fields status
+```
+
+| Blocker status               | Action                                                                                                                                   |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Not In Review / not Done** | **🛑 STOP — do not proceed.** Inform the user that the blocking ticket must reach at least "In Review" before this ticket can be worked. |
+| **In Review**                | Use the blocker's branch as the parent (dependent path in Step 1).                                                                       |
+| **Done** (or no blockers)    | Base off `origin/main` (default path in Step 1).                                                                                         |
 
 > **⚠️ Getting this wrong creates sibling branches that will conflict when both merge to main.** Always check before proceeding.
+> **⚠️ Working on a ticket whose blocker is still in progress wastes effort** — the blocker's changes may invalidate your work.
 
 ### Step 1: Create the Branch + Worktree
 
