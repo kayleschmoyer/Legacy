@@ -404,102 +404,173 @@ export function LeagueStandings({
         </Text>
       </XStack>
 
-      {/* Table Header */}
-      <XStack
-        paddingHorizontal="$4"
-        paddingVertical="$2"
-        borderBottomWidth={1}
-        borderBottomColor="$outlineSubtle"
-      >
-        <Text
-          width={44}
-          fontSize="$1"
-          color="$textMuted"
-          fontWeight="700"
-          textTransform="uppercase"
-          letterSpacing={0.6}
+      {/* Table Header - only when no divisions; divisions render their own headers */}
+      {!divisionGroups && (
+        <XStack
+          paddingHorizontal="$4"
+          paddingVertical="$2"
+          borderBottomWidth={1}
+          borderBottomColor="$outlineSubtle"
         >
-          #
-        </Text>
-        <Text
-          flex={2}
-          fontSize="$1"
-          color="$textMuted"
-          fontWeight="700"
-          textTransform="uppercase"
-          letterSpacing={0.6}
-        >
-          Team
-        </Text>
-        <Text
-          width={60}
-          fontSize="$1"
-          color="$textMuted"
-          fontWeight="700"
-          textTransform="uppercase"
-          letterSpacing={0.6}
-          textAlign="center"
-          display="none"
-          $gtSm={{ display: 'flex' }}
-        >
-          {waiverType === 'faab' ? 'FAAB' : 'Waiver'}
-        </Text>
-        <Text
-          width={80}
-          fontSize="$1"
-          color="$textMuted"
-          fontWeight="700"
-          textTransform="uppercase"
-          letterSpacing={0.6}
-          textAlign="center"
-        >
-          Record
-        </Text>
-        <Text
-          width={70}
-          fontSize="$1"
-          color="$textMuted"
-          fontWeight="700"
-          textTransform="uppercase"
-          letterSpacing={0.6}
-          textAlign="right"
-        >
-          Points
-        </Text>
-      </XStack>
+          <Text
+            width={44}
+            fontSize="$1"
+            color="$textMuted"
+            fontWeight="700"
+            textTransform="uppercase"
+            letterSpacing={0.6}
+          >
+            #
+          </Text>
+          <Text
+            flex={2}
+            fontSize="$1"
+            color="$textMuted"
+            fontWeight="700"
+            textTransform="uppercase"
+            letterSpacing={0.6}
+          >
+            Team
+          </Text>
+          <Text
+            width={60}
+            fontSize="$1"
+            color="$textMuted"
+            fontWeight="700"
+            textTransform="uppercase"
+            letterSpacing={0.6}
+            textAlign="center"
+            display="none"
+            $gtSm={{ display: 'flex' }}
+          >
+            {waiverType === 'faab' ? 'FAAB' : 'Waiver'}
+          </Text>
+          <Text
+            width={80}
+            fontSize="$1"
+            color="$textMuted"
+            fontWeight="700"
+            textTransform="uppercase"
+            letterSpacing={0.6}
+            textAlign="center"
+          >
+            Record
+          </Text>
+          <Text
+            width={70}
+            fontSize="$1"
+            color="$textMuted"
+            fontWeight="700"
+            textTransform="uppercase"
+            letterSpacing={0.6}
+            textAlign="right"
+          >
+            Points
+          </Text>
+        </XStack>
+      )}
 
       {/* Team Rows */}
       {divisionGroups ? (
-        divisionGroups.map(([divId, divTeams], groupIdx) => (
-          <YStack key={divId} role="list">
-            {/* Division Header */}
-            <XStack
-              paddingHorizontal="$4"
-              paddingVertical="$2"
-              backgroundColor={withAlpha(SURFACE_SUBTLE, 0.8)}
-              borderTopWidth={groupIdx > 0 ? 1 : 0}
-              borderTopColor="$outlineSubtle"
-              borderBottomWidth={1}
-              borderBottomColor="$outlineSubtle"
+        <XStack alignItems="flex-start" overflow="hidden">
+          {divisionGroups.map(([divId, divTeams], groupIdx) => (
+            <YStack
+              key={divId}
+              flex={1}
+              role="list"
+              borderRightWidth={groupIdx < divisionGroups.length - 1 ? 1 : 0}
+              borderRightColor="$outlineSubtle"
             >
-              <Text
-                fontSize="$2"
-                fontWeight="800"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.8}
+              {/* Division Header */}
+              <XStack
+                paddingHorizontal="$4"
+                paddingVertical="$2"
+                backgroundColor={withAlpha(SURFACE_SUBTLE, 0.8)}
+                borderBottomWidth={1}
+                borderBottomColor="$outlineSubtle"
               >
-                Division {divId}
-              </Text>
-              <Text fontSize="$2" color="$textMuted" marginLeft="$2">
-                ({divTeams.length} {divTeams.length === 1 ? 'team' : 'teams'})
-              </Text>
-            </XStack>
-            {divTeams.map((team, index) =>
-              renderTeamRow(team, index, divTeams.length),
-            )}
-          </YStack>
-        ))
+                <Text
+                  fontSize="$2"
+                  fontWeight="800"
+                  color="$textMuted"
+                  textTransform="uppercase"
+                  letterSpacing={0.8}
+                >
+                  Division {divId}
+                </Text>
+                <Text fontSize="$2" color="$textMuted" marginLeft="$2">
+                  ({divTeams.length} {divTeams.length === 1 ? 'team' : 'teams'})
+                </Text>
+              </XStack>
+              {/* Per-division column header */}
+              <XStack
+                paddingHorizontal="$4"
+                paddingVertical="$2"
+                borderBottomWidth={1}
+                borderBottomColor="$outlineSubtle"
+              >
+                <Text
+                  width={44}
+                  fontSize="$1"
+                  color="$textMuted"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  letterSpacing={0.6}
+                >
+                  #
+                </Text>
+                <Text
+                  flex={2}
+                  fontSize="$1"
+                  color="$textMuted"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  letterSpacing={0.6}
+                >
+                  Team
+                </Text>
+                <Text
+                  width={60}
+                  fontSize="$1"
+                  color="$textMuted"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  letterSpacing={0.6}
+                  textAlign="center"
+                  display="none"
+                  $gtSm={{ display: 'flex' }}
+                >
+                  {waiverType === 'faab' ? 'FAAB' : 'Waiver'}
+                </Text>
+                <Text
+                  width={80}
+                  fontSize="$1"
+                  color="$textMuted"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  letterSpacing={0.6}
+                  textAlign="center"
+                >
+                  Record
+                </Text>
+                <Text
+                  width={70}
+                  fontSize="$1"
+                  color="$textMuted"
+                  fontWeight="700"
+                  textTransform="uppercase"
+                  letterSpacing={0.6}
+                  textAlign="right"
+                >
+                  Points
+                </Text>
+              </XStack>
+              {divTeams.map((team, index) =>
+                renderTeamRow(team, index, divTeams.length),
+              )}
+            </YStack>
+          ))}
+        </XStack>
       ) : (
         <YStack role="list">
           {rankedTeams.map((team, index) =>
