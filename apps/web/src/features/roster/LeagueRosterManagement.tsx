@@ -460,9 +460,36 @@ function RosterRow({
 
       {/* Player Name & Eligibility */}
       <YStack flex={1} minWidth={0} gap="$1">
-        <Text fontSize="$3" fontWeight="700" color="$color12" numberOfLines={1}>
-          {hasPlayer ? getPlayerName(assignedPlayer) : positionLabel}
-        </Text>
+        {hasPlayer && assignedPlayer && onViewDetails ? (
+          <Text
+            fontSize="$3"
+            fontWeight="700"
+            color="$color12"
+            numberOfLines={1}
+            cursor="pointer"
+            hoverStyle={{
+              color: BRAND_NAVY_LIGHT,
+              textDecorationLine: 'underline',
+            }}
+            animation="quick"
+            onPress={(e: { stopPropagation: () => void }) => {
+              e.stopPropagation();
+              onViewDetails(assignedPlayer);
+            }}
+            aria-label={`View ${getPlayerName(assignedPlayer)} details`}
+          >
+            {getPlayerName(assignedPlayer)}
+          </Text>
+        ) : (
+          <Text
+            fontSize="$3"
+            fontWeight="700"
+            color="$color12"
+            numberOfLines={1}
+          >
+            {hasPlayer ? getPlayerName(assignedPlayer) : positionLabel}
+          </Text>
+        )}
         {hasPlayer && eligible.length > 0 && (
           <XStack gap="$1" flexWrap="wrap">
             {eligible.map((pos) => (
@@ -797,9 +824,36 @@ function BenchPlayerCard({
     >
       {/* Player info */}
       <YStack flex={1} minWidth={0} gap="$0.5">
-        <Text fontSize="$3" fontWeight="600" color="$color12" numberOfLines={1}>
-          {getPlayerName(player)}
-        </Text>
+        {onViewDetails ? (
+          <Text
+            fontSize="$3"
+            fontWeight="600"
+            color="$color12"
+            numberOfLines={1}
+            cursor="pointer"
+            hoverStyle={{
+              color: BRAND_NAVY_LIGHT,
+              textDecorationLine: 'underline',
+            }}
+            animation="quick"
+            onPress={(e: { stopPropagation: () => void }) => {
+              e.stopPropagation();
+              onViewDetails(player);
+            }}
+            aria-label={`View ${getPlayerName(player)} details`}
+          >
+            {getPlayerName(player)}
+          </Text>
+        ) : (
+          <Text
+            fontSize="$3"
+            fontWeight="600"
+            color="$color12"
+            numberOfLines={1}
+          >
+            {getPlayerName(player)}
+          </Text>
+        )}
         {eligible.length > 0 && (
           <XStack gap="$1" flexWrap="wrap">
             {eligible.map((pos) => (
