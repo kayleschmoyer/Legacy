@@ -28,6 +28,8 @@ interface DraftState {
   inviteCode: string;
   leagueName: string;
   teams: string[];
+  commissionerPicks: string[];
+  manager1Picks: string[];
 }
 
 let state: DraftState;
@@ -74,6 +76,8 @@ test.describe
       inviteCode: '',
       leagueName: '',
       teams: [],
+      commissionerPicks: [],
+      manager1Picks: [],
     };
   });
 
@@ -339,16 +343,19 @@ test.describe
           const ariaLabel = await draftBtn.getAttribute('aria-label');
           await draftBtn.click({ force: true });
 
-          // Verify the pick was accepted: the specific player's button
-          // should be removed from the DOM once they're drafted.
-          // If the server rejected it (stale turn), the button stays.
-          const wasAccepted = ariaLabel
-            ? await page
-                .getByRole('button', { name: ariaLabel, exact: true })
-                .waitFor({ state: 'hidden', timeout: 5000 })
-                .then(() => true)
-                .catch(() => false)
-            : true;
+          // Verify the pick was accepted by checking the turn advanced:
+          // "YOUR PICK" must disappear from this page, meaning the server
+          // confirmed the pick and moved to the next drafter.
+          //
+          // Do NOT check whether the player button disappears — it can
+          // vanish due to an incoming WebSocket update about another
+          // manager's pick (false positive), causing duplicate-pick logs.
+          const wasAccepted = await page
+            .getByText('YOUR PICK')
+            .first()
+            .waitFor({ state: 'hidden', timeout: 8000 })
+            .then(() => true)
+            .catch(() => false);
 
           if (wasAccepted) {
             pickCount++;
@@ -357,6 +364,17 @@ test.describe
             console.log(
               `[live-draft] Pick #${pickCount} by ${label} — ${ariaLabel}`,
             );
+            // Record player name for post-draft roster assertions.
+            // ariaLabel format: "Draft Bill Lange now"
+            const playerName = ariaLabel
+              ?.replace(/^Draft\s+/i, '')
+              .replace(/\s+now$/i, '');
+            if (playerName) {
+              if (label === 'Commissioner')
+                state.commissionerPicks.push(playerName);
+              else if (label === 'Manager 1')
+                state.manager1Picks.push(playerName);
+            }
           }
 
           pickerFound = true;
@@ -462,6 +480,17 @@ test.describe
       expect(benchMatch).toBeTruthy();
       expect(parseInt(benchMatch![1], 10)).toBeGreaterThan(0);
     });
+
+    await test.step('Verify commissioner-drafted players appear on roster', async () => {
+      // Confirm each player the commissioner drafted is actually listed on
+      // their roster page, proving the pick was persisted server-side.
+      expect(state.commissionerPicks.length).toBeGreaterThan(0);
+      for (const playerName of state.commissionerPicks) {
+        await expect(
+          page.getByText(playerName, { exact: false }).first(),
+        ).toBeVisible({ timeout: 10000 });
+      }
+    });
   });
 
   // -----------------------------------------------------------------
@@ -492,6 +521,17 @@ test.describe
       const benchMatch = benchText?.match(/Bench\s*(\d+)/);
       expect(benchMatch).toBeTruthy();
       expect(parseInt(benchMatch![1], 10)).toBeGreaterThan(0);
+    });
+
+    await test.step('Verify manager 1-drafted players appear on roster', async () => {
+      // Confirm each player Manager 1 drafted is actually listed on their
+      // roster page, proving the pick was persisted server-side.
+      expect(state.manager1Picks.length).toBeGreaterThan(0);
+      for (const playerName of state.manager1Picks) {
+        await expect(
+          managerPage1.getByText(playerName, { exact: false }).first(),
+        ).toBeVisible({ timeout: 10000 });
+      }
     });
   });
 });
