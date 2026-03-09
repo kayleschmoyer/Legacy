@@ -259,13 +259,20 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 break;
               }
 
+              // Matchup settings used by both candidate selection and detailed scoring
+              const gamesPerMatchup = leaguePre.gamesPerMatchup ?? 5;
+              const spStartsPerMatchup = leaguePre.spStartsPerMatchup ?? 1;
+
               // 1. Fetch the top 1000 undrafted candidates pre-sorted by projected
-              //    fantasy points per game (FPG). Limiting the candidate pool here
-              //    avoids passing 23 k+ player IDs as array parameters to the
-              //    eligibility filters and the scoring query, which previously
-              //    caused ~10 s per pick and Lambda timeouts.
-              //    1000 candidates gives ample coverage for all roster positions
-              //    while reducing downstream query cost by ~23×.
+              //    fantasy points per matchup. Batting/fielding are scaled by
+              //    gamesPerMatchup; pitching by spStartsPerMatchup so that
+              //    position players and pitchers are ranked by their actual
+              //    expected matchup contribution.
+              //    Limiting the candidate pool here avoids passing 23 k+ player
+              //    IDs as array parameters to the eligibility filters and the
+              //    scoring query, which previously caused ~10 s per pick and
+              //    Lambda timeouts. 1000 candidates gives ample coverage for all
+              //    roster positions while reducing downstream query cost by ~23×.
               const undraftedRows = await context.db.execute(
                 sql`SELECT p.id,
                     (
@@ -275,7 +282,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                          COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
                          COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
                          COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
-                        ) / cb.g
+                        ) / cb.g * ${gamesPerMatchup}
                       ELSE 0 END
                       +
                       CASE WHEN COALESCE(cp.g, 0) > 0 THEN
@@ -283,11 +290,11 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                          COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
                          COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
                          COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
-                        ) / cp.g
+                        ) / cp.g * ${spStartsPerMatchup}
                       ELSE 0 END
                       +
                       CASE WHEN COALESCE(cf.g, 0) > 0 THEN
-                        COALESCE(cf.e_def,0) * -1.0 / cf.g
+                        COALESCE(cf.e_def,0) * -1.0 / cf.g * ${gamesPerMatchup}
                       ELSE 0 END
                     ) AS fpg
                   FROM players p
@@ -338,8 +345,6 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               //   Fielding: E=-1
               // Projected matchup pts = career ppg × games per matchup (hitters)
               //                         career ppg × SP starts per matchup (pitchers)
-              const gamesPerMatchup = leaguePre.gamesPerMatchup ?? 5;
-              const spStartsPerMatchup = leaguePre.spStartsPerMatchup ?? 1;
               const statsRows = await context.db.execute(
                 sql`SELECT
                   p.id AS player_id,
@@ -415,6 +420,72 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 if (!playerDraftInfo.has(id)) {
                   rankedEligibleIds.push(id);
                   playerDraftInfo.set(id, { fpg: 0, positions: [] });
+                }
+              }
+
+              // ─── Pre-compute bench versatility (Phase 1) ────────────────────────────
+              // A single SQL query counts how many of the league's roster slots
+              // each eligible player could start in (slots_coverable) by joining
+              // player_eligible_positions against league_positions through the
+              // position-mapping rules.  Combined with the already-computed
+              // per-matchup FPG to rank bench candidates before the lock.
+              const benchVersatilityRows = await context.db.execute(
+                sql`WITH position_mapping(slot_type, stat_pos) AS (
+                  VALUES
+                    ('1B'::text, '1B'::text),
+                    ('2B', '2B'), ('3B', '3B'), ('C', 'C'),
+                    ('CF', 'CF'), ('LF', 'LF'), ('RF', 'RF'), ('SS', 'SS'),
+                    ('SP', 'SP'), ('SP', 'P'), ('RP', 'RP'), ('RP', 'P'),
+                    ('OF', 'LF'), ('OF', 'RF'), ('OF', 'CF'),
+                    ('IF', '1B'), ('IF', '2B'), ('IF', '3B'), ('IF', 'SS'),
+                    ('DH', '1B'), ('DH', '2B'), ('DH', '3B'), ('DH', 'SS'),
+                    ('DH', 'LF'), ('DH', 'RF'), ('DH', 'CF'), ('DH', 'C'), ('DH', 'DH'),
+                    ('XDH', 'DH')
+                )
+                SELECT
+                  pep.player_id,
+                  COUNT(DISTINCT lp.id)::int AS slots_coverable,
+                  (SELECT COUNT(*)::int FROM league_positions
+                   WHERE league_id = ${draftLeagueId}) AS total_slots
+                FROM league_positions lp
+                JOIN position_mapping pm ON pm.slot_type = lp.position_type::text
+                JOIN player_eligible_positions pep ON pep.position = pm.stat_pos
+                WHERE lp.league_id = ${draftLeagueId}
+                  AND pep.player_id = ANY(${sql.param(eligibleIds)}::integer[])
+                GROUP BY pep.player_id`,
+              );
+
+              // Combine DB-computed slot counts with in-memory FPG to rank bench picks
+              const slotsCoverableMap = new Map<number, number>();
+              let benchTotalSlots = 0;
+              for (const row of benchVersatilityRows.rows) {
+                slotsCoverableMap.set(
+                  row.player_id as number,
+                  Number(row.slots_coverable),
+                );
+                benchTotalSlots = Number(row.total_slots);
+              }
+
+              let bestBenchPick:
+                | {
+                    playerId: number;
+                    fpg: number;
+                    slotsCoverable: number;
+                    totalSlots: number;
+                  }
+                | undefined;
+              let bestBenchScore = -Infinity;
+              for (const [id, info] of playerDraftInfo) {
+                const slotsCoverable = slotsCoverableMap.get(id) ?? 0;
+                const benchScore = info.fpg * (1 + 0.15 * slotsCoverable);
+                if (benchScore > bestBenchScore) {
+                  bestBenchScore = benchScore;
+                  bestBenchPick = {
+                    playerId: id,
+                    fpg: info.fpg,
+                    slotsCoverable,
+                    totalSlots: benchTotalSlots,
+                  };
                 }
               }
 
@@ -624,19 +695,18 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     },
                   );
                 } else if (autoPlayerId === undefined) {
-                  // No unfilled positions — pick the highest-FPG player (bench).
-                  // rankedEligibleIds is pre-sorted by projected_fpg DESC.
-                  const topId = rankedEligibleIds[0];
-                  if (topId !== undefined) {
-                    autoPlayerId = topId;
-                    const fpg = playerDraftInfo.get(topId)?.fpg ?? 0;
-                    autoPickReason = `Best available (bench) — ${fpg.toFixed(1)} projected matchup pts`;
+                  // No unfilled starting positions — use the pre-computed bench
+                  // pick (slot-coverage scored at the DB level in Phase 1).
+                  if (bestBenchPick) {
+                    autoPlayerId = bestBenchPick.playerId;
+                    autoPickReason = `Best available (bench) — ${bestBenchPick.fpg.toFixed(1)} projected matchup pts, starts in ${bestBenchPick.slotsCoverable}/${bestBenchPick.totalSlots} slots`;
                     LOGGER.info(
-                      '[autoProcessDraftPicks] Auto-pick for bench (all positions filled)',
+                      '[autoProcessDraftPicks] Auto-pick for bench (versatility + matchup pts)',
                       {
                         draftId,
                         playerId: autoPlayerId,
-                        projectedFpg: fpg.toFixed(2),
+                        reason: autoPickReason,
+                        totalSlots: bestBenchPick.totalSlots,
                       },
                     );
                   }
