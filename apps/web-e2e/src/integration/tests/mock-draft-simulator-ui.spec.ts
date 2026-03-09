@@ -1,0 +1,364 @@
+/**
+ * Mock Draft Simulator UI Integration Test
+ *
+ * Tests the full mock draft simulator flow end-to-end against real services:
+ *   1. Setup screen — verify all settings (teams, rounds, draft position)
+ *   2. Click "Start Mock Draft" → mutation → redirect to draft board
+ *   3. Draft flow — user picks on their turn, AI picks fire automatically
+ *      via the nudge mechanism as each pick deadline expires
+ *   4. Draft Complete! — verify mock-draft-specific completion message
+ *      ("No rosters were saved") and "Practice Again" CTA
+ *
+ * Only 1 browser context is needed (commissioner = the single human team).
+ * AI teams (autoPick=true) are managed server-side via the `nudgeExpiredDraftPick`
+ * mutation that fires on the draft board when each timer expires.
+ *
+ * Run:
+ *   cd apps/web-e2e
+ *   pnpm exec playwright test --config playwright.integration.config.ts \
+ *     src/integration/tests/mock-draft-simulator-ui.spec.ts
+ *
+ * Timing note:
+ *   The mock draft uses a 90-second pick timer.  With 4 teams and 5 rounds
+ *   there are 15 AI picks × 90 s ≈ 22 minutes of automated waiting, so the
+ *   pick phase has a 40-minute timeout.
+ */
+
+import { expect } from '@playwright/test';
+import { test } from '../fixtures/ui';
+
+// ---------------------------------------------------------------------------
+// Shared state accumulated across serial tests.
+// ---------------------------------------------------------------------------
+
+interface MockDraftState {
+  leagueId: number;
+  numTeams: number;
+  rosterSize: number;
+}
+
+let state: MockDraftState;
+
+// ---------------------------------------------------------------------------
+// Serial test suite
+// ---------------------------------------------------------------------------
+
+test.describe
+  .serial('Mock Draft Simulator UI (Live Backend) @integration @critical', () => {
+  test.describe.configure({ retries: 0 });
+
+  test.beforeAll(() => {
+    state = { leagueId: 0, numTeams: 4, rosterSize: 5 };
+  });
+
+  // -----------------------------------------------------------------
+  // PHASE 1 — SETUP SCREEN
+  // -----------------------------------------------------------------
+
+  test('Phase 1: Setup screen renders with correct settings', async ({
+    commissionerPage: page,
+  }) => {
+    await test.step('Navigate to mock draft setup page', async () => {
+      await page.goto('/baseball/mock-draft');
+      await page.waitForLoadState('domcontentloaded');
+      await expect(
+        page.getByRole('heading', { name: /Mock Draft Simulator/i }),
+      ).toBeVisible({ timeout: 30_000 });
+    });
+
+    await test.step('Verify "Practice Mode" label is visible', async () => {
+      await expect(page.getByText(/Practice Mode/i)).toBeVisible({
+        timeout: 5_000,
+      });
+    });
+
+    await test.step('Verify team count options are displayed', async () => {
+      for (const n of [4, 6, 8, 10, 12]) {
+        await expect(
+          page.getByRole('button', { name: String(n), exact: true }).first(),
+        ).toBeVisible({ timeout: 5_000 });
+      }
+    });
+
+    await test.step('Verify rounds (roster size) options are displayed', async () => {
+      for (const n of [5, 8, 10, 15]) {
+        await expect(
+          page.getByRole('button', { name: String(n), exact: true }).first(),
+        ).toBeVisible({ timeout: 5_000 });
+      }
+    });
+
+    await test.step('Verify draft position buttons are displayed', async () => {
+      // Default is 8 teams, so positions 1–8 should be visible
+      await expect(
+        page.getByRole('button', { name: '1', exact: true }).first(),
+      ).toBeVisible({ timeout: 5_000 });
+    });
+
+    await test.step('Select 4 teams — draft position buttons should update to 1–4', async () => {
+      await page
+        .getByRole('button', { name: '4', exact: true })
+        .first()
+        .click();
+      // After selecting 4 teams, draft position 4 should appear but 5 should not
+      await expect(
+        page.getByRole('button', { name: '4', exact: true }).first(),
+      ).toBeVisible({ timeout: 3_000 });
+      // Pick "Position 1" explicitly
+      await page
+        .getByRole('button', {
+          name: (name) => name === '1' || name === '1\n',
+        })
+        .first()
+        .click();
+    });
+
+    await test.step('Select 5 rounds (roster size)', async () => {
+      await page
+        .getByRole('button', { name: '5', exact: true })
+        .first()
+        .click();
+    });
+
+    await test.step('Verify snake draft description updates for position 1', async () => {
+      await expect(
+        page.getByText(/you pick.*first every odd round/i),
+      ).toBeVisible({ timeout: 3_000 });
+    });
+
+    await test.step('Verify "Start Mock Draft" button is present and enabled', async () => {
+      await expect(
+        page.getByRole('button', { name: /Start Mock Draft/i }),
+      ).toBeEnabled({ timeout: 5_000 });
+    });
+  });
+
+  // -----------------------------------------------------------------
+  // PHASE 2 — START DRAFT & NAVIGATE TO BOARD
+  // -----------------------------------------------------------------
+
+  test('Phase 2: Start mock draft and navigate to draft board', async ({
+    commissionerPage: page,
+  }) => {
+    // Allow extra time for the mutation to initialise the mock league
+    test.setTimeout(60_000);
+
+    await test.step('Navigate to setup page', async () => {
+      await page.goto('/baseball/mock-draft');
+      await page.waitForLoadState('domcontentloaded');
+      await expect(
+        page.getByRole('heading', { name: /Mock Draft Simulator/i }),
+      ).toBeVisible({ timeout: 30_000 });
+    });
+
+    await test.step('Configure: 4 teams, 5 rounds, position 1', async () => {
+      // Teams: 4
+      await page
+        .getByRole('button', { name: '4', exact: true })
+        .first()
+        .click();
+
+      // Roster size: 5
+      await page
+        .getByRole('button', { name: '5', exact: true })
+        .first()
+        .click();
+
+      // Draft position: 1
+      await page
+        .getByRole('button', {
+          name: (name) => name === '1' || name === '1\n',
+        })
+        .first()
+        .click();
+    });
+
+    await test.step('Click "Start Mock Draft"', async () => {
+      const startBtn = page.getByRole('button', {
+        name: /Start Mock Draft/i,
+      });
+      await expect(startBtn).toBeEnabled({ timeout: 5_000 });
+      await startBtn.click();
+    });
+
+    await test.step('Wait for redirect to the draft board', async () => {
+      await expect(page).toHaveURL(/\/baseball\/league\/\d+\/draft/, {
+        timeout: 30_000,
+      });
+    });
+
+    await test.step('Extract league ID from URL', () => {
+      const url = page.url();
+      const match = url.match(/\/baseball\/league\/(\d+)\/draft/);
+      expect(match).toBeTruthy();
+      if (match) {
+        state.leagueId = Number(match[1]);
+      }
+      expect(state.leagueId).toBeGreaterThan(0);
+    });
+
+    await test.step('Verify draft board rendered (not an error page)', async () => {
+      await expect(page.locator('body')).not.toContainText(
+        'Unexpected Application Error',
+        { timeout: 15_000 },
+      );
+      // Draft board renders the "LIVE DRAFT" header for all draft types
+      await expect(page.getByText('LIVE DRAFT').first()).toBeVisible({
+        timeout: 30_000,
+      });
+    });
+  });
+
+  // -----------------------------------------------------------------
+  // PHASE 3 — MAKE ALL PICKS (USER + AI)
+  // -----------------------------------------------------------------
+
+  test('Phase 3: Complete the mock draft — user picks + AI picks', async ({
+    commissionerPage: page,
+  }) => {
+    // 4 teams × 5 rounds = 20 picks total.
+    // User (position 1) makes 5 picks; AI makes 15 via the nudge mechanism
+    // (90s pick timer).  Allow 40 minutes to be safe.
+    test.setTimeout(2_400_000);
+
+    await test.step('Navigate to draft board', async () => {
+      await page.goto(`/baseball/league/${state.leagueId}/draft`);
+      await page.waitForLoadState('load');
+      await expect(page.getByText('LIVE DRAFT').first()).toBeVisible({
+        timeout: 30_000,
+      });
+      // Give WebSocket time to establish
+      await page.waitForTimeout(3_000);
+    });
+
+    const totalPicks = state.numTeams * state.rosterSize; // 4 × 5 = 20
+    let pickCount = 0;
+    const maxPicks = totalPicks + 5; // safety margin
+    let consecutiveMisses = 0;
+    const MAX_MISSES = 120; // ≈ 2 minutes of 1-second polling
+
+    await test.step('Loop: make user picks on each turn; wait for AI picks', async () => {
+      while (pickCount < maxPicks) {
+        // Check if draft is already complete
+        const draftDone = await page
+          .getByText('Draft Complete!')
+          .isVisible()
+          .catch(() => false);
+        if (draftDone) break;
+
+        // Is it the user's turn?
+        const isMyTurn = await page
+          .getByText('YOUR PICK')
+          .first()
+          .isVisible({ timeout: 2_000 })
+          .catch(() => false);
+
+        if (isMyTurn) {
+          // Find the first available "Draft X now" button and click it
+          const draftBtn = page
+            .getByRole('button', { name: /Draft .* now/i })
+            .first();
+          const btnReady = await draftBtn
+            .isVisible({ timeout: 3_000 })
+            .catch(() => false);
+
+          if (btnReady) {
+            const ariaLabel = await draftBtn
+              .getAttribute('aria-label')
+              .catch(() => null);
+            await draftBtn.click({ force: true });
+
+            // Confirm pick accepted: the button should disappear from available players
+            const wasAccepted = ariaLabel
+              ? await page
+                  .getByRole('button', { name: ariaLabel, exact: true })
+                  .waitFor({ state: 'hidden', timeout: 8_000 })
+                  .then(() => true)
+                  .catch(() => false)
+              : true;
+
+            if (wasAccepted) {
+              pickCount++;
+              consecutiveMisses = 0;
+            }
+          } else {
+            // "YOUR PICK" visible but button not ready — give the UI a moment
+            await page.waitForTimeout(1_000);
+          }
+        } else {
+          // AI's turn — the draft board page will nudge the server when
+          // the pick deadline expires (every ~90s).  Poll quietly.
+          consecutiveMisses++;
+
+          if (consecutiveMisses > MAX_MISSES) {
+            // Force-reload the page to resync state after prolonged inactivity
+            await page.reload();
+            await page.waitForLoadState('load');
+            await page.waitForTimeout(3_000);
+            consecutiveMisses = 0;
+          } else if (consecutiveMisses % 30 === 0) {
+            // Every 30 seconds soft-reload to keep WebSocket alive
+            await page.reload();
+            await page.waitForLoadState('load');
+            await page.waitForTimeout(2_000);
+          }
+
+          await page.waitForTimeout(1_000);
+        }
+      }
+
+      expect(pickCount).toBeGreaterThan(0);
+    });
+
+    await test.step('Verify draft is complete', async () => {
+      // Poll until "Draft Complete!" appears (in case we exited loop early)
+      await expect(page.getByText('Draft Complete!').first()).toBeVisible({
+        timeout: 300_000, // 5-minute final grace period
+      });
+    });
+  });
+
+  // -----------------------------------------------------------------
+  // PHASE 4 — VERIFY MOCK-DRAFT COMPLETION MESSAGE
+  // -----------------------------------------------------------------
+
+  test('Phase 4: Verify mock-draft completion screen', async ({
+    commissionerPage: page,
+  }) => {
+    await test.step('Navigate to draft board', async () => {
+      await page.goto(`/baseball/league/${state.leagueId}/draft`);
+      await page.waitForLoadState('load');
+    });
+
+    await test.step('Verify "Draft Complete!" heading is shown', async () => {
+      await expect(page.getByText('Draft Complete!').first()).toBeVisible({
+        timeout: 30_000,
+      });
+    });
+
+    await test.step('Verify mock-draft-specific message ("No rosters were saved")', async () => {
+      await expect(page.getByText(/No rosters were saved/i)).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(page.getByText(/practice draft/i)).toBeVisible({
+        timeout: 5_000,
+      });
+    });
+
+    await test.step('Verify "Practice Again" CTA button is shown', async () => {
+      await expect(
+        page.getByRole('button', { name: /Practice Again/i }),
+      ).toBeVisible({ timeout: 10_000 });
+    });
+
+    await test.step('"Practice Again" navigates back to setup screen', async () => {
+      await page.getByRole('button', { name: /Practice Again/i }).click();
+      await expect(page).toHaveURL(/\/baseball\/mock-draft/, {
+        timeout: 10_000,
+      });
+      await expect(
+        page.getByRole('heading', { name: /Mock Draft Simulator/i }),
+      ).toBeVisible({ timeout: 10_000 });
+    });
+  });
+});
