@@ -20,6 +20,7 @@ import { handleVerify } from './handlers/Verify';
 import { handleRefreshJwt } from './handlers/RefreshJwt';
 import {
   handleDeviceAuthorize,
+  handleDeviceCompleteLocal,
   handleDeviceToken,
   handleDeviceVerify,
 } from './handlers/DeviceFlow';
@@ -172,6 +173,7 @@ const baseOAuthHandler = async (
               '/oauth/device/authorize (CLI device flow)',
               '/oauth/device/token (CLI device flow)',
               '/oauth/device/verify (CLI device flow)',
+              '/oauth/device/complete-local (CLI device flow with local auth)',
             ],
             security:
               'New users are automatically created on first OAuth login with default access level',
@@ -274,6 +276,14 @@ const baseOAuthHandler = async (
       case '/dev/oauth/device/verify':
         if (event.httpMethod === 'GET') {
           const result = await handleDeviceVerify(event);
+          return addCorsHeaders(result);
+        }
+        break;
+
+      case '/oauth/device/complete-local':
+      case '/dev/oauth/device/complete-local':
+        if (event.httpMethod === 'POST') {
+          const result = await handleDeviceCompleteLocal(event);
           return addCorsHeaders(result);
         }
         break;

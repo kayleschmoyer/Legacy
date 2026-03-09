@@ -8,8 +8,12 @@ import {
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb';
 import { LOGGER } from '@legacy-sports/logging';
+import { getUserByEmail } from '@legacy-sports/db-client';
 import crypto from 'crypto';
 import { parseEventBody } from '../util/lambda';
+import { testPassword } from '../Users';
+import { createJwt } from '../util/jwt';
+import { withDbClient } from '../util/db';
 
 interface User {
   id: number;
@@ -39,6 +43,12 @@ interface DeviceAuthRequest {
 
 interface DeviceTokenRequest {
   device_code: string;
+}
+
+interface DeviceCompleteLocalRequest {
+  user_code: string;
+  email: string;
+  password: string;
 }
 
 export interface TokenResponse {
@@ -74,7 +84,7 @@ const inMemoryFlows = new Map<string, DeviceAuthFlow>();
 const inMemoryUserCodeIndex = new Map<string, string>(); // userCode → deviceCode
 
 // Clean up expired in-memory flows periodically (dev only)
-setInterval(
+export const cleanupIntervalHandle = setInterval(
   () => {
     const now = Date.now();
     for (const [deviceCode, flow] of inMemoryFlows.entries()) {
@@ -497,6 +507,149 @@ export const completeDeviceFlow = async (
 };
 
 /**
+ * Complete device flow using local email/password credentials.
+ * Allows test users (or any user with a password hash) to authenticate
+ * via the device flow without requiring Google OAuth.
+ */
+export const handleDeviceCompleteLocal = async (
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> => {
+  LOGGER.info('Device flow local auth completion requested');
+
+  try {
+    const body = parseEventBody<DeviceCompleteLocalRequest>(event);
+    const { user_code, email, password } = body;
+
+    if (!user_code || !email || !password) {
+      return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: 'invalid_request',
+          message: 'user_code, email, and password are required',
+        }),
+      };
+    }
+
+    const deviceCode = await resolveDeviceCodeFromUserCode(
+      user_code.toUpperCase(),
+    );
+    if (!deviceCode) {
+      return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: 'invalid_code',
+          message: 'Invalid or expired user code',
+        }),
+      };
+    }
+
+    const flow = await getFlow(deviceCode);
+    if (!flow || Date.now() > flow.expiresAt) {
+      return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: 'expired_token',
+          message: 'Device code has expired',
+        }),
+      };
+    }
+
+    // Authenticate with local credentials
+    return await withDbClient(async (db) => {
+      const user = await getUserByEmail(db, email);
+
+      if (!user?.passwordHash) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: 'invalid_credentials',
+            message: 'Invalid email or password',
+          }),
+        };
+      }
+
+      const isCorrect = await testPassword(password, user.passwordHash);
+      if (!isCorrect) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: 'invalid_credentials',
+            message: 'Invalid email or password',
+          }),
+        };
+      }
+
+      const internalJwt = await createJwt(user);
+
+      const tokenResponse: TokenResponse = {
+        jwt: internalJwt,
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username || user.email,
+          accessLevel: user.accessLevel || 'none',
+        },
+      };
+
+      await completeDeviceFlow(deviceCode, tokenResponse);
+
+      LOGGER.info(`Device flow completed via local auth (user ID: ${user.id})`);
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'text/html' },
+        body: getDeviceSuccessHtml(user.email),
+      };
+    });
+  } catch (error) {
+    LOGGER.error(
+      'Device flow local auth error:',
+      error instanceof Error ? error.message : String(error),
+    );
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        error: 'server_error',
+        message: 'Local authentication failed',
+      }),
+    };
+  }
+};
+
+/**
+ * Generate HTML for the device flow success page
+ */
+function getDeviceSuccessHtml(email: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authentication Successful</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; background-color: #f5f5f5; }
+        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .success { color: #16a34a; font-size: 24px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success">&#x2705; Authentication Successful!</div>
+        <p>You can now close this browser window and return to your CLI.</p>
+        <p>Authenticated as: <strong>${email}</strong></p>
+    </div>
+</body>
+</html>
+  `;
+}
+
+/**
  * Get base URL from API Gateway event
  */
 function getBaseUrl(event: APIGatewayEvent): string {
@@ -605,6 +758,29 @@ function getVerificationHtml(error?: string): string {
             After clicking Continue, you'll be redirected to complete<br>
             the OAuth authentication with your Google account.
         </div>
+
+        <hr style="margin: 24px 0; border: none; border-top: 1px solid #ddd;">
+
+        <div class="instructions"><strong>Or log in with a local account:</strong></div>
+
+        <form method="post" action="/oauth/device/complete-local" id="localForm" style="margin-top: 10px;">
+            <input type="hidden" name="user_code" id="localUserCode" />
+            <input
+                type="email"
+                name="email"
+                placeholder="Email"
+                style="padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 4px; width: 200px; margin: 4px;"
+                required
+            /><br>
+            <input
+                type="password"
+                name="password"
+                placeholder="Password"
+                style="padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 4px; width: 200px; margin: 4px;"
+                required
+            /><br>
+            <button type="submit" style="background-color: #059669;">Log In Locally</button>
+        </form>
     </div>
     
     <script>
@@ -612,6 +788,63 @@ function getVerificationHtml(error?: string): string {
         const input = document.querySelector('input[name="user_code"]');
         input.addEventListener('input', function(e) {
             e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        });
+
+        // Sync user_code to the local login form and submit as JSON
+        const localForm = document.getElementById('localForm');
+        const codeInput = document.querySelector('input[name="user_code"]');
+        const localCodeInput = document.getElementById('localUserCode');
+
+        // Keep hidden input synced
+        if (codeInput) {
+            codeInput.addEventListener('input', function() {
+                localCodeInput.value = codeInput.value;
+            });
+            // Also read from URL on page load
+            const params = new URLSearchParams(window.location.search);
+            const codeFromUrl = params.get('user_code');
+            if (codeFromUrl) {
+                localCodeInput.value = codeFromUrl.toUpperCase();
+                codeInput.value = codeFromUrl.toUpperCase();
+            }
+        }
+
+        localForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(localForm);
+            try {
+                const response = await fetch('/oauth/device/complete-local', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_code: formData.get('user_code'),
+                        email: formData.get('email'),
+                        password: formData.get('password'),
+                    }),
+                });
+                if (response.ok) {
+                    const html = await response.text();
+                    document.open();
+                    document.write(html);
+                    document.close();
+                } else {
+                    const data = await response.json();
+                    const errDiv = document.querySelector('.error');
+                    if (errDiv) {
+                        errDiv.textContent = data.message || 'Login failed';
+                    } else {
+                        const div = document.createElement('div');
+                        div.className = 'error';
+                        div.textContent = data.message || 'Login failed';
+                        localForm.insertBefore(div, localForm.firstChild);
+                    }
+                }
+            } catch (err) {
+                const div = document.createElement('div');
+                div.className = 'error';
+                div.textContent = 'Network error. Please try again.';
+                localForm.insertBefore(div, localForm.firstChild);
+            }
         });
     </script>
 </body>
