@@ -31,9 +31,15 @@ class WebRollbarImplementation implements RollbarInterface {
         //   navigation or component unmount (LS-502). This is expected browser
         //   behaviour, not a bug.
         // - ResizeObserver loop: a benign browser warning, not an app error.
+        // - "Failed to fetch": transient network errors caused by connectivity
+        //   drops, browser extension interference, or tab backgrounding (LS-900).
+        //   Apollo RetryLink already retries these; logging them is noise.
         checkIgnore: (_isUncaught: boolean, args: unknown[]) => {
           const err = args[0];
           if (err instanceof Error && err.name === 'AbortError') {
+            return true;
+          }
+          if (err instanceof Error && err.message === 'Failed to fetch') {
             return true;
           }
           if (typeof err === 'string' && err.includes('ResizeObserver loop')) {

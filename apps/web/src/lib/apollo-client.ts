@@ -8,6 +8,7 @@ import {
   ServerError,
 } from '@apollo/client';
 import { ErrorLink } from '@apollo/client/link/error';
+import { RetryLink } from '@apollo/client/link/retry';
 import { setContext } from '@apollo/client/link/context';
 import type { ApolloLink } from '@apollo/client/link';
 import { LOGGER } from '@legacy-sports/logging';
@@ -95,6 +96,23 @@ function dispatchApolloError(message: string): void {
   );
 }
 
+// ─── Retry link for transient network errors (LS-900) ──────────────────────
+
+const retryLink = new RetryLink({
+  delay: { initial: 300, max: 5000, jitter: true },
+  attempts: {
+    max: 3,
+    retryIf: (error: unknown) => {
+      // Only retry network-level failures (e.g. "Failed to fetch"), not
+      // HTTP responses (4xx/5xx) which have a statusCode.
+      if (error instanceof Error && !('statusCode' in error)) {
+        return true;
+      }
+      return false;
+    },
+  },
+});
+
 // ─── Error link with token-refresh + retry ─────────────────────────────────
 
 const errorLink = new ErrorLink(({ error, operation, forward }) => {
@@ -120,7 +138,17 @@ const errorLink = new ErrorLink(({ error, operation, forward }) => {
         `Server error (${error.statusCode.toString()}): please try again`,
       );
     } else if (error instanceof Error) {
-      dispatchApolloError(error.message);
+      // Transient network errors (e.g. "Failed to fetch") surface a
+      // user-friendly message instead of the raw TypeError text.
+      const isNetworkError =
+        error.message === 'Failed to fetch' ||
+        error.message === 'NetworkError when attempting to fetch resource.' ||
+        error.message === 'Network request failed';
+      dispatchApolloError(
+        isNetworkError
+          ? 'Network error — please check your connection and try again'
+          : error.message,
+      );
     } else {
       dispatchApolloError('An unexpected error occurred');
     }
@@ -151,7 +179,7 @@ const errorLink = new ErrorLink(({ error, operation, forward }) => {
 });
 
 export const apolloClient = new ApolloClient({
-  link: from([errorLink, authLink, httpLink]),
+  link: from([retryLink, errorLink, authLink, httpLink]),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: {
