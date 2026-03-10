@@ -27,6 +27,15 @@ interface ExtendedAPIGatewayEvent extends APIGatewayEvent {
 const REFRESH_TOKEN_COOKIE = 'GOOGLE_REFRESH_TOKEN';
 const GOOGLE_JWT_COOKIE = 'GOOGLE_JWT';
 
+function htmlEscape(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 interface GoogleAuthSettings {
   clientId: string;
   clientSecret: string;
@@ -142,7 +151,7 @@ export const handleGoogleCallback = async (
 <head><title>Authentication Failed</title></head>
 <body>
     <h1>Authentication Failed</h1>
-    <p>OAuth error: ${error}</p>
+    <p>OAuth error: ${htmlEscape(error)}</p>
     <p>Please close this window and try again in your CLI.</p>
 </body>
 </html>
