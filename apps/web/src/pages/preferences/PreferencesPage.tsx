@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   H1,
   Paragraph,
@@ -13,7 +13,6 @@ import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
-  BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
 import { useThemeContext } from '../../context/ThemeContext';
@@ -149,7 +148,7 @@ const ToggleTrack = styled(YStack, {
   animation: 'quick',
   variants: {
     active: {
-      true: { backgroundColor: BRAND_NAVY_LIGHT },
+      true: { backgroundColor: '$blue9' },
       false: { backgroundColor: '$color4' },
     },
   } as const,
@@ -191,8 +190,8 @@ const OptionChip = styled(YStack, {
   variants: {
     selected: {
       true: {
-        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.25),
-        borderColor: BRAND_NAVY_LIGHT,
+        backgroundColor: '$accentMuted',
+        borderColor: '$brandNavyLight',
       },
       false: {
         backgroundColor: '$color2',
@@ -211,19 +210,40 @@ const SaveBanner = styled(XStack, {
   padding: '$3',
   borderRadius: '$5',
   borderWidth: 1,
-  borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.4),
-  backgroundColor: withAlpha(BRAND_NAVY, 0.15),
+  borderColor: '$successMuted',
+  backgroundColor: '$successMuted',
 });
 
-/* ─── Background style ─── */
+/* ─── Background style helpers ─── */
 
-const pageBackgroundStyle: React.CSSProperties = {
-  background: `
-    radial-gradient(ellipse at 15% 0%, ${withAlpha(BRAND_NAVY, 0.16)} 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 5%, ${withAlpha(BRAND_GOLD, 0.06)} 0%, transparent 45%)
-  `,
-  backgroundAttachment: 'fixed',
-};
+function getPageBackgroundStyle(isDark: boolean): React.CSSProperties {
+  return {
+    background: isDark
+      ? `
+          radial-gradient(ellipse at 15% 0%, ${withAlpha(BRAND_NAVY, 0.16)} 0%, transparent 50%),
+          radial-gradient(ellipse at 85% 5%, ${withAlpha(BRAND_GOLD, 0.06)} 0%, transparent 45%)
+        `
+      : `
+          radial-gradient(ellipse at 15% 0%, ${withAlpha(BRAND_NAVY, 0.06)} 0%, transparent 50%),
+          radial-gradient(ellipse at 85% 5%, ${withAlpha(BRAND_GOLD, 0.04)} 0%, transparent 45%)
+        `,
+    backgroundAttachment: 'fixed',
+  };
+}
+
+function getCardStyle(isDark: boolean, navyAlpha = 0.25): React.CSSProperties {
+  return isDark
+    ? {
+        background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, navyAlpha)} 100%)`,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      }
+    : {
+        background: `linear-gradient(135deg, ${withAlpha('#FFFFFF', 0.9)} 0%, ${withAlpha(BRAND_NAVY, 0.04)} 100%)`,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      };
+}
 
 /* ─── Sub-components ─── */
 
@@ -284,9 +304,7 @@ function ChipGroup<T extends string>({
           <Paragraph
             size="$3"
             fontWeight="500"
-            style={{
-              color: value === opt.value ? BRAND_GOLD_LIGHT : undefined,
-            }}
+            color={value === opt.value ? '$brandGoldLight' : '$color'}
           >
             {opt.label}
           </Paragraph>
@@ -299,7 +317,15 @@ function ChipGroup<T extends string>({
 /* ─── Main Component ─── */
 
 const PreferencesPage: React.FC = () => {
-  const { themePreference, setThemePreference } = useThemeContext();
+  const { themePreference, resolvedTheme, setThemePreference } =
+    useThemeContext();
+  const isDark = resolvedTheme === 'dark';
+  const pageBackgroundStyle = useMemo(
+    () => getPageBackgroundStyle(isDark),
+    [isDark],
+  );
+  const cardStyle = useMemo(() => getCardStyle(isDark), [isDark]);
+  const cardStyleAlt = useMemo(() => getCardStyle(isDark, 0.2), [isDark]);
   const [prefs, setPrefs] = useState<UserPreferences>(() => ({
     ...loadPrefs(),
     // theme is owned by ThemeContext; sync local mirror from context
@@ -346,7 +372,7 @@ const PreferencesPage: React.FC = () => {
               style={{
                 fontSize: 32,
                 fontWeight: '700',
-                color: BRAND_GOLD_LIGHT,
+                color: isDark ? BRAND_GOLD_LIGHT : BRAND_NAVY,
                 letterSpacing: -0.5,
               }}
             >
@@ -373,13 +399,7 @@ const PreferencesPage: React.FC = () => {
           )}
 
           {/* ── Appearance ── */}
-          <SectionCard
-            style={{
-              background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.25)} 100%)`,
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-            }}
-          >
+          <SectionCard style={cardStyle}>
             <SectionHeader>
               <SectionIconBox>
                 <Paragraph fontSize={16} lineHeight={18}>
@@ -432,13 +452,7 @@ const PreferencesPage: React.FC = () => {
           </SectionCard>
 
           {/* ── Sports & Stats ── */}
-          <SectionCard
-            style={{
-              background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.2)} 100%)`,
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-            }}
-          >
+          <SectionCard style={cardStyleAlt}>
             <SectionHeader>
               <SectionIconBox>
                 <Paragraph fontSize={16} lineHeight={18}>
