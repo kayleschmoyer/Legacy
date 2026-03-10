@@ -626,17 +626,25 @@ export class WaiverClaimProcessor {
       leagueId: claim.leagueId,
     });
 
-    // Refresh team settings for remaining claims in this batch
-    const updatedTeams = await db
-      .select({
-        id: PublicSchema.teams.id,
-        waiverOrder: PublicSchema.teams.waiverOrder,
-        faabBudget: PublicSchema.teams.faabBudget,
-      })
-      .from(PublicSchema.teams)
-      .where(eq(PublicSchema.teams.leagueId, claim.leagueId));
-    for (const ut of updatedTeams) {
-      teamSettingsMap.set(ut.id, ut);
+    // Optimistically update in-memory map instead of re-fetching all teams
+    for (const [id, settings] of teamSettingsMap) {
+      if (
+        id !== claim.teamId &&
+        settings.waiverOrder != null &&
+        settings.waiverOrder > winnerOrder
+      ) {
+        teamSettingsMap.set(id, {
+          ...settings,
+          waiverOrder: settings.waiverOrder - 1,
+        });
+      }
+    }
+    const winnerSettings = teamSettingsMap.get(claim.teamId);
+    if (winnerSettings) {
+      teamSettingsMap.set(claim.teamId, {
+        ...winnerSettings,
+        waiverOrder: lastOrder,
+      });
     }
   }
 
