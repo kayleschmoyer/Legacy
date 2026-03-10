@@ -13,6 +13,13 @@ const DEFAULT_SENSITIVE_KEYS = [
   'secret',
   'jwt',
   'session',
+  // PII fields
+  'email',
+  'phone',
+  'address',
+  'ssn',
+  'name',
+  'ip',
 ];
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
