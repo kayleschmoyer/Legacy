@@ -6,6 +6,7 @@
 import Rollbar from 'rollbar';
 import { LOGGER } from '@legacy-sports/logging';
 import { RollbarBreadcrumb, RollbarConfig, RollbarInterface } from './types';
+import { RollbarOutputDestination } from './RollbarOutputDestination';
 import { sanitizeSentryContext } from './sanitize-context';
 
 /** Maximum number of breadcrumbs retained in memory. Oldest entries are dropped when the buffer is full. */
@@ -14,6 +15,7 @@ const MAX_BREADCRUMBS = 100;
 class WebRollbarImplementation implements RollbarInterface {
   private rollbar: Rollbar | null = null;
   private breadcrumbs: RollbarBreadcrumb[] = [];
+  private rollbarDestination: RollbarOutputDestination | null = null;
 
   init(config: RollbarConfig): void {
     try {
@@ -56,6 +58,15 @@ class WebRollbarImplementation implements RollbarInterface {
         accessToken: config.accessToken ? 'SET' : 'NOT_SET',
         release: config.release ?? 'NOT_SET',
       });
+
+      // Route all LOGGER.error / LOGGER.fatal calls to Rollbar automatically.
+      if (this.rollbarDestination) {
+        LOGGER.removeDestination(this.rollbarDestination);
+      }
+      this.rollbarDestination = new RollbarOutputDestination(
+        this.captureError.bind(this),
+      );
+      LOGGER.addDestination(this.rollbarDestination);
     } catch (error) {
       LOGGER.error(
         'Failed to initialize Rollbar',
