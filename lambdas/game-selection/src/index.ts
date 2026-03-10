@@ -18,6 +18,7 @@ import { createNotificationService } from '@legacy-sports/aws-utils';
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 import {
   getMissingMatchupRecords,
+  getSelectedGamesCount,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import type { PublicDb } from '@legacy-sports/db-client';
@@ -293,21 +294,7 @@ async function selectGameForMatchup(
   }
 
   // 5. Calculate how many games have been selected so far
-  const totalGamesSelected = await db
-    .select({
-      count: sql<number>`count(distinct ${PublicSchema.matchupPlayerGames.gameNum})`,
-    })
-    .from(PublicSchema.matchupPlayerGames)
-    .innerJoin(
-      PublicSchema.matchupPlayers,
-      eq(
-        PublicSchema.matchupPlayers.id,
-        PublicSchema.matchupPlayerGames.matchupPlayerId,
-      ),
-    )
-    .where(eq(PublicSchema.matchupPlayers.matchupId, matchupId));
-
-  const gamesSelected = Number(totalGamesSelected[0]?.count || 0);
+  const gamesSelected = await getSelectedGamesCount(db, matchupId);
   const gamesRemaining = gamesPerMatchup - gamesSelected;
 
   LOGGER.info(

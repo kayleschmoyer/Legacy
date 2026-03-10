@@ -10,12 +10,13 @@
 import {
   createBadgeService,
   type GenericDatabase,
+  getSelectedGamesCountBatch,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import { builder, type Context } from '../builder';
 import { PlayoffService } from '../../services/playoff-service';
@@ -134,32 +135,8 @@ export async function assertAuthorized(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Get the count of distinct game_num values already selected for a matchup.
- */
-async function getSelectedGamesCount(
-  db: Db,
-  matchupId: number,
-): Promise<number> {
-  const rows = await db
-    .select({
-      count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
-    })
-    .from(PublicSchema.matchupPlayerGames)
-    .innerJoin(
-      PublicSchema.matchupPlayers,
-      eq(
-        PublicSchema.matchupPlayerGames.matchupPlayerId,
-        PublicSchema.matchupPlayers.id,
-      ),
-    )
-    .where(eq(PublicSchema.matchupPlayers.matchupId, matchupId));
-
-  // The pg driver returns COUNT(*) results as strings over the wire.
-  // Coerce to a JS number so callers use arithmetic (not string concat).
-  return Number(rows[0]?.count ?? 0);
-}
+// getSelectedGamesCountBatch is imported from
+// @legacy-sports/db-client (matchup-queries-optimized).
 
 // ── Mutation: autoSelectGames ────────────────────────────────────────────────
 // Triggered nightly at midnight EST by EventBridge.
@@ -265,18 +242,13 @@ builder.mutationField('autoSelectGames', (t) =>
           );
         }
 
-        // 3. Batch selectedGamesCount for all reference matchups in parallel
+        // 3. Batch selectedGamesCount for all reference matchups in one query
         const referenceMatchupIds = activeLeagueIds
           .map((id) => matchupsByLeague.get(id)?.[0]?.id)
           .filter((id): id is number => id !== undefined);
-        const selectedCountEntries = await Promise.all(
-          referenceMatchupIds.map(
-            async (id) =>
-              [id, await getSelectedGamesCount(context.db, id)] as const,
-          ),
-        );
-        const selectedCountByMatchup = new Map<number, number>(
-          selectedCountEntries,
+        const selectedCountByMatchup = await getSelectedGamesCountBatch(
+          context.db,
+          referenceMatchupIds,
         );
 
         for (const league of activeLeagues) {
@@ -481,17 +453,15 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
             const gamesPerMatchup =
               currentMatchups[0].gamesPerMatchup ?? league.gamesPerMatchup ?? 5;
 
-            // Batch all selected-game counts in parallel — one DB round-trip total
-            const selectedCounts = await Promise.all(
-              currentMatchups.map((m) =>
-                getSelectedGamesCount(context.db, m.id),
-              ),
+            // Batch all selected-game counts in one query (GROUP BY)
+            const selectedCountMap = await getSelectedGamesCountBatch(
+              context.db,
+              currentMatchups.map((m) => m.id),
             );
 
             let allGamesComplete = true;
-            for (let i = 0; i < currentMatchups.length; i++) {
-              const selectedCount = selectedCounts[i];
-              const matchup = currentMatchups[i];
+            for (const matchup of currentMatchups) {
+              const selectedCount = selectedCountMap.get(matchup.id) ?? 0;
 
               if (selectedCount < gamesPerMatchup) {
                 LOGGER.info(
