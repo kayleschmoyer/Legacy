@@ -385,9 +385,12 @@ jobs:
         uses: ./.github/actions/setup
         with:
           node-version: 22
-          install-dependencies: true
+          install-dependencies: false
           set-nx-shas: false
           include-optional-deps: false
+
+      - name: "Install Playwright (standalone)"
+        run: npm install --no-save playwright@1.55.0
 
       - name: "Download All Blob Reports"
         uses: actions/download-artifact@v8
@@ -399,7 +402,7 @@ jobs:
       - name: "Merge Playwright Reports"
         run: |
           mkdir -p all-blob-reports
-          pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+          npx playwright merge-reports --reporter html ./all-blob-reports
 
       - name: "Generate App Token"
         id: app-token
