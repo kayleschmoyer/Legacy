@@ -179,6 +179,10 @@ type BadgeProgress {
   userId: Int
 }
 
+type BillingPortalSessionResult {
+  url: String
+}
+
 input BulkDropPlayersInput {
   leagueId: Int!
   reason: String
@@ -343,6 +347,10 @@ type ChampionTrophy {
   season: Int
   teamId: Int
   updatedAt: String
+}
+
+type CheckoutSessionResult {
+  url: String
 }
 
 """
@@ -1227,6 +1235,20 @@ type Mutation {
   """
   commissionerSetDraftAutoPickDisabled(disabled: Boolean!, draftId: Int!): Draft
   createAllMatchups(leagueId: Int!): AdvanceLeagueWeekResponse
+
+  """
+  Create a Stripe Billing Portal session for managing an existing subscription (upgrade, downgrade, cancel, update payment method).
+  """
+  createBillingPortalSession(returnUrl: String!): BillingPortalSessionResult
+
+  """
+  Create a Stripe Checkout Session for a subscription plan. If the user already has an active subscription a Billing Portal URL is returned instead so they can manage their plan.
+  """
+  createCheckoutSession(
+    cancelUrl: String!
+    priceId: String!
+    successUrl: String!
+  ): CheckoutSessionResult
   createLeague(maxRosterSize: Int, name: String!): League
   createLeagueAndTeams(
     input: CreateLeagueAndTeamsInput!
@@ -2017,6 +2039,11 @@ type Query {
   myDataRequests: [DataRequest!]
 
   """
+  Get the current subscription for the authenticated user.
+  """
+  mySubscription: SubscriptionInfo
+
+  """
   Notable historical game-log performances from today's calendar date across all seasons
   """
   onThisDay(
@@ -2494,6 +2521,13 @@ enum StatsLoadingStatus {
   not_started
   queued
   retry
+}
+
+type SubscriptionInfo {
+  cancelAtPeriodEnd: Boolean
+  currentPeriodEnd: String
+  status: String
+  tier: String
 }
 
 input SwapMatchupTeamsInput {

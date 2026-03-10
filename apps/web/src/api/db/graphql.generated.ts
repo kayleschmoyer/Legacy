@@ -168,6 +168,11 @@ export type BadgeProgress = {
   userId?: Maybe<Scalars['Int']['output']>;
 };
 
+export type BillingPortalSessionResult = {
+  __typename?: 'BillingPortalSessionResult';
+  url?: Maybe<Scalars['String']['output']>;
+};
+
 export type BulkDropPlayersInput = {
   leagueId: Scalars['Int']['input'];
   reason?: InputMaybe<Scalars['String']['input']>;
@@ -306,6 +311,11 @@ export type ChampionTrophy = {
   season?: Maybe<Scalars['Int']['output']>;
   teamId?: Maybe<Scalars['Int']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type CheckoutSessionResult = {
+  __typename?: 'CheckoutSessionResult';
+  url?: Maybe<Scalars['String']['output']>;
 };
 
 /** Result of a commissioner action */
@@ -1049,6 +1059,10 @@ export type Mutation = {
   /** Commissioner: enable or disable auto-pick for the entire draft (LS-481). When disabled, autoProcessDraftPicks will not fire and teams cannot opt in to auto-pick. */
   commissionerSetDraftAutoPickDisabled?: Maybe<Draft>;
   createAllMatchups?: Maybe<AdvanceLeagueWeekResponse>;
+  /** Create a Stripe Billing Portal session for managing an existing subscription (upgrade, downgrade, cancel, update payment method). */
+  createBillingPortalSession?: Maybe<BillingPortalSessionResult>;
+  /** Create a Stripe Checkout Session for a subscription plan. If the user already has an active subscription a Billing Portal URL is returned instead so they can manage their plan. */
+  createCheckoutSession?: Maybe<CheckoutSessionResult>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
@@ -1239,6 +1253,16 @@ export type MutationCommissionerSetDraftAutoPickDisabledArgs = {
 
 export type MutationCreateAllMatchupsArgs = {
   leagueId: Scalars['Int']['input'];
+};
+
+export type MutationCreateBillingPortalSessionArgs = {
+  returnUrl: Scalars['String']['input'];
+};
+
+export type MutationCreateCheckoutSessionArgs = {
+  cancelUrl: Scalars['String']['input'];
+  priceId: Scalars['String']['input'];
+  successUrl: Scalars['String']['input'];
 };
 
 export type MutationCreateLeagueArgs = {
@@ -1934,6 +1958,8 @@ export type Query = {
   myConsents?: Maybe<Array<UserConsent>>;
   /** Get all data export/deletion requests for the authenticated user */
   myDataRequests?: Maybe<Array<DataRequest>>;
+  /** Get the current subscription for the authenticated user. */
+  mySubscription?: Maybe<SubscriptionInfo>;
   /** Notable historical game-log performances from today's calendar date across all seasons */
   onThisDay?: Maybe<Array<OnThisDayEntry>>;
   /** Baseball events (signings, trades) that occurred on the given calendar date */
@@ -2742,6 +2768,14 @@ export enum StatsLoadingStatus {
   Queued = 'queued',
   Retry = 'retry',
 }
+
+export type SubscriptionInfo = {
+  __typename?: 'SubscriptionInfo';
+  cancelAtPeriodEnd?: Maybe<Scalars['Boolean']['output']>;
+  currentPeriodEnd?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  tier?: Maybe<Scalars['String']['output']>;
+};
 
 export type SwapMatchupTeamsInput = {
   matchupId1: Scalars['Int']['input'];
