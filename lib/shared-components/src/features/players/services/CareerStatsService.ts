@@ -62,8 +62,8 @@ export interface CareerFieldingStatsRaw {
  */
 export interface PositionData {
   readonly games: number;
-  readonly gamesStarted: number;
-  readonly position: string;
+  readonly gamesStarted?: number;
+  readonly position?: string;
 }
 
 /**
@@ -197,7 +197,7 @@ function parsePositionsPlayed(
  * Format positions played data into a readable string sorted by games played
  *
  * @param positionsPlayedJson - JSON string of position data from database
- * @returns Formatted string like "1B (210g), OF (45g), DH (12g)"
+ * @returns Formatted string like "1B, OF, DH" (sorted by most games played)
  */
 function formatPositionsPlayed(
   positionsPlayedJson: string | null | undefined,
@@ -209,10 +209,10 @@ function formatPositionsPlayed(
       positionsPlayedJson,
     ) as Record<string, PositionData>;
 
-    // Convert to array and sort by games played (descending)
-    const sortedPositions = Object.values(positionsData)
-      .sort((a, b) => b.games - a.games)
-      .map((pos) => `${pos.position} (${pos.games}g)`);
+    // Use entries to preserve position code (key), sort by games played descending
+    const sortedPositions = Object.entries(positionsData)
+      .sort(([, a], [, b]) => b.games - a.games)
+      .map(([positionCode, data]) => data.position ?? positionCode);
 
     return sortedPositions.join(', ');
   } catch (error) {
