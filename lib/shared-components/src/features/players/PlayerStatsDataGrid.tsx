@@ -816,7 +816,11 @@ export function PlayerStatsDataGrid({
       </XStack>
 
       {/* Table Body */}
-      <YStack flex={1} maxHeight={maxHeight} style={{ overflowY: 'auto' }}>
+      <YStack
+        flex={1}
+        maxHeight={maxHeight}
+        style={{ overflowY: 'auto', scrollbarGutter: 'stable' }}
+      >
         {loading ? (
           <XStack
             justifyContent="center"
