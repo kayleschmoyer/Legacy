@@ -195,6 +195,16 @@ export interface WeekAdvancedNotification {
 }
 
 /**
+ * Sent to a specific user when their subscription tier or status changes.
+ * Delivered only to the affected user's active WebSocket connections.
+ */
+export interface SubscriptionUpdatedNotification {
+  type: typeof WireNotificationType.SUBSCRIPTION_UPDATED;
+  tier: 'free' | 'premium';
+  status: string;
+}
+
+/**
  * Service for sending real-time notifications via WebSocket.
  *
  * **IMPORTANT: Always `await` every `notify*()` call and wrap it in try/catch.**
@@ -1070,6 +1080,61 @@ export class WebSocketNotificationService {
       },
       leagueId,
     );
+  }
+
+  /**
+   * Notify the affected user that their subscription tier or status has changed.
+   * Delivered only to the user's currently active WebSocket connections.
+   *
+   * Fired by the stripe-webhook Lambda after syncing a new tier to the database.
+   *
+   * @param userId - The user whose subscription has changed.
+   * @param tier   - The new subscription tier: 'free' or 'premium'.
+   * @param status - The Stripe subscription status (e.g. 'active', 'canceled').
+   */
+  async notifySubscriptionUpdated(
+    userId: number,
+    tier: 'free' | 'premium',
+    status: string,
+  ): Promise<void> {
+    const notification: SubscriptionUpdatedNotification = {
+      type: WireNotificationType.SUBSCRIPTION_UPDATED,
+      tier,
+      status,
+    };
+
+    LOGGER.info('Sending subscription updated notification', {
+      userId,
+      tier,
+      status,
+    });
+
+    try {
+      const connectionIds = await this.getUserConnections(userId);
+
+      if (connectionIds.length === 0) {
+        LOGGER.info(
+          'User has no active WebSocket connections, subscription update not pushed',
+          { userId },
+        );
+        return;
+      }
+
+      await Promise.allSettled(
+        connectionIds.map((connectionId) =>
+          this.sendToConnection(connectionId, {
+            type: 'notification',
+            data: notification,
+          }),
+        ),
+      );
+    } catch (error) {
+      LOGGER.error('Error sending subscription updated notification', {
+        error,
+        userId,
+      });
+      throw error;
+    }
   }
 }
 

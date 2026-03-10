@@ -11,7 +11,10 @@
  */
 import { useEffect, useRef } from 'react';
 import { ClientNotificationType } from '@legacy-sports/utils';
-import type { LeagueChatMessageNotification } from '@legacy-sports/websocket-client';
+import type {
+  LeagueChatMessageNotification,
+  SubscriptionUpdatedNotification,
+} from '@legacy-sports/websocket-client';
 import { useLeagueWebSocketClient } from '../context/LeagueWebSocketContext';
 
 export interface UseLeagueWebSocketOptions {
@@ -27,6 +30,11 @@ export interface UseLeagueWebSocketOptions {
   onMatchupStatsComplete?: () => void;
   /** Fired when a new chat message arrives in this league's chat room. */
   onLeagueChatMessage?: (n: LeagueChatMessageNotification) => void;
+  /**
+   * Fired when the authenticated user's subscription tier or status changes.
+   * Use this to update Apollo cache or local state without a full page reload.
+   */
+  onSubscriptionUpdated?: (n: SubscriptionUpdatedNotification) => void;
   /**
    * Fired when the socket reconnects after a drop (i.e. *not* the initial
    * connection).  Useful for refetching any data that may have changed while
@@ -63,6 +71,9 @@ export function useLeagueWebSocket(options: UseLeagueWebSocketOptions): {
 
   const onLeagueChatMessageRef = useRef(options.onLeagueChatMessage);
   onLeagueChatMessageRef.current = options.onLeagueChatMessage;
+
+  const onSubscriptionUpdatedRef = useRef(options.onSubscriptionUpdated);
+  onSubscriptionUpdatedRef.current = options.onSubscriptionUpdated;
 
   const onReconnectRef = useRef(options.onReconnect);
   onReconnectRef.current = options.onReconnect;
@@ -115,6 +126,14 @@ export function useLeagueWebSocket(options: UseLeagueWebSocketOptions): {
     unsubs.push(
       client.on(ClientNotificationType.LEAGUE_CHAT_MESSAGE, (n) => {
         onLeagueChatMessageRef.current?.(n as LeagueChatMessageNotification);
+      }),
+    );
+
+    unsubs.push(
+      client.on(ClientNotificationType.SUBSCRIPTION_UPDATED, (n) => {
+        onSubscriptionUpdatedRef.current?.(
+          n as SubscriptionUpdatedNotification,
+        );
       }),
     );
 

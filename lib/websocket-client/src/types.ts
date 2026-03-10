@@ -209,6 +209,16 @@ export interface UserListNotification {
   users: Array<{ userId: number; username: string }>;
 }
 
+/**
+ * Sent to a specific user when their subscription tier or status changes.
+ * Delivered only to the affected user's active WebSocket connections.
+ */
+export interface SubscriptionUpdatedNotification {
+  type: typeof ClientNotificationType.SUBSCRIPTION_UPDATED;
+  tier: 'free' | 'premium';
+  status: string;
+}
+
 export type NotificationData =
   | DraftCompletedNotification
   | DraftStartedNotification
@@ -227,7 +237,8 @@ export type NotificationData =
   | WeekAdvancedNotification
   | UserJoinedNotification
   | UserLeftNotification
-  | UserListNotification;
+  | UserListNotification
+  | SubscriptionUpdatedNotification;
 
 /**
  * WebSocket message structure
