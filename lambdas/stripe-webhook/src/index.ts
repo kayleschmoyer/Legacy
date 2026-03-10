@@ -761,12 +761,35 @@ const baseStripeWebhookHandler = async (
     };
   }
 
-  // Record event as processed (idempotency)
-  await recordEvent(stripeEvent.id);
+  // Record event as processed (idempotency).
+  // Must NOT throw: if recordEvent fails and we return 500, Stripe will retry
+  // and re-run all processing side effects (pushSubscriptionUpdated, tier
+  // changes, etc.) on an event that was already successfully handled.
+  try {
+    await recordEvent(stripeEvent.id);
+  } catch (err) {
+    captureError(err instanceof Error ? err : new Error(String(err)), {
+      tags: { lambda: 'stripe-webhook', eventType: stripeEvent.type },
+    });
+    LOGGER.error(
+      'Failed to record Stripe event — idempotency record missing; returning 200 to prevent duplicate side effects on retry',
+      { eventId: stripeEvent.id, err },
+    );
+  }
 
-  // Push real-time tier update to the user's WebSocket connections
+  // Push real-time tier update to the user's WebSocket connections.
+  // Non-fatal: a notification failure must never cause a 500 that triggers a
+  // Stripe retry.
   if (userId !== null && subscriptionId !== null) {
-    await pushSubscriptionUpdated(userId, subscriptionId);
+    try {
+      await pushSubscriptionUpdated(userId, subscriptionId);
+    } catch (err) {
+      LOGGER.warn('pushSubscriptionUpdated failed (non-fatal)', {
+        err,
+        userId,
+        subscriptionId,
+      });
+    }
   }
 
   return { statusCode: 200, body: JSON.stringify({ received: true }) };
