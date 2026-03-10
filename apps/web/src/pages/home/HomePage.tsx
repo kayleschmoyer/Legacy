@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -279,6 +279,19 @@ const FEATURES = [
  * Modernized with gradient backgrounds, glassmorphism cards,
  * and entrance animations for a polished user experience.
  */
+const PREFS_STORAGE_KEY = 'ls_user_preferences';
+
+function readDefaultSport(): 'baseball' | 'football' {
+  try {
+    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    if (!raw) return 'baseball';
+    const parsed = JSON.parse(raw) as { defaultSport?: string };
+    return parsed.defaultSport === 'football' ? 'football' : 'baseball';
+  } catch {
+    return 'baseball';
+  }
+}
+
 export function HomePage(): React.JSX.Element {
   const navigate = useNavigate();
   const [onboardingComplete, setOnboardingComplete] = useLocalStorage<boolean>(
@@ -286,6 +299,16 @@ export function HomePage(): React.JSX.Element {
     false,
   );
   const [tutorialOpen, setTutorialOpen] = useState(false);
+
+  const defaultSport = useMemo(() => readDefaultSport(), []);
+  const orderedSports = useMemo(
+    () =>
+      defaultSport === 'baseball'
+        ? SPORTS
+        : [...SPORTS].sort((a) => (a.key === defaultSport ? -1 : 1)),
+    [defaultSport],
+  );
+  const primarySport = orderedSports[0];
 
   // Auto-show tutorial once for first-time visitors.
   useEffect(() => {
@@ -352,9 +375,9 @@ export function HomePage(): React.JSX.Element {
             >
               <ActionButton
                 onPress={() => {
-                  navigate('/baseball');
+                  navigate(primarySport.route);
                 }}
-                accessibilityLabel="Get started with baseball"
+                accessibilityLabel={`Get started with ${primarySport.title.toLowerCase()}`}
               >
                 <Text fontWeight="700">Get Started</Text>
               </ActionButton>
@@ -392,7 +415,7 @@ export function HomePage(): React.JSX.Element {
               </YStack>
 
               <XStack gap="$5" flexWrap="wrap">
-                {SPORTS.map((sport) => (
+                {orderedSports.map((sport) => (
                   <SportCard
                     key={sport.key}
                     flex={1}
@@ -506,17 +529,19 @@ export function HomePage(): React.JSX.Element {
               </XStack>
             </YStack>
 
-            {/* ─── On This Day ─── */}
-            <YStack gap="$5">
-              <YStack gap="$2">
-                <SectionTitle>On This Day in Baseball</SectionTitle>
-                <Paragraph fontSize="$4" color="$textMuted" maxWidth={500}>
-                  Historic performances from today's date across every season in
-                  the database — see which players you manage made history.
-                </Paragraph>
+            {/* ─── On This Day (baseball-only) ─── */}
+            {defaultSport === 'baseball' && (
+              <YStack gap="$5">
+                <YStack gap="$2">
+                  <SectionTitle>On This Day in Baseball</SectionTitle>
+                  <Paragraph fontSize="$4" color="$textMuted" maxWidth={500}>
+                    Historic performances from today's date across every season
+                    in the database — see which players you manage made history.
+                  </Paragraph>
+                </YStack>
+                <OnThisDayFeed />
               </YStack>
-              <OnThisDayFeed />
-            </YStack>
+            )}
 
             {/* ─── Stats CTA ─── */}
             <YStack
