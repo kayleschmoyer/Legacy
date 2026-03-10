@@ -7,6 +7,7 @@
   "types": "./src/index.ts",
   "dependencies": {
     "tslib": "*",
+    "@tamagui/animations-react-native": "*",
     "@tamagui/config": "*",
     "tamagui": "*"
   }

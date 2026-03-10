@@ -1,3 +1,4 @@
+import { createAnimations } from '@tamagui/animations-react-native';
 import { config } from '@tamagui/config';
 import { createTamagui, type TamaguiConfig } from 'tamagui';
 
@@ -307,8 +308,26 @@ const brandLight = {
 };
 
 // Custom configuration extending the base config
+// Extract the base animation definitions so we can extend them with "fast"
+const baseAnimationDefs =
+  (
+    config.animations as
+      | { animations: Record<string, Record<string, unknown>> }
+      | undefined
+  )?.animations ?? {};
+
+const animations = createAnimations({
+  ...baseAnimationDefs,
+  // "fast" — used by PricingPage toggle/FAQ; not in @tamagui/config defaults
+  fast: {
+    type: 'timing' as const,
+    duration: 150,
+  },
+});
+
 const customConfig = {
   ...config,
+  animations,
   themes: {
     ...config.themes,
     // Branded themes
