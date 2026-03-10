@@ -199,6 +199,45 @@ async function attachFilesToJiraIssue(
   }
 }
 
+/**
+ * Look up a Jira user's accountId by their email address.
+ * Returns null if no matching Jira account is found.
+ */
+async function findJiraUserAccountId(
+  email: string,
+  authHeader: string,
+  baseUrl: string,
+): Promise<string | null> {
+  try {
+    const url = `${baseUrl}/rest/api/3/user/search?query=${encodeURIComponent(email)}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${authHeader}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      LOGGER.warn(`Jira user search failed with status ${response.status}`);
+      return null;
+    }
+
+    const users = (await response.json()) as Array<{
+      accountId: string;
+      emailAddress?: string;
+    }>;
+
+    // Find exact email match (Jira search is fuzzy)
+    const match = users.find(
+      (u) => u.emailAddress?.toLowerCase() === email.toLowerCase(),
+    );
+    return match?.accountId ?? null;
+  } catch (err) {
+    LOGGER.warn(`Failed to look up Jira user by email: ${String(err)}`);
+    return null;
+  }
+}
+
 export async function createJiraBug(
   input: CreateIssueInput,
   projectKey: string,
@@ -222,6 +261,25 @@ export async function createJiraBug(
 
   if (input.labels && input.labels.length > 0) {
     fields.labels = input.labels;
+  }
+
+  // Attempt to set the reporter to the actual user who filed the bug.
+  // Falls back gracefully (reporter = API token owner) if email is absent or
+  // the user has no Jira account.
+  if (input.reporterEmail) {
+    const accountId = await findJiraUserAccountId(
+      input.reporterEmail,
+      authHeader,
+      base_url,
+    );
+    if (accountId) {
+      fields.reporter = { id: accountId };
+      LOGGER.info(`Setting Jira reporter to accountId ${accountId}`);
+    } else {
+      LOGGER.info(
+        `No Jira account found for ${input.reporterEmail}; reporter will default to API token owner`,
+      );
+    }
   }
 
   LOGGER.info(`Creating Jira bug in project ${projectKey}: ${input.summary}`);
