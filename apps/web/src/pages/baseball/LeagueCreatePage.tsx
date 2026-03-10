@@ -126,6 +126,7 @@ const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500];
 export function LeagueCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
   const isPremium = useIsPremium();
+  const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
     numberOfTeams: DEFAULT_NUM_TEAMS,
@@ -236,11 +237,12 @@ export function LeagueCreatePage(): React.JSX.Element {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
 
     // Form validation
     const validationError = validateForm();
     if (validationError) {
-      alert(validationError);
+      setFormError(validationError);
       return;
     }
 
@@ -300,7 +302,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       }
     } catch (error) {
       LOGGER.error('Error creating league:', String(error));
-      alert(
+      setFormError(
         (error as Error).message ||
           'Failed to create league. Please try again.',
       );
@@ -1508,6 +1510,22 @@ export function LeagueCreatePage(): React.JSX.Element {
                     : 'Only people with your invite code can join this league'}
                 </Text>
               </YStack>
+
+              {/* Inline error banner */}
+              {formError && (
+                <Card
+                  role="alert"
+                  aria-live="assertive"
+                  backgroundColor="$red3"
+                  borderColor="$red8"
+                  padding="$3"
+                  borderRadius="$4"
+                >
+                  <Text color="$red11" fontWeight="bold">
+                    {formError}
+                  </Text>
+                </Card>
+              )}
 
               {/* Action Buttons */}
               <XStack space="$3" justifyContent="flex-end" marginTop="$4">
