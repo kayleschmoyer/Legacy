@@ -100,7 +100,7 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
   {
     key: 'playerName' as unknown as string,
     label: 'Player',
-    sortable: false,
+    sortable: true,
     width: '200px',
     align: 'left',
     priority: 'high',
@@ -223,6 +223,7 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
 ] as const;
 
 const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
+  playerName: 'lastName',
   games: 'games',
   wins: 'wins',
   losses: 'losses',

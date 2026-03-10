@@ -37,7 +37,9 @@ export interface StatisticsQueryFilters {
  * Options for ordering query results with comprehensive field support
  */
 export interface QueryOptions {
-  orderBy?: // Batting statistics
+  orderBy?: // Player information
+    | 'lastName'
+    // Batting statistics
     | 'games'
     | 'plateAppearances'
     | 'atBats'
@@ -116,8 +118,8 @@ export class CareerBattingQueryBuilder {
     // Determine ordering clause
     const orderByClause = this.getOrderByClause(options);
 
-    // Check if we need to join with players table (for search functionality)
-    if (filters.searchTerm) {
+    // Check if we need to join with players table (for search or name sorting)
+    if (filters.searchTerm || options.orderBy === 'lastName') {
       return this.executeWithPlayerJoin(
         battingConditions,
         filters.searchTerm,
@@ -135,20 +137,22 @@ export class CareerBattingQueryBuilder {
    */
   private async executeWithPlayerJoin(
     battingConditions: SQL<unknown>[],
-    searchTerm: string,
+    searchTerm: string | undefined,
     orderByClause: SQL<unknown>,
     options: QueryOptions,
   ) {
-    // Add search conditions to existing batting conditions
-    const searchPattern = `%${searchTerm}%`;
-    const searchCondition = or(
-      ilike(PublicSchema.players.firstName, searchPattern),
-      ilike(PublicSchema.players.lastName, searchPattern),
-    );
-
-    const allConditions = searchCondition
-      ? [...battingConditions, searchCondition]
-      : battingConditions;
+    // Add search conditions to existing batting conditions when a search term is provided
+    const allConditions = [...battingConditions];
+    if (searchTerm) {
+      const searchPattern = `%${searchTerm}%`;
+      const searchCondition = or(
+        ilike(PublicSchema.players.firstName, searchPattern),
+        ilike(PublicSchema.players.lastName, searchPattern),
+      );
+      if (searchCondition) {
+        allConditions.push(searchCondition);
+      }
+    }
 
     // Build complete query using function-based approach - Drizzle recommended pattern
     const baseQuery = () =>
@@ -240,6 +244,10 @@ export class CareerBattingQueryBuilder {
 
     // Map orderBy field names to database columns with NULLS LAST
     switch (options.orderBy) {
+      // Player information (requires join with players table)
+      case 'lastName':
+        return sql`${PublicSchema.players.lastName} ${sql.raw(dir)} NULLS LAST, ${PublicSchema.players.firstName} ${sql.raw(dir)} NULLS LAST`;
+
       // Basic batting statistics
       case 'games':
         return sql`${PublicSchema.careerBatting.g} ${sql.raw(dir)} NULLS LAST`;

@@ -237,6 +237,56 @@ export class StatisticsService {
     return runWithPublicClient(
       this.options,
       async (db): Promise<CareerPitching[]> => {
+        // When sorting by player name, use a join-based query
+        if (queryOptions.orderBy === 'lastName') {
+          const conditions = queryOptions.filters
+            ? this.buildPitchingFilters(queryOptions.filters)
+            : [];
+          const orderDirection = queryOptions.orderDirection || 'desc';
+
+          const validConditions = conditions.filter(
+            (condition): condition is SQL => condition !== undefined,
+          );
+          const baseJoinQuery = db
+            .select()
+            .from(PublicSchema.careerPitching)
+            .innerJoin(
+              PublicSchema.players,
+              eq(PublicSchema.careerPitching.playerId, PublicSchema.players.id),
+            );
+
+          const withConditions =
+            validConditions.length > 0
+              ? baseJoinQuery.where(
+                  validConditions.length === 1
+                    ? validConditions[0]
+                    : and(...validConditions),
+                )
+              : baseJoinQuery;
+
+          const withOrder =
+            orderDirection === 'desc'
+              ? withConditions.orderBy(
+                  desc(PublicSchema.players.lastName),
+                  desc(PublicSchema.players.firstName),
+                )
+              : withConditions.orderBy(
+                  asc(PublicSchema.players.lastName),
+                  asc(PublicSchema.players.firstName),
+                );
+
+          const withLimit = queryOptions.limit
+            ? withOrder.limit(queryOptions.limit)
+            : withOrder;
+          const withOffset =
+            queryOptions.offset && queryOptions.limit
+              ? withLimit.offset(queryOptions.offset)
+              : withLimit;
+
+          const results = await withOffset.execute();
+          return results.map((r) => r.career_pitching as CareerPitching);
+        }
+
         const conditions = queryOptions.filters
           ? this.buildPitchingFilters(queryOptions.filters)
           : [];

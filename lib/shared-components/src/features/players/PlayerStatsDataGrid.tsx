@@ -121,9 +121,9 @@ export interface PlayerStatsDataGridProps {
  */
 export const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   // Player information
-  displayName: 'playerId', // Player names aren't sortable in GraphQL, use ID instead
-  firstName: 'playerId',
-  lastName: 'playerId',
+  displayName: 'lastName',
+  firstName: 'lastName',
+  lastName: 'lastName',
 
   // Basic batting statistics
   games: 'games',
@@ -173,7 +173,7 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
   {
     key: 'displayName',
     label: 'Player',
-    sortable: false,
+    sortable: true,
     width: '200px',
     minWidth: 150,
     align: 'left',
