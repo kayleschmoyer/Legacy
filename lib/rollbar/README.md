@@ -5,7 +5,9 @@ Rollbar error reporting integration for Legacy Sports. Replaces the legacy Sentr
 Exposes the same function API as the previous `@legacy-sports/sentry` library for a drop-in migration:
 
 - `initSentry(config)` — initialize Rollbar with a `RollbarConfig`
-- `captureError(error, context?)` — capture an error with optional context
+- `captureError(error, context?, severity?)` — capture an error; `severity` is `'error'` (default) | `'warning'` | `'info'`
+- `captureWarning(error, context?)` — shorthand for `captureError` with `severity: 'warning'`
+- `captureInfo(error, context?)` — shorthand for `captureError` with `severity: 'info'`
 - `addBreadcrumb(message, data?, level?)` — log a breadcrumb
 - `withSentry(handler)` — wrap a handler function with automatic error capture
 - `getSentryConfigFromEnv()` — read `ROLLBAR_ACCESS_TOKEN` from environment

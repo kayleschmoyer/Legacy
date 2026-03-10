@@ -16,8 +16,23 @@ export const initSentry = (config: import('./lib/types').RollbarConfig) => {
 export const captureError = (
   error: Error,
   context?: Record<string, unknown>,
+  severity?: import('./lib/types').RollbarSeverity,
 ) => {
-  return sentry.captureError(error, context);
+  return sentry.captureError(error, context, severity);
+};
+
+export const captureWarning = (
+  error: Error,
+  context?: Record<string, unknown>,
+) => {
+  return sentry.captureError(error, context, 'warning');
+};
+
+export const captureInfo = (
+  error: Error,
+  context?: Record<string, unknown>,
+) => {
+  return sentry.captureError(error, context, 'info');
 };
 
 export const addBreadcrumb = (

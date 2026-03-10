@@ -6,7 +6,12 @@
 
 import Rollbar from 'rollbar';
 import { LOGGER } from '@legacy-sports/logging';
-import { RollbarBreadcrumb, RollbarConfig, RollbarInterface } from './types';
+import {
+  RollbarBreadcrumb,
+  RollbarConfig,
+  RollbarInterface,
+  RollbarSeverity,
+} from './types';
 import { RollbarOutputDestination } from './RollbarOutputDestination';
 import { sanitizeSentryContext } from './sanitize-context';
 
@@ -55,7 +60,11 @@ class ReactNativeRollbarImplementation implements RollbarInterface {
     }
   }
 
-  captureError(error: Error, context?: Record<string, unknown>): void {
+  captureError(
+    error: Error,
+    context?: Record<string, unknown>,
+    severity: RollbarSeverity = 'error',
+  ): void {
     try {
       if (!this.rollbar) {
         LOGGER.warn('Rollbar not initialized, skipping error capture', {
@@ -69,10 +78,20 @@ class ReactNativeRollbarImplementation implements RollbarInterface {
           ? { breadcrumbs: this.breadcrumbs.slice() }
           : {};
       this.breadcrumbs = [];
-      this.rollbar.error(error, {
+      const payload = {
         ...breadcrumbContext,
         ...(safeContext ?? {}),
-      });
+      };
+      switch (severity) {
+        case 'warning':
+          this.rollbar.warning(error, payload);
+          break;
+        case 'info':
+          this.rollbar.info(error, payload);
+          break;
+        default:
+          this.rollbar.error(error, payload);
+      }
     } catch (captureError) {
       LOGGER.error(
         'Failed to capture error in Rollbar',

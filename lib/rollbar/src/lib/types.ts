@@ -3,6 +3,9 @@
  * This interface abstracts away platform-specific Rollbar implementations
  */
 
+/** Rollbar severity level. Defaults to 'error' when not specified. */
+export type RollbarSeverity = 'error' | 'warning' | 'info';
+
 export interface RollbarConfig {
   accessToken: string;
   environment: string;
@@ -31,9 +34,15 @@ export interface RollbarInterface {
   init(config: RollbarConfig): void;
 
   /**
-   * Capture an error with optional context
+   * Capture an error with optional context and severity level.
+   * Use 'warning' for non-critical issues (soft validation failures, expected
+   * timeouts) and 'info' for informational events. Defaults to 'error'.
    */
-  captureError(error: Error, context?: Record<string, unknown>): void;
+  captureError(
+    error: Error,
+    context?: Record<string, unknown>,
+    severity?: RollbarSeverity,
+  ): void;
 
   /**
    * Add a breadcrumb for debugging
