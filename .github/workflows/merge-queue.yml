@@ -67,6 +67,52 @@ jobs:
           token: ${{ steps.generate-token.outputs.token }}
           persist-credentials: true
 
+      # ── Lightweight comment steps (inlined from merge-queue-management) ──
+
+      - name: Comment – Added to Merge Queue
+        if: |
+          github.event_name == 'pull_request' &&
+          github.event.action == 'labeled' &&
+          github.event.label.name == 'merge-when-ready'
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ steps.generate-token.outputs.token }}
+          script: |
+            const pr = context.payload.pull_request;
+            await github.rest.issues.createComment({
+              issue_number: pr.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🚀 **Added to merge queue!**\n\n' +
+                    'This PR will be automatically merged when:\n' +
+                    '- All status checks pass ✅\n' +
+                    '- No merge conflicts exist ✅\n' +
+                    '- Required reviews are approved ✅\n\n' +
+                    'The merge queue responds immediately to status changes, new commits, and reviews. ' +
+                    'Remove the `merge-when-ready` label to exit the queue.'
+            });
+
+      - name: Comment – Removed from Merge Queue
+        if: |
+          github.event_name == 'pull_request' &&
+          github.event.action == 'unlabeled' &&
+          github.event.label.name == 'merge-when-ready'
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ steps.generate-token.outputs.token }}
+          script: |
+            const pr = context.payload.pull_request;
+            await github.rest.issues.createComment({
+              issue_number: pr.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '⏹️ **Removed from merge queue.**\n\n' +
+                    'This PR will no longer be automatically merged. ' +
+                    'Add the `merge-when-ready` label to add it back to the queue.'
+            });
+
+      # ── Heavy merge-queue processing ──
+
       - name: Process Enhanced Merge Queue
         uses: actions/github-script@v8
         with:
@@ -206,7 +252,7 @@ jobs:
               // Guard: if no check runs exist yet for this SHA, CI hasn't started.
               // Treat this as pending rather than all-passing to avoid premature merges.
               const relevantChecks = checks.data.check_runs.filter(
-                c => c.name !== 'process-merge-queue' && c.name !== 'manage-merge-queue'
+                c => c.name !== 'process-merge-queue'
               );
               if (relevantChecks.length === 0) {
                 pendingChecks.push('CI checks not yet registered for this SHA');
@@ -215,7 +261,7 @@ jobs:
               // Validate check runs
               for (const check of checks.data.check_runs) {
                 // Skip merge queue checks to avoid circular dependency
-                if (check.name === 'process-merge-queue' || check.name === 'manage-merge-queue') {
+                if (check.name === 'process-merge-queue') {
                   continue;
                 }
                 
