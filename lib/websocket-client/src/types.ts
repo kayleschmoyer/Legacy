@@ -300,6 +300,12 @@ export interface WebSocketClientOptions {
   reconnectDelay?: number;
   /** Maximum reconnection delay in ms (default: 30000) */
   maxReconnectDelay?: number;
+  /**
+   * Optional error reporting callback. Pass `captureError` from
+   * `@legacy-sports/rollbar` (or the platform-specific entry point) so that
+   * WebSocket errors are automatically sent to Rollbar.
+   */
+  captureError?: (error: Error) => void;
 }
 
 /**

@@ -55,6 +55,9 @@ export class WebSocketClient {
   private consecutivePings = 0;
   private disposed = false;
 
+  // Optional error reporting (e.g. Rollbar via captureError)
+  private captureError?: (error: Error) => void;
+
   // Event handlers
   private eventHandlers = new Map<string, Set<EventHandler>>();
   private connectionHandlers = new Set<EventHandler<ConnectionState>>();
@@ -77,6 +80,8 @@ export class WebSocketClient {
       reconnectDelay: options.reconnectDelay ?? 1000,
       maxReconnectDelay: options.maxReconnectDelay ?? 30000,
     };
+
+    this.captureError = options.captureError;
 
     if (!this.options.url) {
       LOGGER.error('WebSocket URL not configured');
@@ -414,8 +419,10 @@ export class WebSocketClient {
    */
   private handleError(error: Event): void {
     LOGGER.error('WebSocket error', { error });
+    const wsError = new Error('WebSocket error');
+    this.captureError?.(wsError);
     this.emitConnectionState('error');
-    this.emitError(new Error('WebSocket error'));
+    this.emitError(wsError);
   }
 
   /**

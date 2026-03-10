@@ -3,6 +3,7 @@ import { useQuery } from '@apollo/client/react';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
 import type { NotificationData } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils';
+import { captureError } from '@legacy-sports/rollbar/native';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 import {
   GetLeagueMessages,
@@ -123,6 +124,7 @@ export function useLeagueChat(leagueId: number): {
         viewContext: 'chat',
         autoConnect: true,
         reconnect: true,
+        captureError,
       });
 
       client.on(

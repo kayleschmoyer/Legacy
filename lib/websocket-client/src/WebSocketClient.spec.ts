@@ -730,6 +730,35 @@ describe('WebSocketClient', () => {
       jest.advanceTimersByTime(100);
     });
 
+    it('should call captureError when a WebSocket error occurs', (done) => {
+      const mockCaptureError = jest.fn();
+
+      mockServer = new Server(mockUrl);
+
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        autoConnect: true,
+        reconnect: false,
+        captureError: mockCaptureError,
+      });
+
+      // Wait for connection then simulate an error event
+      jest.advanceTimersByTime(50);
+
+      client.on('error', () => {
+        expect(mockCaptureError).toHaveBeenCalledWith(expect.any(Error));
+        client.dispose();
+        done();
+      });
+
+      // Trigger the onerror handler by closing the server abruptly
+      mockServer.simulate('error');
+
+      jest.advanceTimersByTime(100);
+    });
+
     it('should handle connection state correctly', () => {
       mockServer = new Server(mockUrl);
 
