@@ -260,7 +260,7 @@ jobs:
           du -sh .nx-cache
 
       - name: "Save Main Branch Cache"
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: |
             .nx-cache
@@ -273,7 +273,7 @@ jobs:
           fetch-depth: 0
 
       - name: "Restore Main Branch Cache"
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             .nx-cache
