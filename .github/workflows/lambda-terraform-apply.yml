@@ -35,6 +35,7 @@ concurrency:
 env:
   AWS_REGION: us-east-1
   AWS_STAGE: dev
+  LAMBDA_PREFIX: legacy-sports-dev
 
 permissions:
   id-token: write
@@ -292,6 +293,83 @@ jobs:
             --key '{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}' \
             --region us-east-1 2>&1 || true
           echo "✅ Lock released"
+
+      # -------------------------------------------------------------------
+      # Post-deploy health checks for non-HTTP Lambdas
+      # Updates shields.io badges so they reflect actual deploy-time state
+      # instead of polling every 15 minutes.
+      # -------------------------------------------------------------------
+      - name: Check Stats Lambda Health
+        id: stats-health
+        if: always()
+        run: |
+          STATE=$(aws lambda get-function-configuration \
+            --function-name "${{ env.LAMBDA_PREFIX }}-stats" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "State" --output text 2>/dev/null || echo "unknown")
+          echo "State: $STATE"
+          case "$STATE" in
+            Active)   echo "result=healthy"  >> "$GITHUB_OUTPUT" ;;
+            Inactive) echo "result=degraded" >> "$GITHUB_OUTPUT" ;;
+            *)        echo "result=offline"  >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Check Draft Processor Lambda Health
+        id: draft-health
+        if: always()
+        run: |
+          STATE=$(aws lambda get-function-configuration \
+            --function-name "${{ env.LAMBDA_PREFIX }}-draft-processor" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "State" --output text 2>/dev/null || echo "unknown")
+          echo "State: $STATE"
+          case "$STATE" in
+            Active)   echo "result=healthy"  >> "$GITHUB_OUTPUT" ;;
+            Inactive) echo "result=degraded" >> "$GITHUB_OUTPUT" ;;
+            *)        echo "result=offline"  >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Check WebSocket Lambda Health
+        id: websocket-health
+        if: always()
+        run: |
+          STATE=$(aws lambda get-function-configuration \
+            --function-name "${{ env.LAMBDA_PREFIX }}-websocket" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "State" --output text 2>/dev/null || echo "unknown")
+          echo "State: $STATE"
+          case "$STATE" in
+            Active)   echo "result=healthy"  >> "$GITHUB_OUTPUT" ;;
+            Inactive) echo "result=degraded" >> "$GITHUB_OUTPUT" ;;
+            *)        echo "result=offline"  >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Badge — Stats Lambda
+        if: always()
+        uses: ./.github/actions/update-health-badge
+        with:
+          github-token: ${{ secrets.GIST_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          lambda-name: "Stats Lambda"
+          health-status: ${{ steps.stats-health.outputs.result || 'offline' }}
+
+      - name: Badge — Draft Processor Lambda
+        if: always()
+        uses: ./.github/actions/update-health-badge
+        with:
+          github-token: ${{ secrets.GIST_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          lambda-name: "Draft Processor Lambda"
+          health-status: ${{ steps.draft-health.outputs.result || 'offline' }}
+
+      - name: Badge — WebSocket Lambda
+        if: always()
+        uses: ./.github/actions/update-health-badge
+        with:
+          github-token: ${{ secrets.GIST_TOKEN }}
+          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
+          lambda-name: "WebSocket Lambda"
+          health-status: ${{ steps.websocket-health.outputs.result || 'offline' }}
 
       - name: Update Deployment Badge
         if: always()

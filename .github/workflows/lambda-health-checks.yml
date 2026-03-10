@@ -1,14 +1,16 @@
 name: Lambda Health Checks
 
-# Runs on a schedule and can be triggered manually to verify the health of
-# SQS/WebSocket lambdas that have no HTTP surface.  Results are published as
-# shields.io-compatible badge JSON files in the shared CI_BADGES_GIST.
+# Runs on-demand to verify the health of SQS/WebSocket lambdas that have
+# no HTTP surface.  Results are published as shields.io-compatible badge
+# JSON files in the shared CI_BADGES_GIST.
 # HTTP lambdas (GraphQL, OAuth, Game Selection, Jira Proxy) serve their own
 # live /badge endpoint — no workflow polling needed for those.
+#
+# NOTE: Scheduled polling (cron every 15 min) was removed in LS-915.
+# Health badges are now updated at deploy time by lambda-terraform-apply.yml.
+# This workflow is kept for manual ad-hoc checks only.
 
 on:
-  schedule:
-    - cron: "*/15 * * * *" # every 15 minutes
   workflow_dispatch:
 
 permissions:
