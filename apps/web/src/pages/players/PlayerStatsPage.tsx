@@ -18,6 +18,9 @@ import {
 } from '../../constants/colors';
 import { PlayerDetailModal } from '../../components/PlayerDetailModal';
 
+// GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors
+const MAX_GRAPHQL_INT = 2147483647;
+
 /**
  * Web App Player Statistics Page
  *
@@ -73,20 +76,28 @@ export function PlayerStatsPage() {
     const searchTerm = searchParams.get('searchTerm');
 
     // Apply batting filters
-    if (minHR) filters.minHomeRuns = parseInt(minHR, 10);
-    if (maxHR) filters.maxHomeRuns = parseInt(maxHR, 10);
-    if (minRBI) filters.minRBI = parseInt(minRBI, 10);
-    if (maxRBI) filters.maxRBI = parseInt(maxRBI, 10);
+    if (minHR)
+      filters.minHomeRuns = Math.min(parseInt(minHR, 10), MAX_GRAPHQL_INT);
+    if (maxHR)
+      filters.maxHomeRuns = Math.min(parseInt(maxHR, 10), MAX_GRAPHQL_INT);
+    if (minRBI)
+      filters.minRBI = Math.min(parseInt(minRBI, 10), MAX_GRAPHQL_INT);
+    if (maxRBI)
+      filters.maxRBI = Math.min(parseInt(maxRBI, 10), MAX_GRAPHQL_INT);
     if (minAVG) filters.minBattingAvg = parseFloat(minAVG);
     if (maxAVG) filters.maxBattingAvg = parseFloat(maxAVG);
 
     // Apply pitching filters
     if (minERA) filters.minERA = parseFloat(minERA);
     if (maxERA) filters.maxERA = parseFloat(maxERA);
-    if (minWins) filters.minWins = parseInt(minWins, 10);
-    if (maxWins) filters.maxWins = parseInt(maxWins, 10);
-    if (minSO) filters.minStrikeouts = parseInt(minSO, 10);
-    if (maxSO) filters.maxStrikeouts = parseInt(maxSO, 10);
+    if (minWins)
+      filters.minWins = Math.min(parseInt(minWins, 10), MAX_GRAPHQL_INT);
+    if (maxWins)
+      filters.maxWins = Math.min(parseInt(maxWins, 10), MAX_GRAPHQL_INT);
+    if (minSO)
+      filters.minStrikeouts = Math.min(parseInt(minSO, 10), MAX_GRAPHQL_INT);
+    if (maxSO)
+      filters.maxStrikeouts = Math.min(parseInt(maxSO, 10), MAX_GRAPHQL_INT);
 
     // Apply player info filters
     if (position) filters.position = position;

@@ -14,6 +14,13 @@ import {
 import { Filter, RotateCcw, X } from '@tamagui/lucide-icons';
 import { PlayerStatsFilters } from './PlayerStatsTypes';
 
+// GraphQL Int is a 32-bit signed integer — clamp filter inputs to prevent query errors
+const MAX_GRAPHQL_INT = 2147483647;
+const clampInt = (value: string): number | undefined => {
+  const n = parseInt(value, 10);
+  return n ? Math.min(n, MAX_GRAPHQL_INT) : undefined;
+};
+
 export interface PlayerStatsFilterDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -192,7 +199,7 @@ export function PlayerStatsFilterDialog({
                     onChangeText={(value: string) =>
                       updateFilter(
                         'minGames',
-                        value ? parseInt(value) || undefined : undefined,
+                        value ? clampInt(value) : undefined,
                       )
                     }
                   />
@@ -208,7 +215,7 @@ export function PlayerStatsFilterDialog({
                     onChangeText={(value: string) =>
                       updateFilter(
                         'maxGames',
-                        value ? parseInt(value) || undefined : undefined,
+                        value ? clampInt(value) : undefined,
                       )
                     }
                   />
@@ -226,7 +233,7 @@ export function PlayerStatsFilterDialog({
                     onChangeText={(value: string) =>
                       updateFilter(
                         'minHomeRuns',
-                        value ? parseInt(value) || undefined : undefined,
+                        value ? clampInt(value) : undefined,
                       )
                     }
                   />
@@ -242,7 +249,7 @@ export function PlayerStatsFilterDialog({
                     onChangeText={(value: string) =>
                       updateFilter(
                         'minRBI',
-                        value ? parseInt(value) || undefined : undefined,
+                        value ? clampInt(value) : undefined,
                       )
                     }
                   />
@@ -301,7 +308,7 @@ export function PlayerStatsFilterDialog({
                     onChangeText={(value: string) =>
                       updateFilter(
                         'minWins',
-                        value ? parseInt(value) || undefined : undefined,
+                        value ? clampInt(value) : undefined,
                       )
                     }
                   />
@@ -317,7 +324,7 @@ export function PlayerStatsFilterDialog({
                     onChangeText={(value: string) =>
                       updateFilter(
                         'maxWins',
-                        value ? parseInt(value) || undefined : undefined,
+                        value ? clampInt(value) : undefined,
                       )
                     }
                   />
@@ -367,7 +374,7 @@ export function PlayerStatsFilterDialog({
                     onChangeText={(value: string) =>
                       updateFilter(
                         'minStrikeouts',
-                        value ? parseInt(value) || undefined : undefined,
+                        value ? clampInt(value) : undefined,
                       )
                     }
                   />
@@ -383,7 +390,7 @@ export function PlayerStatsFilterDialog({
                     onChangeText={(value: string) =>
                       updateFilter(
                         'maxStrikeouts',
-                        value ? parseInt(value) || undefined : undefined,
+                        value ? clampInt(value) : undefined,
                       )
                     }
                   />
