@@ -214,6 +214,11 @@ export const matchupPlayerGames = pgTable(
       statsLoadingStatusIdx: index(
         'matchup_player_games_stats_loading_status_idx',
       ).on(table.statsLoadingStatus),
+      // Composite for game-count queries (LS-910)
+      matchupPlayerGameNumIdx: index('idx_matchup_player_games_player_game').on(
+        table.matchupPlayerId,
+        table.gameNum,
+      ),
     };
   },
 );

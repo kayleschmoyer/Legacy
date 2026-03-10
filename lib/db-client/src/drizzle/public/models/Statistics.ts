@@ -133,6 +133,12 @@ export const seasonBatting = pgTable(
         table.playerId.asc().nullsLast(),
         table.lgId.asc().nullsLast(),
       ),
+      // lg_id-leading composite for pool filtering (LS-910)
+      lgidPlayerIdIdx: index('idx_season_batting_lgid_playerid').using(
+        'btree',
+        table.lgId.asc().nullsLast(),
+        table.playerId.asc().nullsLast(),
+      ),
       seasonBattingPlayersIdFk: foreignKey({
         columns: [table.playerId],
         foreignColumns: [players.id],
