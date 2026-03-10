@@ -94,6 +94,21 @@ resource "aws_ssm_parameter" "jira_proxy_lambda_version" {
   })
 }
 
+resource "aws_ssm_parameter" "stripe_webhook_lambda_version" {
+  name        = "/legacy-sports/${var.environment}/lambda/stripe-webhook/version"
+  description = "Current version of the Stripe Webhook Lambda function"
+  type        = "String"
+  value       = "initial"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  tags = merge(local.common_tags, {
+    Component = "lambda-versioning"
+    Function  = "stripe-webhook"
+  })
+}
 
 
 # =============================================================================

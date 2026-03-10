@@ -38,7 +38,7 @@ export const WireNotificationType = {
   USER_LEFT: 'USER_LEFT',
   /** Sent to a newly connected client with the list of already-online users. */
   USER_LIST: 'USER_LIST',
-  /** Sent to a user when their subscription tier or status changes (e.g. via Stripe). */
+  /** Sent to a specific user when their subscription tier or status changes (e.g. via Stripe). */
   SUBSCRIPTION_UPDATED: 'SUBSCRIPTION_UPDATED',
 } as const;
 
