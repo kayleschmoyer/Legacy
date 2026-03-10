@@ -74,7 +74,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
 
-  const { data, loading, refetch } = useGetPublicLeaguesQuery({
+  const { data, loading, error, refetch } = useGetPublicLeaguesQuery({
     variables: {
       search: search.trim() || undefined,
       draftStatus: draftStatusFilter !== 'all' ? draftStatusFilter : undefined,
@@ -271,6 +271,43 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
           <Text size="$3">↻ Refresh</Text>
         </Button>
       </XStack>
+
+      {/* Error State */}
+      {error && (
+        <Card
+          elevate
+          bordered
+          backgroundColor={withAlpha('#ff4444', 0.08)}
+          borderColor={withAlpha('#ff4444', 0.3)}
+          padding="$5"
+        >
+          <YStack space="$3" alignItems="center">
+            <Text size="$5" fontWeight="700" color="$red10">
+              <span role="img" aria-label="warning">
+                ⚠️
+              </span>{' '}
+              Failed to load public leagues
+            </Text>
+            <Text size="$3" color="$red9" textAlign="center">
+              {error.message ||
+                'An unexpected error occurred. Please try again.'}
+            </Text>
+            <Button
+              size="$3"
+              onPress={handleRefresh}
+              backgroundColor={BRAND_NAVY_LIGHT}
+              borderColor={BRAND_NAVY_LIGHT}
+              borderWidth={2}
+              hoverStyle={{ backgroundColor: BRAND_NAVY }}
+              pressStyle={{ scale: 0.97 }}
+            >
+              <Text color={BRAND_GOLD} fontWeight="600" size="$3">
+                ↻ Retry
+              </Text>
+            </Button>
+          </YStack>
+        </Card>
+      )}
 
       {/* Loading State */}
       {loading && leagues.length === 0 && (
