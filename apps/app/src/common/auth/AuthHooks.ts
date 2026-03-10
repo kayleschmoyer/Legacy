@@ -78,6 +78,7 @@ async function storeToken(tokens: OAuthProxyTokens): Promise<void> {
     KEYCHAIN_LAST_UPDATE = Date.now().valueOf();
   } catch (error) {
     LOGGER.error('Error storing token:', String(error));
+    throw error;
   }
 }
 
