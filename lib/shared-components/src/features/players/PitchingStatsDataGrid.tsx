@@ -596,7 +596,7 @@ export function PitchingStatsDataGrid({
         })}
       </XStack>
 
-      <YStack flex={1} maxHeight={maxHeight}>
+      <YStack flex={1} maxHeight={maxHeight} style={{ overflowY: 'auto' }}>
         {loading ? (
           <XStack
             justifyContent="center"
