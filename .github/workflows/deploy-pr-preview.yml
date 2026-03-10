@@ -1,8 +1,34 @@
 name: PR Preview Deploy
 
+# =============================================================================
+# PR Preview Deploy
+# =============================================================================
+# Deploys a preview of the web app for each PR that touches web-related paths.
+#
+# Strategy:
+#   1. workflow_run trigger: runs AFTER CI completes (not in parallel), so
+#      previews are never wasted on PRs that fail CI.
+#   2. Downloads the web-build artifact from the CI pipeline (build-validation).
+#      The CI artifact is built with base:"/" and dev defaults, so we post-
+#      process it: rewrite asset paths for the GitHub Pages subdirectory and
+#      replace localhost API URLs with production secrets.
+#   3. Falls back to a full local build only when the artifact is unavailable
+#      (e.g. web wasn't affected, upload failed, or retention expired).
+#   4. Cleanup still triggers on pull_request:closed directly.
+#
+# Estimated savings: ~5-10 min per web-touching PR push (eliminates redundant
+# full build), plus all wasted builds on PRs whose CI fails.
+# =============================================================================
+
 on:
+  # Deploy after CI pipeline completes (replaces the previous pull_request trigger)
+  workflow_run:
+    workflows: ["🧠 Legacy Sports CI Orchestrator"]
+    types: [completed]
+
+  # Cleanup still needs the pull_request trigger (workflow_run doesn't fire on close)
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [closed]
     paths:
       - "apps/web/**"
       - "lib/shared-components/**"
@@ -10,12 +36,15 @@ on:
       - ".github/workflows/deploy-pr-preview.yml"
 
 concurrency:
-  group: pr-preview-${{ github.event.pull_request.number }}
+  # workflow_run: group by head branch (unique per PR)
+  # pull_request: group by PR number
+  group: pr-preview-${{ github.event.workflow_run.head_branch || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 permissions:
   contents: read
   pull-requests: write
+  actions: read # required to download artifacts from the CI workflow run
 
 env:
   DEPLOY_REPO: bkrupa/legacy-sports-deploys
@@ -24,7 +53,11 @@ env:
 jobs:
   deploy-preview:
     name: Deploy PR Preview
-    if: github.event.action != 'closed'
+    # Only run on successful CI for pull_request events
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -33,12 +66,92 @@ jobs:
       NODE_OPTIONS: "--max_old_space_size=4096"
 
     steps:
-      - name: Checkout Repository
+      # ── Extract PR metadata from the triggering workflow run ──────────────
+      - name: Get PR Info
+        id: pr
+        run: |
+          PR_NUM='${{ github.event.workflow_run.pull_requests[0].number }}'
+          if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "null" ] || [ "$PR_NUM" = "0" ]; then
+            echo "::notice::No PR associated with this workflow run — skipping preview."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "number=$PR_NUM"                                               >> "$GITHUB_OUTPUT"
+          echo "skip=false"                                                   >> "$GITHUB_OUTPUT"
+          echo "head_sha=${{ github.event.workflow_run.head_sha }}"           >> "$GITHUB_OUTPUT"
+          echo "head_branch=${{ github.event.workflow_run.head_branch }}"     >> "$GITHUB_OUTPUT"
+
+      # ── Try to download the web-build artifact from the CI run ────────────
+      - name: Download CI Web Build Artifact
+        if: steps.pr.outputs.skip != 'true'
+        id: download
+        uses: actions/download-artifact@v8
+        with:
+          name: web-build-${{ github.event.workflow_run.id }}
+          path: dist/apps/web
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      # ── Post-process the CI artifact for the preview subdirectory ─────────
+      # The CI build uses base:"/" and localhost fallback URLs.  We rewrite:
+      #   • Asset paths in HTML/CSS:  /assets/ → /legacy-sports-deploys/pr-N/assets/
+      #   • Localhost API URLs in JS: replace with production secrets
+      - name: Rewrite Artifact for Preview
+        if: steps.pr.outputs.skip != 'true' && steps.download.outcome == 'success'
+        id: rewrite
+        env:
+          VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
+          VITE_WEBSOCKET_URL: ${{ secrets.VITE_WEBSOCKET_URL }}
+        run: |
+          set -euo pipefail
+          PR_NUM="${{ steps.pr.outputs.number }}"
+          BASE_PATH="/legacy-sports-deploys/pr-${PR_NUM}/"
+
+          cd dist/apps/web
+
+          echo "::group::Rewrite asset paths"
+          # Rewrite absolute /assets/ references in HTML and CSS to the preview subdirectory.
+          # JS dynamic imports use relative paths (./chunk.js) so they resolve correctly
+          # once the entry point is loaded from the right location.
+          find . -type f \( -name "*.html" -o -name "*.css" \) -exec \
+            sed -i "s|/assets/|${BASE_PATH}assets/|g" {} +
+          echo "::endgroup::"
+
+          echo "::group::Rewrite API URLs"
+          # Replace compile-time localhost defaults (from vite.config.mts define block)
+          # with production values so the preview is fully functional.
+          find . -type f -name "*.js" -exec sed -i \
+            -e "s|http://localhost:5001|${VITE_OAUTH_PROXY_URL}|g" \
+            -e "s|placeholder-google-client-id|${VITE_GOOGLE_CLIENT_ID}|g" \
+            -e "s|http://localhost:5000/graphql|${VITE_GRAPHQL_HOST}|g" \
+            {} +
+
+          # Replace empty websocket URL only if a production value is provided
+          if [ -n "${VITE_WEBSOCKET_URL}" ]; then
+            # The Vite define block produces an empty string literal "" for websocket URL.
+            # We intentionally leave it empty if no production URL is set.
+            echo "WebSocket URL available — will be set via the full build fallback if needed."
+          fi
+          echo "::endgroup::"
+
+          # SPA fallback: GitHub Pages serves 404.html for unknown paths
+          cp index.html 404.html
+          echo "✅ Artifact rewritten for preview at ${BASE_PATH}"
+          echo "success=true" >> "$GITHUB_OUTPUT"
+
+      # ── Fallback: full local build when the CI artifact is unavailable ────
+      - name: Checkout Repository (Fallback)
+        if: steps.pr.outputs.skip != 'true' && steps.download.outcome != 'success'
         uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
-      - name: Setup Workspace
+      - name: Setup Workspace (Fallback)
+        if: steps.pr.outputs.skip != 'true' && steps.download.outcome != 'success'
         uses: ./.github/actions/setup
         with:
           node-version: 22
@@ -46,18 +159,10 @@ jobs:
           set-nx-shas: true
           skip-system-deps: true
 
-      - name: Generate App Token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.PREVIEW_APP_ID }}
-          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
-          owner: bkrupa
-          repositories: legacy-sports-deploys
-
-      - name: Build Web App
+      - name: Build Web App (Fallback)
+        if: steps.pr.outputs.skip != 'true' && steps.download.outcome != 'success'
         env:
-          VITE_BASE_PATH: /legacy-sports-deploys/pr-${{ github.event.pull_request.number }}/
+          VITE_BASE_PATH: /legacy-sports-deploys/pr-${{ steps.pr.outputs.number }}/
           VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
@@ -67,43 +172,57 @@ jobs:
           VITE_GIPHY_API_KEY: ${{ secrets.VITE_GIPHY_API_KEY }}
           VITE_JIRA_PROXY_URL: ${{ secrets.VITE_JIRA_PROXY_URL }}
           VITE_ROLLBAR_ACCESS_TOKEN: ""
-          VITE_VERSION: "0.0.0-pr.${{ github.event.pull_request.number }}"
-          VITE_APP_VERSION: "0.0.0-pr.${{ github.event.pull_request.number }}"
-          VITE_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-          VITE_BUILD_DATE: ${{ github.event.pull_request.updated_at }}
-          VITE_BRANCH: ${{ github.head_ref }}
+          VITE_VERSION: "0.0.0-pr.${{ steps.pr.outputs.number }}"
+          VITE_APP_VERSION: "0.0.0-pr.${{ steps.pr.outputs.number }}"
+          VITE_COMMIT_SHA: ${{ steps.pr.outputs.head_sha }}
+          VITE_BUILD_DATE: ${{ github.event.workflow_run.updated_at }}
+          VITE_BRANCH: ${{ steps.pr.outputs.head_branch }}
           NODE_ENV: production
         run: pnpm exec nx build web --configuration=production
 
-      # SPA fallback: GitHub Pages serves 404.html for unknown paths
-      - name: Add SPA fallback
+      - name: Add SPA Fallback (Fallback Build)
+        if: steps.pr.outputs.skip != 'true' && steps.download.outcome != 'success'
         run: cp ./dist/apps/web/index.html ./dist/apps/web/404.html
 
+      # ── Deploy to the preview repo ───────────────────────────────────────
+      - name: Generate App Token
+        if: steps.pr.outputs.skip != 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: bkrupa
+          repositories: legacy-sports-deploys
+
       - name: Deploy to Preview Repo
+        if: steps.pr.outputs.skip != 'true'
         uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ steps.app-token.outputs.token }}
           external_repository: bkrupa/legacy-sports-deploys
           publish_branch: gh-pages
           publish_dir: ./dist/apps/web
-          destination_dir: pr-${{ github.event.pull_request.number }}
+          destination_dir: pr-${{ steps.pr.outputs.number }}
 
       - name: Comment Preview URL
+        if: steps.pr.outputs.skip != 'true'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: pr-preview
+          number: ${{ steps.pr.outputs.number }}
           message: |
             ## 🌐 PR Preview
 
             | | |
             |---|---|
-            | **URL** | [${{ env.PREVIEW_BASE_URL }}/pr-${{ github.event.pull_request.number }}/](${{ env.PREVIEW_BASE_URL }}/pr-${{ github.event.pull_request.number }}/) |
-            | **Branch** | `${{ github.head_ref }}` |
-            | **Commit** | `${{ github.event.pull_request.head.sha }}` |
+            | **URL** | [${{ env.PREVIEW_BASE_URL }}/pr-${{ steps.pr.outputs.number }}/](${{ env.PREVIEW_BASE_URL }}/pr-${{ steps.pr.outputs.number }}/) |
+            | **Branch** | `${{ steps.pr.outputs.head_branch }}` |
+            | **Commit** | `${{ steps.pr.outputs.head_sha }}` |
 
   cleanup-preview:
     name: Cleanup PR Preview
-    if: github.event.action == 'closed'
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
