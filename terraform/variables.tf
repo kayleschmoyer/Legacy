@@ -123,3 +123,9 @@ variable "github_username" {
   type        = string
   default     = "bkrupa"
 }
+
+variable "stripe_publishable_key" {
+  description = "Stripe publishable key for client-side payment integration"
+  type        = string
+  default     = ""
+}

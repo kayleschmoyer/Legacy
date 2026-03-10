@@ -54,7 +54,9 @@ resource "aws_iam_policy" "graphql_lambda_secrets" {
         ]
         Resource = [
           aws_secretsmanager_secret.database_credentials.arn,
-          aws_secretsmanager_secret.jwt_secret.arn
+          aws_secretsmanager_secret.jwt_secret.arn,
+          aws_secretsmanager_secret.stripe_secret_key.arn,
+          aws_secretsmanager_secret.stripe_webhook_secret.arn
         ]
       }
     ]
@@ -223,6 +225,11 @@ resource "aws_lambda_function" "graphql" {
 
       # System API key for EventBridge / admin CLI system mutations
       SYSTEM_API_KEY = random_password.system_api_key.result
+
+      # Stripe payment integration
+      STRIPE_SECRET_KEY_SECRET_NAME      = aws_secretsmanager_secret.stripe_secret_key.name
+      STRIPE_WEBHOOK_SECRET_SECRET_NAME  = aws_secretsmanager_secret.stripe_webhook_secret.name
+      STRIPE_PUBLISHABLE_KEY             = var.stripe_publishable_key
     }
   }
 

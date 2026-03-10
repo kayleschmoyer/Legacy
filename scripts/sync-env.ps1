@@ -91,6 +91,20 @@ $cookieSecretName = $terraformOutput.environment_variables_summary.value.oauth_p
 Write-Host "  Cookie secret from: $cookieSecretName" -ForegroundColor Gray
 $cookieSecret = aws secretsmanager get-secret-value --secret-id $cookieSecretName --query "SecretString" --output text
 
+# Get Stripe secret key
+$stripeSecretKeyName = $terraformOutput.environment_variables_summary.value.stripe_secret_key_secret_name
+if ($stripeSecretKeyName) {
+    Write-Host "  Stripe secret key from: $stripeSecretKeyName" -ForegroundColor Gray
+    $stripeSecretKey = aws secretsmanager get-secret-value --secret-id $stripeSecretKeyName --query "SecretString" --output text
+}
+
+# Get Stripe webhook secret
+$stripeWebhookSecretName = $terraformOutput.environment_variables_summary.value.stripe_webhook_secret_secret_name
+if ($stripeWebhookSecretName) {
+    Write-Host "  Stripe webhook secret from: $stripeWebhookSecretName" -ForegroundColor Gray
+    $stripeWebhookSecret = aws secretsmanager get-secret-value --secret-id $stripeWebhookSecretName --query "SecretString" --output text
+}
+
 # Get CI readonly DB credentials (for running migrations that create the ci_readonly Postgres role)
 $ciReadonlySecret = $null
 $ciReadonlySecretName = $terraformOutput.environment_variables_summary.value.ci_readonly_db_creds_secret_name
@@ -140,6 +154,20 @@ $newEnvVars["DB_CREDS_PATH"] = $dbCredsSecretName
 # Application Secrets
 $newEnvVars["JWT_SECRET"] = $jwtSecret
 $newEnvVars["COOKIE_SECRET"] = $cookieSecret
+
+# Stripe
+if ($stripeSecretKey) {
+    $newEnvVars["STRIPE_SECRET_KEY"] = $stripeSecretKey
+}
+if ($stripeWebhookSecret) {
+    $newEnvVars["STRIPE_WEBHOOK_SECRET"] = $stripeWebhookSecret
+}
+$stripePublishableKey = $terraformOutput.environment_variables_summary.value.stripe_publishable_key
+if ($stripePublishableKey) {
+    $newEnvVars["STRIPE_PUBLISHABLE_KEY"] = $stripePublishableKey
+    $newEnvVars["VITE_STRIPE_PUBLISHABLE_KEY"] = $stripePublishableKey
+    $newEnvVars["EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY"] = $stripePublishableKey
+}
 
 # CI Readonly Database Credentials (needed when running migrations that create the ci_readonly Postgres role)
 if ($ciReadonlySecretName) {

@@ -193,6 +193,7 @@
     "react-router-dom": "6.29.0",
     "rollbar": "^2.26.4",
     "solito": "^4.4.1",
+    "stripe": "^20.4.1",
     "tamagui": "1.132.23",
     "tamedevil": "0.1.0-rc.4",
     "tslib": "^2.3.0",

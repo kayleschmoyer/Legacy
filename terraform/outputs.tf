@@ -188,6 +188,9 @@ output "environment_variables_summary" {
     google_oauth_client_id             = var.google_oauth_client_id
     jira_proxy_url                     = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/jira"
     ci_readonly_db_creds_secret_name   = aws_secretsmanager_secret.ci_readonly_db_credentials.name
+    stripe_secret_key_secret_name      = aws_secretsmanager_secret.stripe_secret_key.name
+    stripe_webhook_secret_secret_name  = aws_secretsmanager_secret.stripe_webhook_secret.name
+    stripe_publishable_key             = var.stripe_publishable_key
   }
 }
 

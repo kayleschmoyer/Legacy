@@ -34,6 +34,18 @@ variable "rollbar_access_token" {
   sensitive   = true
 }
 
+variable "stripe_secret_key" {
+  description = "Stripe API secret key for payment processing"
+  type        = string
+  sensitive   = true
+}
+
+variable "stripe_webhook_secret" {
+  description = "Stripe webhook endpoint signing secret for verifying webhook payloads"
+  type        = string
+  sensitive   = true
+}
+
 # =============================================================================
 # GENERATED SECRETS
 # =============================================================================
@@ -113,6 +125,32 @@ resource "aws_secretsmanager_secret" "system_api_key" {
 resource "aws_secretsmanager_secret_version" "system_api_key" {
   secret_id     = aws_secretsmanager_secret.system_api_key.id
   secret_string = random_password.system_api_key.result
+}
+
+# Stripe API secret key for payment processing
+resource "aws_secretsmanager_secret" "stripe_secret_key" {
+  name        = "${var.environment}/stripe-secret-key"
+  description = "Stripe API secret key for payment processing"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "stripe_secret_key" {
+  secret_id     = aws_secretsmanager_secret.stripe_secret_key.id
+  secret_string = var.stripe_secret_key
+}
+
+# Stripe webhook endpoint signing secret
+resource "aws_secretsmanager_secret" "stripe_webhook_secret" {
+  name        = "${var.environment}/stripe-webhook-secret"
+  description = "Stripe webhook endpoint signing secret for verifying webhook payloads"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "stripe_webhook_secret" {
+  secret_id     = aws_secretsmanager_secret.stripe_webhook_secret.id
+  secret_string = var.stripe_webhook_secret
 }
 
 # Jira credentials for the Jira Proxy Lambda
