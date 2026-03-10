@@ -17,6 +17,8 @@ import {
   useGetAllPlayerSeasonStatsQuery,
   useGetPlayersWithStatsQuery,
 } from '../../api/db/graphql.generated';
+import { PremiumGate } from '../../components/PremiumGate';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -819,217 +821,224 @@ export function PlayerComparisonPage() {
   }, [activePlayers]);
 
   const showTable = activePlayers.length >= 2;
+  const isPremium = useIsPremium();
 
   return (
-    <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
-      <YStack minHeight="100vh" backgroundColor={BG_DARK as never}>
-        <YStack
-          maxWidth={1280}
-          alignSelf="center"
-          width="100%"
-          padding="$4"
-          gap="$5"
-        >
-          {/* ── Page header ── */}
-          <XStack alignItems="center" gap="$3" paddingTop="$2">
-            <BarChart2 size={28} color={BRAND_GOLD} />
-            <YStack>
-              <H2 color={WHITE} fontSize="$8" fontWeight="700" margin={0}>
-                Player Comparison
-              </H2>
-              <Text color={TEXT_MUTED} fontSize="$3">
-                Compare up to 4 players side-by-side — career stats, scoring
-                projections, and season breakdowns.
+    <PremiumGate
+      isPremium={isPremium}
+      featureName="Player Comparison"
+      featureDescription="Compare up to 4 players side-by-side with career stats, scoring projections, and season breakdowns."
+    >
+      <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
+        <YStack minHeight="100vh" backgroundColor={BG_DARK as never}>
+          <YStack
+            maxWidth={1280}
+            alignSelf="center"
+            width="100%"
+            padding="$4"
+            gap="$5"
+          >
+            {/* ── Page header ── */}
+            <XStack alignItems="center" gap="$3" paddingTop="$2">
+              <BarChart2 size={28} color={BRAND_GOLD} />
+              <YStack>
+                <H2 color={WHITE} fontSize="$8" fontWeight="700" margin={0}>
+                  Player Comparison
+                </H2>
+                <Text color={TEXT_MUTED} fontSize="$3">
+                  Compare up to 4 players side-by-side — career stats, scoring
+                  projections, and season breakdowns.
+                </Text>
+              </YStack>
+            </XStack>
+
+            <Separator borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)} />
+
+            {/* ── Player selection ── */}
+            <YStack gap="$3">
+              <Text color={BRAND_GOLD_LIGHT} fontWeight="700" fontSize="$4">
+                Select Players ({activePlayers.length}/{MAX_PLAYERS})
               </Text>
+
+              {/* Active player chips */}
+              {activePlayers.length > 0 && (
+                <XStack flexWrap="wrap" gap="$2">
+                  {selected.map((p, idx) =>
+                    p ? (
+                      <PlayerChip
+                        key={p.id}
+                        player={p}
+                        index={idx}
+                        onRemove={() => handleRemove(idx)}
+                      />
+                    ) : null,
+                  )}
+                </XStack>
+              )}
+
+              {/* Search */}
+              <PlayerSearchInput
+                onSelect={handleAdd}
+                excludeIds={activeIds}
+                disabled={activePlayers.length >= MAX_PLAYERS}
+              />
+
+              {activePlayers.length < 2 && (
+                <Text color={TEXT_MUTED} fontSize="$2">
+                  Add at least 2 players to see the comparison table.
+                </Text>
+              )}
             </YStack>
-          </XStack>
 
-          <Separator borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.25)} />
+            {/* ── Comparison table ── */}
+            {showTable && (
+              <YStack gap="$4">
+                <YStack
+                  backgroundColor={SURFACE_SUBTLE}
+                  borderRadius="$4"
+                  borderWidth={1}
+                  borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.3)}
+                  overflow="hidden"
+                >
+                  <ComparisonHeader players={activePlayers} />
 
-          {/* ── Player selection ── */}
-          <YStack gap="$3">
-            <Text color={BRAND_GOLD_LIGHT} fontWeight="700" fontSize="$4">
-              Select Players ({activePlayers.length}/{MAX_PLAYERS})
-            </Text>
-
-            {/* Active player chips */}
-            {activePlayers.length > 0 && (
-              <XStack flexWrap="wrap" gap="$2">
-                {selected.map((p, idx) =>
-                  p ? (
-                    <PlayerChip
-                      key={p.id}
-                      player={p}
-                      index={idx}
-                      onRemove={() => handleRemove(idx)}
+                  {/* Fantasy Scoring Projections */}
+                  <SectionHeader title="⚡ Fantasy Scoring Projections" />
+                  {scoringRows.map((row) => (
+                    <ComparisonRow
+                      key={row.label}
+                      label={row.label}
+                      values={row.vals}
+                      lowerIsBetter={row.lowerIsBetter}
+                      rawNums={row.nums}
                     />
-                  ) : null,
-                )}
-              </XStack>
+                  ))}
+
+                  {/* Career Batting */}
+                  <SectionHeader title="🏏 Career Batting" />
+                  {careerBattingRows.map((row) => (
+                    <ComparisonRow
+                      key={row.label}
+                      label={row.label}
+                      values={row.vals}
+                      lowerIsBetter={row.lowerIsBetter}
+                      rawNums={row.nums}
+                    />
+                  ))}
+
+                  {/* Career Pitching (if any player is a pitcher) */}
+                  {careerPitchingRows.length > 0 && (
+                    <>
+                      <SectionHeader title="⚾ Career Pitching" />
+                      {careerPitchingRows.map((row) => (
+                        <ComparisonRow
+                          key={row.label}
+                          label={row.label}
+                          values={row.vals}
+                          lowerIsBetter={row.lowerIsBetter}
+                          rawNums={row.nums}
+                        />
+                      ))}
+                    </>
+                  )}
+
+                  {/* Achievements */}
+                  <SectionHeader title="🏆 Career Achievements" />
+                  {achievementRows.map((row) => (
+                    <ComparisonRow
+                      key={row.label}
+                      label={row.label}
+                      values={row.vals}
+                      lowerIsBetter={row.lowerIsBetter}
+                      rawNums={row.nums}
+                    />
+                  ))}
+                </YStack>
+
+                {/* ── Season-by-season breakdown ── */}
+                <YStack gap="$2">
+                  <H3 color={WHITE} fontSize="$6" fontWeight="700">
+                    Season-by-Season Breakdown
+                  </H3>
+                  <Separator borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.2)} />
+                </YStack>
+
+                <YStack gap="$6">
+                  {selected.map((player, idx) => {
+                    if (!player) return null;
+                    const accent = PLAYER_ACCENTS[idx] ?? BRAND_GOLD;
+                    const stats = slotStats[idx];
+                    return (
+                      <YStack key={player.id} gap="$3">
+                        <XStack
+                          alignItems="center"
+                          gap="$2"
+                          paddingHorizontal="$1"
+                        >
+                          <YStack
+                            width={12}
+                            height={12}
+                            borderRadius={6}
+                            backgroundColor={accent}
+                          />
+                          <Text fontSize="$5" fontWeight="700" color={accent}>
+                            {player.name}
+                          </Text>
+                          <Text fontSize="$3" color={TEXT_MUTED}>
+                            {player.position}
+                          </Text>
+                        </XStack>
+                        <SeasonBattingTable
+                          name={player.name}
+                          accent={accent}
+                          data={stats?.data}
+                          loading={stats?.loading ?? false}
+                        />
+                        <SeasonPitchingTable
+                          name={player.name}
+                          accent={accent}
+                          data={stats?.data}
+                          loading={stats?.loading ?? false}
+                        />
+                      </YStack>
+                    );
+                  })}
+                </YStack>
+              </YStack>
             )}
 
-            {/* Search */}
-            <PlayerSearchInput
-              onSelect={handleAdd}
-              excludeIds={activeIds}
-              disabled={activePlayers.length >= MAX_PLAYERS}
-            />
-
-            {activePlayers.length < 2 && (
-              <Text color={TEXT_MUTED} fontSize="$2">
-                Add at least 2 players to see the comparison table.
-              </Text>
-            )}
-          </YStack>
-
-          {/* ── Comparison table ── */}
-          {showTable && (
-            <YStack gap="$4">
+            {/* ── Empty state ── */}
+            {!showTable && activePlayers.length === 0 && (
               <YStack
+                alignItems="center"
+                justifyContent="center"
+                paddingVertical="$12"
+                gap="$4"
                 backgroundColor={SURFACE_SUBTLE}
                 borderRadius="$4"
                 borderWidth={1}
-                borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.3)}
-                overflow="hidden"
+                borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.2)}
+                style={{ borderStyle: 'dashed' as never }}
               >
-                <ComparisonHeader players={activePlayers} />
-
-                {/* Fantasy Scoring Projections */}
-                <SectionHeader title="⚡ Fantasy Scoring Projections" />
-                {scoringRows.map((row) => (
-                  <ComparisonRow
-                    key={row.label}
-                    label={row.label}
-                    values={row.vals}
-                    lowerIsBetter={row.lowerIsBetter}
-                    rawNums={row.nums}
-                  />
-                ))}
-
-                {/* Career Batting */}
-                <SectionHeader title="🏏 Career Batting" />
-                {careerBattingRows.map((row) => (
-                  <ComparisonRow
-                    key={row.label}
-                    label={row.label}
-                    values={row.vals}
-                    lowerIsBetter={row.lowerIsBetter}
-                    rawNums={row.nums}
-                  />
-                ))}
-
-                {/* Career Pitching (if any player is a pitcher) */}
-                {careerPitchingRows.length > 0 && (
-                  <>
-                    <SectionHeader title="⚾ Career Pitching" />
-                    {careerPitchingRows.map((row) => (
-                      <ComparisonRow
-                        key={row.label}
-                        label={row.label}
-                        values={row.vals}
-                        lowerIsBetter={row.lowerIsBetter}
-                        rawNums={row.nums}
-                      />
-                    ))}
-                  </>
-                )}
-
-                {/* Achievements */}
-                <SectionHeader title="🏆 Career Achievements" />
-                {achievementRows.map((row) => (
-                  <ComparisonRow
-                    key={row.label}
-                    label={row.label}
-                    values={row.vals}
-                    lowerIsBetter={row.lowerIsBetter}
-                    rawNums={row.nums}
-                  />
-                ))}
+                <BarChart2 size={48} color={withAlpha(BRAND_GOLD, 0.4)} />
+                <YStack alignItems="center" gap="$2">
+                  <Text fontSize="$5" color={TEXT_MUTED} fontWeight="600">
+                    No players selected
+                  </Text>
+                  <Text
+                    fontSize="$3"
+                    color={withAlpha(TEXT_MUTED, 0.6)}
+                    textAlign="center"
+                  >
+                    Search for players above to start comparing side-by-side.
+                    {'\n'}Great for draft preparation and free agent evaluation.
+                  </Text>
+                </YStack>
               </YStack>
-
-              {/* ── Season-by-season breakdown ── */}
-              <YStack gap="$2">
-                <H3 color={WHITE} fontSize="$6" fontWeight="700">
-                  Season-by-Season Breakdown
-                </H3>
-                <Separator borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.2)} />
-              </YStack>
-
-              <YStack gap="$6">
-                {selected.map((player, idx) => {
-                  if (!player) return null;
-                  const accent = PLAYER_ACCENTS[idx] ?? BRAND_GOLD;
-                  const stats = slotStats[idx];
-                  return (
-                    <YStack key={player.id} gap="$3">
-                      <XStack
-                        alignItems="center"
-                        gap="$2"
-                        paddingHorizontal="$1"
-                      >
-                        <YStack
-                          width={12}
-                          height={12}
-                          borderRadius={6}
-                          backgroundColor={accent}
-                        />
-                        <Text fontSize="$5" fontWeight="700" color={accent}>
-                          {player.name}
-                        </Text>
-                        <Text fontSize="$3" color={TEXT_MUTED}>
-                          {player.position}
-                        </Text>
-                      </XStack>
-                      <SeasonBattingTable
-                        name={player.name}
-                        accent={accent}
-                        data={stats?.data}
-                        loading={stats?.loading ?? false}
-                      />
-                      <SeasonPitchingTable
-                        name={player.name}
-                        accent={accent}
-                        data={stats?.data}
-                        loading={stats?.loading ?? false}
-                      />
-                    </YStack>
-                  );
-                })}
-              </YStack>
-            </YStack>
-          )}
-
-          {/* ── Empty state ── */}
-          {!showTable && activePlayers.length === 0 && (
-            <YStack
-              alignItems="center"
-              justifyContent="center"
-              paddingVertical="$12"
-              gap="$4"
-              backgroundColor={SURFACE_SUBTLE}
-              borderRadius="$4"
-              borderWidth={1}
-              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.2)}
-              style={{ borderStyle: 'dashed' as never }}
-            >
-              <BarChart2 size={48} color={withAlpha(BRAND_GOLD, 0.4)} />
-              <YStack alignItems="center" gap="$2">
-                <Text fontSize="$5" color={TEXT_MUTED} fontWeight="600">
-                  No players selected
-                </Text>
-                <Text
-                  fontSize="$3"
-                  color={withAlpha(TEXT_MUTED, 0.6)}
-                  textAlign="center"
-                >
-                  Search for players above to start comparing side-by-side.
-                  {'\n'}Great for draft preparation and free agent evaluation.
-                </Text>
-              </YStack>
-            </YStack>
-          )}
+            )}
+          </YStack>
         </YStack>
-      </YStack>
-    </ScrollView>
+      </ScrollView>
+    </PremiumGate>
   );
 }

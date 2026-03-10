@@ -13,6 +13,8 @@ import {
 import { AlertTriangle, Check, Lock, Settings } from '@tamagui/lucide-icons';
 import { useUpdateLeagueSettingsMutation } from '../../api/db/graphql.generated';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
+import { PremiumGate } from '../PremiumGate';
+import { useIsPremium } from '../../hooks/useIsPremium';
 
 export interface LeagueSettingsControlProps {
   leagueId: number;
@@ -120,6 +122,7 @@ export function LeagueSettingsControl({
   const [hasChanges, setHasChanges] = useState(false);
 
   const isLocked = draftStatus === 'completed';
+  const isPremium = useIsPremium();
   const [updateLeagueSettings, { loading: saving }] =
     useUpdateLeagueSettingsMutation();
 
@@ -821,60 +824,68 @@ export function LeagueSettingsControl({
               <Separator />
 
               {/* Playoff Format */}
-              <YStack gap="$2">
-                <YStack gap="$1">
-                  <Text fontSize="$3" fontWeight="600" color="$color">
-                    Playoff Format
-                  </Text>
-                  <Text fontSize="$2" color="$gray10">
-                    Number of teams that qualify for the playoffs. 6-team
-                    includes a wildcard round; 8-team has two wildcard rounds.
-                  </Text>
-                </YStack>
-                <XStack gap="$2" flexWrap="wrap">
-                  {PLAYOFF_FORMAT_OPTIONS.map((option) => {
-                    const isSelected = playoffFormat === option.value;
-                    return (
-                      <Button
-                        key={option.value}
-                        size="$3"
-                        theme={isSelected ? 'active' : 'alt2'}
-                        backgroundColor={
-                          isSelected
-                            ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
-                            : '$gray3'
-                        }
-                        borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                        borderWidth={1}
-                        borderRadius="$3"
-                        onPress={() => handlePlayoffFormatChange(option.value)}
-                        disabled={saving}
-                        opacity={saving ? 0.5 : 1}
-                        icon={isSelected ? <Check size={14} /> : undefined}
-                        aria-pressed={isSelected}
-                        aria-label={`Playoff format: ${option.label}`}
-                        hoverStyle={
-                          saving
-                            ? undefined
-                            : {
-                                backgroundColor: isSelected
-                                  ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                                  : '$gray4',
-                              }
-                        }
-                      >
-                        <Text
-                          fontSize="$2"
-                          fontWeight={isSelected ? '700' : '400'}
-                          color={isSelected ? 'white' : '$color'}
+              <PremiumGate
+                isPremium={isPremium}
+                featureName="Advanced Playoff Format"
+                featureDescription="Unlock 6-team and 8-team playoff brackets with wildcard rounds for deeper post-season competition."
+              >
+                <YStack gap="$2">
+                  <YStack gap="$1">
+                    <Text fontSize="$3" fontWeight="600" color="$color">
+                      Playoff Format
+                    </Text>
+                    <Text fontSize="$2" color="$gray10">
+                      Number of teams that qualify for the playoffs. 6-team
+                      includes a wildcard round; 8-team has two wildcard rounds.
+                    </Text>
+                  </YStack>
+                  <XStack gap="$2" flexWrap="wrap">
+                    {PLAYOFF_FORMAT_OPTIONS.map((option) => {
+                      const isSelected = playoffFormat === option.value;
+                      return (
+                        <Button
+                          key={option.value}
+                          size="$3"
+                          theme={isSelected ? 'active' : 'alt2'}
+                          backgroundColor={
+                            isSelected
+                              ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                              : '$gray3'
+                          }
+                          borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                          borderWidth={1}
+                          borderRadius="$3"
+                          onPress={() =>
+                            handlePlayoffFormatChange(option.value)
+                          }
+                          disabled={saving}
+                          opacity={saving ? 0.5 : 1}
+                          icon={isSelected ? <Check size={14} /> : undefined}
+                          aria-pressed={isSelected}
+                          aria-label={`Playoff format: ${option.label}`}
+                          hoverStyle={
+                            saving
+                              ? undefined
+                              : {
+                                  backgroundColor: isSelected
+                                    ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                                    : '$gray4',
+                                }
+                          }
                         >
-                          {option.label}
-                        </Text>
-                      </Button>
-                    );
-                  })}
-                </XStack>
-              </YStack>
+                          <Text
+                            fontSize="$2"
+                            fontWeight={isSelected ? '700' : '400'}
+                            color={isSelected ? 'white' : '$color'}
+                          >
+                            {option.label}
+                          </Text>
+                        </Button>
+                      );
+                    })}
+                  </XStack>
+                </YStack>
+              </PremiumGate>
 
               <Separator />
 
@@ -945,77 +956,85 @@ export function LeagueSettingsControl({
 
           {/* Salary Cap Settings (LS-646) */}
           <Separator />
-          <YStack gap="$3">
-            <Text fontWeight="600" fontSize="$4">
-              Salary Cap
-            </Text>
-            <Text fontSize="$2" color="$gray10">
-              Control player salary limits and roster spending caps.
-            </Text>
-            <XStack
-              alignItems="center"
-              gap="$3"
-              padding="$3"
-              borderRadius="$4"
-              borderWidth={1}
-              borderColor={
-                salaryCapEnabled
-                  ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
-                  : '$borderColor'
-              }
-              backgroundColor={
-                salaryCapEnabled ? withAlpha(BRAND_NAVY_LIGHT, 0.08) : '$color1'
-              }
-              cursor="pointer"
-              onPress={() => {
-                setSalaryCapEnabled(!salaryCapEnabled);
-                setHasChanges(true);
-              }}
-            >
-              <YStack
-                width={24}
-                height={24}
-                borderRadius={12}
-                borderWidth={2}
+          <PremiumGate
+            isPremium={isPremium}
+            featureName="Salary Cap"
+            featureDescription="Track player salaries and enforce roster spending caps to create a competitive salary cap league."
+          >
+            <YStack gap="$3">
+              <Text fontWeight="600" fontSize="$4">
+                Salary Cap
+              </Text>
+              <Text fontSize="$2" color="$gray10">
+                Control player salary limits and roster spending caps.
+              </Text>
+              <XStack
+                alignItems="center"
+                gap="$3"
+                padding="$3"
+                borderRadius="$4"
+                borderWidth={1}
                 borderColor={
-                  salaryCapEnabled ? BRAND_NAVY_LIGHT : '$borderColor'
+                  salaryCapEnabled
+                    ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
+                    : '$borderColor'
                 }
                 backgroundColor={
-                  salaryCapEnabled ? BRAND_NAVY_LIGHT : 'transparent'
+                  salaryCapEnabled
+                    ? withAlpha(BRAND_NAVY_LIGHT, 0.08)
+                    : '$color1'
                 }
-                alignItems="center"
-                justifyContent="center"
+                cursor="pointer"
+                onPress={() => {
+                  setSalaryCapEnabled(!salaryCapEnabled);
+                  setHasChanges(true);
+                }}
               >
-                {salaryCapEnabled && <Check size={14} color="white" />}
-              </YStack>
-              <YStack flex={1}>
-                <Text fontWeight="600">Enable Salary Cap</Text>
-                <Text fontSize="$2" color="$gray10">
-                  Track player salaries and enforce roster spending limits
-                </Text>
-              </YStack>
-            </XStack>
-            {salaryCapEnabled && (
-              <YStack gap="$2">
-                <Text fontSize="$3" fontWeight="600">
-                  Salary Cap Limit
-                </Text>
-                <Input
-                  value={salaryCap != null ? String(salaryCap) : ''}
-                  onChangeText={(text: string) => {
-                    const n = parseInt(text, 10);
-                    setSalaryCap(isNaN(n) ? null : n);
-                    setHasChanges(true);
-                  }}
-                  placeholder="e.g. 50000000"
-                  keyboardType="numeric"
-                />
-                <Text fontSize="$2" color="$gray10">
-                  Maximum total salary each team can spend
-                </Text>
-              </YStack>
-            )}
-          </YStack>
+                <YStack
+                  width={24}
+                  height={24}
+                  borderRadius={12}
+                  borderWidth={2}
+                  borderColor={
+                    salaryCapEnabled ? BRAND_NAVY_LIGHT : '$borderColor'
+                  }
+                  backgroundColor={
+                    salaryCapEnabled ? BRAND_NAVY_LIGHT : 'transparent'
+                  }
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  {salaryCapEnabled && <Check size={14} color="white" />}
+                </YStack>
+                <YStack flex={1}>
+                  <Text fontWeight="600">Enable Salary Cap</Text>
+                  <Text fontSize="$2" color="$gray10">
+                    Track player salaries and enforce roster spending limits
+                  </Text>
+                </YStack>
+              </XStack>
+              {salaryCapEnabled && (
+                <YStack gap="$2">
+                  <Text fontSize="$3" fontWeight="600">
+                    Salary Cap Limit
+                  </Text>
+                  <Input
+                    value={salaryCap != null ? String(salaryCap) : ''}
+                    onChangeText={(text: string) => {
+                      const n = parseInt(text, 10);
+                      setSalaryCap(isNaN(n) ? null : n);
+                      setHasChanges(true);
+                    }}
+                    placeholder="e.g. 50000000"
+                    keyboardType="numeric"
+                  />
+                  <Text fontSize="$2" color="$gray10">
+                    Maximum total salary each team can spend
+                  </Text>
+                </YStack>
+              )}
+            </YStack>
+          </PremiumGate>
 
           {/* Validation warning */}
           {validationError && (

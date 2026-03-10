@@ -8,6 +8,8 @@ import {
   DEFAULT_NUM_TEAMS,
 } from '../../constants/league';
 import { PageMeta } from '../../components/PageMeta';
+import { PremiumGate } from '../../components/PremiumGate';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import {
   GetUserLeagues,
   GetUserLeaguesQuery,
@@ -123,6 +125,7 @@ const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500];
 
 export function LeagueCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
+  const isPremium = useIsPremium();
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
     numberOfTeams: DEFAULT_NUM_TEAMS,
@@ -725,116 +728,125 @@ export function LeagueCreatePage(): React.JSX.Element {
               </YStack>
 
               {/* Era Filter — Era-Based Leagues (LS-295) */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Historical Era Filter
-                </Text>
-                <Text size="$2" color="$gray10">
-                  Restrict your league's player pool to a specific baseball era
-                  — a unique differentiator no live-stats platform can offer.
-                </Text>
-                <XStack space="$2" flexWrap="wrap">
-                  {ERA_FILTER_OPTIONS.map((option) => (
-                    <Button
-                      key={option.value}
-                      size="$3"
-                      onPress={() => {
-                        handleInputChange('eraFilter', option.value);
-                      }}
-                      disabled={loading}
-                      backgroundColor={
-                        formData.eraFilter === option.value
-                          ? '$orange8'
-                          : '$color2'
-                      }
-                      borderColor={
-                        formData.eraFilter === option.value
-                          ? '$orange8'
-                          : '$borderColor'
-                      }
-                      borderWidth={formData.eraFilter === option.value ? 2 : 1}
-                      hoverStyle={{
-                        backgroundColor:
+              <PremiumGate
+                isPremium={isPremium}
+                featureName="Historical Era Selection"
+                featureDescription="Restrict your league's player pool to a specific baseball era — a unique differentiator no live-stats platform can offer."
+              >
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Historical Era Filter
+                  </Text>
+                  <Text size="$2" color="$gray10">
+                    Restrict your league's player pool to a specific baseball
+                    era — a unique differentiator no live-stats platform can
+                    offer.
+                  </Text>
+                  <XStack space="$2" flexWrap="wrap">
+                    {ERA_FILTER_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        size="$3"
+                        onPress={() => {
+                          handleInputChange('eraFilter', option.value);
+                        }}
+                        disabled={loading}
+                        backgroundColor={
                           formData.eraFilter === option.value
-                            ? '$orange9'
-                            : '$color3',
-                      }}
-                      pressStyle={{ scale: 0.95 }}
-                    >
-                      <Text
-                        color={
+                            ? '$orange8'
+                            : '$color2'
+                        }
+                        borderColor={
                           formData.eraFilter === option.value
-                            ? '$orange12'
-                            : '$color'
+                            ? '$orange8'
+                            : '$borderColor'
                         }
-                        fontWeight={
-                          formData.eraFilter === option.value ? '600' : '400'
+                        borderWidth={
+                          formData.eraFilter === option.value ? 2 : 1
                         }
-                        fontSize="$2"
+                        hoverStyle={{
+                          backgroundColor:
+                            formData.eraFilter === option.value
+                              ? '$orange9'
+                              : '$color3',
+                        }}
+                        pressStyle={{ scale: 0.95 }}
                       >
-                        {option.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </XStack>
-
-                {/* Custom era year range */}
-                {formData.eraFilter === 'custom' && (
-                  <XStack space="$3" alignItems="center" flexWrap="wrap">
-                    <YStack flex={1} space="$1">
-                      <Text fontSize="$2" color="$gray10">
-                        Start Year
-                      </Text>
-                      <Input
-                        size="$3"
-                        placeholder="e.g. 1940"
-                        value={
-                          formData.customEraStartYear !== undefined
-                            ? String(formData.customEraStartYear)
-                            : ''
-                        }
-                        onChangeText={(text: string) => {
-                          const year = parseInt(text, 10);
-                          handleInputChange(
-                            'customEraStartYear',
-                            isNaN(year) ? '' : year,
-                          );
-                        }}
-                        keyboardType="numeric"
-                        disabled={loading}
-                        borderColor="$orange8"
-                      />
-                    </YStack>
-                    <Text color="$gray10" marginTop="$4">
-                      –
-                    </Text>
-                    <YStack flex={1} space="$1">
-                      <Text fontSize="$2" color="$gray10">
-                        End Year
-                      </Text>
-                      <Input
-                        size="$3"
-                        placeholder="e.g. 1960"
-                        value={
-                          formData.customEraEndYear !== undefined
-                            ? String(formData.customEraEndYear)
-                            : ''
-                        }
-                        onChangeText={(text: string) => {
-                          const year = parseInt(text, 10);
-                          handleInputChange(
-                            'customEraEndYear',
-                            isNaN(year) ? '' : year,
-                          );
-                        }}
-                        keyboardType="numeric"
-                        disabled={loading}
-                        borderColor="$orange8"
-                      />
-                    </YStack>
+                        <Text
+                          color={
+                            formData.eraFilter === option.value
+                              ? '$orange12'
+                              : '$color'
+                          }
+                          fontWeight={
+                            formData.eraFilter === option.value ? '600' : '400'
+                          }
+                          fontSize="$2"
+                        >
+                          {option.label}
+                        </Text>
+                      </Button>
+                    ))}
                   </XStack>
-                )}
-              </YStack>
+
+                  {/* Custom era year range */}
+                  {formData.eraFilter === 'custom' && (
+                    <XStack space="$3" alignItems="center" flexWrap="wrap">
+                      <YStack flex={1} space="$1">
+                        <Text fontSize="$2" color="$gray10">
+                          Start Year
+                        </Text>
+                        <Input
+                          size="$3"
+                          placeholder="e.g. 1940"
+                          value={
+                            formData.customEraStartYear !== undefined
+                              ? String(formData.customEraStartYear)
+                              : ''
+                          }
+                          onChangeText={(text: string) => {
+                            const year = parseInt(text, 10);
+                            handleInputChange(
+                              'customEraStartYear',
+                              isNaN(year) ? '' : year,
+                            );
+                          }}
+                          keyboardType="numeric"
+                          disabled={loading}
+                          borderColor="$orange8"
+                        />
+                      </YStack>
+                      <Text color="$gray10" marginTop="$4">
+                        –
+                      </Text>
+                      <YStack flex={1} space="$1">
+                        <Text fontSize="$2" color="$gray10">
+                          End Year
+                        </Text>
+                        <Input
+                          size="$3"
+                          placeholder="e.g. 1960"
+                          value={
+                            formData.customEraEndYear !== undefined
+                              ? String(formData.customEraEndYear)
+                              : ''
+                          }
+                          onChangeText={(text: string) => {
+                            const year = parseInt(text, 10);
+                            handleInputChange(
+                              'customEraEndYear',
+                              isNaN(year) ? '' : year,
+                            );
+                          }}
+                          keyboardType="numeric"
+                          disabled={loading}
+                          borderColor="$orange8"
+                        />
+                      </YStack>
+                    </XStack>
+                  )}
+                </YStack>
+              </PremiumGate>
 
               {/* Hall of Fame Only Toggle */}
               <YStack space="$2">
@@ -1162,212 +1174,227 @@ export function LeagueCreatePage(): React.JSX.Element {
 
               {/* FAAB Budget (only when FAAB selected) */}
               {formData.waiverType === 'faab' && (
-                <YStack space="$2">
-                  <Text size="$4" fontWeight="600" color="$gray12">
-                    FAAB Budget Per Team
-                  </Text>
-                  <XStack space="$2" flexWrap="wrap">
-                    {FAAB_BUDGET_OPTIONS.map((amount) => (
-                      <Button
-                        key={amount}
-                        size="$3"
-                        variant={
-                          formData.faabBudgetDefault === amount
-                            ? 'primary'
-                            : 'outlined'
-                        }
-                        onPress={() => {
-                          handleInputChange('faabBudgetDefault', amount);
-                        }}
-                        disabled={loading}
-                        minWidth="$5"
-                        backgroundColor={
-                          formData.faabBudgetDefault === amount
-                            ? '$purple8'
-                            : '$color2'
-                        }
-                        borderColor={
-                          formData.faabBudgetDefault === amount
-                            ? '$purple8'
-                            : '$borderColor'
-                        }
-                        borderWidth={
-                          formData.faabBudgetDefault === amount ? 2 : 1
-                        }
-                        hoverStyle={{
-                          backgroundColor:
+                <PremiumGate
+                  isPremium={isPremium}
+                  featureName="FAAB Waiver Settings"
+                  featureDescription="Configure Free Agent Acquisition Budget (FAAB) bidding — the most competitive waiver system for serious leagues."
+                >
+                  <YStack space="$2">
+                    <Text size="$4" fontWeight="600" color="$gray12">
+                      FAAB Budget Per Team
+                    </Text>
+                    <XStack space="$2" flexWrap="wrap">
+                      {FAAB_BUDGET_OPTIONS.map((amount) => (
+                        <Button
+                          key={amount}
+                          size="$3"
+                          variant={
                             formData.faabBudgetDefault === amount
-                              ? '$purple9'
-                              : '$color3',
-                          borderColor:
-                            formData.faabBudgetDefault === amount
-                              ? '$purple9'
-                              : '$borderColorHover',
-                        }}
-                        pressStyle={{
-                          scale: 0.95,
-                          backgroundColor:
-                            formData.faabBudgetDefault === amount
-                              ? '$purple7'
-                              : '$color4',
-                        }}
-                      >
-                        <Text
-                          color={
-                            formData.faabBudgetDefault === amount
-                              ? '$purple12'
-                              : '$color'
+                              ? 'primary'
+                              : 'outlined'
                           }
-                          fontWeight={
+                          onPress={() => {
+                            handleInputChange('faabBudgetDefault', amount);
+                          }}
+                          disabled={loading}
+                          minWidth="$5"
+                          backgroundColor={
                             formData.faabBudgetDefault === amount
-                              ? '600'
-                              : '400'
+                              ? '$purple8'
+                              : '$color2'
                           }
+                          borderColor={
+                            formData.faabBudgetDefault === amount
+                              ? '$purple8'
+                              : '$borderColor'
+                          }
+                          borderWidth={
+                            formData.faabBudgetDefault === amount ? 2 : 1
+                          }
+                          hoverStyle={{
+                            backgroundColor:
+                              formData.faabBudgetDefault === amount
+                                ? '$purple9'
+                                : '$color3',
+                            borderColor:
+                              formData.faabBudgetDefault === amount
+                                ? '$purple9'
+                                : '$borderColorHover',
+                          }}
+                          pressStyle={{
+                            scale: 0.95,
+                            backgroundColor:
+                              formData.faabBudgetDefault === amount
+                                ? '$purple7'
+                                : '$color4',
+                          }}
                         >
-                          ${amount}
-                        </Text>
-                      </Button>
-                    ))}
-                  </XStack>
-                  <Text size="$2" color="$gray10">
-                    Each team starts with this budget to bid on free agents for
-                    the season
-                  </Text>
-                </YStack>
+                          <Text
+                            color={
+                              formData.faabBudgetDefault === amount
+                                ? '$purple12'
+                                : '$color'
+                            }
+                            fontWeight={
+                              formData.faabBudgetDefault === amount
+                                ? '600'
+                                : '400'
+                            }
+                          >
+                            ${amount}
+                          </Text>
+                        </Button>
+                      ))}
+                    </XStack>
+                    <Text size="$2" color="$gray10">
+                      Each team starts with this budget to bid on free agents
+                      for the season
+                    </Text>
+                  </YStack>
+                </PremiumGate>
               )}
 
               {/* Salary Cap */}
-              <YStack space="$3">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Salary Cap
-                </Text>
-                <XStack
-                  alignItems="center"
-                  gap="$3"
-                  padding="$3"
-                  borderRadius="$4"
-                  borderWidth={1}
-                  borderColor={
-                    formData.salaryCapEnabled
-                      ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
-                      : '$borderColor'
-                  }
-                  backgroundColor={
-                    formData.salaryCapEnabled
-                      ? withAlpha(BRAND_NAVY_LIGHT, 0.08)
-                      : '$color1'
-                  }
-                  cursor="pointer"
-                  onPress={() =>
-                    handleInputChange(
-                      'salaryCapEnabled',
-                      !formData.salaryCapEnabled,
-                    )
-                  }
-                >
-                  <YStack
-                    width={24}
-                    height={24}
-                    borderRadius={12}
-                    borderWidth={2}
+              <PremiumGate
+                isPremium={isPremium}
+                featureName="Salary Cap"
+                featureDescription="Track player salaries and enforce roster spending caps for a competitive salary cap league format."
+              >
+                <YStack space="$3">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Salary Cap
+                  </Text>
+                  <XStack
+                    alignItems="center"
+                    gap="$3"
+                    padding="$3"
+                    borderRadius="$4"
+                    borderWidth={1}
                     borderColor={
                       formData.salaryCapEnabled
-                        ? BRAND_NAVY_LIGHT
+                        ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
                         : '$borderColor'
                     }
                     backgroundColor={
                       formData.salaryCapEnabled
-                        ? BRAND_NAVY_LIGHT
-                        : 'transparent'
+                        ? withAlpha(BRAND_NAVY_LIGHT, 0.08)
+                        : '$color1'
                     }
-                    alignItems="center"
-                    justifyContent="center"
+                    cursor="pointer"
+                    onPress={() =>
+                      handleInputChange(
+                        'salaryCapEnabled',
+                        !formData.salaryCapEnabled,
+                      )
+                    }
                   >
-                    {formData.salaryCapEnabled && (
-                      <Text fontSize={14} color="white" fontWeight="700">
-                        ✓
-                      </Text>
-                    )}
-                  </YStack>
-                  <YStack flex={1}>
-                    <Text fontWeight="600" color="$color12">
-                      Enable Salary Cap
-                    </Text>
-                    <Text size="$2" color="$gray10">
-                      Track player salaries and enforce roster spending limits
-                    </Text>
-                  </YStack>
-                </XStack>
-
-                {formData.salaryCapEnabled && (
-                  <YStack space="$2">
-                    <Text size="$3" fontWeight="600" color="$gray12">
-                      Salary Cap Limit
-                    </Text>
-                    <Input
-                      value={
-                        formData.salaryCap !== undefined
-                          ? String(formData.salaryCap)
-                          : ''
+                    <YStack
+                      width={24}
+                      height={24}
+                      borderRadius={12}
+                      borderWidth={2}
+                      borderColor={
+                        formData.salaryCapEnabled
+                          ? BRAND_NAVY_LIGHT
+                          : '$borderColor'
                       }
-                      onChangeText={(text: string) => {
-                        const n = parseInt(text, 10);
-                        handleInputChange('salaryCap', isNaN(n) ? 0 : n);
-                      }}
-                      placeholder="e.g. 50000000"
-                      keyboardType="numeric"
-                      disabled={loading}
-                    />
-                    <Text size="$2" color="$gray10">
-                      Maximum total salary each team can spend on their roster
-                    </Text>
-                  </YStack>
-                )}
+                      backgroundColor={
+                        formData.salaryCapEnabled
+                          ? BRAND_NAVY_LIGHT
+                          : 'transparent'
+                      }
+                      alignItems="center"
+                      justifyContent="center"
+                    >
+                      {formData.salaryCapEnabled && (
+                        <Text fontSize={14} color="white" fontWeight="700">
+                          ✓
+                        </Text>
+                      )}
+                    </YStack>
+                    <YStack flex={1}>
+                      <Text fontWeight="600" color="$color12">
+                        Enable Salary Cap
+                      </Text>
+                      <Text size="$2" color="$gray10">
+                        Track player salaries and enforce roster spending limits
+                      </Text>
+                    </YStack>
+                  </XStack>
 
-                {formData.selectionMethod === 'auction' && (
-                  <>
+                  {formData.salaryCapEnabled && (
                     <YStack space="$2">
                       <Text size="$3" fontWeight="600" color="$gray12">
-                        Auction Budget per Team
+                        Salary Cap Limit
                       </Text>
                       <Input
-                        value={String(formData.auctionBudget)}
+                        value={
+                          formData.salaryCap !== undefined
+                            ? String(formData.salaryCap)
+                            : ''
+                        }
                         onChangeText={(text: string) => {
                           const n = parseInt(text, 10);
-                          handleInputChange(
-                            'auctionBudget',
-                            isNaN(n) ? 200 : n,
-                          );
+                          handleInputChange('salaryCap', isNaN(n) ? 0 : n);
                         }}
-                        placeholder="200"
+                        placeholder="e.g. 50000000"
                         keyboardType="numeric"
                         disabled={loading}
                       />
                       <Text size="$2" color="$gray10">
-                        Each team's total budget for the auction draft
+                        Maximum total salary each team can spend on their roster
                       </Text>
                     </YStack>
-                    <YStack space="$2">
-                      <Text size="$3" fontWeight="600" color="$gray12">
-                        Minimum Bid
-                      </Text>
-                      <Input
-                        value={String(formData.auctionMinBid)}
-                        onChangeText={(text: string) => {
-                          const n = parseInt(text, 10);
-                          handleInputChange('auctionMinBid', isNaN(n) ? 1 : n);
-                        }}
-                        placeholder="1"
-                        keyboardType="numeric"
-                        disabled={loading}
-                      />
-                      <Text size="$2" color="$gray10">
-                        Minimum amount a team can bid on any player
-                      </Text>
-                    </YStack>
-                  </>
-                )}
-              </YStack>
+                  )}
+
+                  {formData.selectionMethod === 'auction' && (
+                    <>
+                      <YStack space="$2">
+                        <Text size="$3" fontWeight="600" color="$gray12">
+                          Auction Budget per Team
+                        </Text>
+                        <Input
+                          value={String(formData.auctionBudget)}
+                          onChangeText={(text: string) => {
+                            const n = parseInt(text, 10);
+                            handleInputChange(
+                              'auctionBudget',
+                              isNaN(n) ? 200 : n,
+                            );
+                          }}
+                          placeholder="200"
+                          keyboardType="numeric"
+                          disabled={loading}
+                        />
+                        <Text size="$2" color="$gray10">
+                          Each team's total budget for the auction draft
+                        </Text>
+                      </YStack>
+                      <YStack space="$2">
+                        <Text size="$3" fontWeight="600" color="$gray12">
+                          Minimum Bid
+                        </Text>
+                        <Input
+                          value={String(formData.auctionMinBid)}
+                          onChangeText={(text: string) => {
+                            const n = parseInt(text, 10);
+                            handleInputChange(
+                              'auctionMinBid',
+                              isNaN(n) ? 1 : n,
+                            );
+                          }}
+                          placeholder="1"
+                          keyboardType="numeric"
+                          disabled={loading}
+                        />
+                        <Text size="$2" color="$gray10">
+                          Minimum amount a team can bid on any player
+                        </Text>
+                      </YStack>
+                    </>
+                  )}
+                </YStack>
+              </PremiumGate>
 
               {/* Draft Date and Time */}
               <YStack space="$2">

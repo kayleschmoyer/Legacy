@@ -1,6 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInitializeMockDraftMutation } from '../../api/db/graphql.generated';
+import { PremiumGate } from '../../components/PremiumGate';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import {
   BLACK,
   BRAND_GOLD,
@@ -372,6 +374,7 @@ function SetupScreen({
 
 export function MockDraftPage(): React.JSX.Element {
   const navigate = useNavigate();
+  const isPremium = useIsPremium();
   const [initializeMockDraft, { loading, error }] =
     useInitializeMockDraftMutation();
 
@@ -391,12 +394,18 @@ export function MockDraftPage(): React.JSX.Element {
   };
 
   return (
-    <SetupScreen
-      onStart={(s) => {
-        void handleStart(s);
-      }}
-      loading={loading}
-      error={error?.message ?? null}
-    />
+    <PremiumGate
+      isPremium={isPremium}
+      featureName="Mock Draft Simulator"
+      featureDescription="Practice your draft strategy with the full Mock Draft simulator before the real draft."
+    >
+      <SetupScreen
+        onStart={(s) => {
+          void handleStart(s);
+        }}
+        loading={loading}
+        error={error?.message ?? null}
+      />
+    </PremiumGate>
   );
 }

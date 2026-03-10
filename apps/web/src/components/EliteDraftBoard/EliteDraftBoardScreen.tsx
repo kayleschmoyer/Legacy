@@ -41,6 +41,7 @@ import { DraftGrid } from './DraftGrid';
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
 import { getDraftCommentary } from './draftUtils';
+import { PremiumGate } from '../PremiumGate';
 import { DEFAULT_NUM_TEAMS } from '../../constants/league';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import {
@@ -96,6 +97,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   // ---- Auth ----
   const { user } = useAuth();
   const userId = user?.id ?? 0;
+  const isPremium = user?.accessLevel === 'admin';
 
   // ---- UI State ----
   const [selectedPosition, setSelectedPosition] = useState('ALL');
@@ -2160,11 +2162,17 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
           {/* Draft Intelligence (only when it's the user's turn) */}
           {isMyPick && (
-            <DraftIntelligence
-              draftId={draftId}
-              teamId={myTeamId}
-              currentOverallPick={currentPickInfo?.overallPick ?? 0}
-            />
+            <PremiumGate
+              isPremium={isPremium}
+              featureName="Draft Recommendations"
+              featureDescription="Get AI-powered player recommendations tailored to your roster's needs on every pick."
+            >
+              <DraftIntelligence
+                draftId={draftId}
+                teamId={myTeamId}
+                currentOverallPick={currentPickInfo?.overallPick ?? 0}
+              />
+            </PremiumGate>
           )}
 
           {/* My Roster */}

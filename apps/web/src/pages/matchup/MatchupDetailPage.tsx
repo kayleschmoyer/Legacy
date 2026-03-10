@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
+import { PremiumGate } from '../../components/PremiumGate';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { MatchupWinProbabilityPanel } from '../../features/matchup/MatchupWinProbabilityPanel';
 import { GamesRemaining } from '../../features/matchup/GamesRemaining';
@@ -13,6 +14,7 @@ import {
   MatchupStatus,
   useGetUserTeamIdQuery,
 } from '../../api/db/graphql.generated';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import {
   useCurrentWeek,
   useMatchupById,
@@ -63,6 +65,8 @@ export function MatchupDetailPage() {
       ) ?? null
     );
   }, [currentWeek, userTeamId, allLeagueMatchups]);
+
+  const isPremium = useIsPremium();
 
   if (loading) {
     return (
@@ -199,7 +203,13 @@ export function MatchupDetailPage() {
       <MatchupScoreboard matchup={matchup} gamesRemaining={gamesRemaining} />
 
       {/* Win Probability & Projections */}
-      <MatchupWinProbabilityPanel matchup={matchup} />
+      <PremiumGate
+        isPremium={isPremium}
+        featureName="Matchup Projections"
+        featureDescription="See win probability and projected scores for every matchup based on remaining games."
+      >
+        <MatchupWinProbabilityPanel matchup={matchup} />
+      </PremiumGate>
 
       {/* Games Progress */}
       {matchup.gamesPerMatchup && (
@@ -237,7 +247,13 @@ export function MatchupDetailPage() {
 
       {/* Narrative Recap — shown only for completed matchups */}
       {matchup.status === MatchupStatus.Completed && matchupIdNum && (
-        <MatchupRecapPanel matchupId={matchupIdNum} />
+        <PremiumGate
+          isPremium={isPremium}
+          featureName="AI Matchup Recap"
+          featureDescription="Get AI-generated narrative recaps that summarize your matchup story, highlights, and standout performances."
+        >
+          <MatchupRecapPanel matchupId={matchupIdNum} />
+        </PremiumGate>
       )}
 
       {/* Team Rosters & Player Matchups */}
