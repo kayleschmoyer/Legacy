@@ -36,8 +36,28 @@ export const server = new ApolloServer({
       stack: error instanceof Error ? error.stack : undefined,
     });
 
-    // Return the formatted error to the client
-    return formattedError;
+    // Mask internal errors — only pass through client-facing error messages.
+    // User-visible codes (validation, auth, bad input) are safe to return as-is.
+    const clientFacingCodes = new Set([
+      'GRAPHQL_VALIDATION_FAILED',
+      'GRAPHQL_PARSE_FAILED',
+      'BAD_USER_INPUT',
+      'UNAUTHENTICATED',
+      'FORBIDDEN',
+      'NOT_FOUND',
+      'PERSISTED_QUERY_NOT_FOUND',
+      'PERSISTED_QUERY_NOT_SUPPORTED',
+    ]);
+    const code = formattedError.extensions?.code as string | undefined;
+    if (code && clientFacingCodes.has(code)) {
+      return formattedError;
+    }
+
+    // Strip internal message; retain path/locations for client-side error correlation.
+    return {
+      ...formattedError,
+      message: 'Internal server error',
+    };
   },
 });
 

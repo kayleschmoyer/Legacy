@@ -181,7 +181,6 @@ export function createLambdaHandler(
         },
         body: JSON.stringify({
           error: 'Internal server error',
-          message: error instanceof Error ? error.message : String(error),
         }),
       };
     }

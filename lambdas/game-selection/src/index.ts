@@ -952,7 +952,6 @@ const baseGameSelectionHandler = async (
       statusCode: 500,
       body: JSON.stringify({
         error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
       }),
     });
   }
