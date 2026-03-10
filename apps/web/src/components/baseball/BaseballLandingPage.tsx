@@ -1481,37 +1481,67 @@ export function BaseballLandingPage() {
                     </YStack>
                   </XStack>
 
-                  {/* Public League toggle */}
-                  <XStack alignItems="center" justifyContent="space-between">
-                    <YStack>
-                      <Text fontWeight="600" fontSize="$3" color="$gray12">
-                        Public League
-                      </Text>
-                      <Text fontSize="$1" color="$gray10">
-                        Allow anyone to find and join
-                      </Text>
-                    </YStack>
-                    <Button
-                      size="$2"
-                      onPress={() => setIsPublic((p) => !p)}
-                      backgroundColor={isPublic ? BRAND_NAVY_LIGHT : '$color2'}
-                      borderColor={isPublic ? BRAND_NAVY_LIGHT : '$borderColor'}
-                      borderWidth={isPublic ? 2 : 1}
-                      aria-pressed={isPublic}
-                      aria-label={
-                        isPublic
-                          ? 'Public league (click to make private)'
-                          : 'Private league (click to make public)'
-                      }
-                    >
-                      <Text
-                        fontSize="$2"
-                        color={isPublic ? BRAND_GOLD : '$color'}
+                  {/* League Visibility */}
+                  <YStack space="$1.5">
+                    <Text fontWeight="600" fontSize="$3" color="$gray12">
+                      League Visibility
+                    </Text>
+                    <XStack gap="$1.5">
+                      <Button
+                        size="$2"
+                        flex={1}
+                        onPress={() => setIsPublic(false)}
+                        backgroundColor={
+                          !isPublic ? BRAND_NAVY_LIGHT : '$color2'
+                        }
+                        borderColor={
+                          !isPublic ? BRAND_NAVY_LIGHT : '$borderColor'
+                        }
+                        borderWidth={!isPublic ? 2 : 1}
+                        aria-pressed={!isPublic}
+                        aria-label="Private league"
                       >
-                        {isPublic ? 'Public' : 'Private'}
-                      </Text>
-                    </Button>
-                  </XStack>
+                        <Text
+                          fontSize="$2"
+                          color={!isPublic ? BRAND_GOLD : '$color'}
+                        >
+                          <span role="img" aria-label="private">
+                            🔒
+                          </span>{' '}
+                          Private
+                        </Text>
+                      </Button>
+                      <Button
+                        size="$2"
+                        flex={1}
+                        onPress={() => setIsPublic(true)}
+                        backgroundColor={
+                          isPublic ? BRAND_NAVY_LIGHT : '$color2'
+                        }
+                        borderColor={
+                          isPublic ? BRAND_NAVY_LIGHT : '$borderColor'
+                        }
+                        borderWidth={isPublic ? 2 : 1}
+                        aria-pressed={isPublic}
+                        aria-label="Public league"
+                      >
+                        <Text
+                          fontSize="$2"
+                          color={isPublic ? BRAND_GOLD : '$color'}
+                        >
+                          <span role="img" aria-label="public">
+                            🌐
+                          </span>{' '}
+                          Public
+                        </Text>
+                      </Button>
+                    </XStack>
+                    <Text fontSize="$1" color="$gray10">
+                      {isPublic
+                        ? 'Anyone can browse and join this league without an invite code'
+                        : 'Only people with your invite code can join this league'}
+                    </Text>
+                  </YStack>
                 </YStack>
               </YStack>
 
