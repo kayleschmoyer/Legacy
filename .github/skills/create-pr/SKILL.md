@@ -116,7 +116,7 @@ with properly escaped content via a variable.
 gh pr create --title "LS-#### fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
 # 3. Clean up the temp file
-Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
+.\scripts\cleanup-pr-body.ps1
 ```
 
 ### ❌ NEVER Do These
@@ -178,7 +178,7 @@ If a PR was already created with broken formatting:
 # 2. Update the existing PR
 gh pr edit <PR_NUMBER> --body-file ".github/tmp-pr-body.md"
 # 3. Clean up
-Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
+.\scripts\cleanup-pr-body.ps1
 ```
 
 ## PR Body Template
@@ -451,7 +451,7 @@ git push origin HEAD
 gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
 # 6. Clean up temp file
-Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
+.\scripts\cleanup-pr-body.ps1
 
 # 7. Update Jira ticket
 acli jira workitem transition --key LS-1234 --status "In Review"
