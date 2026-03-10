@@ -39,6 +39,8 @@ export const players = pgTable(
   (table) => {
     return {
       playersUkBrefId: unique('players_uk_bref_id').on(table.brefId),
+      // GIN trigram index for LIKE '%name%' search: idx_players_name_trgm (LS-905)
+      // Managed by migration — cannot be modeled in Drizzle (expression + pg_trgm ops class)
     };
   },
 );

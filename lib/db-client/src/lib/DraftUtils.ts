@@ -402,12 +402,15 @@ export async function playerMeetsMinCareerSeasons(
  *
  * Uses `career_batting.g` — NOT `players.total_games` which double-counts
  * batting + pitching appearances.  Pure pitchers with no `career_batting`
- * record pass via the `NOT EXISTS` escape hatch.
+ * record pass automatically (no matching row → NOT EXISTS is true).
+ *
+ * Optimized (LS-905): single NOT EXISTS replaces the former NOT EXISTS OR IN
+ * pattern, allowing one index scan on career_batting(player_id).
  */
 export function careerGamesCondition(minCareerGames: number): SQL {
-  return sql`(
-    NOT EXISTS (SELECT 1 FROM career_batting WHERE player_id = p.id)
-    OR p.id IN (SELECT player_id FROM career_batting WHERE g >= ${minCareerGames})
+  return sql`NOT EXISTS (
+    SELECT 1 FROM career_batting cb
+    WHERE cb.player_id = p.id AND cb.g < ${minCareerGames}
   )`;
 }
 
@@ -415,7 +418,11 @@ export function careerGamesCondition(minCareerGames: number): SQL {
  * SQL condition: player meets a minimum career-seasons threshold.
  *
  * Counts only MLB (AL / NL) batting seasons.  Pure pitchers with no
- * MLB batting records pass via the `NOT EXISTS` escape hatch.
+ * MLB batting records pass automatically (no matching rows → NOT EXISTS is true).
+ *
+ * Optimized (LS-905): replaced IN (GROUP BY HAVING) with a correlated scalar
+ * subquery so the planner only evaluates the specific player's seasons
+ * via idx_season_batting_player_lgid instead of materializing all players.
  */
 export function careerSeasonsCondition(minCareerSeasons: number): SQL {
   return sql`(
@@ -423,12 +430,9 @@ export function careerSeasonsCondition(minCareerSeasons: number): SQL {
       SELECT 1 FROM season_batting
       WHERE player_id = p.id AND lg_id IN ('AL', 'NL')
     )
-    OR p.id IN (
-      SELECT player_id FROM season_batting
-      WHERE lg_id IN ('AL', 'NL')
-      GROUP BY player_id
-      HAVING COUNT(DISTINCT season) >= ${minCareerSeasons}
-    )
+    OR (SELECT COUNT(DISTINCT season) FROM season_batting
+        WHERE player_id = p.id AND lg_id IN ('AL', 'NL')
+       ) >= ${minCareerSeasons}
   )`;
 }
 

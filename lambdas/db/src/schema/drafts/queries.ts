@@ -222,9 +222,9 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       if (league && league.playerPool !== 'all') {
         const poolUpper = league.playerPool.toUpperCase();
         sqlConditions.push(
-          sql`p.id IN (
-            SELECT DISTINCT sb.player_id FROM season_batting sb
-            WHERE sb.lg_id = ${poolUpper}
+          sql`EXISTS (
+            SELECT 1 FROM season_batting sb
+            WHERE sb.player_id = p.id AND sb.lg_id = ${poolUpper}
           )`,
         );
       }
@@ -242,23 +242,23 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         const pos = position.trim().toUpperCase();
         if (pos === 'P') {
           sqlConditions.push(
-            sql`p.id IN (
-              SELECT player_id FROM public.player_eligible_positions
-              WHERE position IN ('SP', 'RP')
+            sql`EXISTS (
+              SELECT 1 FROM public.player_eligible_positions pep
+              WHERE pep.player_id = p.id AND pep.position IN ('SP', 'RP')
             )`,
           );
         } else if (pos === 'OF') {
           sqlConditions.push(
-            sql`p.id IN (
-              SELECT player_id FROM public.player_eligible_positions
-              WHERE position IN ('LF', 'CF', 'RF')
+            sql`EXISTS (
+              SELECT 1 FROM public.player_eligible_positions pep
+              WHERE pep.player_id = p.id AND pep.position IN ('LF', 'CF', 'RF')
             )`,
           );
         } else {
           sqlConditions.push(
-            sql`p.id IN (
-              SELECT player_id FROM public.player_eligible_positions
-              WHERE position = ${pos}
+            sql`EXISTS (
+              SELECT 1 FROM public.player_eligible_positions pep
+              WHERE pep.player_id = p.id AND pep.position = ${pos}
             )`,
           );
         }
