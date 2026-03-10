@@ -9,6 +9,7 @@ import {
   integer,
   text,
   timestamp,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -55,6 +56,7 @@ export const usersInAppInternal = appInternal.table(
       withTimezone: true,
     }),
     avatarUrl: text('avatar_url'),
+    subscriptionTier: text('subscription_tier').notNull().default('free'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -145,3 +147,43 @@ export const dataRequests = appInternal.table(
     };
   },
 );
+
+export const subscriptions = appInternal.table(
+  'subscriptions',
+  {
+    id: serial('id').primaryKey().notNull(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => usersInAppInternal.id, { onDelete: 'cascade' }),
+    stripeCustomerId: text('stripe_customer_id').notNull(),
+    stripeSubscriptionId: text('stripe_subscription_id').notNull(),
+    status: text('status').notNull().default('inactive'),
+    tier: text('tier').notNull().default('free'),
+    currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+    cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      userIdIdx: index('subscriptions_user_id_idx').on(table.userId),
+      stripeCustomerIdUk: unique('subscriptions_stripe_customer_id_uk').on(
+        table.stripeCustomerId,
+      ),
+      stripeSubscriptionIdUk: unique(
+        'subscriptions_stripe_subscription_id_uk',
+      ).on(table.stripeSubscriptionId),
+    };
+  },
+);
+
+export const stripeEvents = appInternal.table('stripe_events', {
+  eventId: text('event_id').primaryKey().notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

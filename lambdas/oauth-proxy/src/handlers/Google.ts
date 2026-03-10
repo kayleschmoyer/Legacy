@@ -518,6 +518,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       accessLevel: 'none' as const,
       avatarUrl: null,
       privacyPolicyAcceptedAt: null,
+      subscriptionTier: 'free',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
