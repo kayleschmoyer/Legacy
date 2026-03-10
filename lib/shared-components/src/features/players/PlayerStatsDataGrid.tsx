@@ -107,6 +107,8 @@ export interface PlayerStatsDataGridProps {
   className?: string;
   /** Test ID for automated testing */
   testId?: string;
+  /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
+  statsFormat?: 'standard' | 'expanded';
 }
 
 // =============================================================================
@@ -334,6 +336,7 @@ export function PlayerStatsDataGrid({
   maxHeight = '600px',
   className,
   testId = 'player-stats-data-grid',
+  statsFormat = 'expanded',
 }: PlayerStatsDataGridProps): React.ReactElement {
   // =============================================================================
   // State Management
@@ -550,10 +553,11 @@ export function PlayerStatsDataGrid({
   // =============================================================================
 
   const visibleColumns = useMemo(() => {
-    // For now, show all columns. In a real implementation, you might
-    // filter based on screen size or user preferences
+    if (statsFormat === 'standard') {
+      return CAREER_STATS_COLUMNS.filter((col) => col.priority === 'high');
+    }
     return CAREER_STATS_COLUMNS;
-  }, []);
+  }, [statsFormat]);
 
   // =============================================================================
   // Render Helpers

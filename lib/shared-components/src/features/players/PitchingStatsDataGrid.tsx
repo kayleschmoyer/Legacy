@@ -88,6 +88,8 @@ export interface PitchingStatsDataGridProps {
   maxHeight?: number | string;
   className?: string;
   testId?: string;
+  /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
+  statsFormat?: 'standard' | 'expanded';
 }
 
 // =============================================================================
@@ -250,6 +252,7 @@ export function PitchingStatsDataGrid({
   maxHeight = '600px',
   className,
   testId = 'pitching-stats-data-grid',
+  statsFormat = 'expanded',
 }: PitchingStatsDataGridProps): React.ReactElement {
   // =============================================================================
   // State Management
@@ -400,7 +403,12 @@ export function PitchingStatsDataGrid({
   const hasNextPage = currentOffset + pageSize < totalCount;
   const hasPreviousPage = currentOffset > 0;
 
-  const visibleColumns = useMemo(() => PITCHING_STATS_COLUMNS, []);
+  const visibleColumns = useMemo(() => {
+    if (statsFormat === 'standard') {
+      return PITCHING_STATS_COLUMNS.filter((col) => col.priority === 'high');
+    }
+    return PITCHING_STATS_COLUMNS;
+  }, [statsFormat]);
 
   // =============================================================================
   // Render Helpers

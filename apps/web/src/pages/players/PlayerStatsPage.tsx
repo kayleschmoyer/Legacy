@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   type PlayerStatsViewMode,
@@ -21,6 +21,25 @@ import { PlayerDetailModal } from '../../components/PlayerDetailModal';
 // GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors
 const MAX_GRAPHQL_INT = 2147483647;
 
+const PREFS_STORAGE_KEY = 'ls_user_preferences';
+
+function readStatsFormat(): 'standard' | 'expanded' {
+  try {
+    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    if (!raw) return 'standard';
+    const parsed = JSON.parse(raw) as { statsFormat?: string };
+    if (
+      parsed.statsFormat === 'standard' ||
+      parsed.statsFormat === 'expanded'
+    ) {
+      return parsed.statsFormat;
+    }
+    return 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+
 /**
  * Web App Player Statistics Page
  *
@@ -33,6 +52,18 @@ const MAX_GRAPHQL_INT = 2147483647;
 export function PlayerStatsPage() {
   const [searchParams] = useSearchParams();
   const [liveMsg, setLiveMsg] = React.useState('');
+
+  // Stats format preference from user settings
+  const [statsFormat, setStatsFormat] = useState<'standard' | 'expanded'>(
+    readStatsFormat,
+  );
+
+  // Re-read preference when the page gains focus (user may have changed it on the Preferences page)
+  useEffect(() => {
+    const handleFocus = () => setStatsFormat(readStatsFormat());
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   // Player detail modal state
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -216,6 +247,7 @@ export function PlayerStatsPage() {
         initialPageSize={initialState.pageSize}
         showHeader={true}
         showActions={true}
+        statsFormat={statsFormat}
         onPlayerDetails={handlePlayerDetails}
         onExport={handleExport}
         onShare={handleShare}

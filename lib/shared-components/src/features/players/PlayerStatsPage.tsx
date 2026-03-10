@@ -28,6 +28,8 @@ export interface PlayerStatsPageProps {
   initialPageSize?: number;
   showHeader?: boolean;
   showActions?: boolean;
+  /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
+  statsFormat?: 'standard' | 'expanded';
   onPlayerDetails?: (player: PlayerWithStats) => void;
   onExport?: (
     filters: PlayerStatsFilters,
@@ -53,6 +55,7 @@ export function PlayerStatsPage({
   initialPageSize = 25,
   showHeader = true,
   showActions = true,
+  statsFormat = 'expanded',
   onPlayerDetails,
   onExport: _onExport,
   onShare: _onShare,
@@ -403,6 +406,7 @@ export function PlayerStatsPage({
                 showFilters={true}
                 showSorting={true}
                 showPagination={true}
+                statsFormat={statsFormat}
               />
             </YStack>
           </Tabs.Content>
@@ -428,6 +432,7 @@ export function PlayerStatsPage({
                 showFilters={true}
                 showSorting={true}
                 showPagination={true}
+                statsFormat={statsFormat}
               />
             </YStack>
           </Tabs.Content>
