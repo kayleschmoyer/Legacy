@@ -554,6 +554,9 @@ export const gameBatting = pgTable(
       gameIdentifierIdx: index('game_batting_game_identifier_idx').on(
         table.gameIdentifier,
       ),
+      playerIdGameIdentifierIdx: index(
+        'game_batting_player_id_game_identifier_idx',
+      ).on(table.playerId, table.gameIdentifier),
     };
   },
 );
@@ -598,6 +601,9 @@ export const gamePitching = pgTable(
       gameIdentifierIdx: index('game_pitching_game_identifier_idx').on(
         table.gameIdentifier,
       ),
+      playerIdGameIdentifierIdx: index(
+        'game_pitching_player_id_game_identifier_idx',
+      ).on(table.playerId, table.gameIdentifier),
     };
   },
 );

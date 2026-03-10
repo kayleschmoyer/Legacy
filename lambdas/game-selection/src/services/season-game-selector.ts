@@ -1,7 +1,16 @@
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { cryptoRandomFloat, cryptoRandomInt } from '@legacy-sports/utils';
-import { and, eq, isNotNull, isNull, notInArray, or, sql } from 'drizzle-orm';
+import {
+  and,
+  eq,
+  exists,
+  isNotNull,
+  isNull,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 
 export interface GameSelectionResult {
   gameIdentifier: string | null;
@@ -91,27 +100,39 @@ async function selectGameIdentifier(
           )
         : eq(PublicSchema.gamePitching.gs, gsValue);
 
-    // Join game_batting with game_pitching to filter by GS
+    // Use EXISTS subquery instead of JOIN + DISTINCT for better planner optimization
     const availableGames = await db
-      .selectDistinct({
+      .select({
         gameIdentifier: PublicSchema.gameBatting.gameIdentifier,
       })
       .from(PublicSchema.gameBatting)
-      .innerJoin(
-        PublicSchema.gamePitching,
+      .where(
         and(
-          eq(
-            PublicSchema.gameBatting.gameIdentifier,
-            PublicSchema.gamePitching.gameIdentifier,
+          ...battingConditions,
+          exists(
+            db
+              .select({ _: sql`1` })
+              .from(PublicSchema.gamePitching)
+              .where(
+                and(
+                  eq(
+                    PublicSchema.gamePitching.playerId,
+                    PublicSchema.gameBatting.playerId,
+                  ),
+                  eq(
+                    PublicSchema.gamePitching.gameIdentifier,
+                    PublicSchema.gameBatting.gameIdentifier,
+                  ),
+                  eq(
+                    PublicSchema.gamePitching.season,
+                    PublicSchema.gameBatting.season,
+                  ),
+                  gsCondition,
+                ),
+              ),
           ),
-          eq(
-            PublicSchema.gameBatting.playerId,
-            PublicSchema.gamePitching.playerId,
-          ),
-          eq(PublicSchema.gameBatting.season, PublicSchema.gamePitching.season),
         ),
-      )
-      .where(and(...battingConditions, gsCondition));
+      );
 
     if (availableGames.length === 0) {
       LOGGER.warn(
@@ -126,7 +147,7 @@ async function selectGameIdentifier(
 
   // Non-pitcher: select from all games
   const availableGames = await db
-    .selectDistinct({ gameIdentifier: PublicSchema.gameBatting.gameIdentifier })
+    .select({ gameIdentifier: PublicSchema.gameBatting.gameIdentifier })
     .from(PublicSchema.gameBatting)
     .where(and(...battingConditions));
 
@@ -175,7 +196,7 @@ async function selectGameIdentifierFromPitching(
       : eq(PublicSchema.gamePitching.gs, 1);
 
   const availableGames = await db
-    .selectDistinct({
+    .select({
       gameIdentifier: PublicSchema.gamePitching.gameIdentifier,
     })
     .from(PublicSchema.gamePitching)
