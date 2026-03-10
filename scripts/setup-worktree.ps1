@@ -204,8 +204,8 @@ else {
 
 Write-Step "terraform/secrets.auto.tfvars"
 
-$mainTfSecrets = Join-Path $MainRepoPath "terraform" "secrets.auto.tfvars"
-$wtTfSecrets   = Join-Path $WorktreePath "terraform" "secrets.auto.tfvars"
+$mainTfSecrets = Join-Path (Join-Path $MainRepoPath "terraform") "secrets.auto.tfvars"
+$wtTfSecrets   = Join-Path (Join-Path $WorktreePath "terraform") "secrets.auto.tfvars"
 
 if (-not (Test-Path $mainTfSecrets)) {
     Write-Warn "No terraform/secrets.auto.tfvars in main repo -- skipping (run terraform setup first)"
