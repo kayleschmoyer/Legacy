@@ -184,7 +184,10 @@ export const SportsDropdown: React.FC = () => {
           id={menuId}
           aria-labelledby={buttonId}
         >
-          <Link to="/football" style={{ textDecoration: 'none' }}>
+          <Link
+            to="/football"
+            style={{ textDecoration: 'none', display: 'block' }}
+          >
             <MenuItem
               onPress={() => setIsOpen(false)}
               role="menuitem"
@@ -214,7 +217,10 @@ export const SportsDropdown: React.FC = () => {
             </MenuItem>
           </Link>
 
-          <Link to="/baseball" style={{ textDecoration: 'none' }}>
+          <Link
+            to="/baseball"
+            style={{ textDecoration: 'none', display: 'block' }}
+          >
             <MenuItem
               onPress={() => setIsOpen(false)}
               role="menuitem"
@@ -244,7 +250,10 @@ export const SportsDropdown: React.FC = () => {
             </MenuItem>
           </Link>
 
-          <Link to="/baseball/leagues" style={{ textDecoration: 'none' }}>
+          <Link
+            to="/baseball/leagues"
+            style={{ textDecoration: 'none', display: 'block' }}
+          >
             <MenuItem
               onPress={() => setIsOpen(false)}
               role="menuitem"
