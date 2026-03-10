@@ -420,30 +420,24 @@ export function PlayerStatsDataGrid({
         // Use endCursor from current page as the 'after' cursor for next page
         const endCursor =
           data?.length > 0
-            ? Buffer.from(
+            ? btoa(
                 (
-                  (queryParams.after
-                    ? parseInt(
-                        Buffer.from(queryParams.after, 'base64').toString(),
-                      )
-                    : 0) +
+                  (queryParams.after ? parseInt(atob(queryParams.after)) : 0) +
                   (queryParams.first ?? 25) -
                   1
                 ).toString(),
-              ).toString('base64')
+              )
             : undefined;
         updateQueryParams({ after: endCursor });
       } else if (direction === 'prev' && hasPreviousPage) {
         // For previous page, calculate the cursor based on current position
         const currentOffset = queryParams.after
-          ? parseInt(Buffer.from(queryParams.after, 'base64').toString())
+          ? parseInt(atob(queryParams.after))
           : 0;
         const pageSize = queryParams.first ?? 25;
         const newOffset = Math.max(0, currentOffset - pageSize);
         const prevCursor =
-          newOffset > 0
-            ? Buffer.from(newOffset.toString()).toString('base64')
-            : undefined;
+          newOffset > 0 ? btoa(newOffset.toString()) : undefined;
         updateQueryParams({ after: prevCursor });
       }
     },
@@ -484,10 +478,7 @@ export function PlayerStatsDataGrid({
       const offset = (pageNumber - 1) * pageSize;
 
       // Create cursor from offset (same encoding used by backend)
-      const cursor =
-        offset > 0
-          ? Buffer.from(offset.toString()).toString('base64')
-          : undefined;
+      const cursor = offset > 0 ? btoa(offset.toString()) : undefined;
 
       updateQueryParams({ after: cursor });
     },
@@ -502,9 +493,7 @@ export function PlayerStatsDataGrid({
 
   const currentPageNumber = useMemo(() => {
     const pageSize = queryParams.first ?? 25;
-    const offset = queryParams.after
-      ? parseInt(Buffer.from(queryParams.after, 'base64').toString())
-      : 0;
+    const offset = queryParams.after ? parseInt(atob(queryParams.after)) : 0;
     return Math.floor(offset / pageSize) + 1;
   }, [queryParams.after, queryParams.first]);
 
