@@ -12,7 +12,6 @@ import {
   ArrowLeftRight,
   Calendar,
   ChevronRight,
-  Star,
   TrendingUp,
   Zap,
 } from '@tamagui/lucide-icons';
@@ -243,8 +242,6 @@ export function OnThisDayFeed(): React.JSX.Element {
             Baseball history — {dateLabel}
           </Text>
         </YStack>
-
-        <Star size={16} color={withAlpha(BRAND_GOLD, 0.6)} />
       </FeedHeader>
 
       {/* Body */}
