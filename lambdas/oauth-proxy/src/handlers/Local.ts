@@ -26,13 +26,13 @@ export const handleLogin = async (event: APIGatewayEvent) => {
     const user = await getUserByEmail(db, email);
 
     if (!user?.passwordHash) {
-      throw new Error('User has not set a local password!');
+      throw new Error('Invalid email or password');
     }
 
     const isCorrect = await testPassword(password, user.passwordHash);
 
     if (!isCorrect) {
-      throw new Error('Incorrect user/password combination!');
+      throw new Error('Invalid email or password');
     }
 
     const internalJwt = await createJwt(user);
@@ -71,7 +71,7 @@ export const handleRegister = async (event: APIGatewayEvent) => {
       LOGGER.debug('Get User');
       let user = await getUserByEmail(db, email);
       if (user !== null) {
-        throw new Error(`User already registered for email ${email}`);
+        throw new Error('An account with this email already exists');
       }
 
       const hashedPassword = await hashPassword(password);
