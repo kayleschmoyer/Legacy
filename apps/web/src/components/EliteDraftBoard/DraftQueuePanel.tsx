@@ -16,9 +16,10 @@ import {
 
 interface DraftQueuePanelProps {
   draftId: number;
+  onError?: (message: string) => void;
 }
 
-export function DraftQueuePanel({ draftId }: DraftQueuePanelProps) {
+export function DraftQueuePanel({ draftId, onError }: DraftQueuePanelProps) {
   const {
     data,
     loading,
@@ -45,12 +46,13 @@ export function DraftQueuePanel({ draftId }: DraftQueuePanelProps) {
     async (playerId: number) => {
       try {
         await removeFromQueue({ variables: { draftId, playerId } });
-        void refetchQueue();
       } catch {
-        // silently ignore — optimistic UI not needed here
+        onError?.('Failed to remove player from queue. Please try again.');
+      } finally {
+        void refetchQueue();
       }
     },
-    [draftId, removeFromQueue, refetchQueue],
+    [draftId, removeFromQueue, refetchQueue, onError],
   );
 
   const handleMoveUp = useCallback(
@@ -68,12 +70,13 @@ export function DraftQueuePanel({ draftId }: DraftQueuePanelProps) {
             playerIds: reordered.map((e) => e.playerId ?? e.player?.id ?? 0),
           },
         });
-        void refetchQueue();
       } catch {
-        // ignore
+        onError?.('Failed to reorder queue. Please try again.');
+      } finally {
+        void refetchQueue();
       }
     },
-    [draftId, entries, reorderQueue, refetchQueue],
+    [draftId, entries, reorderQueue, refetchQueue, onError],
   );
 
   const handleMoveDown = useCallback(
@@ -91,12 +94,13 @@ export function DraftQueuePanel({ draftId }: DraftQueuePanelProps) {
             playerIds: reordered.map((e) => e.playerId ?? e.player?.id ?? 0),
           },
         });
-        void refetchQueue();
       } catch {
-        // ignore
+        onError?.('Failed to reorder queue. Please try again.');
+      } finally {
+        void refetchQueue();
       }
     },
-    [draftId, entries, reorderQueue, refetchQueue],
+    [draftId, entries, reorderQueue, refetchQueue, onError],
   );
 
   const busy = removing || reordering;

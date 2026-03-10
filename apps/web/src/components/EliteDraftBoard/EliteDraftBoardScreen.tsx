@@ -2256,7 +2256,12 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
           {/* Draft Queue */}
           {draftId && myTeamId !== null && (
-            <DraftQueuePanel draftId={draftId} />
+            <DraftQueuePanel
+              draftId={draftId}
+              onError={(msg) => {
+                showToast(msg);
+              }}
+            />
           )}
 
           {/* Pick History */}
