@@ -8,6 +8,9 @@ import { LOGGER } from '@legacy-sports/logging';
 import { RollbarBreadcrumb, RollbarConfig, RollbarInterface } from './types';
 import { sanitizeSentryContext } from './sanitize-context';
 
+/** Maximum number of breadcrumbs retained in memory. Oldest entries are dropped when the buffer is full. */
+const MAX_BREADCRUMBS = 100;
+
 class NodeRollbarImplementation implements RollbarInterface {
   private rollbar: Rollbar | null = null;
   /** In-memory breadcrumb log (Rollbar telemetry handles this internally but we keep compat). */
@@ -66,6 +69,11 @@ class NodeRollbarImplementation implements RollbarInterface {
     // Buffer breadcrumbs locally; they are attached to the next captureError call.
     // Do NOT call rollbar.log() here — each log() counts as a rated item and
     // causes "item per minute limit reached" when breadcrumbs are added frequently.
+    // Ring buffer: drop the oldest entry when the cap is reached to prevent
+    // unbounded memory growth in long-running Lambdas or web sessions (LS-939).
+    if (this.breadcrumbs.length >= MAX_BREADCRUMBS) {
+      this.breadcrumbs.shift();
+    }
     this.breadcrumbs.push(breadcrumb);
   }
 
