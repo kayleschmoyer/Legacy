@@ -704,10 +704,14 @@ export type League = {
   currentWeek?: Maybe<Scalars['Int']['output']>;
   /** The current active week number for the league */
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
+  customEraEndYear?: Maybe<Scalars['Int']['output']>;
+  customEraStartYear?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
+  eraFilter?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   frozenAt?: Maybe<Scalars['String']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
+  hofOnly?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMockDraft?: Maybe<Scalars['Boolean']['output']>;
@@ -3616,6 +3620,10 @@ export type LeagueFragment = {
   salaryDecayPct?: number | null;
   auctionBudget?: number | null;
   auctionMinBid?: number | null;
+  eraFilter?: string | null;
+  hofOnly?: boolean | null;
+  customEraStartYear?: number | null;
+  customEraEndYear?: number | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -3688,6 +3696,10 @@ export type GetLeagueByIdQuery = {
     salaryDecayPct?: number | null;
     auctionBudget?: number | null;
     auctionMinBid?: number | null;
+    eraFilter?: string | null;
+    hofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3748,6 +3760,10 @@ export type CreateLeagueAndTeamsMutation = {
       salaryDecayPct?: number | null;
       auctionBudget?: number | null;
       auctionMinBid?: number | null;
+      eraFilter?: string | null;
+      hofOnly?: boolean | null;
+      customEraStartYear?: number | null;
+      customEraEndYear?: number | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -3805,6 +3821,10 @@ export type GetUserLeaguesQuery = {
     salaryDecayPct?: number | null;
     auctionBudget?: number | null;
     auctionMinBid?: number | null;
+    eraFilter?: string | null;
+    hofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -3894,6 +3914,10 @@ export type StartDraftMutation = {
     salaryDecayPct?: number | null;
     auctionBudget?: number | null;
     auctionMinBid?: number | null;
+    eraFilter?: string | null;
+    hofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -4088,6 +4112,10 @@ export type UpdateLeagueSettingsMutation = {
     salaryDecayPct?: number | null;
     auctionBudget?: number | null;
     auctionMinBid?: number | null;
+    eraFilter?: string | null;
+    hofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -4189,6 +4217,10 @@ export type RenewLeagueMutation = {
     salaryDecayPct?: number | null;
     auctionBudget?: number | null;
     auctionMinBid?: number | null;
+    eraFilter?: string | null;
+    hofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -7511,6 +7543,10 @@ export const LeagueFragmentDoc = gql`
     salaryDecayPct
     auctionBudget
     auctionMinBid
+    eraFilter
+    hofOnly
+    customEraStartYear
+    customEraEndYear
     userMembership {
       ...LeagueMember
     }

@@ -773,10 +773,14 @@ type League {
   The current active week number for the league
   """
   currentWeekNumber: Int
+  customEraEndYear: Int
+  customEraStartYear: Int
   draftStatus: String
+  eraFilter: String
   faabBudgetDefault: Int
   frozenAt: String
   gamesPerMatchup: Int
+  hofOnly: Boolean
   id: Int
   inviteCode: String
   isMockDraft: Boolean

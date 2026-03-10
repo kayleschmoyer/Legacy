@@ -34,6 +34,10 @@ interface LeagueState {
     previousLeagueId?: number | null;
     frozenAt?: string | null;
     seasonNumber?: number | null;
+    eraFilter?: string | null;
+    hofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
   } | null;
   positions: LeaguePositionFragment[];
   teamMembers: TeamMemberFragment[];

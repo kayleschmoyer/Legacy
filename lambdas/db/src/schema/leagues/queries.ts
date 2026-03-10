@@ -85,6 +85,11 @@ builder.queryField('league', (t) =>
             salaryDecayPct: PublicSchema.leagues.salaryDecayPct,
             auctionBudget: PublicSchema.leagues.auctionBudget,
             auctionMinBid: PublicSchema.leagues.auctionMinBid,
+            // Era filter settings (LS-887)
+            eraFilter: PublicSchema.leagues.eraFilter,
+            hofOnly: PublicSchema.leagues.hofOnly,
+            customEraStartYear: PublicSchema.leagues.customEraStartYear,
+            customEraEndYear: PublicSchema.leagues.customEraEndYear,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -171,6 +176,11 @@ builder.queryField('league', (t) =>
           salaryDecayPct: league.salaryDecayPct,
           auctionBudget: league.auctionBudget,
           auctionMinBid: league.auctionMinBid,
+          // Era filter settings (LS-887)
+          eraFilter: league.eraFilter,
+          hofOnly: league.hofOnly,
+          customEraStartYear: league.customEraStartYear,
+          customEraEndYear: league.customEraEndYear,
           userMembership,
         };
       } catch (error) {

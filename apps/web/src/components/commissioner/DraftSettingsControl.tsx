@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Card, H4, Spinner, Text, XStack, YStack } from 'tamagui';
+import {
+  Button,
+  Card,
+  H4,
+  Input,
+  Spinner,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { Check, Lock, Settings } from '@tamagui/lucide-icons';
 import {
   DateTimePicker,
@@ -23,6 +32,8 @@ export interface DraftSettingsControlProps {
   /** Current era filter for the league (editable before draft starts). */
   eraFilter?: string | null | undefined;
   hofOnly?: boolean | null | undefined;
+  customEraStartYear?: number | null | undefined;
+  customEraEndYear?: number | null | undefined;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
   /** Called whenever the unsaved-changes state changes. Used by parents to
@@ -118,6 +129,8 @@ export function DraftSettingsControl({
   playerPool: leaguePlayerPool,
   eraFilter,
   hofOnly,
+  customEraStartYear,
+  customEraEndYear,
   onSuccess,
   onError,
   onDirtyChange,
@@ -144,6 +157,12 @@ export function DraftSettingsControl({
   const [playerPool, setPlayerPool] = useState('all');
   const [eraFilterLocal, setEraFilterLocal] = useState('all');
   const [hofOnlyLocal, setHofOnlyLocal] = useState(false);
+  const [customEraStartYearLocal, setCustomEraStartYearLocal] = useState<
+    number | undefined
+  >(undefined);
+  const [customEraEndYearLocal, setCustomEraEndYearLocal] = useState<
+    number | undefined
+  >(undefined);
   /** ISO-8601 string (YYYY-MM-DDTHH:MM) for the datetime-local input, or '' for no schedule */
   const [scheduledAt, setScheduledAt] = useState('');
   const [pickTimeLimitSeconds, setPickTimeLimitSeconds] = useState('120');
@@ -184,6 +203,14 @@ export function DraftSettingsControl({
   useEffect(() => {
     setHofOnlyLocal(hofOnly ?? false);
   }, [hofOnly]);
+
+  useEffect(() => {
+    setCustomEraStartYearLocal(customEraStartYear ?? undefined);
+  }, [customEraStartYear]);
+
+  useEffect(() => {
+    setCustomEraEndYearLocal(customEraEndYear ?? undefined);
+  }, [customEraEndYear]);
 
   // Track changes
   const checkChanges = useCallback(
@@ -373,6 +400,14 @@ export function DraftSettingsControl({
             pickTimeLimitSeconds: parseInt(pickTimeLimitSeconds, 10),
             eraFilter: eraFilterLocal,
             hofOnly: hofOnlyLocal,
+            customEraStartYear:
+              eraFilterLocal === 'custom'
+                ? (customEraStartYearLocal ?? null)
+                : null,
+            customEraEndYear:
+              eraFilterLocal === 'custom'
+                ? (customEraEndYearLocal ?? null)
+                : null,
             // LS-423: send null to clear the schedule, ISO-8601 string to set it
             scheduledAt: scheduledAt
               ? new Date(scheduledAt).toISOString()
@@ -419,6 +454,8 @@ export function DraftSettingsControl({
     );
     setEraFilterLocal(eraFilter ?? 'all');
     setHofOnlyLocal(hofOnly ?? false);
+    setCustomEraStartYearLocal(customEraStartYear ?? undefined);
+    setCustomEraEndYearLocal(customEraEndYear ?? undefined);
     setScheduledAt(originalScheduledAt);
     setHasChanges(false);
   };
@@ -539,6 +576,61 @@ export function DraftSettingsControl({
               onChange={handleEraFilterChange}
               disabled={isDraftLocked || saving}
             />
+
+            {/* Custom era year range (LS-887) */}
+            {eraFilterLocal === 'custom' && (
+              <XStack gap="$3" alignItems="center" flexWrap="wrap">
+                <YStack flex={1} gap="$1">
+                  <Text fontSize="$2" color="$gray10">
+                    Start Year
+                  </Text>
+                  <Input
+                    size="$3"
+                    placeholder="e.g. 1940"
+                    value={
+                      customEraStartYearLocal !== undefined
+                        ? String(customEraStartYearLocal)
+                        : ''
+                    }
+                    onChangeText={(text: string) => {
+                      const year = parseInt(text, 10);
+                      setCustomEraStartYearLocal(
+                        isNaN(year) ? undefined : year,
+                      );
+                      setHasChanges(true);
+                    }}
+                    keyboardType="numeric"
+                    disabled={isDraftLocked || saving}
+                    borderColor="$orange8"
+                  />
+                </YStack>
+                <Text color="$gray10" marginTop="$4">
+                  –
+                </Text>
+                <YStack flex={1} gap="$1">
+                  <Text fontSize="$2" color="$gray10">
+                    End Year
+                  </Text>
+                  <Input
+                    size="$3"
+                    placeholder="e.g. 1960"
+                    value={
+                      customEraEndYearLocal !== undefined
+                        ? String(customEraEndYearLocal)
+                        : ''
+                    }
+                    onChangeText={(text: string) => {
+                      const year = parseInt(text, 10);
+                      setCustomEraEndYearLocal(isNaN(year) ? undefined : year);
+                      setHasChanges(true);
+                    }}
+                    keyboardType="numeric"
+                    disabled={isDraftLocked || saving}
+                    borderColor="$orange8"
+                  />
+                </YStack>
+              </XStack>
+            )}
 
             {/* Hall of Fame Only */}
             <YStack gap="$2">

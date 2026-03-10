@@ -2862,6 +2862,10 @@ export function LeagueDetailPage(): React.JSX.Element {
             leagueId={leagueId}
             draftStatus={league.draftStatus}
             playerPool={league.playerPool}
+            eraFilter={league.eraFilter}
+            hofOnly={league.hofOnly}
+            customEraStartYear={league.customEraStartYear}
+            customEraEndYear={league.customEraEndYear}
             onDirtyChange={setHasDraftSettingsChanges}
             onSuccess={(message) => {
               setMatchupSuccessMessage(message);

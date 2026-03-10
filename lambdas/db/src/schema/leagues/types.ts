@@ -94,6 +94,11 @@ export const League = builder.objectRef<{
   salaryDecayPct?: number;
   auctionBudget?: number;
   auctionMinBid?: number;
+  // Era filter settings
+  eraFilter?: string;
+  hofOnly?: boolean;
+  customEraStartYear?: number | null;
+  customEraEndYear?: number | null;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -180,6 +185,11 @@ League.implement({
     salaryDecayPct: t.exposeInt('salaryDecayPct', { nullable: true }),
     auctionBudget: t.exposeInt('auctionBudget', { nullable: true }),
     auctionMinBid: t.exposeInt('auctionMinBid', { nullable: true }),
+    // Era filter settings
+    eraFilter: t.exposeString('eraFilter', { nullable: true }),
+    hofOnly: t.exposeBoolean('hofOnly', { nullable: true }),
+    customEraStartYear: t.exposeInt('customEraStartYear', { nullable: true }),
+    customEraEndYear: t.exposeInt('customEraEndYear', { nullable: true }),
     userMembership: t.field({
       type: LeagueMember,
       nullable: true,

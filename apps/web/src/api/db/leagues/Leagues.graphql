@@ -40,6 +40,10 @@ fragment League on League {
   salaryDecayPct
   auctionBudget
   auctionMinBid
+  eraFilter
+  hofOnly
+  customEraStartYear
+  customEraEndYear
   userMembership {
     ...LeagueMember
   }
