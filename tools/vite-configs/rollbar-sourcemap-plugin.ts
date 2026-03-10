@@ -146,18 +146,44 @@ export function rollbarSourcemapPlugin(
             );
             failed++;
           } else {
-            resolvedConfig.logger.info(
-              `[rollbar] ✓ Uploaded ${relPath} → ${minifiedUrl}`,
-            );
-            uploaded++;
+            // Rollbar returns HTTP 200 for both success and application-level
+            // errors (e.g. invalid token, wrong scope). Must check the JSON
+            // `err` field — `err: 0` means success, `err: 1` means the upload
+            // was rejected. If we skip this check we would delete the .map
+            // file even though Rollbar never stored the sourcemap, making the
+            // "Could not download source map" error impossible to recover from.
+            let rollbarErr = 0;
+            let rollbarMessage = '';
+            try {
+              const json = (await response.json()) as {
+                err?: number;
+                message?: string;
+              };
+              rollbarErr = json.err ?? 0;
+              rollbarMessage = json.message ?? '';
+            } catch {
+              // Non-JSON body — treat as success (older API versions).
+            }
 
-            if (deleteFilesAfterUpload) {
-              try {
-                unlinkSync(mapFile);
-              } catch {
-                resolvedConfig.logger.warn(
-                  `[rollbar] Could not delete ${mapFile} after upload.`,
-                );
+            if (rollbarErr !== 0) {
+              resolvedConfig.logger.warn(
+                `[rollbar] ✗ Upload rejected for ${relPath}: ${rollbarMessage}`,
+              );
+              failed++;
+            } else {
+              resolvedConfig.logger.info(
+                `[rollbar] ✓ Uploaded ${relPath} → ${minifiedUrl}`,
+              );
+              uploaded++;
+
+              if (deleteFilesAfterUpload) {
+                try {
+                  unlinkSync(mapFile);
+                } catch {
+                  resolvedConfig.logger.warn(
+                    `[rollbar] Could not delete ${mapFile} after upload.`,
+                  );
+                }
               }
             }
           }
