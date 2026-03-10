@@ -1,0 +1,32 @@
+fragment SubscriptionInfo on SubscriptionInfo {
+  status
+  tier
+  currentPeriodEnd
+  cancelAtPeriodEnd
+}
+
+query GetMySubscription {
+  mySubscription {
+    ...SubscriptionInfo
+  }
+}
+
+mutation CreateCheckoutSession(
+  $priceId: String!
+  $successUrl: String!
+  $cancelUrl: String!
+) {
+  createCheckoutSession(
+    priceId: $priceId
+    successUrl: $successUrl
+    cancelUrl: $cancelUrl
+  ) {
+    url
+  }
+}
+
+mutation CreateBillingPortalSession($returnUrl: String!) {
+  createBillingPortalSession(returnUrl: $returnUrl) {
+    url
+  }
+}

@@ -23,6 +23,10 @@ export interface EnvironmentConfig {
   readonly googleAnalyticsMeasurementId?: string;
   /** URL for the Jira proxy lambda used by the bug report button. */
   readonly jiraProxyUrl: string;
+  /** Stripe price ID for monthly Premium subscription. */
+  readonly stripeMonthlyPriceId: string;
+  /** Stripe price ID for annual Premium subscription. */
+  readonly stripeAnnualPriceId: string;
 }
 
 /**
@@ -62,6 +66,10 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
     | string
     | undefined,
   jiraProxyUrl: (import.meta.env.VITE_JIRA_PROXY_URL as string) || '',
+  stripeMonthlyPriceId:
+    (import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID as string) || '',
+  stripeAnnualPriceId:
+    (import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID as string) || '',
 });
 
 /**

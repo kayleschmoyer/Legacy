@@ -13,6 +13,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   ChevronDown,
   ChevronUp,
+  CreditCard,
   HelpCircle,
   LogOut,
   Settings,
@@ -267,6 +268,22 @@ export const UserProfileDropdown: React.FC = () => {
                 </MenuIconBox>
                 <Paragraph size="$3" color="$color" fontWeight="500">
                   Preferences
+                </Paragraph>
+              </XStack>
+            </MenuItem>
+
+            <MenuItem
+              onPress={() => {
+                void navigate('/profile/subscription');
+                setIsOpen(false);
+              }}
+            >
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <CreditCard size={18} color="$color" />
+                </MenuIconBox>
+                <Paragraph size="$3" color="$color" fontWeight="500">
+                  Subscription
                 </Paragraph>
               </XStack>
             </MenuItem>
