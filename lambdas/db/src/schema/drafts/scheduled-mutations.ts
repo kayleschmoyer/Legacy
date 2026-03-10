@@ -345,41 +345,22 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               // 3. Pre-compute per-player stats and positions for the candidate pool.
               //    Done outside the lock so this expensive join doesn't hold the row lock.
               //
-              // Scoring weights mirror lib/scoring/src/baseball/DefaultScoring.ts:
-              //   Batting:  H=1, 2B=2, 3B=3, HR=4, R=1, RBI=1, SB=2, CS=-1, HBP=1, SO=-0.5
-              //   Pitching: W=5, L=-2, SV=5, SO=1, outsRecorded=1, H=-1, ER=-2, BB=-1
-              //   Fielding: E=-1
-              // Projected matchup pts = career ppg × games per matchup (hitters)
-              //                         career ppg × SP starts per matchup (pitchers)
+              // Use pre-computed per-category PPG from player_scoring_cache (LS-902)
+              // instead of 3 LEFT JOINs to career stat materialized views.
+              // Projected matchup pts = batting_ppg × games per matchup
+              //                       + pitching_ppg × SP starts per matchup
+              //                       + fielding_ppg × games per matchup
               const statsRows = await context.db.execute(
                 sql`SELECT
                   p.id AS player_id,
                   (
-                    CASE WHEN COALESCE(cb.g, 0) > 0 THEN
-                      (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
-                       COALESCE(cb.triples,0)*3.0 + COALESCE(cb.hr,0)*4.0 +
-                       COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
-                       COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
-                       COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
-                      ) / cb.g * ${gamesPerMatchup}
-                    ELSE 0 END
-                    +
-                    CASE WHEN COALESCE(cp.g, 0) > 0 THEN
-                      (COALESCE(cp.w,0)*5.0 + COALESCE(cp.l,0)*-2.0 +
-                       COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
-                       COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
-                       COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
-                      ) / cp.g * ${spStartsPerMatchup}
-                    ELSE 0 END
-                    +
-                    CASE WHEN COALESCE(cf.g, 0) > 0 THEN
-                      COALESCE(cf.e_def,0) * -1.0 / cf.g * ${gamesPerMatchup}
-                    ELSE 0 END
+                    COALESCE(cs.batting_ppg, 0)  * ${gamesPerMatchup} +
+                    COALESCE(cs.pitching_ppg, 0) * ${spStartsPerMatchup} +
+                    COALESCE(cs.fielding_ppg, 0) * ${gamesPerMatchup}
                   ) AS projected_fpg
                 FROM players p
-                LEFT JOIN career_batting cb ON cb.player_id = p.id
-                LEFT JOIN career_pitching cp ON cp.player_id = p.id
-                LEFT JOIN career_fielding cf ON cf.player_id = p.id
+                LEFT JOIN public.player_scoring_cache cs
+                  ON cs.player_id = p.id AND cs.league_id IS NULL
                 WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
                 ORDER BY projected_fpg DESC`,
               );
