@@ -811,6 +811,33 @@ builder.queryField('publicLeagues', (t) =>
           conditions.push(ilike(PublicSchema.leagues.name, `%${args.search}%`));
         }
 
+        // Pre-aggregate counts to avoid correlated subqueries per league row
+        const teamCounts = context.db
+          .select({
+            leagueId: PublicSchema.teams.leagueId,
+            count: sql<number>`count(*)::int`.as('team_count'),
+          })
+          .from(PublicSchema.teams)
+          .groupBy(PublicSchema.teams.leagueId)
+          .as('team_counts');
+
+        const memberCounts = context.db
+          .select({
+            leagueId: PublicSchema.leagueMembers.leagueId,
+            count: sql<number>`count(*)::int`.as('member_count'),
+          })
+          .from(PublicSchema.leagueMembers)
+          .groupBy(PublicSchema.leagueMembers.leagueId)
+          .as('member_counts');
+
+        const userMembership = context.db
+          .select({
+            leagueId: PublicSchema.leagueMembers.leagueId,
+          })
+          .from(PublicSchema.leagueMembers)
+          .where(eq(PublicSchema.leagueMembers.userId, userId))
+          .as('user_membership');
+
         const rows = await context.db
           .select({
             id: PublicSchema.leagues.id,
@@ -820,19 +847,23 @@ builder.queryField('publicLeagues', (t) =>
             draftStatus: PublicSchema.leagues.draftStatus,
             playerPool: PublicSchema.leagues.playerPool,
             isPublic: PublicSchema.leagues.isPublic,
-            totalSpots: sql<number>`(
-              SELECT COUNT(*)::int FROM teams WHERE teams.league_id = ${PublicSchema.leagues.id}
-            )`,
-            claimedSpots: sql<number>`(
-              SELECT COUNT(*)::int FROM league_members WHERE league_members.league_id = ${PublicSchema.leagues.id}
-            )`,
-            isAlreadyMember: sql<boolean>`EXISTS (
-              SELECT 1 FROM league_members
-              WHERE league_members.league_id = ${PublicSchema.leagues.id}
-                AND league_members.user_id = ${userId}
-            )`,
+            totalSpots: sql<number>`COALESCE(${teamCounts.count}, 0)`,
+            claimedSpots: sql<number>`COALESCE(${memberCounts.count}, 0)`,
+            isAlreadyMember: sql<boolean>`${userMembership.leagueId} IS NOT NULL`,
           })
           .from(PublicSchema.leagues)
+          .leftJoin(
+            teamCounts,
+            eq(teamCounts.leagueId, PublicSchema.leagues.id),
+          )
+          .leftJoin(
+            memberCounts,
+            eq(memberCounts.leagueId, PublicSchema.leagues.id),
+          )
+          .leftJoin(
+            userMembership,
+            eq(userMembership.leagueId, PublicSchema.leagues.id),
+          )
           .where(and(...conditions))
           .orderBy(PublicSchema.leagues.id)
           .limit(limitVal)
