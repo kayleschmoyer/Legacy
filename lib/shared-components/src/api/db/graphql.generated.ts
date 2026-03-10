@@ -742,6 +742,8 @@ export type League = {
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
   spStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
+  /** ISO timestamp set when this league was frozen due to a subscription tier downgrade. Null when the league is active or frozen for a different reason (season retirement). Cleared on re-upgrade or when the owner re-selects this league as one of their active free-tier leagues. */
+  tierFrozenAt?: Maybe<Scalars['String']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
   userMembership?: Maybe<LeagueMember>;
   waiverEnabled?: Maybe<Scalars['Boolean']['output']>;
@@ -1137,6 +1139,8 @@ export type Mutation = {
   sendDirectMessage?: Maybe<DirectMessage>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
+  /** Select up to 3 leagues to keep active after a subscription downgrade. Leagues not included in the list will be tier-frozen (read-only). Only callable on the free tier — all leagues are automatically active on premium. */
+  setActiveLeagues?: Maybe<Scalars['Boolean']['output']>;
   setDraftOrder?: Maybe<Draft>;
   /** Replace the current user's draft queue for a draft. The order of playerIds defines pick priority (index 0 = first pick). Pass an empty array to clear. */
   setDraftQueue?: Maybe<Array<DraftQueueEntry>>;
@@ -1503,6 +1507,10 @@ export type MutationSendMatchupMessageArgs = {
   matchupId: Scalars['Int']['input'];
   message: Scalars['String']['input'];
   replyToMessageId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type MutationSetActiveLeaguesArgs = {
+  leagueIds: Array<Scalars['Int']['input']>;
 };
 
 export type MutationSetDraftOrderArgs = {

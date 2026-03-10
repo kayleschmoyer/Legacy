@@ -1,5 +1,6 @@
 import {
   InternalSchema,
+  reapplyLeagueRestrictions,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
 import { eq } from 'drizzle-orm';
@@ -8,6 +9,7 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
 import { AuthenticationError } from './graphql-errors';
+import { getSubscriptionTier } from './authorization';
 import { getStripeClient } from '../server/stripe';
 
 // ─── Object Types ────────────────────────────────────────────────────────────
@@ -172,6 +174,65 @@ builder.mutationField('createBillingPortalSession', (t) =>
 );
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// ─── setActiveLeagues mutation ───────────────────────────────────────────────
+
+const FREE_TIER_LEAGUE_LIMIT = 3;
+
+/**
+ * After a subscription downgrade the owner's leagues beyond the free-tier
+ * limit (3) are tier-frozen.  This mutation lets the user choose which
+ * leagues they want to keep active.  Passing up to FREE_TIER_LEAGUE_LIMIT
+ * league IDs activates those leagues and freezes the rest.
+ *
+ * Only callable when the user is on the free tier.  Premium users should
+ * never need to call this (all their leagues are already active).
+ */
+builder.mutationField('setActiveLeagues', (t) =>
+  t.field({
+    type: 'Boolean',
+    description:
+      'Select up to 3 leagues to keep active after a subscription downgrade. ' +
+      'Leagues not included in the list will be tier-frozen (read-only). ' +
+      'Only callable on the free tier — all leagues are automatically active ' +
+      'on premium.',
+    args: {
+      leagueIds: t.arg.intList({
+        required: true,
+        description: 'IDs of leagues to keep active (max 3).',
+      }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) throw AuthenticationError();
+
+      const { id: userId } = context.user;
+
+      const tier = await getSubscriptionTier(context);
+      if (tier !== 'free') {
+        throw new Error(
+          'setActiveLeagues is only available on the free tier. ' +
+            'Premium users have all leagues active.',
+        );
+      }
+
+      if (args.leagueIds.length > FREE_TIER_LEAGUE_LIMIT) {
+        throw new Error(
+          `Free tier allows at most ${FREE_TIER_LEAGUE_LIMIT} active leagues. ` +
+            `Received ${args.leagueIds.length} league IDs.`,
+        );
+      }
+
+      await reapplyLeagueRestrictions(userId, args.leagueIds, getDbOptions());
+
+      LOGGER.info('User updated active league selection', {
+        userId,
+        activeLeagueIds: args.leagueIds,
+      });
+
+      return true;
+    },
+  }),
+);
 
 async function getSubscriptionForUser(userId: number) {
   return runWithInternalClient(getDbOptions(), async (db) => {

@@ -187,6 +187,8 @@ builder.queryField('userLeagues', (t) =>
             salaryDecayPct: PublicSchema.leagues.salaryDecayPct,
             auctionBudget: PublicSchema.leagues.auctionBudget,
             auctionMinBid: PublicSchema.leagues.auctionMinBid,
+            // Tier downgrade freeze (LS-846)
+            tierFrozenAt: PublicSchema.leagues.tierFrozenAt,
           })
           .from(PublicSchema.leagues)
           .innerJoin(
@@ -221,6 +223,8 @@ builder.queryField('userLeagues', (t) =>
           salaryDecayPct: league.salaryDecayPct,
           auctionBudget: league.auctionBudget,
           auctionMinBid: league.auctionMinBid,
+          // Tier downgrade freeze (LS-846)
+          tierFrozenAt: league.tierFrozenAt?.toISOString() ?? null,
         }));
       } catch (error) {
         LOGGER.error('Failed to fetch user leagues', {

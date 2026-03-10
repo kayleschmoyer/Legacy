@@ -79,6 +79,9 @@ export const League = builder.objectRef<{
   previousLeagueId?: number | null;
   /** ISO timestamp set when the league is retired (frozen) at season end */
   frozenAt?: string | null;
+  /** ISO timestamp set when the league is frozen due to a subscription
+   *  tier downgrade (distinct from frozenAt which marks season retirement). */
+  tierFrozenAt?: string | null;
   /** Monotonic season counter (1 = founding, incremented on renewal) */
   seasonNumber?: number;
   // ── Salary cap settings (LS-634/LS-646) ─────────────────────────────
@@ -132,6 +135,14 @@ League.implement({
     secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
     previousLeagueId: t.exposeInt('previousLeagueId', { nullable: true }),
     frozenAt: t.exposeString('frozenAt', { nullable: true }),
+    tierFrozenAt: t.exposeString('tierFrozenAt', {
+      nullable: true,
+      description:
+        'ISO timestamp set when this league was frozen due to a subscription ' +
+        'tier downgrade. Null when the league is active or frozen for a ' +
+        'different reason (season retirement). Cleared on re-upgrade or when ' +
+        'the owner re-selects this league as one of their active free-tier leagues.',
+    }),
     seasonNumber: t.exposeInt('seasonNumber', { nullable: true }),
     currentWeekNumber: t.int({
       nullable: true,

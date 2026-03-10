@@ -95,6 +95,10 @@ export const leagues = pgTable(
     previousLeagueId: integer('previous_league_id'),
     /** Set when the league is retired at the end of a season and becomes read-only */
     frozenAt: timestamp('frozen_at', { withTimezone: true }),
+    /** Set when the league is frozen because the owner's subscription tier was downgraded.
+     *  Distinct from frozenAt (season retirement). Cleared if the user re-upgrades or
+     *  re-selects this league as one of their free-tier active leagues. */
+    tierFrozenAt: timestamp('tier_frozen_at', { withTimezone: true }),
     /** Monotonic season counter (1 = founding season, incremented on each renewal) */
     seasonNumber: integer('season_number').notNull().default(1),
     // Salary cap settings (LS-634)

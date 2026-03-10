@@ -805,6 +805,11 @@ type League {
   seasonNumber: Int
   secondaryColor: String
   spStartsPerMatchup: Int
+
+  """
+  ISO timestamp set when this league was frozen due to a subscription tier downgrade. Null when the league is active or frozen for a different reason (season retirement). Cleared on re-upgrade or when the owner re-selects this league as one of their active free-tier leagues.
+  """
+  tierFrozenAt: String
   totalMatchups: Int
   userMembership: LeagueMember
   waiverEnabled: Boolean
@@ -1457,6 +1462,16 @@ type Mutation {
     message: String!
     replyToMessageId: Int
   ): MatchupMessage
+
+  """
+  Select up to 3 leagues to keep active after a subscription downgrade. Leagues not included in the list will be tier-frozen (read-only). Only callable on the free tier — all leagues are automatically active on premium.
+  """
+  setActiveLeagues(
+    """
+    IDs of leagues to keep active (max 3).
+    """
+    leagueIds: [Int!]!
+  ): Boolean
   setDraftOrder(draftId: Int!, teamIds: [Int!]!): Draft
 
   """

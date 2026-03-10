@@ -24,6 +24,12 @@ import {
 } from './SubscriptionService';
 import { type GenericDatabase, getPublicDbConnection } from '../client/Helpers';
 import * as PublicSchema from '../../drizzle/public/schema';
+export {
+  handleSubscriptionDowngrade,
+  reapplyLeagueRestrictions,
+  clearLeagueTierFreezes,
+  FREE_TIER_LEAGUE_LIMIT,
+} from './SubscriptionDowngradeService';
 export { SeasonDraftGameService } from './SeasonDraftGameService';
 export { HITTER_STAT_KEYS, PITCHER_STAT_KEYS } from './SeasonDraftGameService';
 export type {

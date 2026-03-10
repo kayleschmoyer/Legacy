@@ -7,6 +7,8 @@ import {
   retrieveSecretParameterValue,
 } from '@legacy-sports/aws-utils';
 import {
+  clearLeagueTierFreezes,
+  handleSubscriptionDowngrade,
   InternalSchema,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
@@ -104,7 +106,27 @@ async function upsertSubscription(
   currentPeriodEnd: Date | null,
   cancelAtPeriodEnd: boolean,
 ): Promise<void> {
-  const tier = tierFromStatus(status);
+  const newTier = tierFromStatus(status);
+
+  // Capture the previous tier before overwriting so we can detect direction
+  // of change (premium → free or free → premium).
+  const previousTier = await runWithInternalClient(
+    getDbOptions(),
+    async (db) => {
+      const rows = await db
+        .select({ tier: InternalSchema.subscriptions.tier })
+        .from(InternalSchema.subscriptions)
+        .where(
+          eq(
+            InternalSchema.subscriptions.stripeSubscriptionId,
+            stripeSubscriptionId,
+          ),
+        )
+        .limit(1);
+      return (rows[0]?.tier ?? null) as 'free' | 'premium' | null;
+    },
+  );
+
   await runWithInternalClient(getDbOptions(), async (db) => {
     await db
       .insert(InternalSchema.subscriptions)
@@ -113,7 +135,7 @@ async function upsertSubscription(
         stripeCustomerId,
         stripeSubscriptionId,
         status,
-        tier,
+        tier: newTier,
         currentPeriodEnd,
         cancelAtPeriodEnd,
       })
@@ -121,7 +143,7 @@ async function upsertSubscription(
         target: InternalSchema.subscriptions.stripeSubscriptionId,
         set: {
           status,
-          tier,
+          tier: newTier,
           currentPeriodEnd,
           cancelAtPeriodEnd,
           updatedAt: new Date(),
@@ -131,19 +153,26 @@ async function upsertSubscription(
     // Denormalize tier onto users table for fast resolver lookups
     await db
       .update(InternalSchema.usersInAppInternal)
-      .set({ subscriptionTier: tier, updatedAt: new Date() })
+      .set({ subscriptionTier: newTier, updatedAt: new Date() })
       .where(eq(InternalSchema.usersInAppInternal.id, userId));
   });
+
+  // Apply tier-change side effects (league freezes / feature conversions)
+  await applyTierChangeSideEffects(userId, previousTier, newTier);
 }
 
 async function updateSubscriptionStatus(
   stripeSubscriptionId: string,
   status: string,
 ): Promise<number | null> {
-  const tier = tierFromStatus(status);
-  return runWithInternalClient(getDbOptions(), async (db) => {
+  const newTier = tierFromStatus(status);
+
+  const result = await runWithInternalClient(getDbOptions(), async (db) => {
     const existing = await db
-      .select({ userId: InternalSchema.subscriptions.userId })
+      .select({
+        userId: InternalSchema.subscriptions.userId,
+        tier: InternalSchema.subscriptions.tier,
+      })
       .from(InternalSchema.subscriptions)
       .where(
         eq(
@@ -160,11 +189,11 @@ async function updateSubscriptionStatus(
       return null;
     }
 
-    const { userId } = existing[0];
+    const { userId, tier: previousTier } = existing[0];
 
     await db
       .update(InternalSchema.subscriptions)
-      .set({ status, tier, updatedAt: new Date() })
+      .set({ status, tier: newTier, updatedAt: new Date() })
       .where(
         eq(
           InternalSchema.subscriptions.stripeSubscriptionId,
@@ -175,11 +204,51 @@ async function updateSubscriptionStatus(
     // Denormalize tier onto users table
     await db
       .update(InternalSchema.usersInAppInternal)
-      .set({ subscriptionTier: tier, updatedAt: new Date() })
+      .set({ subscriptionTier: newTier, updatedAt: new Date() })
       .where(eq(InternalSchema.usersInAppInternal.id, userId));
 
-    return userId;
+    return { userId, previousTier: previousTier as 'free' | 'premium' };
   });
+
+  if (result === null) return null;
+
+  const { userId, previousTier } = result;
+  await applyTierChangeSideEffects(userId, previousTier, newTier);
+  return userId;
+}
+
+// ── Tier-change side effects ──────────────────────────────────────────────────
+
+/**
+ * Apply league-level side effects when a user's subscription tier changes.
+ *
+ * - premium → free: run the downgrade handler (freeze excess leagues, convert
+ *   salary-cap / FAAB-waiver settings)
+ * - free → premium: clear any tier-based league freezes
+ * - No change: no-op
+ */
+async function applyTierChangeSideEffects(
+  userId: number,
+  previousTier: 'free' | 'premium' | null,
+  newTier: 'free' | 'premium',
+): Promise<void> {
+  if (previousTier === newTier) return;
+
+  if (newTier === 'free') {
+    LOGGER.info('Tier downgrade detected — applying downgrade restrictions', {
+      userId,
+      previousTier,
+      newTier,
+    });
+    await handleSubscriptionDowngrade(userId, getDbOptions());
+  } else if (newTier === 'premium' && previousTier === 'free') {
+    LOGGER.info('Tier upgrade detected — clearing tier freezes', {
+      userId,
+      previousTier,
+      newTier,
+    });
+    await clearLeagueTierFreezes(userId, getDbOptions());
+  }
 }
 
 // ── Event handlers ────────────────────────────────────────────────────────────
