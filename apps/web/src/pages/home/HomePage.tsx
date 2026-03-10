@@ -238,7 +238,7 @@ const SPORTS: SportConfig[] = [
       'Manage lineups, trade players, and lead your team through every game week.',
     route: '/football',
     accent: withAlpha(GREEN_DEEP, 0.35),
-    available: true,
+    available: false,
   },
 ];
 
@@ -421,11 +421,21 @@ export function HomePage(): React.JSX.Element {
                     flex={1}
                     minWidth={300}
                     style={sportCardGlassStyle(sport.accent)}
-                    onPress={() => {
-                      navigate(sport.route);
-                    }}
-                    accessibilityLabel={`Navigate to ${sport.title}`}
-                    role="link"
+                    {...(sport.available
+                      ? {
+                          onPress: () => {
+                            navigate(sport.route);
+                          },
+                          role: 'link' as const,
+                        }
+                      : {})}
+                    opacity={sport.available ? 1 : 0.6}
+                    cursor={sport.available ? 'pointer' : 'default'}
+                    accessibilityLabel={
+                      sport.available
+                        ? `Navigate to ${sport.title}`
+                        : `${sport.title} — Coming Soon`
+                    }
                   >
                     <XStack gap="$4" alignItems="center">
                       <SportIcon
@@ -465,26 +475,28 @@ export function HomePage(): React.JSX.Element {
                       {sport.description}
                     </Paragraph>
 
-                    <XStack gap="$3" marginTop="$1">
-                      <ActionButton
-                        size="$3"
-                        onPress={() => {
-                          navigate(sport.route);
-                        }}
-                      >
-                        <Text fontWeight="700">View Leagues</Text>
-                      </ActionButton>
-                      {sport.key === 'baseball' && (
-                        <OutlineButton
+                    {sport.available && (
+                      <XStack gap="$3" marginTop="$1">
+                        <ActionButton
                           size="$3"
                           onPress={() => {
-                            navigate('/baseball/league/create');
+                            navigate(sport.route);
                           }}
                         >
-                          <Text fontWeight="700">Create League</Text>
-                        </OutlineButton>
-                      )}
-                    </XStack>
+                          <Text fontWeight="700">View Leagues</Text>
+                        </ActionButton>
+                        {sport.key === 'baseball' && (
+                          <OutlineButton
+                            size="$3"
+                            onPress={() => {
+                              navigate('/baseball/league/create');
+                            }}
+                          >
+                            <Text fontWeight="700">Create League</Text>
+                          </OutlineButton>
+                        )}
+                      </XStack>
+                    )}
                   </SportCard>
                 ))}
               </XStack>
