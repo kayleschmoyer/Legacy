@@ -201,7 +201,10 @@ async function queueMatchupStatsLoad(
       error: error instanceof Error ? error.message : String(error),
       matchupId,
     });
-    // Don't throw - we don't want to fail game selection if queuing fails
+    captureError(error instanceof Error ? error : new Error(String(error)), {
+      matchupId,
+    });
+    throw error;
   }
 }
 
