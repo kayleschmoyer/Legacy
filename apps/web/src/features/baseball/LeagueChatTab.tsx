@@ -60,7 +60,8 @@ export function LeagueChatTab({
   userId,
   onNavigate,
 }: LeagueChatTabProps): React.JSX.Element {
-  const { messages, loading, sending, sendMessage } = useLeagueChat(leagueId);
+  const { messages, loading, sending, sendError, sendMessage } =
+    useLeagueChat(leagueId);
   const [inputText, setInputText] = useState('');
   const [showGifPicker, setShowGifPicker] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -245,6 +246,21 @@ export function LeagueChatTab({
             onClose={() => setShowGifPicker(false)}
           />
         </YStack>
+      )}
+
+      {/* Send error */}
+      {sendError != null && (
+        <XStack
+          paddingHorizontal="$4"
+          paddingVertical="$2"
+          backgroundColor="$red2"
+          borderTopWidth={1}
+          borderTopColor="$red6"
+        >
+          <Text color="$red10" fontSize="$3">
+            {sendError}
+          </Text>
+        </XStack>
       )}
 
       {/* Input area */}

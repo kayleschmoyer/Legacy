@@ -44,9 +44,11 @@ export function useLeagueChat(leagueId: number): {
   messages: ChatMessage[];
   loading: boolean;
   sending: boolean;
+  sendError: string | null;
   sendMessage: (text: string, gifUrl?: string) => Promise<void>;
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   // Load message history
   const {
@@ -124,55 +126,61 @@ export function useLeagueChat(leagueId: number): {
         text: trimmed,
         gifUrl,
       });
-      await sendMutation({
-        variables: {
-          leagueId,
-          messageText: trimmed || ' ',
-          gifUrl: gifUrl ?? null,
-        },
-        awaitRefetchQueries: true,
-        refetchQueries: [
-          {
-            query: GetLeagueChatMessages,
-            variables: { leagueId, limit: 50 },
+      setSendError(null);
+      try {
+        await sendMutation({
+          variables: {
+            leagueId,
+            messageText: trimmed || ' ',
+            gifUrl: gifUrl ?? null,
           },
-        ],
-        onCompleted: (data) => {
-          const raw = data.sendLeagueMessage;
-          if (!raw) return;
-          const msg: ChatMessage = {
-            id: Number(raw.id),
-            userId: raw.userId != null ? Number(raw.userId) : null,
-            username:
-              raw.sender?.username ??
-              (raw.userId != null ? `user_${raw.userId}` : 'System'),
-            avatarUrl: raw.sender?.avatarUrl ?? null,
-            messageText: raw.messageText ?? '',
-            gifUrl: raw.gifUrl ?? null,
-            createdAt: raw.timestamp ?? '',
-            messageType: raw.messageType ?? 'text',
-            metadata: null,
-          };
-          LOGGER.info(`[chat ${_ts()}] onCompleted`, {
-            msgId: msg.id,
-            idType: typeof msg.id,
-            rawId: raw.id,
-            rawIdType: typeof raw.id,
-            text: msg.messageText.substring(0, 30),
-          });
-          setMessages((prev) => {
-            const isDupe = prev.some((m) => m.id === msg.id);
-            LOGGER.info(`[chat ${_ts()}] onCompleted setMessages`, {
+          awaitRefetchQueries: true,
+          refetchQueries: [
+            {
+              query: GetLeagueChatMessages,
+              variables: { leagueId, limit: 50 },
+            },
+          ],
+          onCompleted: (data) => {
+            const raw = data.sendLeagueMessage;
+            if (!raw) return;
+            const msg: ChatMessage = {
+              id: Number(raw.id),
+              userId: raw.userId != null ? Number(raw.userId) : null,
+              username:
+                raw.sender?.username ??
+                (raw.userId != null ? `user_${raw.userId}` : 'System'),
+              avatarUrl: raw.sender?.avatarUrl ?? null,
+              messageText: raw.messageText ?? '',
+              gifUrl: raw.gifUrl ?? null,
+              createdAt: raw.timestamp ?? '',
+              messageType: raw.messageType ?? 'text',
+              metadata: null,
+            };
+            LOGGER.info(`[chat ${_ts()}] onCompleted`, {
               msgId: msg.id,
-              isDupe,
-              prevIds: prev.map((m) => m.id),
+              idType: typeof msg.id,
+              rawId: raw.id,
+              rawIdType: typeof raw.id,
+              text: msg.messageText.substring(0, 30),
             });
-            if (isDupe) return prev;
-            return [...prev, msg];
-          });
-        },
-      });
-      LOGGER.info(`[chat ${_ts()}] sendMessage await resolved`);
+            setMessages((prev) => {
+              const isDupe = prev.some((m) => m.id === msg.id);
+              LOGGER.info(`[chat ${_ts()}] onCompleted setMessages`, {
+                msgId: msg.id,
+                isDupe,
+                prevIds: prev.map((m) => m.id),
+              });
+              if (isDupe) return prev;
+              return [...prev, msg];
+            });
+          },
+        });
+        LOGGER.info(`[chat ${_ts()}] sendMessage await resolved`);
+      } catch (err) {
+        LOGGER.error(`[chat ${_ts()}] sendMessage failed`, { err });
+        setSendError('Failed to send message. Please try again.');
+      }
     },
     [sendMutation, leagueId],
   );
@@ -222,5 +230,5 @@ export function useLeagueChat(leagueId: number): {
     },
   });
 
-  return { messages, loading, sending, sendMessage };
+  return { messages, loading, sending, sendError, sendMessage };
 }
