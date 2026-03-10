@@ -504,6 +504,124 @@ describe('PlayerStatsDataGrid - Interactions', () => {
     // Refresh button should be present (component should not crash)
     expect(refreshButton).toBeInTheDocument();
   });
+
+  test('Next button advances to page 2 and page counter updates (LS-871)', async () => {
+    // Page 1 mock: totalCount > pageSize so Next is enabled, hasNextPage=true
+    const page1Mock: MockedResponse = {
+      request: {
+        query: CAREER_BATTING_STATS_QUERY,
+        variables: {
+          first: 25,
+          after: undefined,
+          orderBy: 'homeRuns',
+          orderDirection: 'desc',
+          minGames: 10,
+          minHomeRuns: 0,
+          minRBI: 0,
+          minBattingAvg: 0,
+          searchTerm: '',
+        },
+      },
+      result: {
+        data: {
+          careerBattingStats: {
+            __typename: 'CareerBattingConnection',
+            edges: [
+              {
+                __typename: 'CareerBattingEdge',
+                node: { ...mockPlayerData[0], playerId: 1 },
+                cursor: Buffer.from('0').toString('base64'),
+              },
+            ],
+            pageInfo: {
+              __typename: 'PageInfo',
+              hasNextPage: true,
+              hasPreviousPage: false,
+              startCursor: Buffer.from('0').toString('base64'),
+              endCursor: Buffer.from('0').toString('base64'),
+            },
+            totalCount: 50,
+          },
+        },
+      },
+    };
+
+    // Page 2 mock: after = base64("25") — the correct next-page starting offset
+    const page2Mock: MockedResponse = {
+      request: {
+        query: CAREER_BATTING_STATS_QUERY,
+        variables: {
+          first: 25,
+          after: Buffer.from('25').toString('base64'),
+          orderBy: 'homeRuns',
+          orderDirection: 'desc',
+          minGames: 10,
+          minHomeRuns: 0,
+          minRBI: 0,
+          minBattingAvg: 0,
+          searchTerm: '',
+        },
+      },
+      result: {
+        data: {
+          careerBattingStats: {
+            __typename: 'CareerBattingConnection',
+            edges: [
+              {
+                __typename: 'CareerBattingEdge',
+                node: {
+                  ...mockPlayerData[0],
+                  playerId: 999,
+                  player: {
+                    __typename: 'Player',
+                    id: 999,
+                    firstName: 'Page Two',
+                    lastName: 'Player',
+                    brefId: 'pagetwo999',
+                  },
+                },
+                cursor: Buffer.from('25').toString('base64'),
+              },
+            ],
+            pageInfo: {
+              __typename: 'PageInfo',
+              hasNextPage: false,
+              hasPreviousPage: true,
+              startCursor: Buffer.from('25').toString('base64'),
+              endCursor: Buffer.from('25').toString('base64'),
+            },
+            totalCount: 50,
+          },
+        },
+      },
+    };
+
+    render(
+      <TestWrapper mocks={[page1Mock, page2Mock, playersQueryMock]}>
+        <PlayerStatsDataGrid {...defaultProps} />
+      </TestWrapper>,
+    );
+
+    // Wait for page 1 data to fully load (loading=false when player row appears)
+    await waitFor(() => {
+      expect(screen.getByTestId('player-row-1')).toBeInTheDocument();
+    });
+
+    // Page counter should show page 1
+    expect(screen.getByText(/Page 1 of 2/)).toBeInTheDocument();
+
+    // The Next button must be enabled (not disabled) when there's a next page
+    const nextButton = screen.getByText('Next →');
+    expect(nextButton).not.toBeDisabled();
+
+    // Click Next
+    fireEvent.click(nextButton);
+
+    // Page counter must advance to page 2 — this was the broken behaviour in LS-871
+    await waitFor(() => {
+      expect(screen.getByText(/Page 2/)).toBeInTheDocument();
+    });
+  });
 });
 
 // =============================================================================

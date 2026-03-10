@@ -448,26 +448,22 @@ export function PlayerStatsDataGrid({
    */
   const handlePageChange = useCallback(
     (direction: 'next' | 'prev') => {
+      const currentOffset = queryParams.after
+        ? parseInt(Buffer.from(queryParams.after, 'base64').toString())
+        : 0;
+      const pageSz = queryParams.first ?? 25;
+
       if (direction === 'next' && hasNextPage) {
-        // Use endCursor from current page as the 'after' cursor for next page
-        const endCursor =
-          data?.length > 0
-            ? btoa(
-                (
-                  (queryParams.after ? parseInt(atob(queryParams.after)) : 0) +
-                  (queryParams.first ?? 25) -
-                  1
-                ).toString(),
-              )
-            : undefined;
-        updateQueryParams({ after: endCursor });
+        // The backend treats the `after` cursor as the starting offset of the
+        // next page, so advance by a full page size.
+        const nextOffset = currentOffset + pageSz;
+        updateQueryParams({
+          after: Buffer.from(nextOffset.toString()).toString('base64'),
+        });
       } else if (direction === 'prev' && hasPreviousPage) {
-        // For previous page, calculate the cursor based on current position
-        const currentOffset = queryParams.after
-          ? parseInt(atob(queryParams.after))
-          : 0;
-        const pageSize = queryParams.first ?? 25;
-        const newOffset = Math.max(0, currentOffset - pageSize);
+        // Go back one full page; if we reach offset 0 omit the cursor so the
+        // query defaults to the first page (matching initial load behaviour).
+        const newOffset = Math.max(0, currentOffset - pageSz);
         const prevCursor =
           newOffset > 0 ? btoa(newOffset.toString()) : undefined;
         updateQueryParams({ after: prevCursor });
@@ -478,7 +474,6 @@ export function PlayerStatsDataGrid({
       queryParams.first,
       hasNextPage,
       hasPreviousPage,
-      data?.length,
       updateQueryParams,
     ],
   );
