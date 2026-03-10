@@ -17,6 +17,7 @@ import {
   captureError,
   getSentryConfigFromEnv,
   initSentry,
+  withSentry,
 } from '@legacy-sports/rollbar';
 
 // Initialize Sentry on cold start
@@ -638,7 +639,7 @@ async function pushSubscriptionUpdated(
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
-export const handler = async (
+const baseStripeWebhookHandler = async (
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> => {
   const signature = event.headers['stripe-signature'] ?? '';
@@ -770,3 +771,5 @@ export const handler = async (
 
   return { statusCode: 200, body: JSON.stringify({ received: true }) };
 };
+
+export const handler = withSentry(baseStripeWebhookHandler);
