@@ -136,7 +136,7 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
   {
     key: 'era',
     label: 'ERA',
-    sortable: false,
+    sortable: true,
     width: '70px',
     align: 'center',
     priority: 'high',
@@ -226,6 +226,7 @@ const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   games: 'games',
   wins: 'wins',
   losses: 'losses',
+  era: 'era',
   gamesStarted: 'gamesStarted',
   completeGames: 'completeGames',
   shutouts: 'shutouts',

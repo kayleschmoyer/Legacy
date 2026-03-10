@@ -252,6 +252,10 @@ export class StatisticsService {
             return orderDirection === 'desc'
               ? desc(PublicSchema.careerPitching.so)
               : asc(PublicSchema.careerPitching.so);
+          } else if (queryOptions.orderBy === 'era') {
+            return orderDirection === 'desc'
+              ? desc(PublicSchema.careerPitching.era)
+              : asc(PublicSchema.careerPitching.era);
           }
           return desc(PublicSchema.careerPitching.w);
         };
