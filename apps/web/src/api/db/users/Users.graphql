@@ -4,6 +4,7 @@ fragment User on User {
   username
   accessLevel
   avatarUrl
+  subscriptionTier
 }
 
 fragment AdminUser on User {

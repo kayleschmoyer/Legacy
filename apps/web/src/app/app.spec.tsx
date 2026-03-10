@@ -78,6 +78,11 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
+// Mock analytics identify hook (requires ApolloProvider not present in tests)
+jest.mock('../hooks/useAnalyticsIdentify', () => ({
+  useAnalyticsIdentify: () => undefined,
+}));
+
 // Mock the styled function to avoid Tamagui issues
 jest.mock('tamagui', () => ({
   styled: (component: React.ComponentType<unknown>) => component,

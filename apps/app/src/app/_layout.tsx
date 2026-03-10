@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useEffect } from 'react';
 import { TamaguiProvider } from 'tamagui';
 import Constants from 'expo-constants';
 import {
@@ -15,6 +16,7 @@ import {
   FootballScreen,
   HomeScreen,
   TamaguiAppNavigator,
+  useAuth,
 } from '@legacy-sports/shared-components';
 import type { NavigationRoute } from '@legacy-sports/shared-components';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
@@ -22,6 +24,8 @@ import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { DbClientContext } from '../common/ApolloClientContext';
 import { ThemeProvider, useThemeContext } from '../context/ThemeContext';
+import { setUserId, setUserProperties } from '../utils/analytics';
+import { useGetUserByIdQuery } from '../api/db/graphql.generated';
 
 // Initialize Rollbar for mobile app
 const sentryConfig = getSentryConfigFromEnv();
@@ -76,9 +80,30 @@ const authConfig: OAuthConfig = {
   offlineAccess: true,
 };
 
+/**
+ * Runs inside AppProvider (Apollo context) to set analytics identity using
+ * the real subscriptionTier from the database.
+ */
+function AnalyticsIdentify({ userId }: { userId: number }): null {
+  const { data } = useGetUserByIdQuery({
+    variables: { id: userId },
+    skip: !userId,
+  });
+
+  useEffect(() => {
+    if (!data?.user) return;
+    const tier = data.user.subscriptionTier === 'premium' ? 'premium' : 'free';
+    setUserId(userId);
+    setUserProperties({ userId, subscriptionTier: tier });
+  }, [userId, data?.user?.subscriptionTier]);
+
+  return null;
+}
+
 function AuthenticatedContent(): React.JSX.Element {
   const client = React.useContext(DbClientContext);
   const { resolvedTheme } = useThemeContext();
+  const { user } = useAuth();
 
   return (
     <AppProvider
@@ -89,6 +114,7 @@ function AuthenticatedContent(): React.JSX.Element {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       tamaguiConfig={tamaguiConfig}
     >
+      {user?.id ? <AnalyticsIdentify userId={user.id} /> : null}
       <TamaguiAppNavigator routes={routes} initialRoute="Home" />
     </AppProvider>
   );

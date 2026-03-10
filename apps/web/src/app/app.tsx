@@ -55,6 +55,7 @@ import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
 import { useRouteAnnouncer } from '../hooks/useRouteAnnouncer';
+import { useAnalyticsIdentify } from '../hooks/useAnalyticsIdentify';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { AdminPage } from '../pages/admin/AdminPage';
@@ -457,6 +458,8 @@ function App() {
   usePageTracking();
   // Announce page title to screen readers on route change
   useRouteAnnouncer();
+  // Identify the authenticated user in analytics with real subscription tier
+  useAnalyticsIdentify();
 
   return (
     <MainLayout>

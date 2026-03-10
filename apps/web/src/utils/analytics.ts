@@ -8,6 +8,9 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { getEnvironmentConfig } from '../config/environment';
 
+// Internal state — updated by setUserProperties(); auto-included in all events
+let _subscriptionTier: 'free' | 'premium' | undefined;
+
 declare global {
   interface Window {
     gtag?: (
@@ -94,7 +97,10 @@ export function trackEvent(eventName: string, params?: AnalyticsEvent): void {
     return;
   }
 
-  window.gtag('event', eventName, params);
+  window.gtag('event', eventName, {
+    subscription_tier: _subscriptionTier,
+    ...params,
+  });
 
   LOGGER.info('[Analytics] Event tracked:', eventName, params);
 }
@@ -208,6 +214,10 @@ export function setUserProperties(properties: {
     account_age: properties.accountAge,
     subscription_tier: properties.subscriptionTier,
   });
+
+  if (properties.subscriptionTier !== undefined) {
+    _subscriptionTier = properties.subscriptionTier;
+  }
 
   if (properties.userId) {
     setUserId(properties.userId);
@@ -399,6 +409,50 @@ export function trackTiming(
 export function trackPremiumFeatureClick(featureName: string): void {
   trackEvent('premium_feature_click', {
     feature_name: featureName,
+    category: 'monetization',
+  });
+}
+
+/**
+ * Track when a premium gate is shown (user hit a paywall)
+ * @param featureName - Name of the blocked feature
+ */
+export function trackPremiumFeatureBlocked(featureName: string): void {
+  trackEvent('premium_feature_blocked', {
+    feature_name: featureName,
+    category: 'monetization',
+  });
+}
+
+/**
+ * Track subscription started
+ * @param tier - Subscription tier
+ */
+export function trackSubscriptionStarted(tier: 'premium'): void {
+  trackEvent('subscription_started', {
+    tier,
+    category: 'monetization',
+  });
+}
+
+/**
+ * Track subscription cancelled
+ * @param tier - Subscription tier that was cancelled
+ */
+export function trackSubscriptionCancelled(tier: 'premium'): void {
+  trackEvent('subscription_cancelled', {
+    tier,
+    category: 'monetization',
+  });
+}
+
+/**
+ * Track subscription renewed
+ * @param tier - Subscription tier that was renewed
+ */
+export function trackSubscriptionRenewed(tier: 'premium'): void {
+  trackEvent('subscription_renewed', {
+    tier,
     category: 'monetization',
   });
 }

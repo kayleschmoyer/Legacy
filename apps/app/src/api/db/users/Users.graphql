@@ -2,6 +2,7 @@ fragment User on User {
   id
   email
   username
+  subscriptionTier
 }
 
 query GetUserByEmail($email: String!) {

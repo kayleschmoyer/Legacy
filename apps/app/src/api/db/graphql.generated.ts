@@ -4301,6 +4301,7 @@ export type UserFragment = {
   id?: number | null;
   email?: string | null;
   username?: string | null;
+  subscriptionTier?: string | null;
 };
 
 export type GetUserByEmailQueryVariables = Exact<{
@@ -4314,6 +4315,7 @@ export type GetUserByEmailQuery = {
     id?: number | null;
     email?: string | null;
     username?: string | null;
+    subscriptionTier?: string | null;
   } | null;
 };
 
@@ -4331,6 +4333,7 @@ export type GetLeaguesForUserQuery = {
     id?: number | null;
     email?: string | null;
     username?: string | null;
+    subscriptionTier?: string | null;
   } | null;
 };
 
@@ -4345,6 +4348,7 @@ export type GetUserByIdQuery = {
     id?: number | null;
     email?: string | null;
     username?: string | null;
+    subscriptionTier?: string | null;
   } | null;
 };
 
@@ -4591,6 +4595,7 @@ export const UserFragmentDoc = gql`
     id
     email
     username
+    subscriptionTier
   }
 `;
 export const GetLeagueById = gql`

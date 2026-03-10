@@ -7313,6 +7313,7 @@ export type UserFragment = {
   username?: string | null;
   accessLevel?: string | null;
   avatarUrl?: string | null;
+  subscriptionTier?: string | null;
 };
 
 export type AdminUserFragment = {
@@ -7336,6 +7337,7 @@ export type GetUserByIdQuery = {
     username?: string | null;
     accessLevel?: string | null;
     avatarUrl?: string | null;
+    subscriptionTier?: string | null;
   } | null;
 };
 
@@ -7354,6 +7356,7 @@ export type GetAllUsersQuery = {
     username?: string | null;
     accessLevel?: string | null;
     avatarUrl?: string | null;
+    subscriptionTier?: string | null;
   }> | null;
 };
 
@@ -7380,6 +7383,7 @@ export type UpdateUserRoleMutation = {
     username?: string | null;
     accessLevel?: string | null;
     avatarUrl?: string | null;
+    subscriptionTier?: string | null;
   } | null;
 };
 
@@ -7926,6 +7930,7 @@ export const UserFragmentDoc = gql`
     username
     accessLevel
     avatarUrl
+    subscriptionTier
   }
 `;
 export const AdminUserFragmentDoc = gql`
