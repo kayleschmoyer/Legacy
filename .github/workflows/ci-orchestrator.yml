@@ -67,6 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run-security: ${{ steps.scope.outputs.run-security }}
+      security-scan-type: ${{ steps.scope.outputs.security-scan-type }}
 
     steps:
       - name: "🚀 Checkout Repository"
@@ -84,6 +85,7 @@ jobs:
           manual_security='${{ github.event_name == 'workflow_dispatch' && (inputs.run_security && 'true' || 'false') }}'
 
           run_security=false
+          scan_type=comprehensive
 
           if [ "$event" = "schedule" ]; then
             case "$schedule" in
@@ -121,15 +123,36 @@ jobs:
             fi
 
             if [ -n "$changed_files" ]; then
-              SECURITY_PATHS='(^|/)package\.json$|(^|/)package-lock\.json$'
-              SECURITY_PATHS="$SECURITY_PATHS|^apps\/.*\.(ts|tsx|js|jsx)$"
-              SECURITY_PATHS="$SECURITY_PATHS|^lib\/.*\.(ts|tsx|js|jsx)$"
-              SECURITY_PATHS="$SECURITY_PATHS|^lambdas\/.*\.(ts|js)$"
-              SECURITY_PATHS="$SECURITY_PATHS|^tools\/.*\.(ts|js)$"
-              SECURITY_PATHS="$SECURITY_PATHS|^\.github\/workflows\/security-scanning\.yml$"
-              SECURITY_PATHS="$SECURITY_PATHS|^tsconfig.*\.json$|^\.npmrc$"
-              if echo "$changed_files" | grep -Eq "$SECURITY_PATHS"; then
+              # Dependency paths — heavyweight scanning (pnpm audit, Snyk, Trivy)
+              DEPENDENCY_PATHS='(^|/)package\.json$|(^|/)pnpm-lock\.yaml$|(^|/)\.npmrc$'
+
+              # Code paths — lightweight scanning (SAST, secret detection)
+              CODE_PATHS='^apps\/.*\.(ts|tsx|js|jsx)$'
+              CODE_PATHS="$CODE_PATHS|^lib\/.*\.(ts|tsx|js|jsx)$"
+              CODE_PATHS="$CODE_PATHS|^lambdas\/.*\.(ts|js)$"
+              CODE_PATHS="$CODE_PATHS|^tools\/.*\.(ts|js)$"
+              CODE_PATHS="$CODE_PATHS|^\.github\/workflows\/security-scanning\.yml$"
+              CODE_PATHS="$CODE_PATHS|^tsconfig.*\.json$"
+
+              deps_changed=false
+              code_changed=false
+
+              if echo "$changed_files" | grep -Eq "$DEPENDENCY_PATHS"; then
+                deps_changed=true
+              fi
+              if echo "$changed_files" | grep -Eq "$CODE_PATHS"; then
+                code_changed=true
+              fi
+
+              if [ "$deps_changed" = true ] && [ "$code_changed" = true ]; then
                 run_security=true
+                scan_type=comprehensive
+              elif [ "$deps_changed" = true ]; then
+                run_security=true
+                scan_type=dependencies-only
+              elif [ "$code_changed" = true ]; then
+                run_security=true
+                scan_type=sast-only
               fi
             fi
           fi
@@ -139,6 +162,7 @@ jobs:
           fi
 
           echo "run-security=$run_security" >> "$GITHUB_OUTPUT"
+          echo "security-scan-type=$scan_type" >> "$GITHUB_OUTPUT"
 
   ci-pipeline:
     name: "🚀 CI Pipeline"
@@ -154,6 +178,6 @@ jobs:
     if: ${{ needs.determine-scope.outputs.run-security == 'true' }}
     uses: ./.github/workflows/security-scanning.yml
     with:
-      # PRs get a lightweight dependency-only scan; comprehensive runs weekly
-      scan_type: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_type || (github.event_name == 'pull_request' && 'dependencies-only' || 'comprehensive') }}
+      # Scan type is determined by what changed: deps → dependency scan, code → SAST/secrets, both → comprehensive
+      scan_type: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_type || needs.determine-scope.outputs.security-scan-type }}
     secrets: inherit
