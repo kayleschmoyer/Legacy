@@ -304,6 +304,28 @@ git commit -m "feat(scope): description (LS-####)"
 git push -u origin HEAD
 ```
 
+### Step 6b: Apply Pending Migrations 🚨 Required
+
+**Always do this step — even if you think no migrations were added.**
+Run `db:status` to check, then apply any pending migrations before running `make pc`.
+Tests may depend on the updated schema, so migrations must be applied first.
+
+```powershell
+cd $wt/lib/db-client
+
+# Check for pending migrations
+pnpm run db:status
+
+# Apply any that are pending
+pnpm run db:up
+```
+
+Confirm `db:up` output shows `Applied N new migrations` or `No new migrations to apply`.
+If it throws an error, fix the migration SQL, re-commit, push, and re-run `db:up`.
+
+> 🛑 **Blocked here? Do NOT open the PR.** A PR with an unapplied migration leaves the
+> local database out of sync and breaks any developer who pulls the branch.
+
 ### Step 7: Pre-PR Validation
 
 Run the full validation suite before opening the PR. Fix any failures and push again before continuing.
@@ -315,19 +337,6 @@ make pc
 > 🚨 **DO NOT STOP HERE.** Passing `make pc` is a checkpoint, not the finish line. You **must**
 > continue to Step 8 (create PR) and Step 9 (Jira "In Review"). Stopping after validation
 > without opening a PR is the single most common agent failure mode.
-
-### Step 7b: Apply Pending Migrations 🚨
-
-If you added or modified any migration files under `lib/db-client/migrations/`, apply them now:
-
-```powershell
-cd lib/db-client
-pnpm run db:up
-```
-
-Confirm the output shows `Applied N new migrations`. If it throws, fix the migration SQL before proceeding.
-
-> ⚠️ **Do not skip this step.** A PR with an unapplied migration leaves the local DB out of sync.
 
 ### Step 7c: User Testing (Optional)
 

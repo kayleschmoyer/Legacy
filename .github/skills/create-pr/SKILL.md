@@ -133,7 +133,22 @@ gh pr create --title "fix: thing" --body "Change \`--old\` to \`--new\`"
 The `function` was broken
 "@ | Set-Content -Path "$env:TEMP\pr-body.md"
 # Result: "The  was broken" (backticks gone)
+
+# BAD - `twig pr` is NOT a valid twig command; it produces an error, not a PR body
+twig pr > .github/tmp-pr-body.md
+# Result: the file contains the twig error message, not a PR description
+
+# BAD - PowerShell's `>` operator writes UTF-16LE (null byte after every char)
+# Even if the command succeeded, the file would be unreadable by gh pr create
+some-command > .github/tmp-pr-body.md
+# ALWAYS use Out-File -Encoding utf8 or, better, the create_file tool
 ```
+
+> **Root cause of PR #878's garbled description**: `twig pr > .github/tmp-pr-body.md` was run.
+> `twig` has no `pr` subcommand, so it wrote an error message to the file. PowerShell's `>`
+> operator encoded that error in UTF-16LE (a null byte after every character), producing the
+> `^@F^@i^@x^@e^@s^@...` output visible in the PR body. **Always use `create_file` to write
+> the PR body — never shell-redirect into the file.**
 
 ### 🚨 Do NOT Escape Backticks in PR Body Content
 
@@ -270,17 +285,40 @@ Your markdown content here
 gh pr create --title "your title" --body-file "$env:TEMP\pr-body.md" --base main
 ```
 
+### Issue: PR body contains `^@` null bytes / garbled UTF-16 output
+
+**Cause**: The file was written using PowerShell's `>` redirect operator (which outputs UTF-16LE), or the command that wrote the file printed an error instead of content (e.g., `twig pr` is not a valid command).
+
+**Solution**: Check what was written to the file before using it:
+
+```powershell
+Get-Content .github/tmp-pr-body.md | Select-Object -First 5
+```
+
+If it looks garbled or contains an error message, delete it and recreate correctly:
+
+```powershell
+Remove-Item .github/tmp-pr-body.md -ErrorAction SilentlyContinue
+# Use create_file tool to write the correct PR body markdown
+gh pr edit <PR_NUMBER> --body-file ".github/tmp-pr-body.md"
+```
+
+**Prevention**: Always use the `create_file` tool (not shell redirection) to write `.github/tmp-pr-body.md`.
+
 ## Best Practices
 
 1. **Always use `--body-file`** for PR descriptions — never inline `--body` in PowerShell
 2. **Use `create_file` tool** to write the temp .md file — it preserves backticks and special chars
 3. **Never use PowerShell heredoc** (`@" "@`) for markdown with backticks — it strips them
 4. **Never escape backticks** in the PR body content — write `` `code` `` not `\`code\`` (escaped backticks render as backslashes)
-5. **Run pre-commit validation** before creating PR (`make pre-commit`)
-6. **Prefix PR title with Jira ticket key**: `LS-#### type(scope): description`
-7. **Link Jira ticket** in PR description
-8. **Add screenshots for every UI change** — see [UI Screenshots](#ui-screenshots) section below
-9. **Keep PRs focused** — split large changes into multiple PRs
+5. **Never use shell redirection (`>`)** to create the PR body file — PowerShell writes UTF-16LE; use `create_file` instead
+6. **`twig pr` is not a valid command** — do not attempt to generate the PR body via twig; write it directly with `create_file`
+7. **Verify the file before using it** — `Get-Content .github/tmp-pr-body.md | Select-Object -First 5` to confirm it looks like markdown, not an error
+8. **Run pre-commit validation** before creating PR (`make pre-commit`)
+9. **Prefix PR title with Jira ticket key**: `LS-#### type(scope): description`
+10. **Link Jira ticket** in PR description
+11. **Add screenshots for every UI change** — see [UI Screenshots](#ui-screenshots) section below
+12. **Keep PRs focused** — split large changes into multiple PRs
 
 ## UI Screenshots
 

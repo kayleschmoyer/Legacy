@@ -27,15 +27,21 @@ Create a new database migration file to track schema changes in version control.
 The migration runner (`rollback-migrations.ts`) enforces strict conventions.
 Violating any of these will cause the migration to be **silently skipped**.
 
-| Rule          | Correct                                       | Wrong                                      |
-| ------------- | --------------------------------------------- | ------------------------------------------ |
-| **Directory** | `lib/db-client/migrations/`                   | `lib/db-client/src/drizzle/migrations/`    |
-| **Filename**  | `YYYYMMDD_HHMMSS_name.ts`                     | `0051_name.ts`                             |
-| **Exports**   | Named `export const up` / `export const down` | `export default { up, down }`              |
-| **Signature** | `up({ db }: { db: PgDatabase<any> })`         | `up(db: NodePgDatabase)`                   |
-| **SQL calls** | `db.execute(\`...\`)` (plain string)          | `db.execute(sql\`...\`)` (tagged template) |
+| Rule                | Correct                                       | Wrong                                      |
+| ------------------- | --------------------------------------------- | ------------------------------------------ |
+| **Directory**       | `lib/db-client/migrations/`                   | `lib/db-client/src/drizzle/migrations/`    |
+| **Filename**        | `YYYYMMDD_HHMMSS_name.ts`                     | `0051_name.ts`                             |
+| **Exports**         | Named `export const up` / `export const down` | `export default { up, down }`              |
+| **Signature**       | `up({ db }: { db: PgDatabase<any> })`         | `up(db: NodePgDatabase)`                   |
+| **SQL calls**       | `db.execute(\`...\`)` (plain string)          | `db.execute(sql\`...\`)` (tagged template) |
+| **Apply before PR** | Run `pnpm run db:up` before opening PR        | Commit migration file without applying it  |
 
 **Why**: The runner regex is `^(\d{8}_\d{6})_(.+)\.ts$` and calls `migrationModule.up({ db, sql })`.
+
+> 🛑 **Never push a branch to origin with pending (unapplied) migrations.**
+> A pending migration in a PR leaves every developer who pulls the branch with a broken
+> local DB until they manually run `db:up`. Always confirm `Applied N new migrations` before
+> opening a PR. See [Step 6b in the worktree-workflow skill](../worktree-workflow/SKILL.md).
 
 ## Steps
 
