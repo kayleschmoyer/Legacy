@@ -6,6 +6,7 @@ import {
   H2,
   H3,
   Paragraph,
+  useAuth,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
@@ -13,6 +14,7 @@ import { ScrollView, Separator, styled, Text, H2 as TH2 } from 'tamagui';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { PageMeta } from '../../components/PageMeta';
+import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
 import { OnThisDayFeed } from '../../features/baseball';
 import {
   BG_DARK,
@@ -177,6 +179,33 @@ const SectionTitle = styled(TH2, {
   color: '$color',
 });
 
+const DashboardCard = styled(YStack, {
+  borderRadius: '$7',
+  borderWidth: 1,
+  borderColor: '$glassBorder',
+  padding: '$5',
+  gap: '$3',
+  cursor: 'pointer',
+  animation: 'medium',
+  hoverStyle: {
+    borderColor: '$glassBorderHover',
+    transform: 'translateY(-2px)',
+  },
+  pressStyle: {
+    scale: 0.98,
+  },
+  $sm: {
+    padding: '$4',
+  },
+});
+
+const StatBox = styled(YStack, {
+  alignItems: 'center',
+  gap: '$1',
+  flex: 1,
+  minWidth: 80,
+});
+
 /* ─── Page Background ─── */
 
 const pageBackgroundStyle: React.CSSProperties = {
@@ -294,6 +323,7 @@ function readDefaultSport(): 'baseball' | 'football' {
 
 export function HomePage(): React.JSX.Element {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [onboardingComplete, setOnboardingComplete] = useLocalStorage<boolean>(
     'ls_onboarding_complete',
     false,
@@ -309,19 +339,283 @@ export function HomePage(): React.JSX.Element {
     [defaultSport],
   );
   const primarySport = orderedSports[0];
+  const defaultSportRoute = primarySport.route;
 
-  // Auto-show tutorial once for first-time visitors.
+  const { data: leagueData, loading: leaguesLoading } = useGetUserLeaguesQuery({
+    skip: !auth?.user,
+    fetchPolicy: 'cache-and-network',
+  });
+
+  const leagues = leagueData?.userLeagues ?? [];
+  const hasLeagues = leagues.length > 0;
+  const userName = auth?.user?.username || 'Manager';
+
+  const upcomingDrafts = leagues.filter((l) =>
+    l.draftStatus
+      ? ['not-started', 'queued', 'scheduled'].includes(l.draftStatus)
+      : false,
+  ).length;
+
+  // Auto-show tutorial once for first-time visitors who have no leagues.
   useEffect(() => {
-    if (!onboardingComplete) {
+    if (!onboardingComplete && !hasLeagues && !leaguesLoading) {
       setTutorialOpen(true);
     }
-  }, [onboardingComplete]);
+  }, [onboardingComplete, hasLeagues, leaguesLoading]);
 
   const handleTutorialClose = () => {
     setTutorialOpen(false);
     setOnboardingComplete(true);
   };
 
+  /* ─── Personalized dashboard for returning users ─── */
+  if (hasLeagues) {
+    return (
+      <ScrollView>
+        <PageMeta
+          title="Legacy Sports — Dashboard"
+          description="Your personalized fantasy sports dashboard."
+        />
+        <PageContainer style={pageBackgroundStyle}>
+          {/* ─── Welcome Hero ─── */}
+          <HeroSection style={heroGradientStyle}>
+            <HeroBadge>
+              <Text fontSize="$2" fontWeight="600" color={BRAND_GOLD_LIGHT}>
+                {new Date().getFullYear()} Season
+              </Text>
+            </HeroBadge>
+
+            <H1
+              fontSize="$12"
+              fontWeight="800"
+              color="$color"
+              textAlign="center"
+              letterSpacing={-0.5}
+              animation="medium"
+              enterStyle={{ opacity: 0, y: 20 }}
+              $sm={{ fontSize: '$10' }}
+            >
+              Welcome back, {userName}
+            </H1>
+
+            <Paragraph
+              fontSize="$6"
+              color="$textMuted"
+              textAlign="center"
+              maxWidth={560}
+              lineHeight="$7"
+              animation="medium"
+              enterStyle={{ opacity: 0, y: 15 }}
+            >
+              You&apos;re managing {leagues.length}{' '}
+              {leagues.length === 1 ? 'league' : 'leagues'}. Jump into your
+              season dashboard to check matchups, rosters, and drafts.
+            </Paragraph>
+
+            <XStack
+              gap="$3"
+              marginTop="$2"
+              flexWrap="wrap"
+              justifyContent="center"
+              animation="medium"
+              enterStyle={{ opacity: 0, y: 10 }}
+            >
+              <ActionButton
+                onPress={() => {
+                  navigate(defaultSportRoute);
+                }}
+                accessibilityLabel={`Go to ${defaultSport} dashboard`}
+              >
+                <Text fontWeight="700">My Dashboard</Text>
+              </ActionButton>
+              <OutlineButton
+                onPress={() => {
+                  navigate('/players/stats');
+                }}
+                accessibilityLabel="Browse player statistics"
+              >
+                <Text fontWeight="700">Browse Stats</Text>
+              </OutlineButton>
+              <OutlineButton
+                onPress={() => {
+                  navigate('/preferences');
+                }}
+                accessibilityLabel="Open preferences"
+              >
+                <Text fontWeight="700">
+                  <span role="img" aria-label="gear">
+                    ⚙️
+                  </span>{' '}
+                  Preferences
+                </Text>
+              </OutlineButton>
+            </XStack>
+          </HeroSection>
+
+          <ContentContainer>
+            {/* ─── Season Snapshot ─── */}
+            <YStack gap="$5">
+              <YStack gap="$2">
+                <SectionTitle>Season Snapshot</SectionTitle>
+                <Paragraph fontSize="$4" color="$textMuted" maxWidth={480}>
+                  A quick look at where things stand across your leagues.
+                </Paragraph>
+              </YStack>
+
+              <XStack
+                gap="$4"
+                flexWrap="wrap"
+                borderRadius="$7"
+                borderWidth={1}
+                borderColor="$glassBorder"
+                padding="$5"
+                style={{
+                  background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.72)} 0%, ${withAlpha(BRAND_NAVY, 0.35)} 100%)`,
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                }}
+              >
+                <StatBox>
+                  <Text fontSize="$9" fontWeight="800" color={BRAND_GOLD_LIGHT}>
+                    {leagues.length}
+                  </Text>
+                  <Text fontSize="$2" color="$textMuted" fontWeight="600">
+                    Active Leagues
+                  </Text>
+                </StatBox>
+                <StatBox>
+                  <Text fontSize="$9" fontWeight="800" color={BRAND_GOLD_LIGHT}>
+                    {upcomingDrafts}
+                  </Text>
+                  <Text fontSize="$2" color="$textMuted" fontWeight="600">
+                    Upcoming Drafts
+                  </Text>
+                </StatBox>
+              </XStack>
+            </YStack>
+
+            {/* ─── Your Leagues ─── */}
+            <YStack gap="$5">
+              <YStack gap="$2">
+                <SectionTitle>Your Leagues</SectionTitle>
+                <Paragraph fontSize="$4" color="$textMuted" maxWidth={480}>
+                  Jump into a league to manage rosters, review matchups, and
+                  prep for drafts.
+                </Paragraph>
+              </YStack>
+
+              <XStack gap="$4" flexWrap="wrap">
+                {leagues.map((league) => (
+                  <DashboardCard
+                    key={league.id}
+                    flex={1}
+                    minWidth={280}
+                    style={{
+                      background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.85)} 0%, ${withAlpha(BRAND_NAVY, 0.55)} 100%)`,
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                    }}
+                    onPress={() => {
+                      navigate(`/baseball/league/${league.id}`);
+                    }}
+                    accessibilityLabel={`View league ${league.name}`}
+                  >
+                    <H3 fontSize="$6" fontWeight="700" color="$color">
+                      {league.name}
+                    </H3>
+                    <XStack gap="$4">
+                      {league.currentWeekNumber != null && (
+                        <Text fontSize="$3" color="$textMuted">
+                          Week {league.currentWeekNumber}
+                        </Text>
+                      )}
+                      {league.draftStatus && (
+                        <Text fontSize="$3" color={BRAND_GOLD_LIGHT}>
+                          Draft:{' '}
+                          {league.draftStatus === 'completed'
+                            ? 'Done'
+                            : league.draftStatus}
+                        </Text>
+                      )}
+                    </XStack>
+                  </DashboardCard>
+                ))}
+              </XStack>
+            </YStack>
+
+            <Separator backgroundColor="$glassBorder" />
+
+            {/* ─── Sports Navigation ─── */}
+            <YStack gap="$5">
+              <YStack gap="$2">
+                <SectionTitle>Your Sports</SectionTitle>
+                <Paragraph fontSize="$4" color="$textMuted" maxWidth={480}>
+                  Navigate to a sport dashboard to manage leagues and track
+                  stats.
+                </Paragraph>
+              </YStack>
+
+              <XStack gap="$5" flexWrap="wrap">
+                {SPORTS.map((sport) => (
+                  <SportCard
+                    key={sport.key}
+                    flex={1}
+                    minWidth={300}
+                    style={sportCardGlassStyle(sport.accent)}
+                    onPress={() => {
+                      navigate(sport.route);
+                    }}
+                    accessibilityLabel={`Navigate to ${sport.title}`}
+                    role="link"
+                  >
+                    <XStack gap="$4" alignItems="center">
+                      <SportIcon
+                        style={{
+                          background: `linear-gradient(135deg, ${sport.accent}, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)})`,
+                        }}
+                      >
+                        <Text fontSize="$8">
+                          <span role="img" aria-label={sport.emojiLabel}>
+                            {sport.emoji}
+                          </span>
+                        </Text>
+                      </SportIcon>
+                      <YStack gap="$1" flex={1}>
+                        <H3 fontSize="$8" fontWeight="700" color="$color">
+                          {sport.title}
+                        </H3>
+                      </YStack>
+                    </XStack>
+                    <Paragraph
+                      fontSize="$4"
+                      color="$glassTextSubdued"
+                      lineHeight="$5"
+                    >
+                      {sport.description}
+                    </Paragraph>
+                  </SportCard>
+                ))}
+              </XStack>
+            </YStack>
+
+            {/* ─── On This Day ─── */}
+            <YStack gap="$5">
+              <YStack gap="$2">
+                <SectionTitle>On This Day in Baseball</SectionTitle>
+                <Paragraph fontSize="$4" color="$textMuted" maxWidth={500}>
+                  Historic performances from today&apos;s date across every
+                  season in the database.
+                </Paragraph>
+              </YStack>
+              <OnThisDayFeed />
+            </YStack>
+          </ContentContainer>
+        </PageContainer>
+      </ScrollView>
+    );
+  }
+
+  /* ─── Getting-started page for new users (no leagues yet) ─── */
   return (
     <>
       {tutorialOpen && <OnboardingTutorial onClose={handleTutorialClose} />}
@@ -349,7 +643,7 @@ export function HomePage(): React.JSX.Element {
               enterStyle={{ opacity: 0, y: 20 }}
               $sm={{ fontSize: '$10' }}
             >
-              Legacy Sports
+              Welcome, {userName}
             </H1>
 
             <Paragraph
@@ -361,8 +655,8 @@ export function HomePage(): React.JSX.Element {
               animation="medium"
               enterStyle={{ opacity: 0, y: 15 }}
             >
-              Your all-in-one fantasy sports platform — draft, manage, and
-              compete with friends across every season.
+              Create or join your first league to start drafting players,
+              tracking live stats, and competing with friends.
             </Paragraph>
 
             <XStack
@@ -379,7 +673,7 @@ export function HomePage(): React.JSX.Element {
                 }}
                 accessibilityLabel={`Get started with ${primarySport.title.toLowerCase()}`}
               >
-                <Text fontWeight="700">Get Started</Text>
+                <Text fontWeight="700">Create a League</Text>
               </ActionButton>
               <OutlineButton
                 onPress={() => {
