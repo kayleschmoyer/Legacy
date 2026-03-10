@@ -187,7 +187,11 @@ async function validateLeagueAccess(
     });
   } catch (error) {
     LOGGER.error('Error validating league access', { error, userId, leagueId });
-    return false;
+    captureError(error instanceof Error ? error : new Error(String(error)), {
+      tags: { lambda: 'websocket', operation: 'validateLeagueAccess' },
+      extra: { userId, leagueId },
+    });
+    throw error;
   }
 }
 
@@ -234,7 +238,11 @@ async function validateMatchupAccess(
       userId,
       matchupId,
     });
-    return { hasAccess: false };
+    captureError(error instanceof Error ? error : new Error(String(error)), {
+      tags: { lambda: 'websocket', operation: 'validateMatchupAccess' },
+      extra: { userId, matchupId },
+    });
+    throw error;
   }
 }
 
