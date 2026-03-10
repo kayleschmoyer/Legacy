@@ -12,6 +12,7 @@ import { RetryLink } from '@apollo/client/link/retry';
 import { setContext } from '@apollo/client/link/context';
 import type { ApolloLink } from '@apollo/client/link';
 import { LOGGER } from '@legacy-sports/logging';
+import { captureError } from '@legacy-sports/rollbar/web';
 import { env } from '../config/environment';
 
 // GraphQL endpoint URL from centralized environment config
@@ -78,7 +79,23 @@ async function silentlyRefreshJwt(): Promise<string | null> {
       // Persist the new token immediately so retried requests pick it up
       localStorage.setItem('auth_jwt', result.jwt);
       return result.jwt;
-    } catch {
+    } catch (err) {
+      // Network errors (device offline, CORS, DNS) are expected — swallow silently.
+      // Anything else (JSON parse failures, programming errors, missing config) is
+      // a structural bug that must be surfaced in Sentry/Rollbar.
+      const isNetworkError =
+        err instanceof TypeError &&
+        (err.message === 'Failed to fetch' ||
+          err.message === 'NetworkError when attempting to fetch resource.' ||
+          err.message === 'Network request failed');
+      if (!isNetworkError) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        LOGGER.error(
+          'silentlyRefreshJwt: unexpected error during JWT refresh',
+          error.message,
+        );
+        captureError(error, { context: 'silentlyRefreshJwt' });
+      }
       return null;
     } finally {
       refreshInFlight = null;
