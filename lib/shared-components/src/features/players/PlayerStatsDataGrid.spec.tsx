@@ -545,8 +545,11 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
       ).toBeInTheDocument();
     });
 
-    // Should show clear filters button
-    expect(screen.getByText('Clear Filters')).toBeInTheDocument();
+    // Should show clear filters button(s) — one in the filter bar (active filters)
+    // and one in the empty state panel
+    expect(screen.getAllByText('Clear Filters').length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 
   test('should handle error recovery with retry button', async () => {

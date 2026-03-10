@@ -493,6 +493,30 @@ export function PitchingStatsDataGrid({
                 />
               </XStack>
             ))}
+            {(localFilters.minGames > 0 ||
+              localFilters.minWins > 0 ||
+              localFilters.minStrikeouts > 0) && (
+              <Button
+                size="$2"
+                onPress={() => {
+                  const cleared = {
+                    minGames: 0,
+                    minWins: 0,
+                    minStrikeouts: 0,
+                  };
+                  setLocalFilters(cleared);
+                  updateQueryParams({ ...cleared, offset: 0 });
+                }}
+                style={{
+                  background: `rgba(197,165,90,0.12)`,
+                  border: `1px solid rgba(196,165,90,0.4)`,
+                  borderRadius: 8,
+                  color: BRAND_GOLD_LIGHT,
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
           </XStack>
         )}
 
