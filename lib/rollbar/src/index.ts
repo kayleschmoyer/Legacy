@@ -10,9 +10,13 @@ export { sentry } from './lib/rollbar.node';
 
 // Re-export convenience functions matching the legacy Sentry API for drop-in replacement
 import { sentry } from './lib/rollbar.node';
+import { registerGlobalErrorCapture } from '@legacy-sports/logging';
 
 export const initSentry = (config: import('./lib/types').RollbarConfig) => {
-  return sentry.init(config);
+  sentry.init(config);
+  registerGlobalErrorCapture((error) => {
+    sentry.captureError(error);
+  });
 };
 
 export const captureError = (

@@ -187,28 +187,6 @@ class UniversalLogger implements Logger {
 
 export const LOGGER = new UniversalLogger();
 
-// Global error handlers (only in Node.js environment)
-if (isNode && typeof process !== 'undefined') {
-  process.on('uncaughtException', (error) => {
-    LOGGER.error('Uncaught Exception', error.message, error.stack);
-  });
-
-  process.on('unhandledRejection', (reason) => {
-    let reasonString: string;
-    if (reason instanceof Error) {
-      reasonString = reason.message;
-    } else if (typeof reason === 'string') {
-      reasonString = reason;
-    } else if (typeof reason === 'number' || typeof reason === 'boolean') {
-      reasonString = String(reason);
-    } else if (typeof reason === 'object' && reason !== null) {
-      reasonString = JSON.stringify(reason);
-    } else if (reason === null || reason === undefined) {
-      reasonString = String(reason);
-    } else {
-      reasonString = '[Unknown rejection reason]';
-    }
-
-    LOGGER.error('Promise rejected', reasonString);
-  });
-}
+// Note: global uncaughtException/unhandledRejection handlers live in
+// lib/logging/src/index.ts (the primary entry point) to avoid duplicate
+// handler registration. Do NOT add process.on listeners here.
