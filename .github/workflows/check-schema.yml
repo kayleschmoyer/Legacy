@@ -21,8 +21,24 @@ name: "GraphQL Schema Check"
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - "lambdas/db/src/schema/**"
+      - "lambdas/db/schema.graphql"
+      - "**/*.graphql"
+      - "lib/codegen/**"
+      - "lib/api/**"
+      - ".github/workflows/check-schema.yml"
+      - ".github/actions/setup/**"
   push:
     branches: [main]
+    paths:
+      - "lambdas/db/src/schema/**"
+      - "lambdas/db/schema.graphql"
+      - "**/*.graphql"
+      - "lib/codegen/**"
+      - "lib/api/**"
+      - ".github/workflows/check-schema.yml"
+      - ".github/actions/setup/**"
 
 concurrency:
   group: schema-check-${{ github.event.pull_request.number || github.ref }}
