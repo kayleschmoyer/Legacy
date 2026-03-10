@@ -73,9 +73,14 @@ export function PlayerStatsPage({
   // Handle pitching player click
   const handlePitchingPlayerClick = (player: CareerPitchingFragment) => {
     if (onPlayerDetails) {
+      const firstName = player.player?.firstName;
+      const lastName = player.player?.lastName;
       const playerWithStats: PlayerWithStats = {
         id: player.playerId || 0,
-        name: `Pitcher ${player.playerId}`,
+        name:
+          firstName && lastName
+            ? `${firstName} ${lastName}`
+            : `Player ${player.playerId}`,
       } as PlayerWithStats;
       onPlayerDetails(playerWithStats);
     }

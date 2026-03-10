@@ -217,6 +217,13 @@ export function PlayerDetailModal({
 
   const eligiblePositions = data?.player?.eligiblePositions ?? [];
 
+  // Use fetched name when available (handles direct URL navigation where caller
+  // may only have the player ID, not the name)
+  const firstName = data?.player?.firstName;
+  const lastName = data?.player?.lastName;
+  const resolvedPlayerName =
+    firstName && lastName ? `${firstName} ${lastName}` : playerName;
+
   // ------ Transform to season rows ------
   const seasonRows = useMemo((): SeasonRow[] => {
     if (!data) return [];
@@ -486,7 +493,7 @@ export function PlayerDetailModal({
     <BaseModal
       open={open}
       onOpenChange={onOpenChange}
-      title={playerName}
+      title={resolvedPlayerName}
       titleId="player-detail-title"
       subtitle={subtitle}
       titleBadge={titleBadge}
