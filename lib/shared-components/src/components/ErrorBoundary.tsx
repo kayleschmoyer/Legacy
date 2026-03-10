@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 
 interface Props {
@@ -44,6 +44,10 @@ export class ErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
+
+  handleRetry = (): void => {
+    this.setState({ hasError: false, error: null });
+  };
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log to console for development
@@ -103,6 +107,20 @@ export class ErrorBoundary extends Component<Props, State> {
             We're sorry for the inconvenience. The error has been reported and
             we'll look into it.
           </Text>
+          <TouchableOpacity
+            onPress={this.handleRetry}
+            style={{
+              backgroundColor: '#dc3545',
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+              borderRadius: 8,
+              marginBottom: 20,
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+              Try Again
+            </Text>
+          </TouchableOpacity>
           {__DEV__ && this.state.error && (
             <View
               style={{
