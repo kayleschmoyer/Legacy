@@ -136,15 +136,10 @@ resource "aws_cloudwatch_log_group" "stripe_webhook_lambda" {
   tags = local.common_tags
 }
 
-# SSM version parameter — read for Lambda deployment; updated by CI after upload
-data "aws_ssm_parameter" "stripe_webhook_lambda_version" {
-  name = "/legacy-sports/${var.environment}/lambda/stripe-webhook/version"
-}
-
 # Lambda Function
 resource "aws_lambda_function" "stripe_webhook" {
   s3_bucket     = aws_s3_bucket.lambda_deployments.bucket
-  s3_key        = "stripe-webhook/stripe-webhook-${data.aws_ssm_parameter.stripe_webhook_lambda_version.value}.zip"
+  s3_key        = "stripe-webhook/stripe-webhook-${aws_ssm_parameter.stripe_webhook_lambda_version.value}.zip"
   function_name = "${local.name_prefix}-stripe-webhook"
   role          = aws_iam_role.stripe_webhook_lambda.arn
   handler       = "index.handler"
@@ -152,7 +147,7 @@ resource "aws_lambda_function" "stripe_webhook" {
   timeout       = var.lambda_timeout
   memory_size   = 256
 
-  source_code_hash = data.aws_ssm_parameter.stripe_webhook_lambda_version.value
+  source_code_hash = aws_ssm_parameter.stripe_webhook_lambda_version.value
 
   vpc_config {
     subnet_ids         = aws_subnet.private_lambda[*].id
