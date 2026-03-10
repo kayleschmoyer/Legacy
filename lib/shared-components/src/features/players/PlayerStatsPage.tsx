@@ -117,11 +117,16 @@ export function PlayerStatsPage({
             boxShadow: `0 4px 24px rgba(0,0,0,0.5), 0 1px 0 rgba(196,165,90,0.1)`,
           }}
           paddingVertical="$5"
-          paddingHorizontal="$6"
+          paddingHorizontal="$8"
         >
-          <XStack alignItems="center" justifyContent="space-between" gap="$4">
+          <XStack
+            alignItems="center"
+            justifyContent="space-between"
+            gap="$4"
+            flexWrap="wrap"
+          >
             {/* Icon + Title */}
-            <XStack alignItems="center" gap="$3">
+            <XStack alignItems="center" gap="$3" flexShrink={0}>
               <YStack
                 style={{
                   background: `radial-gradient(circle, rgba(196,165,90,0.2) 0%, transparent 70%)`,
@@ -153,8 +158,8 @@ export function PlayerStatsPage({
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
                     lineHeight: 1.3,
-                    paddingTop: 2,
-                    paddingBottom: 4,
+                    paddingTop: 6,
+                    paddingBottom: 8,
                     display: 'inline-block',
                   }}
                 >
