@@ -20,6 +20,7 @@ import {
   HelpCircle,
   Info,
   Menu,
+  Tag,
   Users,
   X,
 } from '@tamagui/lucide-icons';
@@ -44,6 +45,7 @@ import { LeagueDiscoveryPage } from '../pages/baseball/LeagueDiscoveryPage';
 import ManagementPage from '../pages/management/ManagementPage';
 import AboutPage from '../pages/about/AboutPage';
 import HelpPage from '../pages/help/HelpPage';
+import PricingPage from '../pages/pricing/PricingPage';
 import { MockDraftPage } from '../pages/draft/MockDraftPage';
 import { SeasonDraftGamePage } from '../pages/games/SeasonDraftGamePage';
 import { SeasonDraftGamesPage } from '../pages/games/SeasonDraftGamesPage';
@@ -288,6 +290,21 @@ function Navigation() {
               </NavLinkButton>
             </Link>
 
+            <Link
+              to="/pricing"
+              style={{ textDecoration: 'none' }}
+              aria-current={
+                location.pathname === '/pricing' ? 'page' : undefined
+              }
+            >
+              <NavLinkButton active={location.pathname === '/pricing'}>
+                <XStack alignItems="center" gap="$2">
+                  <Tag size={15} />
+                  <Paragraph marginBottom={0}>Pricing</Paragraph>
+                </XStack>
+              </NavLinkButton>
+            </Link>
+
             <HelpDropdown />
           </NavLinks>
 
@@ -402,6 +419,15 @@ function Navigation() {
                 <Paragraph marginBottom={0}>Help</Paragraph>
               </MobileNavLink>
             </Link>
+            <Link to="/pricing" style={{ textDecoration: 'none' }}>
+              <MobileNavLink
+                active={isActive('/pricing')}
+                onPress={() => setMobileOpen(false)}
+              >
+                <Tag size={16} />
+                <Paragraph marginBottom={0}>Pricing</Paragraph>
+              </MobileNavLink>
+            </Link>
           </YStack>
         </MobileNavPanel>
       )}
@@ -509,6 +535,7 @@ function App() {
           <Route path="/players/:id" element={<PlayerDetailPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/help" element={<HelpPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/profile/settings" element={<ProfileSettingsPage />} />
           <Route path="/preferences" element={<PreferencesPage />} />

@@ -63,6 +63,9 @@ export const Settings2 = () => 'Settings2';
 export const Shield = () => 'Shield';
 export const User = () => 'User';
 
+// Icons added for pricing page (LS-830)
+export const Tag = () => 'Tag';
+
 // Default export for any other icons
 const mockIcon = () => 'MockIcon';
 export default mockIcon;
