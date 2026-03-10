@@ -2547,8 +2547,10 @@ enum StatsLoadingStatus {
 type SubscriptionInfo {
   cancelAtPeriodEnd: Boolean
   currentPeriodEnd: String
+  gracePeriodEndsAt: String
   status: String
   tier: String
+  trialEndsAt: String
 }
 
 input SwapMatchupTeamsInput {

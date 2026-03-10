@@ -2789,8 +2789,10 @@ export type SubscriptionInfo = {
   __typename?: 'SubscriptionInfo';
   cancelAtPeriodEnd?: Maybe<Scalars['Boolean']['output']>;
   currentPeriodEnd?: Maybe<Scalars['String']['output']>;
+  gracePeriodEndsAt?: Maybe<Scalars['String']['output']>;
   status?: Maybe<Scalars['String']['output']>;
   tier?: Maybe<Scalars['String']['output']>;
+  trialEndsAt?: Maybe<Scalars['String']['output']>;
 };
 
 export type SwapMatchupTeamsInput = {

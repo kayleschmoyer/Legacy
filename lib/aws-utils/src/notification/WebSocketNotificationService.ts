@@ -205,6 +205,16 @@ export interface SubscriptionUpdatedNotification {
 }
 
 /**
+ * Sent to a user 3 days before their free trial ends (Stripe trial_will_end event).
+ * Delivered only to the affected user's active WebSocket connections.
+ */
+export interface TrialWillEndNotification {
+  type: typeof WireNotificationType.TRIAL_WILL_END;
+  /** ISO-8601 timestamp when the trial will end. */
+  trialEndsAt: string;
+}
+
+/**
  * Service for sending real-time notifications via WebSocket.
  *
  * **IMPORTANT: Always `await` every `notify*()` call and wrap it in try/catch.**
@@ -1130,6 +1140,51 @@ export class WebSocketNotificationService {
       );
     } catch (error) {
       LOGGER.error('Error sending subscription updated notification', {
+        error,
+        userId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Notify a user that their free trial will end soon (3 days before expiry).
+   * Delivered only to the user's currently active WebSocket connections.
+   *
+   * Fired by the stripe-webhook Lambda on customer.subscription.trial_will_end.
+   *
+   * @param userId      - The user whose trial is ending.
+   * @param trialEndsAt - ISO-8601 timestamp when the trial will end.
+   */
+  async notifyTrialWillEnd(userId: number, trialEndsAt: string): Promise<void> {
+    const notification: TrialWillEndNotification = {
+      type: WireNotificationType.TRIAL_WILL_END,
+      trialEndsAt,
+    };
+
+    LOGGER.info('Sending trial will end notification', { userId, trialEndsAt });
+
+    try {
+      const connectionIds = await this.getUserConnections(userId);
+
+      if (connectionIds.length === 0) {
+        LOGGER.info(
+          'User has no active WebSocket connections, trial-will-end not pushed',
+          { userId },
+        );
+        return;
+      }
+
+      await Promise.allSettled(
+        connectionIds.map((connectionId) =>
+          this.sendToConnection(connectionId, {
+            type: 'notification',
+            data: notification,
+          }),
+        ),
+      );
+    } catch (error) {
+      LOGGER.error('Error sending trial will end notification', {
         error,
         userId,
       });

@@ -168,6 +168,7 @@ resource "aws_lambda_function" "stripe_webhook" {
       STRIPE_WEBHOOK_SECRET_SECRET_NAME      = aws_secretsmanager_secret.stripe_webhook_secret.name
       CONNECTIONS_TABLE_NAME                 = aws_dynamodb_table.websocket_connections.name
       WEBSOCKET_ENDPOINT                     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
+      STRIPE_GRACE_PERIOD_DAYS               = tostring(var.stripe_grace_period_days)
       DB_HOST                                = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
       DB_PORT                                = "5432"
       DB_NAME                                = "legacy_sports"

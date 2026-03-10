@@ -129,3 +129,15 @@ variable "stripe_publishable_key" {
   type        = string
   default     = ""
 }
+
+variable "stripe_trial_period_days" {
+  description = "Number of free trial days offered on new subscriptions (0 = no trial)"
+  type        = number
+  default     = 0
+}
+
+variable "stripe_grace_period_days" {
+  description = "Number of days a past_due subscriber retains premium access while payment retries are in progress"
+  type        = number
+  default     = 7
+}

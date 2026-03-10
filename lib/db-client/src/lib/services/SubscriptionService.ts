@@ -12,6 +12,8 @@ export interface UserSubscription {
   tier: string;
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
+  trialEndsAt: Date | null;
+  gracePeriodEndsAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

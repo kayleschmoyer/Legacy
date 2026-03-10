@@ -40,6 +40,8 @@ export const WireNotificationType = {
   USER_LIST: 'USER_LIST',
   /** Sent to a specific user when their subscription tier or status changes (e.g. via Stripe). */
   SUBSCRIPTION_UPDATED: 'SUBSCRIPTION_UPDATED',
+  /** Sent to a user 3 days before their free trial expires (Stripe trial_will_end event). */
+  TRIAL_WILL_END: 'TRIAL_WILL_END',
 } as const;
 
 export type WireNotificationType =
@@ -72,6 +74,7 @@ export const ClientNotificationType = {
   USER_LEFT: 'user-left',
   USER_LIST: 'user-list',
   SUBSCRIPTION_UPDATED: 'subscription-updated',
+  TRIAL_WILL_END: 'trial-will-end',
 } as const;
 
 export type ClientNotificationType =

@@ -12,6 +12,11 @@ import { AuthenticationError } from './graphql-errors';
 import { getSubscriptionTier } from './authorization';
 import { getStripeClient } from '../server/stripe';
 
+// Number of trial days to apply on new subscriptions, or undefined if no trial.
+const STRIPE_TRIAL_PERIOD_DAYS = process.env['STRIPE_TRIAL_PERIOD_DAYS']
+  ? parseInt(process.env['STRIPE_TRIAL_PERIOD_DAYS'], 10)
+  : undefined;
+
 // ─── Object Types ────────────────────────────────────────────────────────────
 
 const CheckoutSessionResultRef = builder.objectRef<{ url: string }>(
@@ -39,6 +44,8 @@ const SubscriptionInfoRef = builder.objectRef<{
   tier: string;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
+  trialEndsAt: string | null;
+  gracePeriodEndsAt: string | null;
 }>('SubscriptionInfo');
 
 SubscriptionInfoRef.implement({
@@ -47,6 +54,8 @@ SubscriptionInfoRef.implement({
     tier: t.exposeString('tier'),
     currentPeriodEnd: t.exposeString('currentPeriodEnd', { nullable: true }),
     cancelAtPeriodEnd: t.exposeBoolean('cancelAtPeriodEnd'),
+    trialEndsAt: t.exposeString('trialEndsAt', { nullable: true }),
+    gracePeriodEndsAt: t.exposeString('gracePeriodEndsAt', { nullable: true }),
   }),
 });
 
@@ -68,6 +77,9 @@ builder.queryField('mySubscription', (t) =>
         tier: subscription.tier,
         currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() ?? null,
         cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
+        gracePeriodEndsAt:
+          subscription.gracePeriodEndsAt?.toISOString() ?? null,
       };
     },
   }),
@@ -123,6 +135,15 @@ builder.mutationField('createCheckoutSession', (t) =>
         success_url: args.successUrl,
         cancel_url: args.cancelUrl,
         metadata: { userId: String(userId) },
+        subscription_data: {
+          // Always propagate userId so trial_will_end and other subscription
+          // events can correlate back to our user record without a DB lookup.
+          metadata: { userId: String(userId) },
+          ...(Number.isInteger(STRIPE_TRIAL_PERIOD_DAYS) &&
+          STRIPE_TRIAL_PERIOD_DAYS! > 0
+            ? { trial_period_days: STRIPE_TRIAL_PERIOD_DAYS }
+            : {}),
+        },
       });
 
       if (!session.url) {

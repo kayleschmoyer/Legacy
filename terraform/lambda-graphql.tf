@@ -230,6 +230,7 @@ resource "aws_lambda_function" "graphql" {
       STRIPE_SECRET_KEY_SECRET_NAME      = aws_secretsmanager_secret.stripe_secret_key.name
       STRIPE_WEBHOOK_SECRET_SECRET_NAME  = aws_secretsmanager_secret.stripe_webhook_secret.name
       STRIPE_PUBLISHABLE_KEY             = var.stripe_publishable_key
+      STRIPE_TRIAL_PERIOD_DAYS           = tostring(var.stripe_trial_period_days)
     }
   }
 

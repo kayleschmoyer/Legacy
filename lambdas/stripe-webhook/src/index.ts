@@ -34,6 +34,14 @@ const STRIPE_WEBHOOK_SECRET_LOCAL = process.env['STRIPE_WEBHOOK_SECRET'] ?? '';
 const STRIPE_WEBHOOK_SECRET_SECRET_NAME =
   process.env['STRIPE_WEBHOOK_SECRET_SECRET_NAME'] ?? '';
 
+// ── Config ────────────────────────────────────────────────────────────────────
+
+// Number of days a past_due user retains premium access while payment retries.
+const GRACE_PERIOD_DAYS = parseInt(
+  process.env['STRIPE_GRACE_PERIOD_DAYS'] ?? '7',
+  10,
+);
+
 let stripeClientPromise: Promise<Stripe> | null = null;
 let webhookSecretPromise: Promise<string> | null = null;
 
@@ -105,6 +113,7 @@ async function upsertSubscription(
   status: string,
   currentPeriodEnd: Date | null,
   cancelAtPeriodEnd: boolean,
+  trialEndsAt: Date | null,
 ): Promise<void> {
   const newTier = tierFromStatus(status);
 
@@ -138,6 +147,7 @@ async function upsertSubscription(
         tier: newTier,
         currentPeriodEnd,
         cancelAtPeriodEnd,
+        trialEndsAt,
       })
       .onConflictDoUpdate({
         target: InternalSchema.subscriptions.stripeSubscriptionId,
@@ -146,6 +156,7 @@ async function upsertSubscription(
           tier: newTier,
           currentPeriodEnd,
           cancelAtPeriodEnd,
+          trialEndsAt,
           updatedAt: new Date(),
         },
       });
@@ -293,6 +304,7 @@ async function handleCheckoutSessionCompleted(
     await stripe.subscriptions.retrieve(stripeSubscriptionId);
 
   const periodEnd = subscription.items.data[0]?.current_period_end;
+  const trialEnd = subscription.trial_end;
   await upsertSubscription(
     userId,
     stripeCustomerId,
@@ -300,6 +312,7 @@ async function handleCheckoutSessionCompleted(
     subscription.status,
     periodEnd ? new Date(periodEnd * 1000) : null,
     subscription.cancel_at_period_end,
+    trialEnd ? new Date(trialEnd * 1000) : null,
   );
 
   LOGGER.info('Handled checkout.session.completed', {
@@ -363,6 +376,7 @@ async function handleSubscriptionEvent(
   }
 
   const periodEnd = subscription.items.data[0]?.current_period_end;
+  const trialEnd = subscription.trial_end;
   await upsertSubscription(
     userId,
     stripeCustomerId,
@@ -370,6 +384,7 @@ async function handleSubscriptionEvent(
     subscription.status,
     periodEnd ? new Date(periodEnd * 1000) : null,
     subscription.cancel_at_period_end,
+    trialEnd ? new Date(trialEnd * 1000) : null,
   );
 
   LOGGER.info('Handled subscription event', {
@@ -377,6 +392,204 @@ async function handleSubscriptionEvent(
     subscriptionId: subscription.id,
     status: subscription.status,
   });
+
+  return userId;
+}
+
+// ── Payment failure / success (grace period) ─────────────────────────────────
+
+/**
+ * Handle invoice.payment_failed:
+ * - On first failure, set grace_period_ends_at = now + GRACE_PERIOD_DAYS.
+ * - Keep tier = premium while within the grace period.
+ * - Downgrade to free once the grace period expires.
+ */
+async function handlePaymentFailed(
+  stripeSubscriptionId: string,
+): Promise<number | null> {
+  return runWithInternalClient(getDbOptions(), async (db) => {
+    const existing = await db
+      .select()
+      .from(InternalSchema.subscriptions)
+      .where(
+        eq(
+          InternalSchema.subscriptions.stripeSubscriptionId,
+          stripeSubscriptionId,
+        ),
+      )
+      .limit(1);
+
+    if (existing.length === 0) {
+      LOGGER.warn('No subscription record found for invoice.payment_failed', {
+        stripeSubscriptionId,
+      });
+      return null;
+    }
+
+    const record = existing[0];
+    const now = new Date();
+    // Set grace period on the first failure only (don't reset on retries).
+    const gracePeriodEndsAt =
+      record.gracePeriodEndsAt ??
+      new Date(now.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+
+    const withinGracePeriod = gracePeriodEndsAt > now;
+    const tier: 'free' | 'premium' = withinGracePeriod ? 'premium' : 'free';
+
+    await db
+      .update(InternalSchema.subscriptions)
+      .set({ status: 'past_due', tier, gracePeriodEndsAt, updatedAt: now })
+      .where(
+        eq(
+          InternalSchema.subscriptions.stripeSubscriptionId,
+          stripeSubscriptionId,
+        ),
+      );
+
+    await db
+      .update(InternalSchema.usersInAppInternal)
+      .set({ subscriptionTier: tier, updatedAt: now })
+      .where(eq(InternalSchema.usersInAppInternal.id, record.userId));
+
+    if (withinGracePeriod) {
+      LOGGER.info('Payment failed — user retains premium during grace period', {
+        userId: record.userId,
+        gracePeriodEndsAt,
+      });
+    } else {
+      LOGGER.info('Grace period expired — user downgraded to free tier', {
+        userId: record.userId,
+        gracePeriodEndsAt,
+      });
+    }
+
+    return record.userId;
+  });
+}
+
+/**
+ * Handle invoice.payment_succeeded:
+ * - Mark subscription as active.
+ * - Clear grace_period_ends_at (payment resolved).
+ */
+async function handlePaymentSucceeded(
+  stripeSubscriptionId: string,
+): Promise<number | null> {
+  return runWithInternalClient(getDbOptions(), async (db) => {
+    const existing = await db
+      .select({ userId: InternalSchema.subscriptions.userId })
+      .from(InternalSchema.subscriptions)
+      .where(
+        eq(
+          InternalSchema.subscriptions.stripeSubscriptionId,
+          stripeSubscriptionId,
+        ),
+      )
+      .limit(1);
+
+    if (existing.length === 0) {
+      LOGGER.warn(
+        'No subscription record found for invoice.payment_succeeded',
+        {
+          stripeSubscriptionId,
+        },
+      );
+      return null;
+    }
+
+    const { userId } = existing[0];
+    const now = new Date();
+
+    await db
+      .update(InternalSchema.subscriptions)
+      .set({
+        status: 'active',
+        tier: 'premium',
+        gracePeriodEndsAt: null,
+        updatedAt: now,
+      })
+      .where(
+        eq(
+          InternalSchema.subscriptions.stripeSubscriptionId,
+          stripeSubscriptionId,
+        ),
+      );
+
+    await db
+      .update(InternalSchema.usersInAppInternal)
+      .set({ subscriptionTier: 'premium', updatedAt: now })
+      .where(eq(InternalSchema.usersInAppInternal.id, userId));
+
+    LOGGER.info('Payment succeeded — subscription restored to active', {
+      userId,
+      stripeSubscriptionId,
+    });
+
+    return userId;
+  });
+}
+
+/**
+ * Handle customer.subscription.trial_will_end (fires ~3 days before trial ends):
+ * - Look up the user from the subscription record.
+ * - Push a TRIAL_WILL_END WebSocket notification with the trial end timestamp.
+ */
+async function handleTrialWillEnd(
+  subscription: Stripe.Subscription,
+): Promise<number | null> {
+  const stripeSubscriptionId = subscription.id;
+  const trialEnd = subscription.trial_end;
+  const trialEndsAt = trialEnd ? new Date(trialEnd * 1000) : null;
+
+  const userIdStr = subscription.metadata?.['userId'];
+  let userId: number | null = userIdStr ? parseInt(userIdStr, 10) : null;
+  if (userId !== null && isNaN(userId)) userId = null;
+
+  if (userId === null) {
+    const existing = await runWithInternalClient(getDbOptions(), async (db) => {
+      const rows = await db
+        .select({ userId: InternalSchema.subscriptions.userId })
+        .from(InternalSchema.subscriptions)
+        .where(
+          eq(
+            InternalSchema.subscriptions.stripeSubscriptionId,
+            stripeSubscriptionId,
+          ),
+        )
+        .limit(1);
+      return rows[0] ?? null;
+    });
+
+    if (existing) {
+      userId = existing.userId;
+    } else {
+      LOGGER.warn('No subscription record found for trial_will_end event', {
+        stripeSubscriptionId,
+      });
+      return null;
+    }
+  }
+
+  LOGGER.info('Trial will end soon — sending reminder', {
+    userId,
+    stripeSubscriptionId,
+    trialEndsAt,
+  });
+
+  const notificationService = createNotificationService();
+  if (notificationService && trialEndsAt) {
+    try {
+      await notificationService.notifyTrialWillEnd(
+        userId,
+        trialEndsAt.toISOString(),
+      );
+    } catch (err) {
+      LOGGER.warn('Trial will end notification failed (non-fatal)', {
+        err,
+        userId,
+      });
+    }
+  }
 
   return userId;
 }
@@ -480,6 +693,14 @@ export const handler = async (
         break;
       }
 
+      case 'customer.subscription.trial_will_end': {
+        const sub = stripeEvent.data.object;
+        // Notification is pushed directly inside handleTrialWillEnd;
+        // leave subscriptionId null to skip the generic pushSubscriptionUpdated.
+        userId = await handleTrialWillEnd(sub);
+        break;
+      }
+
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub = stripeEvent.data.object;
@@ -501,7 +722,7 @@ export const handler = async (
         const invoiceSubId =
           typeof rawSub === 'string' ? rawSub : (rawSub?.id ?? null);
         if (invoiceSubId) {
-          userId = await updateSubscriptionStatus(invoiceSubId, 'active');
+          userId = await handlePaymentSucceeded(invoiceSubId);
           subscriptionId = invoiceSubId;
         }
         break;
@@ -513,7 +734,7 @@ export const handler = async (
         const invoiceSubId =
           typeof rawSub === 'string' ? rawSub : (rawSub?.id ?? null);
         if (invoiceSubId) {
-          userId = await updateSubscriptionStatus(invoiceSubId, 'past_due');
+          userId = await handlePaymentFailed(invoiceSubId);
           subscriptionId = invoiceSubId;
         }
         break;

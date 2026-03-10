@@ -219,6 +219,16 @@ export interface SubscriptionUpdatedNotification {
   status: string;
 }
 
+/**
+ * Sent to a user 3 days before their free trial ends (Stripe trial_will_end event).
+ * Delivered only to the affected user's active WebSocket connections.
+ */
+export interface TrialWillEndNotification {
+  type: typeof ClientNotificationType.TRIAL_WILL_END;
+  /** ISO-8601 timestamp when the trial will end. */
+  trialEndsAt: string;
+}
+
 export type NotificationData =
   | DraftCompletedNotification
   | DraftStartedNotification
@@ -238,7 +248,8 @@ export type NotificationData =
   | UserJoinedNotification
   | UserLeftNotification
   | UserListNotification
-  | SubscriptionUpdatedNotification;
+  | SubscriptionUpdatedNotification
+  | TrialWillEndNotification;
 
 /**
  * WebSocket message structure

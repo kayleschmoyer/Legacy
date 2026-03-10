@@ -168,6 +168,10 @@ export const subscriptions = appInternal.table(
     tier: text('tier').notNull().default('free'),
     currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
     cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
+    trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
+    gracePeriodEndsAt: timestamp('grace_period_ends_at', {
+      withTimezone: true,
+    }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
