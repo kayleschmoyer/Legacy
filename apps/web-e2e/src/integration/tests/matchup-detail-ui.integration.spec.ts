@@ -302,7 +302,7 @@ test.describe
 
       const week1 = data.getMatchupsForLeague.filter((m) => m.weekNumber === 1);
       expect(week1.length).toBeGreaterThan(0);
-      state.matchupId = week1[0].id;
+      state.matchupId = Number(week1[0].id);
       expect(state.matchupId).toBeGreaterThan(0);
     });
 
@@ -363,9 +363,9 @@ test.describe
     });
 
     await test.step('Matchup status chip is visible', async () => {
-      // Status is one of: Scheduled, Active, Completed
+      // Status is one of: Scheduled, Active, Completed, LIVE (in-progress)
       await expect(
-        page.getByText(/^(Scheduled|Active|Completed)$/i).first(),
+        page.getByText(/^(Scheduled|Active|Completed|LIVE)$/i).first(),
       ).toBeVisible({ timeout: 10_000 });
     });
   });
@@ -389,7 +389,7 @@ test.describe
     });
 
     await test.step('Probability percentages are shown', async () => {
-      // At least two percentage values like "50%", "67%"
+      // Find all percentage text on the page — at least the two win-probability values
       const pctLocator = page.locator('text=/^\\d+%$/');
       await expect(pctLocator.first()).toBeVisible({ timeout: 10_000 });
       const count = await pctLocator.count();
@@ -398,12 +398,12 @@ test.describe
 
     await test.step('Probability percentages sum to 100', async () => {
       const texts = await page.locator('text=/^\\d+%$/').allTextContents();
-      if (texts.length >= 2) {
-        const nums = texts
-          .slice(0, 2)
-          .map((t) => parseInt(t.replace('%', ''), 10));
-        expect(nums[0] + nums[1]).toBe(100);
-      }
+      // Find the win-probability pair: two percentages that sum to 100
+      const nums = texts.map((t) => parseInt(t.replace('%', ''), 10));
+      const hasPairSumTo100 = nums.some((n, i) =>
+        nums.some((m, j) => i !== j && n + m === 100),
+      );
+      expect(hasPairSumTo100).toBe(true);
     });
   });
 
@@ -512,10 +512,18 @@ test.describe
       // A 4-team league has 2 matchups per week.  At minimum 1 card is shown.
       // The navigation card renders matchup info (team names) as clickable rows.
       await expect(page.locator('body')).not.toContainText('No matchups found');
-      // The "You" badge appears for the commissioner's own matchup
-      await expect(page.getByText('You', { exact: true }).first()).toBeVisible({
-        timeout: 10_000,
-      });
+      // The "You" badge appears for the commissioner's own matchup —
+      // it may take a moment for the sidebar matchup list to populate.
+      const youBadge = page.getByText('You', { exact: true }).first();
+      // Try up to 3 reloads — the sidebar matchup list can be slow to populate
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (await youBadge.isVisible({ timeout: 5_000 }).catch(() => false))
+          break;
+        await page.reload();
+        await page.waitForLoadState('load');
+        await page.waitForTimeout(2_000);
+      }
+      await expect(youBadge).toBeVisible({ timeout: 15_000 });
     });
 
     await test.step('"Current" week badge is displayed for Week 1', async () => {

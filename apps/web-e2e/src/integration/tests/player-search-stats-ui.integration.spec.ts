@@ -67,9 +67,9 @@ test.describe
     });
 
     await test.step('Batting tab is active by default', async () => {
-      // Tabs component renders a "Batting" tab label
+      // Tabs component renders a "Batting Stats" tab label
       await expect(
-        page.getByText('Batting', { exact: true }).first(),
+        page.getByText('Batting Stats', { exact: true }).first(),
       ).toBeVisible({
         timeout: 15_000,
       });
@@ -168,13 +168,15 @@ test.describe
 
     // Wait for batting tab to load first
     await expect(
-      page.getByText('Batting', { exact: true }).first(),
+      page.getByText('Batting Stats', { exact: true }).first(),
     ).toBeVisible({
       timeout: 30_000,
     });
 
     await test.step('Click the Pitching tab', async () => {
-      await page.getByText('Pitching', { exact: true }).first().click();
+      const pitchingTab = page.getByRole('tab', { name: /Pitching/i });
+      await expect(pitchingTab).toBeVisible({ timeout: 10_000 });
+      await pitchingTab.click();
     });
 
     await test.step('Pitching column headers are visible', async () => {
@@ -307,10 +309,13 @@ test.describe
     await test.step(`Add second player: "${PLAYER_SEARCH_2}"`, async () => {
       // After adding player 1, the input resets to empty
       await expect(searchInput).toBeVisible({ timeout: 10_000 });
+      // Wait for any previous search dropdown to clear
+      await searchInput.clear();
+      await page.waitForTimeout(500);
       await searchInput.fill(PLAYER_SEARCH_2);
       await expect(
         page.getByText(new RegExp(PLAYER_SEARCH_2, 'i')).nth(1),
-      ).toBeVisible({ timeout: 15_000 });
+      ).toBeVisible({ timeout: 30_000 });
       await page.getByText(new RegExp(PLAYER_SEARCH_2, 'i')).nth(1).click();
       await expect(
         page.getByRole('button', {
@@ -361,10 +366,13 @@ test.describe
       }),
     ).toBeVisible({ timeout: 10_000 });
 
+    // Wait for any previous search dropdown to clear before second search
+    await searchInput.clear();
+    await page.waitForTimeout(500);
     await searchInput.fill(PLAYER_SEARCH_2);
     await expect(
       page.getByText(new RegExp(PLAYER_SEARCH_2, 'i')).nth(1),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible({ timeout: 30_000 });
     await page.getByText(new RegExp(PLAYER_SEARCH_2, 'i')).nth(1).click();
     await expect(page.getByText(/Career Batting/i).first()).toBeVisible({
       timeout: 20_000,

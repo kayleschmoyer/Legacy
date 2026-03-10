@@ -467,31 +467,27 @@ test.describe
 
       expect(data.leagueTeams.length).toBeGreaterThanOrEqual(2);
 
-      // Identify commissioner's team by resolving the user ID from the JWT
-      const commissionerData = await gqlFetch<{
-        me: { id: number } | null;
-      }>(commissionerJwt, `query { me { id } }`);
-      const commissionerUserId = commissionerData.me?.id;
-      expect(commissionerUserId).toBeTruthy();
-
-      const managerData = await gqlFetch<{
-        me: { id: number } | null;
-      }>(managerJwt1, `query { me { id } }`);
-      const managerUserId = managerData.me?.id;
-      expect(managerUserId).toBeTruthy();
-
-      const commTeam = data.leagueTeams.find(
-        (t) => t.managerId === commissionerUserId,
+      // Identify each user's team directly via the userTeamId query
+      const { userTeamId: commTeamId } = await gqlFetch<{
+        userTeamId: number;
+      }>(
+        commissionerJwt,
+        `query GetUserTeamId($leagueId: Int!) { userTeamId(leagueId: $leagueId) }`,
+        { leagueId: state.leagueId },
       );
-      const mgrTeam = data.leagueTeams.find(
-        (t) => t.managerId === managerUserId,
+      const { userTeamId: mgrTeamId } = await gqlFetch<{
+        userTeamId: number;
+      }>(
+        managerJwt1,
+        `query GetUserTeamId($leagueId: Int!) { userTeamId(leagueId: $leagueId) }`,
+        { leagueId: state.leagueId },
       );
 
-      expect(commTeam).toBeTruthy();
-      expect(mgrTeam).toBeTruthy();
+      expect(commTeamId).toBeTruthy();
+      expect(mgrTeamId).toBeTruthy();
 
-      state.commissionerTeamId = commTeam!.id;
-      state.managerTeamId = mgrTeam!.id;
+      state.commissionerTeamId = commTeamId;
+      state.managerTeamId = mgrTeamId;
       expect(state.commissionerTeamId).toBeGreaterThan(0);
       expect(state.managerTeamId).toBeGreaterThan(0);
     });
@@ -515,7 +511,7 @@ test.describe
 
     await test.step('Verify the outgoing trade offer appears in the UI', async () => {
       await expect(
-        page.getByText('Outgoing Offers', { exact: false }),
+        page.getByText('Outgoing Offers', { exact: true }).first(),
       ).toBeVisible({ timeout: 10000 });
       await expect(
         page.getByText('To: Trade Busters', { exact: false }).first(),
@@ -760,7 +756,7 @@ test.describe
 
     await test.step('Verify counter-offer is visible as outgoing', async () => {
       await expect(
-        page.getByText('Outgoing Offers', { exact: false }),
+        page.getByText('Outgoing Offers', { exact: true }),
       ).toBeVisible({ timeout: 10000 });
     });
 

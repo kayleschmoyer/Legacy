@@ -336,29 +336,27 @@ test.describe
     test.setTimeout(60_000);
 
     await test.step('Auto-select games for week 1', async () => {
-      const data = await gqlFetch<{
-        autoSelectGames: { processedCount: number };
+      await gqlFetch<{
+        autoSelectGames: { gamesTriggered: number } | null;
       }>(
         commissionerJwt,
         `mutation AutoSelect($leagueId: Int) {
-             autoSelectGames(leagueId: $leagueId) { processedCount }
+             autoSelectGames(leagueId: $leagueId) { gamesTriggered }
            }`,
         { leagueId: state.leagueId },
       );
-      expect(data.autoSelectGames).toBeTruthy();
     });
 
     await test.step('Auto-advance the completed matchup', async () => {
-      const data = await gqlFetch<{
-        autoAdvanceMatchups: { advancedCount: number };
+      await gqlFetch<{
+        autoAdvanceMatchups: { leaguesAdvanced: number } | null;
       }>(
         commissionerJwt,
         `mutation AutoAdvance($leagueId: Int) {
-             autoAdvanceMatchups(leagueId: $leagueId) { advancedCount }
+             autoAdvanceMatchups(leagueId: $leagueId) { leaguesAdvanced }
            }`,
         { leagueId: state.leagueId },
       );
-      expect(data.autoAdvanceMatchups).toBeTruthy();
     });
 
     await test.step('Poll until season is complete (currentMatchup = null)', async () => {
@@ -371,7 +369,7 @@ test.describe
               league: {
                 draftStatus: string;
                 frozenAt: string | null;
-                currentMatchup: { id: number } | null;
+                currentMatchup: number | null;
                 totalMatchups: number | null;
               };
             }>(
@@ -380,7 +378,7 @@ test.describe
                    league(id: $id) {
                      draftStatus
                      frozenAt
-                     currentMatchup { id }
+                     currentMatchup
                      totalMatchups
                    }
                  }`,

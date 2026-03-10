@@ -394,17 +394,15 @@ test.describe
       .poll(
         async () => {
           const data = await gqlFetch<{
-            league: { teams: Array<{ id: number }> };
+            leagueTeams: Array<{ id: number }>;
           }>(
             commissionerJwt,
-            `query GetLeagueTeams($id: Int!) {
-               league(id: $id) {
-                 teams { id }
-               }
+            `query GetLeagueTeams($leagueId: Int!) {
+               leagueTeams(leagueId: $leagueId) { id }
              }`,
-            { id: state.leagueId },
+            { leagueId: state.leagueId },
           );
-          return data.league.teams.length;
+          return data.leagueTeams.length;
         },
         {
           timeout: 15_000,

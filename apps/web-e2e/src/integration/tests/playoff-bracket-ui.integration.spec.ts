@@ -384,7 +384,7 @@ test.describe
     );
 
     const bracket = data.createPlayoffBracket;
-    expect(bracket.id).toBeGreaterThan(0);
+    expect(Number(bracket.id)).toBeGreaterThan(0);
     expect(bracket.leagueId).toBe(state.leagueId);
     expect(bracket.format).toBe('4-team');
     expect(bracket.status).toBe('scheduled');
@@ -406,14 +406,14 @@ test.describe
     expect(finals[0].highSeedTeamId).toBeNull();
     expect(finals[0].lowSeedTeamId).toBeNull();
 
-    state.bracketId = bracket.id;
+    state.bracketId = Number(bracket.id);
     // Sort by matchupNumber to get consistent IDs
     const sortedSFIds = semifinals
       .sort((a, b) => a.matchupNumber - b.matchupNumber)
       .map((m) => m.id);
-    state.semiFinalMatchup1Id = sortedSFIds[0];
-    state.semiFinalMatchup2Id = sortedSFIds[1];
-    state.finalMatchupId = finals[0].id;
+    state.semiFinalMatchup1Id = Number(sortedSFIds[0]);
+    state.semiFinalMatchup2Id = Number(sortedSFIds[1]);
+    state.finalMatchupId = Number(finals[0].id);
   });
 
   // -----------------------------------------------------------------------
@@ -451,7 +451,7 @@ test.describe
 
     const bracket = data.getPlayoffBracket;
     expect(bracket).not.toBeNull();
-    expect(bracket.id).toBe(state.bracketId);
+    expect(Number(bracket.id)).toBe(state.bracketId);
     expect(bracket.status).toBe('scheduled');
     expect(bracket.championTeamId).toBeNull();
 
@@ -494,7 +494,7 @@ test.describe
     await test.step('Playoff bracket section appears', async () => {
       // PlayoffBracketDisplay renders a "Playoff Bracket" heading
       await expect(
-        page.getByText('Playoff Bracket', { exact: false }),
+        page.getByRole('heading', { name: 'Playoff Bracket', exact: true }),
       ).toBeVisible({ timeout: 15_000 });
     });
 
@@ -609,7 +609,7 @@ test.describe
         { bracketId: state.bracketId },
       );
       const bracket = data.advancePlayoffBracket;
-      expect(bracket.id).toBe(state.bracketId);
+      expect(Number(bracket.id)).toBe(state.bracketId);
       // After advancing both semifinals, bracket moves to in_progress
       expect(bracket.status).toBe('in_progress');
     });
@@ -747,9 +747,9 @@ test.describe
     );
 
     const trophy = data.awardChampionship;
-    expect(trophy.id).toBeGreaterThan(0);
-    expect(trophy.leagueId).toBe(state.leagueId);
-    expect(trophy.teamId).toBeGreaterThan(0);
+    expect(Number(trophy.id)).toBeGreaterThan(0);
+    expect(Number(trophy.leagueId)).toBe(state.leagueId);
+    expect(Number(trophy.teamId)).toBeGreaterThan(0);
     expect(trophy.championshipWeek).toBe(14); // startWeek(13) + 1
     expect(trophy.finalScore).toBeCloseTo(145.3);
     expect(trophy.runnerUpTeamId).not.toBeNull();
@@ -817,7 +817,7 @@ test.describe
 
       expect(data.getChampionshipTrophies.length).toBeGreaterThan(0);
       const trophy = data.getChampionshipTrophies[0];
-      expect(trophy.leagueId).toBe(state.leagueId);
+      expect(Number(trophy.leagueId)).toBe(state.leagueId);
       expect(trophy.finalScore).toBeCloseTo(145.3);
       expect(trophy.championTeam.name).toBeTruthy();
     });

@@ -382,6 +382,8 @@ test.describe
       const playerRows = dialog
         .getByRole('button')
         .filter({ hasText: /\w+ \w+/ });
+      // Wait for at least one player button to load before counting
+      await expect(playerRows.first()).toBeVisible({ timeout: 15_000 });
       const count = await playerRows.count();
       for (let i = 0; i < count; i++) {
         const text = await playerRows.nth(i).innerText();
@@ -560,8 +562,10 @@ test.describe
     });
 
     await test.step('Verify draft events appear', async () => {
-      // Draft picks should have "Round X, Pick Y" text
-      await expect(page.getByText(/Round \d+, Pick \d+/).first()).toBeVisible({
+      // Draft picks should have "Round X, Pick Y" text (backend may store null → UI shows "?")
+      await expect(
+        page.getByText(/Round (\d+|\?), Pick (\d+|\?)/).first(),
+      ).toBeVisible({
         timeout: 10_000,
       });
     });
@@ -635,8 +639,10 @@ test.describe
       await expect(allTab).toBeVisible({ timeout: 5_000 });
       // Verify multiple different event types are visible
       const activityItems = page.locator(
-        'text=/Round \\d+, Pick \\d+|Trade proposed|Trade accepted|Waiver claim|League announcement/i',
+        'text=/Round (\\d+|\\?), Pick (\\d+|\\?)|Trade proposed|Trade accepted|Waiver claim|League announcement/i',
       );
+      // Wait for items to render before counting
+      await expect(activityItems.first()).toBeVisible({ timeout: 10_000 });
       const count = await activityItems.count();
       expect(count).toBeGreaterThanOrEqual(3);
     });
@@ -653,7 +659,7 @@ test.describe
       ).toBeVisible({ timeout: 5_000 });
 
       // Draft events should NOT be visible when filtered
-      const draftEvents = page.getByText(/Round \d+, Pick \d+/);
+      const draftEvents = page.getByText(/Round (\d+|\?), Pick (\d+|\?)/);
       // Filter is client-side so draft events should be hidden
       if (
         await draftEvents
@@ -685,7 +691,9 @@ test.describe
       await draftTab.click();
       await page.waitForTimeout(500);
 
-      await expect(page.getByText(/Round \d+, Pick \d+/).first()).toBeVisible({
+      await expect(
+        page.getByText(/Round (\d+|\?), Pick (\d+|\?)/).first(),
+      ).toBeVisible({
         timeout: 5_000,
       });
     });
@@ -710,7 +718,7 @@ test.describe
 
       // All events visible again
       const activityItems = page.locator(
-        'text=/Round \\d+, Pick \\d+|Trade proposed|Trade accepted|Waiver claim|League announcement/i',
+        'text=/Round (\\d+|\\?), Pick (\\d+|\\?)|Trade proposed|Trade accepted|Waiver claim|League announcement/i',
       );
       const count = await activityItems.count();
       expect(count).toBeGreaterThanOrEqual(3);
@@ -738,7 +746,9 @@ test.describe
     });
 
     await test.step('Manager sees draft, trade, and waiver events', async () => {
-      await expect(page.getByText(/Round \d+, Pick \d+/).first()).toBeVisible({
+      await expect(
+        page.getByText(/Round (\d+|\?), Pick (\d+|\?)/).first(),
+      ).toBeVisible({
         timeout: 10_000,
       });
       await expect(

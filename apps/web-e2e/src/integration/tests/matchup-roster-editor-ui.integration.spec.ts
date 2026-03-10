@@ -331,8 +331,8 @@ test.describe
         (m) => m.team1Id === userTeamId || m.team2Id === userTeamId,
       );
       expect(matchup).toBeTruthy();
-      // Roster editor requires Scheduled status
-      expect(matchup!.status).toBe('scheduled');
+      // Roster editor works for both scheduled and in-progress matchups
+      expect(['scheduled', 'in_progress']).toContain(matchup!.status);
 
       state.matchupId = Number(matchup!.id);
       expect(state.matchupId).toBeGreaterThan(0);
@@ -346,21 +346,30 @@ test.describe
   test('Phase 5: Matchup detail page shows Edit Lineup section', async ({
     commissionerPage: page,
   }) => {
-    await test.step('Navigate to matchup detail page', async () => {
-      await page.goto(
-        `/baseball/league/${state.leagueId}/matchups/${state.matchupId}`,
-      );
+    await test.step('Navigate to matchup detail page and wait for Edit Lineup', async () => {
+      const matchupUrl = `/baseball/league/${state.leagueId}/matchups/${state.matchupId}`;
+      await page.goto(matchupUrl);
       await page.waitForLoadState('load');
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
         { timeout: 15_000 },
       );
-    });
 
-    await test.step('Roster editor "Edit Lineup" section is visible', async () => {
-      await expect(
-        page.getByText('Edit Lineup', { exact: true }).first(),
-      ).toBeVisible({ timeout: 30_000 });
+      // The MatchupRosterEditor depends on a separate getMatchupPlayers query
+      // that may not resolve on the first load for newly-created leagues.
+      // Retry with a reload if "Edit Lineup" isn't visible after 15s.
+      const editLineup = page.getByText('Edit Lineup', { exact: true }).first();
+      const visible = await editLineup.isVisible().catch(() => false);
+      if (!visible) {
+        const deadline = Date.now() + 30_000;
+        while (Date.now() < deadline) {
+          await page.waitForTimeout(5_000);
+          await page.reload();
+          await page.waitForLoadState('load');
+          if (await editLineup.isVisible().catch(() => false)) break;
+        }
+      }
+      await expect(editLineup).toBeVisible({ timeout: 15_000 });
     });
 
     await test.step('Roster editor shows Unlocked badge', async () => {

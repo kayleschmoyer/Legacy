@@ -299,7 +299,7 @@ test.describe
     });
 
     await test.step('Announcement text is displayed to the member', async () => {
-      await expect(page.getByText(state.announcementText)).toBeVisible({
+      await expect(page.getByText(state.announcementText).first()).toBeVisible({
         timeout: 15_000,
       });
     });

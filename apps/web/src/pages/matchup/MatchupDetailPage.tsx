@@ -238,9 +238,10 @@ export function MatchupDetailPage() {
         </YStack>
       </YStack>
 
-      {/* Roster Editor — shown when the matchup is still editable */}
+      {/* Roster Editor — shown when the matchup is scheduled or in progress */}
       {userTeamId &&
-        matchup.status === MatchupStatus.Scheduled &&
+        (matchup.status === MatchupStatus.Scheduled ||
+          matchup.status === MatchupStatus.InProgress) &&
         (matchup.team1Id === userTeamId || matchup.team2Id === userTeamId) && (
           <MatchupRosterEditor matchup={matchup} userTeamId={userTeamId} />
         )}

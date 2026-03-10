@@ -712,26 +712,36 @@ test.describe
         dialog.getByText(/Select players.*you will give/i),
       ).toBeVisible({ timeout: 15000 });
 
+      // Wait for roster animation to settle
+      await page.waitForTimeout(1000);
+
       // Click the first player button in the dialog to select them
       const playerRows = dialog
         .getByRole('button')
         .filter({ hasText: /\w+ \w+/ });
       // Exclude navigation buttons (Next, Review, etc.) — pick only player name buttons
       const count = await playerRows.count();
+      let clicked = false;
       for (let i = 0; i < count; i++) {
         const text = await playerRows.nth(i).innerText();
         // Skip buttons that are clearly nav buttons
         if (/next|review|send|back|cancel/i.test(text)) continue;
-        await playerRows.nth(i).click({ force: true });
+        // Use dispatchEvent to bypass Tamagui overlay interception
+        await playerRows.nth(i).scrollIntoViewIfNeeded();
+        await playerRows.nth(i).dispatchEvent('click');
+        clicked = true;
         break;
       }
+      expect(clicked).toBe(true);
+
+      await page.waitForTimeout(500);
 
       // Click "Next" to proceed
       const nextBtn = dialog.getByRole('button', {
         name: /Next.*Select Their Players/i,
       });
       await expect(nextBtn).toBeVisible({ timeout: 5000 });
-      await nextBtn.click({ force: true });
+      await nextBtn.click();
     });
 
     await test.step('Step 3: Select players to request', async () => {
@@ -739,24 +749,35 @@ test.describe
         dialog.getByText(/Select players you want.*to give you/i),
       ).toBeVisible({ timeout: 5000 });
 
+      // Wait for step transition animation to settle before clicking
+      await page.waitForTimeout(1000);
+
       // Click the first player from the other team
       const playerRows = dialog
         .getByRole('button')
         .filter({ hasText: /\w+ \w+/ });
       const count = await playerRows.count();
+      let clicked = false;
       for (let i = 0; i < count; i++) {
         const text = await playerRows.nth(i).innerText();
         if (/next|review|send|back|cancel/i.test(text)) continue;
-        await playerRows.nth(i).click({ force: true });
+        // Use dispatchEvent to bypass Tamagui overlay interception
+        await playerRows.nth(i).scrollIntoViewIfNeeded();
+        await playerRows.nth(i).dispatchEvent('click');
+        clicked = true;
         break;
       }
+      expect(clicked).toBe(true);
 
-      // Click "Review Trade"
+      // Wait for selection to register before checking for Review button
+      await page.waitForTimeout(500);
+
+      // Click "Review Trade" — only appears after a player is selected
       const reviewBtn = dialog.getByRole('button', {
         name: /Review Trade/i,
       });
-      await expect(reviewBtn).toBeVisible({ timeout: 5000 });
-      await reviewBtn.click({ force: true });
+      await expect(reviewBtn).toBeVisible({ timeout: 10000 });
+      await reviewBtn.click();
     });
 
     await test.step('Step 4: Add message and send trade offer', async () => {
@@ -773,7 +794,7 @@ test.describe
         name: /Send Trade Offer/i,
       });
       await expect(sendBtn).toBeVisible({ timeout: 5000 });
-      await sendBtn.click({ force: true });
+      await sendBtn.click();
 
       // Wait for the trade to be submitted
       await page.waitForTimeout(2000);

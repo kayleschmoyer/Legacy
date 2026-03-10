@@ -199,7 +199,9 @@ test.describe
     await test.step('All three stat groups are visible', async () => {
       await expect(page.getByText('Batting')).toBeVisible({ timeout: 10_000 });
       await expect(page.getByText('Pitching')).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByText('Fielding')).toBeVisible({ timeout: 10_000 });
+      await expect(
+        page.getByText('Fielding', { exact: true }).first(),
+      ).toBeVisible({ timeout: 10_000 });
     });
   });
 
@@ -227,15 +229,17 @@ test.describe
       }>(commissionerJwt, GET_SCORING_PROFILE, { leagueId: state.leagueId });
 
       const hrStat = data.leagueScoringProfile.stats.find(
-        (s) => s.definition.displayName === 'Home Run',
+        (s) => s.definition.displayName === 'Home Runs',
       );
       expect(hrStat).toBeDefined();
       state.originalMultiplier = hrStat!.multiplier;
       state.updatedMultiplier = hrStat!.multiplier + 1;
     });
 
-    await test.step('Edit the Home Run multiplier input', async () => {
-      const hrInput = page.getByLabel('Home Run multiplier');
+    await test.step('Edit the Home Runs multiplier input', async () => {
+      const hrInput = page.getByRole('textbox', {
+        name: 'Home Runs multiplier',
+      });
       await expect(hrInput).toBeVisible({ timeout: 10_000 });
       await hrInput.fill(String(state.updatedMultiplier));
     });
@@ -247,10 +251,16 @@ test.describe
     });
 
     await test.step('Save the change', async () => {
-      await page.getByRole('button', { name: /save.*change/i }).click();
-      await expect(
-        page.getByText('Changes saved — scoring table refreshed.'),
-      ).toBeVisible({ timeout: 15_000 });
+      const saveBtn = page.getByRole('button', { name: /save.*change/i });
+      await expect(saveBtn).toBeVisible({ timeout: 5_000 });
+      // Use keyboard Enter to bypass Tamagui overlay interception
+      await saveBtn.scrollIntoViewIfNeeded();
+      await saveBtn.focus();
+      await page.keyboard.press('Enter');
+      // Wait for the unsaved badge to disappear (confirms save completed)
+      await expect(page.getByText(/\d+ unsaved/i)).not.toBeVisible({
+        timeout: 20_000,
+      });
     });
   });
 
@@ -276,14 +286,14 @@ test.describe
             leagueId: state.leagueId,
           });
           const hrStat = data.leagueScoringProfile.stats.find(
-            (s) => s.definition.displayName === 'Home Run',
+            (s) => s.definition.displayName === 'Home Runs',
           );
           return hrStat?.multiplier;
         },
         {
           timeout: 15_000,
           intervals: [1_000, 2_000, 3_000],
-          message: `Home Run multiplier not updated to ${state.updatedMultiplier} within 15s`,
+          message: `Home Runs multiplier not updated to ${state.updatedMultiplier} within 15s`,
         },
       )
       .toBe(state.updatedMultiplier);
@@ -316,7 +326,7 @@ test.describe
       ).toBeVisible({ timeout: 15_000 });
     });
 
-    await test.step('API confirms override is cleared for Home Run', async () => {
+    await test.step('API confirms override is cleared for Home Runs', async () => {
       await expect
         .poll(
           async () => {
@@ -332,7 +342,7 @@ test.describe
               leagueId: state.leagueId,
             });
             const hrStat = data.leagueScoringProfile.stats.find(
-              (s) => s.definition.displayName === 'Home Run',
+              (s) => s.definition.displayName === 'Home Runs',
             );
             return hrStat?.isOverride;
           },
@@ -340,13 +350,13 @@ test.describe
             timeout: 15_000,
             intervals: [1_000, 2_000, 3_000],
             message:
-              'Home Run multiplier did not return to default (isOverride remains true)',
+              'Home Runs multiplier did not return to default (isOverride remains true)',
           },
         )
         .toBe(false);
     });
 
-    await test.step('Home Run multiplier matches original default', async () => {
+    await test.step('Home Runs multiplier matches original default', async () => {
       const data = await gqlFetch<{
         leagueScoringProfile: {
           stats: Array<{
@@ -356,7 +366,7 @@ test.describe
         };
       }>(commissionerJwt, GET_SCORING_PROFILE, { leagueId: state.leagueId });
       const hrStat = data.leagueScoringProfile.stats.find(
-        (s) => s.definition.displayName === 'Home Run',
+        (s) => s.definition.displayName === 'Home Runs',
       );
       expect(hrStat?.multiplier).toBe(state.originalMultiplier);
     });

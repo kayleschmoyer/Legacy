@@ -75,6 +75,8 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
   // -------------------------------------------------------------------------
 
   test('Phase 1: League setup', async ({ api, api2, apiCommissioner }) => {
+    // Reset teams array so retries (global retries: 1) start fresh
+    state.teams = [];
     await test.step('1.1 Commissioner creates league', async () => {
       const data = await graphqlOk<{
         createLeague: { id: number; name: string; inviteCode: string };
@@ -93,34 +95,34 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
 
     await test.step('1.2 Team manager 1 joins league', async () => {
       const data = await graphqlOk<{
-        joinLeague: { team: { id: number; name: string } };
+        joinLeague: { teamId: number };
       }>(
         api,
         `mutation JoinLeague($inviteCode: String!, $teamName: String!) {
            joinLeague(inviteCode: $inviteCode, teamName: $teamName) {
-             team { ${TEAM_FIELDS} }
+             teamId
            }
          }`,
         { inviteCode: state.inviteCode, teamName: 'The Sluggers' },
       );
-      state.teams.push(data.joinLeague.team);
-      expect(data.joinLeague.team.name).toBe('The Sluggers');
+      expect(data.joinLeague.teamId).toBeGreaterThan(0);
+      state.teams.push({ id: data.joinLeague.teamId, name: 'The Sluggers' });
     });
 
     await test.step('1.3 Team manager 2 joins league', async () => {
       const data = await graphqlOk<{
-        joinLeague: { team: { id: number; name: string } };
+        joinLeague: { teamId: number };
       }>(
         api2,
         `mutation JoinLeague($inviteCode: String!, $teamName: String!) {
            joinLeague(inviteCode: $inviteCode, teamName: $teamName) {
-             team { ${TEAM_FIELDS} }
+             teamId
            }
          }`,
         { inviteCode: state.inviteCode, teamName: 'The Aces' },
       );
-      state.teams.push(data.joinLeague.team);
-      expect(data.joinLeague.team.name).toBe('The Aces');
+      expect(data.joinLeague.teamId).toBeGreaterThan(0);
+      state.teams.push({ id: data.joinLeague.teamId, name: 'The Aces' });
     });
 
     await test.step('1.4 Rename team', async () => {

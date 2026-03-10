@@ -55,6 +55,26 @@ builder.queryField('league', (t) =>
             waiverEnabled: PublicSchema.leagues.waiverEnabled,
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
             isPublic: PublicSchema.leagues.isPublic,
+            // Matchup settings
+            spStartsPerMatchup: PublicSchema.leagues.spStartsPerMatchup,
+            gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+            minCareerGames: PublicSchema.leagues.minCareerGames,
+            minCareerSeasons: PublicSchema.leagues.minCareerSeasons,
+            totalMatchups: PublicSchema.leagues.totalMatchups,
+            playoffEnabled: PublicSchema.leagues.playoffEnabled,
+            playoffFormat: PublicSchema.leagues.playoffFormat,
+            playoffMultiWeek: PublicSchema.leagues.playoffMultiWeek,
+            // Branding
+            logoUrl: PublicSchema.leagues.logoUrl,
+            bannerUrl: PublicSchema.leagues.bannerUrl,
+            primaryColor: PublicSchema.leagues.primaryColor,
+            secondaryColor: PublicSchema.leagues.secondaryColor,
+            // Season info
+            lmNotes: PublicSchema.leagues.lmNotes,
+            isMockDraft: PublicSchema.leagues.isMockDraft,
+            previousLeagueId: PublicSchema.leagues.previousLeagueId,
+            frozenAt: PublicSchema.leagues.frozenAt,
+            seasonNumber: PublicSchema.leagues.seasonNumber,
             // Salary cap settings (LS-646)
             salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
             salaryCap: PublicSchema.leagues.salaryCap,
@@ -121,6 +141,26 @@ builder.queryField('league', (t) =>
           waiverEnabled: league.waiverEnabled,
           faabBudgetDefault: league.faabBudgetDefault,
           isPublic: league.isPublic,
+          // Matchup settings
+          spStartsPerMatchup: league.spStartsPerMatchup,
+          gamesPerMatchup: league.gamesPerMatchup ?? undefined,
+          minCareerGames: league.minCareerGames,
+          minCareerSeasons: league.minCareerSeasons,
+          totalMatchups: league.totalMatchups,
+          playoffEnabled: league.playoffEnabled,
+          playoffFormat: league.playoffFormat ?? undefined,
+          playoffMultiWeek: league.playoffMultiWeek,
+          // Branding
+          logoUrl: league.logoUrl,
+          bannerUrl: league.bannerUrl,
+          primaryColor: league.primaryColor,
+          secondaryColor: league.secondaryColor,
+          // Season info
+          lmNotes: league.lmNotes,
+          isMockDraft: league.isMockDraft,
+          previousLeagueId: league.previousLeagueId,
+          frozenAt: league.frozenAt ? league.frozenAt.toISOString() : null,
+          seasonNumber: league.seasonNumber,
           // Salary cap settings
           salaryCapEnabled: league.salaryCapEnabled,
           salaryCap: league.salaryCap,
