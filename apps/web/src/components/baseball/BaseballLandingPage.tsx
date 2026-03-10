@@ -1122,19 +1122,32 @@ export function BaseballLandingPage() {
               <EmptyStateIcon>
                 <Text aria-hidden="true">⚾</Text>
               </EmptyStateIcon>
-              <EmptyStateTitle>No leagues yet</EmptyStateTitle>
-              <EmptyStateDescription>
-                Build a private competition or join friends to unlock live
-                matchups, draft tools, and performance tracking.
-              </EmptyStateDescription>
-              <ActionButtonsRow justifyContent="center">
-                <PrimaryButton onPress={handleCreateLeague}>
-                  <Text fontWeight="700">Create your first league</Text>
-                </PrimaryButton>
-                <SecondaryButton onPress={handleJoinLeague}>
-                  <Text fontWeight="700">Join with a code</Text>
-                </SecondaryButton>
-              </ActionButtonsRow>
+              {search.trim() ? (
+                <>
+                  <EmptyStateTitle>
+                    No leagues match your search
+                  </EmptyStateTitle>
+                  <EmptyStateDescription>
+                    Try a different search term or clear the search field.
+                  </EmptyStateDescription>
+                </>
+              ) : (
+                <>
+                  <EmptyStateTitle>No leagues yet</EmptyStateTitle>
+                  <EmptyStateDescription>
+                    Build a private competition or join friends to unlock live
+                    matchups, draft tools, and performance tracking.
+                  </EmptyStateDescription>
+                  <ActionButtonsRow justifyContent="center">
+                    <PrimaryButton onPress={handleCreateLeague}>
+                      <Text fontWeight="700">Create your first league</Text>
+                    </PrimaryButton>
+                    <SecondaryButton onPress={handleJoinLeague}>
+                      <Text fontWeight="700">Join with a code</Text>
+                    </SecondaryButton>
+                  </ActionButtonsRow>
+                </>
+              )}
             </EmptyState>
           )}
         </LeaguesSection>
