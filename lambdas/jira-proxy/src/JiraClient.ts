@@ -28,6 +28,15 @@ interface JiraDocNode {
   attrs?: Record<string, unknown>;
 }
 
+export interface AttachmentInput {
+  /** Original filename (sanitized on the backend before upload). */
+  name: string;
+  /** MIME type, e.g. "image/png" or "video/mp4". */
+  type: string;
+  /** Base64-encoded file content (no data-URI prefix). */
+  data: string;
+}
+
 export interface CreateIssueInput {
   summary: string;
   description?: string;
@@ -42,6 +51,8 @@ export interface CreateIssueInput {
   pageUrl?: string;
   /** User-agent string from the browser. */
   userAgent?: string;
+  /** Optional screenshots or short video clips to attach to the Jira issue. */
+  attachments?: AttachmentInput[];
 }
 
 export interface CreateIssueResult {
@@ -131,6 +142,63 @@ function buildDescription(input: CreateIssueInput): JiraDocNode {
   return textToAdf(parts.join('\n\n'));
 }
 
+/**
+ * Strip path separators and other OS-forbidden characters from a filename.
+ */
+function sanitizeFilename(name: string): string {
+  return name.replace(/[/\\:*?"<>|]/g, '_').slice(0, 255);
+}
+
+/**
+ * Attach base64-encoded files to an existing Jira issue.
+ * Failures are logged as warnings — the issue is already created, so we
+ * do not throw and roll back.
+ */
+async function attachFilesToJiraIssue(
+  issueKey: string,
+  attachments: AttachmentInput[],
+  credentials: JiraCredentials,
+): Promise<void> {
+  const { api_token, email, base_url } = credentials;
+  const authHeader = Buffer.from(`${email}:${api_token}`).toString('base64');
+
+  for (const attachment of attachments) {
+    try {
+      const buffer = Buffer.from(attachment.data, 'base64');
+      const blob = new Blob([buffer], { type: attachment.type });
+      const formData = new FormData();
+      formData.append('file', blob, sanitizeFilename(attachment.name));
+
+      const response = await fetch(
+        `${base_url}/rest/api/3/issue/${issueKey}/attachments`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${authHeader}`,
+            // Required by Jira to allow programmatic attachment uploads
+            'X-Atlassian-Token': 'no-check',
+            Accept: 'application/json',
+          },
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        LOGGER.warn(
+          `Failed to attach ${attachment.name} to ${issueKey}: ${String(response.status)} ${errorBody}`,
+        );
+      } else {
+        LOGGER.info(`Attached ${attachment.name} to ${issueKey}`);
+      }
+    } catch (err) {
+      LOGGER.warn(
+        `Error attaching ${attachment.name} to ${issueKey}: ${String(err)}`,
+      );
+    }
+  }
+}
+
 export async function createJiraBug(
   input: CreateIssueInput,
   projectKey: string,
@@ -186,6 +254,10 @@ export async function createJiraBug(
   const issueUrl = `${base_url}/browse/${issueKey}`;
 
   LOGGER.info(`Created Jira issue: ${issueKey}`);
+
+  if (input.attachments && input.attachments.length > 0) {
+    await attachFilesToJiraIssue(issueKey, input.attachments, credentials);
+  }
 
   return { issueKey, issueUrl };
 }

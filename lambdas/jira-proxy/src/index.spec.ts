@@ -284,4 +284,101 @@ describe('Jira Proxy Handler', () => {
       );
     });
   });
+
+  describe('POST /jira/bug — attachments', () => {
+    const validBase64Png =
+      // 1x1 transparent PNG, base64-encoded
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+    it('returns 400 when attachments is not an array', async () => {
+      const event = makeEvent({
+        body: JSON.stringify({ summary: 'Test', attachments: 'not-an-array' }),
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body) as { error: string };
+      expect(body.error).toContain('attachments');
+    });
+
+    it('returns 400 when more than 3 attachments are provided', async () => {
+      const attachment = {
+        name: 'screenshot.png',
+        type: 'image/png',
+        data: validBase64Png,
+      };
+      const event = makeEvent({
+        body: JSON.stringify({
+          summary: 'Test',
+          attachments: [attachment, attachment, attachment, attachment],
+        }),
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body) as { error: string };
+      expect(body.error).toContain('Maximum');
+    });
+
+    it('returns 400 when attachment type is not allowed', async () => {
+      const event = makeEvent({
+        body: JSON.stringify({
+          summary: 'Test',
+          attachments: [
+            {
+              name: 'malware.exe',
+              type: 'application/octet-stream',
+              data: validBase64Png,
+            },
+          ],
+        }),
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body) as { error: string };
+      expect(body.error).toContain('not allowed');
+    });
+
+    it('returns 400 when attachment data is too large', async () => {
+      // ~3 MB of base64 data (exceeds the 2 MB decoded limit)
+      const hugeData = 'A'.repeat(4 * 1024 * 1024);
+      const event = makeEvent({
+        body: JSON.stringify({
+          summary: 'Test',
+          attachments: [{ name: 'big.png', type: 'image/png', data: hugeData }],
+        }),
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body) as { error: string };
+      expect(body.error).toContain('size limit');
+    });
+
+    it('passes valid attachments to createJiraBug', async () => {
+      mockCreateJiraBug.mockResolvedValueOnce({
+        issueKey: 'LS-200',
+        issueUrl: 'https://test.atlassian.net/browse/LS-200',
+      });
+
+      const attachment = {
+        name: 'screenshot.png',
+        type: 'image/png',
+        data: validBase64Png,
+      };
+      const event = makeEvent({
+        body: JSON.stringify({
+          summary: 'Bug with screenshot',
+          attachments: [attachment],
+        }),
+      });
+
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(201);
+      expect(mockCreateJiraBug).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachments: [attachment],
+        }),
+        'LS',
+        'test-secret',
+      );
+    });
+  });
 });

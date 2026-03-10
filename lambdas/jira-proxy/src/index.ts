@@ -8,7 +8,7 @@ import {
   initSentry,
   withSentry,
 } from '@legacy-sports/rollbar';
-import type { CreateIssueInput } from './JiraClient';
+import type { AttachmentInput, CreateIssueInput } from './JiraClient';
 import { createJiraBug } from './JiraClient';
 
 /** Verified JWT payload fields used for attribution. */
@@ -89,6 +89,13 @@ function handleOptions(): APIGatewayProxyResult {
     body: '',
   };
 }
+
+const MAX_ATTACHMENTS = 3;
+/** Max decoded file size per attachment: 2 MB */
+const MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024;
+/** Allowed attachment MIME type prefix/values */
+const ALLOWED_ATTACHMENT_TYPES =
+  /^(image\/|video\/(mp4|webm|quicktime|x-msvideo)$)/;
 
 /**
  * Validate and parse the incoming bug report request body.
@@ -186,6 +193,52 @@ function parseBugReport(rawBody: string | null): CreateIssueInput {
       throw new Error('Field "userAgent" must be a string');
     }
     input.userAgent = body['userAgent'];
+  }
+
+  if (body['attachments'] !== undefined) {
+    if (!Array.isArray(body['attachments'])) {
+      throw new Error('Field "attachments" must be an array');
+    }
+    const rawAttachments = body['attachments'] as unknown[];
+    if (rawAttachments.length > MAX_ATTACHMENTS) {
+      throw new Error(`Maximum ${String(MAX_ATTACHMENTS)} attachments allowed`);
+    }
+    const attachments: AttachmentInput[] = [];
+    for (const item of rawAttachments) {
+      if (typeof item !== 'object' || item === null) {
+        throw new Error('Each attachment must be an object');
+      }
+      const att = item as Record<string, unknown>;
+      if (typeof att['name'] !== 'string' || !att['name']) {
+        throw new Error('Each attachment must have a non-empty "name" string');
+      }
+      if (
+        typeof att['type'] !== 'string' ||
+        !ALLOWED_ATTACHMENT_TYPES.test(att['type'])
+      ) {
+        throw new Error(
+          `Attachment type "${String(att['type'])}" is not allowed`,
+        );
+      }
+      if (typeof att['data'] !== 'string' || !att['data']) {
+        throw new Error(
+          'Each attachment must have a non-empty "data" base64 string',
+        );
+      }
+      // Estimate decoded size: base64 encodes 3 bytes as 4 chars
+      const estimatedBytes = Math.ceil((att['data'].length * 3) / 4);
+      if (estimatedBytes > MAX_ATTACHMENT_SIZE_BYTES) {
+        throw new Error(
+          `Attachment "${att['name']}" exceeds the 2 MB size limit`,
+        );
+      }
+      attachments.push({
+        name: att['name'],
+        type: att['type'],
+        data: att['data'],
+      });
+    }
+    input.attachments = attachments;
   }
 
   return input;

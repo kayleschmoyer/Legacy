@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Button,
   Paragraph,
@@ -26,6 +26,31 @@ function detectEnvironment(): string {
   return 'production';
 }
 
+const MAX_ATTACHMENTS = 3;
+const MAX_FILE_SIZE_MB = 2;
+const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
+/** image/* plus common web-safe video formats */
+const ALLOWED_ATTACHMENT_TYPES =
+  /^(image\/|video\/(mp4|webm|quicktime|x-msvideo)$)/;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${String(Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // result is "data:<type>;base64,<data>" — extract only the base64 part
+      resolve(result.split(',')[1] ?? '');
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 interface SubmitState {
   status: 'idle' | 'loading' | 'success' | 'error';
   message?: string;
@@ -43,11 +68,16 @@ export const BugReportButton: React.FC = () => {
     status: 'idle',
   });
   const [showDetails, setShowDetails] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachmentError, setAttachmentError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const resetForm = useCallback(() => {
     setDescription('');
     setSubmitState({ status: 'idle' });
     setShowDetails(false);
+    setAttachments([]);
+    setAttachmentError('');
   }, []);
 
   const handleOpenChange = useCallback(
@@ -57,6 +87,47 @@ export const BugReportButton: React.FC = () => {
     },
     [resetForm],
   );
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files ?? []);
+      // Reset the input so the same file can be re-selected after removal
+      e.target.value = '';
+      setAttachmentError('');
+      const newFiles: File[] = [];
+      for (const file of files) {
+        if (!ALLOWED_ATTACHMENT_TYPES.test(file.type)) {
+          setAttachmentError(
+            `${file.name}: unsupported type. Use images or MP4/WebM videos.`,
+          );
+          return;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+          setAttachmentError(
+            `${file.name} is too large (max ${String(MAX_FILE_SIZE_MB)} MB per file).`,
+          );
+          return;
+        }
+        newFiles.push(file);
+      }
+      setAttachments((prev) => {
+        const combined = [...prev, ...newFiles];
+        if (combined.length > MAX_ATTACHMENTS) {
+          setAttachmentError(
+            `Maximum ${String(MAX_ATTACHMENTS)} attachments allowed.`,
+          );
+          return combined.slice(0, MAX_ATTACHMENTS);
+        }
+        return combined;
+      });
+    },
+    [],
+  );
+
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+    setAttachmentError('');
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (!description.trim()) return;
@@ -77,6 +148,27 @@ export const BugReportButton: React.FC = () => {
         ? (localStorage.getItem('auth_jwt') ?? '')
         : '';
 
+    // Convert any attached files to base64 before building the payload
+    let attachmentData: Array<{ name: string; type: string; data: string }> =
+      [];
+    if (attachments.length > 0) {
+      try {
+        attachmentData = await Promise.all(
+          attachments.map(async (file) => ({
+            name: file.name,
+            type: file.type,
+            data: await readFileAsBase64(file),
+          })),
+        );
+      } catch {
+        setSubmitState({
+          status: 'error',
+          message: 'Failed to read attachment files. Please try again.',
+        });
+        return;
+      }
+    }
+
     const payload = {
       summary: buildSummary(description) || 'Bug report',
       description: description.trim(),
@@ -88,6 +180,7 @@ export const BugReportButton: React.FC = () => {
       userAgent: navigator.userAgent,
       appVersion: env.appVersion,
       environment: detectEnvironment(),
+      ...(attachmentData.length > 0 ? { attachments: attachmentData } : {}),
     };
 
     try {
@@ -123,7 +216,7 @@ export const BugReportButton: React.FC = () => {
             : 'Something went wrong. Try again.',
       });
     }
-  }, [description, auth]);
+  }, [description, auth, attachments]);
 
   const isLoading = submitState.status === 'loading';
   const isSuccess = submitState.status === 'success';
@@ -318,6 +411,92 @@ export const BugReportButton: React.FC = () => {
                         </XStack>
                       ))}
                     </YStack>
+                  )}
+                </YStack>
+
+                {/* Attachments */}
+                <YStack gap="$2">
+                  <XStack alignItems="center" gap="$2">
+                    <Paragraph size="$3" fontWeight="600" color="$color">
+                      Attachments
+                    </Paragraph>
+                    <Paragraph size="$2" color="$colorPress">
+                      (optional · images or videos · max {MAX_ATTACHMENTS}{' '}
+                      files, {MAX_FILE_SIZE_MB} MB each)
+                    </Paragraph>
+                  </XStack>
+
+                  {/* Hidden file input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/mp4,video/webm,video/quicktime"
+                    multiple
+                    onChange={handleFileChange}
+                    style={{ display: 'none' }}
+                    aria-label="Add screenshot or video"
+                  />
+
+                  {/* File list */}
+                  {attachments.length > 0 && (
+                    <YStack gap="$1">
+                      {attachments.map((file, i) => (
+                        <XStack
+                          key={`${file.name}-${String(i)}`}
+                          alignItems="center"
+                          gap="$2"
+                          backgroundColor="$color2"
+                          borderRadius="$3"
+                          paddingVertical="$1"
+                          paddingHorizontal="$2"
+                        >
+                          <Paragraph size="$2" flex={1} numberOfLines={1}>
+                            {file.type.startsWith('image/') ? '🖼 ' : '🎥 '}
+                            {file.name}
+                          </Paragraph>
+                          <Paragraph size="$1" color="$colorPress">
+                            {formatFileSize(file.size)}
+                          </Paragraph>
+                          <Button
+                            size="$1"
+                            backgroundColor="transparent"
+                            borderWidth={0}
+                            padding="$1"
+                            onPress={() => removeAttachment(i)}
+                            aria-label={`Remove ${file.name}`}
+                            disabled={isLoading}
+                          >
+                            <Paragraph size="$2" color="$colorPress">
+                              ✕
+                            </Paragraph>
+                          </Button>
+                        </XStack>
+                      ))}
+                    </YStack>
+                  )}
+
+                  {/* Add-file button */}
+                  {attachments.length < MAX_ATTACHMENTS && (
+                    <Button
+                      size="$2"
+                      backgroundColor="transparent"
+                      borderWidth={1}
+                      borderColor="$borderColor"
+                      borderRadius="$4"
+                      onPress={() => fileInputRef.current?.click()}
+                      disabled={isLoading}
+                      alignSelf="flex-start"
+                    >
+                      <Paragraph size="$2" color="$colorPress">
+                        + Add screenshot or video
+                      </Paragraph>
+                    </Button>
+                  )}
+
+                  {attachmentError && (
+                    <Paragraph size="$2" color="$red10">
+                      ⚠ {attachmentError}
+                    </Paragraph>
                   )}
                 </YStack>
 
