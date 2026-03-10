@@ -28,6 +28,17 @@ import {
   type ScoringSettings,
 } from '@legacy-sports/scoring';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  captureError,
+  getSentryConfigFromEnv,
+  initSentry,
+} from '@legacy-sports/rollbar';
+
+// Initialize Sentry
+const sentryConfig = getSentryConfigFromEnv();
+if (sentryConfig) {
+  initSentry(sentryConfig);
+}
 
 export interface CalculateMatchupScoresEvent {
   matchupId: number;
@@ -71,17 +82,14 @@ export async function handler(
       );
     });
   } catch (error) {
-    LOGGER.error(`Error calculating matchup scores: ${String(error)}`);
-    return {
+    const err = error instanceof Error ? error : new Error(String(error));
+    LOGGER.error(`Error calculating matchup scores for matchup ${matchupId}`, {
+      error: err.message,
+      stack: err.stack,
       matchupId,
-      team1Score: null,
-      team2Score: null,
-      team1GamesSelected: 0,
-      team2GamesSelected: 0,
-      gamesPerMatchup: 0,
-      updated: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    });
+    captureError(err, { matchupId });
+    throw err;
   }
 }
 
