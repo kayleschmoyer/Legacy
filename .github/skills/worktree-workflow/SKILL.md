@@ -112,6 +112,14 @@ acli jira workitem view --key LS-XXXX --fields status
 Use `make worktree` — it creates the branch, worktree, registers the parent dependency, and
 auto-adds to the VS Code workspace in one atomic command:
 
+> **Before creating any worktree**, fetch from origin so the new branch is cut from the
+> latest remote `main` (or the parent branch, if stacked):
+>
+> ```powershell
+> cd "D:\code\legacy-sports"
+> git fetch origin
+> ```
+
 **Independent ticket (parent = main):**
 
 ```powershell
@@ -147,6 +155,7 @@ twig worktree list
 > If `make worktree` fails, fall back to manual creation:
 >
 > ```powershell
+> git fetch origin   # ensure branch is cut from latest origin/main
 > twig worktree create LS-####/short-description
 > twig branch depend LS-####/short-description main   # or the actual parent branch
 > twig worktree list
