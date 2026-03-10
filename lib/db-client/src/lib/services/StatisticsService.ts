@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, or, sql, SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, or, sql, SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { DbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
@@ -237,20 +237,85 @@ export class StatisticsService {
     return runWithPublicClient(
       this.options,
       async (db): Promise<CareerPitching[]> => {
-        const queryBuilder = db.select().from(PublicSchema.careerPitching);
-
-        // Build WHERE clause
         const conditions = queryOptions.filters
           ? this.buildPitchingFilters(queryOptions.filters)
           : [];
 
         const orderDirection = queryOptions.orderDirection || 'desc';
 
-        // Execute query with all conditions
-        let finalQuery = queryBuilder;
+        const getOrderByClause = () => {
+          if (queryOptions.orderBy === 'wins') {
+            return orderDirection === 'desc'
+              ? desc(PublicSchema.careerPitching.w)
+              : asc(PublicSchema.careerPitching.w);
+          } else if (queryOptions.orderBy === 'strikeouts') {
+            return orderDirection === 'desc'
+              ? desc(PublicSchema.careerPitching.so)
+              : asc(PublicSchema.careerPitching.so);
+          }
+          return desc(PublicSchema.careerPitching.w);
+        };
+
+        const searchTerm = queryOptions.filters?.searchTerm;
+
+        if (searchTerm) {
+          // JOIN with players table to enable name search
+          const searchPattern = `%${searchTerm}%`;
+          const searchCondition = or(
+            ilike(PublicSchema.players.firstName, searchPattern),
+            ilike(PublicSchema.players.lastName, searchPattern),
+          );
+          const allConditions = searchCondition
+            ? [...conditions, searchCondition]
+            : conditions;
+
+          const whereClause =
+            allConditions.length === 1
+              ? allConditions[0]
+              : allConditions.length > 1
+                ? and(...allConditions)
+                : undefined;
+
+          // Use plain .select() so Drizzle returns { career_pitching: {...}, players: {...} }
+          const baseQuery = db
+            .select()
+            .from(PublicSchema.careerPitching)
+            .innerJoin(
+              PublicSchema.players,
+              eq(PublicSchema.careerPitching.playerId, PublicSchema.players.id),
+            );
+
+          const withWhere = whereClause
+            ? baseQuery.where(whereClause)
+            : baseQuery;
+          const orderClause = getOrderByClause();
+          const withOrder = withWhere.orderBy(orderClause);
+          const withLimit = queryOptions.limit
+            ? withOrder.limit(queryOptions.limit)
+            : withOrder;
+          const withOffset = queryOptions.offset
+            ? withLimit.offset(queryOptions.offset)
+            : withLimit;
+
+          const results = await withOffset.execute();
+          // Drizzle returns joined rows as { career_pitching: ..., players: ... }
+          return results.map((result) => {
+            if (
+              result &&
+              typeof result === 'object' &&
+              'career_pitching' in result
+            ) {
+              return (result as unknown as { career_pitching: CareerPitching })
+                .career_pitching;
+            }
+            return result as unknown as CareerPitching;
+          });
+        }
+
+        // No search — simple query without JOIN
+        let finalQuery = db.select().from(PublicSchema.careerPitching);
 
         if (conditions.length > 0) {
-          // Filter out any undefined conditions before passing to and()
           const validConditions = conditions.filter(
             (condition): condition is SQL => condition !== undefined,
           );
@@ -263,38 +328,15 @@ export class StatisticsService {
           }
         }
 
-        // Default ordering by wins descending for interesting results
-        if (queryOptions.orderBy === 'wins') {
-          finalQuery =
-            orderDirection === 'desc'
-              ? (finalQuery.orderBy(
-                  desc(PublicSchema.careerPitching.w),
-                ) as typeof finalQuery)
-              : (finalQuery.orderBy(
-                  asc(PublicSchema.careerPitching.w),
-                ) as typeof finalQuery);
-        } else if (queryOptions.orderBy === 'strikeouts') {
-          finalQuery =
-            orderDirection === 'desc'
-              ? (finalQuery.orderBy(
-                  desc(PublicSchema.careerPitching.so),
-                ) as typeof finalQuery)
-              : (finalQuery.orderBy(
-                  asc(PublicSchema.careerPitching.so),
-                ) as typeof finalQuery);
-        } else {
-          // Default to wins descending
-          finalQuery = finalQuery.orderBy(
-            desc(PublicSchema.careerPitching.w),
-          ) as typeof finalQuery;
-        }
+        finalQuery = finalQuery.orderBy(
+          getOrderByClause(),
+        ) as typeof finalQuery;
 
         if (queryOptions.limit) {
           finalQuery = finalQuery.limit(
             queryOptions.limit,
           ) as typeof finalQuery;
         }
-
         if (queryOptions.offset) {
           finalQuery = finalQuery.offset(
             queryOptions.offset,
@@ -895,11 +937,46 @@ export class StatisticsService {
    */
   async countCareerPitchingStats(filters?: StatisticsFilters): Promise<number> {
     return runWithPublicClient(this.options, async (db) => {
+      const conditions = filters ? this.buildPitchingFilters(filters) : [];
+
+      if (filters?.searchTerm) {
+        // JOIN with players table to enable name-based count
+        const searchPattern = `%${filters.searchTerm}%`;
+        const searchCondition = or(
+          ilike(PublicSchema.players.firstName, searchPattern),
+          ilike(PublicSchema.players.lastName, searchPattern),
+        );
+        const allConditions = searchCondition
+          ? [...conditions, searchCondition]
+          : conditions;
+
+        const whereClause =
+          allConditions.length === 1
+            ? allConditions[0]
+            : allConditions.length > 1
+              ? and(...allConditions)
+              : undefined;
+
+        // Use plain .select() to avoid view/table shape mismatch
+        const baseCountQuery = db
+          .select({ count: count() })
+          .from(PublicSchema.careerPitching)
+          .innerJoin(
+            PublicSchema.players,
+            eq(PublicSchema.careerPitching.playerId, PublicSchema.players.id),
+          );
+
+        const finalCountQuery = whereClause
+          ? baseCountQuery.where(whereClause)
+          : baseCountQuery;
+
+        const result = await finalCountQuery.execute();
+        return result[0]?.count || 0;
+      }
+
       let queryBuilder = db
         .select({ count: count() })
         .from(PublicSchema.careerPitching);
-
-      const conditions = filters ? this.buildPitchingFilters(filters) : [];
 
       if (conditions.length > 0) {
         // Filter out any undefined conditions before passing to and()

@@ -17,7 +17,13 @@
  * @since 2025-09-28
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Button, H2, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   type CareerStatsQueryParams,
@@ -390,13 +396,36 @@ export function PlayerStatsDataGrid({
     [updateQueryParams],
   );
 
+  // Debounce ref for search
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   /**
-   * Handles search input changes (currently disabled - GraphQL schema doesn't support search)
+   * Handles search input changes — debounces and propagates to server-side query
    */
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchTerm(value);
-    // TODO(LS-329): Implement search using separate searchPlayers query
-    // For now, search is disabled as careerBattingStats doesn't support searchTerm
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearchTerm(value);
+
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+      searchDebounceRef.current = setTimeout(() => {
+        updateQueryParams({
+          searchTerm: value.trim() || undefined,
+          after: undefined, // reset to first page
+        });
+      }, 300);
+    },
+    [updateQueryParams],
+  );
+
+  // Clean up debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
   }, []);
 
   /**

@@ -14,7 +14,13 @@
  * @author Legacy Sports Team
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Button, H2, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   type CareerPitchingFragment,
@@ -259,6 +265,7 @@ export function PitchingStatsDataGrid({
     });
 
   const [searchTerm, setSearchTerm] = useState('');
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [localFilters, setLocalFilters] = useState({
     minGames: initialParams.minGames ?? 10,
     minWins: initialParams.minWins ?? 0,
@@ -283,6 +290,7 @@ export function PitchingStatsDataGrid({
       minGames: queryParams.minGames,
       minWins: queryParams.minWins,
       minStrikeouts: queryParams.minStrikeouts,
+      searchTerm: queryParams.searchTerm,
     },
     errorPolicy: 'all',
     fetchPolicy: 'cache-and-network',
@@ -312,8 +320,30 @@ export function PitchingStatsDataGrid({
     [updateQueryParams],
   );
 
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchTerm(value);
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearchTerm(value);
+
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+      searchDebounceRef.current = setTimeout(() => {
+        updateQueryParams({
+          searchTerm: value.trim() || undefined,
+          offset: 0, // reset to first page
+        });
+      }, 300);
+    },
+    [updateQueryParams],
+  );
+
+  // Clean up debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
   }, []);
 
   const handleFilterChange = useCallback(

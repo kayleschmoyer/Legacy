@@ -895,6 +895,7 @@ builder.queryField('careerPitchingStats', (t) =>
       minGames: t.arg.int({ required: false }),
       minWins: t.arg.int({ required: false }),
       minStrikeouts: t.arg.int({ required: false }),
+      searchTerm: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
       return dbService.statistics.getCareerPitchingStats({
@@ -906,6 +907,7 @@ builder.queryField('careerPitchingStats', (t) =>
           minGames: args.minGames || undefined,
           minWins: args.minWins || undefined,
           minStrikeouts: args.minStrikeouts || undefined,
+          searchTerm: args.searchTerm || undefined,
         },
       });
     },
@@ -920,12 +922,14 @@ builder.queryField('careerPitchingStatsCount', (t) =>
       minGames: t.arg.int({ required: false }),
       minWins: t.arg.int({ required: false }),
       minStrikeouts: t.arg.int({ required: false }),
+      searchTerm: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
       return dbService.statistics.countCareerPitchingStats({
         minGames: args.minGames || undefined,
         minWins: args.minWins || undefined,
         minStrikeouts: args.minStrikeouts || undefined,
+        searchTerm: args.searchTerm || undefined,
       });
     },
   }),

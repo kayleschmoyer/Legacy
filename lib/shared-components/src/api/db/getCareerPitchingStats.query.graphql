@@ -9,6 +9,7 @@ query GetCareerPitchingStats(
   $minGames: Int
   $minWins: Int
   $minStrikeouts: Int
+  $searchTerm: String
 ) {
   careerPitchingStats(
     limit: $limit
@@ -18,6 +19,7 @@ query GetCareerPitchingStats(
     minGames: $minGames
     minWins: $minWins
     minStrikeouts: $minStrikeouts
+    searchTerm: $searchTerm
   ) {
     ...CareerPitching
   }

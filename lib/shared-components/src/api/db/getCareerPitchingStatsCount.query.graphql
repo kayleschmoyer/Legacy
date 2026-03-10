@@ -3,10 +3,12 @@ query GetCareerPitchingStatsCount(
   $minGames: Int
   $minWins: Int
   $minStrikeouts: Int
+  $searchTerm: String
 ) {
   careerPitchingStatsCount(
     minGames: $minGames
     minWins: $minWins
     minStrikeouts: $minStrikeouts
+    searchTerm: $searchTerm
   )
 }
