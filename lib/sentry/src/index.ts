@@ -9,8 +9,8 @@ export * from './lib/types';
 export { sentry } from './lib/sentry.node';
 
 // Re-export convenience functions that match the old API for backward compatibility
-import { sentry } from './lib/sentry.node';
 import { registerGlobalErrorCapture } from '@legacy-sports/logging';
+import { sentry } from './lib/sentry.node';
 
 export const initSentry = (config: import('./lib/types').SentryConfig) => {
   sentry.init(config);

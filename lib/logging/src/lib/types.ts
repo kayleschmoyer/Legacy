@@ -71,27 +71,43 @@ export function shouldLog(level: LogLevel, minimumLevel: LogLevel): boolean {
   return LOG_LEVELS[level] >= LOG_LEVELS[minimumLevel];
 }
 
+/**
+ * JSON.stringify replacer that converts Error instances to plain objects with
+ * their name, message, and stack preserved (normally lost during serialization).
+ */
+function errorReplacer(_key: string, value: unknown): unknown {
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+    };
+  }
+  return value;
+}
+
+function serializeArg(arg: LogArgs[number]): string {
+  if (typeof arg === 'string') {
+    return arg;
+  } else if (typeof arg === 'number' || typeof arg === 'boolean') {
+    return String(arg);
+  } else if (arg instanceof Error) {
+    // Direct Error argument — extract stack before serializing
+    return JSON.stringify(errorReplacer('', arg), null, 2);
+  } else if (typeof arg === 'object' && arg !== null) {
+    // Plain object — use replacer so nested Errors (e.g. { error }) are preserved
+    return JSON.stringify(arg, errorReplacer, 2);
+  } else if (arg === null || arg === undefined) {
+    return String(arg);
+  } else {
+    return '[Unknown Type]';
+  }
+}
+
 export function formatLogEntry(entry: LogEntry): string {
   const timestamp = entry.timestamp.toISOString();
   const formattedArgs =
-    entry.args.length > 0
-      ? ' ' +
-        entry.args
-          .map((arg) => {
-            if (typeof arg === 'string') {
-              return arg;
-            } else if (typeof arg === 'number' || typeof arg === 'boolean') {
-              return String(arg);
-            } else if (typeof arg === 'object' && arg !== null) {
-              return JSON.stringify(arg, null, 2);
-            } else if (arg === null || arg === undefined) {
-              return String(arg);
-            } else {
-              return '[Unknown Type]';
-            }
-          })
-          .join(' ')
-      : '';
+    entry.args.length > 0 ? ' ' + entry.args.map(serializeArg).join(' ') : '';
   const formattedMessage = `[${timestamp}] ${entry.level.toUpperCase()}: ${entry.message}${formattedArgs}`;
   // Apply emoji-safe encoding for console output
   return safeEncodeForConsole(formattedMessage);
