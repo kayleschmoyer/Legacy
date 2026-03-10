@@ -272,17 +272,17 @@ twig github setup
 
 ### Issue: PR body has broken formatting
 
-**Solution**: You used `--body` inline. Re-create using `--body-file`:
+**Solution**: Use the `create_file` tool to write a correct `.github/tmp-pr-body.md`, then update the existing PR body with `gh pr edit` — **do not close and recreate**:
 
 ```powershell
-# Close the broken PR
-gh pr close <PR_NUMBER>
+# 1. Use create_file tool to write the correct markdown to .github/tmp-pr-body.md
+#    (never use @" "@ heredoc or shell redirection — both corrupt backticks/encoding)
 
-# Recreate with --body-file
-@"
-Your markdown content here
-"@ | Set-Content -Path "$env:TEMP\pr-body.md" -Encoding utf8
-gh pr create --title "your title" --body-file "$env:TEMP\pr-body.md" --base main
+# 2. Update the existing PR body in-place
+gh pr edit <PR_NUMBER> --body-file ".github/tmp-pr-body.md"
+
+# 3. Clean up
+.\scripts\cleanup-pr-body.ps1
 ```
 
 ### Issue: PR body contains `^@` null bytes / garbled UTF-16 output
