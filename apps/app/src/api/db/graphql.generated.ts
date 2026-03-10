@@ -704,10 +704,14 @@ export type League = {
   currentWeek?: Maybe<Scalars['Int']['output']>;
   /** The current active week number for the league */
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
+  customEraEndYear?: Maybe<Scalars['Int']['output']>;
+  customEraStartYear?: Maybe<Scalars['Int']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
+  eraFilter?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
   frozenAt?: Maybe<Scalars['String']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
+  hofOnly?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMockDraft?: Maybe<Scalars['Boolean']['output']>;

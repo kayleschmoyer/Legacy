@@ -84,7 +84,7 @@ export function PlayerStatsFilterDialog({
           borderColor="$borderColor"
           animateOnly={['transform', 'opacity']}
           animation={[
-            'quicker',
+            'quick',
             {
               opacity: {
                 overshootClamping: true,

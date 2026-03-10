@@ -309,7 +309,7 @@ function SportHome({
               key="content"
               animateOnly={['transform', 'opacity']}
               animation={[
-                'quicker',
+                'quick',
                 {
                   opacity: {
                     overshootClamping: true,
