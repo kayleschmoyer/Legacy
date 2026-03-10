@@ -2775,6 +2775,7 @@ type User {
   avatarUrl: String
   email: String
   id: Int
+  subscriptionTier: String
   username: String
 }
 

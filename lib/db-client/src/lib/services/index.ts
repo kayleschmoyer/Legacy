@@ -18,6 +18,10 @@ import {
 import { createLeagueService, LeagueService } from './LeagueService';
 import { createGdprService, GdprService } from './GdprService';
 import { BadgeService, createBadgeService } from './BadgeService';
+import {
+  createSubscriptionService,
+  SubscriptionService,
+} from './SubscriptionService';
 import { type GenericDatabase, getPublicDbConnection } from '../client/Helpers';
 import * as PublicSchema from '../../drizzle/public/schema';
 export { SeasonDraftGameService } from './SeasonDraftGameService';
@@ -42,6 +46,7 @@ export class DatabaseService {
   public readonly leagues: LeagueService;
   public readonly gdpr: GdprService;
   public readonly badges: BadgeService;
+  public readonly subscriptions: SubscriptionService;
   private _dbConnection: GenericDatabase<typeof PublicSchema> | null = null;
 
   constructor(private options: DbOptions) {
@@ -53,6 +58,7 @@ export class DatabaseService {
     this.leagues = createLeagueService(options);
     this.gdpr = createGdprService(options);
     this.badges = createBadgeService(options);
+    this.subscriptions = createSubscriptionService(options);
   }
 
   /**
@@ -104,6 +110,11 @@ export {
   BADGE_DEFINITIONS,
   BADGE_DEFINITION_MAP,
 } from './BadgeService';
+export {
+  SubscriptionService,
+  createSubscriptionService,
+} from './SubscriptionService';
+export type { UserSubscription } from './SubscriptionService';
 
 // Re-export types
 export type { UserFilters, UserQueryOptions } from './UserService';

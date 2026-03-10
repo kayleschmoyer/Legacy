@@ -10,12 +10,13 @@ import { getJwtSecret } from '../server/context';
 const dbService = createDatabaseService(getDbOptions());
 
 // User type
-const UserRef = builder.objectRef<{
+export const UserRef = builder.objectRef<{
   id: number;
   email?: string | null;
   username?: string | null;
   accessLevel?: string | null;
   avatarUrl?: string | null;
+  subscriptionTier?: string | null;
 }>('User');
 
 UserRef.implement({
@@ -25,6 +26,7 @@ UserRef.implement({
     username: t.exposeString('username', { nullable: true }),
     accessLevel: t.exposeString('accessLevel', { nullable: true }),
     avatarUrl: t.exposeString('avatarUrl', { nullable: true }),
+    subscriptionTier: t.exposeString('subscriptionTier', { nullable: true }),
   }),
 });
 
