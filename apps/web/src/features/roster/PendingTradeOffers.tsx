@@ -8,7 +8,14 @@
 import React, { useCallback } from 'react';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components';
 import { Card, Separator, Spinner, Text } from 'tamagui';
-import { ArrowLeftRight, Check, Clock, Send, X } from '@tamagui/lucide-icons';
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  Check,
+  Clock,
+  Send,
+  X,
+} from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useAcceptTradeMutation,
@@ -41,6 +48,7 @@ export function PendingTradeOffers({
   leagueId: _leagueId,
 }: PendingTradeOffersProps) {
   const [actionLoading, setActionLoading] = React.useState<number | null>(null);
+  const [actionError, setActionError] = React.useState<string | null>(null);
 
   const { data, loading, refetch } = useGetTeamTradeOffersQuery({
     variables: { teamId, status: 'pending' },
@@ -66,11 +74,13 @@ export function PendingTradeOffers({
   const handleAccept = useCallback(
     async (tradeId: number) => {
       setActionLoading(tradeId);
+      setActionError(null);
       try {
         await acceptTrade({ variables: { tradeId } });
         await refetch();
       } catch (err) {
         LOGGER.error('Failed to accept trade:', String(err));
+        setActionError('Failed to accept trade. Please try again.');
       } finally {
         setActionLoading(null);
       }
@@ -81,11 +91,13 @@ export function PendingTradeOffers({
   const handleReject = useCallback(
     async (tradeId: number) => {
       setActionLoading(tradeId);
+      setActionError(null);
       try {
         await rejectTrade({ variables: { tradeId } });
         await refetch();
       } catch (err) {
         LOGGER.error('Failed to reject trade:', String(err));
+        setActionError('Failed to decline trade. Please try again.');
       } finally {
         setActionLoading(null);
       }
@@ -96,11 +108,13 @@ export function PendingTradeOffers({
   const handleCancel = useCallback(
     async (tradeId: number) => {
       setActionLoading(tradeId);
+      setActionError(null);
       try {
         await cancelTrade({ variables: { tradeId } });
         await refetch();
       } catch (err) {
         LOGGER.error('Failed to cancel trade:', String(err));
+        setActionError('Failed to cancel trade. Please try again.');
       } finally {
         setActionLoading(null);
       }
@@ -313,6 +327,21 @@ export function PendingTradeOffers({
           {offers.length}
         </Text>
       </XStack>
+
+      {actionError && (
+        <XStack
+          backgroundColor="$red3"
+          borderRadius="$2"
+          padding="$2"
+          alignItems="center"
+          gap="$2"
+        >
+          <AlertTriangle size={14} color="$red10" />
+          <Text fontSize="$2" color="$red10">
+            {actionError}
+          </Text>
+        </XStack>
+      )}
 
       {incoming.length > 0 && (
         <YStack gap="$2">
