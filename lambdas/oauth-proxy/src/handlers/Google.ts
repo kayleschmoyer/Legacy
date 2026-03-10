@@ -6,6 +6,7 @@ import {
 } from 'google-auth-library';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
+import { captureError } from '@legacy-sports/rollbar';
 import { readSecret } from '@legacy-sports/aws-utils';
 import memoizeOne from 'memoize-one';
 import { InternalUser } from '@legacy-sports/db-client';
@@ -114,6 +115,7 @@ export const handleGoogleAuthorize = async (
       'Google authorize error:',
       error instanceof Error ? error.message : String(error),
     );
+    captureError(error as Error, { handler: 'handleGoogleAuthorize' });
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -185,6 +187,7 @@ export const handleGoogleCallback = async (
       'Google callback error:',
       error instanceof Error ? error.message : String(error),
     );
+    captureError(error as Error, { handler: 'handleGoogleCallback' });
     return {
       statusCode: 500,
       headers: {
@@ -348,6 +351,7 @@ export const handleSecureGoogleAuth = async (
       'Secure Google auth error:',
       error instanceof Error ? error.message : String(error),
     );
+    captureError(error as Error, { handler: 'handleSecureGoogleAuth' });
 
     return {
       statusCode: 500,
@@ -508,6 +512,10 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       'Database unavailable during authentication — refusing to issue JWT:',
       dbError instanceof Error ? dbError.message : String(dbError),
     );
+    captureError(dbError as Error, {
+      handler: 'handleGoogleAuth',
+      context: 'db_access',
+    });
     return {
       statusCode: 503,
       body: JSON.stringify({

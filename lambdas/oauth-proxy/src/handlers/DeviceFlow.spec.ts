@@ -177,6 +177,7 @@ describe('DeviceFlow', () => {
         passwordHash: 'hashed_password',
         avatarUrl: null,
         privacyPolicyAcceptedAt: null,
+        subscriptionTier: 'free' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -230,6 +231,7 @@ describe('DeviceFlow', () => {
         passwordHash: 'hashed_password',
         avatarUrl: null,
         privacyPolicyAcceptedAt: null,
+        subscriptionTier: 'free' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -272,6 +274,7 @@ describe('DeviceFlow', () => {
         passwordHash: null,
         avatarUrl: null,
         privacyPolicyAcceptedAt: null,
+        subscriptionTier: 'free' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
       });

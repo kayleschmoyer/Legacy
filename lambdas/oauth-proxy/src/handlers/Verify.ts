@@ -2,6 +2,7 @@ import { OAuth2Client } from 'google-auth-library';
 import memoizeOne from 'memoize-one';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
+import { captureError } from '@legacy-sports/rollbar';
 import { readSecret } from '@legacy-sports/aws-utils';
 import { getEnvVarRequired } from '@legacy-sports/env-utilities';
 import { parseEventBody } from '../util/lambda';
@@ -199,6 +200,10 @@ export const handleVerify = async (
           ? decodeError.message
           : String(decodeError),
       );
+      captureError(decodeError as Error, {
+        handler: 'handleVerify',
+        context: 'token_decode',
+      });
       return {
         statusCode: 500,
         body: JSON.stringify({
@@ -212,6 +217,7 @@ export const handleVerify = async (
       'OAuth verification error:',
       error instanceof Error ? error.message : String(error),
     );
+    captureError(error as Error, { handler: 'handleVerify' });
 
     return {
       statusCode: 500,
