@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
   H2,
@@ -31,8 +31,6 @@ export interface PlayersGridProps {
 const SORT_OPTIONS = [
   { label: 'Name (A-Z)', value: 'NAME_ASC' },
   { label: 'Name (Z-A)', value: 'NAME_DESC' },
-  { label: 'ID (Low to High)', value: 'ID_ASC' },
-  { label: 'ID (High to Low)', value: 'ID_DESC' },
 ] as const;
 
 function PlayersGrid({
@@ -46,37 +44,67 @@ function PlayersGrid({
 }: PlayersGridProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<string>('NAME_ASC');
+  const [allPlayers, setAllPlayers] = useState<PlayerFragment[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const { data, loading, error, refetch } = useGetAllPlayersQuery({
+  const orderBy = sortBy.split('_')[0].toLowerCase();
+  const orderDirection = sortBy.split('_')[1].toLowerCase();
+
+  const { data, loading, error, fetchMore, refetch } = useGetAllPlayersQuery({
     variables: {
       limit: pageSize,
-      orderBy: sortBy.split('_')[0].toLowerCase(),
-      orderDirection: sortBy.split('_')[1].toLowerCase(),
+      offset: 0,
+      orderBy,
+      orderDirection,
     },
     errorPolicy: 'all',
   });
 
+  // Sync accumulated state when the base query result changes (initial load or sort change).
+  useEffect(() => {
+    if (!data?.players) return;
+    const players = data.players.filter((p): p is PlayerFragment => p !== null);
+    setAllPlayers(players);
+    setOffset(players.length);
+    setHasMore(players.length >= pageSize);
+  }, [data?.players, pageSize]);
+
+  const handleSortChange = useCallback((newSort: string) => {
+    setSortBy(newSort);
+    // useEffect above resets allPlayers when data updates for the new sort
+  }, []);
+
+  const handleLoadMore = useCallback(async () => {
+    setLoadingMore(true);
+    try {
+      const result = await fetchMore({ variables: { offset } });
+      const newPlayers = (result.data?.players ?? []).filter(
+        (p): p is PlayerFragment => p !== null,
+      );
+      setAllPlayers((prev) => [...prev, ...newPlayers]);
+      setOffset((prev) => prev + newPlayers.length);
+      setHasMore(newPlayers.length >= pageSize);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [fetchMore, offset, pageSize]);
+
   const handleRefresh = useCallback(() => {
-    void refetch();
+    void refetch({ offset: 0 });
+    // useEffect resets allPlayers when refreshed data arrives
   }, [refetch]);
 
   const filteredPlayers = useMemo(() => {
-    if (!data?.players) return [];
+    if (!searchTerm) return allPlayers;
 
-    const players = data.players.filter(
-      (player): player is PlayerFragment => player !== null,
+    return allPlayers.filter((player) =>
+      `${player.firstName || ''} ${player.lastName || ''}`
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()),
     );
-
-    if (!searchTerm) return players;
-
-    return players.filter(
-      (player) =>
-        `${player.firstName || ''} ${player.lastName || ''}`
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        player.brefId?.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
-  }, [data?.players, searchTerm]);
+  }, [allPlayers, searchTerm]);
 
   if (loading && !data) {
     return (
@@ -117,6 +145,7 @@ function PlayersGrid({
             <Text color="$gray10">
               {filteredPlayers.length} player
               {filteredPlayers.length !== 1 ? 's' : ''}
+              {!searchTerm && hasMore ? ' (more available)' : ''}
             </Text>
             <Button size="$3" onPress={handleRefresh} variant="outlined">
               <RefreshCw size={16} />
@@ -146,7 +175,7 @@ function PlayersGrid({
             )}
 
             {showSorting && (
-              <Select value={sortBy} onValueChange={setSortBy} size="$3">
+              <Select value={sortBy} onValueChange={handleSortChange} size="$3">
                 <Select.Trigger width={180}>
                   <Select.Value placeholder="Sort by..." />
                   <Select.Icon>
@@ -209,6 +238,28 @@ function PlayersGrid({
               );
             })}
           </YStack>
+
+          {!searchTerm && hasMore && (
+            <YStack ai="center" marginTop="$4" marginBottom="$2">
+              <Button
+                onPress={() => {
+                  void handleLoadMore();
+                }}
+                disabled={loadingMore}
+                variant="outlined"
+                size="$4"
+              >
+                {loadingMore ? (
+                  <XStack gap="$2" ai="center">
+                    <Spinner size="small" color="$blue10" />
+                    <Text>Loading...</Text>
+                  </XStack>
+                ) : (
+                  <Text>Load More Players</Text>
+                )}
+              </Button>
+            </YStack>
+          )}
         </ScrollView>
       )}
     </YStack>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, H4, Paragraph, Text, XStack, YStack } from 'tamagui';
+import { Card, H4, Text, XStack, YStack } from 'tamagui';
 import { TrendingUp } from '@tamagui/lucide-icons';
 import { PlayerFragment } from './PlayersApi';
 import { formatProjection } from './usePlayerProjections';
@@ -42,15 +42,6 @@ function PlayerCard({
 
       <Card.Footer>
         <YStack gap="$2" flex={1}>
-          <XStack flex={1} jc="space-between" ai="center">
-            <Paragraph theme="alt2" size={2}>
-              ID: {player.id}
-            </Paragraph>
-            <Paragraph theme="alt2" size={2} fontFamily="$mono">
-              {player.brefId}
-            </Paragraph>
-          </XStack>
-
           {showProjection && projectedPoints !== undefined && (
             <XStack
               jc="space-between"
