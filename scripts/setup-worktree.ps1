@@ -46,6 +46,46 @@ function Get-FileHash256 {
     (Get-FileHash -Path $Path -Algorithm SHA256).Hash
 }
 
+function Get-LockfileHash {
+    # Content-normalised SHA-256 for lockfile comparison.
+    # Normalises CRLF -> LF and strips a leading BOM so that minor formatting
+    # differences (CRLF checkout on Windows, git config differences, pnpm header
+    # whitespace) do not trigger a false-positive "lockfiles differ" and a
+    # needless full pnpm install.
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return $null }
+    $content = [System.IO.File]::ReadAllText($Path)
+    # Strip UTF-8 BOM (U+FEFF) if present
+    if ($content.Length -gt 0 -and [int][char]$content[0] -eq 0xFEFF) {
+        $content = $content.Substring(1)
+    }
+    # Normalise line endings: CRLF -> LF
+    $content = $content -replace "`r`n", "`n"
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($content)
+    $sha   = [System.Security.Cryptography.SHA256]::Create()
+    $hash  = $sha.ComputeHash($bytes)
+    $sha.Dispose()
+    return ([System.BitConverter]::ToString($hash) -replace '-', '')
+}
+
+function Assert-NodeModulesValid {
+    # Validate that a pnpm install produced a usable node_modules.
+    # Returns $true when valid, $false when broken.
+    param([string]$NMPath)
+    $modulesYaml = Join-Path $NMPath ".modules.yaml"
+    $binDir      = Join-Path $NMPath ".bin"
+    if (-not (Test-Path $modulesYaml)) {
+        Write-Warn "node_modules/.modules.yaml missing -- install may have failed"
+        return $false
+    }
+    $binItems = @(Get-ChildItem $binDir -ErrorAction SilentlyContinue)
+    if ($binItems.Count -eq 0) {
+        Write-Warn "node_modules/.bin is empty -- install may have failed"
+        return $false
+    }
+    return $true
+}
+
 function Test-IsJunction {
     param([string]$Path)
     if (-not (Test-Path $Path)) { return $false }
@@ -162,8 +202,10 @@ else {
 
     $wtLockPath   = Join-Path $WorktreePath "pnpm-lock.yaml"
     $mainLockPath = Join-Path $MainRepoPath "pnpm-lock.yaml"
-    $wtLock       = Get-FileHash256 $wtLockPath
-    $mainLock     = Get-FileHash256 $mainLockPath
+    # Use content-normalised hashes to avoid false positives from CRLF/LF or
+    # BOM differences that git may introduce on Windows checkout.
+    $wtLock       = Get-LockfileHash $wtLockPath
+    $mainLock     = Get-LockfileHash $mainLockPath
     $mainNM       = Join-Path $MainRepoPath "node_modules"
     $wtNM         = Join-Path $WorktreePath "node_modules"
 
@@ -176,6 +218,14 @@ else {
         Remove-JunctionSafe $wtNM
         Push-Location $WorktreePath
         try { pnpm install --frozen-lockfile } finally { Pop-Location }
+        if (-not (Assert-NodeModulesValid $wtNM)) {
+            Write-Warn "Retrying pnpm install (first attempt left node_modules incomplete)"
+            Push-Location $WorktreePath
+            try { pnpm install --frozen-lockfile } finally { Pop-Location }
+            if (-not (Assert-NodeModulesValid $wtNM)) {
+                Write-Error "pnpm install failed to produce a valid node_modules. Run 'make wt-setup WT=$WorktreePath' again."
+            }
+        }
         Write-Ok "pnpm install completed (independent node_modules)"
     }
     elseif ($lockfilesMatch -and (Test-Path $mainNM) -and -not $currentIsJunction) {
@@ -202,6 +252,14 @@ else {
         Remove-JunctionSafe $wtNM
         Push-Location $WorktreePath
         try { pnpm install --frozen-lockfile } finally { Pop-Location }
+        if (-not (Assert-NodeModulesValid $wtNM)) {
+            Write-Warn "Retrying pnpm install (first attempt left node_modules incomplete)"
+            Push-Location $WorktreePath
+            try { pnpm install --frozen-lockfile } finally { Pop-Location }
+            if (-not (Assert-NodeModulesValid $wtNM)) {
+                Write-Error "pnpm install failed to produce a valid node_modules. Run 'make wt-setup WT=$WorktreePath' again."
+            }
+        }
         Write-Ok "pnpm install completed (independent node_modules)"
     }
     elseif (-not $lockfilesMatch) {
@@ -209,6 +267,14 @@ else {
         Write-Warn "Lockfiles differ from main -- running pnpm install"
         Push-Location $WorktreePath
         try { pnpm install --frozen-lockfile } finally { Pop-Location }
+        if (-not (Assert-NodeModulesValid $wtNM)) {
+            Write-Warn "Retrying pnpm install (first attempt left node_modules incomplete)"
+            Push-Location $WorktreePath
+            try { pnpm install --frozen-lockfile } finally { Pop-Location }
+            if (-not (Assert-NodeModulesValid $wtNM)) {
+                Write-Error "pnpm install failed to produce a valid node_modules. Run 'make wt-setup WT=$WorktreePath' again."
+            }
+        }
         Write-Ok "pnpm install completed (independent node_modules)"
     }
     else {
@@ -216,6 +282,14 @@ else {
         Write-Warn "Main repo has no node_modules -- running pnpm install in worktree"
         Push-Location $WorktreePath
         try { pnpm install --frozen-lockfile } finally { Pop-Location }
+        if (-not (Assert-NodeModulesValid $wtNM)) {
+            Write-Warn "Retrying pnpm install (first attempt left node_modules incomplete)"
+            Push-Location $WorktreePath
+            try { pnpm install --frozen-lockfile } finally { Pop-Location }
+            if (-not (Assert-NodeModulesValid $wtNM)) {
+                Write-Error "pnpm install failed to produce a valid node_modules. Run 'make wt-setup WT=$WorktreePath' again."
+            }
+        }
         Write-Ok "pnpm install completed"
     }
 }
