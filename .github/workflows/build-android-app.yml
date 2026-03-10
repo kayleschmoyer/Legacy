@@ -6,7 +6,13 @@ on:
     branches: [main]
     paths:
       - "apps/app/**"
-      - "lib/**"
+      - "lib/shared-components/**"
+      - "lib/ui-abstractions/**"
+      - "lib/utils/**"
+      - "lib/api/**"
+      - "lib/analytics/**"
+      - "lib/websocket-client/**"
+      - "lib/tamagui-config/**"
       - "package.json"
       - "pnpm-lock.yaml"
   workflow_dispatch:
