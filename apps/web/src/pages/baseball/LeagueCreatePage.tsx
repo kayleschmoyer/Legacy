@@ -258,7 +258,7 @@ export function LeagueCreatePage(): React.JSX.Element {
             draftOrder: formData.draftOrder,
             maxRosterSize: formData.maxRosterSize,
             startDate: formData.draftDate
-              ? formData.draftDate.toISOString().split('T')[0]
+              ? formData.draftDate.toISOString()
               : undefined,
             isPublic: formData.isPublic,
             tradingEnabled: true,

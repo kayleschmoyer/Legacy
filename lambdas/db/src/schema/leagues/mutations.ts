@@ -194,6 +194,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         salaryDecayPct: inputSalaryDecayPct,
         auctionBudget: inputAuctionBudget,
         auctionMinBid: inputAuctionMinBid,
+        startDate: inputStartDate,
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
@@ -298,6 +299,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           salaryDecayPct: inputSalaryDecayPct ?? 25,
           auctionBudget: inputAuctionBudget ?? 260,
           auctionMinBid: inputAuctionMinBid ?? 1,
+          startDate: inputStartDate ?? undefined,
         });
 
         return result;

@@ -92,6 +92,8 @@ export interface CreateLeagueOptions {
   salaryDecayPct?: number;
   auctionBudget?: number;
   auctionMinBid?: number;
+  /** ISO datetime string for the scheduled draft start time. */
+  startDate?: string;
 }
 
 export interface CreateLeagueResult {
@@ -179,6 +181,7 @@ export class LeagueService {
       salaryDecayPct = 25,
       auctionBudget = 260,
       auctionMinBid = 1,
+      startDate,
     } = input;
 
     return runWithPublicClient(this.options, async (db) => {
@@ -287,6 +290,12 @@ export class LeagueService {
         draftMode,
         selectionMethod,
         draftOrder,
+        ...(startDate
+          ? {
+              scheduledAt: new Date(startDate),
+              date: startDate.split('T')[0],
+            }
+          : {}),
       });
 
       LOGGER.info('League created with all related records', {
