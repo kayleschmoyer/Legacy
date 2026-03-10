@@ -424,11 +424,25 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               }
 
               // ─── Pre-compute bench versatility (Phase 1) ────────────────────────────
-              // A single SQL query counts how many of the league's roster slots
-              // each eligible player could start in (slots_coverable) by joining
-              // player_eligible_positions against league_positions through the
-              // position-mapping rules.  Combined with the already-computed
-              // per-matchup FPG to rank bench candidates before the lock.
+              // Two focused queries replace the previous single query that contained a
+              // correlated subquery (total_slots) executing once per result row:
+              //   1. total_slots: simple COUNT(*) scalar, runs once.
+              //   2. slots_coverable: uses an eligible_players CTE to pre-filter
+              //      player_eligible_positions before the 3-way join, shrinking the
+              //      dataset the planner joins across league_positions + position_mapping.
+              // Combined with the pre-computed per-matchup FPG to rank bench candidates.
+
+              // Step 1: total roster slots for this league (scalar, no correlated subquery)
+              const totalSlotsResult = await context.db.execute(
+                sql`SELECT COUNT(*)::int AS total_slots
+                    FROM league_positions
+                    WHERE league_id = ${draftLeagueId}`,
+              );
+              const benchTotalSlots = Number(
+                totalSlotsResult.rows[0]?.total_slots ?? 0,
+              );
+
+              // Step 2: slots_coverable per eligible player (no correlated subquery)
               const benchVersatilityRows = await context.db.execute(
                 sql`WITH position_mapping(slot_type, stat_pos) AS (
                   VALUES
@@ -441,29 +455,29 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     ('DH', '1B'), ('DH', '2B'), ('DH', '3B'), ('DH', 'SS'),
                     ('DH', 'LF'), ('DH', 'RF'), ('DH', 'CF'), ('DH', 'C'), ('DH', 'DH'),
                     ('XDH', 'DH')
+                ),
+                eligible_players AS (
+                  SELECT player_id, position
+                  FROM player_eligible_positions
+                  WHERE player_id = ANY(${sql.param(eligibleIds)}::integer[])
                 )
                 SELECT
-                  pep.player_id,
-                  COUNT(DISTINCT lp.id)::int AS slots_coverable,
-                  (SELECT COUNT(*)::int FROM league_positions
-                   WHERE league_id = ${draftLeagueId}) AS total_slots
+                  ep.player_id,
+                  COUNT(DISTINCT lp.id)::int AS slots_coverable
                 FROM league_positions lp
                 JOIN position_mapping pm ON pm.slot_type = lp.position_type::text
-                JOIN player_eligible_positions pep ON pep.position = pm.stat_pos
+                JOIN eligible_players ep ON ep.position = pm.stat_pos
                 WHERE lp.league_id = ${draftLeagueId}
-                  AND pep.player_id = ANY(${sql.param(eligibleIds)}::integer[])
-                GROUP BY pep.player_id`,
+                GROUP BY ep.player_id`,
               );
 
               // Combine DB-computed slot counts with in-memory FPG to rank bench picks
               const slotsCoverableMap = new Map<number, number>();
-              let benchTotalSlots = 0;
               for (const row of benchVersatilityRows.rows) {
                 slotsCoverableMap.set(
                   row.player_id as number,
                   Number(row.slots_coverable),
                 );
-                benchTotalSlots = Number(row.total_slots);
               }
 
               let bestBenchPick:
