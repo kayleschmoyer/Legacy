@@ -512,8 +512,25 @@ async function handleDisconnect(
         const leagueIdStr = existing.Item['leagueId']?.N;
         if (leagueIdStr) disconnectingLeagueId = parseInt(leagueIdStr, 10);
       }
-    } catch {
-      // Non-fatal — we still proceed with the delete
+    } catch (readError) {
+      // Non-fatal — we still proceed with the delete, but log for visibility
+      LOGGER.warn('Failed to read connection data before disconnect', {
+        connectionId,
+        error:
+          readError instanceof Error ? readError.message : String(readError),
+      });
+      if (
+        (readError as { name?: string }).name !==
+        'ConditionalCheckFailedException'
+      ) {
+        captureError(
+          readError instanceof Error ? readError : new Error(String(readError)),
+          {
+            tags: { lambda: 'websocket', operation: 'disconnect-read' },
+            extra: { connectionId },
+          },
+        );
+      }
     }
 
     await dynamoClient.send(
