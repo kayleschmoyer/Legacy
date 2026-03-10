@@ -14,6 +14,7 @@ export async function createJwt(
 
   const jwt = {
     accessLevel: user.accessLevel,
+    email: user.email,
     id: user.id,
     username: user.username,
     ...(additionalFields?.picture && { picture: additionalFields.picture }),
