@@ -504,38 +504,18 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
     userInfo = result.user;
     internalJwt = result.jwt;
   } catch (dbError) {
-    LOGGER.warn(
-      'Database access failed, creating temporary user from JWT:',
+    LOGGER.error(
+      'Database unavailable during authentication — refusing to issue JWT:',
       dbError instanceof Error ? dbError.message : String(dbError),
     );
-
-    // Fallback: decode JWT and create temporary user
-    const { jwtDecode } = await import('jwt-decode');
-    const payload = jwtDecode<{
-      sub: string;
-      email: string;
-      name?: string;
-      picture?: string;
-    }>(idToken);
-
-    // Create a temporary user object that matches InternalUser interface
-    userInfo = {
-      id: parseInt(payload.sub, 10) || Date.now(), // Use timestamp as fallback ID
-      email: payload.email || 'unknown@example.com',
-      username: payload.name || payload.email || 'Unknown User',
-      passwordHash: null,
-      accessLevel: 'none' as const,
-      subscriptionTier: 'free' as const,
-      avatarUrl: null,
-      privacyPolicyAcceptedAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    return {
+      statusCode: 503,
+      body: JSON.stringify({
+        error: 'Service unavailable',
+        message:
+          'Authentication service temporarily unavailable. Please try again later.',
+      }),
     };
-
-    // Create JWT directly from user info (fallback when DB unavailable)
-    internalJwt = await createJwt(userInfo, {
-      picture: payload.picture,
-    });
   }
 
   const cookies = {
