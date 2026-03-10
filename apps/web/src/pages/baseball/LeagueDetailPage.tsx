@@ -25,11 +25,13 @@ import {
 } from 'tamagui';
 import {
   ArrowLeftRight,
+  BarChart3,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Clock,
   Copy,
   Edit3,
   Eye,
@@ -395,6 +397,12 @@ export function LeagueDetailPage(): React.JSX.Element {
   /** When set, the roster tab shows the lineup context for a specific week.
    *  null = current week (default, editable). Past weeks are read-only. */
   const [rosterViewWeek, setRosterViewWeek] = useState<number | null>(null);
+
+  // ── Overview Sub-Tab ──
+  /** Controls which section is shown in the compact tabbed card on the overview. */
+  const [overviewSubTab, setOverviewSubTab] = useState<
+    'activity' | 'chat' | 'scoring'
+  >('activity');
 
   const { user } = useAuth();
 
@@ -1675,49 +1683,123 @@ export function LeagueDetailPage(): React.JSX.Element {
             </Card>
           )}
 
-          {/* Activity Feed */}
-          <LeagueActivityFeed
-            leagueId={leagueId}
-            draftStatus={String(league.draftStatus)}
-            currentMatchup={currentWeek ?? undefined}
-            teamCount={teamCount}
-          />
-
-          {/* Scoring Summary */}
-          <LeagueScoringSummary
-            loading={scoringLoading}
-            error={scoringError}
-            profileName={scoringProfileName}
-            settings={scoringSettings}
-          />
-
-          {/* League Chat */}
-          <Card
-            backgroundColor="$surfacePanel"
-            borderColor="$surfacePanelBorder"
-            borderWidth={1}
-            borderRadius="$6"
-            overflow="hidden"
-          >
+          {/* Activity / Chat / Scoring — section selector + swappable content */}
+          <YStack gap="$0">
+            {/* Tab strip */}
             <XStack
-              alignItems="center"
-              gap="$2"
-              padding="$5"
-              paddingBottom="$3"
+              backgroundColor="$surfacePanel"
+              borderColor="$surfacePanelBorder"
+              borderWidth={1}
+              borderRadius="$6"
+              borderBottomLeftRadius={0}
+              borderBottomRightRadius={0}
+              borderBottomWidth={0}
+              paddingHorizontal="$2"
             >
-              <MessageSquare size={18} color={BRAND_GOLD_LIGHT} />
-              <Text fontSize="$5" fontWeight="700" color="$color">
-                League Chat
-              </Text>
+              {(
+                [
+                  {
+                    id: 'activity',
+                    label: 'Activity',
+                    icon: <Clock size={14} />,
+                  },
+                  {
+                    id: 'chat',
+                    label: 'Chat',
+                    icon: <MessageSquare size={14} />,
+                  },
+                  {
+                    id: 'scoring',
+                    label: 'Scoring',
+                    icon: <BarChart3 size={14} />,
+                  },
+                ] as const
+              ).map((st) => {
+                const isActive = overviewSubTab === st.id;
+                return (
+                  <XStack
+                    key={st.id}
+                    paddingHorizontal="$4"
+                    paddingVertical="$3"
+                    gap="$1.5"
+                    alignItems="center"
+                    cursor="pointer"
+                    borderBottomWidth={2}
+                    borderBottomColor={
+                      isActive ? BRAND_GOLD_LIGHT : 'transparent'
+                    }
+                    onPress={() => setOverviewSubTab(st.id)}
+                    animation="quick"
+                    hoverStyle={{ backgroundColor: '$surfaceSubtle' }}
+                  >
+                    <XStack color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}>
+                      {st.icon}
+                    </XStack>
+                    <Text
+                      fontSize="$3"
+                      fontWeight={isActive ? '700' : '500'}
+                      color={isActive ? BRAND_GOLD_LIGHT : '$textMuted'}
+                    >
+                      {st.label}
+                    </Text>
+                  </XStack>
+                );
+              })}
             </XStack>
-            <YStack height={420}>
-              <LeagueChatTab
-                leagueId={leagueId}
-                userId={user?.id ?? 0}
-                onNavigate={(tabId) => setActiveTab(tabId as TabId)}
-              />
-            </YStack>
-          </Card>
+
+            {/* Active section — each component renders its own Card */}
+            {overviewSubTab === 'activity' && (
+              <YStack
+                maxHeight={480}
+                overflow="hidden"
+                borderTopLeftRadius={0}
+                borderTopRightRadius={0}
+              >
+                <LeagueActivityFeed
+                  leagueId={leagueId}
+                  draftStatus={String(league.draftStatus)}
+                  currentMatchup={currentWeek ?? undefined}
+                  teamCount={teamCount}
+                />
+              </YStack>
+            )}
+
+            {overviewSubTab === 'chat' && (
+              <Card
+                backgroundColor="$surfacePanel"
+                borderColor="$surfacePanelBorder"
+                borderWidth={1}
+                borderRadius="$6"
+                borderTopLeftRadius={0}
+                borderTopRightRadius={0}
+                overflow="hidden"
+              >
+                <YStack height={420}>
+                  <LeagueChatTab
+                    leagueId={leagueId}
+                    userId={user?.id ?? 0}
+                    onNavigate={(tabId) => setActiveTab(tabId as TabId)}
+                  />
+                </YStack>
+              </Card>
+            )}
+
+            {overviewSubTab === 'scoring' && (
+              <YStack
+                maxHeight={480}
+                overflow="auto"
+                borderTopLeftRadius={0}
+                borderTopRightRadius={0}
+              >
+                <LeagueScoringSummary
+                  loading={scoringLoading}
+                  error={scoringError}
+                  profileName={scoringProfileName}
+                  settings={scoringSettings}
+                />
+              </YStack>
+            )}
+          </YStack>
         </YStack>
 
         {/* Sidebar */}
