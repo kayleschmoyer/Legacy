@@ -343,8 +343,10 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                 onPress={handleSubmit}
                 disabled={
                   loading ||
+                  validating ||
                   !inviteCode.trim() ||
                   !teamName.trim() ||
+                  !leagueInfo ||
                   isLeagueFull
                 }
                 minWidth={150}
