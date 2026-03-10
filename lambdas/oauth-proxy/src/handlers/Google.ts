@@ -516,9 +516,9 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       username: payload.name || payload.email || 'Unknown User',
       passwordHash: null,
       accessLevel: 'none' as const,
+      subscriptionTier: 'free' as const,
       avatarUrl: null,
       privacyPolicyAcceptedAt: null,
-      subscriptionTier: 'free',
       createdAt: new Date(),
       updatedAt: new Date(),
     };

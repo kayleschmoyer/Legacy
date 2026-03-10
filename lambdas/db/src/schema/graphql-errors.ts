@@ -41,3 +41,17 @@ export function ForbiddenError(message: string): GraphQLError {
     extensions: { code: 'FORBIDDEN' },
   });
 }
+
+/**
+ * Throw when the authenticated user lacks a premium subscription to access a
+ * gated feature.  The client should display an upgrade prompt.
+ *
+ * Maps to Apollo code `PREMIUM_REQUIRED` (HTTP 402 / 403 equivalent).
+ */
+export function PremiumRequiredError(
+  message = 'This feature requires a premium subscription. Upgrade to unlock it.',
+): GraphQLError {
+  return new GraphQLError(message, {
+    extensions: { code: 'PREMIUM_REQUIRED' },
+  });
+}

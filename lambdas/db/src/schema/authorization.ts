@@ -34,10 +34,18 @@
  *   - {@link checkPlayersNotLocked}    – throws if any player has game selections
  */
 
-import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
+import {
+  InternalSchema,
+  PublicDb,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import { and, count, eq, inArray, or } from 'drizzle-orm';
 import type { Context } from './builder';
-import { AuthenticationError, ForbiddenError } from './graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  PremiumRequiredError,
+} from './graphql-errors';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -95,6 +103,14 @@ export interface AuthConfig<TArgs> {
   memberOf?: (args: TArgs) => number;
 
   /**
+   * When `true`, the wrapper will call {@link requirePremium} to ensure the
+   * user has an active premium subscription before executing the handler.
+   *
+   * @default false
+   */
+  premium?: boolean;
+
+  /**
    * When `true` (and `teamMembers` is also provided) the wrapper will call
    * {@link checkPlayersNotLocked} to ensure none of the players already have
    * game selections in the current matchup.
@@ -115,6 +131,52 @@ export type AuthorizedHandler<TParent, TArgs, TResult> = (
   context: Context,
   user: AuthenticatedUser,
 ) => TResult | Promise<TResult>;
+
+// ── Building Blocks ────────────────────────────────────────────────────────────
+
+// ── Premium Tier Helpers ──────────────────────────────────────────────────────
+
+/**
+ * Returns the subscription tier (`'free'` | `'premium'`) for the authenticated
+ * user.  Performs a single DB lookup against `app_internal.users`.
+ *
+ * @throws Error when `context.user` is null/undefined (same as {@link requireAuth}).
+ */
+export async function getSubscriptionTier(
+  context: Context,
+): Promise<'free' | 'premium'> {
+  const user = requireAuth(context);
+  const rows = await context.db
+    .select({ tier: InternalSchema.usersInAppInternal.subscriptionTier })
+    .from(InternalSchema.usersInAppInternal)
+    .where(eq(InternalSchema.usersInAppInternal.id, user.id))
+    .limit(1);
+  return rows[0]?.tier ?? 'free';
+}
+
+/**
+ * Ensures the authenticated user has an active **premium** subscription.
+ * Throws {@link PremiumRequiredError} if the user is on the free tier.
+ *
+ * @param featureDescription  Short human-readable name of the gated feature
+ *                            (e.g. `'Salary cap leagues'`).  Included in the
+ *                            error message shown to the client.
+ *
+ * @throws AuthenticationError when the user is not authenticated.
+ * @throws PremiumRequiredError when the user is on the free tier.
+ */
+export async function requirePremium(
+  context: Context,
+  featureDescription?: string,
+): Promise<void> {
+  const tier = await getSubscriptionTier(context);
+  if (tier !== 'premium') {
+    const msg = featureDescription
+      ? `${featureDescription} requires a premium subscription. Upgrade to unlock this feature.`
+      : 'This feature requires a premium subscription. Upgrade to unlock it.';
+    throw PremiumRequiredError(msg);
+  }
+}
 
 // ── Building Blocks ────────────────────────────────────────────────────────────
 
@@ -418,24 +480,29 @@ export function authorized<TArgs, TResult>(
     const user = requireAuth(context);
     const db = context.db;
 
-    // 2. League membership check
+    // 2. Premium subscription check
+    if (config.premium) {
+      await requirePremium(context);
+    }
+
+    // 3. League membership check
     if (config.memberOf) {
       const leagueId = config.memberOf(args);
       await verifyLeagueMembership(db, leagueId, user.id);
     }
 
-    // 3. Commissioner / owner check
+    // 4. Commissioner / owner check
     if (config.commissionerOf) {
       const leagueId = config.commissionerOf(args);
       await verifyCommissionerAccess(db, leagueId, user.id);
     }
 
-    // 4. Team edit access check (team owner OR commissioner)
+    // 5. Team edit access check (team owner OR commissioner)
     if (config.teamMembers) {
       const memberIds = config.teamMembers(args);
       await verifyTeamEditAccess(db, user.id, memberIds);
 
-      // 5. Player lock check (only meaningful when team members are specified)
+      // 6. Player lock check (only meaningful when team members are specified)
       if (config.checkLocked) {
         await checkPlayersNotLocked(db, memberIds);
       }

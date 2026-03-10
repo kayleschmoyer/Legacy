@@ -66,6 +66,12 @@ describe('League Mutations', () => {
           leagueId: 'leagueId',
         },
       },
+      InternalSchema: {
+        usersInAppInternal: {
+          id: 'app_internal.users.id',
+          subscriptionTier: 'app_internal.users.subscription_tier',
+        },
+      },
       createBadgeService: jest.fn(() => ({
         getUserBadges: jest.fn().mockResolvedValue([]),
         getTeamBadges: jest.fn().mockResolvedValue([]),
@@ -435,6 +441,8 @@ describe('League Mutations', () => {
     });
 
     it('should create a league with default roster size', async () => {
+      // Return premium tier so free-tier gating is skipped
+      mockDb.limit.mockResolvedValue([{ tier: 'premium' }]);
       // Mock the LeagueService.createLeague method
       mockCreateLeague.mockResolvedValueOnce({
         league: {
@@ -472,6 +480,8 @@ describe('League Mutations', () => {
     });
 
     it('should create a league with custom roster size', async () => {
+      // Return premium tier so free-tier gating is skipped
+      mockDb.limit.mockResolvedValue([{ tier: 'premium' }]);
       // Mock the LeagueService.createLeague method
       mockCreateLeague.mockResolvedValueOnce({
         league: {

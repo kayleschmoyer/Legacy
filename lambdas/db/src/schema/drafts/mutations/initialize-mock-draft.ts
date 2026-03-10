@@ -16,10 +16,12 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { eq } from 'drizzle-orm';
+import { and, count, eq, gte } from 'drizzle-orm';
 
 import { builder } from '../../builder';
 import { AuthenticationError } from '../../graphql-errors';
+import { getSubscriptionTier } from '../../authorization';
+import { PremiumRequiredError } from '../../graphql-errors';
 
 // ── Response type ────────────────────────────────────────────────────────────
 
@@ -100,6 +102,27 @@ builder.mutationField('initializeMockDraft', (t) =>
       }
       if (userPickPosition < 1 || userPickPosition > numTeams) {
         throw new Error(`userPickPosition must be between 1 and ${numTeams}`);
+      }
+
+      // ── Premium feature gating: max 2 mock drafts/week for free tier ────
+      const tier = await getSubscriptionTier(context);
+      if (tier !== 'premium') {
+        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const [{ mockDraftCount }] = await context.db
+          .select({ mockDraftCount: count() })
+          .from(PublicSchema.leagues)
+          .where(
+            and(
+              eq(PublicSchema.leagues.owner, userId),
+              eq(PublicSchema.leagues.isMockDraft, true),
+              gte(PublicSchema.leagues.createdAt, oneWeekAgo),
+            ),
+          );
+        if (mockDraftCount >= 2) {
+          throw PremiumRequiredError(
+            'Free tier is limited to 2 mock drafts per week. Upgrade to premium for unlimited mock drafts.',
+          );
+        }
       }
 
       LOGGER.info('Initializing mock draft', {

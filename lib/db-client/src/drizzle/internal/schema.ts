@@ -44,6 +44,11 @@ export const dataRequestStatusEnum = appInternal.enum('data_request_status', [
   'cancelled',
 ]);
 
+export const subscriptionTierInAppInternal = appInternal.enum(
+  'subscription_tier',
+  ['free', 'premium'],
+);
+
 export const usersInAppInternal = appInternal.table(
   'users',
   {
@@ -56,7 +61,9 @@ export const usersInAppInternal = appInternal.table(
       withTimezone: true,
     }),
     avatarUrl: text('avatar_url'),
-    subscriptionTier: text('subscription_tier').notNull().default('free'),
+    subscriptionTier: subscriptionTierInAppInternal('subscription_tier')
+      .notNull()
+      .default('free'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -13,7 +13,7 @@ import {
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 import {
   DEFAULT_ROSTER_POSITIONS,
   League,
@@ -23,7 +23,12 @@ import {
 } from './types';
 import { builder } from '../builder';
 import { adjustMatchupsForNewTotal } from '../matchups/mutations';
-import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  PremiumRequiredError,
+} from '../graphql-errors';
+import { getSubscriptionTier, requirePremium } from '../authorization';
 import { applyDecay, applyEscalation } from '../../services/salary-rollover';
 
 // League service instance for create operations
@@ -192,6 +197,55 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
+
+      // ── Premium feature gating ──────────────────────────────────────────────
+      const tier = await getSubscriptionTier(context);
+      if (tier !== 'premium') {
+        // Enforce max 3 non-mock leagues for free tier
+        const [{ leagueCount }] = await context.db
+          .select({ leagueCount: count() })
+          .from(PublicSchema.leagues)
+          .where(
+            and(
+              eq(PublicSchema.leagues.owner, userId),
+              eq(PublicSchema.leagues.isMockDraft, false),
+            ),
+          );
+        if (leagueCount >= 3) {
+          throw PremiumRequiredError(
+            'Free tier is limited to 3 leagues. Upgrade to premium for unlimited leagues.',
+          );
+        }
+
+        // FAAB waiver type is premium only
+        if (inputWaiverType === 'faab') {
+          throw PremiumRequiredError(
+            'FAAB waiver type requires a premium subscription. Upgrade to unlock advanced waiver settings.',
+          );
+        }
+
+        // Salary cap is premium only
+        if (inputSalaryCapEnabled) {
+          throw PremiumRequiredError(
+            'Salary cap leagues require a premium subscription. Upgrade to unlock salary cap features.',
+          );
+        }
+
+        // Non-modern era filters are premium only
+        const premiumEraFilters = [
+          'dead_ball',
+          'golden_age',
+          'expansion',
+          'free_agency',
+          'steroid_era',
+          'custom',
+        ];
+        if (inputEraFilter && premiumEraFilters.includes(inputEraFilter)) {
+          throw PremiumRequiredError(
+            'Era-based filtering (non-Modern eras) requires a premium subscription. Upgrade to access historical era leagues.',
+          );
+        }
+      }
 
       try {
         const result = await leagueService.createLeague({
@@ -652,6 +706,26 @@ builder.mutationField('createLeague', (t) =>
       }
 
       const userId = context.user.id;
+
+      // ── Premium feature gating: max 3 leagues for free tier ──────────────
+      const tier = await getSubscriptionTier(context);
+      if (tier !== 'premium') {
+        const [{ leagueCount }] = await context.db
+          .select({ leagueCount: count() })
+          .from(PublicSchema.leagues)
+          .where(
+            and(
+              eq(PublicSchema.leagues.owner, userId),
+              eq(PublicSchema.leagues.isMockDraft, false),
+            ),
+          );
+        if (leagueCount >= 3) {
+          throw PremiumRequiredError(
+            'Free tier is limited to 3 leagues. Upgrade to premium for unlimited leagues.',
+          );
+        }
+      }
+
       const maxRosterSize = args.maxRosterSize ?? 25;
 
       try {
@@ -1242,6 +1316,13 @@ builder.mutationField('updateLeagueSettings', (t) =>
             `Invalid playoff format. Must be one of: ${validFormats.join(', ')}`,
           );
         }
+        // 6-team and 8-team playoff formats are premium only
+        if (['6-team', '8-team'].includes(playoffFormat)) {
+          await requirePremium(
+            context,
+            'Advanced playoff formats (6-team, 8-team)',
+          );
+        }
         leagueUpdate.playoffFormat = playoffFormat;
         changeDescriptions.push(`Playoff format: ${playoffFormat}`);
       }
@@ -1255,6 +1336,10 @@ builder.mutationField('updateLeagueSettings', (t) =>
 
       // ── Salary cap settings ──────────────────────────────────────────
       if (salaryCapEnabled !== null && salaryCapEnabled !== undefined) {
+        // Enabling salary cap is a premium feature
+        if (salaryCapEnabled) {
+          await requirePremium(context, 'Salary cap leagues');
+        }
         leagueUpdate.salaryCapEnabled = salaryCapEnabled;
         changeDescriptions.push(
           `Salary cap: ${salaryCapEnabled ? 'enabled' : 'disabled'}`,
