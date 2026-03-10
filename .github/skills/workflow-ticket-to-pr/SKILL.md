@@ -170,17 +170,19 @@ git fetch origin
 twig rebase   # rebases onto twig-tracked parent: main for independent branches, parent feature branch for stacked work
 ```
 
-If conflicts occur, see the [rebase-conflicts skill](../rebase-conflicts/SKILL.md). After resolving, force-push:
+If conflicts occur, see the [rebase-conflicts skill](../rebase-conflicts/SKILL.md). After resolving:
+
+### Step 7b: Post-Rebase Stabilization + Validation
+
+> 🚨 **Do NOT push until `make pc` passes.** Pushing before validating is the #1 cause of post-rebase CI failures.
 
 ```powershell
-git push --force-with-lease origin HEAD
-```
+# Stabilize: main may have changed deps, schema, or formatting
+pnpm install --frozen-lockfile
+pnpm exec nx run db:print-schema
+pnpm exec nx affected -t codegen --base=origin/main
 
-### Step 7b: Pre-PR Validation
-
-Run the full validation suite before opening the PR. Fix any failures and amend/push before continuing.
-
-```powershell
+# Validate
 make pc
 ```
 
@@ -191,8 +193,13 @@ make pc
 > git add -A
 > git commit -m "style: fix code formatting"
 > make pc  # re-run to confirm clean
-> git push origin HEAD
 > ```
+
+Only push **after `make pc` passes**:
+
+```powershell
+git push --force-with-lease origin HEAD
+```
 
 > 🚨 **DO NOT STOP HERE.** Passing `make pc` is a checkpoint, not the finish line. You **must**
 > continue to Step 8 (create PR) and Step 9 (Jira "In Review"). Stopping after validation

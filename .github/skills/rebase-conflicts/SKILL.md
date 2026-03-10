@@ -44,7 +44,8 @@ Rebasing replays your branch's commits on top of another branch (usually `main`)
 | Abort and return to pre-rebase state     | `git rebase --abort`                                                                                                       |
 | Resolve generated file conflicts         | `.\scripts\resolve-generated-conflicts.ps1`                                                                                |
 | Skip duplicate migration commits         | `.\scripts\skip-migration-conflict.ps1`                                                                                    |
-| **Verify locally after push**            | `make pc`                                                                                                                  |
+| **Stabilize before push (CRITICAL)**     | `pnpm install --frozen-lockfile ; pnpm exec nx run db:print-schema ; pnpm exec nx affected -t codegen --base=origin/main`  |
+| **Validate before push**                 | `make pc`                                                                                                                  |
 | **Fix CI formatting failure**            | `pnpm exec nx format:write ; git add -A ; git commit -m "style: fix formatting" ; git push --force-with-lease origin HEAD` |
 
 ---
@@ -141,7 +142,43 @@ If more commits have conflicts, Git will pause again. Repeat Steps 3–5 for eac
 git stash pop
 ```
 
-### Step 7: Force-Push the Rebased Branch
+### Step 7: Post-Rebase Stabilization (BEFORE push)
+
+> 🚨 **Do NOT push until this step passes.** Pushing before validating is the #1 cause of post-rebase CI failures.
+
+After the rebase completes, the working tree may be out of sync: main may have introduced new dependencies, changed the schema, or reformatted files. Run these steps **before** pushing:
+
+```powershell
+# 7a. Install dependencies (main may have added/updated packages)
+pnpm install --frozen-lockfile
+# If the lockfile itself was regenerated during conflict resolution, use:
+# pnpm install --no-frozen-lockfile
+
+# 7b. Regenerate codegen (schema or GraphQL types may have changed on main)
+pnpm exec nx run db:print-schema
+pnpm exec nx affected -t codegen --base=origin/main
+
+# 7c. Run full pre-commit validation
+make pc
+```
+
+If `make pc` fails:
+
+- **Formatting**: `nx format:write` rewrote files → commit them and re-run `make pc`
+- **Type errors**: the rebase resolution missed a rename or signature change → fix, commit, re-run
+- **Lint errors**: new rules on main or unresolved conflicts → fix, commit, re-run
+- **Test failures**: merged code broke a test → fix, commit, re-run
+
+```powershell
+# Fix whatever make pc found, then:
+git add -A
+git commit -m "fix: post-rebase stabilization"
+make pc   # re-run until clean
+```
+
+### Step 8: Force-Push the Validated Branch
+
+Only push **after `make pc` passes**:
 
 ```powershell
 # Guard: never force-push main
@@ -154,15 +191,6 @@ git push --force-with-lease origin HEAD
 > **Always use `--force-with-lease`** instead of `--force`. It prevents overwriting someone else's commits if they pushed to the same branch.
 > The branch guard above is a safety net — if you somehow end up on `main` after
 > a botched checkout, the script stops before rewriting public history.
-
-### Step 8: Verify Locally with `make pc`
-
-After pushing, confirm all checks pass **locally** by running `make pc`. Do not wait on GitHub CI — run the same checks yourself. The most common post-rebase failure is **formatting** — if `nx format:write` rewrites any file during `make pc`, the command **fails** and prints the changed files; commit them and re-run `make pc`.
-
-```powershell
-# Run all pre-commit checks locally
-make pc
-```
 
 If `make pc` fails with a formatting error:
 
@@ -447,18 +475,17 @@ git rebase origin/main
 
 # Resolve conflicts (same process as above)
 
-# Force-push
+# Stabilize before pushing (CRITICAL — prevents CI failures)
+pnpm install --frozen-lockfile
+pnpm exec nx run db:print-schema
+pnpm exec nx affected -t codegen --base=origin/main
+make pc
+
+# Only push AFTER make pc passes
 git push --force-with-lease origin HEAD
 ```
 
 > **Important**: Never rebase from the main repo directory if the branch is checked out in a worktree. Always `cd` into the worktree first.
-
-After pushing from a worktree, always verify locally:
-
-```powershell
-# From inside the worktree — run all pre-commit checks
-make pc
-```
 
 ---
 
@@ -527,30 +554,38 @@ When Copilot is resolving conflicts autonomously, follow this priority order:
 
 ### After All Conflicts Resolved
 
-Always run validation:
+> 🚨 **Do NOT push until `make pc` passes.** Pushing before validating is the #1 cause of post-rebase CI failures.
+
+First, stabilize the workspace (main may have changed deps, schema, or formatting):
 
 ```powershell
-pnpm exec nx affected -t typecheck
-pnpm exec nx affected -t lint --fix
-pnpm exec nx affected -t test
+# Install deps (main may have added/updated packages)
+pnpm install --frozen-lockfile
+
+# Regenerate schema + codegen (may have changed on main)
+pnpm exec nx run db:print-schema
+pnpm exec nx affected -t codegen --base=origin/main
 ```
 
-If validation fails, fix the issues and amend:
+Then run full validation:
 
 ```powershell
-git add .
-git commit --amend --no-edit
-git push --force-with-lease origin HEAD
-```
-
-Then **verify locally** after the push — run `make pc` to catch formatting, lint, and type errors before CI does:
-
-```powershell
-# Run all pre-commit checks locally
 make pc
 ```
 
-If `make pc` fails with a formatting error, run `pnpm exec nx format:write`, commit the changes, and push again. See Step 8 above.
+If validation fails, fix the issues, commit, and re-run `make pc` until clean:
+
+```powershell
+git add -A
+git commit -m "fix: post-rebase stabilization"
+make pc
+```
+
+Only **after `make pc` passes**, push:
+
+```powershell
+git push --force-with-lease origin HEAD
+```
 
 ---
 
