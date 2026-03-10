@@ -55,23 +55,31 @@ Write-Host "`nStep 5: Removing node_modules..." -ForegroundColor Cyan
 $nodeModulesPath = Join-Path $workspaceRoot "node_modules"
 
 if (Test-Path $nodeModulesPath) {
-    try {
-        Remove-Item -Path $nodeModulesPath -Recurse -Force -ErrorAction Stop
-        Write-Host "   node_modules removed successfully" -ForegroundColor Green
-    } catch {
-        Write-Host "  Standard removal failed, using robocopy..." -ForegroundColor Yellow
-        $emptyDir = Join-Path $env:TEMP "empty_$(Get-Random)"
-        New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
-        robocopy $emptyDir $nodeModulesPath /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
-        Remove-Item -Path $emptyDir -Force -ErrorAction SilentlyContinue
+    # Check if node_modules is a junction (shared with worktrees) — only unlink, don't destroy target
+    $nmItem = Get-Item $nodeModulesPath -Force
+    if (($nmItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        cmd /c "rmdir `"$nodeModulesPath`"" 2>$null
+        Write-Host "   node_modules junction removed (target preserved)" -ForegroundColor Green
+    }
+    else {
         try {
             Remove-Item -Path $nodeModulesPath -Recurse -Force -ErrorAction Stop
-            Write-Host "   node_modules removed using robocopy" -ForegroundColor Green
+            Write-Host "   node_modules removed successfully" -ForegroundColor Green
         } catch {
-            $deleteMePath = Join-Path $workspaceRoot "node_modules_DELETE_ME_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-            Rename-Item -Path $nodeModulesPath -NewName (Split-Path $deleteMePath -Leaf) -Force
-            Write-Host "   Renamed to: $(Split-Path $deleteMePath -Leaf)" -ForegroundColor Yellow
-            Write-Host "  Please manually delete this folder" -ForegroundColor Yellow
+            Write-Host "  Standard removal failed, using robocopy..." -ForegroundColor Yellow
+            $emptyDir = Join-Path $env:TEMP "empty_$(Get-Random)"
+            New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
+            robocopy $emptyDir $nodeModulesPath /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+            Remove-Item -Path $emptyDir -Force -ErrorAction SilentlyContinue
+            try {
+                Remove-Item -Path $nodeModulesPath -Recurse -Force -ErrorAction Stop
+                Write-Host "   node_modules removed using robocopy" -ForegroundColor Green
+            } catch {
+                $deleteMePath = Join-Path $workspaceRoot "node_modules_DELETE_ME_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+                Rename-Item -Path $nodeModulesPath -NewName (Split-Path $deleteMePath -Leaf) -Force
+                Write-Host "   Renamed to: $(Split-Path $deleteMePath -Leaf)" -ForegroundColor Yellow
+                Write-Host "  Please manually delete this folder" -ForegroundColor Yellow
+            }
         }
     }
 } else {

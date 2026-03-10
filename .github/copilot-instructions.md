@@ -26,8 +26,9 @@
 
 ## Rules
 
-- **Drive to PR**: your work is **NOT complete** until a PR is created and Jira is moved to "In Review". Passing `make pc` is a checkpoint, not the finish line. After validation passes, you **must** continue to: commit ΓåÆ push ΓåÆ `gh pr create` ΓåÆ Jira "In Review". Stopping after code changes or after `make pc` without opening a PR is the single most common agent failure mode.
-- **Worktree-first**: always create a worktree for ticket work ΓÇö never edit code in the main repo (`D:\code\legacy-sports`). After creating the worktree, all file edits and terminal commands must use the worktree path.
+- **Drive to PR**: your work is **NOT complete** until a PR is created and Jira is moved to "In Review". Passing `make pc` is a checkpoint, not the finish line. After validation passes, you **must** continue to: commit → push → `gh pr create` → Jira "In Review". Stopping after code changes or after `make pc` without opening a PR is the single most common agent failure mode.
+- **Worktree-first**: always create a worktree for ticket work — never edit code in the main repo (`D:\code\legacy-sports`). After creating the worktree, all file edits and terminal commands must use the worktree path.
+- **Shared node_modules — do not mutate**: Worktrees share `node_modules` via Windows junctions to the main repo. **Never run `make clean`, `make install`, `make install-force`, or `pnpm install` in the main repo** (`D:\code\legacy-sports`) while worktrees are active — doing so destroys or mutates the shared `node_modules` and breaks every junctioned worktree mid-flight. Only run install/clean commands **inside your own worktree**, and only when it has independent (non-junctioned) `node_modules`.
 - **Make first**: prefer `make <target>` over raw `pnpm exec nx` — it sets `NODE_OPTIONS` for the Windows windowsHide patch and is cross-platform safe. For project-specific targets use `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly. See `skills/makefile/SKILL.md` for the full target list.
 - **PowerShell**: `;` to chain, `$env:` for vars
 - **No suppression**: fix root causes, no `@ts-ignore` / `eslint-disable` (see `skills/no-lint-disable/SKILL.md`)

@@ -70,6 +70,31 @@ This project uses **one worktree per branch** rather than a pool of static, reus
 - pnpm's content-addressable store deduplicates packages globally — multiple worktrees don't multiply download or storage costs.
 - The only per-worktree disk cost is the source files themselves (~50 MB), which is negligible.
 
+## ⚠️ Concurrent Agent Safety (Shared node_modules)
+
+When multiple agents work in parallel, **all junctioned worktrees share the same physical
+`node_modules` directory** in the main repo. This creates race conditions if any agent
+mutates that directory.
+
+**Rules for concurrent agents:**
+
+1. **Never run `make clean`, `make install`, `make install-force`, or `pnpm install` in the
+   main repo** (`D:\code\legacy-sports`) while worktrees are active. These mutate or destroy
+   the shared `node_modules`, breaking every junctioned worktree mid-build/test.
+2. **Only run install/clean inside your own worktree** — and only when it has independent
+   (non-junctioned) `node_modules` (i.e., lockfiles diverged from main).
+3. **`make wt-setup` is serialized** — the setup script acquires a file lock
+   (`.wt-setup.lock`) in the main repo so two concurrent setups don't race on junction
+   creation. If another setup is in progress, yours will wait (up to 120 s).
+4. **`make clean` and `make force-clean` are junction-safe** — they detect junctions and
+   only unlink them (`cmd rmdir`) instead of recursively deleting the target contents.
+
+**What is safe in parallel:**
+
+- Reading `node_modules` via junctions (builds, tests, lint) — multiple readers are fine.
+- Running `make wt-setup` concurrently (serialized by lock).
+- Running `pnpm install` in a worktree with independent `node_modules`.
+
 ## Prerequisites
 
 - Main repo is on `main` and up to date

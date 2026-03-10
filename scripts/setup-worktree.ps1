@@ -96,6 +96,61 @@ Write-Host "  Worktree : $WorktreePath"
 Write-Host "  Main repo: $MainRepoPath"
 
 # ---------------------------------------------------------------------------
+# Serialize concurrent wt-setup calls via file lock
+# ---------------------------------------------------------------------------
+# Multiple agents may run wt-setup simultaneously. The node_modules junction
+# logic reads and mutates the main repo's node_modules directory, so we need
+# exclusive access. We acquire a .wt-setup.lock file in the main repo and
+# release it when done (or on error).
+
+$lockPath = Join-Path $MainRepoPath ".wt-setup.lock"
+$lockStream = $null
+
+function Enter-SetupLock {
+    $maxWait = 120  # seconds
+    $waited  = 0
+    while ($true) {
+        try {
+            $script:lockStream = [System.IO.File]::Open(
+                $lockPath,
+                [System.IO.FileMode]::OpenOrCreate,
+                [System.IO.FileAccess]::ReadWrite,
+                [System.IO.FileShare]::None
+            )
+            # Write PID so other agents can see who holds the lock
+            $writer = [System.IO.StreamWriter]::new($script:lockStream)
+            $writer.Write("PID=$PID at $(Get-Date -Format o)")
+            $writer.Flush()
+            return
+        }
+        catch {
+            if ($waited -ge $maxWait) {
+                Write-Warn "Timed out waiting for wt-setup lock after ${maxWait}s. Proceeding without lock."
+                return
+            }
+            if ($waited -eq 0) {
+                Write-Host "  [..] Another wt-setup is running -- waiting for lock..." -ForegroundColor Yellow
+            }
+            Start-Sleep -Seconds 2
+            $waited += 2
+        }
+    }
+}
+
+function Exit-SetupLock {
+    if ($script:lockStream) {
+        $script:lockStream.Close()
+        $script:lockStream = $null
+        Remove-Item $lockPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Enter-SetupLock
+
+# Ensure lock is released on exit (normal, error, or Ctrl+C)
+try {
+
+# ---------------------------------------------------------------------------
 # 1. node_modules
 # ---------------------------------------------------------------------------
 
@@ -260,3 +315,8 @@ Write-Host ""
 Write-Host "=== Setup complete! ===" -ForegroundColor Green
 Write-Host "  Next: code $WorktreePath"
 Write-Host ""
+
+} # end try (lock scope)
+finally {
+    Exit-SetupLock
+}

@@ -155,8 +155,8 @@ endif
 ifeq ($(DETECTED_OS),Windows)
 	@$(call echo_blue,Waiting for file handles to release...)
 	@powershell -Command "Start-Sleep -Seconds 3"
-	@$(call echo_blue,Removing node_modules (using Windows-safe method)...)
-	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$nmPath = 'node_modules'; if (Test-Path $$nmPath) { try { Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction Stop; Write-Host 'node_modules removed' } catch { $$emptyDir = Join-Path $$env:TEMP 'empty_$$(Get-Random)'; New-Item -ItemType Directory -Path $$emptyDir -Force | Out-Null; robocopy $$emptyDir $$nmPath /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null; Remove-Item -Path $$emptyDir -Force -ErrorAction SilentlyContinue; Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction SilentlyContinue; Write-Host 'node_modules removed using robocopy' } } else { Write-Host 'No node_modules to remove' }"
+	@$(call echo_blue,Removing node_modules (junction-safe)...)
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$nmPath = 'node_modules'; if (-not (Test-Path $$nmPath)) { Write-Host 'No node_modules to remove'; return } $$item = Get-Item $$nmPath -Force; if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { cmd /c 'rmdir node_modules'; Write-Host 'node_modules junction removed (target preserved)' } else { try { Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction Stop; Write-Host 'node_modules removed' } catch { $$emptyDir = Join-Path $$env:TEMP ('empty_' + (Get-Random)); New-Item -ItemType Directory -Path $$emptyDir -Force | Out-Null; robocopy $$emptyDir $$nmPath /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null; Remove-Item -Path $$emptyDir -Force -ErrorAction SilentlyContinue; Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction SilentlyContinue; Write-Host 'node_modules removed using robocopy' } }"
 else
 	@$(call echo_blue,Removing node_modules...)
 	@$(RM_DIR) node_modules $(NULL_REDIRECT) || echo No node_modules to remove

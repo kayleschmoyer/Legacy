@@ -17,6 +17,7 @@
 ## Rules
 
 **Drive to PR** — code → rebase → stabilize (`pnpm install` + codegen) → `make pc` → push → `gh pr create` → Jira "In Review". **Do NOT push until `make pc` passes** — pushing before validating is the #1 cause of post-rebase CI failures.
+**Shared node_modules — do not mutate** — Worktrees share `node_modules` via junctions to the main repo. Never run `make clean`, `make install`, or `pnpm install` in `D:\code\legacy-sports` while worktrees are active. Only install/clean inside your own worktree with independent `node_modules`.
 Nx only (`pnpm exec nx affected -t <target>`) PowerShell (`;` chains) Fix root causes Update Jira No `console.*` — use `LOGGER` from `@legacy-sports/logging` (exceptions: `lib/logging/`, `apps/cli/`, migrations, build scripts)
 
 ## Environment
