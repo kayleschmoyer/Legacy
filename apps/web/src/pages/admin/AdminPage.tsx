@@ -8,6 +8,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { Input, Spinner, Text, TextArea } from 'tamagui';
+import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { styled } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components';
@@ -290,6 +291,21 @@ export function AdminPage(): React.JSX.Element {
         <Paragraph size="$4" color="$colorPress">
           Manage users and impersonate accounts for debugging.
         </Paragraph>
+        <XStack gap="$2" paddingTop="$1">
+          <Link
+            to="/admin/revenue"
+            style={{
+              fontSize: 14,
+              color: BRAND_GOLD_LIGHT,
+              textDecoration: 'none',
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: `1px solid ${BRAND_GOLD_LIGHT}`,
+            }}
+          >
+            Revenue Analytics →
+          </Link>
+        </XStack>
       </YStack>
 
       <Separator />

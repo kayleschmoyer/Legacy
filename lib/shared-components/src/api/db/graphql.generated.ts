@@ -64,6 +64,18 @@ export type AchievementRestriction = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+export type AdminRevenueStats = {
+  __typename?: 'AdminRevenueStats';
+  conversionRate?: Maybe<Scalars['Float']['output']>;
+  newSubscribersThisMonth?: Maybe<Scalars['Int']['output']>;
+  statusBreakdown?: Maybe<Array<SubscriptionStatusCount>>;
+  subscriberGrowth?: Maybe<Array<SubscriberGrowthPoint>>;
+  totalFreeUsers?: Maybe<Scalars['Int']['output']>;
+  totalPremiumUsers?: Maybe<Scalars['Int']['output']>;
+  totalSubscribers?: Maybe<Scalars['Int']['output']>;
+  totalUsers?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AdvanceLeagueWeekResponse = {
   __typename?: 'AdvanceLeagueWeekResponse';
   currentMatchupId?: Maybe<Scalars['Int']['output']>;
@@ -1905,6 +1917,8 @@ export type Query = {
   __typename?: 'Query';
   /** Return all achievement restrictions configured for a league, sorted by achievement type */
   achievementRestrictions?: Maybe<Array<AchievementRestriction>>;
+  /** Admin-only aggregate revenue and subscription metrics. */
+  adminRevenueStats?: Maybe<AdminRevenueStats>;
   /** List all badge definitions available in the system */
   allBadgeDefinitions?: Maybe<Array<BadgeDefinition>>;
   auctionBudgets?: Maybe<Array<AuctionBudget>>;
@@ -2789,6 +2803,12 @@ export enum StatsLoadingStatus {
   Retry = 'retry',
 }
 
+export type SubscriberGrowthPoint = {
+  __typename?: 'SubscriberGrowthPoint';
+  month?: Maybe<Scalars['String']['output']>;
+  newSubscribers?: Maybe<Scalars['Int']['output']>;
+};
+
 export type SubscriptionInfo = {
   __typename?: 'SubscriptionInfo';
   cancelAtPeriodEnd?: Maybe<Scalars['Boolean']['output']>;
@@ -2797,6 +2817,12 @@ export type SubscriptionInfo = {
   status?: Maybe<Scalars['String']['output']>;
   tier?: Maybe<Scalars['String']['output']>;
   trialEndsAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type SubscriptionStatusCount = {
+  __typename?: 'SubscriptionStatusCount';
+  count?: Maybe<Scalars['Int']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
 };
 
 export type SwapMatchupTeamsInput = {

@@ -3,13 +3,13 @@ import {
   reapplyLeagueRestrictions,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
-import { eq } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
-import { AuthenticationError } from './graphql-errors';
-import { getSubscriptionTier } from './authorization';
+import { AuthenticationError, ForbiddenError } from './graphql-errors';
+import { getSubscriptionTier, requireAuth } from './authorization';
 import { getStripeClient } from '../server/stripe';
 
 // Number of trial days to apply on new subscriptions, or undefined if no trial.
@@ -22,6 +22,60 @@ const STRIPE_TRIAL_PERIOD_DAYS = process.env['STRIPE_TRIAL_PERIOD_DAYS']
 const CheckoutSessionResultRef = builder.objectRef<{ url: string }>(
   'CheckoutSessionResult',
 );
+
+// ─── Admin Revenue Analytics Types ───────────────────────────────────────────
+
+const SubscriptionStatusCountRef = builder.objectRef<{
+  status: string;
+  count: number;
+}>('SubscriptionStatusCount');
+
+SubscriptionStatusCountRef.implement({
+  fields: (t) => ({
+    status: t.exposeString('status'),
+    count: t.exposeInt('count'),
+  }),
+});
+
+const SubscriberGrowthPointRef = builder.objectRef<{
+  month: string;
+  newSubscribers: number;
+}>('SubscriberGrowthPoint');
+
+SubscriberGrowthPointRef.implement({
+  fields: (t) => ({
+    month: t.exposeString('month'),
+    newSubscribers: t.exposeInt('newSubscribers'),
+  }),
+});
+
+const AdminRevenueStatsRef = builder.objectRef<{
+  totalSubscribers: number;
+  totalPremiumUsers: number;
+  totalFreeUsers: number;
+  totalUsers: number;
+  conversionRate: number;
+  newSubscribersThisMonth: number;
+  statusBreakdown: { status: string; count: number }[];
+  subscriberGrowth: { month: string; newSubscribers: number }[];
+}>('AdminRevenueStats');
+
+AdminRevenueStatsRef.implement({
+  fields: (t) => ({
+    totalSubscribers: t.exposeInt('totalSubscribers'),
+    totalPremiumUsers: t.exposeInt('totalPremiumUsers'),
+    totalFreeUsers: t.exposeInt('totalFreeUsers'),
+    totalUsers: t.exposeInt('totalUsers'),
+    conversionRate: t.exposeFloat('conversionRate'),
+    newSubscribersThisMonth: t.exposeInt('newSubscribersThisMonth'),
+    statusBreakdown: t.expose('statusBreakdown', {
+      type: [SubscriptionStatusCountRef],
+    }),
+    subscriberGrowth: t.expose('subscriberGrowth', {
+      type: [SubscriberGrowthPointRef],
+    }),
+  }),
+});
 
 CheckoutSessionResultRef.implement({
   fields: (t) => ({
@@ -81,6 +135,100 @@ builder.queryField('mySubscription', (t) =>
         gracePeriodEndsAt:
           subscription.gracePeriodEndsAt?.toISOString() ?? null,
       };
+    },
+  }),
+);
+
+builder.queryField('adminRevenueStats', (t) =>
+  t.field({
+    type: AdminRevenueStatsRef,
+    description: 'Admin-only aggregate revenue and subscription metrics.',
+    resolve: async (_parent, _args, context) => {
+      const user = requireAuth(context);
+      if (!user.isAdmin) throw ForbiddenError('Admin access required');
+
+      return runWithInternalClient(getDbOptions(), async (db) => {
+        // Status breakdown — count subscriptions by status
+        const statusRows = await db
+          .select({
+            status: InternalSchema.subscriptions.status,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(InternalSchema.subscriptions)
+          .groupBy(InternalSchema.subscriptions.status);
+
+        // Total platform users
+        const [totalUsersRow] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(InternalSchema.usersInAppInternal);
+        const totalUsers = totalUsersRow?.count ?? 0;
+
+        // Premium tier count (active + trialing subscriptions)
+        const totalSubscribers = statusRows
+          .filter((r) => r.status === 'active' || r.status === 'trialing')
+          .reduce((sum, r) => sum + r.count, 0);
+
+        // Premium users by subscription_tier column on users table
+        const [premiumUsersRow] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(InternalSchema.usersInAppInternal)
+          .where(
+            sql`${InternalSchema.usersInAppInternal.subscriptionTier} = 'premium'`,
+          );
+        const totalPremiumUsers = premiumUsersRow?.count ?? 0;
+        const totalFreeUsers = Math.max(0, totalUsers - totalPremiumUsers);
+        const conversionRate =
+          totalUsers > 0 ? totalPremiumUsers / totalUsers : 0;
+
+        // New premium subscriptions this month
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const [newThisMonthRow] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(InternalSchema.subscriptions)
+          .where(
+            and(
+              gte(InternalSchema.subscriptions.createdAt, startOfMonth),
+              sql`${InternalSchema.subscriptions.tier} = 'premium'`,
+            ),
+          );
+
+        // Monthly subscriber growth — last 12 months
+        const twelveMonthsAgo = new Date(now);
+        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+        twelveMonthsAgo.setDate(1);
+        twelveMonthsAgo.setHours(0, 0, 0, 0);
+
+        const growthRows = await db
+          .select({
+            month: sql<string>`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
+            newSubscribers: sql<number>`count(*)::int`,
+          })
+          .from(InternalSchema.subscriptions)
+          .where(
+            and(
+              gte(InternalSchema.subscriptions.createdAt, twelveMonthsAgo),
+              sql`${InternalSchema.subscriptions.tier} = 'premium'`,
+            ),
+          )
+          .groupBy(
+            sql`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
+          )
+          .orderBy(
+            sql`to_char(${InternalSchema.subscriptions.createdAt}, 'YYYY-MM')`,
+          );
+
+        return {
+          totalSubscribers,
+          totalPremiumUsers,
+          totalFreeUsers,
+          totalUsers,
+          conversionRate,
+          newSubscribersThisMonth: newThisMonthRow?.count ?? 0,
+          statusBreakdown: statusRows,
+          subscriberGrowth: growthRows,
+        };
+      });
     },
   }),
 );

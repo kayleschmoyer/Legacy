@@ -37,6 +37,17 @@ type AchievementRestriction {
   updatedAt: String
 }
 
+type AdminRevenueStats {
+  conversionRate: Float
+  newSubscribersThisMonth: Int
+  statusBreakdown: [SubscriptionStatusCount!]
+  subscriberGrowth: [SubscriberGrowthPoint!]
+  totalFreeUsers: Int
+  totalPremiumUsers: Int
+  totalSubscribers: Int
+  totalUsers: Int
+}
+
 type AdvanceLeagueWeekResponse {
   currentMatchupId: Int
   matchups: [Matchup!]
@@ -1902,6 +1913,11 @@ type Query {
   achievementRestrictions(leagueId: Int!): [AchievementRestriction!]
 
   """
+  Admin-only aggregate revenue and subscription metrics.
+  """
+  adminRevenueStats: AdminRevenueStats
+
+  """
   List all badge definitions available in the system
   """
   allBadgeDefinitions: [BadgeDefinition!]
@@ -2548,6 +2564,11 @@ enum StatsLoadingStatus {
   retry
 }
 
+type SubscriberGrowthPoint {
+  month: String
+  newSubscribers: Int
+}
+
 type SubscriptionInfo {
   cancelAtPeriodEnd: Boolean
   currentPeriodEnd: String
@@ -2555,6 +2576,11 @@ type SubscriptionInfo {
   status: String
   tier: String
   trialEndsAt: String
+}
+
+type SubscriptionStatusCount {
+  count: Int
+  status: String
 }
 
 input SwapMatchupTeamsInput {

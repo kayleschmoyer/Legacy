@@ -59,6 +59,7 @@ import { useAnalyticsIdentify } from '../hooks/useAnalyticsIdentify';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { AdminPage } from '../pages/admin/AdminPage';
+import AdminRevenuePage from '../pages/admin/AdminRevenuePage';
 import ProfileSettingsPage from '../pages/profile/ProfileSettingsPage';
 import SubscriptionPage from '../pages/profile/SubscriptionPage';
 import PreferencesPage from '../pages/preferences/PreferencesPage';
@@ -541,6 +542,7 @@ function App() {
           <Route path="/help" element={<HelpPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/revenue" element={<AdminRevenuePage />} />
           <Route path="/profile/settings" element={<ProfileSettingsPage />} />
           <Route path="/profile/subscription" element={<SubscriptionPage />} />
           <Route path="/preferences" element={<PreferencesPage />} />

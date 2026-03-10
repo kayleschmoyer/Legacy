@@ -58,6 +58,18 @@ export type AchievementRestriction = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+export type AdminRevenueStats = {
+  __typename?: 'AdminRevenueStats';
+  conversionRate?: Maybe<Scalars['Float']['output']>;
+  newSubscribersThisMonth?: Maybe<Scalars['Int']['output']>;
+  statusBreakdown?: Maybe<Array<SubscriptionStatusCount>>;
+  subscriberGrowth?: Maybe<Array<SubscriberGrowthPoint>>;
+  totalFreeUsers?: Maybe<Scalars['Int']['output']>;
+  totalPremiumUsers?: Maybe<Scalars['Int']['output']>;
+  totalSubscribers?: Maybe<Scalars['Int']['output']>;
+  totalUsers?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AdvanceLeagueWeekResponse = {
   __typename?: 'AdvanceLeagueWeekResponse';
   currentMatchupId?: Maybe<Scalars['Int']['output']>;
@@ -1899,6 +1911,8 @@ export type Query = {
   __typename?: 'Query';
   /** Return all achievement restrictions configured for a league, sorted by achievement type */
   achievementRestrictions?: Maybe<Array<AchievementRestriction>>;
+  /** Admin-only aggregate revenue and subscription metrics. */
+  adminRevenueStats?: Maybe<AdminRevenueStats>;
   /** List all badge definitions available in the system */
   allBadgeDefinitions?: Maybe<Array<BadgeDefinition>>;
   auctionBudgets?: Maybe<Array<AuctionBudget>>;
@@ -2783,6 +2797,12 @@ export enum StatsLoadingStatus {
   Retry = 'retry',
 }
 
+export type SubscriberGrowthPoint = {
+  __typename?: 'SubscriberGrowthPoint';
+  month?: Maybe<Scalars['String']['output']>;
+  newSubscribers?: Maybe<Scalars['Int']['output']>;
+};
+
 export type SubscriptionInfo = {
   __typename?: 'SubscriptionInfo';
   cancelAtPeriodEnd?: Maybe<Scalars['Boolean']['output']>;
@@ -2791,6 +2811,12 @@ export type SubscriptionInfo = {
   status?: Maybe<Scalars['String']['output']>;
   tier?: Maybe<Scalars['String']['output']>;
   trialEndsAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type SubscriptionStatusCount = {
+  __typename?: 'SubscriptionStatusCount';
+  count?: Maybe<Scalars['Int']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
 };
 
 export type SwapMatchupTeamsInput = {
@@ -6695,6 +6721,31 @@ export type UpdateLeagueScoringProfileMutation = {
         sourceColumn?: string | null;
         multiplier?: number | null;
       }> | null;
+    }> | null;
+  } | null;
+};
+
+export type AdminRevenueStatsQueryVariables = Exact<{ [key: string]: never }>;
+
+export type AdminRevenueStatsQuery = {
+  __typename?: 'Query';
+  adminRevenueStats?: {
+    __typename?: 'AdminRevenueStats';
+    totalSubscribers?: number | null;
+    totalPremiumUsers?: number | null;
+    totalFreeUsers?: number | null;
+    totalUsers?: number | null;
+    conversionRate?: number | null;
+    newSubscribersThisMonth?: number | null;
+    statusBreakdown?: Array<{
+      __typename?: 'SubscriptionStatusCount';
+      status?: string | null;
+      count?: number | null;
+    }> | null;
+    subscriberGrowth?: Array<{
+      __typename?: 'SubscriberGrowthPoint';
+      month?: string | null;
+      newSubscribers?: number | null;
     }> | null;
   } | null;
 };
@@ -16076,6 +16127,104 @@ export type UpdateLeagueScoringProfileMutationResult =
 export type UpdateLeagueScoringProfileMutationOptions = BaseMutationOptions<
   UpdateLeagueScoringProfileMutation,
   UpdateLeagueScoringProfileMutationVariables
+>;
+export const AdminRevenueStats = gql`
+  query AdminRevenueStats {
+    adminRevenueStats {
+      totalSubscribers
+      totalPremiumUsers
+      totalFreeUsers
+      totalUsers
+      conversionRate
+      newSubscribersThisMonth
+      statusBreakdown {
+        status
+        count
+      }
+      subscriberGrowth {
+        month
+        newSubscribers
+      }
+    }
+  }
+`;
+
+/**
+ * __useAdminRevenueStatsQuery__
+ *
+ * To run a query within a React component, call `useAdminRevenueStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useAdminRevenueStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useAdminRevenueStatsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useAdminRevenueStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    AdminRevenueStatsQuery,
+    AdminRevenueStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    AdminRevenueStatsQuery,
+    AdminRevenueStatsQueryVariables
+  >(AdminRevenueStats, options);
+}
+export function useAdminRevenueStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    AdminRevenueStatsQuery,
+    AdminRevenueStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    AdminRevenueStatsQuery,
+    AdminRevenueStatsQueryVariables
+  >(AdminRevenueStats, options);
+}
+export function useAdminRevenueStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        AdminRevenueStatsQuery,
+        AdminRevenueStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    AdminRevenueStatsQuery,
+    AdminRevenueStatsQueryVariables
+  >(
+    AdminRevenueStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          AdminRevenueStatsQuery,
+          AdminRevenueStatsQueryVariables
+        >,
+  );
+}
+export type AdminRevenueStatsQueryHookResult = ReturnType<
+  typeof useAdminRevenueStatsQuery
+>;
+export type AdminRevenueStatsLazyQueryHookResult = ReturnType<
+  typeof useAdminRevenueStatsLazyQuery
+>;
+export type AdminRevenueStatsSuspenseQueryHookResult = ReturnType<
+  typeof useAdminRevenueStatsSuspenseQuery
+>;
+export type AdminRevenueStatsQueryResult = Apollo.QueryResult<
+  AdminRevenueStatsQuery,
+  AdminRevenueStatsQueryVariables
 >;
 export const GetMySubscription = gql`
   query GetMySubscription {

@@ -191,6 +191,7 @@
     "react-native-web": "^0.21.1",
     "react-redux": "^9.2.0",
     "react-router-dom": "6.29.0",
+    "recharts": "^3.8.0",
     "rollbar": "^2.26.4",
     "solito": "^4.4.1",
     "stripe": "^20.4.1",

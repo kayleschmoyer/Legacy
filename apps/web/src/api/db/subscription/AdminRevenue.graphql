@@ -1,0 +1,18 @@
+query AdminRevenueStats {
+  adminRevenueStats {
+    totalSubscribers
+    totalPremiumUsers
+    totalFreeUsers
+    totalUsers
+    conversionRate
+    newSubscribersThisMonth
+    statusBreakdown {
+      status
+      count
+    }
+    subscriberGrowth {
+      month
+      newSubscribers
+    }
+  }
+}
