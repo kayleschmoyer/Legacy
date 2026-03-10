@@ -59,22 +59,33 @@ async function gqlFetch<T>(
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
-  const res = await fetch(GQL_BASE + 'graphql', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  const json = (await res.json()) as GqlResponse<T>;
-  if (json.errors?.length) {
-    throw new Error(`GraphQL error: ${json.errors[0].message}`);
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(GQL_BASE + 'graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+      const json = (await res.json()) as GqlResponse<T>;
+      if (json.errors?.length) {
+        throw new Error(`GraphQL error: ${json.errors[0].message}`);
+      }
+      if (!json.data) {
+        throw new Error('GraphQL response contained no data');
+      }
+      return json.data;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      await new Promise((r) => setTimeout(r, 1_000 * attempt));
+    }
   }
-  if (!json.data) {
-    throw new Error('GraphQL response contained no data');
-  }
-  return json.data;
+
+  throw new Error('gqlFetch failed after retries');
 }
 
 const impersonationCache = new Map<number, string>();

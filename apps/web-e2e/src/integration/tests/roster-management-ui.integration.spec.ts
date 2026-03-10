@@ -33,6 +33,7 @@
 
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { createLeagueViaUI } from '../helpers/create-league';
 import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -137,50 +138,12 @@ test.describe
   test('Phase 1: Create league via the UI', async ({
     commissionerPage: page,
   }) => {
-    await test.step('Navigate to create league page', async () => {
-      await page.goto('/baseball/league/create');
-      await page.waitForLoadState('domcontentloaded');
-      await expect(
-        page.getByRole('heading', { name: /Create Baseball League/i }),
-      ).toBeVisible({ timeout: 30000 });
+    state.leagueName = `Roster Mgmt E2E ${Date.now()}`;
+    const result = await createLeagueViaUI(page, {
+      leagueName: state.leagueName,
     });
-
-    await test.step('Fill in league settings and submit', async () => {
-      state.leagueName = `Roster Mgmt E2E ${Date.now()}`;
-      await page
-        .getByPlaceholder('Enter your league name')
-        .fill(state.leagueName);
-      // 4 teams for a quick automated draft
-      await page
-        .getByRole('button', { name: '4', exact: true })
-        .first()
-        .click();
-      await page.getByRole('button', { name: /create league/i }).click();
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
-        timeout: 30000,
-      });
-    });
-
-    await test.step('Extract league ID from the URL', () => {
-      const url = page.url();
-      const match = url.match(/\/baseball\/league\/(\d+)/);
-      expect(match).toBeTruthy();
-      state.leagueId = Number(match![1]);
-      expect(state.leagueId).toBeGreaterThan(0);
-    });
-
-    await test.step('Read invite code from the overview page', async () => {
-      await page.goto(`/baseball/league/${state.leagueId}/overview`);
-      await page.waitForLoadState('load');
-      await expect(page.getByText('Manual Code', { exact: false })).toBeVisible(
-        { timeout: 15000 },
-      );
-      const codeLocator = page.locator('text=/^[A-Z0-9]{8}$/').first();
-      await expect(codeLocator).toBeVisible({ timeout: 10000 });
-      const code = await codeLocator.textContent();
-      expect(code).toBeTruthy();
-      state.inviteCode = code!;
-    });
+    state.leagueId = result.leagueId;
+    state.inviteCode = result.inviteCode;
   });
 
   // -----------------------------------------------------------------

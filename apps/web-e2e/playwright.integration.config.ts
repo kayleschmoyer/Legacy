@@ -8,11 +8,13 @@ config({ path: resolve(__dirname, '../../.env') });
 export default defineConfig({
   testDir: './src/integration/tests',
   timeout: 120_000,
-  retries: 1,
-  // Run up to 3 spec files in parallel (each file runs its phases sequentially,
-  // enforced by fullyParallel:false below). Each file creates its own isolated
-  // league, so there are no DB collisions between workers.
-  workers: 3,
+  retries: 2,
+  // Serialize test execution to avoid API Gateway / Lambda throttling under
+  // concurrent load.  Each file still runs phases sequentially (fullyParallel:
+  // false).  With workers=1 the live backend only handles one league-creation
+  // flow at a time, eliminating the "Failed to fetch" errors seen with 3
+  // workers.
+  workers: 1,
   fullyParallel: false,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
