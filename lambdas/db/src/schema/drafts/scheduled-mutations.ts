@@ -273,6 +273,11 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               //    scoring query, which previously caused ~10 s per pick and
               //    Lambda timeouts. 1000 candidates gives ample coverage for all
               //    roster positions while reducing downstream query cost by ~23×.
+              //
+              //    NOT EXISTS is used instead of NOT IN to avoid the null-safety
+              //    footgun (NOT IN returns no rows if the subquery contains a
+              //    NULL) and to allow the planner to use the unique index on
+              //    draft_picks(draft_id, player_id) for the anti-join.
               const undraftedRows = await context.db.execute(
                 sql`SELECT p.id,
                     (
@@ -301,8 +306,9 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   LEFT JOIN career_batting cb ON cb.player_id = p.id
                   LEFT JOIN career_pitching cp ON cp.player_id = p.id
                   LEFT JOIN career_fielding cf ON cf.player_id = p.id
-                  WHERE p.id NOT IN (
-                    SELECT player_id FROM draft_picks WHERE draft_id = ${draftId}
+                  WHERE NOT EXISTS (
+                    SELECT 1 FROM draft_picks dp
+                    WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
                   )
                   ORDER BY fpg DESC
                   LIMIT 1000`,
