@@ -1574,11 +1574,6 @@ export function BaseballLandingPage() {
                 <PrimaryButton
                   disabled={creating || leagueName.trim().length < 3}
                   onPress={() => {
-                    const startDate = new Date(
-                      Date.now() + 7 * 24 * 60 * 60 * 1000,
-                    )
-                      .toISOString()
-                      .split('T')[0];
                     void createLeague({
                       variables: {
                         input: {
@@ -1590,7 +1585,6 @@ export function BaseballLandingPage() {
                           selectionMethod,
                           draftOrder,
                           maxRosterSize,
-                          startDate,
                           isPublic,
                           tradingEnabled: true,
                           waiverEnabled: true,

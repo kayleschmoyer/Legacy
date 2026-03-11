@@ -137,7 +137,7 @@ export function LeagueCreatePage(): React.JSX.Element {
     selectionMethod: 'standard',
     draftOrder: 'snake',
     maxRosterSize: 25,
-    draftDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    draftDate: undefined,
     waiverType: 'standard',
     faabBudgetDefault: 100,
     isPublic: false,
@@ -224,11 +224,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       return 'Roster size must be between 15 and 50 players';
     }
 
-    if (!formData.draftDate) {
-      return 'Please select a draft date';
-    }
-
-    if (formData.draftDate < new Date()) {
+    if (formData.draftDate && formData.draftDate < new Date()) {
       return 'Draft date must be in the future';
     }
 
@@ -1414,8 +1410,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                   useNativeInput={false} // Use custom picker popup on web
                 />
                 <Text size="$2" color="$gray10">
-                  When do you want to hold your draft? Include the time for
-                  scheduling.
+                  Optional. You can set or change your draft date after creating
+                  the league.
                 </Text>
               </YStack>
 
