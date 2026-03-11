@@ -56,7 +56,7 @@ endif
 # console window even with windowsHide. Caching still works without
 # the daemon; only the persistent project-graph file watcher is lost.
 ifeq ($(OS),Windows_NT)
-    export NODE_OPTIONS := --require $(WORKSPACE_PATH)/scripts/patch-child-process.js --max-listeners=20
+    export NODE_OPTIONS := --require $(WORKSPACE_PATH)/scripts/patch-child-process.js
     export NX_DAEMON := false
 endif
 
@@ -129,19 +129,14 @@ setup: install ## Alias for install
 
 setup-force: install-force ## Setup with force install for Windows file lock issues
 
-# LS-970: Run wt-setup directly under PowerShell rather than via cmd.exe.
-# GNU Make on Windows uses SHELL=cmd/.SHELLFLAGS=/c for all recipes, which
-# means if a Ctrl+C / SIGINT arrives mid-run (e.g. agent timeout during
-# pnpm install), cmd.exe shows "Terminate batch job (Y/N)?" and blocks.
-# The target-specific SHELL override eliminates cmd.exe from the call chain
-# entirely; -NonInteractive ensures PowerShell never prompts for input either.
-ifeq ($(DETECTED_OS),Windows)
-wt-setup: SHELL = powershell
-wt-setup: .SHELLFLAGS = -NonInteractive -NoProfile -ExecutionPolicy Bypass -File
-endif
+# NOTE: Target-specific SHELL overrides do NOT work in GNU Make 4.4.1 on
+# Windows — the global SHELL=cmd always wins. We call powershell.exe
+# explicitly so cmd.exe never tries to run the .ps1 directly (which would
+# open it in Notepad via file association). -NonInteractive prevents any
+# interactive prompts from PowerShell itself.
 wt-setup: ## Set up a worktree (node_modules junction, .env, .twig). Usage: make wt-setup WT=<path>
 ifeq ($(DETECTED_OS),Windows)
-	@"$(WORKSPACE_PATH)/scripts/setup-worktree.ps1" -WorktreePath "$(WT)"
+	@powershell -NonInteractive -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\setup-worktree.ps1" -WorktreePath "$(WT)"
 else
 	@echo "wt-setup is currently Windows-only. Run: make install && cp .env from main repo."
 endif

@@ -20,6 +20,12 @@
  * - .env provides a fallback for non-Makefile contexts
  */
 
+// Suppress MaxListenersExceededWarning: Nx spawns many forked workers, each
+// inheriting this --require and adding listeners. Setting a higher default
+// avoids noisy warnings. Done here (not via NODE_OPTIONS --max-listeners)
+// because --max-listeners is not a valid Node.js CLI flag.
+require('events').setMaxListeners(20);
+
 // No-op on non-Windows — the file is still --required but exits immediately.
 // Uses top-level return which is valid in CommonJS modules loaded via --require.
 if (process.platform !== 'win32') return;
