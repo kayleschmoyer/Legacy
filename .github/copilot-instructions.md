@@ -57,6 +57,7 @@ Windows PowerShell ┬╖ Nx monorepo ┬╖ pnpm 9.12.1 ┬╖ Jira project LS 
 | **Integration testing**         | `skills/integration-testing/SKILL.md`     |
 | Full workflow (start here)      | `skills/workflow-ticket-to-pr/SKILL.md`   |
 | **Install packages**            | `skills/install-packages/SKILL.md`        |
+| **Bug fixes (root cause)**      | `skills/fix-bugs/SKILL.md`                |
 | Lint errors                     | `skills/fix-lint/SKILL.md`                |
 | **Never edit generated**        | `skills/no-edit-generated/SKILL.md`       |
 | **Never edit schema.graphql**   | `skills/no-edit-schema-graphql/SKILL.md`  |
@@ -80,5 +81,5 @@ Windows PowerShell ┬╖ Nx monorepo ┬╖ pnpm 9.12.1 ┬╖ Jira project LS 
 | **Resolve merge conflicts**     | `skills/resolve-merge-conflicts/SKILL.md` |
 | **Makefile reference**          | `skills/makefile/SKILL.md`                |
 | **Worktree workflow (default)** | `skills/worktree-workflow/SKILL.md`       |
-| All skills (60 guides)          | `skills/`                                 |
+| All skills (61 guides)          | `skills/`                                 |
 | CSV reference data              | `docs/agents/*.csv`                       |
