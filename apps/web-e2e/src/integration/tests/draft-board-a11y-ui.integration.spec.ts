@@ -331,6 +331,24 @@ test.describe
     // clicks even when force:true is used, preventing the view-mode buttons from
     // getting the click event.
     const announceOverlay = page.locator('.d-announce-overlay');
+
+    /** Helper: dismiss overlay if visible, then do a direct JS click on target. */
+    const clickWithOverlayDismiss = async (
+      btn: ReturnType<typeof viewGroup.getByRole>,
+    ) => {
+      if (
+        await announceOverlay.isVisible({ timeout: 1_000 }).catch(() => false)
+      ) {
+        await announceOverlay.click({ force: true });
+        await announceOverlay
+          .waitFor({ state: 'hidden', timeout: 3_000 })
+          .catch(() => null);
+      }
+      await btn.scrollIntoViewIfNeeded();
+      // Use dispatchEvent to avoid coordinate-based click landing on overlay
+      await btn.dispatchEvent('click');
+    };
+
     if (
       await announceOverlay.isVisible({ timeout: 3_000 }).catch(() => false)
     ) {
@@ -352,23 +370,26 @@ test.describe
     });
 
     await test.step('Clicking list switches aria-checked state', async () => {
-      await listBtn.scrollIntoViewIfNeeded();
-      await listBtn.click({ force: true });
-      await expect(listBtn).toHaveAttribute('aria-checked', 'true');
+      await clickWithOverlayDismiss(listBtn);
+      await expect(listBtn).toHaveAttribute('aria-checked', 'true', {
+        timeout: 5_000,
+      });
       await expect(gridBtn).toHaveAttribute('aria-checked', 'false');
     });
 
     await test.step('Clicking compact switches aria-checked state', async () => {
-      await compactBtn.scrollIntoViewIfNeeded();
-      await compactBtn.click({ force: true });
-      await expect(compactBtn).toHaveAttribute('aria-checked', 'true');
+      await clickWithOverlayDismiss(compactBtn);
+      await expect(compactBtn).toHaveAttribute('aria-checked', 'true', {
+        timeout: 5_000,
+      });
       await expect(listBtn).toHaveAttribute('aria-checked', 'false');
     });
 
     await test.step('Clicking grid restores the original active state', async () => {
-      await gridBtn.scrollIntoViewIfNeeded();
-      await gridBtn.click({ force: true });
-      await expect(gridBtn).toHaveAttribute('aria-checked', 'true');
+      await clickWithOverlayDismiss(gridBtn);
+      await expect(gridBtn).toHaveAttribute('aria-checked', 'true', {
+        timeout: 5_000,
+      });
       await expect(compactBtn).toHaveAttribute('aria-checked', 'false');
     });
   });

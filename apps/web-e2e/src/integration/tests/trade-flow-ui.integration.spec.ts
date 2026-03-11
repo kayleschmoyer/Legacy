@@ -349,9 +349,10 @@ test.describe
     });
 
     await test.step('Switch draft mode to Automated', async () => {
-      const draftSettingsBtn = page.getByTestId(
-        'commissioner-section-toggle-draft-settings',
-      );
+      const draftSettingsBtn = page.getByRole('button', {
+        name: 'Draft Settings',
+        exact: true,
+      });
       await expect(draftSettingsBtn).toBeVisible({ timeout: 10000 });
       await draftSettingsBtn.click();
 

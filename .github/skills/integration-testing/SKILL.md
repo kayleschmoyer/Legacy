@@ -785,3 +785,60 @@ Then in the test:
 const row = page.locator('[data-testid^="drop-player-"]').first();
 await row.click();
 ```
+
+### Exact `aria-label` for Add/Drop Player Buttons
+
+Player searches often return multiple results, producing multiple "Add" buttons on the page. **Never use `.first()` on a generic `button[aria-label^="Add "]` selector** — it will click the wrong player. Always target the exact player name:
+
+```typescript
+// ❌ BAD — clicks first result, not necessarily the player you want
+await page.locator('button[aria-label^="Add "]').first().click();
+
+// ✅ GOOD — exact player match
+await page.locator(`button[aria-label="Add ${playerName}"]`).click();
+```
+
+If the exact name is not available, fall back to the prefix selector only as a last resort, and assert the player was actually added before continuing.
+
+### Tamagui `getByTestId` Is Not Forwarded to DOM
+
+Tamagui components (e.g., `<Button>`, `<XStack>`) do not always forward `testID` to the rendered DOM element. If `getByTestId('my-id')` cannot find the element, use a role-based selector instead:
+
+```typescript
+// ❌ UNRELIABLE — Tamagui may not forward testID to DOM
+await page.getByTestId('commissioner-section-toggle-draft-settings').click();
+
+// ✅ RELIABLE — role + name always works for labeled buttons
+await page.getByRole('button', { name: 'Draft Settings', exact: true }).click();
+```
+
+### Tamagui Disabled Buttons Reject Forced Clicks
+
+Tamagui `<Button disabled>` renders with the native HTML `disabled` attribute. Playwright's `click({ force: true })` does **not** fire on natively disabled elements. Always wait for the button to become enabled first:
+
+```typescript
+// ❌ BAD — force: true is silently ignored on disabled buttons
+await saveBtn.click({ force: true });
+
+// ✅ GOOD — wait for enabled, then click normally
+await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
+await saveBtn.click();
+```
+
+### Fixed Overlay Intercepts Clicks (`z-index: 9999`)
+
+Toast overlays with `position: fixed; z-index: 9999` will intercept Playwright clicks even with `{ force: true }`. Use `dispatchEvent` to bypass:
+
+```typescript
+// ❌ BAD — toast overlay intercepts this
+await element.click({ force: true });
+
+// ✅ GOOD — dispatches click directly on the element, bypassing hit-test
+await element.dispatchEvent('click');
+```
+
+This is useful for click targets obscured by persistent toast notifications (e.g., draft pick confirmation toasts that linger between picks).
+
+### DB Unique Constraint in `randomizeDraftOrder` / `setDraftOrder`
+
+If integration tests fail instantly (~200ms) with `duplicate key value violates unique constraint "draft_teams_uk_order"` it means the Lambda (lambdas/db) has not been deployed with the delete-and-reinsert fix from LS-1076. The serial UPDATE loop in the old code violates the unique constraint on `(draftId, draftOrder)` when swapping values. This is a **deploy problem**, not a test-side fix — deploy the Lambda and the test will pass.

@@ -154,8 +154,15 @@ async function submitWaiverClaimViaUI(
     await page.waitForTimeout(500);
   }
 
-  const addBtn = page.locator('button[aria-label^="Add "]').first();
-  await expect(addBtn).toBeVisible({ timeout: 15000 });
+  // Use the exact player name in the aria-label to avoid clicking a different
+  // player's Add button when the search returns multiple results.
+  const exactAddBtn = page.locator(`button[aria-label="Add ${playerName}"]`);
+  const firstAddBtn = page.locator('button[aria-label^="Add "]').first();
+  const hasExact = await exactAddBtn
+    .isVisible({ timeout: 10000 })
+    .catch(() => false);
+  const addBtn = hasExact ? exactAddBtn : firstAddBtn;
+  await expect(addBtn).toBeVisible({ timeout: 5000 });
   await addBtn.click();
 
   // WaiverClaimModal opens

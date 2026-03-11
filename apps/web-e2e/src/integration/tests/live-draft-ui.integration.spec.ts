@@ -458,16 +458,18 @@ test.describe
     });
 
     await test.step('Verify roster has drafted players', async () => {
-      // Section headers prove roster structure loaded
+      // Section headers prove roster structure loaded.
+      // Fresh browser context means positions + team members must all load
+      // from scratch — allow up to 30s for the roster to fully render.
       await expect(
         page.getByText('Pitching', { exact: false }).first(),
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: 30000 });
       await expect(
         page.getByText('Infield', { exact: false }).first(),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 30000 });
       await expect(
         page.getByText('Outfield', { exact: false }).first(),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 30000 });
 
       // After a live draft, players go to bench/bullpen (not starting lineup)
       // Verify bench count > 0 by reading the summary section

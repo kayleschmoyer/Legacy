@@ -231,8 +231,10 @@ test.describe
       const saveBtn = page.getByRole('button', { name: /save.*change/i });
       await expect(saveBtn).toBeVisible({ timeout: 5_000 });
       await saveBtn.scrollIntoViewIfNeeded();
-      // Use force:true to bypass any Tamagui overlay that intercepts pointer events
-      await saveBtn.click({ force: true });
+      // Wait for the button to become interactive (canSave=true: !loading && !saving)
+      // before clicking. A disabled Tamagui Button won't fire onPress even with force.
+      await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
+      await saveBtn.click();
       // Wait for the unsaved badge to disappear (confirms save completed)
       await expect(page.getByText(/\d+ unsaved/i)).not.toBeVisible({
         timeout: 20_000,

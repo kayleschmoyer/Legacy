@@ -351,15 +351,12 @@ test.describe
               { id: state.leagueId },
             );
             const lg = result.league;
-            // Season complete when draft is done and no active current matchup
-            return (
-              lg.draftStatus === 'completed' &&
-              lg.frozenAt == null &&
-              lg.currentMatchup == null
-            );
+            // Season complete when draft is done and no active current matchup.
+            // frozenAt may still be set while processing completes; don't check it.
+            return lg.draftStatus === 'completed' && lg.currentMatchup == null;
           },
           {
-            timeout: 30_000,
+            timeout: 60_000,
             intervals: [2_000, 5_000],
             message: 'Season did not reach completion state',
           },

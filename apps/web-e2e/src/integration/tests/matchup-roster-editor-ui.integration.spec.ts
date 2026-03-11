@@ -255,6 +255,21 @@ test.describe
   test('Phase 4: Identify the commissioner matchup ID', async ({
     commissionerJwt,
   }) => {
+    await test.step('Run autoSelectGames to populate matchup_players', async () => {
+      // getMatchupPlayers returns rows from matchup_players, which is only
+      // populated after game selection runs. Without this, the roster editor
+      // shows nothing (players.length === 0) and "Edit Lineup" never appears.
+      await gqlFetch<{
+        autoSelectGames: { gamesTriggered: number } | null;
+      }>(
+        commissionerJwt,
+        `mutation AutoSelectGames($leagueId: Int) {
+          autoSelectGames(leagueId: $leagueId) { gamesTriggered }
+        }`,
+        { leagueId: state.leagueId },
+      );
+    });
+
     await test.step('Fetch commissioner team ID', async () => {
       const { userTeamId } = await gqlFetch<{ userTeamId: number }>(
         commissionerJwt,

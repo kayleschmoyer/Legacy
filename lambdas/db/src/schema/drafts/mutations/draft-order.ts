@@ -141,37 +141,53 @@ builder.mutationField('setDraftOrder', (t) =>
           );
         }
 
-        // Fetch current draft_teams to validate the provided teamIds
+        // Fetch current draft_teams to validate the provided teamIds (preserve autoPick/leagueId)
         const currentTeams = await context.db
-          .select({ teamId: PublicSchema.draftTeams.teamId })
+          .select({
+            teamId: PublicSchema.draftTeams.teamId,
+            leagueId: PublicSchema.draftTeams.leagueId,
+            autoPick: PublicSchema.draftTeams.autoPick,
+          })
           .from(PublicSchema.draftTeams)
           .where(eq(PublicSchema.draftTeams.draftId, draftId));
 
-        const currentTeamIds = new Set(currentTeams.map((t) => t.teamId));
+        const currentTeamMap = new Map(
+          currentTeams.map((t) => [
+            t.teamId,
+            { leagueId: t.leagueId, autoPick: t.autoPick },
+          ]),
+        );
 
-        if (teamIds.length !== currentTeamIds.size) {
+        if (teamIds.length !== currentTeamMap.size) {
           throw new Error(
-            `Expected ${String(currentTeamIds.size)} team IDs but received ${String(teamIds.length)}`,
+            `Expected ${String(currentTeamMap.size)} team IDs but received ${String(teamIds.length)}`,
           );
         }
         for (const id of teamIds) {
-          if (!currentTeamIds.has(id)) {
+          if (!currentTeamMap.has(id)) {
             throw new Error(`Team ${String(id)} is not part of this draft`);
           }
         }
 
-        // Update draft_teams draftOrder for each team
-        for (let i = 0; i < teamIds.length; i++) {
-          await context.db
-            .update(PublicSchema.draftTeams)
-            .set({ draftOrder: i + 1 })
-            .where(
-              and(
-                eq(PublicSchema.draftTeams.draftId, draftId),
-                eq(PublicSchema.draftTeams.teamId, teamIds[i]),
-              ),
-            );
-        }
+        // Delete and re-insert to avoid unique constraint violation on (draftId, draftOrder)
+        // when the reorder conflicts with existing orders during per-row updates.
+        await context.db.transaction(async (tx) => {
+          await tx
+            .delete(PublicSchema.draftTeams)
+            .where(eq(PublicSchema.draftTeams.draftId, draftId));
+          await tx.insert(PublicSchema.draftTeams).values(
+            teamIds.map((teamId, index) => {
+              const meta = currentTeamMap.get(teamId)!;
+              return {
+                draftId,
+                teamId,
+                leagueId: meta.leagueId,
+                draftOrder: index + 1,
+                autoPick: meta.autoPick,
+              };
+            }),
+          );
+        });
 
         LOGGER.info('Commissioner set draft order', {
           draftId,
@@ -299,9 +315,13 @@ builder.mutationField('randomizeDraftOrder', (t) =>
           );
         }
 
-        // Fetch current team IDs in this draft
+        // Fetch current team IDs in this draft (preserve autoPick and leagueId)
         const currentTeams = await context.db
-          .select({ teamId: PublicSchema.draftTeams.teamId })
+          .select({
+            teamId: PublicSchema.draftTeams.teamId,
+            leagueId: PublicSchema.draftTeams.leagueId,
+            autoPick: PublicSchema.draftTeams.autoPick,
+          })
           .from(PublicSchema.draftTeams)
           .where(eq(PublicSchema.draftTeams.draftId, draftId))
           .orderBy(asc(PublicSchema.draftTeams.draftOrder));
@@ -317,18 +337,22 @@ builder.mutationField('randomizeDraftOrder', (t) =>
           [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
 
-        // Update draftOrder for each team
-        for (let i = 0; i < shuffled.length; i++) {
-          await context.db
-            .update(PublicSchema.draftTeams)
-            .set({ draftOrder: i + 1 })
-            .where(
-              and(
-                eq(PublicSchema.draftTeams.draftId, draftId),
-                eq(PublicSchema.draftTeams.teamId, shuffled[i].teamId),
-              ),
-            );
-        }
+        // Delete and re-insert to avoid unique constraint violation on (draftId, draftOrder)
+        // when the shuffled order conflicts with existing orders during per-row updates.
+        await context.db.transaction(async (tx) => {
+          await tx
+            .delete(PublicSchema.draftTeams)
+            .where(eq(PublicSchema.draftTeams.draftId, draftId));
+          await tx.insert(PublicSchema.draftTeams).values(
+            shuffled.map((team, index) => ({
+              draftId,
+              teamId: team.teamId,
+              leagueId: team.leagueId,
+              draftOrder: index + 1,
+              autoPick: team.autoPick,
+            })),
+          );
+        });
 
         LOGGER.info('Commissioner randomized draft order', {
           draftId,

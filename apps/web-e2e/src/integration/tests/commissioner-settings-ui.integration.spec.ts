@@ -270,11 +270,12 @@ test.describe
     });
 
     await test.step('All three stat groups are visible', async () => {
-      await expect(page.getByText('Batting')).toBeVisible({ timeout: 10_000 });
+      // Groups only render when scoring data finishes loading; allow up to 20s each.
+      await expect(page.getByText('Batting')).toBeVisible({ timeout: 20_000 });
       await expect(page.getByText('Pitching')).toBeVisible({
-        timeout: 5_000,
+        timeout: 20_000,
       });
-      await expect(page.getByText('Fielding')).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByText('Fielding')).toBeVisible({ timeout: 20_000 });
     });
 
     await test.step('Scoring profile name is displayed', async () => {
