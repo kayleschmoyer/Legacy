@@ -3067,7 +3067,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             }}
             onError={(deleteError) => {
               LOGGER.error('Delete league error:', String(deleteError));
-              alert(`Error deleting league: ${deleteError.message}`);
+              setMatchupErrorMessage(deleteError.message);
             }}
           />
         ),
