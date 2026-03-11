@@ -292,10 +292,15 @@ test.describe
         // Find the page showing "YOUR PICK" — the draft board shows
         // "🎯 YOUR PICK" when isMyPick=true, "⏳ ON THE CLOCK" otherwise.
         // Only click on the page whose turn it actually is.
+        //
+        // Use the exact status-bar text "🎯 YOUR PICK" to avoid false
+        // positives from the PickAnnouncement overlay ("🎉 YOUR PICK")
+        // which briefly appears on the picker's page after a successful
+        // pick and would cause the test to double-credit the same manager.
         let pickerFound = false;
         for (const { label, page } of pages) {
           const isMyTurn = await page
-            .getByText('YOUR PICK')
+            .getByText('🎯 YOUR PICK', { exact: true })
             .first()
             .isVisible({ timeout: 2000 })
             .catch(() => false);
@@ -334,14 +339,19 @@ test.describe
           await allDraftBtns.nth(draftBtnIdx).click({ force: true });
 
           // Verify the pick was accepted by checking the turn advanced:
-          // "YOUR PICK" must disappear from this page, meaning the server
+          // "🎯 YOUR PICK" must disappear from this page, meaning the server
           // confirmed the pick and moved to the next drafter.
+          //
+          // Use the exact status-bar text to avoid confusion with the
+          // "🎉 YOUR PICK" announcement overlay (which lingers ~3 s and
+          // would cause a false wasAccepted=false with the old generic
+          // 'YOUR PICK' selector).
           //
           // Do NOT check whether the player button disappears — it can
           // vanish due to an incoming WebSocket update about another
           // manager's pick (false positive), causing duplicate-pick logs.
           const wasAccepted = await page
-            .getByText('YOUR PICK')
+            .getByText('🎯 YOUR PICK', { exact: true })
             .first()
             .waitFor({ state: 'hidden', timeout: 8000 })
             .then(() => true)
