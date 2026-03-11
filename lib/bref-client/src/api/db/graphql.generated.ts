@@ -677,6 +677,13 @@ export type GamePitching = {
   wins?: Maybe<Scalars['Int']['output']>;
 };
 
+export type GoogleVerifyResult = {
+  __typename?: 'GoogleVerifyResult';
+  status?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+  tier?: Maybe<Scalars['String']['output']>;
+};
+
 /** Head-to-head record between two teams */
 export type HeadToHeadRecord = {
   __typename?: 'HeadToHeadRecord';
@@ -1153,6 +1160,8 @@ export type Mutation = {
   requestDataExport?: Maybe<DataRequest>;
   /** Restore Apple IAP purchases and sync the subscription tier. Pass the JWS-signed transaction string for the most recent active purchase returned by StoreKit 2 restoreCompletedTransactions. */
   restoreApplePurchases?: Maybe<Scalars['Boolean']['output']>;
+  /** Restore Google Play subscriptions and sync the subscription tier. Pass the purchaseToken for the most recent active purchase returned by react-native-iap getAvailablePurchases on Android. */
+  restoreGooglePurchases?: Maybe<Scalars['Boolean']['output']>;
   resumeDraft?: Maybe<Draft>;
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
@@ -1203,6 +1212,8 @@ export type Mutation = {
   upsertLeagueSeasonAward?: Maybe<LeagueSeasonAward>;
   /** Verify and record an iOS in-app purchase transaction. The client passes the JWS-signed transaction string from StoreKit 2. Returns the resulting subscription tier and status. */
   verifyApplePurchase?: Maybe<AppleVerifyResult>;
+  /** Verify and record an Android Google Play Billing purchase. The client passes the purchaseToken and productId from the Billing Library. Returns the resulting subscription tier and status. */
+  verifyGooglePurchase?: Maybe<GoogleVerifyResult>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
 };
@@ -1514,6 +1525,11 @@ export type MutationRestoreApplePurchasesArgs = {
   jwsTransaction: Scalars['String']['input'];
 };
 
+export type MutationRestoreGooglePurchasesArgs = {
+  productId: Scalars['String']['input'];
+  purchaseToken: Scalars['String']['input'];
+};
+
 export type MutationResumeDraftArgs = {
   leagueId: Scalars['Int']['input'];
 };
@@ -1690,6 +1706,11 @@ export type MutationUpsertLeagueSeasonAwardArgs = {
 
 export type MutationVerifyApplePurchaseArgs = {
   jwsTransaction: Scalars['String']['input'];
+};
+
+export type MutationVerifyGooglePurchaseArgs = {
+  productId: Scalars['String']['input'];
+  purchaseToken: Scalars['String']['input'];
 };
 
 export type MutationVetoTradeArgs = {

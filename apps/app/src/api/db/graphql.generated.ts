@@ -677,6 +677,13 @@ export type GamePitching = {
   wins?: Maybe<Scalars['Int']['output']>;
 };
 
+export type GoogleVerifyResult = {
+  __typename?: 'GoogleVerifyResult';
+  status?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+  tier?: Maybe<Scalars['String']['output']>;
+};
+
 /** Head-to-head record between two teams */
 export type HeadToHeadRecord = {
   __typename?: 'HeadToHeadRecord';
@@ -1153,6 +1160,8 @@ export type Mutation = {
   requestDataExport?: Maybe<DataRequest>;
   /** Restore Apple IAP purchases and sync the subscription tier. Pass the JWS-signed transaction string for the most recent active purchase returned by StoreKit 2 restoreCompletedTransactions. */
   restoreApplePurchases?: Maybe<Scalars['Boolean']['output']>;
+  /** Restore Google Play subscriptions and sync the subscription tier. Pass the purchaseToken for the most recent active purchase returned by react-native-iap getAvailablePurchases on Android. */
+  restoreGooglePurchases?: Maybe<Scalars['Boolean']['output']>;
   resumeDraft?: Maybe<Draft>;
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
@@ -1203,6 +1212,8 @@ export type Mutation = {
   upsertLeagueSeasonAward?: Maybe<LeagueSeasonAward>;
   /** Verify and record an iOS in-app purchase transaction. The client passes the JWS-signed transaction string from StoreKit 2. Returns the resulting subscription tier and status. */
   verifyApplePurchase?: Maybe<AppleVerifyResult>;
+  /** Verify and record an Android Google Play Billing purchase. The client passes the purchaseToken and productId from the Billing Library. Returns the resulting subscription tier and status. */
+  verifyGooglePurchase?: Maybe<GoogleVerifyResult>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
 };
@@ -1514,6 +1525,11 @@ export type MutationRestoreApplePurchasesArgs = {
   jwsTransaction: Scalars['String']['input'];
 };
 
+export type MutationRestoreGooglePurchasesArgs = {
+  productId: Scalars['String']['input'];
+  purchaseToken: Scalars['String']['input'];
+};
+
 export type MutationResumeDraftArgs = {
   leagueId: Scalars['Int']['input'];
 };
@@ -1690,6 +1706,11 @@ export type MutationUpsertLeagueSeasonAwardArgs = {
 
 export type MutationVerifyApplePurchaseArgs = {
   jwsTransaction: Scalars['String']['input'];
+};
+
+export type MutationVerifyGooglePurchaseArgs = {
+  productId: Scalars['String']['input'];
+  purchaseToken: Scalars['String']['input'];
 };
 
 export type MutationVetoTradeArgs = {
@@ -4297,6 +4318,31 @@ export type RestoreApplePurchasesMutationVariables = Exact<{
 export type RestoreApplePurchasesMutation = {
   __typename?: 'Mutation';
   restoreApplePurchases?: boolean | null;
+};
+
+export type VerifyGooglePurchaseMutationVariables = Exact<{
+  purchaseToken: Scalars['String']['input'];
+  productId: Scalars['String']['input'];
+}>;
+
+export type VerifyGooglePurchaseMutation = {
+  __typename?: 'Mutation';
+  verifyGooglePurchase?: {
+    __typename?: 'GoogleVerifyResult';
+    success?: boolean | null;
+    tier?: string | null;
+    status?: string | null;
+  } | null;
+};
+
+export type RestoreGooglePurchasesMutationVariables = Exact<{
+  purchaseToken: Scalars['String']['input'];
+  productId: Scalars['String']['input'];
+}>;
+
+export type RestoreGooglePurchasesMutation = {
+  __typename?: 'Mutation';
+  restoreGooglePurchases?: boolean | null;
 };
 
 export type TeamFragment = {
@@ -7797,6 +7843,111 @@ export type RestoreApplePurchasesMutationResult =
 export type RestoreApplePurchasesMutationOptions = BaseMutationOptions<
   RestoreApplePurchasesMutation,
   RestoreApplePurchasesMutationVariables
+>;
+export const VerifyGooglePurchase = gql`
+  mutation VerifyGooglePurchase($purchaseToken: String!, $productId: String!) {
+    verifyGooglePurchase(purchaseToken: $purchaseToken, productId: $productId) {
+      success
+      tier
+      status
+    }
+  }
+`;
+export type VerifyGooglePurchaseMutationFn = MutationFunction<
+  VerifyGooglePurchaseMutation,
+  VerifyGooglePurchaseMutationVariables
+>;
+
+/**
+ * __useVerifyGooglePurchaseMutation__
+ *
+ * To run a mutation, you first call `useVerifyGooglePurchaseMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useVerifyGooglePurchaseMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [verifyGooglePurchaseMutation, { data, loading, error }] = useVerifyGooglePurchaseMutation({
+ *   variables: {
+ *      purchaseToken: // value for 'purchaseToken'
+ *      productId: // value for 'productId'
+ *   },
+ * });
+ */
+export function useVerifyGooglePurchaseMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    VerifyGooglePurchaseMutation,
+    VerifyGooglePurchaseMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    VerifyGooglePurchaseMutation,
+    VerifyGooglePurchaseMutationVariables
+  >(VerifyGooglePurchase, options);
+}
+export type VerifyGooglePurchaseMutationHookResult = ReturnType<
+  typeof useVerifyGooglePurchaseMutation
+>;
+export type VerifyGooglePurchaseMutationResult =
+  Apollo.MutationResult<VerifyGooglePurchaseMutation>;
+export type VerifyGooglePurchaseMutationOptions = BaseMutationOptions<
+  VerifyGooglePurchaseMutation,
+  VerifyGooglePurchaseMutationVariables
+>;
+export const RestoreGooglePurchases = gql`
+  mutation RestoreGooglePurchases(
+    $purchaseToken: String!
+    $productId: String!
+  ) {
+    restoreGooglePurchases(purchaseToken: $purchaseToken, productId: $productId)
+  }
+`;
+export type RestoreGooglePurchasesMutationFn = MutationFunction<
+  RestoreGooglePurchasesMutation,
+  RestoreGooglePurchasesMutationVariables
+>;
+
+/**
+ * __useRestoreGooglePurchasesMutation__
+ *
+ * To run a mutation, you first call `useRestoreGooglePurchasesMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRestoreGooglePurchasesMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [restoreGooglePurchasesMutation, { data, loading, error }] = useRestoreGooglePurchasesMutation({
+ *   variables: {
+ *      purchaseToken: // value for 'purchaseToken'
+ *      productId: // value for 'productId'
+ *   },
+ * });
+ */
+export function useRestoreGooglePurchasesMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RestoreGooglePurchasesMutation,
+    RestoreGooglePurchasesMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RestoreGooglePurchasesMutation,
+    RestoreGooglePurchasesMutationVariables
+  >(RestoreGooglePurchases, options);
+}
+export type RestoreGooglePurchasesMutationHookResult = ReturnType<
+  typeof useRestoreGooglePurchasesMutation
+>;
+export type RestoreGooglePurchasesMutationResult =
+  Apollo.MutationResult<RestoreGooglePurchasesMutation>;
+export type RestoreGooglePurchasesMutationOptions = BaseMutationOptions<
+  RestoreGooglePurchasesMutation,
+  RestoreGooglePurchasesMutationVariables
 >;
 export const GetTeamMembers = gql`
   query GetTeamMembers($teamId: Int!) {

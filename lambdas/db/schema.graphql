@@ -742,6 +742,12 @@ type GamePitching {
   wins: Int
 }
 
+type GoogleVerifyResult {
+  status: String
+  success: Boolean
+  tier: String
+}
+
 """
 Head-to-head record between two teams
 """
@@ -1472,6 +1478,21 @@ type Mutation {
     """
     jwsTransaction: String!
   ): Boolean
+
+  """
+  Restore Google Play subscriptions and sync the subscription tier. Pass the purchaseToken for the most recent active purchase returned by react-native-iap getAvailablePurchases on Android.
+  """
+  restoreGooglePurchases(
+    """
+    The Google Play product ID associated with the token.
+    """
+    productId: String!
+
+    """
+    The purchase token from Google Play Billing Library.
+    """
+    purchaseToken: String!
+  ): Boolean
   resumeDraft(leagueId: Int!): Draft
 
   """
@@ -1642,6 +1663,21 @@ type Mutation {
     """
     jwsTransaction: String!
   ): AppleVerifyResult
+
+  """
+  Verify and record an Android Google Play Billing purchase. The client passes the purchaseToken and productId from the Billing Library. Returns the resulting subscription tier and status.
+  """
+  verifyGooglePurchase(
+    """
+    The Google Play product ID that was purchased.
+    """
+    productId: String!
+
+    """
+    The purchase token returned by the Google Play Billing Library.
+    """
+    purchaseToken: String!
+  ): GoogleVerifyResult
 
   """
   Commissioner-only: veto an accepted trade, reversing the player swap.

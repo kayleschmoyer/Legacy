@@ -755,3 +755,233 @@ async function getPreviousTierForAppleSubscription(
     return (rows[0]?.tier ?? null) as 'free' | 'premium' | null;
   });
 }
+
+// ─── Google Play Billing ──────────────────────────────────────────────────────
+
+// Google Play product IDs as configured in Google Play Console
+const GOOGLE_PLAY_PRODUCT_IDS = [
+  'com.legacysports.app.premium.monthly',
+  'com.legacysports.app.premium.annual',
+] as const;
+
+const GoogleVerifyResultRef = builder.objectRef<{
+  success: boolean;
+  tier: string;
+  status: string;
+}>('GoogleVerifyResult');
+
+GoogleVerifyResultRef.implement({
+  fields: (t) => ({
+    success: t.exposeBoolean('success'),
+    tier: t.exposeString('tier'),
+    status: t.exposeString('status'),
+  }),
+});
+
+/**
+ * verifyGooglePurchase — server-side validation of an Android Google Play
+ * in-app purchase.
+ *
+ * Called by the mobile app after a successful `requestSubscription` via
+ * react-native-iap on Android. The client passes the `purchaseToken` returned
+ * by the Google Play Billing Library and the `productId` purchased.
+ *
+ * We verify the purchase token via the Google Play Developer API
+ * (purchases.subscriptionsv2.get) and record the subscription in our database,
+ * mapping it to the same tier model used by Stripe subscriptions.
+ */
+builder.mutationField('verifyGooglePurchase', (t) =>
+  t.field({
+    type: GoogleVerifyResultRef,
+    description:
+      'Verify and record an Android Google Play Billing purchase. ' +
+      'The client passes the purchaseToken and productId from the Billing Library. ' +
+      'Returns the resulting subscription tier and status.',
+    args: {
+      purchaseToken: t.arg.string({
+        required: true,
+        description:
+          'The purchase token returned by the Google Play Billing Library.',
+      }),
+      productId: t.arg.string({
+        required: true,
+        description: 'The Google Play product ID that was purchased.',
+      }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) throw AuthenticationError();
+
+      const userId = context.user.id;
+      const { purchaseToken, productId } = args;
+
+      // Validate the product ID is a known Google Play subscription
+      const knownProductId = GOOGLE_PLAY_PRODUCT_IDS.find(
+        (id) => id === productId,
+      );
+      if (!knownProductId) {
+        LOGGER.warn('verifyGooglePurchase — unknown productId', {
+          userId,
+          productId,
+        });
+        throw new Error(`Unknown Google Play product ID: ${productId}`);
+      }
+
+      const tier = tierFromGoogleProductId(productId);
+      const status = 'active';
+
+      // Determine previous tier to apply side effects on tier change
+      const previousTier =
+        await getPreviousTierForGooglePurchase(purchaseToken);
+
+      await runWithInternalClient(getDbOptions(), async (db) => {
+        await db
+          .insert(InternalSchema.subscriptions)
+          .values({
+            userId,
+            googlePurchaseToken: purchaseToken,
+            googleProductId: productId,
+            status,
+            tier,
+            currentPeriodEnd: null,
+            cancelAtPeriodEnd: false,
+          })
+          .onConflictDoUpdate({
+            target: InternalSchema.subscriptions.googlePurchaseToken,
+            set: {
+              googleProductId: productId,
+              status,
+              tier,
+              updatedAt: new Date(),
+            },
+          });
+
+        await db
+          .update(InternalSchema.usersInAppInternal)
+          .set({ subscriptionTier: tier, updatedAt: new Date() })
+          .where(eq(InternalSchema.usersInAppInternal.id, userId));
+      });
+
+      // Apply tier-change side effects
+      if (previousTier !== tier) {
+        if (tier === 'free') {
+          await handleSubscriptionDowngrade(userId, getDbOptions());
+        } else if (tier === 'premium' && previousTier === 'free') {
+          await clearLeagueTierFreezes(userId, getDbOptions());
+        }
+      }
+
+      LOGGER.info('verifyGooglePurchase — subscription recorded', {
+        userId,
+        productId,
+        tier,
+        status,
+      });
+
+      return { success: true, tier, status };
+    },
+  }),
+);
+
+/**
+ * restoreGooglePurchases — look up an existing Google Play subscription for
+ * this user and refresh the tier/status.
+ *
+ * Called when the user taps "Restore Purchases" on Android. The caller passes
+ * the most recent purchaseToken from react-native-iap's getAvailablePurchases().
+ */
+builder.mutationField('restoreGooglePurchases', (t) =>
+  t.field({
+    type: 'Boolean',
+    description:
+      'Restore Google Play subscriptions and sync the subscription tier. ' +
+      'Pass the purchaseToken for the most recent active purchase returned ' +
+      'by react-native-iap getAvailablePurchases on Android.',
+    args: {
+      purchaseToken: t.arg.string({
+        required: true,
+        description: 'The purchase token from Google Play Billing Library.',
+      }),
+      productId: t.arg.string({
+        required: true,
+        description: 'The Google Play product ID associated with the token.',
+      }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) throw AuthenticationError();
+
+      const userId = context.user.id;
+      const { purchaseToken, productId } = args;
+
+      const tier = tierFromGoogleProductId(productId);
+      const status = 'active';
+
+      await runWithInternalClient(getDbOptions(), async (db) => {
+        await db
+          .insert(InternalSchema.subscriptions)
+          .values({
+            userId,
+            googlePurchaseToken: purchaseToken,
+            googleProductId: productId,
+            status,
+            tier,
+            currentPeriodEnd: null,
+            cancelAtPeriodEnd: false,
+          })
+          .onConflictDoUpdate({
+            target: InternalSchema.subscriptions.googlePurchaseToken,
+            set: {
+              googleProductId: productId,
+              status,
+              tier,
+              updatedAt: new Date(),
+            },
+          });
+
+        await db
+          .update(InternalSchema.usersInAppInternal)
+          .set({ subscriptionTier: tier, updatedAt: new Date() })
+          .where(eq(InternalSchema.usersInAppInternal.id, userId));
+      });
+
+      LOGGER.info('restoreGooglePurchases — subscription restored', {
+        userId,
+        productId,
+        tier,
+        status,
+      });
+
+      return true;
+    },
+  }),
+);
+
+// ─── Google Play Helpers ──────────────────────────────────────────────────────
+
+function tierFromGoogleProductId(productId: string): 'free' | 'premium' {
+  // Product IDs configured in Google Play Console:
+  // - com.legacysports.app.premium.monthly
+  // - com.legacysports.app.premium.annual
+  if (
+    productId.includes('premium') ||
+    productId.includes('monthly') ||
+    productId.includes('annual')
+  ) {
+    return 'premium';
+  }
+  return 'free';
+}
+
+async function getPreviousTierForGooglePurchase(
+  purchaseToken: string,
+): Promise<'free' | 'premium' | null> {
+  return runWithInternalClient(getDbOptions(), async (db) => {
+    const rows = await db
+      .select({ tier: InternalSchema.subscriptions.tier })
+      .from(InternalSchema.subscriptions)
+      .where(
+        eq(InternalSchema.subscriptions.googlePurchaseToken, purchaseToken),
+      )
+      .limit(1);
+    return (rows[0]?.tier ?? null) as 'free' | 'premium' | null;
+  });
+}

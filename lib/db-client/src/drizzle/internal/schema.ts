@@ -165,6 +165,8 @@ export const subscriptions = appInternal.table(
     stripeSubscriptionId: text('stripe_subscription_id'),
     appleOriginalTransactionId: text('apple_original_transaction_id'),
     appleProductId: text('apple_product_id'),
+    googlePurchaseToken: text('google_purchase_token'),
+    googleProductId: text('google_product_id'),
     status: text('status').notNull().default('inactive'),
     tier: text('tier').notNull().default('free'),
     currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
@@ -192,6 +194,9 @@ export const subscriptions = appInternal.table(
       appleOriginalTransactionIdUk: unique(
         'subscriptions_apple_original_transaction_id_uk',
       ).on(table.appleOriginalTransactionId),
+      googlePurchaseTokenUk: unique(
+        'subscriptions_google_purchase_token_uk',
+      ).on(table.googlePurchaseToken),
     };
   },
 );
@@ -204,6 +209,13 @@ export const stripeEvents = appInternal.table('stripe_events', {
 });
 
 export const appleEvents = appInternal.table('apple_events', {
+  eventId: text('event_id').primaryKey().notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const googleEvents = appInternal.table('google_events', {
   eventId: text('event_id').primaryKey().notNull(),
   processedAt: timestamp('processed_at', { withTimezone: true })
     .notNull()

@@ -9,3 +9,15 @@ mutation VerifyApplePurchase($jwsTransaction: String!) {
 mutation RestoreApplePurchases($jwsTransaction: String!) {
   restoreApplePurchases(jwsTransaction: $jwsTransaction)
 }
+
+mutation VerifyGooglePurchase($purchaseToken: String!, $productId: String!) {
+  verifyGooglePurchase(purchaseToken: $purchaseToken, productId: $productId) {
+    success
+    tier
+    status
+  }
+}
+
+mutation RestoreGooglePurchases($purchaseToken: String!, $productId: String!) {
+  restoreGooglePurchases(purchaseToken: $purchaseToken, productId: $productId)
+}
