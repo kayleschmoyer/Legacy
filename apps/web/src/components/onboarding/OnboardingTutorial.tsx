@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import {
   Button,
   H2,
@@ -30,7 +31,7 @@ interface TutorialStep {
   emoji: string;
   emojiLabel: string;
   title: string;
-  body: React.ReactNode;
+  body: React.ReactNode | ((ctx: { onClose: () => void }) => React.ReactNode);
   accentColor: string;
 }
 
@@ -450,7 +451,7 @@ const STEPS: TutorialStep[] = [
     emojiLabel: 'rocket',
     title: "You're Ready to Play!",
     accentColor: BRAND_GOLD_DARK,
-    body: (
+    body: ({ onClose }: { onClose: () => void }) => (
       <YStack gap="$4">
         <Paragraph color="$colorPress" fontSize="$4" lineHeight={26}>
           You now know everything you need to dominate your Legacy Sports
@@ -509,8 +510,9 @@ const STEPS: TutorialStep[] = [
                   {desc}
                 </Paragraph>
                 {link && linkText && (
-                  <a
-                    href={link}
+                  <Link
+                    to={link}
+                    onClick={onClose}
                     style={{
                       color: BRAND_GOLD_LIGHT,
                       fontWeight: 600,
@@ -519,7 +521,7 @@ const STEPS: TutorialStep[] = [
                     }}
                   >
                     {linkText}
-                  </a>
+                  </Link>
                 )}
               </YStack>
             </XStack>
@@ -549,6 +551,8 @@ export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
   const step = STEPS[currentStep];
   const isFirst = currentStep === 0;
   const isLast = currentStep === STEPS.length - 1;
+  const bodyContent =
+    typeof step.body === 'function' ? step.body({ onClose }) : step.body;
 
   const handleNext = () => {
     if (isLast) {
@@ -706,7 +710,7 @@ export function OnboardingTutorial({ onClose }: OnboardingTutorialProps) {
           paddingTop="$3"
           style={{ overflowY: 'auto', flex: 1 }}
         >
-          {step.body}
+          {bodyContent}
         </YStack>
 
         {/* ── Footer ── */}
