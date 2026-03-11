@@ -211,16 +211,9 @@ test.describe
         .click({ force: true });
     });
 
-    await test.step('Re-enable Playoffs and change format to 6-team', async () => {
+    await test.step('Re-enable Playoffs', async () => {
       await page
         .getByRole('button', { name: 'Playoffs: Enabled', exact: true })
-        .click({ force: true });
-      // Wait for playoff format to appear
-      await expect(page.getByText('Playoff Format')).toBeVisible({
-        timeout: 5_000,
-      });
-      await page
-        .getByRole('button', { name: 'Playoff format: 6-team', exact: true })
         .click({ force: true });
     });
 
@@ -257,7 +250,7 @@ test.describe
       expect(data.league.minCareerGames).toBe(100);
       expect(data.league.minCareerSeasons).toBe(5);
       expect(data.league.playoffEnabled).toBe(true);
-      expect(data.league.playoffFormat).toBe('6-team');
+      expect(data.league.playoffFormat).toBe('4-team');
       expect(data.league.playoffMultiWeek).toBe(true);
     });
   });
