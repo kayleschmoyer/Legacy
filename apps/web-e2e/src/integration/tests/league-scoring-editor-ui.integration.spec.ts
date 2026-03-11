@@ -230,10 +230,9 @@ test.describe
     await test.step('Save the change', async () => {
       const saveBtn = page.getByRole('button', { name: /save.*change/i });
       await expect(saveBtn).toBeVisible({ timeout: 5_000 });
-      // Use keyboard Enter to bypass Tamagui overlay interception
       await saveBtn.scrollIntoViewIfNeeded();
-      await saveBtn.focus();
-      await page.keyboard.press('Enter');
+      // Use force:true to bypass any Tamagui overlay that intercepts pointer events
+      await saveBtn.click({ force: true });
       // Wait for the unsaved badge to disappear (confirms save completed)
       await expect(page.getByText(/\d+ unsaved/i)).not.toBeVisible({
         timeout: 20_000,
