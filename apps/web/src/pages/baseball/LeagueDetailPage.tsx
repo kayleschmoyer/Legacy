@@ -926,6 +926,8 @@ export function LeagueDetailPage(): React.JSX.Element {
     useUpdateTeamBrandingMutation();
   const [teamPrimaryColor, setTeamPrimaryColor] = useState('');
   const [teamSecondaryColor, setTeamSecondaryColor] = useState('');
+  const [teamColorSuccess, setTeamColorSuccess] = useState(false);
+  const [teamColorError, setTeamColorError] = useState<string | null>(null);
 
   // Pre-populate color inputs with the team's existing saved colors so that
   // opening Team Settings and saving without editing does not clear them.
@@ -2766,98 +2768,170 @@ export function LeagueDetailPage(): React.JSX.Element {
             <Text fontSize="$3" fontWeight="600">
               Team Colors
             </Text>
-            <XStack gap="$4" flexWrap="wrap">
-              <YStack gap="$1" flex={1} minWidth={160}>
-                <Label
-                  htmlFor="team-primary-color"
-                  fontSize="$2"
-                  fontWeight="600"
-                >
-                  Primary Color
-                </Label>
-                <XStack gap="$2" alignItems="center">
-                  <YStack
-                    width={32}
-                    height={32}
-                    borderRadius="$2"
-                    borderWidth={1}
-                    borderColor="$gray6"
-                    backgroundColor={
-                      /^#[0-9a-fA-F]{6}$/.test(teamPrimaryColor)
-                        ? teamPrimaryColor
-                        : '$gray4'
-                    }
-                    flexShrink={0}
-                  />
-                  <Input
-                    id="team-primary-color"
-                    flex={1}
-                    placeholder="#1A2B3C"
-                    value={teamPrimaryColor}
-                    onChangeText={setTeamPrimaryColor}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    maxLength={7}
-                  />
-                </XStack>
-              </YStack>
-              <YStack gap="$1" flex={1} minWidth={160}>
-                <Label
-                  htmlFor="team-secondary-color"
-                  fontSize="$2"
-                  fontWeight="600"
-                >
-                  Secondary Color
-                </Label>
-                <XStack gap="$2" alignItems="center">
-                  <YStack
-                    width={32}
-                    height={32}
-                    borderRadius="$2"
-                    borderWidth={1}
-                    borderColor="$gray6"
-                    backgroundColor={
-                      /^#[0-9a-fA-F]{6}$/.test(teamSecondaryColor)
-                        ? teamSecondaryColor
-                        : '$gray4'
-                    }
-                    flexShrink={0}
-                  />
-                  <Input
-                    id="team-secondary-color"
-                    flex={1}
-                    placeholder="#FFFFFF"
-                    value={teamSecondaryColor}
-                    onChangeText={setTeamSecondaryColor}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    maxLength={7}
-                  />
-                </XStack>
-              </YStack>
-            </XStack>
-            <Button
-              size="$3"
-              backgroundColor={BRAND_NAVY_LIGHT}
-              color={WHITE}
-              borderRadius="$3"
-              alignSelf="flex-start"
-              disabled={teamBrandingLoading}
-              opacity={teamBrandingLoading ? 0.6 : 1}
-              onPress={() => {
-                if (!userTeamId) return;
-                void updateTeamBranding({
-                  variables: {
-                    teamId: userTeamId,
-                    leagueId,
-                    primaryColor: teamPrimaryColor || null,
-                    secondaryColor: teamSecondaryColor || null,
-                  },
-                });
-              }}
-            >
-              {teamBrandingLoading ? 'Saving…' : 'Save Colors'}
-            </Button>
+            {(() => {
+              const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
+              const primaryError =
+                teamPrimaryColor !== '' && !HEX_RE.test(teamPrimaryColor)
+                  ? 'Must be a hex color like #1A2B3C'
+                  : null;
+              const secondaryError =
+                teamSecondaryColor !== '' && !HEX_RE.test(teamSecondaryColor)
+                  ? 'Must be a hex color like #1A2B3C'
+                  : null;
+              const hasErrors = !!(primaryError ?? secondaryError);
+
+              const handleColorsSave = async () => {
+                if (!userTeamId || hasErrors) return;
+                setTeamColorSuccess(false);
+                setTeamColorError(null);
+                try {
+                  await updateTeamBranding({
+                    variables: {
+                      teamId: userTeamId,
+                      leagueId,
+                      primaryColor: teamPrimaryColor || null,
+                      secondaryColor: teamSecondaryColor || null,
+                    },
+                  });
+                  setTeamColorSuccess(true);
+                  setTimeout(() => setTeamColorSuccess(false), 4000);
+                } catch (err) {
+                  setTeamColorError(
+                    err instanceof Error
+                      ? err.message
+                      : 'Failed to save colors',
+                  );
+                }
+              };
+
+              return (
+                <>
+                  <XStack gap="$4" flexWrap="wrap">
+                    <YStack gap="$1" flex={1} minWidth={160}>
+                      <Label
+                        htmlFor="team-primary-color"
+                        fontSize="$2"
+                        fontWeight="600"
+                      >
+                        Primary Color
+                      </Label>
+                      <XStack gap="$2" alignItems="center">
+                        <YStack
+                          width={32}
+                          height={32}
+                          borderRadius="$2"
+                          borderWidth={1}
+                          borderColor="$gray6"
+                          backgroundColor={
+                            HEX_RE.test(teamPrimaryColor)
+                              ? teamPrimaryColor
+                              : '$gray4'
+                          }
+                          flexShrink={0}
+                        />
+                        <Input
+                          id="team-primary-color"
+                          flex={1}
+                          placeholder="#1A2B3C"
+                          value={teamPrimaryColor}
+                          onChangeText={(v: string) => {
+                            setTeamPrimaryColor(v);
+                            setTeamColorError(null);
+                          }}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          maxLength={7}
+                          borderColor={primaryError ? '$red8' : undefined}
+                        />
+                      </XStack>
+                      {primaryError && (
+                        <Text fontSize="$1" color="$red10">
+                          {primaryError}
+                        </Text>
+                      )}
+                    </YStack>
+                    <YStack gap="$1" flex={1} minWidth={160}>
+                      <Label
+                        htmlFor="team-secondary-color"
+                        fontSize="$2"
+                        fontWeight="600"
+                      >
+                        Secondary Color
+                      </Label>
+                      <XStack gap="$2" alignItems="center">
+                        <YStack
+                          width={32}
+                          height={32}
+                          borderRadius="$2"
+                          borderWidth={1}
+                          borderColor="$gray6"
+                          backgroundColor={
+                            HEX_RE.test(teamSecondaryColor)
+                              ? teamSecondaryColor
+                              : '$gray4'
+                          }
+                          flexShrink={0}
+                        />
+                        <Input
+                          id="team-secondary-color"
+                          flex={1}
+                          placeholder="#FFFFFF"
+                          value={teamSecondaryColor}
+                          onChangeText={(v: string) => {
+                            setTeamSecondaryColor(v);
+                            setTeamColorError(null);
+                          }}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          maxLength={7}
+                          borderColor={secondaryError ? '$red8' : undefined}
+                        />
+                      </XStack>
+                      {secondaryError && (
+                        <Text fontSize="$1" color="$red10">
+                          {secondaryError}
+                        </Text>
+                      )}
+                    </YStack>
+                  </XStack>
+                  <XStack gap="$3" alignItems="center">
+                    <Button
+                      size="$3"
+                      backgroundColor={BRAND_NAVY_LIGHT}
+                      color={WHITE}
+                      borderRadius="$3"
+                      disabled={teamBrandingLoading || hasErrors}
+                      opacity={teamBrandingLoading || hasErrors ? 0.6 : 1}
+                      onPress={() => void handleColorsSave()}
+                    >
+                      {teamBrandingLoading ? (
+                        <XStack alignItems="center" gap="$2">
+                          <Spinner size="small" color="white" />
+                          <Text fontWeight="600" color="white" fontSize="$3">
+                            Saving…
+                          </Text>
+                        </XStack>
+                      ) : (
+                        'Save Colors'
+                      )}
+                    </Button>
+                    {teamColorSuccess && (
+                      <XStack alignItems="center" gap="$1">
+                        <Check size={14} color="var(--green10)" />
+                        <Text color="$green10" fontSize="$2">
+                          Saved
+                        </Text>
+                      </XStack>
+                    )}
+                    {teamColorError && (
+                      <Text color="$red10" fontSize="$2">
+                        {teamColorError}
+                      </Text>
+                    )}
+                  </XStack>
+                </>
+              );
+            })()}
           </YStack>
         </Card>
       </YStack>
