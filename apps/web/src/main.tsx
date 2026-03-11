@@ -33,6 +33,7 @@ import { default as App } from './app/app';
 import { store } from './store/store';
 import { initializeAnalytics, trackLogin } from './utils/analytics';
 import { ThemeProvider, useThemeContext } from './context/ThemeContext';
+import { PublicLandingPage } from './pages/landing/PublicLandingPage';
 
 // Initialize Rollbar for web app
 const sentryConfig = getSentryConfigFromEnv();
@@ -102,6 +103,7 @@ try {
               <EnhancedAuthGuard
                 loginTitle="Welcome to Legacy Sports!"
                 loginSubtitle="Sign in to access your fantasy leagues and stats"
+                loginComponent={<PublicLandingPage />}
                 testMode={env.authTestMode}
                 onLoginSuccess={() => {
                   LOGGER.info('Web app login successful!');
