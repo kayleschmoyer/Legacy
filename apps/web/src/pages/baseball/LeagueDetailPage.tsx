@@ -927,6 +927,16 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [teamPrimaryColor, setTeamPrimaryColor] = useState('');
   const [teamSecondaryColor, setTeamSecondaryColor] = useState('');
 
+  // Pre-populate color inputs with the team's existing saved colors so that
+  // opening Team Settings and saving without editing does not clear them.
+  useEffect(() => {
+    const userTeam = reduxLeagueTeams.find((t) => t.id === reduxUserTeamId);
+    if (userTeam) {
+      setTeamPrimaryColor(userTeam.primaryColor ?? '');
+      setTeamSecondaryColor(userTeam.secondaryColor ?? '');
+    }
+  }, [reduxLeagueTeams, reduxUserTeamId]);
+
   const {
     settings: scoringSettings,
     loading: scoringLoading,
