@@ -48,6 +48,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **Never edit schema.graphql**   | `.github/skills/no-edit-schema-graphql/SKILL.md`                           |     | **No lint disable** | `.github/skills/no-lint-disable/SKILL.md` |     | **New app** | `.github/skills/create-app/SKILL.md` |
 | **New lambda**                  | `.github/skills/create-lambda/SKILL.md`                                    |
 | **New library**                 | `.github/skills/create-lib/SKILL.md`                                       |
+| **New MCP server**              | `.github/skills/create-mcp-server/SKILL.md`                                |
 | **New skill**                   | `.github/skills/create-skill/SKILL.md`                                     |
 | PR creation                     | `.github/skills/create-pr/SKILL.md`                                        |
 | **Refresh dev seed**            | `.github/skills/db-dump-dev/SKILL.md`                                      |
@@ -64,6 +65,6 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **Rebase & conflicts**          | `.github/skills/rebase-conflicts/SKILL.md`                                 |
 | **Resolve merge conflicts**     | `.github/skills/resolve-merge-conflicts/SKILL.md`                          |
 | **Worktree workflow (default)** | `.github/skills/worktree-workflow/SKILL.md`                                |
-| All skills (59 guides)          | `.github/skills/`                                                          |
+| All skills (60 guides)          | `.github/skills/`                                                          |
 | CSV reference data              | `docs/agents/*.csv`                                                        |
 | Tech stack                      | React Native · Next.js · Lambda · GraphQL · PostgreSQL/Drizzle · Terraform |

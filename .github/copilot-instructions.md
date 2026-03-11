@@ -65,6 +65,7 @@ Windows PowerShell ┬╖ Nx monorepo ┬╖ pnpm 9.12.1 ┬╖ Jira project LS 
 | **New app**                     | `skills/create-app/SKILL.md`              |
 | **New lambda**                  | `skills/create-lambda/SKILL.md`           |
 | **New library**                 | `skills/create-lib/SKILL.md`              |
+| **New MCP server**              | `skills/create-mcp-server/SKILL.md`       |
 | **New skill**                   | `skills/create-skill/SKILL.md`            |
 | PR creation                     | `skills/create-pr/SKILL.md`               |
 | **Refresh dev seed**            | `skills/db-dump-dev/SKILL.md`             |
@@ -82,5 +83,5 @@ Windows PowerShell ┬╖ Nx monorepo ┬╖ pnpm 9.12.1 ┬╖ Jira project LS 
 | **Resolve merge conflicts**     | `skills/resolve-merge-conflicts/SKILL.md` |
 | **Makefile reference**          | `skills/makefile/SKILL.md`                |
 | **Worktree workflow (default)** | `skills/worktree-workflow/SKILL.md`       |
-| All skills (61 guides)          | `skills/`                                 |
+| All skills (62 guides)          | `skills/`                                 |
 | CSV reference data              | `docs/agents/*.csv`                       |
