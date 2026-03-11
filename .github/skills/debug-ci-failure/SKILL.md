@@ -760,13 +760,13 @@ gh run view RUN_ID --log-failed | Select-String "build failed|deploy.*failed|Pag
 
 Common issues: missing `VITE_*` secrets, Sentry sourcemap upload failure, Pages deployment timeout.
 
-### Lambda deployment (`upload-*.yml` → `lambda-terraform-apply.yml`)
+### Lambda deployment (`upload-lambdas.yml` → `lambda-terraform-apply.yml`)
 
-Individual upload workflows build + package + upload to S3. Then `lambda-terraform-apply.yml` runs Terraform to update the Lambda function code.
+The consolidated upload workflow builds affected lambdas via matrix, packages and uploads to S3. Then `lambda-terraform-apply.yml` runs Terraform to update the Lambda function code.
 
 ```powershell
 # Find upload runs
-gh run list --workflow upload-gql.yml --limit 5
+gh run list --workflow upload-lambdas.yml --limit 5
 
 # Find terraform apply runs
 gh run list --workflow lambda-terraform-apply.yml --limit 5

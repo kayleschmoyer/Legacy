@@ -45,7 +45,7 @@ try {
         // Run yamllint on each file
         for (const file of yamlFiles) {
           try {
-            execSync(`pnpm exec yamllint "${file}"`, { stdio: 'inherit' });
+            execSync(`python -m yamllint "${file}"`, { stdio: 'inherit' });
           } catch (error) {
             console.error(`\n❌ YAML validation failed for: ${file}`);
             console.error('Please fix the YAML syntax errors before committing.\n');

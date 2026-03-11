@@ -7,14 +7,7 @@ name: Apply Lambda Infrastructure
 on:
   workflow_run:
     workflows:
-      - "Upload GraphQL Lambda"
-      - "Upload Stats Lambda"
-      - "Upload Draft Processor Lambda"
-      - "Upload Game Selection Lambda"
-      - "Upload OAuth Proxy Lambda"
-      - "Upload WebSocket Lambda"
-      - "Upload Jira Proxy Lambda"
-      - "Upload Stripe Webhook Lambda"
+      - "Upload Lambdas"
     types: [completed]
     branches: [main]
   workflow_dispatch:

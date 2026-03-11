@@ -50,13 +50,8 @@ gh run list --workflow ci-orchestrator.yml --limit 5
 # Web deployment runs
 gh run list --workflow deploy-web.yml --limit 5
 
-# Lambda upload runs
-gh run list --workflow upload-gql.yml --limit 5
-gh run list --workflow upload-draft-processor.yml --limit 5
-gh run list --workflow upload-game-selection.yml --limit 5
-gh run list --workflow upload-oauth-proxy.yml --limit 5
-gh run list --workflow upload-stats-lambda.yml --limit 5
-gh run list --workflow upload-websocket.yml --limit 5
+# Lambda upload runs (consolidated matrix workflow)
+gh run list --workflow upload-lambdas.yml --limit 5
 
 # Terraform apply runs
 gh run list --workflow lambda-terraform-apply.yml --limit 5
@@ -857,11 +852,11 @@ gh run view $runId --log-failed | Select-String "Pages.*error|deploy.*failed|CNA
 gh run view $runId --log | Select-String "DTE.*fail|NX_CLOUD_NO_TIMEOUTS|NX_NO_CLOUD" -Context 3
 ```
 
-### Lambda Upload (upload-\*.yml)
+### Lambda Upload (upload-lambdas.yml)
 
 ```powershell
 # Find lambda upload runs
-$runId = (gh run list --workflow upload-gql.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+$runId = (gh run list --workflow upload-lambdas.yml --limit 1 --json databaseId --jq '.[0].databaseId')
 
 # Build failures
 gh run view $runId --log-failed | Select-String "Lambda build failed|build failed" -Context 10
@@ -969,7 +964,7 @@ $logs = gh run view $runId --log-failed
 | Find E2E server issues | `gh run view RUN_ID --log \| Select-String "server.*fail\|server.*died"`      |
 | List CI pipeline runs  | `gh run list --workflow ci-orchestrator.yml --limit 5`                        |
 | List deploy runs       | `gh run list --workflow deploy-web.yml --limit 5`                             |
-| List lambda uploads    | `gh run list --workflow upload-gql.yml --limit 5`                             |
+| List lambda uploads    | `gh run list --workflow upload-lambdas.yml --limit 5`                         |
 | List terraform runs    | `gh run list --workflow lambda-terraform-apply.yml --limit 5`                 |
 | List merge queue runs  | `gh run list --workflow merge-queue.yml --limit 5`                            |
 | Check run conclusion   | `gh run view RUN_ID --json conclusion --jq '.conclusion'`                     |
