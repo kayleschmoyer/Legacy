@@ -161,8 +161,10 @@ export const subscriptions = appInternal.table(
     userId: integer('user_id')
       .notNull()
       .references(() => usersInAppInternal.id, { onDelete: 'cascade' }),
-    stripeCustomerId: text('stripe_customer_id').notNull(),
-    stripeSubscriptionId: text('stripe_subscription_id').notNull(),
+    stripeCustomerId: text('stripe_customer_id'),
+    stripeSubscriptionId: text('stripe_subscription_id'),
+    appleOriginalTransactionId: text('apple_original_transaction_id'),
+    appleProductId: text('apple_product_id'),
     status: text('status').notNull().default('inactive'),
     tier: text('tier').notNull().default('free'),
     currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
@@ -187,11 +189,21 @@ export const subscriptions = appInternal.table(
       stripeSubscriptionIdUk: unique(
         'subscriptions_stripe_subscription_id_uk',
       ).on(table.stripeSubscriptionId),
+      appleOriginalTransactionIdUk: unique(
+        'subscriptions_apple_original_transaction_id_uk',
+      ).on(table.appleOriginalTransactionId),
     };
   },
 );
 
 export const stripeEvents = appInternal.table('stripe_events', {
+  eventId: text('event_id').primaryKey().notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const appleEvents = appInternal.table('apple_events', {
   eventId: text('event_id').primaryKey().notNull(),
   processedAt: timestamp('processed_at', { withTimezone: true })
     .notNull()

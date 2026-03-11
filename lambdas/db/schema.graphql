@@ -53,6 +53,12 @@ type AdvanceLeagueWeekResponse {
   matchups: [Matchup!]
 }
 
+type AppleVerifyResult {
+  status: String
+  success: Boolean
+  tier: String
+}
+
 """
 Per-team budget tracking during an auction draft
 """
@@ -1455,6 +1461,16 @@ type Mutation {
   Request an export of all personal data (GDPR Art. 15 - Right of Access)
   """
   requestDataExport: DataRequest
+
+  """
+  Restore Apple IAP purchases and sync the subscription tier. Pass the JWS-signed transaction string for the most recent active purchase returned by StoreKit 2 restoreCompletedTransactions.
+  """
+  restoreApplePurchases(
+    """
+    The JWS-signed transaction from StoreKit 2 restore.
+    """
+    jwsTransaction: String!
+  ): Boolean
   resumeDraft(leagueId: Int!): Draft
 
   """
@@ -1610,6 +1626,16 @@ type Mutation {
   upsertLeagueSeasonAward(
     input: UpsertLeagueSeasonAwardInput!
   ): LeagueSeasonAward
+
+  """
+  Verify and record an iOS in-app purchase transaction. The client passes the JWS-signed transaction string from StoreKit 2. Returns the resulting subscription tier and status.
+  """
+  verifyApplePurchase(
+    """
+    The JWS-signed transaction string from StoreKit 2.
+    """
+    jwsTransaction: String!
+  ): AppleVerifyResult
 
   """
   Commissioner-only: veto an accepted trade, reversing the player swap.

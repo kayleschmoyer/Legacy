@@ -76,6 +76,13 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+export type AppleVerifyResult = {
+  __typename?: 'AppleVerifyResult';
+  status?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+  tier?: Maybe<Scalars['String']['output']>;
+};
+
 /** Per-team budget tracking during an auction draft */
 export type AuctionBudget = {
   __typename?: 'AuctionBudget';
@@ -1143,6 +1150,8 @@ export type Mutation = {
   requestDataDeletion?: Maybe<DataRequest>;
   /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
   requestDataExport?: Maybe<DataRequest>;
+  /** Restore Apple IAP purchases and sync the subscription tier. Pass the JWS-signed transaction string for the most recent active purchase returned by StoreKit 2 restoreCompletedTransactions. */
+  restoreApplePurchases?: Maybe<Scalars['Boolean']['output']>;
   resumeDraft?: Maybe<Draft>;
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
@@ -1190,6 +1199,8 @@ export type Mutation = {
   upsertAchievementRestriction?: Maybe<AchievementRestriction>;
   /** Create or update a season award for a player in a league. Commissioner / General Manager access required. */
   upsertLeagueSeasonAward?: Maybe<LeagueSeasonAward>;
+  /** Verify and record an iOS in-app purchase transaction. The client passes the JWS-signed transaction string from StoreKit 2. Returns the resulting subscription tier and status. */
+  verifyApplePurchase?: Maybe<AppleVerifyResult>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
 };
@@ -1492,6 +1503,10 @@ export type MutationReorderDraftQueueArgs = {
   playerIds: Array<Scalars['Int']['input']>;
 };
 
+export type MutationRestoreApplePurchasesArgs = {
+  jwsTransaction: Scalars['String']['input'];
+};
+
 export type MutationResumeDraftArgs = {
   leagueId: Scalars['Int']['input'];
 };
@@ -1658,6 +1673,10 @@ export type MutationUpsertAchievementRestrictionArgs = {
 
 export type MutationUpsertLeagueSeasonAwardArgs = {
   input: UpsertLeagueSeasonAwardInput;
+};
+
+export type MutationVerifyApplePurchaseArgs = {
+  jwsTransaction: Scalars['String']['input'];
 };
 
 export type MutationVetoTradeArgs = {
@@ -4193,6 +4212,29 @@ export type GetPlayerCareerStatsQuery = {
     winPercentage?: number | null;
     playerId?: number | null;
   } | null;
+};
+
+export type VerifyApplePurchaseMutationVariables = Exact<{
+  jwsTransaction: Scalars['String']['input'];
+}>;
+
+export type VerifyApplePurchaseMutation = {
+  __typename?: 'Mutation';
+  verifyApplePurchase?: {
+    __typename?: 'AppleVerifyResult';
+    success?: boolean | null;
+    tier?: string | null;
+    status?: string | null;
+  } | null;
+};
+
+export type RestoreApplePurchasesMutationVariables = Exact<{
+  jwsTransaction: Scalars['String']['input'];
+}>;
+
+export type RestoreApplePurchasesMutation = {
+  __typename?: 'Mutation';
+  restoreApplePurchases?: boolean | null;
 };
 
 export type TeamFragment = {
@@ -7388,6 +7430,106 @@ export type GetPlayerCareerStatsSuspenseQueryHookResult = ReturnType<
 export type GetPlayerCareerStatsQueryResult = Apollo.QueryResult<
   GetPlayerCareerStatsQuery,
   GetPlayerCareerStatsQueryVariables
+>;
+export const VerifyApplePurchase = gql`
+  mutation VerifyApplePurchase($jwsTransaction: String!) {
+    verifyApplePurchase(jwsTransaction: $jwsTransaction) {
+      success
+      tier
+      status
+    }
+  }
+`;
+export type VerifyApplePurchaseMutationFn = MutationFunction<
+  VerifyApplePurchaseMutation,
+  VerifyApplePurchaseMutationVariables
+>;
+
+/**
+ * __useVerifyApplePurchaseMutation__
+ *
+ * To run a mutation, you first call `useVerifyApplePurchaseMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useVerifyApplePurchaseMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [verifyApplePurchaseMutation, { data, loading, error }] = useVerifyApplePurchaseMutation({
+ *   variables: {
+ *      jwsTransaction: // value for 'jwsTransaction'
+ *   },
+ * });
+ */
+export function useVerifyApplePurchaseMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    VerifyApplePurchaseMutation,
+    VerifyApplePurchaseMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    VerifyApplePurchaseMutation,
+    VerifyApplePurchaseMutationVariables
+  >(VerifyApplePurchase, options);
+}
+export type VerifyApplePurchaseMutationHookResult = ReturnType<
+  typeof useVerifyApplePurchaseMutation
+>;
+export type VerifyApplePurchaseMutationResult =
+  Apollo.MutationResult<VerifyApplePurchaseMutation>;
+export type VerifyApplePurchaseMutationOptions = BaseMutationOptions<
+  VerifyApplePurchaseMutation,
+  VerifyApplePurchaseMutationVariables
+>;
+export const RestoreApplePurchases = gql`
+  mutation RestoreApplePurchases($jwsTransaction: String!) {
+    restoreApplePurchases(jwsTransaction: $jwsTransaction)
+  }
+`;
+export type RestoreApplePurchasesMutationFn = MutationFunction<
+  RestoreApplePurchasesMutation,
+  RestoreApplePurchasesMutationVariables
+>;
+
+/**
+ * __useRestoreApplePurchasesMutation__
+ *
+ * To run a mutation, you first call `useRestoreApplePurchasesMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRestoreApplePurchasesMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [restoreApplePurchasesMutation, { data, loading, error }] = useRestoreApplePurchasesMutation({
+ *   variables: {
+ *      jwsTransaction: // value for 'jwsTransaction'
+ *   },
+ * });
+ */
+export function useRestoreApplePurchasesMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RestoreApplePurchasesMutation,
+    RestoreApplePurchasesMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RestoreApplePurchasesMutation,
+    RestoreApplePurchasesMutationVariables
+  >(RestoreApplePurchases, options);
+}
+export type RestoreApplePurchasesMutationHookResult = ReturnType<
+  typeof useRestoreApplePurchasesMutation
+>;
+export type RestoreApplePurchasesMutationResult =
+  Apollo.MutationResult<RestoreApplePurchasesMutation>;
+export type RestoreApplePurchasesMutationOptions = BaseMutationOptions<
+  RestoreApplePurchasesMutation,
+  RestoreApplePurchasesMutationVariables
 >;
 export const GetTeamMembers = gql`
   query GetTeamMembers($teamId: Int!) {

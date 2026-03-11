@@ -1,0 +1,11 @@
+mutation VerifyApplePurchase($jwsTransaction: String!) {
+  verifyApplePurchase(jwsTransaction: $jwsTransaction) {
+    success
+    tier
+    status
+  }
+}
+
+mutation RestoreApplePurchases($jwsTransaction: String!) {
+  restoreApplePurchases(jwsTransaction: $jwsTransaction)
+}

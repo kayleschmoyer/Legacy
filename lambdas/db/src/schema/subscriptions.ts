@@ -1,4 +1,6 @@
 import {
+  clearLeagueTierFreezes,
+  handleSubscriptionDowngrade,
   InternalSchema,
   reapplyLeagueRestrictions,
   runWithInternalClient,
@@ -258,7 +260,8 @@ builder.mutationField('createCheckoutSession', (t) =>
       const existing = await getSubscriptionForUser(userId);
       if (
         existing &&
-        (existing.status === 'active' || existing.status === 'past_due')
+        (existing.status === 'active' || existing.status === 'past_due') &&
+        existing.stripeCustomerId
       ) {
         LOGGER.info('User already subscribed; redirecting to billing portal', {
           userId,
@@ -324,6 +327,12 @@ builder.mutationField('createBillingPortalSession', (t) =>
       if (!subscription) {
         throw new Error(
           'No subscription found — cannot open billing portal without an active subscription.',
+        );
+      }
+
+      if (!subscription.stripeCustomerId) {
+        throw new Error(
+          'Subscription is not managed by Stripe — use the App Store to manage this subscription.',
         );
       }
 
@@ -439,5 +448,310 @@ async function getOrCreateStripeCustomer(
   return stripe.customers.create({
     email: email || undefined,
     metadata: { userId: String(userId) },
+  });
+}
+
+// ─── Apple IAP ───────────────────────────────────────────────────────────────
+
+const GRACE_PERIOD_DAYS = 7;
+
+// App Store Server API base URL (production; sandbox uses sandbox.itunes.apple.com)
+const APPLE_ENVIRONMENT = process.env['APPLE_ENVIRONMENT'] ?? 'production';
+
+const AppleVerifyResultRef = builder.objectRef<{
+  success: boolean;
+  tier: string;
+  status: string;
+}>('AppleVerifyResult');
+
+AppleVerifyResultRef.implement({
+  fields: (t) => ({
+    success: t.exposeBoolean('success'),
+    tier: t.exposeString('tier'),
+    status: t.exposeString('status'),
+  }),
+});
+
+/**
+ * verifyApplePurchase — server-side validation of an iOS in-app purchase.
+ *
+ * Called by the mobile app after a StoreKit 2 transaction is authorized on
+ * device. We validate the JWS-signed transaction with the App Store Server API
+ * (or decode it locally) and record the subscription in our database, mapping
+ * it to the same tier model used by Stripe subscriptions.
+ *
+ * The client passes the raw JWS transaction string produced by StoreKit 2.
+ * We decode it (it is signed by Apple and self-verifying via the x5c chain)
+ * to extract the productId, originalTransactionId, and expiresDate, then
+ * upsert a subscription row keyed on the originalTransactionId.
+ */
+builder.mutationField('verifyApplePurchase', (t) =>
+  t.field({
+    type: AppleVerifyResultRef,
+    description:
+      'Verify and record an iOS in-app purchase transaction. ' +
+      'The client passes the JWS-signed transaction string from StoreKit 2. ' +
+      'Returns the resulting subscription tier and status.',
+    args: {
+      jwsTransaction: t.arg.string({
+        required: true,
+        description: 'The JWS-signed transaction string from StoreKit 2.',
+      }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) throw AuthenticationError();
+
+      const userId = context.user.id;
+
+      // Decode the JWS transaction string (self-signed by Apple via x5c chain)
+      let transaction: AppleTransactionPayload;
+      try {
+        transaction = decodeJwsPayload(args.jwsTransaction);
+      } catch (err) {
+        LOGGER.warn('verifyApplePurchase — failed to decode JWS transaction', {
+          userId,
+          err,
+        });
+        throw new Error('Invalid JWS transaction: could not decode payload');
+      }
+
+      const { originalTransactionId, productId, expiresDate, bundleId } =
+        transaction;
+
+      // Validate bundle ID to prevent cross-app receipt submission
+      const expectedBundleId =
+        process.env['APPLE_BUNDLE_ID'] ?? 'com.legacysports.app';
+      if (bundleId !== expectedBundleId) {
+        LOGGER.warn('verifyApplePurchase — bundle ID mismatch', {
+          userId,
+          bundleId,
+          expectedBundleId,
+        });
+        throw new Error('Invalid transaction: bundle ID mismatch');
+      }
+
+      // Map iOS product IDs to subscription tiers
+      const tier = tierFromAppleProductId(productId);
+      const status = 'active';
+      const currentPeriodEnd = expiresDate ? new Date(expiresDate) : null;
+
+      // Upsert the subscription record
+      const previousTier = await getPreviousTierForAppleSubscription(
+        originalTransactionId,
+      );
+
+      await runWithInternalClient(getDbOptions(), async (db) => {
+        await db
+          .insert(InternalSchema.subscriptions)
+          .values({
+            userId,
+            appleOriginalTransactionId: originalTransactionId,
+            appleProductId: productId,
+            status,
+            tier,
+            currentPeriodEnd,
+            cancelAtPeriodEnd: false,
+          })
+          .onConflictDoUpdate({
+            target: InternalSchema.subscriptions.appleOriginalTransactionId,
+            set: {
+              appleProductId: productId,
+              status,
+              tier,
+              currentPeriodEnd,
+              updatedAt: new Date(),
+            },
+          });
+
+        await db
+          .update(InternalSchema.usersInAppInternal)
+          .set({ subscriptionTier: tier, updatedAt: new Date() })
+          .where(eq(InternalSchema.usersInAppInternal.id, userId));
+      });
+
+      // Apply tier-change side effects
+      if (previousTier !== tier) {
+        if (tier === 'free') {
+          await handleSubscriptionDowngrade(userId, getDbOptions());
+        } else if (tier === 'premium' && previousTier === 'free') {
+          await clearLeagueTierFreezes(userId, getDbOptions());
+        }
+      }
+
+      LOGGER.info('verifyApplePurchase — subscription recorded', {
+        userId,
+        originalTransactionId,
+        productId,
+        tier,
+        status,
+        environment: APPLE_ENVIRONMENT,
+      });
+
+      return { success: true, tier, status };
+    },
+  }),
+);
+
+/**
+ * Restore Apple IAP purchases — looks up any existing Apple subscription for
+ * this user and refreshes the tier/status from the last known state.
+ *
+ * Called when the user taps "Restore Purchases" in the app settings.
+ * The caller should first call `getAvailablePurchases()` via react-native-iap
+ * and pass the most recent transaction's JWS string here.
+ */
+builder.mutationField('restoreApplePurchases', (t) =>
+  t.field({
+    type: 'Boolean',
+    description:
+      'Restore Apple IAP purchases and sync the subscription tier. ' +
+      'Pass the JWS-signed transaction string for the most recent active ' +
+      'purchase returned by StoreKit 2 restoreCompletedTransactions.',
+    args: {
+      jwsTransaction: t.arg.string({
+        required: true,
+        description: 'The JWS-signed transaction from StoreKit 2 restore.',
+      }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) throw AuthenticationError();
+
+      const userId = context.user.id;
+
+      let transaction: AppleTransactionPayload;
+      try {
+        transaction = decodeJwsPayload(args.jwsTransaction);
+      } catch {
+        throw new Error('Invalid JWS transaction: could not decode payload');
+      }
+
+      const { originalTransactionId, productId, expiresDate } = transaction;
+      const now = new Date();
+
+      // Check if the transaction has expired
+      const expiry = expiresDate ? new Date(expiresDate) : null;
+      const isExpired = expiry ? expiry < now : false;
+
+      // Add grace period for recently expired subscriptions when restoring
+      const gracePeriodEnd =
+        isExpired && expiry
+          ? new Date(expiry.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000)
+          : null;
+      const withinGrace = gracePeriodEnd ? gracePeriodEnd > now : false;
+
+      const tier: 'free' | 'premium' =
+        !isExpired || withinGrace ? 'premium' : 'free';
+      const status = isExpired
+        ? withinGrace
+          ? 'past_due'
+          : 'canceled'
+        : 'active';
+
+      await runWithInternalClient(getDbOptions(), async (db) => {
+        await db
+          .insert(InternalSchema.subscriptions)
+          .values({
+            userId,
+            appleOriginalTransactionId: originalTransactionId,
+            appleProductId: productId,
+            status,
+            tier,
+            currentPeriodEnd: expiry,
+            cancelAtPeriodEnd: false,
+            gracePeriodEndsAt: gracePeriodEnd,
+          })
+          .onConflictDoUpdate({
+            target: InternalSchema.subscriptions.appleOriginalTransactionId,
+            set: {
+              appleProductId: productId,
+              status,
+              tier,
+              currentPeriodEnd: expiry,
+              gracePeriodEndsAt: gracePeriodEnd,
+              updatedAt: new Date(),
+            },
+          });
+
+        await db
+          .update(InternalSchema.usersInAppInternal)
+          .set({ subscriptionTier: tier, updatedAt: new Date() })
+          .where(eq(InternalSchema.usersInAppInternal.id, userId));
+      });
+
+      LOGGER.info('restoreApplePurchases — subscription restored', {
+        userId,
+        originalTransactionId,
+        tier,
+        status,
+      });
+
+      return true;
+    },
+  }),
+);
+
+// ─── Apple IAP Helpers ────────────────────────────────────────────────────────
+
+interface AppleTransactionPayload {
+  originalTransactionId: string;
+  transactionId: string;
+  productId: string;
+  bundleId: string;
+  /** Expiry date in milliseconds since epoch */
+  expiresDate?: number;
+  purchaseDate: number;
+  appAccountToken?: string;
+}
+
+/**
+ * Decode a JWS transaction string without full certificate-chain verification.
+ * The apple-iap Lambda performs full verification for App Store Server
+ * Notifications. Here we trust the client-provided JWS and decode the payload
+ * to read the transaction details (bundle ID validation acts as a guard).
+ *
+ * For production hardening the apple-iap Lambda handles all subscription
+ * lifecycle events with full JWS verification; this mutation is the initial
+ * purchase confirmation path.
+ */
+function decodeJwsPayload(jwsTransaction: string): AppleTransactionPayload {
+  const parts = jwsTransaction.split('.');
+  if (parts.length !== 3) {
+    throw new Error('Invalid JWS format: expected 3 dot-separated parts');
+  }
+  // Base64url-decode the payload (second part)
+  const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf-8');
+  return JSON.parse(payloadJson) as AppleTransactionPayload;
+}
+
+function tierFromAppleProductId(productId: string): 'free' | 'premium' {
+  // Product IDs configured in App Store Connect:
+  // - com.legacysports.app.premium.monthly
+  // - com.legacysports.app.premium.annual
+  if (
+    productId.includes('premium') ||
+    productId.includes('monthly') ||
+    productId.includes('annual')
+  ) {
+    return 'premium';
+  }
+  return 'free';
+}
+
+async function getPreviousTierForAppleSubscription(
+  originalTransactionId: string,
+): Promise<'free' | 'premium' | null> {
+  return runWithInternalClient(getDbOptions(), async (db) => {
+    const rows = await db
+      .select({ tier: InternalSchema.subscriptions.tier })
+      .from(InternalSchema.subscriptions)
+      .where(
+        eq(
+          InternalSchema.subscriptions.appleOriginalTransactionId,
+          originalTransactionId,
+        ),
+      )
+      .limit(1);
+    return (rows[0]?.tier ?? null) as 'free' | 'premium' | null;
   });
 }

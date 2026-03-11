@@ -6,8 +6,10 @@ import * as InternalSchema from '../../drizzle/internal/schema';
 export interface UserSubscription {
   id: number;
   userId: number;
-  stripeCustomerId: string;
-  stripeSubscriptionId: string;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  appleOriginalTransactionId: string | null;
+  appleProductId: string | null;
   status: string;
   tier: string;
   currentPeriodEnd: Date | null;

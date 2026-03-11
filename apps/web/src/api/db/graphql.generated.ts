@@ -76,6 +76,13 @@ export type AdvanceLeagueWeekResponse = {
   matchups?: Maybe<Array<Matchup>>;
 };
 
+export type AppleVerifyResult = {
+  __typename?: 'AppleVerifyResult';
+  status?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+  tier?: Maybe<Scalars['String']['output']>;
+};
+
 /** Per-team budget tracking during an auction draft */
 export type AuctionBudget = {
   __typename?: 'AuctionBudget';
@@ -1143,6 +1150,8 @@ export type Mutation = {
   requestDataDeletion?: Maybe<DataRequest>;
   /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
   requestDataExport?: Maybe<DataRequest>;
+  /** Restore Apple IAP purchases and sync the subscription tier. Pass the JWS-signed transaction string for the most recent active purchase returned by StoreKit 2 restoreCompletedTransactions. */
+  restoreApplePurchases?: Maybe<Scalars['Boolean']['output']>;
   resumeDraft?: Maybe<Draft>;
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
@@ -1190,6 +1199,8 @@ export type Mutation = {
   upsertAchievementRestriction?: Maybe<AchievementRestriction>;
   /** Create or update a season award for a player in a league. Commissioner / General Manager access required. */
   upsertLeagueSeasonAward?: Maybe<LeagueSeasonAward>;
+  /** Verify and record an iOS in-app purchase transaction. The client passes the JWS-signed transaction string from StoreKit 2. Returns the resulting subscription tier and status. */
+  verifyApplePurchase?: Maybe<AppleVerifyResult>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
 };
@@ -1492,6 +1503,10 @@ export type MutationReorderDraftQueueArgs = {
   playerIds: Array<Scalars['Int']['input']>;
 };
 
+export type MutationRestoreApplePurchasesArgs = {
+  jwsTransaction: Scalars['String']['input'];
+};
+
 export type MutationResumeDraftArgs = {
   leagueId: Scalars['Int']['input'];
 };
@@ -1658,6 +1673,10 @@ export type MutationUpsertAchievementRestrictionArgs = {
 
 export type MutationUpsertLeagueSeasonAwardArgs = {
   input: UpsertLeagueSeasonAwardInput;
+};
+
+export type MutationVerifyApplePurchaseArgs = {
+  jwsTransaction: Scalars['String']['input'];
 };
 
 export type MutationVetoTradeArgs = {

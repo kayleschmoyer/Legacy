@@ -1,0 +1,66 @@
+{
+  "name": "apple-iap",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lambdas/apple-iap/src",
+  "projectType": "application",
+  "tags": ["lambda", "platform:node", "scope:lambda", "type:api"],
+  "targets": {
+    "typecheck": {
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.app.json"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "dependsOn": ["^build"],
+      "options": {
+        "command": "vite build",
+        "cwd": "lambdas/apple-iap"
+      },
+      "configurations": {
+        "development": {
+          "command": "vite build --mode development"
+        },
+        "production": {
+          "command": "vite build --mode production"
+        }
+      }
+    },
+    "package": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "echo 'Use nx deploy apple-iap instead.'",
+        "cwd": "lambdas/apple-iap"
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "../../scripts/deploy-lambda.ps1 -FunctionName apple-iap",
+        "cwd": "lambdas/apple-iap"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx src/dev.ts",
+        "cwd": "lambdas/apple-iap"
+      }
+    },
+    "logs": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "aws logs tail /aws/lambda/legacy-sports-dev-apple-iap --follow --region us-east-1"
+        ],
+        "parallel": false,
+        "cwd": "."
+      }
+    }
+  }
+}
