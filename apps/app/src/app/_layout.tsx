@@ -136,7 +136,6 @@ function InnerLayout(): React.JSX.Element {
         }}
         onLoginFailure={(error) => {
           LOGGER.error('Mobile app login failed:', error);
-          captureError(new Error(error), { context: 'mobile-app-login' });
         }}
       >
         <AuthenticatedContent />

@@ -109,7 +109,6 @@ try {
                 }}
                 onLoginFailure={(error: string) => {
                   LOGGER.error('Web app login failed:', error);
-                  captureError(new Error(error), { context: 'web-app-login' });
                 }}
               >
                 <ThemeAwareApp />
