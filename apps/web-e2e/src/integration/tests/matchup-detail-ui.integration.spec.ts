@@ -478,9 +478,10 @@ test.describe
       // A 4-team league has 2 matchups per week.  At minimum 1 card is shown.
       // The navigation card renders matchup info (team names) as clickable rows.
       await expect(page.locator('body')).not.toContainText('No matchups found');
-      // The "You" badge appears for the commissioner's own matchup —
+      // The "YOU" badge appears for the commissioner's own matchup —
       // it may take a moment for the sidebar matchup list to populate.
-      const youBadge = page.getByText('You', { exact: true }).first();
+      // NOTE: the badge renders all-caps "YOU" — exact: true is case-sensitive.
+      const youBadge = page.getByText('YOU', { exact: true }).first();
       // Try up to 3 reloads — the sidebar matchup list can be slow to populate
       for (let attempt = 0; attempt < 3; attempt++) {
         if (await youBadge.isVisible({ timeout: 5_000 }).catch(() => false))
