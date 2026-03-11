@@ -2471,7 +2471,37 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             </div>
 
             {/* View mode */}
-            <div className="d-views" role="radiogroup" aria-label="View mode">
+            <div
+              className="d-views"
+              role="radiogroup"
+              aria-label="View mode"
+              onKeyDown={(e) => {
+                const idx = viewModes.indexOf(viewMode);
+                let next = idx;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  next = (idx + 1) % viewModes.length;
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  next = (idx - 1 + viewModes.length) % viewModes.length;
+                } else if (e.key === 'Home') {
+                  e.preventDefault();
+                  next = 0;
+                } else if (e.key === 'End') {
+                  e.preventDefault();
+                  next = viewModes.length - 1;
+                }
+                if (next !== idx) {
+                  setViewMode(viewModes[next]);
+                  const container = e.currentTarget;
+                  const buttons =
+                    container.querySelectorAll<HTMLButtonElement>(
+                      '[role="radio"]',
+                    );
+                  buttons[next]?.focus();
+                }
+              }}
+            >
               {viewModes.map((mode) => {
                 const isUserAutoPick =
                   mode === 'board' &&

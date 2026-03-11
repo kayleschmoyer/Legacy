@@ -326,6 +326,20 @@ test.describe
     const viewGroup = page.getByRole('radiogroup', { name: /view mode/i });
     await expect(viewGroup).toBeVisible({ timeout: 15_000 });
 
+    // Dismiss any pick-announcement overlay that may be covering the controls.
+    // The overlay is position:fixed (z-index 9999) and receives coordinate-based
+    // clicks even when force:true is used, preventing the view-mode buttons from
+    // getting the click event.
+    const announceOverlay = page.locator('.d-announce-overlay');
+    if (
+      await announceOverlay.isVisible({ timeout: 3_000 }).catch(() => false)
+    ) {
+      await announceOverlay.click({ force: true });
+      await announceOverlay
+        .waitFor({ state: 'hidden', timeout: 5_000 })
+        .catch(() => null);
+    }
+
     // The four modes: ⊞ (grid), ☰ (list), ⋯ (compact), ▦ (board)
     const gridBtn = viewGroup.getByRole('radio', { name: '⊞' });
     const listBtn = viewGroup.getByRole('radio', { name: '☰' });
@@ -338,18 +352,21 @@ test.describe
     });
 
     await test.step('Clicking list switches aria-checked state', async () => {
+      await listBtn.scrollIntoViewIfNeeded();
       await listBtn.click({ force: true });
       await expect(listBtn).toHaveAttribute('aria-checked', 'true');
       await expect(gridBtn).toHaveAttribute('aria-checked', 'false');
     });
 
     await test.step('Clicking compact switches aria-checked state', async () => {
+      await compactBtn.scrollIntoViewIfNeeded();
       await compactBtn.click({ force: true });
       await expect(compactBtn).toHaveAttribute('aria-checked', 'true');
       await expect(listBtn).toHaveAttribute('aria-checked', 'false');
     });
 
     await test.step('Clicking grid restores the original active state', async () => {
+      await gridBtn.scrollIntoViewIfNeeded();
       await gridBtn.click({ force: true });
       await expect(gridBtn).toHaveAttribute('aria-checked', 'true');
       await expect(compactBtn).toHaveAttribute('aria-checked', 'false');

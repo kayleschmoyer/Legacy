@@ -196,6 +196,49 @@ describe('EliteDraftBoardScreen a11y', () => {
     expect(list).toHaveAttribute('aria-checked', 'true');
   });
 
+  test('view mode radiogroup supports keyboard navigation', async () => {
+    const user = userEvent.setup();
+    renderDraftBoard();
+
+    const group = screen.getByRole('radiogroup', { name: /view mode/i });
+    const grid = screen.getByRole('radio', { name: '⊞' });
+    const list = screen.getByRole('radio', { name: '☰' });
+    const compact = screen.getByRole('radio', { name: '⋯' });
+
+    // ArrowRight moves grid → list
+    await user.click(grid);
+    await user.keyboard('{ArrowRight}');
+    expect(list).toHaveAttribute('aria-checked', 'true');
+    expect(grid).toHaveAttribute('aria-checked', 'false');
+
+    // ArrowLeft moves list → grid
+    await user.keyboard('{ArrowLeft}');
+    expect(grid).toHaveAttribute('aria-checked', 'true');
+
+    // End jumps to last (board)
+    await user.keyboard('{End}');
+    const board = group.querySelector<HTMLElement>(
+      '[role="radio"][aria-checked="true"]',
+    );
+    expect(board).toBeTruthy();
+
+    // Home jumps to first (grid)
+    await user.keyboard('{Home}');
+    expect(grid).toHaveAttribute('aria-checked', 'true');
+
+    // ArrowDown also moves forward
+    await user.keyboard('{ArrowDown}');
+    expect(list).toHaveAttribute('aria-checked', 'true');
+
+    // ArrowUp moves backward
+    await user.keyboard('{ArrowUp}');
+    expect(grid).toHaveAttribute('aria-checked', 'true');
+
+    // Verify compact is still reachable via click
+    await user.click(compact);
+    expect(compact).toHaveAttribute('aria-checked', 'true');
+  });
+
   test('watchlist toggle exposes aria-pressed', async () => {
     // Render with real timers so React flushes the useEffect that populates
     // allAvailablePlayers (added for pagination in LS-412). Use findAllByRole
