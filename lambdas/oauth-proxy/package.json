@@ -25,7 +25,8 @@
     "google-auth-library": "*",
     "jsonwebtoken": "*",
     "jwt-decode": "*",
-    "memoize-one": "*"
+    "memoize-one": "*",
+    "zod": "*"
   },
   "devDependencies": {
     "@types/aws-lambda": "*",

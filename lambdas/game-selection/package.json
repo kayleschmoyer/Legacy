@@ -17,7 +17,8 @@
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/sentry": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
-    "aws-lambda": "*"
+    "aws-lambda": "*",
+    "zod": "*"
   },
   "devDependencies": {
     "@types/aws-lambda": "*",

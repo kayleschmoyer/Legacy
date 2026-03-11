@@ -39,6 +39,7 @@ import {
   validateUserAccess,
 } from '@legacy-sports/db-client';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
+import { z } from 'zod';
 
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();
@@ -55,6 +56,18 @@ LOGGER.info('Draft Processor Lambda initialized', {
 
 // Initialize notification service
 const notificationService = createNotificationService();
+
+const SqsDraftMessageSchema = z.object({
+  messageType: z.literal('START_DRAFT'),
+  payload: z.object({
+    leagueId: z.number().int().positive(),
+    draftMode: z.enum(['live', 'automated']),
+    selectionMethod: z.enum(['standard', 'auction', 'random']),
+    draftOrder: z.enum(['snake', 'linear']),
+    requestedBy: z.number().int().positive(),
+    timestamp: z.string(),
+  }),
+});
 
 /**
  * Draft Processing Lambda
@@ -1626,7 +1639,9 @@ const baseDraftProcessorHandler = async (
 
   for (const record of event.Records) {
     try {
-      const message = JSON.parse(record.body) as SqsDraftMessage;
+      const message: SqsDraftMessage = SqsDraftMessageSchema.parse(
+        JSON.parse(record.body) as unknown,
+      );
 
       addBreadcrumb('Processing draft message', {
         messageId: record.messageId,

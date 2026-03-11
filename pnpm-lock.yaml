@@ -306,6 +306,9 @@ importers:
       ws:
         specifier: ^8.18.0
         version: 8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     optionalDependencies:
       '@nx/storybook':
         specifier: ^21.5.2
@@ -919,6 +922,9 @@ importers:
       aws-lambda:
         specifier: '*'
         version: 1.0.7
+      zod:
+        specifier: '*'
+        version: 4.3.6
     devDependencies:
       '@types/aws-lambda':
         specifier: '*'
@@ -1044,6 +1050,9 @@ importers:
       memoize-one:
         specifier: '*'
         version: 6.0.0
+      zod:
+        specifier: '*'
+        version: 4.3.6
     devDependencies:
       '@types/aws-lambda':
         specifier: '*'
@@ -17827,6 +17836,10 @@ packages:
   zip-stream@6.0.1:
     resolution: {integrity: sha512-zK7YHHz4ZXpW89AHXUPbQVGKI7uvkd3hzusTdotCg1UxyaVtg0zFJSTfW/Dq5f7OBBVnq6cZIaC8Ti4hb6dtCA==}
     engines: {node: '>= 14'}
+
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+    engines: {node: '>=10.0.0'}
 
   zustand@5.0.10:
     resolution: {integrity: sha512-U1AiltS1O9hSy3rul+Ub82ut2fqIAefiSuwECWt6jlMVUGejvf+5omLcRBSzqbRagSM3hQZbtzdeRc6QVScXTg==}
@@ -44147,6 +44160,8 @@ snapshots:
       archiver-utils: 5.0.2
       compress-commons: 6.0.2
       readable-stream: 4.7.0
+
+  zod@4.3.6: {}
 
   zustand@5.0.10(@types/react@19.2.14)(immer@11.1.3)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)):
     optionalDependencies:

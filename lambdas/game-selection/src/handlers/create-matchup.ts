@@ -16,6 +16,7 @@ import {
   withSentry,
 } from '@legacy-sports/rollbar';
 import { SQSBatchItemFailure, SQSBatchResponse, SQSEvent } from 'aws-lambda';
+import { z } from 'zod';
 
 // Initialize Sentry
 const sentryConfig = getSentryConfigFromEnv();
@@ -23,10 +24,12 @@ if (sentryConfig) {
   initSentry(sentryConfig);
 }
 
-interface CreateMatchupEvent {
-  league: number;
-  week: number;
-}
+const CreateMatchupEventSchema = z.object({
+  league: z.number().int().positive(),
+  week: z.number().int().positive(),
+});
+
+type CreateMatchupEvent = z.infer<typeof CreateMatchupEventSchema>;
 
 /**
  * Create matchup player records for a matchup
@@ -94,7 +97,9 @@ const baseCreateMatchupHandler = async (
 
     for (const record of event.Records) {
       try {
-        const matchup = JSON.parse(record.body) as CreateMatchupEvent;
+        const matchup = CreateMatchupEventSchema.parse(
+          JSON.parse(record.body) as unknown,
+        );
 
         addBreadcrumb('Processing create matchup message', {
           messageId: record.messageId,

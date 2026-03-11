@@ -12,6 +12,7 @@ import { createNotificationService } from '@legacy-sports/aws-utils';
 import type { PublicDb } from '@legacy-sports/db-client';
 import { PublicSchema } from '@legacy-sports/db-client';
 import { eq, inArray, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { withDb } from '../utils/db';
 import { selectGamesForMatchup } from '../services/season-game-selector';
 
@@ -30,10 +31,10 @@ const GAME_STATS_QUEUE_URL = process.env.SQS_LOAD_GAME_STATS_URL;
 // Initialize WebSocket notification service for real-time UI updates
 const notificationService = createNotificationService();
 
-interface SelectGameEvent {
-  matchupId: number;
-  game: number;
-}
+const SelectGameEventSchema = z.object({
+  matchupId: z.number().int().positive(),
+  game: z.number().int().positive(),
+});
 
 /**
  * Queue stats loading for players that don't have cached stats.
@@ -139,7 +140,9 @@ const baseSelectGameHandler = async (
   await withDb(async (db) => {
     for (const record of event.Records) {
       try {
-        const matchup = JSON.parse(record.body) as SelectGameEvent;
+        const matchup = SelectGameEventSchema.parse(
+          JSON.parse(record.body) as unknown,
+        );
 
         addBreadcrumb('Processing select game message', {
           messageId: record.messageId,
@@ -213,7 +216,9 @@ const baseSelectGameHandler = async (
 
         // Extract matchupId from the failed record to update status
         try {
-          const matchup = JSON.parse(record.body) as SelectGameEvent;
+          const matchup = SelectGameEventSchema.parse(
+            JSON.parse(record.body) as unknown,
+          );
           await db
             .update(PublicSchema.matchups)
             .set({ statsLoadingStatus: 'failed' })

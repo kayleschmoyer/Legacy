@@ -1,24 +1,23 @@
-import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
+﻿import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import { createUser, getUserByEmail } from '@legacy-sports/db-client';
+import { z } from 'zod';
 import { hashPassword, testPassword } from '../Users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
+import { parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
 
-interface LoginRequest {
-  email: string;
-  password: string;
-}
+const LoginRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
 
-interface RegisterRequest {
-  email: string;
-  password: string;
-  confirmPassword: string;
-}
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8;
+const RegisterRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+  confirmPassword: z.string().min(1),
+});
 
 function errorResponse(
   statusCode: number,
@@ -27,37 +26,10 @@ function errorResponse(
   return { statusCode, body: JSON.stringify({ error: message }) };
 }
 
-function parseBody<T>(body: string | null): T | null {
-  if (!body) return null;
-  try {
-    return JSON.parse(body) as T;
-  } catch {
-    return null;
-  }
-}
-
 export const handleLogin = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
-  const body = parseBody<LoginRequest>(event.body);
-
-  if (
-    !body ||
-    typeof body.email !== 'string' ||
-    typeof body.password !== 'string'
-  ) {
-    return errorResponse(400, 'Invalid request body');
-  }
-
-  const { email, password } = body;
-
-  if (!EMAIL_REGEX.test(email)) {
-    return errorResponse(400, 'Invalid email format');
-  }
-
-  if (!password) {
-    return errorResponse(400, 'Password is required');
-  }
+  const { email, password } = parseEventBody(event, LoginRequestSchema);
 
   LOGGER.debug('Initialize database.');
   return await withDbClient(async (db) => {
@@ -96,29 +68,10 @@ export const handleLogin = async (
 export const handleRegister = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
-  const body = parseBody<RegisterRequest>(event.body);
-
-  if (
-    !body ||
-    typeof body.email !== 'string' ||
-    typeof body.password !== 'string' ||
-    typeof body.confirmPassword !== 'string'
-  ) {
-    return errorResponse(400, 'Invalid request body');
-  }
-
-  const { email, password, confirmPassword } = body;
-
-  if (!EMAIL_REGEX.test(email)) {
-    return errorResponse(400, 'Invalid email format');
-  }
-
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return errorResponse(
-      400,
-      `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-    );
-  }
+  const { email, password, confirmPassword } = parseEventBody(
+    event,
+    RegisterRequestSchema,
+  );
 
   if (password !== confirmPassword) {
     return errorResponse(400, 'Password and confirm password must match');
