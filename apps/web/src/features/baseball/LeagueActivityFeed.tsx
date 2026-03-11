@@ -363,13 +363,33 @@ export function LeagueActivityFeed({
             </Text>
           </YStack>
         ) : filtered.length === 0 ? (
-          <YStack paddingVertical="$4" alignItems="center">
-            <Text fontSize="$3" color="$textMuted">
+          <YStack paddingVertical="$6" alignItems="center" gap="$2">
+            <YStack
+              width={48}
+              height={48}
+              borderRadius={24}
+              backgroundColor="$surfaceSubtle"
+              alignItems="center"
+              justifyContent="center"
+              marginBottom="$1"
+            >
+              <Clock size={22} color="$textMuted" />
+            </YStack>
+            <Text fontSize="$4" fontWeight="600" color="$textMuted">
               No{' '}
               {activeFilter === 'all'
                 ? ''
                 : `${TYPE_LABELS[activeFilter].toLowerCase()} `}
-              activity yet.
+              activity yet
+            </Text>
+            <Text
+              fontSize="$2"
+              color="$textMuted"
+              textAlign="center"
+              maxWidth={280}
+            >
+              Activity will appear here once trades, waivers, or draft picks
+              happen in your league.
             </Text>
           </YStack>
         ) : (

@@ -120,11 +120,27 @@ export function LeagueTradeBlock({
         padding="$5"
       >
         {header}
-        <YStack alignItems="center" gap="$2" paddingVertical="$4">
+        <YStack alignItems="center" gap="$2" paddingVertical="$5">
+          <YStack
+            width={44}
+            height={44}
+            borderRadius={22}
+            backgroundColor="$surfaceSubtle"
+            alignItems="center"
+            justifyContent="center"
+            marginBottom="$1"
+          >
+            <ArrowLeftRight size={20} color="$textMuted" />
+          </YStack>
           <Text color="$textMuted" fontSize="$3" textAlign="center">
-            No players on the trade block.
+            No players on the trade block
           </Text>
-          <Text color="$textMuted" fontSize="$2" textAlign="center">
+          <Text
+            color="$textMuted"
+            fontSize="$2"
+            textAlign="center"
+            maxWidth={260}
+          >
             Use the roster page to list players for trade.
           </Text>
         </YStack>

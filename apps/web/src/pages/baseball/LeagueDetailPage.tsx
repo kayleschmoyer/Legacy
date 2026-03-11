@@ -218,15 +218,49 @@ const DraftBadge = styled(XStack, {
   borderWidth: 1,
 });
 
-const QuickStatCard = styled(YStack, {
-  flex: 1,
-  minWidth: 120,
-  backgroundColor: '$surfaceCard',
+const SnapshotBar = styled(XStack, {
+  borderRadius: '$6',
+  borderWidth: 1,
+  borderColor: '$surfacePanelBorder',
+  paddingVertical: '$4',
+  paddingHorizontal: '$5',
+  gap: '$4',
+  alignItems: 'center',
+  justifyContent: 'space-around',
+  flexWrap: 'wrap',
+  backdropFilter: 'blur(12px)',
+  $sm: {
+    paddingHorizontal: '$3',
+    paddingVertical: '$3',
+    gap: '$3',
+  },
+});
+
+const SnapshotStat = styled(YStack, {
+  alignItems: 'center',
+  gap: '$1',
+  minWidth: 80,
+});
+
+const SnapshotDivider = styled(YStack, {
+  width: 1,
+  height: 36,
+  backgroundColor: '$outlineSubtle',
+  $sm: {
+    display: 'none' as never,
+  },
+});
+
+const SidebarCard = styled(Card, {
+  backgroundColor: '$surfacePanel',
   borderColor: '$surfacePanelBorder',
   borderWidth: 1,
-  borderRadius: '$5',
-  padding: '$3',
-  gap: '$1',
+  borderRadius: '$6',
+  padding: '$5',
+  animation: 'quick',
+  hoverStyle: {
+    borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.35),
+  },
 });
 
 const DraftBanner = styled(Card, {
@@ -1567,79 +1601,107 @@ export function LeagueDetailPage(): React.JSX.Element {
         isCommissioner={isCommissioner}
       />
 
+      {/* League Snapshot — unified glass stats bar */}
+      <SnapshotBar
+        style={{
+          background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.18)} 0%, ${withAlpha(BG_DARK, 0.6)} 100%)`,
+        }}
+      >
+        <SnapshotStat>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={1}
+            fontWeight="600"
+          >
+            Teams
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color={BRAND_GOLD_LIGHT}>
+            {teamCount}
+          </Text>
+        </SnapshotStat>
+        <SnapshotDivider />
+        <SnapshotStat>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={1}
+            fontWeight="600"
+          >
+            Roster Size
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color="$color">
+            {league.maxRosterSize}
+          </Text>
+        </SnapshotStat>
+        <SnapshotDivider />
+        <SnapshotStat>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={1}
+            fontWeight="600"
+          >
+            My Starters
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color="$green11">
+            {assignedCount}
+          </Text>
+        </SnapshotStat>
+        <SnapshotDivider />
+        <SnapshotStat>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={1}
+            fontWeight="600"
+          >
+            On Bench
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color="$amber11">
+            {benchCount}
+          </Text>
+        </SnapshotStat>
+        <SnapshotDivider />
+        <SnapshotStat>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={1}
+            fontWeight="600"
+          >
+            Week
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color="$color">
+            {currentWeek || '\u2014'}
+          </Text>
+        </SnapshotStat>
+        <SnapshotDivider />
+        <SnapshotStat>
+          <Text
+            fontSize="$2"
+            color="$textMuted"
+            textTransform="uppercase"
+            letterSpacing={1}
+            fontWeight="600"
+          >
+            Positions
+          </Text>
+          <Text fontSize="$8" fontWeight="800" color="$color">
+            {positions.length}
+          </Text>
+        </SnapshotStat>
+      </SnapshotBar>
+
       {/* Two-column dashboard layout */}
       <XStack gap="$5" flexWrap="wrap" alignItems="flex-start">
         {/* Main column */}
         <YStack flex={2} minWidth={260} gap="$5">
-          {/* Quick Stats — 2-col mini-grid */}
-          <XStack gap="$3" flexWrap="wrap">
-            <QuickStatCard>
-              <Text
-                fontSize="$2"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.8}
-              >
-                Teams
-              </Text>
-              <Text fontSize="$8" fontWeight="800" color={BRAND_GOLD_LIGHT}>
-                {teamCount}
-              </Text>
-            </QuickStatCard>
-            <QuickStatCard>
-              <Text
-                fontSize="$2"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.8}
-              >
-                Roster Size
-              </Text>
-              <Text fontSize="$8" fontWeight="800" color="$color">
-                {league.maxRosterSize}
-              </Text>
-            </QuickStatCard>
-            <QuickStatCard>
-              <Text
-                fontSize="$2"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.8}
-              >
-                My Starters
-              </Text>
-              <Text fontSize="$8" fontWeight="800" color="$green11">
-                {assignedCount}
-              </Text>
-            </QuickStatCard>
-            <QuickStatCard>
-              <Text
-                fontSize="$2"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.8}
-              >
-                On Bench
-              </Text>
-              <Text fontSize="$8" fontWeight="800" color="$amber11">
-                {benchCount}
-              </Text>
-            </QuickStatCard>
-            <QuickStatCard>
-              <Text
-                fontSize="$2"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.8}
-              >
-                Week
-              </Text>
-              <Text fontSize="$8" fontWeight="800" color="$color">
-                {currentWeek || '\u2014'}
-              </Text>
-            </QuickStatCard>
-          </XStack>
-
           {/* Matchup Preview */}
           {userCurrentMatchup && !matchupLoading && (
             <Card
@@ -1648,6 +1710,13 @@ export function LeagueDetailPage(): React.JSX.Element {
               borderWidth={1}
               borderRadius="$6"
               padding="$5"
+              animation="quick"
+              hoverStyle={{
+                borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.35),
+              }}
+              style={{
+                background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.08)} 0%, transparent 100%)`,
+              }}
             >
               <XStack
                 justifyContent="space-between"
@@ -1806,96 +1875,57 @@ export function LeagueDetailPage(): React.JSX.Element {
 
         {/* Sidebar */}
         <YStack flex={1} minWidth={240} maxWidth={380} gap="$5">
-          {/* League Details */}
-          <Card
-            backgroundColor="$surfacePanel"
-            borderColor="$surfacePanelBorder"
-            borderWidth={1}
-            borderRadius="$6"
-            padding="$5"
-          >
-            <XStack alignItems="center" gap="$2" marginBottom="$4">
-              <Info size={18} color="var(--color)" />
+          {/* League Status — compact info strip */}
+          <SidebarCard>
+            <XStack alignItems="center" gap="$2" marginBottom="$3">
+              <Info size={18} color={BRAND_GOLD_LIGHT} />
               <Text fontSize="$5" fontWeight="700" color="$color">
-                League Details
+                League Status
               </Text>
             </XStack>
-            <YStack gap="$3">
-              <XStack justifyContent="space-between" alignItems="center">
-                <Text color="$textMuted" fontSize="$3">
-                  Draft Status
+            <XStack gap="$3" flexWrap="wrap">
+              <DraftBadge
+                backgroundColor={draftColors.bg}
+                borderColor={draftColors.border}
+              >
+                <Text fontSize="$2" fontWeight="700" color={draftColors.text}>
+                  {formatDraftStatus(String(league.draftStatus))}
                 </Text>
-                <DraftBadge
-                  backgroundColor={draftColors.bg}
-                  borderColor={draftColors.border}
+              </DraftBadge>
+              {currentWeek && (
+                <XStack
+                  backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+                  borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+                  borderWidth={1}
+                  borderRadius="$10"
+                  paddingHorizontal="$3"
+                  paddingVertical="$1.5"
                 >
-                  <Text fontSize="$2" fontWeight="700" color={draftColors.text}>
-                    {formatDraftStatus(String(league.draftStatus))}
+                  <Text fontSize="$2" fontWeight="700" color="$color">
+                    Week {currentWeek}
                   </Text>
-                </DraftBadge>
-              </XStack>
-              <Separator borderColor="$outlineSubtle" />
-              <XStack justifyContent="space-between">
-                <Text color="$textMuted" fontSize="$3">
-                  Roster Limit
-                </Text>
-                <Text color="$color" fontWeight="600" fontSize="$3">
-                  {league.maxRosterSize} players
-                </Text>
-              </XStack>
-              <Separator borderColor="$outlineSubtle" />
-              <XStack justifyContent="space-between">
-                <Text color="$textMuted" fontSize="$3">
-                  Positions
-                </Text>
-                <Text color="$color" fontWeight="600" fontSize="$3">
-                  {positions.length} slots
-                </Text>
-              </XStack>
-              <Separator borderColor="$outlineSubtle" />
-              <XStack justifyContent="space-between">
-                <Text color="$textMuted" fontSize="$3">
-                  Week
-                </Text>
-                <Text color="$color" fontWeight="600" fontSize="$3">
-                  {currentWeek ?? 'Pre-season'}
-                </Text>
-              </XStack>
-              {isCommissioner && (
-                <>
-                  <Separator borderColor="$outlineSubtle" />
-                  <XStack justifyContent="space-between" alignItems="center">
-                    <Text color="$textMuted" fontSize="$3">
-                      Role
-                    </Text>
-                    <XStack
-                      backgroundColor="$amber3"
-                      borderColor="$amber7"
-                      borderWidth={1}
-                      borderRadius="$10"
-                      paddingHorizontal="$2"
-                      paddingVertical="$1"
-                    >
-                      <Text fontSize="$2" fontWeight="700" color="$amber11">
-                        Commissioner
-                      </Text>
-                    </XStack>
-                  </XStack>
-                </>
+                </XStack>
               )}
-            </YStack>
-          </Card>
+              {isCommissioner && (
+                <XStack
+                  backgroundColor="$amber3"
+                  borderColor="$amber7"
+                  borderWidth={1}
+                  borderRadius="$10"
+                  paddingHorizontal="$3"
+                  paddingVertical="$1.5"
+                >
+                  <Text fontSize="$2" fontWeight="700" color="$amber11">
+                    Commissioner
+                  </Text>
+                </XStack>
+              )}
+            </XStack>
+          </SidebarCard>
 
           {/* Quick Standings */}
           {leagueTeams.length > 0 && (
-            <Card
-              backgroundColor="$surfacePanel"
-              borderColor="$surfacePanelBorder"
-              borderWidth={1}
-              borderRadius="$6"
-              padding="$5"
-              data-testid="league-teams"
-            >
+            <SidebarCard data-testid="league-teams">
               <XStack
                 justifyContent="space-between"
                 alignItems="center"
@@ -1921,18 +1951,24 @@ export function LeagueDetailPage(): React.JSX.Element {
                   </Text>
                 </Button>
               </XStack>
-              <YStack gap="$2">
+              <YStack gap="$1.5">
                 {leagueTeams.slice(0, 6).map((team, idx) => (
                   <XStack
                     key={team.id}
                     justifyContent="space-between"
                     alignItems="center"
-                    paddingVertical="$2"
-                    paddingHorizontal="$2"
-                    borderRadius="$3"
+                    paddingVertical="$2.5"
+                    paddingHorizontal="$3"
+                    borderRadius="$4"
                     backgroundColor={
                       userTeamId === team.id
                         ? withAlpha(BRAND_NAVY_LIGHT, 0.18)
+                        : 'transparent'
+                    }
+                    borderWidth={1}
+                    borderColor={
+                      userTeamId === team.id
+                        ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
                         : 'transparent'
                     }
                     cursor="pointer"
@@ -1941,20 +1977,25 @@ export function LeagueDetailPage(): React.JSX.Element {
                         userTeamId === team.id
                           ? withAlpha(BRAND_NAVY_LIGHT, 0.25)
                           : '$surfaceSubtle',
+                      borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.2),
                     }}
                     pressStyle={{ scale: 0.98, opacity: 0.9 }}
                     onPress={() => handleViewTeamRoster(team.id)}
                     animation="quick"
                   >
-                    <XStack alignItems="center" gap="$2">
-                      <Text
-                        fontSize="$3"
-                        fontWeight="700"
-                        color="$textMuted"
-                        width={20}
+                    <XStack alignItems="center" gap="$2.5">
+                      <YStack
+                        width={24}
+                        height={24}
+                        borderRadius={12}
+                        backgroundColor="$surfaceSubtle"
+                        alignItems="center"
+                        justifyContent="center"
                       >
-                        {idx + 1}
-                      </Text>
+                        <Text fontSize="$2" fontWeight="700" color="$textMuted">
+                          {idx + 1}
+                        </Text>
+                      </YStack>
                       <AvatarImage
                         url={team.logoUrl}
                         username={team.name}
@@ -1984,17 +2025,27 @@ export function LeagueDetailPage(): React.JSX.Element {
                   </XStack>
                 ))}
                 {leagueTeams.length > 6 && (
-                  <Text
-                    fontSize="$2"
-                    color="$textMuted"
-                    textAlign="center"
-                    marginTop="$1"
+                  <XStack
+                    justifyContent="center"
+                    marginTop="$2"
+                    paddingVertical="$2"
+                    borderRadius="$3"
+                    cursor="pointer"
+                    hoverStyle={{ backgroundColor: '$surfaceSubtle' }}
+                    onPress={() => changeTab('standings')}
+                    animation="quick"
                   >
-                    +{leagueTeams.length - 6} more teams
-                  </Text>
+                    <Text
+                      fontSize="$2"
+                      color={BRAND_GOLD_LIGHT}
+                      fontWeight="600"
+                    >
+                      +{leagueTeams.length - 6} more teams
+                    </Text>
+                  </XStack>
                 )}
               </YStack>
-            </Card>
+            </SidebarCard>
           )}
 
           {/* Invite Friends */}
