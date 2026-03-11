@@ -717,6 +717,21 @@ export function BaseballLandingPage() {
     navigate(`/baseball/league/${leagueId}`);
   };
 
+  const handleDialogOpenChange = (open: boolean) => {
+    setShowCreateDialog(open);
+    if (!open) {
+      setLeagueName('');
+      setTeamCount(DEFAULT_NUM_TEAMS);
+      setPlayerPool('all');
+      setDraftMode('live');
+      setSelectionMethod('standard');
+      setDraftOrder('snake');
+      setMaxRosterSize(25);
+      setNumberOfDivisions(DEFAULT_NUM_DIVISIONS);
+      setIsPublic(false);
+    }
+  };
+
   const handleCreateLeague = () => {
     setShowCreateDialog(true);
   };
@@ -1154,7 +1169,11 @@ export function BaseballLandingPage() {
       </ContentContainer>
 
       {/* Create League - Quick Dialog */}
-      <Dialog modal open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      <Dialog
+        modal
+        open={showCreateDialog}
+        onOpenChange={handleDialogOpenChange}
+      >
         <Dialog.Portal>
           <Dialog.Overlay
             animation="medium"
