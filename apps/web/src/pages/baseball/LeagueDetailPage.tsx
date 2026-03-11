@@ -417,6 +417,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabId>(getTabFromUrl());
   const [linkCopied, setLinkCopied] = useState(false);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
+  const [headerInviteCopied, setHeaderInviteCopied] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [renameEditing, setRenameEditing] = useState(false);
   const [renameInput, setRenameInput] = useState('');
@@ -1449,6 +1450,21 @@ export function LeagueDetailPage(): React.JSX.Element {
       await navigator.clipboard.writeText(inviteUrl);
       setInviteLinkCopied(true);
       setTimeout(() => setInviteLinkCopied(false), 2000);
+    } catch (error) {
+      LOGGER.error('Error copying invite link:', String(error));
+      alert('Failed to copy invite link to clipboard');
+    }
+  }, [inviteUrl]);
+
+  const handleCopyInviteHeader = useCallback(async () => {
+    try {
+      if (!inviteUrl) {
+        alert('Invite code not available');
+        return;
+      }
+      await navigator.clipboard.writeText(inviteUrl);
+      setHeaderInviteCopied(true);
+      setTimeout(() => setHeaderInviteCopied(false), 2000);
     } catch (error) {
       LOGGER.error('Error copying invite link:', String(error));
       alert('Failed to copy invite link to clipboard');
@@ -3354,9 +3370,9 @@ export function LeagueDetailPage(): React.JSX.Element {
               borderColor={withAlpha(BRAND_NAVY, 0.48)}
               borderWidth={1}
               borderRadius="$4"
-              onPress={handleCopyInviteLink}
+              onPress={handleCopyInviteHeader}
               icon={
-                inviteLinkCopied ? (
+                headerInviteCopied ? (
                   <Check size={16} color="rgb(34, 197, 94)" />
                 ) : (
                   <Share2 size={16} color={BRAND_GOLD_LIGHT} />
@@ -3368,9 +3384,9 @@ export function LeagueDetailPage(): React.JSX.Element {
               <Text
                 fontSize="$3"
                 fontWeight="600"
-                color={inviteLinkCopied ? '$green11' : BRAND_GOLD_LIGHT}
+                color={headerInviteCopied ? '$green11' : BRAND_GOLD_LIGHT}
               >
-                {inviteLinkCopied ? 'Copied!' : 'Invite'}
+                {headerInviteCopied ? 'Copied!' : 'Invite'}
               </Text>
             </Button>
           </XStack>
