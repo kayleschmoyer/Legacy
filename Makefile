@@ -129,9 +129,19 @@ setup: install ## Alias for install
 
 setup-force: install-force ## Setup with force install for Windows file lock issues
 
+# LS-970: Run wt-setup directly under PowerShell rather than via cmd.exe.
+# GNU Make on Windows uses SHELL=cmd/.SHELLFLAGS=/c for all recipes, which
+# means if a Ctrl+C / SIGINT arrives mid-run (e.g. agent timeout during
+# pnpm install), cmd.exe shows "Terminate batch job (Y/N)?" and blocks.
+# The target-specific SHELL override eliminates cmd.exe from the call chain
+# entirely; -NonInteractive ensures PowerShell never prompts for input either.
+ifeq ($(DETECTED_OS),Windows)
+wt-setup: SHELL = powershell
+wt-setup: .SHELLFLAGS = -NonInteractive -NoProfile -ExecutionPolicy Bypass -File
+endif
 wt-setup: ## Set up a worktree (node_modules junction, .env, .twig). Usage: make wt-setup WT=<path>
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH)/scripts/setup-worktree.ps1" -WorktreePath "$(WT)"
+	@"$(WORKSPACE_PATH)/scripts/setup-worktree.ps1" -WorktreePath "$(WT)"
 else
 	@echo "wt-setup is currently Windows-only. Run: make install && cp .env from main repo."
 endif
