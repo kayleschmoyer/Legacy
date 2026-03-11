@@ -179,7 +179,12 @@ export class StandingsService {
   }
 
   /**
-   * Get comprehensive league overview including standings and stats
+   * Get comprehensive league overview including standings and stats.
+   *
+   * Runs calculateStandings and getMatchupStatusCounts in parallel. The
+   * in-flight memoization on calculateStandings means any other concurrent
+   * resolver that also requests standings (e.g. getSeasonResults) will share
+   * the same single DB query.
    */
   static async getLeagueOverview(
     db: GenericDatabase<typeof PublicSchema>,
@@ -187,13 +192,18 @@ export class StandingsService {
     _season?: number | null,
   ) {
     // Note: Season parameter preserved for API compatibility
-    // calculateStandings and getSeasonResults still use season filtering
-    // getMatchupStatusCounts is now across all seasons
-    const [standings, statusCounts, seasonResults] = await Promise.all([
+    const [standings, statusCounts] = await Promise.all([
       calculateStandings(db, leagueId),
       getMatchupStatusCounts(db, leagueId),
-      getSeasonResults(db, leagueId),
     ]);
+
+    const seasonResults: SeasonResults = {
+      leagueId,
+      season: null,
+      totalMatchups: statusCounts.total,
+      completedMatchups: statusCounts.completed,
+      standings,
+    };
 
     return {
       standings,

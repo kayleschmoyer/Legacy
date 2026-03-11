@@ -37,6 +37,8 @@ function createMockDbChain(finalResult: any): any {
     where: jest.fn(),
     orderBy: jest.fn(),
     limit: jest.fn(),
+    offset: jest.fn(),
+    groupBy: jest.fn(),
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call -- Test helper thenable mock
     then: jest.fn((resolve) => resolve(finalResult)),
   };
@@ -47,6 +49,8 @@ function createMockDbChain(finalResult: any): any {
   chain.where.mockReturnValue(chain);
   chain.orderBy.mockReturnValue(chain);
   chain.limit.mockReturnValue(chain);
+  chain.offset.mockReturnValue(chain);
+  chain.groupBy.mockReturnValue(chain);
 
   return chain;
 }
@@ -66,6 +70,8 @@ function createMockDbWithMultipleQueries(results: any[]): any {
       where: jest.fn(),
       orderBy: jest.fn(),
       limit: jest.fn(),
+      offset: jest.fn(),
+      groupBy: jest.fn(),
       leftJoin: jest.fn(),
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call -- Test helper thenable mock
       then: jest.fn((resolve) => resolve(currentResult)),
@@ -76,6 +82,8 @@ function createMockDbWithMultipleQueries(results: any[]): any {
     chain.where.mockReturnValue(chain);
     chain.orderBy.mockReturnValue(chain);
     chain.limit.mockReturnValue(chain);
+    chain.offset.mockReturnValue(chain);
+    chain.groupBy.mockReturnValue(chain);
     chain.leftJoin.mockReturnValue(chain);
 
     return chain;
@@ -729,9 +737,26 @@ describe('Matchup History', () => {
         (m) => m.status === 'completed' || m.status === 'in_progress',
       );
 
-      // getSeasonResults: [0] allMatchups, then calculateStandings: [1] teams, [2] matchups, ...game data
-      mockDb = buildStandingsMockDb(mockTeams, standingsMatchups, [
-        allMatchups,
+      // New query order (calculateStandings + COUNT GROUP BY run concurrently):
+      //  [0] teams        - calculateStandings first db.select()
+      //  [1] count rows   - COUNT GROUP BY query (second db.select(), evaluated before first await)
+      //  [2] matchups     - calculateStandings second db.select()
+      //  [3-6] game data
+      const { matchupPlayers, matchupPlayerGames, gameBatting } =
+        buildStandingsGameData(standingsMatchups);
+      const countRows = [
+        { status: 'completed', count: 1 },
+        { status: 'scheduled', count: 1 },
+      ];
+      mockDb = createMockDbWithMultipleQueries([
+        mockTeams, // [0] calculateStandings: teams
+        countRows, // [1] COUNT GROUP BY
+        standingsMatchups, // [2] calculateStandings: matchups
+        matchupPlayers, // [3]
+        matchupPlayerGames, // [4]
+        gameBatting, // [5]
+        [], // [6] pitching
+        [], // [7] fielding
       ]);
 
       const results = await getSeasonResults(mockDb, 1);

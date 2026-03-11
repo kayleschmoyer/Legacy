@@ -65,6 +65,10 @@ export interface MatchupHistoryFilters {
   status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   startDate?: string;
   endDate?: string;
+  /** Maximum number of matchups to return. Applied at the DB level. */
+  limit?: number;
+  /** Number of matchups to skip before returning results (for cursor-style pagination). */
+  offset?: number;
 }
 
 /**
@@ -103,11 +107,17 @@ export async function queryHistoricalMatchups(
     conditions.push(sql`${Schema.matchups.endTime} <= ${filters.endDate}`);
   }
 
-  return await db
+  const baseQuery = db
     .select()
     .from(Schema.matchups)
     .where(and(...conditions))
     .orderBy(desc(Schema.matchups.weekNumber));
+
+  if (filters.limit !== undefined) {
+    return baseQuery.limit(filters.limit).offset(filters.offset ?? 0);
+  }
+
+  return baseQuery;
 }
 
 /**
@@ -207,14 +217,57 @@ function camelCaseMultipliers(
 }
 
 /**
+ * In-flight promise cache for calculateStandings, keyed by db instance → leagueId.
+ *
+ * Purpose: deduplicate concurrent calls within the same request lifecycle
+ * (e.g. multiple GraphQL resolvers asking for the same league's standings).
+ * The entry is removed once the promise settles, so subsequent requests always
+ * compute fresh standings.
+ */
+const standingsInFlight = new WeakMap<
+  object,
+  Map<number, Promise<TeamStanding[]>>
+>();
+
+function getInFlightCache(db: object): Map<number, Promise<TeamStanding[]>> {
+  let cache = standingsInFlight.get(db);
+  if (!cache) {
+    cache = new Map();
+    standingsInFlight.set(db, cache);
+  }
+  return cache;
+}
+
+/**
  * Calculate standings for a league.
  *
  * Points (pointsFor / pointsAgainst) are computed from game stats
  * (batting, pitching, fielding) using the league's scoring profile.
  * Points accumulate from BOTH completed AND in-progress matchups.
  * Win/loss/tie record is determined only from completed matchups.
+ *
+ * Concurrent calls with the same db + leagueId share a single in-flight
+ * promise, eliminating redundant DB queries within a single request.
  */
-export async function calculateStandings(
+export function calculateStandings(
+  db: PublicDb,
+  leagueId: number,
+): Promise<TeamStanding[]> {
+  const cache = getInFlightCache(db as object);
+  const existing = cache.get(leagueId);
+  if (existing) return existing;
+
+  const promise = _computeStandings(db, leagueId);
+  cache.set(leagueId, promise);
+  // Remove from cache once settled so the next request always fetches fresh data.
+  promise.then(
+    () => cache.delete(leagueId),
+    () => cache.delete(leagueId),
+  );
+  return promise;
+}
+
+async function _computeStandings(
   db: PublicDb,
   leagueId: number,
 ): Promise<TeamStanding[]> {
@@ -512,33 +565,43 @@ export async function calculateStandings(
 }
 
 /**
- * Get season results summary with standings
+ * Get season results summary with standings.
+ *
+ * Runs calculateStandings and a lightweight SQL COUNT in parallel, eliminating
+ * the previous full-table matchup fetch that duplicated the work inside
+ * calculateStandings.
  */
 export async function getSeasonResults(
   db: PublicDb,
   leagueId: number,
 ): Promise<SeasonResults> {
-  const matchupConditions = [eq(Schema.matchups.leagueId, leagueId)];
-
   // Note: Season filtering removed - matchups no longer have a selected_season field.
   // Seasons are now per-player (league_week_player_seasons table).
+  const [standings, countRows] = await Promise.all([
+    calculateStandings(db, leagueId),
+    db
+      .select({
+        status: Schema.matchups.status,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(Schema.matchups)
+      .where(eq(Schema.matchups.leagueId, leagueId))
+      .groupBy(Schema.matchups.status),
+  ]);
 
-  // Get all matchups for the season
-  const allMatchups = await db
-    .select()
-    .from(Schema.matchups)
-    .where(and(...matchupConditions));
-
-  const completedMatchups = allMatchups.filter((m) => m.status === 'completed');
-
-  // Calculate standings
-  const standings = await calculateStandings(db, leagueId);
+  let totalMatchups = 0;
+  let completedMatchups = 0;
+  for (const row of countRows) {
+    const n = Number(row.count);
+    totalMatchups += n;
+    if (row.status === 'completed') completedMatchups = n;
+  }
 
   return {
     leagueId,
     season: null,
-    totalMatchups: allMatchups.length,
-    completedMatchups: completedMatchups.length,
+    totalMatchups,
+    completedMatchups,
     standings,
   };
 }

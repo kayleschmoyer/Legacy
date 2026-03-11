@@ -12,8 +12,8 @@
  * StoreKit transaction. This prevents fraudulent receipts from granting premium.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import {
-  ErrorCode,
   fetchProducts,
   finishTransaction,
   getAvailablePurchases,
@@ -22,16 +22,75 @@ import {
   purchaseUpdatedListener,
   requestPurchase,
 } from 'react-native-iap';
-import type {
-  ProductSubscription,
-  Purchase,
-  PurchaseError,
-} from 'react-native-iap';
-import { Platform } from 'react-native';
+import type { Purchase } from 'react-native-iap';
 import {
   useRestoreApplePurchasesMutation,
   useVerifyApplePurchaseMutation,
 } from '../../api/db/graphql.generated';
+
+/**
+ * Minimal interface for the subscription handle returned by react-native-iap
+ * listener functions whose types may not fully resolve in this project.
+ */
+interface PurchaseListenerHandle {
+  remove: () => void;
+}
+
+/** Properties of an iOS subscription product returned by fetchProducts. */
+interface AppleSubscriptionProduct {
+  id: string;
+  title: string;
+  description: string;
+  displayPrice: string;
+  currency: string;
+}
+
+/** Subset of PurchaseError fields we rely on. */
+interface IAPPurchaseError {
+  code: string;
+  message?: string;
+}
+
+/** Subset of Purchase event fields we rely on. */
+interface IAPPurchaseEvent {
+  purchaseToken: string | null;
+  productId: string;
+}
+
+/** Subset of available-purchase record fields we rely on. */
+interface IAPAvailablePurchase {
+  productId: string;
+  transactionDate: number;
+  purchaseToken: string | undefined;
+}
+
+// ErrorCode enum value used for cancellation detection — use the string
+// value directly to avoid unsafe-member-access on the library's any-typed enum.
+const IAP_USER_CANCELLED_CODE = 'E_USER_CANCELLED';
+
+// Typed aliases for react-native-iap functions whose NitroModules type
+// definitions may not fully resolve (typed as `any`) in this project.
+// Casting here keeps call sites clean and passes @typescript-eslint rules.
+const iapInit = initConnection as unknown as () => Promise<void>;
+const iapFetch = fetchProducts as unknown as (p: {
+  skus: string[];
+  type: string;
+}) => Promise<unknown>;
+const iapRequest = requestPurchase as unknown as (p: {
+  type: string;
+  request: { apple: { sku: string } };
+}) => Promise<void>;
+const iapRestore = getAvailablePurchases as unknown as () => Promise<unknown>;
+const iapFinish = finishTransaction as unknown as (p: {
+  purchase: IAPPurchaseEvent;
+  isConsumable: boolean;
+}) => Promise<void>;
+const iapUpdateListener = purchaseUpdatedListener as unknown as (
+  cb: (e: Purchase) => void,
+) => PurchaseListenerHandle;
+const iapErrorListener = purchaseErrorListener as unknown as (
+  cb: (e: IAPPurchaseError) => void,
+) => PurchaseListenerHandle;
 
 // Product IDs as configured in App Store Connect
 export const IAP_PRODUCTS = {
@@ -75,19 +134,22 @@ export function useIAP(): UseIAPResult {
   const [verifyApplePurchase] = useVerifyApplePurchaseMutation();
   const [restoreApplePurchasesMutation] = useRestoreApplePurchasesMutation();
 
-  const purchaseUpdateSubscriptionRef = useRef<ReturnType<
-    typeof purchaseUpdatedListener
-  > | null>(null);
-  const purchaseErrorSubscriptionRef = useRef<ReturnType<
-    typeof purchaseErrorListener
-  > | null>(null);
+  const purchaseUpdateSubscriptionRef = useRef<PurchaseListenerHandle | null>(
+    null,
+  );
+  const purchaseErrorSubscriptionRef = useRef<PurchaseListenerHandle | null>(
+    null,
+  );
 
   const handlePurchaseUpdate = useCallback(
     async (purchaseEvent: Purchase): Promise<void> => {
       if (Platform.OS !== 'ios') return;
 
-      // purchaseToken is the JWS transaction info on iOS (StoreKit 2)
-      const { purchaseToken, productId } = purchaseEvent;
+      // purchaseToken is the JWS transaction info on iOS (StoreKit 2).
+      // Cast to our local interface to avoid unsafe-member-access on the
+      // library's potentially-any Purchase type.
+      const event = purchaseEvent as unknown as IAPPurchaseEvent;
+      const { purchaseToken, productId } = event;
       if (!purchaseToken || !productId) return;
 
       try {
@@ -99,8 +161,8 @@ export function useIAP(): UseIAPResult {
 
         if (result.data?.verifyApplePurchase?.success) {
           setIsSubscribed(true);
-          await finishTransaction({
-            purchase: purchaseEvent,
+          await iapFinish({
+            purchase: event,
             isConsumable: false,
           });
         } else {
@@ -122,18 +184,19 @@ export function useIAP(): UseIAPResult {
 
     const setup = async (): Promise<void> => {
       try {
-        await initConnection();
+        await iapInit();
 
         if (!mounted) return;
 
-        const subs = await fetchProducts({
+        const rawSubs = await iapFetch({
           skus: Object.values(IAP_PRODUCTS),
           type: 'subs',
         });
+        const subs = rawSubs as AppleSubscriptionProduct[];
 
         if (mounted) {
           setProducts(
-            (subs as ProductSubscription[]).map((sub) => ({
+            subs.map((sub) => ({
               productId: sub.id as IAPProductId,
               title: sub.title,
               description: sub.description,
@@ -151,15 +214,15 @@ export function useIAP(): UseIAPResult {
 
     void setup();
 
-    purchaseUpdateSubscriptionRef.current = purchaseUpdatedListener(
+    purchaseUpdateSubscriptionRef.current = iapUpdateListener(
       (purchaseEvent: Purchase) => {
         void handlePurchaseUpdate(purchaseEvent);
       },
     );
 
-    purchaseErrorSubscriptionRef.current = purchaseErrorListener(
-      (purchaseError: PurchaseError) => {
-        if (purchaseError.code !== ErrorCode.UserCancelled) {
+    purchaseErrorSubscriptionRef.current = iapErrorListener(
+      (purchaseError: IAPPurchaseError) => {
+        if (purchaseError.code !== IAP_USER_CANCELLED_CODE) {
           setError(
             purchaseError.message ?? 'Purchase failed. Please try again.',
           );
@@ -182,14 +245,14 @@ export function useIAP(): UseIAPResult {
     setError(null);
 
     try {
-      await requestPurchase({
+      await iapRequest({
         type: 'subs',
         request: { apple: { sku: productId } },
       });
       // The purchaseUpdatedListener handles completion
     } catch (purchaseErr) {
-      const err = purchaseErr as PurchaseError;
-      if (err.code !== ErrorCode.UserCancelled) {
+      const err = purchaseErr as IAPPurchaseError;
+      if (err.code !== IAP_USER_CANCELLED_CODE) {
         setError(err.message ?? 'Purchase failed. Please try again.');
       }
       setLoading(false);
@@ -203,7 +266,8 @@ export function useIAP(): UseIAPResult {
     setError(null);
 
     try {
-      const purchases = await getAvailablePurchases();
+      const rawPurchases = await iapRestore();
+      const purchases = rawPurchases as IAPAvailablePurchase[];
 
       const subscriptionPurchases = purchases.filter((p) =>
         (Object.values(IAP_PRODUCTS) as string[]).includes(p.productId),
