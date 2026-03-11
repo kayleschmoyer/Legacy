@@ -147,6 +147,7 @@ jobs:
 
       - name: "🔍 pnpm Audit Scan"
         id: npm-audit
+        timeout-minutes: 3
         run: |
           echo "::group::📦 pnpm Dependency Audit"
 
@@ -184,17 +185,37 @@ jobs:
 
           echo "::endgroup::"
 
+      - name: "� Cache Snyk CLI"
+        if: github.event_name != 'pull_request'
+        id: snyk-cache
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/snyk
+          key: snyk-cli-v1.1293.1-linux
+
+      - name: "⬇️ Install Snyk CLI"
+        if: github.event_name != 'pull_request' && steps.snyk-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 3
+        run: |
+          curl -sL "https://static.snyk.io/cli/v1.1293.1/snyk-linux" -o /usr/local/bin/snyk
+          chmod +x /usr/local/bin/snyk
+          snyk --version
+
       - name: "🛡️ Snyk Vulnerability Scan"
         id: snyk-scan
+        if: github.event_name != 'pull_request'
         continue-on-error: true
+        timeout-minutes: 5
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           echo "::group::🛡️ Snyk Security Scan"
 
+          snyk --version
+
           # Authenticate if token available
           if [ -n "${SNYK_TOKEN}" ]; then
-            pnpm dlx snyk@1.1293.1 auth "${SNYK_TOKEN}"
+            snyk auth "${SNYK_TOKEN}"
             echo "✅ Snyk authenticated"
           else
             echo "ℹ️ Running Snyk in anonymous mode (limited features)"
@@ -203,7 +224,7 @@ jobs:
           # Run Snyk test
           SNYK_LOG="snyk-results-$(date +%s).json"
 
-          if pnpm dlx snyk@1.1293.1 test --json > "$SNYK_LOG" 2>&1; then
+          if snyk test --json > "$SNYK_LOG" 2>&1; then
             echo "✅ Snyk scan completed - no critical vulnerabilities"
             SNYK_STATUS="clean"
           else
@@ -248,13 +269,15 @@ jobs:
           fi
 
           # Snyk Results
-          SNYK_STATUS="${{ steps.snyk-scan.outputs.snyk-status || 'unknown' }}"
+          SNYK_STATUS="${{ steps.snyk-scan.outputs.snyk-status || 'skipped' }}"
           SNYK_ISSUES="${{ steps.snyk-scan.outputs.snyk-issues || 0 }}"
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Snyk Security Scan" >> $GITHUB_STEP_SUMMARY
           if [ "$SNYK_STATUS" == "clean" ]; then
             echo "✅ **Status**: No critical vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
+          elif [ "$SNYK_STATUS" == "skipped" ]; then
+            echo "⏭️ **Status**: Skipped (runs on push-to-main and scheduled scans only)" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ **Status**: $SNYK_ISSUES potential issues found" >> $GITHUB_STEP_SUMMARY
           fi
@@ -291,6 +314,7 @@ jobs:
 
       - name: "🔍 GitLeaks Secret Detection"
         id: gitleaks
+        timeout-minutes: 5
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -299,6 +323,7 @@ jobs:
 
       - name: "🔐 Manual Secret Pattern Detection"
         id: manual-scan
+        timeout-minutes: 3
         run: |
           echo "::group::🔍 Additional Secret Pattern Scanning"
 
@@ -448,6 +473,7 @@ jobs:
       - name: "📦 Build for Analysis"
         # Skip build on PRs when CodeQL is skipped
         if: github.event_name != 'pull_request'
+        timeout-minutes: 10
         run: |
           echo "🏗️ Building applications for SAST analysis..."
 
@@ -554,6 +580,7 @@ jobs:
 
       - name: "🔐 ESLint Security Rules"
         id: eslint-security
+        timeout-minutes: 5
         run: |
           echo "::group::🔒 ESLint Security Rule Analysis"
 
