@@ -403,18 +403,21 @@ test.describe
   }) => {
     await page.goto(`/baseball/league/${state.leagueId}/draft`);
     await page.waitForLoadState('domcontentloaded');
-    if (
-      await page
-        .getByText('Draft Complete!')
-        .isVisible({ timeout: 5_000 })
-        .catch(() => false)
-    ) {
+
+    // Race: wait for either the live draft board or "Draft Complete!" — whichever
+    // appears first. The previous two-step guard (5 s isVisible check then 45 s
+    // board wait) had a timing gap: if the draft ended *after* the 5 s check the
+    // 45 s wait would hang and eventually throw instead of skipping gracefully.
+    const draftBoard = page.getByRole('main', { name: /player draft board/i });
+    const draftComplete = page.getByText('Draft Complete!');
+    await draftBoard
+      .or(draftComplete)
+      .first()
+      .waitFor({ state: 'visible', timeout: 45_000 });
+    if (await draftComplete.isVisible()) {
       test.skip(true, 'Draft completed before search input could be tested');
       return;
     }
-    await expect(
-      page.getByRole('main', { name: /player draft board/i }),
-    ).toBeVisible({ timeout: 45_000 });
 
     const searchInput = page.getByRole('textbox', { name: /search players/i });
     await expect(searchInput).toBeVisible({ timeout: 15_000 });
