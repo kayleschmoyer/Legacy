@@ -14,6 +14,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { GraphQLError } from 'graphql';
 import {
   DEFAULT_ROSTER_POSITIONS,
   League,
@@ -27,6 +28,7 @@ import {
   AuthenticationError,
   ForbiddenError,
   PremiumRequiredError,
+  UserInputError,
 } from '../graphql-errors';
 import { getSubscriptionTier, requirePremium } from '../authorization';
 import { applyDecay, applyEscalation } from '../../services/salary-rollover';
@@ -544,7 +546,7 @@ builder.mutationField('joinLeagueByCode', (t) =>
           .limit(1);
 
         if (leagues.length === 0) {
-          throw new Error(
+          throw UserInputError(
             'Invalid invite code. Please check the code and try again.',
           );
         }
@@ -564,7 +566,7 @@ builder.mutationField('joinLeagueByCode', (t) =>
           .limit(1);
 
         if (existingMembership.length > 0) {
-          throw new Error('You are already a member of this league');
+          throw UserInputError('You are already a member of this league');
         }
 
         // Find an unassigned team in the league (one with no league_members entry)
@@ -600,7 +602,9 @@ builder.mutationField('joinLeagueByCode', (t) =>
           .limit(1);
 
         if (unassignedTeams.length === 0) {
-          throw new Error('This league is full. All teams have been claimed.');
+          throw UserInputError(
+            'This league is full. All teams have been claimed.',
+          );
         }
 
         // Claim the unassigned team by renaming it to the user's chosen name
@@ -681,6 +685,9 @@ builder.mutationField('joinLeagueByCode', (t) =>
 
         return team;
       } catch (error) {
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
         LOGGER.error('Error joining league', {
           userId,
           inviteCode: args.inviteCode,
@@ -782,7 +789,7 @@ builder.mutationField('joinLeague', (t) =>
           .limit(1);
 
         if (leagues.length === 0) {
-          throw new Error('Invalid invite code');
+          throw UserInputError('Invalid invite code');
         }
 
         const league = leagues[0];
@@ -901,6 +908,9 @@ builder.mutationField('joinLeague', (t) =>
           teamId: team.id,
         };
       } catch (error) {
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
         LOGGER.error('Error joining league', {
           userId,
           inviteCode,
@@ -1571,13 +1581,13 @@ builder.mutationField('joinPublicLeague', (t) =>
           .limit(1);
 
         if (leagueRows.length === 0) {
-          throw new Error('League not found');
+          throw UserInputError('League not found');
         }
 
         const league = leagueRows[0];
 
         if (!league.isPublic) {
-          throw new Error(
+          throw UserInputError(
             'This league is private. Use an invite code to join.',
           );
         }
@@ -1595,7 +1605,7 @@ builder.mutationField('joinPublicLeague', (t) =>
           .limit(1);
 
         if (existingMembership.length > 0) {
-          throw new Error('You are already a member of this league');
+          throw UserInputError('You are already a member of this league');
         }
 
         // Find an unassigned team slot
@@ -1621,7 +1631,9 @@ builder.mutationField('joinPublicLeague', (t) =>
           .limit(1);
 
         if (unassignedTeams.length === 0) {
-          throw new Error('This league is full. All teams have been claimed.');
+          throw UserInputError(
+            'This league is full. All teams have been claimed.',
+          );
         }
 
         const teamId = unassignedTeams[0].id;
@@ -1675,6 +1687,9 @@ builder.mutationField('joinPublicLeague', (t) =>
           teamId,
         };
       } catch (error) {
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
         LOGGER.error('Error joining public league', {
           userId,
           leagueId,

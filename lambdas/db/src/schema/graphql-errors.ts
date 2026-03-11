@@ -55,3 +55,16 @@ export function PremiumRequiredError(
     extensions: { code: 'PREMIUM_REQUIRED' },
   });
 }
+
+/**
+ * Throw when the request contains invalid or conflicting user input.
+ *
+ * Maps to Apollo code `BAD_USER_INPUT` (HTTP 400 equivalent).
+ * These errors are expected user-facing conditions and should NOT be logged
+ * as system errors in Rollbar.
+ */
+export function UserInputError(message: string): GraphQLError {
+  return new GraphQLError(message, {
+    extensions: { code: 'BAD_USER_INPUT' },
+  });
+}
