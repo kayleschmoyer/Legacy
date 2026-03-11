@@ -248,16 +248,6 @@ export function MatchupNavigationControls({
 
   // ── Handlers ──────────────────────────────────────────────────────────
 
-  const handlePrevWeek = () => {
-    if (canGoPrev)
-      setSelectedWeek(availableWeeks[weekIndex - 1] ?? selectedWeek);
-  };
-
-  const handleNextWeek = () => {
-    if (canGoNext)
-      setSelectedWeek(availableWeeks[weekIndex + 1] ?? selectedWeek);
-  };
-
   const handleMatchupSelect = (matchupId: string) => {
     if (onMatchupChange) {
       onMatchupChange(matchupId);
@@ -266,6 +256,42 @@ export function MatchupNavigationControls({
       if (!isNaN(numericId)) {
         navigate(`/baseball/league/${leagueId}/matchups/${numericId}`);
       }
+    }
+  };
+
+  const handlePrevWeek = () => {
+    if (!canGoPrev) return;
+    const newWeek = availableWeeks[weekIndex - 1] ?? selectedWeek;
+    setSelectedWeek(newWeek);
+    // Auto-select the best matchup in the new week so the detail panel
+    // updates immediately without requiring the user to click a card.
+    const candidates = allMatchups.filter((m) => m.weekNumber === newWeek);
+    if (candidates.length > 0) {
+      const toSelect =
+        (userTeamId != null
+          ? candidates.find(
+              (m) => m.team1Id === userTeamId || m.team2Id === userTeamId,
+            )
+          : null) ?? candidates[0];
+      if (toSelect?.id) handleMatchupSelect(toSelect.id);
+    }
+  };
+
+  const handleNextWeek = () => {
+    if (!canGoNext) return;
+    const newWeek = availableWeeks[weekIndex + 1] ?? selectedWeek;
+    setSelectedWeek(newWeek);
+    // Auto-select the best matchup in the new week so the detail panel
+    // updates immediately without requiring the user to click a card.
+    const candidates = allMatchups.filter((m) => m.weekNumber === newWeek);
+    if (candidates.length > 0) {
+      const toSelect =
+        (userTeamId != null
+          ? candidates.find(
+              (m) => m.team1Id === userTeamId || m.team2Id === userTeamId,
+            )
+          : null) ?? candidates[0];
+      if (toSelect?.id) handleMatchupSelect(toSelect.id);
     }
   };
 
