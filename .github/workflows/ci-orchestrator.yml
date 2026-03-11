@@ -248,3 +248,58 @@ jobs:
                 // Label may have been removed already
               }
             }
+
+  # ============================================================================
+  # Remove "merge-when-ready" label on CI failure
+  # ============================================================================
+  # Prevents a failing PR from sitting in the merge queue indefinitely.
+  # The label is removed so the author must consciously re-add it after fixing.
+  # Only fires on real pipeline failures, not cancellations (new push) or skips.
+  # ============================================================================
+  remove-merge-label-on-failure:
+    name: "🏷️ Remove Merge Label on Failure"
+    needs: [ci-pipeline]
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      needs.ci-pipeline.result == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove merge-when-ready label
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+
+            // Fetch current PR to get fresh label state (payload labels may be stale)
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber
+            });
+
+            const hasMergeLabel = pr.labels.some(l => l.name === 'merge-when-ready');
+            if (!hasMergeLabel) {
+              console.log(`PR #${prNumber} does not have merge-when-ready label, skipping`);
+              return;
+            }
+
+            await github.rest.issues.removeLabel({
+              owner,
+              repo,
+              issue_number: prNumber,
+              name: 'merge-when-ready'
+            });
+            console.log(`Removed merge-when-ready label from PR #${prNumber}`);
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body: '⚠️ **`merge-when-ready` label removed** — CI pipeline failed.\n\n' +
+                    'The label was automatically removed to prevent merging a failing PR. ' +
+                    'Fix the CI failures and re-add the label when ready.\n\n' +
+                    '---\n*Automated message from CI pipeline*'
+            });
+            console.log(`Posted failure comment on PR #${prNumber}`);
