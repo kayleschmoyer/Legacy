@@ -108,7 +108,8 @@ export class DivisionalStrategy implements SchedulingStrategy {
         );
 
         while (available.length >= 2) {
-          const team1 = available.shift()!;
+          const team1 = available.shift();
+          if (!team1) break; // guard: while condition ensures this won't trigger
 
           // Prefer a partner from a different division
           const crossDivIdx = available.findIndex(

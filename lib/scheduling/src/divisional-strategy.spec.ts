@@ -80,9 +80,13 @@ describe('DivisionalStrategy', () => {
 
     it('approximately 60% of matchups are divisional', () => {
       const divisionalCount = pairings.filter((p) => {
-        const t1 = teams.find((t) => t.id === p.team1Id)!;
-        const t2 = teams.find((t) => t.id === p.team2Id)!;
-        return t1.divisionId === t2.divisionId;
+        const t1 = teams.find((t) => t.id === p.team1Id);
+        const t2 = teams.find((t) => t.id === p.team2Id);
+        return (
+          t1 !== undefined &&
+          t2 !== undefined &&
+          t1.divisionId === t2.divisionId
+        );
       }).length;
       // Allow ±10% tolerance to account for scheduling constraints
       expect(divisionalCount).toBeGreaterThanOrEqual(20); // ≥ 40%

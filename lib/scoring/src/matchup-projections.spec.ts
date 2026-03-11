@@ -311,7 +311,7 @@ describe('Matchup Projections Engine', () => {
       expect(result.careerProjection.totalPerGame).toBe(1.6);
 
       // Season: (60*1 + 15*3) / 50 = 2.1
-      expect(result.matchupProjection!.totalPerGame).toBe(2.1);
+      expect(result.matchupProjection?.totalPerGame).toBe(2.1);
     });
 
     it('should handle null season stats', () => {

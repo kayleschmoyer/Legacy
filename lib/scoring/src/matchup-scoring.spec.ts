@@ -400,8 +400,11 @@ describe('Matchup Scoring Engine', () => {
       expect(result.matchupId).toBe(999);
       expect(result.team1Score).not.toBeNull();
       expect(result.team2Score).not.toBeNull();
-      expect(result.team1Score!.teamId).toBe(100);
-      expect(result.team2Score!.teamId).toBe(200);
+      const team1Score = result.team1Score;
+      const team2Score = result.team2Score;
+      if (!team1Score || !team2Score) return;
+      expect(team1Score.teamId).toBe(100);
+      expect(team2Score.teamId).toBe(200);
       expect(result.gamesPerMatchup).toBe(5);
     });
 
@@ -437,7 +440,9 @@ describe('Matchup Scoring Engine', () => {
       );
 
       expect(result.team1Score).not.toBeNull();
-      expect(result.team1Score!.totalScore).toBeGreaterThan(0);
+      const score = result.team1Score;
+      if (!score) return;
+      expect(score.totalScore).toBeGreaterThan(0);
     });
   });
 
