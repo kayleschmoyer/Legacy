@@ -356,11 +356,11 @@ builder.mutationField('randomizeDraftOrder', (t) =>
 
         return updatedDraft;
       } catch (error) {
-        LOGGER.error('Error randomizing draft order', {
-          draftId,
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOGGER.error(
+          'Error randomizing draft order',
+          error instanceof Error ? error : new Error(String(error)),
+          { draftId, userId },
+        );
         throw error;
       }
     },
