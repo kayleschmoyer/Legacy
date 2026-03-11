@@ -1099,6 +1099,7 @@ export type Mutation = {
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
+  deleteLeagueAnnouncement?: Maybe<Scalars['Boolean']['output']>;
   /** Remove a season award from a league. Commissioner / General Manager access required. */
   deleteLeagueSeasonAward?: Maybe<Scalars['Boolean']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
@@ -1182,6 +1183,7 @@ export type Mutation = {
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
+  updateLeagueAnnouncement?: Maybe<LeagueChatMessage>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
   updateMatchupPlayerPosition?: Maybe<MatchupPlayer>;
@@ -1340,6 +1342,11 @@ export type MutationDeleteAchievementRestrictionArgs = {
 };
 
 export type MutationDeleteLeagueArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type MutationDeleteLeagueAnnouncementArgs = {
+  id: Scalars['Int']['input'];
   leagueId: Scalars['Int']['input'];
 };
 
@@ -1605,6 +1612,12 @@ export type MutationUpdateCommissionerNoteArgs = {
 
 export type MutationUpdateDraftSettingsArgs = {
   input: UpdateDraftSettingsInput;
+};
+
+export type MutationUpdateLeagueAnnouncementArgs = {
+  id: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
 };
 
 export type MutationUpdateLeagueScoringProfileArgs = {
@@ -4214,6 +4227,55 @@ export type GetPlayerCareerStatsQuery = {
   } | null;
 };
 
+export type SubscriptionInfoFragment = {
+  __typename?: 'SubscriptionInfo';
+  status?: string | null;
+  tier?: string | null;
+  currentPeriodEnd?: string | null;
+  cancelAtPeriodEnd?: boolean | null;
+  gracePeriodEndsAt?: string | null;
+};
+
+export type GetMySubscriptionQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetMySubscriptionQuery = {
+  __typename?: 'Query';
+  mySubscription?: {
+    __typename?: 'SubscriptionInfo';
+    status?: string | null;
+    tier?: string | null;
+    currentPeriodEnd?: string | null;
+    cancelAtPeriodEnd?: boolean | null;
+    gracePeriodEndsAt?: string | null;
+  } | null;
+};
+
+export type CreateCheckoutSessionMutationVariables = Exact<{
+  priceId: Scalars['String']['input'];
+  successUrl: Scalars['String']['input'];
+  cancelUrl: Scalars['String']['input'];
+}>;
+
+export type CreateCheckoutSessionMutation = {
+  __typename?: 'Mutation';
+  createCheckoutSession?: {
+    __typename?: 'CheckoutSessionResult';
+    url?: string | null;
+  } | null;
+};
+
+export type CreateBillingPortalSessionMutationVariables = Exact<{
+  returnUrl: Scalars['String']['input'];
+}>;
+
+export type CreateBillingPortalSessionMutation = {
+  __typename?: 'Mutation';
+  createBillingPortalSession?: {
+    __typename?: 'BillingPortalSessionResult';
+    url?: string | null;
+  } | null;
+};
+
 export type VerifyApplePurchaseMutationVariables = Exact<{
   jwsTransaction: Scalars['String']['input'];
 }>;
@@ -4632,6 +4694,15 @@ export const CareerPitchingStatsFragmentDoc = gql`
     wildPitches
     winPercentage
     playerId
+  }
+`;
+export const SubscriptionInfoFragmentDoc = gql`
+  fragment SubscriptionInfo on SubscriptionInfo {
+    status
+    tier
+    currentPeriodEnd
+    cancelAtPeriodEnd
+    gracePeriodEndsAt
   }
 `;
 export const TeamFragmentDoc = gql`
@@ -7430,6 +7501,202 @@ export type GetPlayerCareerStatsSuspenseQueryHookResult = ReturnType<
 export type GetPlayerCareerStatsQueryResult = Apollo.QueryResult<
   GetPlayerCareerStatsQuery,
   GetPlayerCareerStatsQueryVariables
+>;
+export const GetMySubscription = gql`
+  query GetMySubscription {
+    mySubscription {
+      ...SubscriptionInfo
+    }
+  }
+  ${SubscriptionInfoFragmentDoc}
+`;
+
+/**
+ * __useGetMySubscriptionQuery__
+ *
+ * To run a query within a React component, call `useGetMySubscriptionQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMySubscriptionQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMySubscriptionQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMySubscriptionQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMySubscriptionQuery,
+    GetMySubscriptionQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMySubscriptionQuery,
+    GetMySubscriptionQueryVariables
+  >(GetMySubscription, options);
+}
+export function useGetMySubscriptionLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMySubscriptionQuery,
+    GetMySubscriptionQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMySubscriptionQuery,
+    GetMySubscriptionQueryVariables
+  >(GetMySubscription, options);
+}
+export function useGetMySubscriptionSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMySubscriptionQuery,
+        GetMySubscriptionQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMySubscriptionQuery,
+    GetMySubscriptionQueryVariables
+  >(
+    GetMySubscription,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMySubscriptionQuery,
+          GetMySubscriptionQueryVariables
+        >,
+  );
+}
+export type GetMySubscriptionQueryHookResult = ReturnType<
+  typeof useGetMySubscriptionQuery
+>;
+export type GetMySubscriptionLazyQueryHookResult = ReturnType<
+  typeof useGetMySubscriptionLazyQuery
+>;
+export type GetMySubscriptionSuspenseQueryHookResult = ReturnType<
+  typeof useGetMySubscriptionSuspenseQuery
+>;
+export type GetMySubscriptionQueryResult = Apollo.QueryResult<
+  GetMySubscriptionQuery,
+  GetMySubscriptionQueryVariables
+>;
+export const CreateCheckoutSession = gql`
+  mutation CreateCheckoutSession(
+    $priceId: String!
+    $successUrl: String!
+    $cancelUrl: String!
+  ) {
+    createCheckoutSession(
+      priceId: $priceId
+      successUrl: $successUrl
+      cancelUrl: $cancelUrl
+    ) {
+      url
+    }
+  }
+`;
+export type CreateCheckoutSessionMutationFn = MutationFunction<
+  CreateCheckoutSessionMutation,
+  CreateCheckoutSessionMutationVariables
+>;
+
+/**
+ * __useCreateCheckoutSessionMutation__
+ *
+ * To run a mutation, you first call `useCreateCheckoutSessionMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateCheckoutSessionMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createCheckoutSessionMutation, { data, loading, error }] = useCreateCheckoutSessionMutation({
+ *   variables: {
+ *      priceId: // value for 'priceId'
+ *      successUrl: // value for 'successUrl'
+ *      cancelUrl: // value for 'cancelUrl'
+ *   },
+ * });
+ */
+export function useCreateCheckoutSessionMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CreateCheckoutSessionMutation,
+    CreateCheckoutSessionMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CreateCheckoutSessionMutation,
+    CreateCheckoutSessionMutationVariables
+  >(CreateCheckoutSession, options);
+}
+export type CreateCheckoutSessionMutationHookResult = ReturnType<
+  typeof useCreateCheckoutSessionMutation
+>;
+export type CreateCheckoutSessionMutationResult =
+  Apollo.MutationResult<CreateCheckoutSessionMutation>;
+export type CreateCheckoutSessionMutationOptions = BaseMutationOptions<
+  CreateCheckoutSessionMutation,
+  CreateCheckoutSessionMutationVariables
+>;
+export const CreateBillingPortalSession = gql`
+  mutation CreateBillingPortalSession($returnUrl: String!) {
+    createBillingPortalSession(returnUrl: $returnUrl) {
+      url
+    }
+  }
+`;
+export type CreateBillingPortalSessionMutationFn = MutationFunction<
+  CreateBillingPortalSessionMutation,
+  CreateBillingPortalSessionMutationVariables
+>;
+
+/**
+ * __useCreateBillingPortalSessionMutation__
+ *
+ * To run a mutation, you first call `useCreateBillingPortalSessionMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateBillingPortalSessionMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createBillingPortalSessionMutation, { data, loading, error }] = useCreateBillingPortalSessionMutation({
+ *   variables: {
+ *      returnUrl: // value for 'returnUrl'
+ *   },
+ * });
+ */
+export function useCreateBillingPortalSessionMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CreateBillingPortalSessionMutation,
+    CreateBillingPortalSessionMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CreateBillingPortalSessionMutation,
+    CreateBillingPortalSessionMutationVariables
+  >(CreateBillingPortalSession, options);
+}
+export type CreateBillingPortalSessionMutationHookResult = ReturnType<
+  typeof useCreateBillingPortalSessionMutation
+>;
+export type CreateBillingPortalSessionMutationResult =
+  Apollo.MutationResult<CreateBillingPortalSessionMutation>;
+export type CreateBillingPortalSessionMutationOptions = BaseMutationOptions<
+  CreateBillingPortalSessionMutation,
+  CreateBillingPortalSessionMutationVariables
 >;
 export const VerifyApplePurchase = gql`
   mutation VerifyApplePurchase($jwsTransaction: String!) {

@@ -9,10 +9,12 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { useRouter } from 'expo-router';
 import {
   useAuthHandlers,
   useCurrentUserInfo,
 } from '../../common/auth/AuthHooks';
+import { useSubscription } from '../../features/subscription';
 
 const BRAND_GOLD_LIGHT = '#C5A55A';
 const BRAND_NAVY_LIGHT = '#2C4A7C';
@@ -32,6 +34,8 @@ function getAccessLevelLabel(level: string): string {
 export default function ProfileSettingsScreen(): React.JSX.Element {
   const { data: currentUser } = useCurrentUserInfo();
   const { logout } = useAuthHandlers();
+  const { isPremium, tier } = useSubscription();
+  const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = () => {
@@ -315,6 +319,49 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               </XStack>
             </XStack>
           </YStack>
+        </YStack>
+
+        {/* Subscription & Billing */}
+        <YStack
+          borderRadius="$6"
+          borderWidth={1}
+          borderColor={isPremium ? `${BRAND_GOLD_LIGHT}4D` : '$borderColor'}
+          overflow="hidden"
+        >
+          <XStack
+            paddingHorizontal="$5"
+            paddingVertical="$4"
+            alignItems="center"
+            gap="$3"
+            borderBottomWidth={1}
+            borderBottomColor="$borderColor"
+            onPress={() => router.navigate('subscription-settings')}
+            pressStyle={{ backgroundColor: '$gray3' }}
+          >
+            <YStack
+              width={36}
+              height={36}
+              borderRadius="$4"
+              alignItems="center"
+              justifyContent="center"
+              backgroundColor={isPremium ? `${BRAND_GOLD_LIGHT}33` : '$color2'}
+            >
+              <Text fontSize={16}>{isPremium ? '⭐' : '💎'}</Text>
+            </YStack>
+            <YStack flex={1}>
+              <Paragraph size="$4" color="$color" fontWeight="600">
+                Subscription & Billing
+              </Paragraph>
+              <Paragraph size="$2" color="$colorPress">
+                {isPremium
+                  ? `Premium (${tier === 'annual' ? 'Annual' : 'Monthly'})`
+                  : 'Free plan — tap to upgrade'}
+              </Paragraph>
+            </YStack>
+            <Text fontSize="$4" color="$colorSubtle">
+              ›
+            </Text>
+          </XStack>
         </YStack>
 
         {/* Sign Out */}

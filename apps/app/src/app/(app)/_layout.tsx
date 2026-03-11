@@ -26,6 +26,7 @@ import HelpScreen from './help';
 import ProfileSettingsScreen from './profile-settings';
 import PreferencesScreen from './preferences';
 import NotificationsScreen from './notifications';
+import SubscriptionSettingsScreen from './subscription-settings';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
 import {
   useAuthHandlers,
@@ -54,6 +55,7 @@ export type AppDrawerParamList = {
   'profile-settings': undefined;
   preferences: undefined;
   notifications: undefined;
+  'subscription-settings': undefined;
 };
 
 const { Navigator, Screen } = createDrawerNavigator<AppDrawerParamList>();
@@ -300,6 +302,14 @@ export default function Layout() {
             name="notifications"
             options={{ title: 'Notifications' }}
             component={NotificationsScreen}
+          />
+          <Screen
+            name="subscription-settings"
+            options={{
+              drawerLabel: () => null,
+              title: 'Subscription & Billing',
+            }}
+            component={SubscriptionSettingsScreen}
           />
         </Navigator>
       </GestureHandlerRootView>
