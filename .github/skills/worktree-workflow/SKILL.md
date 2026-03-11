@@ -398,6 +398,7 @@ See the [create-pr skill](../create-pr/SKILL.md) for the full PR template workfl
 
 ```powershell
 gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+./.github/scripts/cleanup-pr-body.ps1
 ```
 
 ### Step 9: Update Jira to In Review
@@ -586,6 +587,7 @@ cd $wt
 
 # 7. PR + Jira (see create-pr skill for full template)
 gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+./.github/scripts/cleanup-pr-body.ps1
 acli jira workitem transition --key LS-#### --status "In Review"
 
 # 7. Cleanup after merge

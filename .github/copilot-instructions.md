@@ -21,7 +21,7 @@
 10. **Migrations (BEFORE make pc)**: run `pnpm run db:status` then `pnpm run db:up` from `lib/db-client` — **always do this even if you think no migrations were added.** Confirm `Applied N new migrations` or `No new migrations to apply`. (See `skills/db-migration-write/SKILL.md`)
 11. Validate: `make pc` — must pass before pushing or opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
     11b. **Push only after `make pc` passes**: `git push --force-with-lease origin HEAD` — pushing before validating is the #1 cause of post-rebase CI failures.
-12. **Ship (REQUIRED ΓÇö do NOT stop before this step)**: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` ΓåÆ Jira "In Review" (see `skills/create-pr/SKILL.md`)
+12. **Ship (REQUIRED ΓÇö do NOT stop before this step)**: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` ΓåÆ `.\.github\scripts\cleanup-pr-body.ps1` ΓåÆ Jira "In Review" (see `skills/create-pr/SKILL.md`)
 13. Cleanup: `twig worktree clean` ΓåÆ `git branch -d LS-####/description` ΓåÆ Jira "Done"
 
 ## Rules
