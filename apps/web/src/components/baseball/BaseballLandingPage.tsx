@@ -744,34 +744,6 @@ export function BaseballLandingPage() {
     navigate('/baseball/mock-draft');
   };
 
-  if (error) {
-    return (
-      <PageContainer
-        role="main"
-        aria-live="assertive"
-        style={pageBackgroundStyle}
-      >
-        <ContentContainer>
-          <YStack
-            alignItems="center"
-            justifyContent="center"
-            flex={1}
-            minHeight={400}
-            gap="$4"
-            role="alert"
-          >
-            <Paragraph fontSize="$6" color="$red10">
-              Failed to load leagues
-            </Paragraph>
-            <SecondaryButton onPress={() => window.location.reload()}>
-              <Text>Try Again</Text>
-            </SecondaryButton>
-          </YStack>
-        </ContentContainer>
-      </PageContainer>
-    );
-  }
-
   const filteredLeagues = leagues.filter((l) =>
     (l?.name || '').toLowerCase().includes(search.trim().toLowerCase()),
   );
@@ -959,6 +931,33 @@ export function BaseballLandingPage() {
         {/* Returning users: compact hero → leagues list (zero-scroll) */}
         {/* New users: full hero → empty state CTA */}
         {hasLeagues ? compactHero : fullHero}
+
+        {error && (
+          <NoticeCard
+            borderColor={withAlpha(BRAND_SEAM_RED, 0.4)}
+            backgroundColor={withAlpha(BRAND_SEAM_RED, 0.08)}
+            role="alert"
+            aria-live="assertive"
+          >
+            <XStack alignItems="center" justifyContent="space-between" gap="$4">
+              <YStack gap="$1" flex={1}>
+                <Paragraph fontSize="$4" color="$red10" fontWeight="600">
+                  Could not load your leagues
+                </Paragraph>
+                <Paragraph fontSize="$3" color="$glassTextSubdued">
+                  There was a problem fetching your league data. You can still
+                  create or join a league below.
+                </Paragraph>
+              </YStack>
+              <SecondaryButton
+                onPress={() => window.location.reload()}
+                accessibilityLabel="Retry loading leagues"
+              >
+                <Text fontWeight="700">Retry</Text>
+              </SecondaryButton>
+            </XStack>
+          </NoticeCard>
+        )}
 
         {!auth?.user && (
           <NoticeCard>
