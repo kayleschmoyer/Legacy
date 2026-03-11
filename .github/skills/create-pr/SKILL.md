@@ -98,11 +98,27 @@ If no e2e project is affected (pure back-end / library change), the command exit
 
 ```powershell
 # Create PR using GitHub CLI with --body-file (preferred — works for both humans and agents)
-gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main --reviewer copilot
 ```
+
+> **Why `--reviewer copilot`?** This requests an automated code review from GitHub Copilot on every PR. Copilot reviews run instantly, surface issues before human reviewers look at the PR, and are required by team convention.
+>
+> **Requirement**: `--reviewer copilot` only works when GitHub Copilot code review is enabled for the repository (Repo Settings → Code review → Copilot code review). If the command errors with `'copilot' not found`, see the [Requesting Copilot Review](#requesting-copilot-review) section below for the fallback.
 
 > **Alternative (human-only, opens browser):** `twig github pr create-pr`
 > Twig auto-fills the PR from Jira — convenient for humans but not usable by agents.
+
+## Requesting Copilot Review
+
+Every PR must have a Copilot code review requested. The preferred method is to pass `--reviewer copilot` directly to `gh pr create` (see above). If that flag is unsupported or errors, use the web UI fallback:
+
+```powershell
+# After gh pr create, open the PR in the browser
+gh pr view --web
+# Then: Reviewers sidebar → gear icon → select "Copilot"
+```
+
+Copilot reviews are non-blocking — they run asynchronously and do not gate the PR merge. However they must be **requested** on every PR so the feedback is available to human reviewers.
 
 ## 🚨 CRITICAL: Always Use --body-file, Never --body
 
@@ -124,8 +140,8 @@ with properly escaped content via a variable.
 #    (agents: use create_file to write the markdown — it preserves backticks)
 #    File location: .github/tmp-pr-body.md (or $env:TEMP/pr-body.md)
 
-# 2. Create PR using --body-file
-gh pr create --title "LS-#### fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+# 2. Create PR using --body-file (always include --reviewer copilot)
+gh pr create --title "LS-#### fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main --reviewer copilot
 
 # 3. Clean up the temp file
 .\scripts\cleanup-pr-body.ps1
@@ -321,18 +337,19 @@ gh pr edit <PR_NUMBER> --body-file ".github/tmp-pr-body.md"
 ## Best Practices
 
 1. **Always use `--body-file`** for PR descriptions — never inline `--body` in PowerShell
-2. **Use `create_file` tool** to write the temp .md file — it preserves backticks and special chars
-3. **Never use PowerShell heredoc** (`@" "@`) for markdown with backticks — it strips them
-4. **Never escape backticks** in the PR body content — write `` `code` `` not `\`code\`` (escaped backticks render as backslashes)
-5. **Never use shell redirection (`>`)** to create the PR body file — PowerShell writes UTF-16LE; use `create_file` instead
-6. **`twig pr` is not a valid command** — do not attempt to generate the PR body via twig; write it directly with `create_file`
-7. **Verify the file before using it** — `Get-Content .github/tmp-pr-body.md | Select-Object -First 5` to confirm it looks like markdown, not an error
-8. **Run pre-commit validation** before creating PR (`make pre-commit`)
-9. **Run affected E2E tests** before creating PR (`pnpm exec nx affected -t e2e --base=origin/main`)
-10. **Prefix PR title with Jira ticket key**: `LS-#### type(scope): description`
-11. **Link Jira ticket** in PR description
-12. **Add screenshots for every UI change** — see [UI Screenshots](#ui-screenshots) section below
-13. **Keep PRs focused** — split large changes into multiple PRs
+2. **Always pass `--reviewer copilot`** to `gh pr create` — this requests an automated Copilot review on every PR
+3. **Use `create_file` tool** to write the temp .md file — it preserves backticks and special chars
+4. **Never use PowerShell heredoc** (`@" "@`) for markdown with backticks — it strips them
+5. **Never escape backticks** in the PR body content — write `` `code` `` not `\`code\`` (escaped backticks render as backslashes)
+6. **Never use shell redirection (`>`)** to create the PR body file — PowerShell writes UTF-16LE; use `create_file` instead
+7. **`twig pr` is not a valid command** — do not attempt to generate the PR body via twig; write it directly with `create_file`
+8. **Verify the file before using it** — `Get-Content .github/tmp-pr-body.md | Select-Object -First 5` to confirm it looks like markdown, not an error
+9. **Run pre-commit validation** before creating PR (`make pre-commit`)
+10. **Run affected E2E tests** before creating PR (`pnpm exec nx affected -t e2e --base=origin/main`)
+11. **Prefix PR title with Jira ticket key**: `LS-#### type(scope): description`
+12. **Link Jira ticket** in PR description
+13. **Add screenshots for every UI change** — see [UI Screenshots](#ui-screenshots) section below
+14. **Keep PRs focused** — split large changes into multiple PRs
 
 ## UI Screenshots
 
@@ -461,8 +478,8 @@ git push origin HEAD
 # 4. Write PR body to a temp .md file (use create_file tool — NOT heredoc)
 #    File: .github/tmp-pr-body.md
 
-# 5. Create PR
-gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+# 5. Create PR (always request Copilot review)
+gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main --reviewer copilot
 
 # 6. Clean up temp file
 .\scripts\cleanup-pr-body.ps1
@@ -490,7 +507,8 @@ acli jira workitem transition --key LS-1234 --status "In Review"
 - [ ] PR title includes Jira ticket key prefix (e.g. `LS-1234 feat(scope): description`)
 - [ ] PR description renders correctly (check in browser)
 - [ ] Jira ticket updated to "In Review"
-- [ ] Reviewers assigned
+- [ ] Copilot review requested (`--reviewer copilot` passed to `gh pr create`)
+- [ ] Human reviewers assigned (if required)
 - [ ] Labels added (if needed)
 - [ ] `make pc` passes locally (do not wait on GitHub CI — verify locally)
 
