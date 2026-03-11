@@ -92,6 +92,7 @@ jobs:
                     'This PR will be automatically merged when:\n' +
                     '- All status checks pass ✅\n' +
                     '- No merge conflicts exist ✅\n' +
+                    '- No unresolved review comments ✅\n' +
                     '- Required reviews are approved ✅\n' +
                     (targetsMain ? '' : '- `merge-to-parent` label is present ✅\n') +
                     '\nThe merge queue responds immediately to status changes, new commits, and reviews. ' +
@@ -269,6 +270,16 @@ jobs:
               //   return { canMerge: false, reason: 'PR requires at least one approval from a reviewer' };
               // }
               
+              // Check for unresolved review threads (including Copilot)
+              const unresolvedResult = await checkUnresolvedReviewThreads(pr.number);
+              if (unresolvedResult.hasUnresolved) {
+                return {
+                  canMerge: false,
+                  reason: `PR has ${unresolvedResult.count} unresolved review comment thread(s)`,
+                  unresolvedThreads: unresolvedResult.threads
+                };
+              }
+
               // Check status checks
               const checksResult = await validateStatusChecks(pr.head.sha);
               if (!checksResult.allPassing) {
@@ -289,6 +300,51 @@ jobs:
               }
               
               return { canMerge: true };
+            }
+
+            async function checkUnresolvedReviewThreads(prNumber) {
+              const query = `
+                query($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      reviewThreads(first: 100) {
+                        nodes {
+                          isResolved
+                          isOutdated
+                          comments(first: 1) {
+                            nodes {
+                              author {
+                                login
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `;
+
+              const result = await github.graphql(query, {
+                owner,
+                repo,
+                number: prNumber
+              });
+
+              const allThreads = result.repository.pullRequest.reviewThreads.nodes;
+              // Outdated threads (on stale diffs) don't block merge
+              const unresolvedThreads = allThreads.filter(t => !t.isResolved && !t.isOutdated);
+
+              const threads = unresolvedThreads.map(t => {
+                const author = t.comments.nodes[0]?.author?.login ?? 'unknown';
+                return author;
+              });
+
+              return {
+                hasUnresolved: unresolvedThreads.length > 0,
+                count: unresolvedThreads.length,
+                threads
+              };
             }
 
             async function validateStatusChecks(sha) {
@@ -491,6 +547,11 @@ jobs:
                 // Reviews are no longer required - this case should not occur
                 comment += "\n1. Check the PR status and resolve any issues\n" +
                           "2. Ensure all requirements are met";
+              } else if (validation.unresolvedThreads) {
+                comment += "\n1. Resolve all open review comment threads on the PR\n" +
+                          "2. Threads from the following reviewer(s) are unresolved:\n" +
+                          [...new Set(validation.unresolvedThreads)].map(a => "   - @" + a).join('\n') + "\n" +
+                          "3. Open each thread on the **Files changed** tab and click **Resolve conversation**";
               } else if (validation.failingChecks) {
                 comment += "\n1. Fix the failing checks:\n" +
                           validation.failingChecks.map(check => "   - " + check).join('\n') + "\n" +
