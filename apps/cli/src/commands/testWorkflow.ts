@@ -4,7 +4,6 @@ import {
   ClientNotificationType,
   wireToClientEventName,
 } from '@legacy-sports/utils';
-import { captureError } from '@legacy-sports/rollbar';
 import { CommandArgs } from '../utils/loadEnvFile';
 import { AuthMiddleware } from '../services/AuthMiddleware';
 
@@ -41,7 +40,6 @@ async function connectWebSocket(
     viewContext,
     autoConnect: false,
     reconnect: false, // CLI manages connection manually
-    captureError,
   });
 
   // Set up logging for connection events

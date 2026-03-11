@@ -51,7 +51,6 @@ import {
 } from '@tamagui/lucide-icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
-import { captureError } from '@legacy-sports/rollbar/web';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import {
   calculateMatchupProjection,
@@ -661,7 +660,6 @@ export function LeagueDetailPage(): React.JSX.Element {
       leagueId,
       viewContext: 'league',
       autoConnect: false,
-      captureError,
     });
     setWsClient(client);
     client.on('connected', () => {
@@ -716,7 +714,7 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   useEffect(() => {
     if (wsError) {
-      LOGGER.error('[LeagueDetailPage] WebSocket error:', wsError);
+      LOGGER.warn('[LeagueDetailPage] WebSocket error:', wsError);
     }
   }, [wsError]);
 
