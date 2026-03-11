@@ -140,10 +140,10 @@ Write-Host "  Main repo: $MainRepoPath"
 # ---------------------------------------------------------------------------
 # Multiple agents may run wt-setup simultaneously. The node_modules junction
 # logic reads and mutates the main repo's node_modules directory, so we need
-# exclusive access. We acquire a .wt-setup.lock file in the main repo and
-# release it when done (or on error).
+# exclusive access. We share the same lock used by pnpm-install-lock.ps1 so
+# that wt-setup and make install never run concurrently.
 
-$lockPath = Join-Path $MainRepoPath ".wt-setup.lock"
+$lockPath = Join-Path $MainRepoPath ".pnpm-install.lock"
 $lockStream = $null
 
 function Enter-SetupLock {

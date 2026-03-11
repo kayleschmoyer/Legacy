@@ -176,6 +176,7 @@ yarn-error.log
 **/*.log
 .twig/
 .wt-setup.lock
+.pnpm-install.lock
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 

@@ -44,7 +44,7 @@ Rebasing replays your branch's commits on top of another branch (usually `main`)
 | Abort and return to pre-rebase state     | `git rebase --abort`                                                                                                       |
 | Resolve generated file conflicts         | `.\scripts\resolve-generated-conflicts.ps1`                                                                                |
 | Skip duplicate migration commits         | `.\scripts\skip-migration-conflict.ps1`                                                                                    |
-| **Stabilize before push (CRITICAL)**     | `pnpm install --frozen-lockfile ; pnpm exec nx run db:print-schema ; pnpm exec nx affected -t codegen --base=origin/main`  |
+| **Stabilize before push (CRITICAL)**     | `make install ; pnpm exec nx run db:print-schema ; pnpm exec nx affected -t codegen --base=origin/main`                    |
 | **Validate before push**                 | `make pc`                                                                                                                  |
 | **Fix CI formatting failure**            | `pnpm exec nx format:write ; git add -A ; git commit -m "style: fix formatting" ; git push --force-with-lease origin HEAD` |
 
@@ -150,9 +150,9 @@ After the rebase completes, the working tree may be out of sync: main may have i
 
 ```powershell
 # 7a. Install dependencies (main may have added/updated packages)
-pnpm install --frozen-lockfile
+make install
 # If the lockfile itself was regenerated during conflict resolution, use:
-# pnpm install --no-frozen-lockfile
+# make install-force
 
 # 7b. Regenerate codegen (schema or GraphQL types may have changed on main)
 pnpm exec nx run db:print-schema
@@ -476,7 +476,7 @@ git rebase origin/main
 # Resolve conflicts (same process as above)
 
 # Stabilize before pushing (CRITICAL — prevents CI failures)
-pnpm install --frozen-lockfile
+make install
 pnpm exec nx run db:print-schema
 pnpm exec nx affected -t codegen --base=origin/main
 make pc
@@ -560,7 +560,7 @@ First, stabilize the workspace (main may have changed deps, schema, or formattin
 
 ```powershell
 # Install deps (main may have added/updated packages)
-pnpm install --frozen-lockfile
+make install
 
 # Regenerate schema + codegen (may have changed on main)
 pnpm exec nx run db:print-schema

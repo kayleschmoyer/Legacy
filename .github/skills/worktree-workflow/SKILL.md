@@ -83,9 +83,10 @@ mutates that directory.
    the shared `node_modules`, breaking every junctioned worktree mid-build/test.
 2. **Only run install/clean inside your own worktree** — and only when it has independent
    (non-junctioned) `node_modules` (i.e., lockfiles diverged from main).
-3. **`make wt-setup` is serialized** — the setup script acquires a file lock
-   (`.wt-setup.lock`) in the main repo so two concurrent setups don't race on junction
-   creation. If another setup is in progress, yours will wait (up to 120 s).
+3. **All install operations are serialized** — `make install`, `make install-force`, `make install-node`,
+   and `make wt-setup` all share a file lock (`.pnpm-install.lock`) in the main repo so concurrent
+   agents don't race on `node_modules`. If another install is in progress, yours will wait (up to 5 min).
+   **Never run raw `pnpm install`** — always use the Makefile targets.
 4. **`make clean` and `make force-clean` are junction-safe** — they detect junctions and
    only unlink them (`cmd rmdir`) instead of recursively deleting the target contents.
 

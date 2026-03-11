@@ -178,7 +178,7 @@ If conflicts occur, see the [rebase-conflicts skill](../rebase-conflicts/SKILL.m
 
 ```powershell
 # Stabilize: main may have changed deps, schema, or formatting
-pnpm install --frozen-lockfile
+make install
 pnpm exec nx run db:print-schema
 pnpm exec nx affected -t codegen --base=origin/main
 

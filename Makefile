@@ -94,22 +94,26 @@ endif
 # Installation and Setup
 install: ## Install all dependencies (Node.js and Python)
 	@$(call echo_blue,Installing dependencies...)
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -InstallArgs "--frozen-lockfile"
+else
 	pnpm install --frozen-lockfile
+endif
 	@$(CHECK_POETRY)
 
 install-force: ## Force install dependencies (handles Windows file locks)
 	@$(call echo_blue,Force installing dependencies...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH)/scripts/force-clean-node-modules.ps1"
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -ForceClean -InstallArgs "--frozen-lockfile"
 else
 	@$(call echo_yellow,Stopping potential background processes...)
 	@$(KILL_NODE)
 	@$(KILL_ESBUILD)
 	@$(call echo_blue,Removing node_modules...)
 	@$(RM_DIR) node_modules $(NULL_REDIRECT) || echo No node_modules to remove
-endif
 	@$(call echo_blue,Installing fresh dependencies...)
 	pnpm install --frozen-lockfile
+endif
 	@$(CHECK_POETRY)
 
 install-tools: ## Install additional development tools (npkill, rimraf)
@@ -119,7 +123,11 @@ install-tools: ## Install additional development tools (npkill, rimraf)
 
 install-node: ## Install only Node.js dependencies
 	@$(call echo_blue,Installing Node.js dependencies...)
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\pnpm-install-lock.ps1" -InstallArgs "--frozen-lockfile"
+else
 	pnpm install --frozen-lockfile
+endif
 
 install-python: ## Install only Python dependencies
 	@$(call echo_blue,Installing Python dependencies...)
