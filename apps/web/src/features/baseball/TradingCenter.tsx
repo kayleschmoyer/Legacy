@@ -583,7 +583,6 @@ function ProposeTradeDialog({
       justifyContent="center"
       backgroundColor={withAlpha(BLACK, 0.6)}
       style={{ backdropFilter: 'blur(4px)' }}
-      onPress={onDismiss}
     >
       <YStack
         role="dialog"
