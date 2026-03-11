@@ -476,7 +476,7 @@ export default function PricingPage() {
                 <Paragraph
                   marginBottom={0}
                   fontWeight="600"
-                  color={!isAnnual ? '$color1' : '$color'}
+                  color={!isAnnual ? BRAND_GOLD_LIGHT : '$color11'}
                   size="$3"
                 >
                   Monthly
@@ -486,7 +486,7 @@ export default function PricingPage() {
                 <Paragraph
                   marginBottom={0}
                   fontWeight="600"
-                  color={isAnnual ? '$color1' : '$color'}
+                  color={isAnnual ? BRAND_GOLD_LIGHT : '$color11'}
                   size="$3"
                 >
                   Annual
