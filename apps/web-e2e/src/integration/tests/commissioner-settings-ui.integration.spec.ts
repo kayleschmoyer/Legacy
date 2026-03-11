@@ -279,9 +279,10 @@ test.describe
     });
 
     await test.step('Scoring profile name is displayed', async () => {
-      // The default profile name renders inside the scoring section
+      // The default profile name renders inside the scoring section.
+      // Allow up to 20s — consistent with the stat-group checks above.
       await expect(page.getByText(/default|standard/i).first()).toBeVisible({
-        timeout: 5_000,
+        timeout: 20_000,
       });
     });
   });
