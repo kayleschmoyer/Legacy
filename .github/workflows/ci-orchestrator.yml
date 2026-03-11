@@ -195,3 +195,56 @@ jobs:
       # Scan type is determined by what changed: deps → dependency scan, code → SAST/secrets, both → comprehensive
       scan_type: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_type || needs.determine-scope.outputs.security-scan-type }}
     secrets: inherit
+
+  # ============================================================================
+  # Label PR with failure reasons from security scanning
+  # CI pipeline labels are handled by the summarize job inside ci-pipeline.yml.
+  # ============================================================================
+  label-pr:
+    name: "🏷️ Label PR"
+    needs: [security-scanning]
+    if: always() && github.event.pull_request.number
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: "Label PR on Security Failure"
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.issue.number;
+            if (!prNumber) return;
+
+            const securityResult = '${{ needs.security-scanning.result }}';
+            const label = 'CI: Security';
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const existingLabels = pr.labels.map(l => l.name);
+
+            if (securityResult === 'failure') {
+              if (!existingLabels.includes(label)) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  labels: [label],
+                });
+                core.info(`Added label: ${label}`);
+              }
+            } else if (existingLabels.includes(label)) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: label,
+                });
+                core.info(`Removed label: ${label}`);
+              } catch (e) {
+                // Label may have been removed already
+              }
+            }

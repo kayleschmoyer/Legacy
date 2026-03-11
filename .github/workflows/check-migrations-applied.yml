@@ -42,6 +42,7 @@ concurrency:
 permissions:
   id-token: write # Required for OIDC authentication
   contents: read
+  pull-requests: write # Required for adding failure labels
 
 jobs:
   check:
@@ -149,6 +150,7 @@ jobs:
       # Run the check
       # -----------------------------------------------------------------------
       - name: "Check all migrations are applied"
+        id: migration-check
         env:
           CI_READONLY_DB_HOST: ${{ steps.db-creds.outputs.db_host }}
           CI_READONLY_DB_PORT: ${{ steps.db-creds.outputs.db_port }}
@@ -176,3 +178,46 @@ jobs:
 
           echo "✅ Ingress rule revoked for ${{ steps.open-sg.outputs.runner_ip }}/32"
           echo "::endgroup::"
+
+      - name: "Label PR on Migration Failure"
+        if: always() && github.event.pull_request.number
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.issue.number;
+            if (!prNumber) return;
+
+            const checkResult = '${{ steps.migration-check.outcome }}';
+            const label = 'CI: Migration';
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const existingLabels = pr.labels.map(l => l.name);
+
+            if (checkResult === 'failure') {
+              if (!existingLabels.includes(label)) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  labels: [label],
+                });
+                core.info(`Added label: ${label}`);
+              }
+            } else if (existingLabels.includes(label)) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: label,
+                });
+                core.info(`Removed label: ${label}`);
+              } catch (e) {
+                // Label may have been removed already
+              }
+            }

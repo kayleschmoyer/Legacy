@@ -570,6 +570,76 @@ jobs:
           commit-sha: ${{ github.sha }}
           dte-status: ${{ needs.detect-dte.outputs.dte-available }}
 
+      - name: "Label PR on Failure"
+        if: always() && github.event.pull_request.number
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.issue.number;
+            if (!prNumber) return;
+
+            // Map CI stage results to label names
+            const labelMap = {
+              'CI: Formatting': '${{ needs.quality-gates.outputs.formatting-result }}',
+              'CI: Lint Failure': '${{ needs.quality-gates.outputs.lint-result }}',
+              'CI: Type Error': '${{ needs.quality-gates.outputs.typecheck-result }}',
+              'CI: Test Failure': '${{ needs.quality-gates.outputs.test-result }}',
+              'CI: Build Failure': '${{ needs.build-validation.outputs.overall-result || needs.build-validation.result }}',
+              'CI: E2E Failure': '${{ needs.e2e.result }}',
+            };
+
+            const allCiLabels = Object.keys(labelMap);
+
+            // Determine which labels to add (failed) and remove (passed/skipped)
+            const labelsToAdd = [];
+            const labelsToRemove = [];
+
+            for (const [label, result] of Object.entries(labelMap)) {
+              if (result === 'failure' || result === 'cancelled') {
+                labelsToAdd.push(label);
+              } else {
+                labelsToRemove.push(label);
+              }
+            }
+
+            // Get existing labels on the PR
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const existingLabels = pr.labels.map(l => l.name);
+
+            // Add failure labels
+            const newLabels = labelsToAdd.filter(l => !existingLabels.includes(l));
+            if (newLabels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: newLabels,
+              });
+              core.info(`Added labels: ${newLabels.join(', ')}`);
+            }
+
+            // Remove labels that no longer apply
+            for (const label of labelsToRemove) {
+              if (existingLabels.includes(label)) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    name: label,
+                  });
+                  core.info(`Removed label: ${label}`);
+                } catch (e) {
+                  // Label may have been removed already
+                }
+              }
+            }
+
       - name: "Final Status"
         run: |
           STATUS="${{ steps.collect-results.outputs.overall-status }}"

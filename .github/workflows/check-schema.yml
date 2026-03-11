@@ -127,6 +127,7 @@ jobs:
       # print-schema a second time.
 
       - name: "Run all codegen targets against generated schema"
+        id: codegen-check
         shell: bash
         env:
           # Point every codegen config at the generated SDL file instead of a
@@ -136,3 +137,47 @@ jobs:
           # post-processing step (see root package.json "codegen" script).
           GRAPHQL_SCHEMA: ${{ github.workspace }}/lambdas/db/schema.graphql
         run: pnpm run codegen
+
+      - name: "Label PR on Schema Drift"
+        if: always() && github.event.pull_request.number
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.issue.number;
+            if (!prNumber) return;
+
+            const driftDetected = '${{ steps.drift-check.outputs.drift }}' === 'true';
+            const codegenFailed = '${{ steps.codegen-check.outcome }}' === 'failure';
+            const label = 'CI: Schema Drift';
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const existingLabels = pr.labels.map(l => l.name);
+
+            if (driftDetected || codegenFailed) {
+              if (!existingLabels.includes(label)) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  labels: [label],
+                });
+                core.info(`Added label: ${label}`);
+              }
+            } else if (existingLabels.includes(label)) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: label,
+                });
+                core.info(`Removed label: ${label}`);
+              } catch (e) {
+                // Label may have been removed already
+              }
+            }
