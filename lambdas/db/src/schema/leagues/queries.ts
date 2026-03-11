@@ -365,40 +365,39 @@ builder.queryField('teamMembers', (t) =>
 
       const { teamId } = args;
       const userId = context.user.id;
+      const db = context.db;
 
+      // First verify user is in the same league as this team (allows read-only access)
+      const team = await db
+        .select({
+          leagueId: PublicSchema.teams.leagueId,
+        })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.id, teamId))
+        .limit(1);
+
+      if (team.length === 0) {
+        throw new Error('Team not found');
+      }
+
+      // Check if user is a member of this league
+      const leagueMember = await db
+        .select()
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, team[0].leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (leagueMember.length === 0) {
+        throw new Error('User does not have access to this team');
+      }
+
+      // Fetch team members (read access granted for all league members)
       try {
-        // Fetch team members from the database
-        const db = context.db;
-        // First verify user is in the same league as this team (allows read-only access)
-        const team = await db
-          .select({
-            leagueId: PublicSchema.teams.leagueId,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, teamId))
-          .limit(1);
-
-        if (team.length === 0) {
-          throw new Error('Team not found');
-        }
-
-        // Check if user is a member of this league
-        const leagueMember = await db
-          .select()
-          .from(PublicSchema.leagueMembers)
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, team[0].leagueId),
-              eq(PublicSchema.leagueMembers.userId, userId),
-            ),
-          )
-          .limit(1);
-
-        if (leagueMember.length === 0) {
-          throw new Error('User does not have access to this team');
-        }
-
-        // Fetch team members (read access granted for all league members)
         const members = await db
           .select({
             id: PublicSchema.teamMembers.id,
