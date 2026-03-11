@@ -973,4 +973,96 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical', () => {
       ).toBeVisible({ timeout: 15000 });
     });
   });
+
+  // -----------------------------------------------------------------------
+  // PHASE 11 — ACTIVITY FEED (overview sub-tab)
+  // -----------------------------------------------------------------------
+
+  test('Phase 11: View activity feed on overview', async ({ page }) => {
+    await installGraphQLMocks(page, {
+      league: mockLeague({ draftStatus: 'completed', currentMatchup: 1 }),
+    });
+
+    await test.step('Navigate to league overview', async () => {
+      await page.goto(`/baseball/league/${LEAGUE_ID}/overview`);
+      await page.waitForLoadState('load');
+      await expect(page.getByText(LEAGUE_NAME)).toBeVisible({
+        timeout: 30000,
+      });
+    });
+
+    await test.step('Activity sub-tab is shown by default', async () => {
+      await expect(page.getByText('Activity').first()).toBeVisible({
+        timeout: 10000,
+      });
+      await expect(page.locator('body')).not.toContainText(
+        'Unexpected Application Error',
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // PHASE 12 — LEAGUE CHAT (overview sub-tab)
+  // -----------------------------------------------------------------------
+
+  test('Phase 12: Interact with league chat', async ({ page }) => {
+    await installGraphQLMocks(page, {
+      league: mockLeague({ draftStatus: 'completed', currentMatchup: 1 }),
+      extra: (postData) => {
+        if (
+          postData.includes('sendleaguemessage') ||
+          postData.includes('sendmessage')
+        ) {
+          return {
+            handled: true,
+            body: {
+              data: {
+                sendLeagueMessage: {
+                  id: 1,
+                  leagueId: LEAGUE_ID,
+                  messageText: 'Hello league!',
+                  messageType: 'text',
+                  createdAt: new Date().toISOString(),
+                  userId: 1,
+                  username: 'TestUser',
+                  gifUrl: null,
+                },
+              },
+            },
+          };
+        }
+        return undefined;
+      },
+    });
+
+    await test.step('Navigate to league overview', async () => {
+      await page.goto(`/baseball/league/${LEAGUE_ID}/overview`);
+      await page.waitForLoadState('load');
+      await expect(page.getByText(LEAGUE_NAME)).toBeVisible({
+        timeout: 30000,
+      });
+    });
+
+    await test.step('Switch to Chat sub-tab', async () => {
+      // The "Chat" sub-tab button sits inside the overview panel header
+      await page.getByText('Chat').first().click();
+      await page.waitForTimeout(500);
+    });
+
+    await test.step('Chat textarea is visible', async () => {
+      await expect(
+        page.getByRole('textbox', { name: /message the league/i }),
+      ).toBeVisible({ timeout: 15000 });
+    });
+
+    await test.step('Type and send a message', async () => {
+      const chatInput = page.getByRole('textbox', {
+        name: /message the league/i,
+      });
+      await chatInput.fill('Hello league!');
+      // Enter sends the message (Shift+Enter inserts newline)
+      await chatInput.press('Enter');
+      await page.waitForTimeout(500);
+    });
+  });
 });
