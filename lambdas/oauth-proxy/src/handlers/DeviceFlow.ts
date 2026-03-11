@@ -605,7 +605,7 @@ export const handleDeviceCompleteLocal = async (
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'text/html' },
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
         body: getDeviceSuccessHtml(user.email),
       };
     });
@@ -634,6 +634,7 @@ function getDeviceSuccessHtml(email: string): string {
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <title>Authentication Successful</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>

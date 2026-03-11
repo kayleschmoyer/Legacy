@@ -559,12 +559,13 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       return {
         statusCode: 200,
         headers: {
-          'Content-Type': 'text/html',
+          'Content-Type': 'text/html; charset=utf-8',
         },
         body: `
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <title>Authentication Successful</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
