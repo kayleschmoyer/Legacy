@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { Button, Card, XStack, YStack } from '@legacy-sports/shared-components';
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
@@ -92,7 +93,15 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
       }
     } catch (err) {
       setError((err as Error).message || 'Failed to join league');
-      LOGGER.error('Error joining league:', String(err));
+      // Only log unexpected errors to Rollbar. BAD_USER_INPUT errors (invalid
+      // invite code, already a member, league full) are expected user-facing
+      // conditions and should not generate error noise in error tracking.
+      const isUserInputError =
+        CombinedGraphQLErrors.is(err) &&
+        err.errors.some((e) => e.extensions?.['code'] === 'BAD_USER_INPUT');
+      if (!isUserInputError) {
+        LOGGER.error('Error joining league:', String(err));
+      }
     }
   };
 
