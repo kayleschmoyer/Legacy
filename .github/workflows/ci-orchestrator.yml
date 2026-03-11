@@ -167,6 +167,10 @@ jobs:
   ci-pipeline:
     name: "🚀 CI Pipeline"
     needs: [determine-scope]
+    # Skip on push-to-main: code was already validated by the PR CI run.
+    # Deployment workflows (deploy-web, upload-*) run independently.
+    # Weekly scheduled run + manual dispatch still provide full validation.
+    if: ${{ github.event_name != 'push' }}
     uses: ./.github/workflows/ci-pipeline.yml
     with:
       debug_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_mode || false }}
@@ -175,7 +179,8 @@ jobs:
   security-scanning:
     name: "🔐 Security Scanning"
     needs: [determine-scope]
-    if: ${{ needs.determine-scope.outputs.run-security == 'true' }}
+    # Skip on push-to-main (PR CI already scanned); weekly schedule provides ongoing coverage.
+    if: ${{ github.event_name != 'push' && needs.determine-scope.outputs.run-security == 'true' }}
     uses: ./.github/workflows/security-scanning.yml
     with:
       # Scan type is determined by what changed: deps → dependency scan, code → SAST/secrets, both → comprehensive
