@@ -44,6 +44,8 @@ interface MatchupRosterState {
   /** Any matchup in an admin league — used to test roster comparison panel */
   rosterLeagueId: number;
   rosterMatchupId: number;
+  /** Whether the roster matchup has bench players (positionId === null) */
+  hasBenchPlayers: boolean;
   /** A completed matchup that has a recap — used for recap panel phase */
   recapLeagueId: number;
   recapMatchupId: number;
@@ -173,6 +175,15 @@ const GET_MATCHUP_RECAP = `
   }
 `;
 
+const GET_MATCHUP_PLAYERS = `
+  query GetMatchupPlayersForBench($matchupId: Int!) {
+    getMatchupPlayers(matchupId: $matchupId) {
+      id
+      positionId
+    }
+  }
+`;
+
 // ---------------------------------------------------------------------------
 // UI helper — swap JWT in localStorage
 // ---------------------------------------------------------------------------
@@ -217,6 +228,7 @@ test.describe
     state = {
       rosterLeagueId: 0,
       rosterMatchupId: 0,
+      hasBenchPlayers: false,
       recapLeagueId: 0,
       recapMatchupId: 0,
     };
@@ -269,6 +281,19 @@ test.describe
 
         state.rosterLeagueId = league.id;
         state.rosterMatchupId = chosen.id;
+
+        // Check whether the chosen matchup has bench players (positionId === null)
+        // so Phase 2 can skip gracefully if none are present.
+        try {
+          const playersData = await gqlFetch<{
+            getMatchupPlayers: Array<{ id: number; positionId: number | null }>;
+          }>(jwt, GET_MATCHUP_PLAYERS, { matchupId: chosen.id });
+          state.hasBenchPlayers = (playersData.getMatchupPlayers ?? []).some(
+            (p) => p.positionId === null,
+          );
+        } catch {
+          /* treat as no bench players if the query fails */
+        }
       } catch {
         /* skip inaccessible leagues */
       }
@@ -393,6 +418,14 @@ test.describe
 
     if (state.rosterMatchupId === 0 || state.rosterLeagueId === 0) {
       test.skip(true, 'No matchup found — bench toggle test skipped');
+      return;
+    }
+
+    if (!state.hasBenchPlayers) {
+      test.skip(
+        true,
+        'Selected matchup has no bench players (positionId === null) — bench toggle test skipped',
+      );
       return;
     }
 
