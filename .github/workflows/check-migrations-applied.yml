@@ -23,10 +23,8 @@ on:
     branches: [main]
     paths:
       - "lib/db-client/migrations/*.ts"
-  push:
-    branches: [main]
-    paths:
-      - "lib/db-client/migrations/*.ts"
+  # push-to-main trigger removed: migration status is verified on PRs before
+  # merge.  Use workflow_dispatch for ad-hoc checks post-merge.
   workflow_dispatch:
 
 env:

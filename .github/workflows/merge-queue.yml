@@ -41,7 +41,7 @@ jobs:
       github.repository_owner == 'bkrupa' && 
       (
         github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'workflow_run' ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
         github.event_name == 'pull_request_review' ||
         (github.event_name == 'pull_request' && github.event.action == 'labeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent')) ||
         (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent'))
