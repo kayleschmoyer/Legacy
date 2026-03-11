@@ -114,7 +114,10 @@
     "git stash": true,
     "aws": true,
     "Rename-Item": true,
-    "poetry": true
+    "poetry": true,
+    ".\\scripts\\resolve-generated-conflicts.ps1": true,
+    "Push-Location": true,
+    "Pop-Location": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {
