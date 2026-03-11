@@ -3,16 +3,8 @@
  */
 
 import DataLoader from 'dataloader';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
-
-function chunk<T>(arr: readonly T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
-}
 
 /**
  * DataLoader for matchup player games
@@ -142,41 +134,28 @@ export const createLeagueWeekPlayerSeasonsLoader = (
       return { leagueId, weekNumber, playerId };
     });
 
-    // Deduplicate (leagueId, weekNumber) pairs and fetch all player seasons for those
+    // Deduplicate (leagueId, weekNumber) pairs and fetch all player seasons in one query
     const pairKeys = [
       ...new Set(lookups.map((l) => `${l.leagueId}-${l.weekNumber}`)),
     ];
-    const allRows: {
-      leagueId: number;
-      weekNumber: number;
-      playerId: number;
-      season: number;
-    }[] = [];
-    for (const batch of chunk(pairKeys, 20)) {
-      const pairs = batch.map((k) => {
+    const valueSql = sql.join(
+      pairKeys.map((k) => {
         const [lid, wn] = k.split('-').map(Number);
-        return { leagueId: lid, weekNumber: wn };
-      });
-      const rows = await db
-        .select({
-          leagueId: PublicSchema.leagueWeekPlayerSeasons.leagueId,
-          weekNumber: PublicSchema.leagueWeekPlayerSeasons.weekNumber,
-          playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
-          season: PublicSchema.leagueWeekPlayerSeasons.season,
-        })
-        .from(PublicSchema.leagueWeekPlayerSeasons)
-        .where(
-          or(
-            ...pairs.map(({ leagueId, weekNumber }) =>
-              and(
-                eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
-                eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, weekNumber),
-              ),
-            ),
-          ),
-        );
-      allRows.push(...rows);
-    }
+        return sql`(${lid}, ${wn})`;
+      }),
+      sql`, `,
+    );
+    const allRows = await db
+      .select({
+        leagueId: PublicSchema.leagueWeekPlayerSeasons.leagueId,
+        weekNumber: PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+        playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+        season: PublicSchema.leagueWeekPlayerSeasons.season,
+      })
+      .from(PublicSchema.leagueWeekPlayerSeasons)
+      .where(
+        sql`(${PublicSchema.leagueWeekPlayerSeasons.leagueId}, ${PublicSchema.leagueWeekPlayerSeasons.weekNumber}) IN (VALUES ${valueSql})`,
+      );
 
     const seasonMap = new Map<string, number>();
     for (const row of allRows) {
