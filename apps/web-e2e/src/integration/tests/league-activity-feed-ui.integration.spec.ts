@@ -38,6 +38,7 @@ interface ActivityFeedState {
   leagueName: string;
   teams: string[];
   announcementText: string;
+  freeAgentPlayerName: string;
 }
 
 let state: ActivityFeedState;
@@ -117,6 +118,7 @@ test.describe
       leagueName: '',
       teams: [],
       announcementText: '',
+      freeAgentPlayerName: '',
     };
   });
 
@@ -412,7 +414,28 @@ test.describe
 
   test('Phase 6: Claim and process a waiver', async ({
     commissionerPage: page,
+    commissionerJwt,
   }) => {
+    await test.step('Fetch a free agent to claim', async () => {
+      const { freeAgents } = await gqlFetch<{
+        freeAgents: Array<{ id: number; firstName: string; lastName: string }>;
+      }>(
+        commissionerJwt,
+        `query GetFreeAgents($leagueId: Int!) {
+          freeAgents(leagueId: $leagueId) {
+            id
+            firstName
+            lastName
+          }
+        }`,
+        { leagueId: state.leagueId },
+      );
+      expect(freeAgents.length).toBeGreaterThan(0);
+      const picked = freeAgents[0];
+      state.freeAgentPlayerName =
+        `${picked.firstName} ${picked.lastName}`.trim();
+    });
+
     await test.step('Navigate to Free Agents', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/free-agents`);
       await page.waitForLoadState('load');
@@ -420,9 +443,28 @@ test.describe
     });
 
     await test.step('Claim a free agent via the UI', async () => {
-      const addButtons = page.locator('button[aria-label^="Add "]');
-      await expect(addButtons.first()).toBeVisible({ timeout: 15_000 });
-      await addButtons.first().click();
+      // Search by last name to reliably surface the specific player row
+      const searchInput = page.getByPlaceholder(/search players/i);
+      if (await searchInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        const lastName =
+          state.freeAgentPlayerName.split(' ').pop() ??
+          state.freeAgentPlayerName;
+        await searchInput.fill(lastName);
+        await page.waitForTimeout(500);
+      }
+
+      // Use the exact player name in the aria-label to avoid clicking a
+      // different player's Add button when the search returns multiple results.
+      const exactAddBtn = page.locator(
+        `button[aria-label="Add ${state.freeAgentPlayerName}"]`,
+      );
+      const firstAddBtn = page.locator('button[aria-label^="Add "]').first();
+      const hasExact = await exactAddBtn
+        .isVisible({ timeout: 10_000 })
+        .catch(() => false);
+      const addBtn = hasExact ? exactAddBtn : firstAddBtn;
+      await expect(addBtn).toBeVisible({ timeout: 5_000 });
+      await addBtn.click();
 
       // WaiverClaimModal opens
       await expect(page.getByText('Claim Free Agent')).toBeVisible({
