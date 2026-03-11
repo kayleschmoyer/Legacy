@@ -744,31 +744,6 @@ export function BaseballLandingPage() {
     navigate('/baseball/mock-draft');
   };
 
-  if (isLoading) {
-    return (
-      <PageContainer
-        role="main"
-        aria-busy="true"
-        aria-live="polite"
-        style={pageBackgroundStyle}
-      >
-        <ContentContainer>
-          <YStack
-            alignItems="center"
-            justifyContent="center"
-            flex={1}
-            minHeight={400}
-            role="status"
-          >
-            <Paragraph fontSize="$6" color="$color11">
-              Loading your leagues...
-            </Paragraph>
-          </YStack>
-        </ContentContainer>
-      </PageContainer>
-    );
-  }
-
   if (error) {
     return (
       <PageContainer
@@ -1029,7 +1004,20 @@ export function BaseballLandingPage() {
             )}
           </SectionHeader>
 
-          {filteredLeagues.length > 0 ? (
+          {isLoading && !data ? (
+            <YStack
+              alignItems="center"
+              justifyContent="center"
+              minHeight={240}
+              role="status"
+              aria-busy="true"
+              aria-live="polite"
+            >
+              <Paragraph fontSize="$5" color="$color11">
+                Loading your leagues...
+              </Paragraph>
+            </YStack>
+          ) : filteredLeagues.length > 0 ? (
             <LeaguesList data-testid="leagues-grid">
               {filteredLeagues.map((league) => {
                 const badge = getLeagueBadge(

@@ -209,4 +209,27 @@ describe('BaseballLandingPage', () => {
     // Compact "+" button should NOT be present
     expect(screen.queryByText(/\+ Create/)).not.toBeInTheDocument();
   });
+
+  it('keeps hero CTAs visible and shows inline loader during league-load state', () => {
+    const {
+      useGetUserLeaguesQuery,
+    }: any = require('../../api/db/graphql.generated');
+    useGetUserLeaguesQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+    });
+
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    // Full page shell is rendered — hero CTAs are accessible
+    expect(screen.getByText(/Create League/i)).toBeInTheDocument();
+    expect(screen.getByText(/Join League/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mock Draft/i)).toBeInTheDocument();
+    // Inline loading message appears in the leagues section
+    expect(screen.getByText(/Loading your leagues/i)).toBeInTheDocument();
+  });
 });
