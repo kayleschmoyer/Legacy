@@ -809,6 +809,15 @@ export function LeagueDetailPage(): React.JSX.Element {
     data?.league?.isPublic && !data?.league?.userMembership
   );
 
+  // LS-1057: Once league data has loaded and commissioner status is known,
+  // redirect any non-commissioner who navigated directly to the commissioner
+  // tab back to the overview tab so they don't see a blank panel.
+  useEffect(() => {
+    if (league && activeTab === 'commissioner' && !isCommissioner) {
+      changeTab('overview');
+    }
+  }, [league, activeTab, isCommissioner, changeTab]);
+
   // ── Spectator join flow ──────────────────────────────────────────────────
   const [spectatorTeamName, setSpectatorTeamName] = useState('');
   const [spectatorJoinError, setSpectatorJoinError] = useState<string | null>(
