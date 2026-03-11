@@ -115,7 +115,10 @@ jest.mock('@apollo/client/react', () => ({
 /** Wrap the component with MemoryRouter so useNavigate / useParams work. */
 function renderDraftBoard() {
   return render(
-    <MemoryRouter initialEntries={['/baseball/league/1/draft']}>
+    <MemoryRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      initialEntries={['/baseball/league/1/draft']}
+    >
       <Routes>
         <Route
           path="/baseball/league/:id/draft"

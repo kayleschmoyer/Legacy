@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react';
+﻿import { act, render } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
@@ -169,7 +169,9 @@ describe('App', () => {
 
   it('should render successfully', () => {
     const { baseElement } = render(
-      <BrowserRouter>
+      <BrowserRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <App />
       </BrowserRouter>,
     );
@@ -178,7 +180,9 @@ describe('App', () => {
 
   it('should show authenticated app content immediately', () => {
     const { container } = render(
-      <BrowserRouter>
+      <BrowserRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <App />
       </BrowserRouter>,
     );
@@ -193,7 +197,9 @@ describe('App', () => {
 
   it('should render homepage with authenticated content', () => {
     const { container } = render(
-      <BrowserRouter>
+      <BrowserRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <App />
       </BrowserRouter>,
     );
@@ -208,7 +214,9 @@ describe('App', () => {
   describe('Homepage Snapshot', () => {
     it('should match homepage snapshot', () => {
       const { container } = render(
-        <BrowserRouter>
+        <BrowserRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
           <App />
         </BrowserRouter>,
       );
@@ -224,7 +232,9 @@ describe('App', () => {
 
     it('should match homepage content snapshot', () => {
       const { container } = render(
-        <BrowserRouter>
+        <BrowserRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
           <App />
         </BrowserRouter>,
       );
@@ -243,7 +253,9 @@ describe('App', () => {
   describe('Navigation', () => {
     it('should render navigation with correct links', () => {
       const { container } = render(
-        <BrowserRouter>
+        <BrowserRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
           <App />
         </BrowserRouter>,
       );
@@ -265,7 +277,9 @@ describe('App', () => {
 
     it('should match navigation snapshot', () => {
       const { container } = render(
-        <BrowserRouter>
+        <BrowserRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
           <App />
         </BrowserRouter>,
       );
@@ -284,7 +298,10 @@ describe('App', () => {
   describe('FootballScreen', () => {
     it('should render football screen when navigating to /football', () => {
       const { container } = render(
-        <MemoryRouter initialEntries={['/football']}>
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/football']}
+        >
           <App />
         </MemoryRouter>,
       );
@@ -299,7 +316,10 @@ describe('App', () => {
 
     it('should display correct football content', () => {
       const { container } = render(
-        <MemoryRouter initialEntries={['/football']}>
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/football']}
+        >
           <App />
         </MemoryRouter>,
       );
@@ -320,7 +340,10 @@ describe('App', () => {
 
     it('should match football screen snapshot', () => {
       const { container } = render(
-        <MemoryRouter initialEntries={['/football']}>
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/football']}
+        >
           <App />
         </MemoryRouter>,
       );
@@ -336,7 +359,10 @@ describe('App', () => {
 
     it('should render football screen with navigation and layout', () => {
       const { container } = render(
-        <MemoryRouter initialEntries={['/football']}>
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/football']}
+        >
           <App />
         </MemoryRouter>,
       );
@@ -359,7 +385,10 @@ describe('App', () => {
 
     it('should show authenticated content immediately when navigating to football', () => {
       const { container } = render(
-        <MemoryRouter initialEntries={['/football']}>
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/football']}
+        >
           <App />
         </MemoryRouter>,
       );
@@ -373,7 +402,10 @@ describe('App', () => {
 
     it('should match complete football page layout snapshot', () => {
       const { container } = render(
-        <MemoryRouter initialEntries={['/football']}>
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/football']}
+        >
           <App />
         </MemoryRouter>,
       );
