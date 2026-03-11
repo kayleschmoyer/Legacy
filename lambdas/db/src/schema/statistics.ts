@@ -824,6 +824,7 @@ builder.queryField('careerBattingStats', (t) =>
       minRBI: t.arg.int({ required: false }),
       minBattingAvg: t.arg.float({ required: false }),
       searchTerm: t.arg.string({ required: false }),
+      position: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
       // Convert relay pagination args to offset/limit
@@ -845,6 +846,7 @@ builder.queryField('careerBattingStats', (t) =>
             minRBI: args.minRBI || undefined,
             minBattingAvg: args.minBattingAvg || undefined,
             searchTerm: args.searchTerm || undefined,
+            position: args.position || undefined,
           },
         }),
         dbService.statistics.getCareerBattingStatsCount({
@@ -854,6 +856,7 @@ builder.queryField('careerBattingStats', (t) =>
             minRBI: args.minRBI || undefined,
             minBattingAvg: args.minBattingAvg || undefined,
             searchTerm: args.searchTerm || undefined,
+            position: args.position || undefined,
           },
         }),
       ]);

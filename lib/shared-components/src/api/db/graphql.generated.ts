@@ -2065,6 +2065,7 @@ export type QueryCareerBattingStatsArgs = {
   minRBI?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -3248,6 +3249,7 @@ export type GetCareerBattingStatsQueryVariables = Exact<{
   minRBI?: InputMaybe<Scalars['Int']['input']>;
   minBattingAvg?: InputMaybe<Scalars['Float']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetCareerBattingStatsQuery = {
@@ -3928,6 +3930,7 @@ export const GetCareerBattingStats = gql`
     $minRBI: Int
     $minBattingAvg: Float
     $searchTerm: String
+    $position: String
   ) {
     careerBattingStats(
       first: $first
@@ -3939,6 +3942,7 @@ export const GetCareerBattingStats = gql`
       minRBI: $minRBI
       minBattingAvg: $minBattingAvg
       searchTerm: $searchTerm
+      position: $position
     ) {
       edges {
         node {
@@ -3978,6 +3982,7 @@ export const GetCareerBattingStats = gql`
  *      minRBI: // value for 'minRBI'
  *      minBattingAvg: // value for 'minBattingAvg'
  *      searchTerm: // value for 'searchTerm'
+ *      position: // value for 'position'
  *   },
  * });
  */

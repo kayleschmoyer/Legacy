@@ -56,6 +56,7 @@ export interface StatisticsFilters {
   minStrikeouts?: number;
   minBattingAvg?: number;
   searchTerm?: string;
+  position?: string;
 }
 
 export interface SeasonStatisticsFilters {
@@ -155,6 +156,7 @@ export class StatisticsService {
       minWins: queryOptions.filters?.minWins,
       minStrikeouts: queryOptions.filters?.minStrikeouts,
       searchTerm: queryOptions.filters?.searchTerm,
+      position: queryOptions.filters?.position,
     };
 
     const options: QueryOptions = {
@@ -217,9 +219,19 @@ export class StatisticsService {
       // Use the same type-safe filters as getCareerBattingStats
       const typeSafeOptions = this.convertToTypeSafeOptions(queryOptions);
 
-      // Check if we need to join with players table for search term
-      if (typeSafeOptions.filters?.searchTerm) {
+      // Dispatch to the correct count method based on which filters are active
+      if (
+        typeSafeOptions.filters?.searchTerm &&
+        typeSafeOptions.filters?.position
+      ) {
+        const result = await queryBuilder.countWithBothJoins(typeSafeOptions);
+        return result[0]?.count ?? 0;
+      } else if (typeSafeOptions.filters?.searchTerm) {
         const result = await queryBuilder.countWithPlayerJoin(typeSafeOptions);
+        return result[0]?.count ?? 0;
+      } else if (typeSafeOptions.filters?.position) {
+        const result =
+          await queryBuilder.countWithPositionJoin(typeSafeOptions);
         return result[0]?.count ?? 0;
       } else {
         const result = await queryBuilder.countWithoutJoin(typeSafeOptions);

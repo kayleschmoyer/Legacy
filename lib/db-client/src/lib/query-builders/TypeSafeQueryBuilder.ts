@@ -31,6 +31,7 @@ export interface StatisticsQueryFilters {
   minStrikeouts?: number;
   minBattingAvg?: number;
   searchTerm?: string;
+  position?: string;
 }
 
 /**
@@ -118,11 +119,26 @@ export class CareerBattingQueryBuilder {
     // Determine ordering clause
     const orderByClause = this.getOrderByClause(options);
 
-    // Check if we need to join with players table (for search or name sorting)
-    if (filters.searchTerm || options.orderBy === 'lastName') {
+    // Check if we need to join with players table (for search, position, or name sorting)
+    if (filters.searchTerm && filters.position) {
+      return this.executeWithBothJoins(
+        battingConditions,
+        filters.searchTerm,
+        filters.position,
+        orderByClause,
+        options,
+      );
+    } else if (filters.searchTerm || options.orderBy === 'lastName') {
       return this.executeWithPlayerJoin(
         battingConditions,
         filters.searchTerm,
+        orderByClause,
+        options,
+      );
+    } else if (filters.position) {
+      return this.executeWithPositionJoin(
+        battingConditions,
+        filters.position,
         orderByClause,
         options,
       );
@@ -180,6 +196,129 @@ export class CareerBattingQueryBuilder {
     const withOrdering = () => withConditions().orderBy(orderByClause);
 
     // Apply pagination conditionally
+    const finalQuery = () => {
+      const query = withOrdering();
+      if (options.limit !== undefined) {
+        const limitedQuery = query.limit(options.limit);
+        return options.offset !== undefined
+          ? limitedQuery.offset(options.offset)
+          : limitedQuery;
+      }
+      return query;
+    };
+
+    return await finalQuery().execute();
+  }
+
+  /**
+   * Execute query with position join for filtering by primary position
+   * Joins career_batting with career_fielding_by_position
+   */
+  private async executeWithPositionJoin(
+    battingConditions: SQL<unknown>[],
+    position: string,
+    orderByClause: SQL<unknown>,
+    options: QueryOptions,
+  ) {
+    const positionCondition = ilike(
+      PublicSchema.careerFieldingByPosition.pos,
+      position,
+    );
+    const allConditions = [...battingConditions, positionCondition];
+
+    const baseQuery = () =>
+      this.db
+        .select()
+        .from(PublicSchema.careerBatting)
+        .innerJoin(
+          PublicSchema.careerFieldingByPosition,
+          eq(
+            PublicSchema.careerBatting.playerId,
+            PublicSchema.careerFieldingByPosition.playerId,
+          ),
+        );
+
+    const withConditions = () => {
+      const query = baseQuery();
+      return allConditions.length > 0
+        ? query.where(
+            allConditions.length === 1
+              ? allConditions[0]
+              : and(...allConditions),
+          )
+        : query;
+    };
+
+    const withOrdering = () => withConditions().orderBy(orderByClause);
+
+    const finalQuery = () => {
+      const query = withOrdering();
+      if (options.limit !== undefined) {
+        const limitedQuery = query.limit(options.limit);
+        return options.offset !== undefined
+          ? limitedQuery.offset(options.offset)
+          : limitedQuery;
+      }
+      return query;
+    };
+
+    return await finalQuery().execute();
+  }
+
+  /**
+   * Execute query with both player join (search) and position join
+   */
+  private async executeWithBothJoins(
+    battingConditions: SQL<unknown>[],
+    searchTerm: string,
+    position: string,
+    orderByClause: SQL<unknown>,
+    options: QueryOptions,
+  ) {
+    const searchPattern = `%${searchTerm}%`;
+    const searchCondition = or(
+      ilike(PublicSchema.players.firstName, searchPattern),
+      ilike(PublicSchema.players.lastName, searchPattern),
+    );
+    const positionCondition = ilike(
+      PublicSchema.careerFieldingByPosition.pos,
+      position,
+    );
+
+    const allConditions = [...battingConditions, positionCondition];
+    if (searchCondition) {
+      allConditions.push(searchCondition);
+    }
+
+    const baseQuery = () =>
+      this.db
+        .select()
+        .from(PublicSchema.careerBatting)
+        .innerJoin(
+          PublicSchema.players,
+          eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id),
+        )
+        .innerJoin(
+          PublicSchema.careerFieldingByPosition,
+          eq(
+            PublicSchema.careerBatting.playerId,
+            PublicSchema.careerFieldingByPosition.playerId,
+          ),
+        );
+
+    const withConditions = () => {
+      const query = baseQuery();
+      return allConditions.length > 0
+        ? query.where(
+            allConditions.length === 1
+              ? allConditions[0]
+              : and(...allConditions),
+          )
+        : query;
+    };
+
+    const withOrdering = () => withConditions().orderBy(orderByClause);
+
     const finalQuery = () => {
       const query = withOrdering();
       if (options.limit !== undefined) {
@@ -402,6 +541,126 @@ export class CareerBattingQueryBuilder {
     // Build query using function-based approach
     const baseQuery = () =>
       this.db.select({ count: count() }).from(PublicSchema.careerBatting);
+
+    const finalQuery = () => {
+      const query = baseQuery();
+      return conditions.length > 0
+        ? query.where(
+            conditions.length === 1 ? conditions[0] : and(...conditions),
+          )
+        : query;
+    };
+
+    return await finalQuery().execute();
+  }
+
+  /**
+   * Get count with position join (career_fielding_by_position) using function-based approach
+   */
+  async countWithPositionJoin(options: {
+    filters?: StatisticsQueryFilters;
+  }): Promise<{ count: number }[]> {
+    const filters = options.filters || {};
+
+    const conditions: SQL<unknown>[] = [];
+    if (filters.playerId !== undefined) {
+      conditions.push(
+        eq(PublicSchema.careerBatting.playerId, filters.playerId),
+      );
+    }
+    if (filters.minGames !== undefined) {
+      conditions.push(gte(PublicSchema.careerBatting.g, filters.minGames));
+    }
+    if (filters.minHomeRuns !== undefined) {
+      conditions.push(gte(PublicSchema.careerBatting.hr, filters.minHomeRuns));
+    }
+    if (filters.minRBI !== undefined) {
+      conditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
+    }
+    if (filters.position) {
+      conditions.push(
+        ilike(PublicSchema.careerFieldingByPosition.pos, filters.position),
+      );
+    }
+
+    const baseQuery = () =>
+      this.db
+        .select({ count: count() })
+        .from(PublicSchema.careerBatting)
+        .innerJoin(
+          PublicSchema.careerFieldingByPosition,
+          eq(
+            PublicSchema.careerBatting.playerId,
+            PublicSchema.careerFieldingByPosition.playerId,
+          ),
+        );
+
+    const finalQuery = () => {
+      const query = baseQuery();
+      return conditions.length > 0
+        ? query.where(
+            conditions.length === 1 ? conditions[0] : and(...conditions),
+          )
+        : query;
+    };
+
+    return await finalQuery().execute();
+  }
+
+  /**
+   * Get count with both player join (search) and position join
+   */
+  async countWithBothJoins(options: {
+    filters?: StatisticsQueryFilters;
+  }): Promise<{ count: number }[]> {
+    const filters = options.filters || {};
+
+    const conditions: SQL<unknown>[] = [];
+    if (filters.playerId !== undefined) {
+      conditions.push(
+        eq(PublicSchema.careerBatting.playerId, filters.playerId),
+      );
+    }
+    if (filters.minGames !== undefined) {
+      conditions.push(gte(PublicSchema.careerBatting.g, filters.minGames));
+    }
+    if (filters.minHomeRuns !== undefined) {
+      conditions.push(gte(PublicSchema.careerBatting.hr, filters.minHomeRuns));
+    }
+    if (filters.minRBI !== undefined) {
+      conditions.push(gte(PublicSchema.careerBatting.rbi, filters.minRBI));
+    }
+    if (filters.position) {
+      conditions.push(
+        ilike(PublicSchema.careerFieldingByPosition.pos, filters.position),
+      );
+    }
+    if (filters.searchTerm) {
+      const searchPattern = `%${filters.searchTerm}%`;
+      const searchCondition = or(
+        ilike(PublicSchema.players.firstName, searchPattern),
+        ilike(PublicSchema.players.lastName, searchPattern),
+      );
+      if (searchCondition) {
+        conditions.push(searchCondition);
+      }
+    }
+
+    const baseQuery = () =>
+      this.db
+        .select({ count: count() })
+        .from(PublicSchema.careerBatting)
+        .innerJoin(
+          PublicSchema.players,
+          eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id),
+        )
+        .innerJoin(
+          PublicSchema.careerFieldingByPosition,
+          eq(
+            PublicSchema.careerBatting.playerId,
+            PublicSchema.careerFieldingByPosition.playerId,
+          ),
+        );
 
     const finalQuery = () => {
       const query = baseQuery();

@@ -1932,6 +1932,7 @@ type Query {
     minRBI: Int
     orderBy: String
     orderDirection: String
+    position: String
     searchTerm: String
   ): CareerBattingConnection
   careerFieldingStats(

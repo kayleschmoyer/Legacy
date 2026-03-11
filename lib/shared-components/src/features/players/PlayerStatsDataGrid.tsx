@@ -353,6 +353,9 @@ export function PlayerStatsDataGrid({
     minHomeRuns: initialParams.minHomeRuns ?? 0,
     minRBI: initialParams.minRBI ?? 0,
   });
+  const [positionFilter, setPositionFilter] = useState(
+    (initialParams.position as string) ?? '',
+  );
 
   // =============================================================================
   // Data Fetching
@@ -441,6 +444,20 @@ export function PlayerStatsDataGrid({
       updateQueryParams({ ...newFilters, after: undefined }); // Reset to first page
     },
     [localFilters, updateQueryParams],
+  );
+
+  /**
+   * Handles position filter changes
+   */
+  const handlePositionFilterChange = useCallback(
+    (value: string) => {
+      setPositionFilter(value);
+      updateQueryParams({
+        position: value || undefined,
+        after: undefined,
+      });
+    },
+    [updateQueryParams],
   );
 
   /**
@@ -674,6 +691,26 @@ export function PlayerStatsDataGrid({
                 Clear Filters
               </Button>
             )}
+            <XStack alignItems="center" gap="$1">
+              <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
+                Pos:
+              </Text>
+              <Input
+                width={52}
+                size="$2"
+                value={positionFilter}
+                onChangeText={handlePositionFilterChange}
+                placeholder="SS"
+                backgroundColor="rgba(10,15,26,0.6)"
+                borderWidth={1}
+                borderColor="rgba(44,74,124,0.4)"
+                borderRadius={8}
+                color={TEXT_HIGH_CONTRAST}
+                placeholderTextColor={TEXT_MUTED}
+                textAlign="center"
+                maxLength={3}
+              />
+            </XStack>
           </XStack>
         )}
 
