@@ -50,8 +50,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
         error.toLowerCase().includes('all teams have been claimed')),
     );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleJoin = async (): Promise<void> => {
     setError(null);
 
     // Validate inputs
@@ -80,14 +79,26 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
         },
       });
 
-      // Handle successful join
-      if (result.data?.joinLeagueByCode?.leagueId) {
-        navigate(`/baseball/league/${result.data.joinLeagueByCode.leagueId}`);
+      const leagueId = result.data?.joinLeagueByCode?.leagueId;
+      if (leagueId) {
+        navigate(`/baseball/league/${leagueId}`);
+      } else {
+        setError(
+          'League joined but navigation failed — please visit My Leagues.',
+        );
+        LOGGER.warn('joinLeagueByCode mutation returned no leagueId', {
+          data: result.data?.joinLeagueByCode,
+        });
       }
     } catch (err) {
       setError((err as Error).message || 'Failed to join league');
       LOGGER.error('Error joining league:', String(err));
     }
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void handleJoin();
   };
 
   return (
@@ -147,9 +158,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
         padding="$5"
       >
         <form
-          onSubmit={(e) => {
-            void handleSubmit(e);
-          }}
+          onSubmit={handleFormSubmit}
           aria-describedby="join-form-help"
           aria-busy={loading}
         >
@@ -340,7 +349,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
               <Button
                 backgroundColor={BRAND_NAVY_LIGHT}
                 color="white"
-                onPress={handleSubmit}
+                onPress={() => void handleJoin()}
                 disabled={
                   loading ||
                   validating ||

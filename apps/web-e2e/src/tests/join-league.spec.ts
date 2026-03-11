@@ -227,6 +227,10 @@ test.describe('Join League — form validation @regression', () => {
   test('join button remains disabled until both fields are filled', async ({
     page,
   }) => {
+    await routeGraphQL(page, {
+      validateinvitecode: validateInviteCodeResponse(),
+    });
+
     const lp = new LeaguePage(page);
     await lp.gotoJoin();
     await lp.expectJoinFormVisible();
@@ -234,7 +238,7 @@ test.describe('Join League — form validation @regression', () => {
     // Both fields empty → disabled
     await expect(lp.joinButton).toBeDisabled();
 
-    // Code filled, team name empty → still disabled
+    // Code filled, team name empty → still disabled (leagueInfo populates but teamName empty)
     await lp.inviteCodeInput.fill('ONLYCOD1');
     await expect(lp.joinButton).toBeDisabled();
 
@@ -243,9 +247,9 @@ test.describe('Join League — form validation @regression', () => {
     await lp.teamNameInput.fill('My Team');
     await expect(lp.joinButton).toBeDisabled();
 
-    // Both filled → enabled
+    // Both filled → enabled (validation mock confirms code is valid)
     await lp.inviteCodeInput.fill('VALIDCO1');
-    await expect(lp.joinButton).toBeEnabled();
+    await expect(lp.joinButton).toBeEnabled({ timeout: 10_000 });
   });
 
   test('shows error when submitting invalid code format', async ({ page }) => {
@@ -341,6 +345,10 @@ test.describe('Join League — error handling @regression', () => {
   });
 
   test('shows error if network fails during join', async ({ page }) => {
+    await routeGraphQL(page, {
+      validateinvitecode: validateInviteCodeResponse(),
+    });
+
     await page.route(isGraphQLEndpoint, async (route) => {
       const op = route.request().postData()?.toLowerCase() ?? '';
       if (op.includes('joinleaguebycode')) {
