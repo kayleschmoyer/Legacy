@@ -97,12 +97,12 @@ function Parse-TicketNumbers([string[]]$raw) {
 # ---------- Resolve paths ----------
 
 if (-not $MainRepo) {
-    # Script lives at <repo>/scripts/sync-worktrees.ps1 — repo root is one level up
+    # Script lives at <repo>/scripts/sync-worktrees.ps1 -- repo root is one level up
     $MainRepo = Split-Path -Parent $PSScriptRoot
     # If running from a worktree, .git is a file (not a directory) pointing to the main repo.
     $gitPath = Join-Path $MainRepo ".git"
     if (Test-Path $gitPath -PathType Leaf) {
-        # We're inside a worktree — read the .git file to find the main repo
+        # We're inside a worktree -- read the .git file to find the main repo
         $gitFileContent = Get-Content $gitPath -Raw
         if ($gitFileContent -match 'gitdir:\s*(.+)') {
             $gitDir = $Matches[1].Trim()
@@ -127,7 +127,7 @@ Write-Host "Output file: $OutputPath" -ForegroundColor Cyan
 
 if ($Add -or $Remove) {
     if (-not (Test-Path $OutputPath)) {
-        Write-Host "No workspace file found at: $OutputPath — skipping." -ForegroundColor DarkGray
+        Write-Host "No workspace file found at: $OutputPath -- skipping." -ForegroundColor DarkGray
         Write-Host "  Create one first: .\scripts\sync-worktrees.ps1 -Include <tickets>" -ForegroundColor DarkGray
         exit 0
     }

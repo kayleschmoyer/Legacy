@@ -4,7 +4,7 @@
     Create a worktree with correct twig parent dependency in one command.
 .DESCRIPTION
     Wraps `twig worktree create` + `twig branch depend` to ensure every worktree
-    has its parent relationship registered — preventing orphaned branches in
+    has its parent relationship registered -- preventing orphaned branches in
     `twig tree`.
 
     For independent tickets the parent defaults to "main".
@@ -55,7 +55,7 @@ function Resolve-ParentBranch([string]$raw) {
     # Already a full branch name (contains slash or dash after LS-###)
     if ($raw -match '^LS-\d+[/-].') { return $raw }
 
-    # Bare Jira key — look for a branch starting with that key
+    # Bare Jira key -- look for a branch starting with that key
     if ($raw -match '^LS-\d+$') {
         $match = git branch --list "$raw/*" --format "%(refname:short)" 2>$null |
             Select-Object -First 1
@@ -104,7 +104,7 @@ Write-Host "  Parent : $resolvedParent" -ForegroundColor White
 Write-Host ""
 
 # ---------------------------------------------------------------------------
-# Step 1 — Create worktree (also creates the branch if needed)
+# Step 1 -- Create worktree (also creates the branch if needed)
 # ---------------------------------------------------------------------------
 Write-Host "[1/4] Creating worktree..." -ForegroundColor Cyan
 twig worktree create $branchName
@@ -114,7 +114,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # ---------------------------------------------------------------------------
-# Step 2 — Register parent dependency
+# Step 2 -- Register parent dependency
 # ---------------------------------------------------------------------------
 if ($resolvedParent -ne "none") {
     Write-Host "[2/4] Registering parent dependency ($branchName -> $resolvedParent)..." -ForegroundColor Cyan
@@ -128,13 +128,13 @@ if ($resolvedParent -ne "none") {
 }
 
 # ---------------------------------------------------------------------------
-# Step 3 — Verify with twig tree (compact)
+# Step 3 -- Verify with twig tree (compact)
 # ---------------------------------------------------------------------------
 Write-Host "[3/4] Verifying branch tree..." -ForegroundColor Cyan
 twig tree 2>$null | Select-String $TicketKey | ForEach-Object { Write-Host "  $_" -ForegroundColor Green }
 
 # ---------------------------------------------------------------------------
-# Step 4 — Auto-add to VS Code workspace
+# Step 4 -- Auto-add to VS Code workspace
 # ---------------------------------------------------------------------------
 if (-not $NoWorkspace -and $ticketNumber -and (Test-Path "legacy-sports.code-workspace")) {
     Write-Host "[4/4] Adding to VS Code workspace..." -ForegroundColor Cyan

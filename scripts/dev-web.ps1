@@ -27,7 +27,7 @@ while ($true) {
 
     $exitCode = $LASTEXITCODE
 
-    # Exit code 0 = clean shutdown (Ctrl+C) — stop looping
+    # Exit code 0 = clean shutdown (Ctrl+C) -- stop looping
     if ($exitCode -eq 0) {
         break
     }

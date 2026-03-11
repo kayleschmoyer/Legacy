@@ -55,7 +55,7 @@ Write-Host "`nStep 5: Removing node_modules..." -ForegroundColor Cyan
 $nodeModulesPath = Join-Path $workspaceRoot "node_modules"
 
 if (Test-Path $nodeModulesPath) {
-    # Check if node_modules is a junction (shared with worktrees) — only unlink, don't destroy target
+    # Check if node_modules is a junction (shared with worktrees) -- only unlink, don't destroy target
     $nmItem = Get-Item $nodeModulesPath -Force
     if (($nmItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
         cmd /c "rmdir `"$nodeModulesPath`"" 2>$null

@@ -1,4 +1,4 @@
-# pnpm-install-lock.ps1 — Mutex-wrapped pnpm install
+# pnpm-install-lock.ps1 -- Mutex-wrapped pnpm install
 #
 # Acquires an exclusive file lock before running pnpm install so that multiple
 # agents / worktrees can never mutate the shared node_modules simultaneously.
@@ -54,7 +54,7 @@ $lockPath   = Join-Path $RepoRoot ".pnpm-install.lock"
 $lockStream = $null
 
 function Enter-InstallLock {
-    $maxWait = 300  # seconds — installs can be slow
+    $maxWait = 300  # seconds -- installs can be slow
     $waited  = 0
     while ($true) {
         try {
@@ -110,7 +110,7 @@ try {
     }
 
     Write-Host "> pnpm install $InstallArgs" -ForegroundColor Cyan
-    # Split args string and invoke pnpm — supports multi-word args like "add -w lodash"
+    # Split args string and invoke pnpm -- supports multi-word args like "add -w lodash"
     $argList = $InstallArgs -split '\s+'
     & pnpm install @argList
     $exitCode = $LASTEXITCODE

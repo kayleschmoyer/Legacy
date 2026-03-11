@@ -83,7 +83,7 @@ try {
     $ghAvailable = $false
 }
 
-# Jira workflow order — transitions must walk through each intermediate status
+# Jira workflow order -- transitions must walk through each intermediate status
 $workflowOrder = @("To Do", "In Progress", "In Review", "Done")
 
 function Invoke-JiraTransition {
