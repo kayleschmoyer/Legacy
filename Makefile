@@ -56,7 +56,7 @@ endif
 # console window even with windowsHide. Caching still works without
 # the daemon; only the persistent project-graph file watcher is lost.
 ifeq ($(OS),Windows_NT)
-    export NODE_OPTIONS := --require $(WORKSPACE_PATH)/scripts/patch-child-process.js
+    export NODE_OPTIONS := --require $(WORKSPACE_PATH)/scripts/patch-child-process.js --max-listeners=20
     export NX_DAEMON := false
 endif
 
