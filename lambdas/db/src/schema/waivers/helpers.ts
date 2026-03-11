@@ -31,24 +31,22 @@ export async function validateFaabBudget(
   teamId: number,
   faabBid: number,
 ): Promise<void> {
-  const teamRow = await db
-    .select({ faabBudget: PublicSchema.teams.faabBudget })
+  const result = await db
+    .select({
+      faabBudget: PublicSchema.teams.faabBudget,
+      committedBids: sql<number>`COALESCE((
+        SELECT SUM(${PublicSchema.waiverClaims.faabBid})
+        FROM ${PublicSchema.waiverClaims}
+        WHERE ${PublicSchema.waiverClaims.teamId} = ${PublicSchema.teams.id}
+          AND ${PublicSchema.waiverClaims.status} = 'pending'
+      ), 0)`,
+    })
     .from(PublicSchema.teams)
     .where(eq(PublicSchema.teams.id, teamId))
     .limit(1);
 
-  const remainingBudget = teamRow[0]?.faabBudget ?? 0;
-
-  const committedBids = await db
-    .select({ total: sql<number>`COALESCE(SUM(faab_bid), 0)` })
-    .from(PublicSchema.waiverClaims)
-    .where(
-      and(
-        eq(PublicSchema.waiverClaims.teamId, teamId),
-        eq(PublicSchema.waiverClaims.status, 'pending'),
-      ),
-    );
-  const alreadyCommitted = Number(committedBids[0]?.total ?? 0);
+  const remainingBudget = result[0]?.faabBudget ?? 0;
+  const alreadyCommitted = Number(result[0]?.committedBids ?? 0);
 
   if (faabBid > remainingBudget - alreadyCommitted) {
     throw new Error(
