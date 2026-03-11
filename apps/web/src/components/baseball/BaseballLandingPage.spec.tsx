@@ -232,4 +232,30 @@ describe('BaseballLandingPage', () => {
     // Inline loading message appears in the leagues section
     expect(screen.getByText(/Loading your leagues/i)).toBeInTheDocument();
   });
+
+  it('shows all leagues when search is whitespace-only', () => {
+    const {
+      useGetUserLeaguesQuery,
+    }: any = require('../../api/db/graphql.generated');
+    useGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [{ id: 1, name: 'Saturday Sluggers' }],
+      },
+      loading: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    const search = screen.getByPlaceholderText(/Search leagues/i);
+    // Typing only whitespace should not hide leagues or show the "no leagues" CTA
+    fireEvent.change(search, { target: { value: '   ' } });
+    expect(screen.getByText('Saturday Sluggers')).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Create your first league/i),
+    ).not.toBeInTheDocument();
+  });
 });

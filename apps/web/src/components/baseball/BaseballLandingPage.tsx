@@ -773,7 +773,7 @@ export function BaseballLandingPage() {
   }
 
   const filteredLeagues = leagues.filter((l) =>
-    (l?.name || '').toLowerCase().includes(search.toLowerCase()),
+    (l?.name || '').toLowerCase().includes(search.trim().toLowerCase()),
   );
 
   /* ─── Helper: full hero for first-time users ─── */
