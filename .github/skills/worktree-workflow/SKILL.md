@@ -369,6 +369,29 @@ If you want to test the UI live against running dev servers before opening a PR,
 see the [user-testing skill](../user-testing/SKILL.md). This checks the branch out in the
 main repo where dev servers run, lets you verify visually, then returns main to `main`.
 
+### Step 7b: Run Affected E2E Tests
+
+Before opening the PR, run all E2E tests affected by your changes. This catches UI regressions that `make pc` does not cover.
+
+```powershell
+cd $wt
+pnpm exec nx affected -t e2e --base=origin/main
+```
+
+> **What this runs:** Playwright tests in any `*-e2e` project whose source or dependencies changed. For most web-app tickets this means `web-e2e`. The command uses the same `@critical|@smoke` filter as CI by default.
+
+If no e2e project is affected (pure back-end / library change), the command exits immediately with a "no affected projects" message — this is fine, continue to step 8.
+
+If tests fail:
+
+1. Read the Playwright error output carefully.
+2. Fix the failing test or the underlying UI bug in the worktree.
+3. Commit the fix: `git add -A ; git commit -m "fix(web-e2e): ..."`.
+4. Re-run `pnpm exec nx affected -t e2e --base=origin/main` until all tests pass.
+5. Then re-run `make pc` to ensure nothing regressed.
+
+> **🚨 DO NOT OPEN THE PR until E2E tests pass.** A PR with known E2E failures blocks CI and forces reviewers to context-switch back to you.
+
 ### Step 8: Create Pull Request
 
 See the [create-pr skill](../create-pr/SKILL.md) for the full PR template workflow. For a quick PR:

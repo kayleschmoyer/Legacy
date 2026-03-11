@@ -82,6 +82,18 @@ Verify the output includes `✅ Applied N new migrations` (or `No pending migrat
 
 > **When to run:** Any time a file exists under `lib/db-client/migrations/` that was created or modified in this branch.
 
+### 4. Affected E2E Tests Must Pass
+
+Before creating the PR, run all E2E tests affected by your changes:
+
+```powershell
+pnpm exec nx affected -t e2e --base=origin/main
+```
+
+If no e2e project is affected (pure back-end / library change), the command exits immediately — this is fine. If tests fail, fix them first before continuing.
+
+> **Why this is required:** `make pc` (unit tests + lint + typecheck) does not run Playwright tests. E2E failures that land in CI block the entire PR queue and force reviewers back into your context.
+
 ## Command
 
 ```powershell
@@ -229,6 +241,7 @@ Technical explanation of why the issue occurred.
 - [ ] GraphQL schema regenerated (`pnpm exec nx run db:print-schema`)
 - [ ] Codegen types regenerated (`pnpm exec nx affected -t codegen`)
 - [ ] Unit tests pass
+- [ ] Affected E2E tests pass (`pnpm exec nx affected -t e2e --base=origin/main`)
 - [ ] Manual testing completed
 - [ ] Pre-commit validation passes (`make pre-commit`)
 - [ ] Pending migrations applied (`pnpm run db:migrate`) — required if any migration files were added or changed
@@ -315,10 +328,11 @@ gh pr edit <PR_NUMBER> --body-file ".github/tmp-pr-body.md"
 6. **`twig pr` is not a valid command** — do not attempt to generate the PR body via twig; write it directly with `create_file`
 7. **Verify the file before using it** — `Get-Content .github/tmp-pr-body.md | Select-Object -First 5` to confirm it looks like markdown, not an error
 8. **Run pre-commit validation** before creating PR (`make pre-commit`)
-9. **Prefix PR title with Jira ticket key**: `LS-#### type(scope): description`
-10. **Link Jira ticket** in PR description
-11. **Add screenshots for every UI change** — see [UI Screenshots](#ui-screenshots) section below
-12. **Keep PRs focused** — split large changes into multiple PRs
+9. **Run affected E2E tests** before creating PR (`pnpm exec nx affected -t e2e --base=origin/main`)
+10. **Prefix PR title with Jira ticket key**: `LS-#### type(scope): description`
+11. **Link Jira ticket** in PR description
+12. **Add screenshots for every UI change** — see [UI Screenshots](#ui-screenshots) section below
+13. **Keep PRs focused** — split large changes into multiple PRs
 
 ## UI Screenshots
 
