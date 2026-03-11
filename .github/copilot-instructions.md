@@ -82,6 +82,7 @@ Windows PowerShell ┬╖ Nx monorepo ┬╖ pnpm 9.12.1 ┬╖ Jira project LS 
 | **Rebase & conflicts**          | `skills/rebase-conflicts/SKILL.md`        |
 | **Resolve merge conflicts**     | `skills/resolve-merge-conflicts/SKILL.md` |
 | **Makefile reference**          | `skills/makefile/SKILL.md`                |
+| **MCP DB operations**           | `skills/mcp-db/SKILL.md`                  |
 | **Worktree workflow (default)** | `skills/worktree-workflow/SKILL.md`       |
 | All skills (62 guides)          | `skills/`                                 |
 | CSV reference data              | `docs/agents/*.csv`                       |

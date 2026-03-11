@@ -1,0 +1,10 @@
+{
+  "inputs": [],
+  "servers": {
+    "legacy-sports-db": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["tsx", "tools/mcp/db-server/src/index.ts"]
+    }
+  }
+}
