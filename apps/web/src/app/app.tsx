@@ -293,21 +293,6 @@ function Navigation() {
               </NavLinkButton>
             </Link>
 
-            <Link
-              to="/pricing"
-              style={{ textDecoration: 'none' }}
-              aria-current={
-                location.pathname === '/pricing' ? 'page' : undefined
-              }
-            >
-              <NavLinkButton active={location.pathname === '/pricing'}>
-                <XStack alignItems="center" gap="$2">
-                  <Tag size={15} />
-                  <Paragraph marginBottom={0}>Pricing</Paragraph>
-                </XStack>
-              </NavLinkButton>
-            </Link>
-
             <HelpDropdown />
           </NavLinks>
 

@@ -13,6 +13,7 @@ import {
   ChevronUp,
   HelpCircle,
   Info,
+  Tag,
 } from '@tamagui/lucide-icons';
 import { BRAND_NAVY_LIGHT } from '../../constants/colors';
 
@@ -97,7 +98,9 @@ export const HelpDropdown: React.FC = () => {
   const menuId = 'help-menu';
 
   const isActive =
-    location.pathname === '/about' || location.pathname === '/help';
+    location.pathname === '/about' ||
+    location.pathname === '/help' ||
+    location.pathname === '/pricing';
   const isHighlighted = isActive || isOpen;
 
   // Click outside handler
@@ -228,6 +231,36 @@ export const HelpDropdown: React.FC = () => {
                   </Paragraph>
                 </YStack>
                 {location.pathname === '/help' && (
+                  <YStack
+                    width={6}
+                    height={6}
+                    borderRadius={3}
+                    backgroundColor={BRAND_NAVY_LIGHT}
+                  />
+                )}
+              </XStack>
+            </MenuItem>
+          </Link>
+
+          <Link to="/pricing" style={{ textDecoration: 'none' }}>
+            <MenuItem
+              onPress={() => setIsOpen(false)}
+              role="menuitem"
+              active={location.pathname === '/pricing'}
+            >
+              <XStack alignItems="center" gap="$3" flex={1}>
+                <MenuIconBox>
+                  <Tag size={20} color="$color" />
+                </MenuIconBox>
+                <YStack flex={1} gap="$1">
+                  <Paragraph size="$4" color="$color" fontWeight="500">
+                    Pricing
+                  </Paragraph>
+                  <Paragraph size="$2" color="$colorPress">
+                    Plans &amp; subscription options
+                  </Paragraph>
+                </YStack>
+                {location.pathname === '/pricing' && (
                   <YStack
                     width={6}
                     height={6}

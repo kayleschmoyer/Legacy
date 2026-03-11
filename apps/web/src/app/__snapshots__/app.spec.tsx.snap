@@ -78,24 +78,6 @@ exports[`App FootballScreen should match complete football page layout snapshot 
               </div>
             </button>
           </a>
-          <a
-            href="/pricing"
-            style="text-decoration: none;"
-          >
-            <button>
-              <div
-                alignitems="center"
-                gap="$2"
-              >
-                Tag
-                <p
-                  marginbottom="0"
-                >
-                  Pricing
-                </p>
-              </div>
-            </button>
-          </a>
           <div>
             Help Dropdown
           </div>
@@ -215,24 +197,6 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
               </div>
             </button>
           </a>
-          <a
-            href="/pricing"
-            style="text-decoration: none;"
-          >
-            <button>
-              <div
-                alignitems="center"
-                gap="$2"
-              >
-                Tag
-                <p
-                  marginbottom="0"
-                >
-                  Pricing
-                </p>
-              </div>
-            </button>
-          </a>
           <div>
             Help Dropdown
           </div>
@@ -346,24 +310,6 @@ exports[`App Navigation should render navigation with correct links 1`] = `
                   marginbottom="0"
                 >
                   Games
-                </p>
-              </div>
-            </button>
-          </a>
-          <a
-            href="/pricing"
-            style="text-decoration: none;"
-          >
-            <button>
-              <div
-                alignitems="center"
-                gap="$2"
-              >
-                Tag
-                <p
-                  marginbottom="0"
-                >
-                  Pricing
                 </p>
               </div>
             </button>
