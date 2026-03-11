@@ -108,6 +108,7 @@ jobs:
       mobile: ${{ steps.detect.outputs.mobile }}
       lambdas: ${{ steps.detect.outputs.lambdas }}
       terraform: ${{ steps.detect.outputs.terraform }}
+      e2e: ${{ steps.detect.outputs.e2e }}
       affected-components: ${{ steps.detect.outputs.affected-components }}
       requires-full-build: ${{ steps.detect.outputs.requires-full-build }}
     steps:
@@ -322,7 +323,8 @@ jobs:
       needs.quality-gates.result == 'success' &&
       needs.quality-gates.outputs.result == 'success' &&
       needs.build-validation.result == 'success' &&
-      needs.build-validation.outputs.overall-result == 'success'
+      needs.build-validation.outputs.overall-result == 'success' &&
+      (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.e2e == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:

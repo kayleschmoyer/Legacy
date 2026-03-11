@@ -55,6 +55,9 @@ outputs:
   core:
     description: "Whether core libraries are affected"
     value: ${{ steps.detect-changes.outputs.core }}
+  e2e:
+    description: "Whether E2E test files are affected"
+    value: ${{ steps.detect-changes.outputs.e2e }}
   dependencies:
     description: "Whether dependencies have changed"
     value: ${{ steps.detect-changes.outputs.package-json }}
@@ -86,7 +89,7 @@ runs:
         echo "Available refs:"
         git branch -r || true
         git log --oneline -5 || true
-        
+
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           # For PRs, use the base branch (target branch)
           BASE_REF="${{ github.event.pull_request.base.sha }}"
@@ -156,7 +159,7 @@ runs:
             fi
           fi
         fi
-        
+
         # Final validation - ensure the base reference exists and resolve to SHA
         if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
           echo "Warning: BASE_REF '$BASE_REF' not found, using empty tree as fallback"
@@ -171,10 +174,10 @@ runs:
             fi
           fi
         fi
-        
+
         echo "Final BASE_REF: $BASE_REF"
         echo "base-ref=$BASE_REF" >> $GITHUB_OUTPUT
-        
+
         # Determine HEAD reference
         if [ -n "${{ inputs.head-ref }}" ]; then
           HEAD_REF="${{ inputs.head-ref }}"
@@ -190,7 +193,7 @@ runs:
             echo "Using GitHub event SHA: $HEAD_REF"
           fi
         fi
-        
+
         # Final validation - ensure we have a valid SHA
         if [[ ! "$HEAD_REF" =~ ^[a-f0-9]{40}$ ]]; then
           echo "HEAD_REF '$HEAD_REF' doesn't look like a SHA, trying to resolve..."
@@ -203,10 +206,10 @@ runs:
             HEAD_REF=$(git rev-parse HEAD)
           fi
         fi
-        
+
         echo "Final HEAD_REF: $HEAD_REF"
         echo "head-ref=$HEAD_REF" >> $GITHUB_OUTPUT
-        
+
         # Additional debugging for dorny/paths-filter
         echo "Git status for debugging:"
         git status --porcelain || true
@@ -242,6 +245,9 @@ runs:
             - package-lock.json
             - apps/*/package.json
             - lib/*/package.json
+          e2e:
+            - apps/web-e2e/**
+            - apps/app-e2e/**
           core:
             - lib/**
             - tools/**
@@ -261,11 +267,11 @@ runs:
         TERRAFORM_AFFECTED="${{ steps.detect-changes.outputs.terraform }}"
         CORE_AFFECTED="${{ steps.detect-changes.outputs.core }}"
         DEPS_AFFECTED="${{ steps.detect-changes.outputs.package-json }}"
-        
+
         # Check for integration build scenarios
         FORCE_FULL_BUILD="${{ inputs.force-full-build }}"
         IS_INTEGRATION_BUILD="false"
-        
+
         # Detect integration build scenarios
         if [ "${{ github.event_name }}" = "merge_group" ]; then
           IS_INTEGRATION_BUILD="true"
@@ -284,7 +290,7 @@ runs:
             echo "🔀 Multiple commits to main detected ($COMMIT_COUNT commits) - treating as integration build"
           fi
         fi
-        
+
         # For integration builds, force all components as affected to ensure comprehensive testing
         if [ "$IS_INTEGRATION_BUILD" = "true" ]; then
           echo "🚀 Integration build mode: Enabling comprehensive testing"
@@ -298,27 +304,27 @@ runs:
 
         # Create affected components array
         AFFECTED_COMPONENTS='[]'
-        
+
         if [ "$WEB_AFFECTED" == "true" ]; then
           AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["web"]')
         fi
-        
+
         if [ "$MOBILE_AFFECTED" == "true" ]; then
           AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["mobile"]')
         fi
-        
+
         if [ "$LAMBDAS_AFFECTED" == "true" ]; then
           AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["lambdas"]')
         fi
-        
+
         if [ "$TERRAFORM_AFFECTED" == "true" ]; then
           AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["terraform"]')
         fi
-        
+
         if [ "$CORE_AFFECTED" == "true" ]; then
           AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["core"]')
         fi
-        
+
         if [ "$DEPS_AFFECTED" == "true" ]; then
           AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["dependencies"]')
         fi
@@ -335,7 +341,7 @@ runs:
 
         # Generate human-readable summary
         COMPONENT_COUNT=$(echo "$AFFECTED_COMPONENTS" | jq 'length')
-        
+
         if [ "$IS_INTEGRATION_BUILD" = "true" ]; then
           CHANGE_SUMMARY="Integration build: Comprehensive testing of all components (Event: ${{ github.event_name }})"
         elif [ "$COMPONENT_COUNT" -eq 0 ]; then
@@ -364,6 +370,7 @@ runs:
         echo "- **Mobile**: $([ "$MOBILE_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "- **Lambdas**: $([ "$LAMBDAS_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "- **Terraform**: $([ "$TERRAFORM_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
+        echo "- **E2E Tests**: $([ "${{ steps.detect-changes.outputs.e2e }}" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "- **Core Libraries**: $([ "$CORE_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "- **Dependencies**: $([ "$DEPS_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -393,11 +400,11 @@ runs:
       shell: bash
       run: |
         echo "::group::📋 Additional Change Context"
-        
+
         # Show recent changes (limit output to prevent log overflow)
         echo "### 📄 Recent Files (Last 10)"
         echo ""
-        
+
         if command -v git >/dev/null 2>&1; then
           echo "Recent file changes:"
           git diff --name-only ${{ steps.determine-base.outputs.base-ref }}..HEAD | head -10 || true
