@@ -117,7 +117,9 @@
     "poetry": true,
     ".\\scripts\\resolve-generated-conflicts.ps1": true,
     "Push-Location": true,
-    "Pop-Location": true
+    "Pop-Location": true,
+    "Get-Member": true,
+    ".\\.github\\scripts\\cleanup-pr-body.ps1": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {
