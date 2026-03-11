@@ -1906,7 +1906,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                     leagueId={leagueId}
                     userId={user?.id ?? 0}
                     mentionableTeams={leagueTeams}
-                    onNavigate={(tabId) => setActiveTab(tabId as TabId)}
+                    onNavigate={(tabId) => changeTab(tabId as TabId)}
                   />
                 </YStack>
               </Card>
