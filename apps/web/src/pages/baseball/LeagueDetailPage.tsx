@@ -1247,6 +1247,9 @@ export function LeagueDetailPage(): React.JSX.Element {
   const [matchupErrorMessage, setMatchupErrorMessage] = useState<string | null>(
     null,
   );
+  // LS-1073: single ref for the auto-clear timeout — prevents an older timeout
+  // from clearing a newer success message when two saves happen within 5 seconds.
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // LS-507: track whether DraftSettingsControl has unsaved changes
   const [hasDraftSettingsChanges, setHasDraftSettingsChanges] = useState(false);
@@ -1283,14 +1286,30 @@ export function LeagueDetailPage(): React.JSX.Element {
       } else {
         message = 'Game selection triggered! Processing in background...';
       }
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
       setMatchupSuccessMessage(message);
       setMatchupErrorMessage(null);
       announcePolite(message);
       void refetchMatchup();
-      setTimeout(() => setMatchupSuccessMessage(null), 5000);
+      successTimeoutRef.current = setTimeout(
+        () => setMatchupSuccessMessage(null),
+        5000,
+      );
     },
     [refetchMatchup],
   );
+
+  // LS-1073: centralised helper so all commissioner onSuccess callbacks share
+  // the same timeout ref — cancels any pending auto-clear before starting fresh.
+  const showMatchupSuccess = useCallback((message: string) => {
+    if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    setMatchupSuccessMessage(message);
+    setMatchupErrorMessage(null);
+    successTimeoutRef.current = setTimeout(
+      () => setMatchupSuccessMessage(null),
+      5000,
+    );
+  }, []);
 
   const handleMatchupError = useCallback((err: Error) => {
     setMatchupErrorMessage(err.message);
@@ -3030,10 +3049,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             customEraStartYear={league.customEraStartYear}
             customEraEndYear={league.customEraEndYear}
             onDirtyChange={setHasDraftSettingsChanges}
-            onSuccess={(message) => {
-              setMatchupSuccessMessage(message);
-              setTimeout(() => setMatchupSuccessMessage(null), 5000);
-            }}
+            onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);
             }}
@@ -3047,10 +3063,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           <DraftOrderControl
             leagueId={leagueId}
             draftStatus={league.draftStatus}
-            onSuccess={(message) => {
-              setMatchupSuccessMessage(message);
-              setTimeout(() => setMatchupSuccessMessage(null), 5000);
-            }}
+            onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);
             }}
@@ -3068,10 +3081,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             currentBannerUrl={league.bannerUrl}
             currentPrimaryColor={league.primaryColor}
             currentSecondaryColor={league.secondaryColor}
-            onSuccess={(message) => {
-              setMatchupSuccessMessage(message);
-              setTimeout(() => setMatchupSuccessMessage(null), 5000);
-            }}
+            onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);
             }}
@@ -3093,10 +3103,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             currentPlayoffEnabled={league.playoffEnabled ?? true}
             currentPlayoffFormat={league.playoffFormat ?? '4-team'}
             currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
-            onSuccess={(message) => {
-              setMatchupSuccessMessage(message);
-              setTimeout(() => setMatchupSuccessMessage(null), 5000);
-            }}
+            onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);
             }}
@@ -3109,10 +3116,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         content: (
           <SeasonAwardsControl
             leagueId={leagueId}
-            onSuccess={(message) => {
-              setMatchupSuccessMessage(message);
-              setTimeout(() => setMatchupSuccessMessage(null), 5000);
-            }}
+            onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);
             }}
@@ -3125,10 +3129,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         content: (
           <AchievementRestrictionsControl
             leagueId={leagueId}
-            onSuccess={(message) => {
-              setMatchupSuccessMessage(message);
-              setTimeout(() => setMatchupSuccessMessage(null), 5000);
-            }}
+            onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);
             }}
@@ -3141,10 +3142,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         content: (
           <WaiverProcessControl
             leagueId={leagueId}
-            onSuccess={(message) => {
-              setMatchupSuccessMessage(message);
-              setTimeout(() => setMatchupSuccessMessage(null), 5000);
-            }}
+            onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);
             }}
