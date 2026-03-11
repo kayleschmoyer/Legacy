@@ -5,7 +5,6 @@ import {
   unique,
   serial,
   varchar,
-  char,
   integer,
   text,
   timestamp,
@@ -55,7 +54,7 @@ export const usersInAppInternal = appInternal.table(
     id: serial('id').primaryKey().notNull(),
     username: varchar('username', { length: 50 }),
     email: varchar('email', { length: 100 }).notNull(),
-    passwordHash: char('password_hash', { length: 128 }),
+    passwordHash: varchar('password_hash', { length: 128 }),
     accessLevel: accessLevelInAppInternal('access_level').default('none'),
     privacyPolicyAcceptedAt: timestamp('privacy_policy_accepted_at', {
       withTimezone: true,

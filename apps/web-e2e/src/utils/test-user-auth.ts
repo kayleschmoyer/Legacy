@@ -54,8 +54,8 @@ function resolveOAuthBaseUrl(): string {
  * Obtain a JWT for a test user by registering or logging in against the live
  * OAuth proxy. The JWT contains a real auto-incremented database user ID.
  *
- * - Tries `POST /oauth/local/register` first (creates user if it doesn't exist)
- * - Falls back to `POST /oauth/local/login` if the user is already registered
+ * - Tries `POST /oauth/register` first (creates user if it doesn't exist)
+ * - Falls back to `POST /oauth/login` if the user is already registered
  */
 export async function getTestUserJwt(
   creds: TestUserCredentials,
@@ -74,7 +74,7 @@ async function registerOrLogin(
   creds: TestUserCredentials,
 ): Promise<string> {
   // Try register first
-  const registerRes = await fetch(`${oauthUrl}/local/register`, {
+  const registerRes = await fetch(`${oauthUrl}/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -90,7 +90,7 @@ async function registerOrLogin(
   }
 
   // If registration failed (user already exists), try login
-  const loginRes = await fetch(`${oauthUrl}/local/login`, {
+  const loginRes = await fetch(`${oauthUrl}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

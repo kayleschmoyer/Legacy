@@ -798,7 +798,9 @@ test.describe
       );
 
       // The bracket header should show "Champion" and the champion team name
-      await expect(page.getByText('Champion', { exact: false })).toBeVisible({
+      await expect(
+        page.getByText('Champion', { exact: false }).first(),
+      ).toBeVisible({
         timeout: 15_000,
       });
 
@@ -845,7 +847,9 @@ test.describe
     });
 
     await test.step('Manager sees champion highlighted', async () => {
-      await expect(page.getByText('Champion', { exact: false })).toBeVisible({
+      await expect(
+        page.getByText('Champion', { exact: false }).first(),
+      ).toBeVisible({
         timeout: 10_000,
       });
     });
