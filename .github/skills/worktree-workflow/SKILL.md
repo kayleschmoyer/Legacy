@@ -135,16 +135,12 @@ acli jira workitem view --key LS-XXXX --fields status
 
 ### Step 1: Create the Branch + Worktree
 
-Use `make worktree` — it creates the branch, worktree, registers the parent dependency, and
+Use `make worktree` — it fetches origin, creates the branch, worktree, registers the parent dependency, and
 auto-adds to the VS Code workspace in one atomic command:
 
-> **Before creating any worktree**, fetch from origin so the new branch is cut from the
-> latest remote `main` (or the parent branch, if stacked):
->
-> ```powershell
-> cd "D:\code\legacy-sports"
-> git fetch origin
-> ```
+> `make worktree` automatically runs `git fetch origin` before creating the branch, so the
+> worktree is always cut from the latest remote state. If you fall back to manual creation
+> (see below), you **must** fetch first yourself.
 
 **Independent ticket (parent = main):**
 

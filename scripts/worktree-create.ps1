@@ -95,6 +95,17 @@ if ($currentBranch -and $currentBranch -ne 'main') {
     exit 1
 }
 
+# ---------------------------------------------------------------------------
+# Fetch latest refs so the worktree is cut from the current remote state.
+# Without this, origin/main (or the parent branch) may be stale and the
+# worktree starts from an outdated base — requiring a post-create rebase.
+# ---------------------------------------------------------------------------
+Write-Host "[PRE] Fetching origin..." -ForegroundColor DarkGray
+git fetch origin 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[WARN] git fetch origin failed — continuing with local refs" -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Worktree Create" -ForegroundColor Cyan
