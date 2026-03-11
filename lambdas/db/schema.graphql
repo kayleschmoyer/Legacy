@@ -1316,6 +1316,7 @@ type Mutation {
   ): Boolean
   deleteAllLeagues: String
   deleteLeague(leagueId: Int!): String
+  deleteLeagueAnnouncement(id: Int!, leagueId: Int!): Boolean
 
   """
   Remove a season award from a league. Commissioner / General Manager access required.
@@ -1568,6 +1569,11 @@ type Mutation {
   updateDraftSettings(
     input: UpdateDraftSettingsInput!
   ): UpdateDraftSettingsPayload
+  updateLeagueAnnouncement(
+    id: Int!
+    leagueId: Int!
+    messageText: String!
+  ): LeagueChatMessage
   updateLeagueScoringProfile(
     leagueId: Int!
     updates: [UpdateLeagueScoringMultiplierInput!]!

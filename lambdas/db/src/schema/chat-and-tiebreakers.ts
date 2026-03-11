@@ -1054,6 +1054,148 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
   }),
 );
 
+// Mutation: updateLeagueAnnouncement — commissioner-only mutation to edit
+// an existing league announcement.
+builder.mutationField('updateLeagueAnnouncement', (t) =>
+  t.field({
+    type: LeagueChatMessage,
+    args: {
+      id: t.arg.int({ required: true }),
+      leagueId: t.arg.int({ required: true }),
+      messageText: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const text = args.messageText.trim();
+      if (text.length === 0) {
+        throw new Error('Announcement cannot be empty');
+      }
+      if (text.length > 2000) {
+        throw new Error('Announcement cannot exceed 2000 characters');
+      }
+
+      // Verify caller is the commissioner of the league
+      const leagueRows = await context.db
+        .select({ owner: PublicSchema.leagues.owner })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, args.leagueId))
+        .limit(1);
+
+      if (leagueRows.length === 0) {
+        throw new Error('League not found');
+      }
+
+      if (leagueRows[0].owner !== context.user.id) {
+        throw ForbiddenError('Only the commissioner can edit announcements');
+      }
+
+      // Verify announcement belongs to this league
+      const existing = await context.db
+        .select()
+        .from(PublicSchema.leagueMessages)
+        .where(
+          and(
+            eq(PublicSchema.leagueMessages.id, args.id),
+            eq(PublicSchema.leagueMessages.leagueId, args.leagueId),
+            eq(PublicSchema.leagueMessages.messageType, 'announcement'),
+          ),
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        throw new Error('Announcement not found');
+      }
+
+      const rows = await context.db
+        .update(PublicSchema.leagueMessages)
+        .set({ messageText: text })
+        .where(
+          and(
+            eq(PublicSchema.leagueMessages.id, args.id),
+            eq(PublicSchema.leagueMessages.leagueId, args.leagueId),
+          ),
+        )
+        .returning();
+
+      const msg = rows[0];
+
+      return {
+        id: msg.id,
+        leagueId: msg.leagueId,
+        userId: msg.userId,
+        messageText: msg.messageText,
+        timestamp: msg.timestamp ?? null,
+        messageType: 'announcement',
+        gifUrl: null,
+        metadata: null,
+      };
+    },
+  }),
+);
+
+// Mutation: deleteLeagueAnnouncement — commissioner-only mutation to delete
+// a league announcement.
+builder.mutationField('deleteLeagueAnnouncement', (t) =>
+  t.field({
+    type: 'Boolean',
+    args: {
+      id: t.arg.int({ required: true }),
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      // Verify caller is the commissioner of the league
+      const leagueRows = await context.db
+        .select({ owner: PublicSchema.leagues.owner })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, args.leagueId))
+        .limit(1);
+
+      if (leagueRows.length === 0) {
+        throw new Error('League not found');
+      }
+
+      if (leagueRows[0].owner !== context.user.id) {
+        throw ForbiddenError('Only the commissioner can delete announcements');
+      }
+
+      // Verify announcement belongs to this league
+      const existing = await context.db
+        .select()
+        .from(PublicSchema.leagueMessages)
+        .where(
+          and(
+            eq(PublicSchema.leagueMessages.id, args.id),
+            eq(PublicSchema.leagueMessages.leagueId, args.leagueId),
+            eq(PublicSchema.leagueMessages.messageType, 'announcement'),
+          ),
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        throw new Error('Announcement not found');
+      }
+
+      await context.db
+        .delete(PublicSchema.leagueMessages)
+        .where(
+          and(
+            eq(PublicSchema.leagueMessages.id, args.id),
+            eq(PublicSchema.leagueMessages.leagueId, args.leagueId),
+          ),
+        );
+
+      return true;
+    },
+  }),
+);
+
 // Mutation: sendDirectMessage
 // Delivers a private message between two players, persists it to
 // `direct_messages`, and pushes a WebSocket notification to the recipient's

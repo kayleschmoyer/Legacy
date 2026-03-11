@@ -1099,6 +1099,7 @@ export type Mutation = {
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
+  deleteLeagueAnnouncement?: Maybe<Scalars['Boolean']['output']>;
   /** Remove a season award from a league. Commissioner / General Manager access required. */
   deleteLeagueSeasonAward?: Maybe<Scalars['Boolean']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
@@ -1182,6 +1183,7 @@ export type Mutation = {
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
+  updateLeagueAnnouncement?: Maybe<LeagueChatMessage>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
   updateMatchupPlayerPosition?: Maybe<MatchupPlayer>;
@@ -1340,6 +1342,11 @@ export type MutationDeleteAchievementRestrictionArgs = {
 };
 
 export type MutationDeleteLeagueArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type MutationDeleteLeagueAnnouncementArgs = {
+  id: Scalars['Int']['input'];
   leagueId: Scalars['Int']['input'];
 };
 
@@ -1605,6 +1612,12 @@ export type MutationUpdateCommissionerNoteArgs = {
 
 export type MutationUpdateDraftSettingsArgs = {
   input: UpdateDraftSettingsInput;
+};
+
+export type MutationUpdateLeagueAnnouncementArgs = {
+  id: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
 };
 
 export type MutationUpdateLeagueScoringProfileArgs = {
@@ -3622,6 +3635,35 @@ export type PostLeagueAnnouncementMutation = {
     messageType?: string | null;
     sender?: { __typename?: 'User'; username?: string | null } | null;
   } | null;
+};
+
+export type UpdateLeagueAnnouncementMutationVariables = Exact<{
+  id: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
+}>;
+
+export type UpdateLeagueAnnouncementMutation = {
+  __typename?: 'Mutation';
+  updateLeagueAnnouncement?: {
+    __typename?: 'LeagueChatMessage';
+    id?: string | null;
+    userId?: number | null;
+    messageText?: string | null;
+    timestamp?: string | null;
+    messageType?: string | null;
+    sender?: { __typename?: 'User'; username?: string | null } | null;
+  } | null;
+};
+
+export type DeleteLeagueAnnouncementMutationVariables = Exact<{
+  id: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type DeleteLeagueAnnouncementMutation = {
+  __typename?: 'Mutation';
+  deleteLeagueAnnouncement?: boolean | null;
 };
 
 export type LeagueFragment = {
@@ -9726,6 +9768,122 @@ export type PostLeagueAnnouncementMutationResult =
 export type PostLeagueAnnouncementMutationOptions = BaseMutationOptions<
   PostLeagueAnnouncementMutation,
   PostLeagueAnnouncementMutationVariables
+>;
+export const UpdateLeagueAnnouncement = gql`
+  mutation UpdateLeagueAnnouncement(
+    $id: Int!
+    $leagueId: Int!
+    $messageText: String!
+  ) {
+    updateLeagueAnnouncement(
+      id: $id
+      leagueId: $leagueId
+      messageText: $messageText
+    ) {
+      id
+      userId
+      messageText
+      timestamp
+      messageType
+      sender {
+        username
+      }
+    }
+  }
+`;
+export type UpdateLeagueAnnouncementMutationFn = MutationFunction<
+  UpdateLeagueAnnouncementMutation,
+  UpdateLeagueAnnouncementMutationVariables
+>;
+
+/**
+ * __useUpdateLeagueAnnouncementMutation__
+ *
+ * To run a mutation, you first call `useUpdateLeagueAnnouncementMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateLeagueAnnouncementMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateLeagueAnnouncementMutation, { data, loading, error }] = useUpdateLeagueAnnouncementMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *      leagueId: // value for 'leagueId'
+ *      messageText: // value for 'messageText'
+ *   },
+ * });
+ */
+export function useUpdateLeagueAnnouncementMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateLeagueAnnouncementMutation,
+    UpdateLeagueAnnouncementMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateLeagueAnnouncementMutation,
+    UpdateLeagueAnnouncementMutationVariables
+  >(UpdateLeagueAnnouncement, options);
+}
+export type UpdateLeagueAnnouncementMutationHookResult = ReturnType<
+  typeof useUpdateLeagueAnnouncementMutation
+>;
+export type UpdateLeagueAnnouncementMutationResult =
+  Apollo.MutationResult<UpdateLeagueAnnouncementMutation>;
+export type UpdateLeagueAnnouncementMutationOptions = BaseMutationOptions<
+  UpdateLeagueAnnouncementMutation,
+  UpdateLeagueAnnouncementMutationVariables
+>;
+export const DeleteLeagueAnnouncement = gql`
+  mutation DeleteLeagueAnnouncement($id: Int!, $leagueId: Int!) {
+    deleteLeagueAnnouncement(id: $id, leagueId: $leagueId)
+  }
+`;
+export type DeleteLeagueAnnouncementMutationFn = MutationFunction<
+  DeleteLeagueAnnouncementMutation,
+  DeleteLeagueAnnouncementMutationVariables
+>;
+
+/**
+ * __useDeleteLeagueAnnouncementMutation__
+ *
+ * To run a mutation, you first call `useDeleteLeagueAnnouncementMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteLeagueAnnouncementMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteLeagueAnnouncementMutation, { data, loading, error }] = useDeleteLeagueAnnouncementMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useDeleteLeagueAnnouncementMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    DeleteLeagueAnnouncementMutation,
+    DeleteLeagueAnnouncementMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    DeleteLeagueAnnouncementMutation,
+    DeleteLeagueAnnouncementMutationVariables
+  >(DeleteLeagueAnnouncement, options);
+}
+export type DeleteLeagueAnnouncementMutationHookResult = ReturnType<
+  typeof useDeleteLeagueAnnouncementMutation
+>;
+export type DeleteLeagueAnnouncementMutationResult =
+  Apollo.MutationResult<DeleteLeagueAnnouncementMutation>;
+export type DeleteLeagueAnnouncementMutationOptions = BaseMutationOptions<
+  DeleteLeagueAnnouncementMutation,
+  DeleteLeagueAnnouncementMutationVariables
 >;
 export const GetLeagueById = gql`
   query GetLeagueById($id: Int!) {

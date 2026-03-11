@@ -63,3 +63,28 @@ mutation PostLeagueAnnouncement($leagueId: Int!, $messageText: String!) {
     }
   }
 }
+
+mutation UpdateLeagueAnnouncement(
+  $id: Int!
+  $leagueId: Int!
+  $messageText: String!
+) {
+  updateLeagueAnnouncement(
+    id: $id
+    leagueId: $leagueId
+    messageText: $messageText
+  ) {
+    id
+    userId
+    messageText
+    timestamp
+    messageType
+    sender {
+      username
+    }
+  }
+}
+
+mutation DeleteLeagueAnnouncement($id: Int!, $leagueId: Int!) {
+  deleteLeagueAnnouncement(id: $id, leagueId: $leagueId)
+}

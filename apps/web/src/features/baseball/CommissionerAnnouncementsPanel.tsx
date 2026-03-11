@@ -8,12 +8,14 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Megaphone, Plus, Send, X } from '@tamagui/lucide-icons';
+import { Edit3, Megaphone, Plus, Send, Trash2, X } from '@tamagui/lucide-icons';
 import {
   GetLeagueAnnouncements,
   type GetLeagueAnnouncementsQuery,
+  useDeleteLeagueAnnouncementMutation,
   useGetLeagueAnnouncementsQuery,
   usePostLeagueAnnouncementMutation,
+  useUpdateLeagueAnnouncementMutation,
 } from '../../api/db/graphql.generated';
 import {
   BRAND_GOLD_LIGHT,
@@ -75,6 +77,14 @@ export function CommissionerAnnouncementsPanel({
   const [inputText, setInputText] = useState('');
   const [postError, setPostError] = useState<string | null>(null);
 
+  // Edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Delete state
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const { data, loading, refetch } = useGetLeagueAnnouncementsQuery({
     variables: { leagueId },
     skip: isNaN(leagueId),
@@ -83,6 +93,11 @@ export function CommissionerAnnouncementsPanel({
 
   const [postAnnouncement, { loading: posting }] =
     usePostLeagueAnnouncementMutation();
+
+  const [updateAnnouncement, { loading: updating }] =
+    useUpdateLeagueAnnouncementMutation();
+
+  const [deleteAnnouncement] = useDeleteLeagueAnnouncementMutation();
 
   const announcements = mapAnnouncements(data);
 
@@ -119,6 +134,60 @@ export function CommissionerAnnouncementsPanel({
       }
     },
     [handlePost],
+  );
+
+  const handleEditStart = useCallback((id: string, currentText: string) => {
+    setEditingId(id);
+    setEditText(currentText);
+    setEditError(null);
+  }, []);
+
+  const handleEditCancel = useCallback(() => {
+    setEditingId(null);
+    setEditText('');
+    setEditError(null);
+  }, []);
+
+  const handleEditSave = useCallback(
+    async (id: string) => {
+      const text = editText.trim();
+      if (!text || updating) return;
+      setEditError(null);
+      try {
+        await updateAnnouncement({
+          variables: { id: Number(id), leagueId, messageText: text },
+          awaitRefetchQueries: true,
+          refetchQueries: [
+            { query: GetLeagueAnnouncements, variables: { leagueId } },
+          ],
+        });
+        setEditingId(null);
+        setEditText('');
+      } catch (err: unknown) {
+        setEditError(
+          err instanceof Error ? err.message : 'Failed to update announcement',
+        );
+      }
+    },
+    [editText, updating, updateAnnouncement, leagueId],
+  );
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      setDeletingId(id);
+      try {
+        await deleteAnnouncement({
+          variables: { id: Number(id), leagueId },
+          awaitRefetchQueries: true,
+          refetchQueries: [
+            { query: GetLeagueAnnouncements, variables: { leagueId } },
+          ],
+        });
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [deleteAnnouncement, leagueId],
   );
 
   // Don't render the panel if there are no announcements and the user is not
@@ -329,18 +398,121 @@ export function CommissionerAnnouncementsPanel({
                         </Text>
                       </XStack>
                     </XStack>
-                    <Text fontSize="$1" color="$textMuted">
-                      {formatDate(announcement.timestamp)}
-                    </Text>
+                    <XStack alignItems="center" gap="$2">
+                      <Text fontSize="$1" color="$textMuted">
+                        {formatDate(announcement.timestamp)}
+                      </Text>
+                      {isCommissioner && editingId !== announcement.id && (
+                        <>
+                          <Button
+                            size="$1"
+                            circular
+                            chromeless
+                            icon={<Edit3 size={12} />}
+                            color="$textMuted"
+                            aria-label="Edit announcement"
+                            onPress={() => {
+                              handleEditStart(
+                                announcement.id,
+                                announcement.messageText,
+                              );
+                            }}
+                            hoverStyle={{ color: BRAND_GOLD_LIGHT }}
+                          />
+                          <Button
+                            size="$1"
+                            circular
+                            chromeless
+                            icon={
+                              deletingId === announcement.id ? (
+                                <Spinner size="small" />
+                              ) : (
+                                <Trash2 size={12} />
+                              )
+                            }
+                            color="$textMuted"
+                            aria-label="Delete announcement"
+                            disabled={deletingId === announcement.id}
+                            onPress={() => {
+                              void handleDelete(announcement.id);
+                            }}
+                            hoverStyle={{ color: '$red10' }}
+                          />
+                        </>
+                      )}
+                    </XStack>
                   </XStack>
-                  <Text
-                    fontSize="$4"
-                    color="$color"
-                    lineHeight="$5"
-                    style={{ wordBreak: 'break-word' } as React.CSSProperties}
-                  >
-                    {announcement.messageText}
-                  </Text>
+
+                  {/* Inline edit form */}
+                  {isCommissioner && editingId === announcement.id ? (
+                    <YStack gap="$2">
+                      <textarea
+                        value={editText}
+                        onChange={(e) => {
+                          setEditText(e.target.value);
+                        }}
+                        maxLength={2000}
+                        rows={3}
+                        style={{
+                          width: '100%',
+                          resize: 'vertical',
+                          padding: '8px 10px',
+                          borderRadius: 6,
+                          border: `1px solid ${withAlpha(BRAND_GOLD_LIGHT, 0.3)}`,
+                          backgroundColor: 'var(--background)',
+                          color: 'var(--color)',
+                          fontSize: 14,
+                          fontFamily: 'inherit',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      {editError && (
+                        <Text fontSize="$2" color="$red10">
+                          {editError}
+                        </Text>
+                      )}
+                      <XStack gap="$2">
+                        <Button
+                          size="$2"
+                          icon={<X size={14} />}
+                          onPress={handleEditCancel}
+                          chromeless
+                          color="$textMuted"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="$2"
+                          icon={
+                            updating ? (
+                              <Spinner size="small" />
+                            ) : (
+                              <Send size={14} />
+                            )
+                          }
+                          onPress={() => {
+                            void handleEditSave(announcement.id);
+                          }}
+                          disabled={!editText.trim() || updating}
+                          backgroundColor={BRAND_NAVY_LIGHT}
+                          color="white"
+                          hoverStyle={{ opacity: 0.85 }}
+                        >
+                          Save
+                        </Button>
+                      </XStack>
+                    </YStack>
+                  ) : (
+                    <Text
+                      fontSize="$4"
+                      color="$color"
+                      lineHeight="$5"
+                      style={{ wordBreak: 'break-word' } as React.CSSProperties}
+                    >
+                      {announcement.messageText}
+                    </Text>
+                  )}
                 </YStack>
               </XStack>
               {idx < announcements.length - 1 && (
