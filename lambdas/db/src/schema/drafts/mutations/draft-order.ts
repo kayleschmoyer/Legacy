@@ -289,9 +289,13 @@ builder.mutationField('randomizeDraftOrder', (t) =>
           )
           .limit(1);
 
-        if (!membership || membership.permissionLevel !== 'general_manager') {
+        if (
+          !membership ||
+          (membership.permissionLevel !== 'general_manager' &&
+            membership.permissionLevel !== 'commissioner')
+        ) {
           throw new Error(
-            'Only the league General Manager can randomize the draft order',
+            'Only the league General Manager or Commissioner can randomize the draft order',
           );
         }
 
