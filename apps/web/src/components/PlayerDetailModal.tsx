@@ -393,17 +393,17 @@ export function PlayerDetailModal({
   const battingTableRows = useMemo(
     () =>
       seasonRows
-        .filter((r) => r.batting)
+        .filter((r) => r.batting != null)
         .map((r) => [
           r.season,
-          r.batting!.games,
-          r.batting!.pa,
-          r.batting!.ab,
-          r.batting!.h,
-          r.batting!.hr,
-          r.batting!.rbi,
-          r.batting!.sb,
-          r.batting!.avg,
+          r.batting?.games ?? 0,
+          r.batting?.pa ?? 0,
+          r.batting?.ab ?? 0,
+          r.batting?.h ?? 0,
+          r.batting?.hr ?? 0,
+          r.batting?.rbi ?? 0,
+          r.batting?.sb ?? 0,
+          r.batting?.avg ?? '',
         ]),
     [seasonRows],
   );
@@ -411,15 +411,15 @@ export function PlayerDetailModal({
   const pitchingTableRows = useMemo(
     () =>
       seasonRows
-        .filter((r) => r.pitching)
+        .filter((r) => r.pitching != null)
         .map((r) => [
           r.season,
-          r.pitching!.games,
-          `${r.pitching!.wins}-${r.pitching!.losses}`,
-          r.pitching!.era,
-          r.pitching!.ip,
-          r.pitching!.so,
-          r.pitching!.bb,
+          r.pitching?.games ?? 0,
+          `${r.pitching?.wins ?? 0}-${r.pitching?.losses ?? 0}`,
+          r.pitching?.era ?? 0,
+          r.pitching?.ip ?? 0,
+          r.pitching?.so ?? 0,
+          r.pitching?.bb ?? 0,
         ]),
     [seasonRows],
   );
@@ -427,15 +427,15 @@ export function PlayerDetailModal({
   const fieldingTableRows = useMemo(
     () =>
       seasonRows
-        .filter((r) => r.fielding)
+        .filter((r) => r.fielding != null)
         .map((r) => [
           r.season,
-          r.fielding!.position,
-          r.fielding!.games,
-          r.fielding!.inn,
-          r.fielding!.po,
-          r.fielding!.a,
-          r.fielding!.e,
+          r.fielding?.position ?? '',
+          r.fielding?.games ?? 0,
+          r.fielding?.inn ?? 0,
+          r.fielding?.po ?? 0,
+          r.fielding?.a ?? 0,
+          r.fielding?.e ?? 0,
         ]),
     [seasonRows],
   );
