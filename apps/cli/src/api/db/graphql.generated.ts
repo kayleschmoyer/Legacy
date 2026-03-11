@@ -1099,6 +1099,7 @@ export type Mutation = {
   deleteAchievementRestriction?: Maybe<Scalars['Boolean']['output']>;
   deleteAllLeagues?: Maybe<Scalars['String']['output']>;
   deleteLeague?: Maybe<Scalars['String']['output']>;
+  deleteLeagueAnnouncement?: Maybe<Scalars['Boolean']['output']>;
   /** Remove a season award from a league. Commissioner / General Manager access required. */
   deleteLeagueSeasonAward?: Maybe<Scalars['Boolean']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
@@ -1182,6 +1183,7 @@ export type Mutation = {
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
+  updateLeagueAnnouncement?: Maybe<LeagueChatMessage>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
   updateMatchupPlayerPosition?: Maybe<MatchupPlayer>;
@@ -1340,6 +1342,11 @@ export type MutationDeleteAchievementRestrictionArgs = {
 };
 
 export type MutationDeleteLeagueArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type MutationDeleteLeagueAnnouncementArgs = {
+  id: Scalars['Int']['input'];
   leagueId: Scalars['Int']['input'];
 };
 
@@ -1605,6 +1612,12 @@ export type MutationUpdateCommissionerNoteArgs = {
 
 export type MutationUpdateDraftSettingsArgs = {
   input: UpdateDraftSettingsInput;
+};
+
+export type MutationUpdateLeagueAnnouncementArgs = {
+  id: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
+  messageText: Scalars['String']['input'];
 };
 
 export type MutationUpdateLeagueScoringProfileArgs = {

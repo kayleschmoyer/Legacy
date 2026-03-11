@@ -3,8 +3,8 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   ALLOWED_POSITIONS,
   BATTING_POSITIONS,
-  isNegroLeague,
   MIN_SEASON_WITH_GAME_DATA,
+  NEGRO_LEAGUE_IDS,
   PITCHING_POSITIONS,
   SEASON_MATCHUP_MULTIPLIER,
   shuffleArray,
@@ -38,7 +38,16 @@ import {
   validateSelectionMethod,
   validateUserAccess,
 } from '@legacy-sports/db-client';
-import { and, eq, gte, inArray, sql } from 'drizzle-orm';
+import {
+  and,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { z } from 'zod';
 
 // Initialize Sentry
@@ -343,7 +352,11 @@ async function buildPlayerPool(
   } = config;
 
   // ── 1. Fetch candidate players ordered by stats availability ─────────────
+  // ORDER BY stats_last_fetched_at DESC NULLS LAST, id ASC is equivalent to
+  // the old CASE WHEN expression but can be served by the
+  // idx_players_stats_fetched_sort index, avoiding a full-table sort.
   const estimatedPlayersNeeded = numTeams * maxRosterSize * 2;
+  const negroLeagueList = [...NEGRO_LEAGUE_IDS];
   const candidatePlayers = await db
     .select({
       id: PublicSchema.players.id,
@@ -354,7 +367,6 @@ async function buildPlayerPool(
     })
     .from(PublicSchema.players)
     .orderBy(
-      sql`CASE WHEN ${PublicSchema.players.statsLastFetchedAt} IS NOT NULL THEN 0 ELSE 1 END`,
       sql`${PublicSchema.players.statsLastFetchedAt} DESC NULLS LAST`,
       PublicSchema.players.id,
     )
@@ -367,52 +379,54 @@ async function buildPlayerPool(
   // ── 2. Filter to players with at least one valid season ───────────────────
   const candidatePlayerIds = candidatePlayers.map((p) => p.id);
 
+  // Negro-league filter pushed to SQL: rows with NULL lg_id are non-NL and
+  // must be kept, so we use (lg_id IS NULL OR lg_id NOT IN (...)).
+  const notNegroLeague = (lgIdCol: typeof PublicSchema.seasonBatting.lgId) =>
+    or(isNull(lgIdCol), notInArray(lgIdCol, negroLeagueList));
+
   const [battingStats, pitchingStats, fieldingStats] = await Promise.all([
     db
       .select({
         playerId: PublicSchema.seasonBatting.playerId,
-        season: PublicSchema.seasonBatting.season,
         g: PublicSchema.seasonBatting.g,
-        lgId: PublicSchema.seasonBatting.lgId,
       })
       .from(PublicSchema.seasonBatting)
       .where(
         and(
           inArray(PublicSchema.seasonBatting.playerId, candidatePlayerIds),
           gte(PublicSchema.seasonBatting.season, MIN_SEASON_WITH_GAME_DATA),
+          gte(PublicSchema.seasonBatting.g, minGames),
+          notNegroLeague(PublicSchema.seasonBatting.lgId),
         ),
-      )
-      .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+      ),
     db
       .select({
         playerId: PublicSchema.seasonPitching.playerId,
-        season: PublicSchema.seasonPitching.season,
         g: PublicSchema.seasonPitching.g,
-        lgId: PublicSchema.seasonPitching.lgId,
       })
       .from(PublicSchema.seasonPitching)
       .where(
         and(
           inArray(PublicSchema.seasonPitching.playerId, candidatePlayerIds),
           gte(PublicSchema.seasonPitching.season, MIN_SEASON_WITH_GAME_DATA),
+          gte(PublicSchema.seasonPitching.g, minGames),
+          notNegroLeague(PublicSchema.seasonPitching.lgId),
         ),
-      )
-      .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+      ),
     db
       .select({
         playerId: PublicSchema.seasonFielding.playerId,
         season: PublicSchema.seasonFielding.season,
         g: PublicSchema.seasonFielding.g,
-        lgId: PublicSchema.seasonFielding.lgId,
       })
       .from(PublicSchema.seasonFielding)
       .where(
         and(
           inArray(PublicSchema.seasonFielding.playerId, candidatePlayerIds),
           gte(PublicSchema.seasonFielding.season, MIN_SEASON_WITH_GAME_DATA),
+          notNegroLeague(PublicSchema.seasonFielding.lgId),
         ),
-      )
-      .then((rows) => rows.filter((row) => !isNegroLeague(row.lgId))),
+      ),
   ]);
 
   const fieldingByPlayerSeason = new Map<string, number>();
@@ -424,13 +438,15 @@ async function buildPlayerPool(
     );
   }
 
+  // Batting and pitching rows already satisfy g >= minGames (filtered in SQL).
   const playersWithValidSeasons = new Set<number>();
   for (const stat of battingStats) {
-    if ((stat.g ?? 0) >= minGames) playersWithValidSeasons.add(stat.playerId);
+    playersWithValidSeasons.add(stat.playerId);
   }
   for (const stat of pitchingStats) {
-    if ((stat.g ?? 0) >= minGames) playersWithValidSeasons.add(stat.playerId);
+    playersWithValidSeasons.add(stat.playerId);
   }
+  // Fielding requires per-season aggregation (multiple positions per season).
   for (const [key, totalGames] of fieldingByPlayerSeason.entries()) {
     if (totalGames >= minGames) {
       playersWithValidSeasons.add(parseInt(key.split('-')[0]));
