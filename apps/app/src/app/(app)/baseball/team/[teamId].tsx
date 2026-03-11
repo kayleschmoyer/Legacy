@@ -25,9 +25,9 @@ import {
   isBattingSlot,
   isPitcher,
   isPitchingSlot,
-} from '../../../../common/temporary_models/Models';
+} from '../../../../common/models/Models';
 import { LineupEditor } from '../../../../features/roster/LineupEditor';
-import { PositionSlot } from '../../../../common/temporary_models/Models';
+import { PositionSlot } from '../../../../common/models/Models';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 
 const TABS = Object.freeze(['Lineup', 'Rotation']);

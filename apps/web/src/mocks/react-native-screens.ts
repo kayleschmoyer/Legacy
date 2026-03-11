@@ -24,6 +24,3 @@ export default {
   ScreenStack,
   ScreenStackHeaderConfig,
 };
-
-// Re-export common screens API
-// export * from 'react-native-web/dist/cjs/exports/View';
