@@ -401,7 +401,7 @@ async function installGraphQLMocks(page: Page, cfg: MockConfig) {
 // Serial test suite
 // ---------------------------------------------------------------------------
 
-test.describe.serial('Full Season UI Lifecycle @e2e @critical', () => {
+test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
   // -----------------------------------------------------------------------
   // PHASE 1 — CREATE LEAGUE
   // -----------------------------------------------------------------------

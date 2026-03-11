@@ -18,9 +18,13 @@ inputs:
     required: false
     default: "localhost"
   test-patterns:
-    description: "Playwright test patterns to run (grep-style)"
+    description: "Playwright test patterns to run (grep-style). Empty string runs all tests."
     required: false
-    default: "@critical|authentication|navigation|core-functionality"
+    default: "@critical"
+  test-patterns-invert:
+    description: "Playwright test patterns to exclude (grep-invert). Empty string excludes nothing."
+    required: false
+    default: "@slow"
   timeout-minutes:
     description: "Timeout for E2E test execution"
     required: false
@@ -114,6 +118,7 @@ runs:
         echo "- **Retries**: ${{ inputs.retry-count }} (CI environment)"
         echo "- **Workers**: 1 (CI stability)"
         echo "- **Test Patterns**: ${{ inputs.test-patterns }}"
+        echo "- **Exclude Patterns**: ${{ inputs.test-patterns-invert }}"
         echo "- **Execution Mode**: Local (Nx Cloud DTE disabled)"
 
         # Prefer pnpm-managed executables when available
@@ -227,7 +232,12 @@ runs:
         # Build Playwright command
         PLAYWRIGHT_CMD="$PLAYWRIGHT_BIN test"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --project=${{ inputs.browser }}"
-        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep=\"${{ inputs.test-patterns }}\""
+        if [ -n "${{ inputs.test-patterns }}" ]; then
+          PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep=\"${{ inputs.test-patterns }}\""
+        fi
+        if [ -n "${{ inputs.test-patterns-invert }}" ]; then
+          PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep-invert=\"${{ inputs.test-patterns-invert }}\""
+        fi
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --reporter=line,json,blob"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output=test-results"
 
@@ -264,9 +274,10 @@ runs:
 
         if [ -f "apps/web-e2e/test-results/results.json" ]; then
           # Extract test results statistics
-          TOTAL_TESTS=$(jq '.suites | map(.suites[]?.specs[]? // empty) | length' apps/web-e2e/test-results/results.json 2>/dev/null || echo 0)
-          PASSED_TESTS=$(jq '[.suites | map(.suites[]?.specs[]?.tests[]? // empty) | map(select(.results[]?.status == "passed"))] | length' apps/web-e2e/test-results/results.json 2>/dev/null || echo 0)
-          FAILED_TESTS=$(jq '[.suites | map(.suites[]?.specs[]?.tests[]? // empty) | map(select(.results[]?.status == "failed"))] | length' apps/web-e2e/test-results/results.json 2>/dev/null || echo 0)
+          RJ=apps/web-e2e/test-results/results.json
+          TOTAL_TESTS=$(jq '.suites | map(.suites[]?.specs[]? // empty) | length' $RJ 2>/dev/null || echo 0)
+          PASSED_TESTS=$(jq '[.suites | map(.suites[]?.specs[]?.tests[]? // empty) | map(select(.results[]?.status == "passed"))] | length' $RJ 2>/dev/null || echo 0)
+          FAILED_TESTS=$(jq '[.suites | map(.suites[]?.specs[]?.tests[]? // empty) | map(select(.results[]?.status == "failed"))] | length' $RJ 2>/dev/null || echo 0)
           
           if [ "$TOTAL_TESTS" -gt 0 ]; then
             SUCCESS_RATE=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))

@@ -12,6 +12,7 @@ on:
   merge_group:
   schedule:
     - cron: "0 2 * * 1" # Weekly security scan (Mondays 02:00 UTC)
+    - cron: "0 3 * * *" # Nightly full E2E suite (daily 03:00 UTC)
   workflow_dispatch:
     inputs:
       debug_mode:
@@ -91,6 +92,9 @@ jobs:
             case "$schedule" in
               "0 2 * * 1")
                 run_security=true
+                ;;
+              "0 3 * * *")
+                run_security=false
                 ;;
               *)
                 run_security=true
@@ -174,6 +178,11 @@ jobs:
     uses: ./.github/workflows/ci-pipeline.yml
     with:
       debug_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_mode || false }}
+      # Nightly schedule: run ALL tests (empty grep = no filter), 3 shards
+      # PRs / merge_group: run only @critical tests, exclude @slow, 2 shards
+      e2e-test-patterns: ${{ github.event.schedule == '0 3 * * *' && '' || '@critical' }}
+      e2e-exclude-patterns: ${{ github.event.schedule == '0 3 * * *' && '' || '@slow' }}
+      e2e-shard-total: ${{ github.event.schedule == '0 3 * * *' && 3 || 2 }}
     secrets: inherit
 
   security-scanning:
