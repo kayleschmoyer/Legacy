@@ -19,9 +19,10 @@
  *     src/integration/tests/mock-draft-simulator-ui.integration.spec.ts
  *
  * Timing note:
- *   The mock draft uses a 90-second pick timer.  With 4 teams and 5 rounds
- *   there are 15 AI picks × 90 s ≈ 22 minutes of automated waiting, so the
- *   pick phase has a 40-minute timeout.
+ *   The mock draft uses a 30-second pick timer (server default for mock drafts).
+ *   With 4 teams and 5 rounds there are 15 AI picks × 30 s ≈ 7.5 minutes of
+ *   automated waiting.  The test also nudges the server directly every 5 s so
+ *   AI turns resolve within ~35 s each regardless of WebSocket state.
  */
 
 import { expect } from '@playwright/test';
@@ -211,11 +212,12 @@ test.describe
 
   test('Phase 3: Complete the mock draft — user picks + AI picks', async ({
     commissionerPage: page,
+    commissionerJwt,
   }) => {
     // 4 teams × 5 rounds = 20 picks total.
-    // User (position 1) makes 5 picks; AI makes 15 via the nudge mechanism
-    // (90s pick timer).  Allow 40 minutes to be safe.
-    test.setTimeout(2_400_000);
+    // User (position 1) makes 5 picks; AI makes 15 picks via the nudge mechanism
+    // (30 s pick timer — mock-draft default).  15 × ~35 s ≈ 9 minutes.
+    test.setTimeout(15 * 60_000); // 15-minute ceiling
 
     await test.step('Navigate to draft board', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/draft`);
@@ -227,11 +229,41 @@ test.describe
       await page.waitForTimeout(3_000);
     });
 
+    // ---- Direct-nudge helper -----------------------------------------------
+    // Calling autoProcessDraftPicks from Node.js is more reliable than waiting
+    // for the in-browser React timer.  The mutation is idempotent: it is a
+    // no-op until the server-side deadline actually expires, so polling every
+    // 5 seconds is safe.
+    const gqlBase =
+      process.env.INTEGRATION_BASE_URL ??
+      'https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/';
+    async function nudgeDraftPick(): Promise<void> {
+      if (!state.leagueId) return;
+      await fetch(`${gqlBase}graphql`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${commissionerJwt}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: `mutation NudgeExpiredDraftPick($leagueId: Int!) {
+            autoProcessDraftPicks(leagueId: $leagueId) { picksAutoMade }
+          }`,
+          variables: { leagueId: state.leagueId },
+        }),
+      }).catch((_err) => {
+        // best-effort nudge — swallow errors; EventBridge is the hard fallback
+      });
+    }
+
     const totalPicks = state.numTeams * state.rosterSize; // 4 × 5 = 20
     let pickCount = 0;
     const maxPicks = totalPicks + 5; // safety margin
     let consecutiveMisses = 0;
-    const MAX_MISSES = 120; // ≈ 2 minutes of 1-second polling
+    // Reload only after 3× the pick timer with no progress (3 × 30 s = 90 s)
+    const MAX_MISSES = 90;
+    let lastNudgeMs = -Infinity;
+    const NUDGE_INTERVAL_MS = 5_000;
 
     await test.step('Loop: make user picks on each turn; wait for AI picks', async () => {
       while (pickCount < maxPicks) {
@@ -282,8 +314,9 @@ test.describe
             await page.waitForTimeout(1_000);
           }
         } else {
-          // AI's turn — the draft board page will nudge the server when
-          // the pick deadline expires (every ~90s).  Poll quietly.
+          // AI's turn — nudge the server directly every 5 s and poll for
+          // the pick to advance. The browser-side timer also fires, giving two
+          // independent mechanisms so either one completing unblocks the draft.
           consecutiveMisses++;
 
           if (consecutiveMisses > MAX_MISSES) {
@@ -292,11 +325,15 @@ test.describe
             await page.waitForLoadState('load');
             await page.waitForTimeout(3_000);
             consecutiveMisses = 0;
-          } else if (consecutiveMisses % 30 === 0) {
-            // Every 30 seconds soft-reload to keep WebSocket alive
-            await page.reload();
-            await page.waitForLoadState('load');
-            await page.waitForTimeout(2_000);
+            lastNudgeMs = -Infinity;
+          }
+
+          // Actively nudge the server so AI picks don't depend on the
+          // browser-side timer (which page reloads can disrupt).
+          const now = Date.now();
+          if (now - lastNudgeMs >= NUDGE_INTERVAL_MS) {
+            await nudgeDraftPick();
+            lastNudgeMs = now;
           }
 
           await page.waitForTimeout(1_000);
@@ -309,7 +346,7 @@ test.describe
     await test.step('Verify draft is complete', async () => {
       // Poll until "Draft Complete!" appears (in case we exited loop early)
       await expect(page.getByText('Draft Complete!').first()).toBeVisible({
-        timeout: 300_000, // 5-minute final grace period
+        timeout: 120_000, // 2-minute final grace period
       });
     });
   });

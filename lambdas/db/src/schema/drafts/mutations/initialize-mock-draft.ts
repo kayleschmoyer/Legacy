@@ -74,7 +74,7 @@ builder.mutationField('initializeMockDraft', (t) =>
       }),
       pickTimeLimitSeconds: t.arg.int({
         required: false,
-        description: 'Seconds per pick (default: 120)',
+        description: 'Seconds per pick (default: 30 for mock drafts)',
       }),
     },
     resolve: async (_parent, args, context) => {
@@ -91,7 +91,9 @@ builder.mutationField('initializeMockDraft', (t) =>
         pickTimeLimitSeconds: rawTimeLimit,
       } = args;
       const userId = context.user.id;
-      const pickTimeLimit = rawTimeLimit ?? 120;
+      // Mock drafts use a shorter default timer (30 s) so practice sessions
+      // complete quickly.  The caller can override via pickTimeLimitSeconds.
+      const pickTimeLimit = rawTimeLimit ?? 30;
 
       // Validate inputs
       if (numTeams < 2 || numTeams > 12) {

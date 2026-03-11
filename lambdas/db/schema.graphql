@@ -1373,7 +1373,7 @@ type Mutation {
     numTeams: Int!
 
     """
-    Seconds per pick (default: 120)
+    Seconds per pick (default: 30 for mock drafts)
     """
     pickTimeLimitSeconds: Int
 
