@@ -5,6 +5,7 @@ import {
   and,
   eq,
   exists,
+  inArray,
   isNotNull,
   isNull,
   notInArray,
@@ -376,17 +377,23 @@ export async function selectGamesForMatchupPlayer(
 }
 
 /**
- * Determine a player's pitcher role from their roster position in the league.
- * Looks up team_members → league_positions to find if the player is slotted as SP or RP.
+ * Batch-load pitcher roles for multiple players in one query.
+ * Issues a single IN-clause JOIN instead of one query per pitcher, reducing N separate
+ * round-trips to a single query for all pitchers in the matchup.
+ * Returns a Map<playerId, PitcherRole>; players not found default to 'non-pitcher'.
  */
-async function getPlayerPitcherRole(
+async function batchGetPlayerPitcherRoles(
   db: PublicDb,
-  playerId: number,
-  teamId: number,
+  playerIds: number[],
   leagueId: number,
-): Promise<PitcherRole> {
-  const result = await db
+): Promise<Map<number, PitcherRole>> {
+  if (playerIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await db
     .select({
+      playerId: PublicSchema.teamMembers.playerId,
       positionType: PublicSchema.leaguePosition.positionType,
     })
     .from(PublicSchema.teamMembers)
@@ -396,21 +403,20 @@ async function getPlayerPitcherRole(
     )
     .where(
       and(
-        eq(PublicSchema.teamMembers.playerId, playerId),
-        eq(PublicSchema.teamMembers.teamId, teamId),
+        inArray(PublicSchema.teamMembers.playerId, playerIds),
         eq(PublicSchema.teamMembers.leagueId, leagueId),
       ),
-    )
-    .limit(1);
+    );
 
-  if (result.length === 0) {
-    return 'non-pitcher';
+  const roleMap = new Map<number, PitcherRole>();
+  for (const row of rows) {
+    const posType = row.positionType;
+    let role: PitcherRole = 'non-pitcher';
+    if (posType === 'SP') role = 'SP';
+    else if (posType === 'RP') role = 'RP';
+    roleMap.set(row.playerId, role);
   }
-
-  const positionType = result[0].positionType;
-  if (positionType === 'SP') return 'SP';
-  if (positionType === 'RP') return 'RP';
-  return 'non-pitcher';
+  return roleMap;
 }
 
 /**
@@ -526,6 +532,14 @@ export async function selectGamesForMatchup(
     playerSeasons.map((ps) => [ps.playerId, ps.season]),
   );
 
+  // Batch-load pitcher roles for all matchup players in one query instead of N per-pitcher queries
+  const allPlayerIds = matchupPlayers.map((mp) => mp.playerId);
+  const pitcherRoleMap = await batchGetPlayerPitcherRoles(
+    db,
+    allPlayerIds,
+    matchup.leagueId,
+  );
+
   const playersNeedingStatsLoading: Array<{
     matchupPlayerId: number;
     playerId: number;
@@ -566,13 +580,9 @@ export async function selectGamesForMatchup(
       continue;
     }
 
-    // Determine the player's pitcher role from their roster position
-    const pitcherRole = await getPlayerPitcherRole(
-      db,
-      matchupPlayer.playerId,
-      matchupPlayer.teamId,
-      matchup.leagueId,
-    );
+    // Determine the player's pitcher role from the pre-loaded map (batched query above)
+    const pitcherRole =
+      pitcherRoleMap.get(matchupPlayer.playerId) ?? 'non-pitcher';
 
     // For SPs: apply probabilistic start selection
     if (pitcherRole === 'SP') {
