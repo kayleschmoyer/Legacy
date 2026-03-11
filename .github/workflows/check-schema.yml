@@ -1,21 +1,17 @@
 name: "GraphQL Schema Check"
 
 # =============================================================================
-# Two independent jobs run on every PR:
+# Single job that runs on every PR when GraphQL files change:
 #
-#   check-schema  — verifies that the committed `lambdas/db/schema.graphql` SDL
-#                   is in sync with the Pothos implementation. Fails + posts a
-#                   PR comment with the diff if they differ.
-#
-#   check-codegen — generates schema.graphql from the implementation, then runs
-#                   every project's `codegen` target against that file.  Fails
-#                   if any codegen target exits non-zero, meaning a .graphql
-#                   operation is incompatible with the current schema.
+#   1. Generates schema.graphql from the Pothos implementation (once).
+#   2. Verifies the committed SDL matches (drift check). Fails + posts a
+#      PR comment with the diff if they differ.
+#   3. Runs every project's codegen target against the generated schema.
+#      Fails if any codegen target exits non-zero.
 #
 # Fix locally:
 #   pnpm exec nx run db:print-schema          # regen schema.graphql
-#   pnpm exec nx run-many -t codegen \
-#     --projects=app,web,cli,api,shared-components,data-loaders,bref-client
+#   pnpm run codegen                          # regen all codegen outputs
 # =============================================================================
 
 on:
@@ -50,12 +46,12 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # JOB 1 — schema drift check
+  # Schema drift check + codegen compatibility (single runner, one print-schema)
   # ---------------------------------------------------------------------------
-  check-schema:
-    name: "GraphQL Schema Up-to-Date"
+  check-schema-and-codegen:
+    name: "GraphQL Schema & Codegen"
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
 
     steps:
@@ -72,6 +68,8 @@ jobs:
 
       - name: "Generate schema.graphql from implementation"
         run: pnpm exec nx run db:print-schema
+
+      # --- Schema drift check ---
 
       - name: "Check for schema drift"
         id: drift-check
@@ -131,31 +129,9 @@ jobs:
         if: steps.drift-check.outputs.drift == 'true'
         run: exit 1
 
-  # ---------------------------------------------------------------------------
-  # JOB 2 — codegen compatibility check (independent of job 1)
-  # Regenerates schema.graphql from the implementation, then runs every
-  # project's codegen target against that file without a live server.
-  # ---------------------------------------------------------------------------
-  check-codegen:
-    name: "GraphQL Codegen Succeeds"
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
-
-    steps:
-      - name: "Checkout Repository"
-        uses: actions/checkout@v6
-
-      - name: "Setup Workspace"
-        uses: ./.github/actions/setup
-        with:
-          node-version: 22
-          install-dependencies: true
-          set-nx-shas: false
-          include-optional-deps: false
-
-      - name: "Generate schema.graphql from implementation"
-        run: pnpm exec nx run db:print-schema
+      # --- Codegen compatibility check ---
+      # Reuses the schema.graphql already generated above instead of running
+      # print-schema a second time.
 
       - name: "Run all codegen targets against generated schema"
         shell: bash
