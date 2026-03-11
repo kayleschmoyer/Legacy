@@ -393,8 +393,9 @@ export function PublicLandingPage(): React.JSX.Element {
                 lineHeight="$7"
                 $sm={{ fontSize: '$4' }}
               >
-                The most immersive fantasy sports platform with live player
-                stats, powerful draft tools, and real-time league management.
+                The only fantasy baseball platform powered by real MLB history —
+                draft legends across every era and compete on archived
+                statistics.
               </Text>
             </YStack>
 

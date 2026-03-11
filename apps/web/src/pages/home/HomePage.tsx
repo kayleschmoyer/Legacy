@@ -655,8 +655,9 @@ export function HomePage(): React.JSX.Element {
               animation="medium"
               enterStyle={{ opacity: 0, y: 15 }}
             >
-              Create or join your first league to start drafting players,
-              tracking live stats, and competing with friends.
+              Create or join your first league. Draft legends from across MLB
+              history, compete on real archived statistics, and build your
+              all-time dynasty.
             </Paragraph>
 
             <XStack
