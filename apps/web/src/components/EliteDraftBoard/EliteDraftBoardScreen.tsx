@@ -2764,7 +2764,14 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               flexDirection: 'column',
             }}
           >
-            <LeagueChatTab leagueId={leagueId} userId={userId} />
+            <LeagueChatTab
+              leagueId={leagueId}
+              userId={userId}
+              mentionableTeams={leagueTeams.map((t) => ({
+                id: parseInt(t.id, 10),
+                name: t.name,
+              }))}
+            />
           </div>
         </div>
       )}

@@ -1847,6 +1847,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                   <LeagueChatTab
                     leagueId={leagueId}
                     userId={user?.id ?? 0}
+                    mentionableTeams={leagueTeams}
                     onNavigate={(tabId) => setActiveTab(tabId as TabId)}
                   />
                 </YStack>
