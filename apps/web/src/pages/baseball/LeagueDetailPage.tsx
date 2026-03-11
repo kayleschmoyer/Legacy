@@ -1479,11 +1479,13 @@ export function LeagueDetailPage(): React.JSX.Element {
   const draftColors = getDraftBadgeColors(String(league?.draftStatus));
 
   // ── Loading / Error States ──
-  // Only show the full-page spinner on the initial load (no cached data yet).
-  // Background refetches triggered by WebSocket events keep existing content
-  // visible and show a subtle "Updating..." indicator instead.
-  const initialLoading =
-    (loading && !data) || positionsLoading || teamMembersLoading;
+  // Only show the full-page spinner until the core league data is available.
+  // positionsLoading and teamMembersLoading are intentionally excluded here —
+  // those datasets are only needed by the roster tab, which shows its own inline
+  // loading state (LeagueRosterManagement `loading` prop). Including them here
+  // caused the entire page to block for users on Overview, Standings, Matchup,
+  // etc. while roster-specific data finished fetching. (LS-1065)
+  const initialLoading = loading && !data;
 
   if (initialLoading) {
     return (
