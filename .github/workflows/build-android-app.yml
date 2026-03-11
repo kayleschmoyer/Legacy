@@ -36,9 +36,9 @@ permissions:
   actions: read
   contents: write # Required for creating GitHub releases
 
-# Cancel in-progress builds for the same workflow
+# Cancel in-progress builds for the same branch/workflow combination
 concurrency:
-  group: ${{ github.workflow }}-android-${{ github.event.inputs.build_type || 'release' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.build_type || 'release' }}
   cancel-in-progress: true
 
 env:
