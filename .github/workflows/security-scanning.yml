@@ -24,6 +24,7 @@ env:
   SECURITY_SCAN_TIMEOUT: 15
   DEPENDENCY_SCAN_TIMEOUT: 10
   SAST_SCAN_TIMEOUT: 20
+  NODE_OPTIONS: "--max_old_space_size=4096"
 
 jobs:
   security-scan-plan:
@@ -147,7 +148,7 @@ jobs:
 
       - name: "🔍 OSV Dependency Scan"
         id: npm-audit
-        uses: google/osv-scanner-action/osv-scanner-action@v2
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.3
         continue-on-error: true
         with:
           scan-args: |-
