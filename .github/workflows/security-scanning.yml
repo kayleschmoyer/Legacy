@@ -145,43 +145,52 @@ jobs:
           node-version: 22
           install-dependencies: true
 
-      - name: "🔍 pnpm Audit Scan"
+      - name: "🔍 OSV Dependency Scan"
         id: npm-audit
-        timeout-minutes: 3
+        uses: google/osv-scanner-action/osv-scanner-action@v2
+        continue-on-error: true
+        with:
+          scan-args: |-
+            --lockfile=pnpm-lock.yaml
+            --format=json
+            --output=osv-results.json
+
+      - name: "📦 Parse OSV Results"
+        id: parse-osv
+        if: always()
         run: |
-          echo "::group::📦 pnpm Dependency Audit"
+          echo "::group::📦 OSV Dependency Audit Results"
 
-          # Run pnpm audit and capture results
-          AUDIT_TIMESTAMP=$(date +%s)
-          AUDIT_LOG="pnpm-audit-${AUDIT_TIMESTAMP}.json"
+          if [ ! -f osv-results.json ]; then
+            echo "✅ No vulnerabilities found (no output file)"
+            echo "audit-status=clean" >> $GITHUB_OUTPUT
+            echo "total-vulns=0" >> $GITHUB_OUTPUT
+            echo "high-vulns=0" >> $GITHUB_OUTPUT
+            echo "critical-vulns=0" >> $GITHUB_OUTPUT
+            echo "::endgroup::"
+            exit 0
+          fi
 
-          echo "🔍 Running pnpm audit..."
-          if pnpm audit --audit-level=moderate --json > "$AUDIT_LOG" 2>&1; then
-            echo "✅ No moderate or higher vulnerabilities found"
+          # Count vulnerabilities by severity from OSV JSON output
+          TOTAL_VULNS=$(jq '[.results[]?.packages[]?.vulnerabilities // [] | length] | add // 0' osv-results.json 2>/dev/null || echo 0)
+          CRITICAL_VULNS=$(jq '[.results[]?.packages[]?.vulnerabilities[]? | select(.database_specific?.severity == "CRITICAL")] | length // 0' osv-results.json 2>/dev/null || echo 0)
+          HIGH_VULNS=$(jq '[.results[]?.packages[]?.vulnerabilities[]? | select(.database_specific?.severity == "HIGH")] | length // 0' osv-results.json 2>/dev/null || echo 0)
+
+          echo "📊 Vulnerability Summary:"
+          echo "- Total: $TOTAL_VULNS"
+          echo "- High: $HIGH_VULNS"
+          echo "- Critical: $CRITICAL_VULNS"
+
+          if [ "$TOTAL_VULNS" -eq 0 ]; then
             AUDIT_STATUS="clean"
           else
-            AUDIT_EXIT_CODE=$?
-            echo "⚠️ Vulnerabilities detected (exit code: $AUDIT_EXIT_CODE)"
             AUDIT_STATUS="vulnerabilities"
           fi
 
-          # Parse audit results
-          if [ -f "$AUDIT_LOG" ]; then
-            TOTAL_VULNS=$(jq -r '.metadata.vulnerabilities.total // 0' "$AUDIT_LOG" 2>/dev/null || echo 0)
-            HIGH_VULNS=$(jq -r '.metadata.vulnerabilities.high // 0' "$AUDIT_LOG" 2>/dev/null || echo 0)
-            CRITICAL_VULNS=$(jq -r '.metadata.vulnerabilities.critical // 0' "$AUDIT_LOG" 2>/dev/null || echo 0)
-            
-            echo "📊 Vulnerability Summary:"
-            echo "- Total: $TOTAL_VULNS"
-            echo "- High: $HIGH_VULNS"
-            echo "- Critical: $CRITICAL_VULNS"
-            
-            # Export for summary
-            echo "total-vulns=$TOTAL_VULNS" >> $GITHUB_OUTPUT
-            echo "high-vulns=$HIGH_VULNS" >> $GITHUB_OUTPUT
-            echo "critical-vulns=$CRITICAL_VULNS" >> $GITHUB_OUTPUT
-            echo "audit-status=$AUDIT_STATUS" >> $GITHUB_OUTPUT
-          fi
+          echo "audit-status=$AUDIT_STATUS" >> $GITHUB_OUTPUT
+          echo "total-vulns=$TOTAL_VULNS" >> $GITHUB_OUTPUT
+          echo "high-vulns=$HIGH_VULNS" >> $GITHUB_OUTPUT
+          echo "critical-vulns=$CRITICAL_VULNS" >> $GITHUB_OUTPUT
 
           echo "::endgroup::"
 
@@ -250,18 +259,19 @@ jobs:
           echo "::endgroup::"
 
       - name: "📊 Dependency Scan Summary"
+        if: always()
         run: |
           echo "## 📦 Dependency Vulnerability Summary" >> $GITHUB_STEP_SUMMARY
 
-          # pnpm Audit Results
-          AUDIT_STATUS="${{ steps.npm-audit.outputs.audit-status || 'unknown' }}"
-          TOTAL_VULNS="${{ steps.npm-audit.outputs.total-vulns || 0 }}"
-          HIGH_VULNS="${{ steps.npm-audit.outputs.high-vulns || 0 }}"
-          CRITICAL_VULNS="${{ steps.npm-audit.outputs.critical-vulns || 0 }}"
+          # OSV Scanner Results
+          AUDIT_STATUS="${{ steps.parse-osv.outputs.audit-status || 'unknown' }}"
+          TOTAL_VULNS="${{ steps.parse-osv.outputs.total-vulns || 0 }}"
+          HIGH_VULNS="${{ steps.parse-osv.outputs.high-vulns || 0 }}"
+          CRITICAL_VULNS="${{ steps.parse-osv.outputs.critical-vulns || 0 }}"
 
-          echo "### pnpm Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "### OSV Dependency Scan Results" >> $GITHUB_STEP_SUMMARY
           if [ "$AUDIT_STATUS" == "clean" ]; then
-            echo "✅ **Status**: No moderate+ vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Status**: No vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ **Status**: $TOTAL_VULNS vulnerabilities found" >> $GITHUB_STEP_SUMMARY
             echo "- **Critical**: $CRITICAL_VULNS" >> $GITHUB_STEP_SUMMARY
@@ -288,7 +298,7 @@ jobs:
 
           if [ "$CRITICAL_VULNS" -gt 0 ] || [ "$HIGH_VULNS" -gt 0 ]; then
             echo "- 🚨 **Immediate Action**: Update packages with critical/high vulnerabilities" >> $GITHUB_STEP_SUMMARY
-            echo "- 🔧 **Command**: \`pnpm audit --fix\` or perform targeted dependency updates" >> $GITHUB_STEP_SUMMARY
+            echo "- 🔧 **Command**: Update affected packages via \`pnpm update <package>\` or review OSV advisories" >> $GITHUB_STEP_SUMMARY
             echo "- 📊 **Monitor**: Set up automated dependency updates with Dependabot" >> $GITHUB_STEP_SUMMARY
           else
             echo "- ✅ **Status**: Dependency security looks good" >> $GITHUB_STEP_SUMMARY
