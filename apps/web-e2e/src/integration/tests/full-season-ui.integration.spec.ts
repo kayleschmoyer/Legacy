@@ -266,16 +266,14 @@ test.describe
 
     await test.step('Switch draft mode to Automated', async () => {
       // Open "Draft Settings" accordion
-      const draftSettingsBtn = page.getByRole('button', {
-        name: /Draft Settings/i,
-      });
+      const draftSettingsBtn = page.getByTestId(
+        'commissioner-section-toggle-draft-settings',
+      );
       await expect(draftSettingsBtn).toBeVisible({ timeout: 10000 });
       await draftSettingsBtn.click();
 
       // Select "Automated Draft" (auto-forces Random selection method)
-      const automatedBtn = page.getByRole('button', {
-        name: /Automated Draft/i,
-      });
+      const automatedBtn = page.getByTestId('option-automated');
       await expect(automatedBtn).toBeVisible({ timeout: 5000 });
       await automatedBtn.click();
 

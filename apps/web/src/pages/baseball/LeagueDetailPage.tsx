@@ -3119,6 +3119,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           return (
             <YStack key={id}>
               <CommissionerSectionHeader
+                data-testid={`commissioner-section-toggle-${id}`}
                 onPress={() => toggleCommissionerSection(id)}
                 role="button"
                 aria-expanded={open}

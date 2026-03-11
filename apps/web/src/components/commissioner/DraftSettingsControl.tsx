@@ -77,6 +77,7 @@ function OptionSelector({
           return (
             <Button
               key={option.value}
+              data-testid={`option-${option.value}`}
               size="$3"
               theme={isSelected ? 'active' : 'alt2'}
               backgroundColor={
