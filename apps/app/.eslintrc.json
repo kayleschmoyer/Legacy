@@ -11,7 +11,9 @@
   "overrides": [
     {
       "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
-      "rules": {}
+      "rules": {
+        "jsx-a11y/accessible-emoji": "off"
+      }
     },
     {
       "files": ["*.ts", "*.tsx"],
