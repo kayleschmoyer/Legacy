@@ -101,18 +101,30 @@ export const drafts = sqliteTable('drafts', {
   draftCompletedAt: text('draft_completed_at'), // Timestamp as ISO string
 });
 
-export const draftTeams = sqliteTable('draft_teams', {
-  draftId: integer('draft_id')
-    .notNull()
-    .references(() => drafts.id, { onDelete: 'cascade' }),
-  teamId: integer('team_id')
-    .notNull()
-    .references(() => teams.id),
-  leagueId: integer('league_id')
-    .notNull()
-    .references(() => leagues.id),
-  draftOrder: integer('draft_order').notNull().unique(),
-});
+export const draftTeams = sqliteTable(
+  'draft_teams',
+  {
+    draftId: integer('draft_id')
+      .notNull()
+      .references(() => drafts.id, { onDelete: 'cascade' }),
+    teamId: integer('team_id')
+      .notNull()
+      .references(() => teams.id),
+    leagueId: integer('league_id')
+      .notNull()
+      .references(() => leagues.id),
+    draftOrder: integer('draft_order').notNull(),
+    autoPick: integer('auto_pick', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+  },
+  (table) => ({
+    draftTeamsUkOrder: unique('draft_teams_uk_order').on(
+      table.draftId,
+      table.draftOrder,
+    ),
+  }),
+);
 
 export const draftPicks = sqliteTable(
   'draft_picks',

@@ -1,4 +1,4 @@
-﻿import { eq } from 'drizzle-orm';
+﻿import { asc, eq } from 'drizzle-orm';
 import type { Database } from 'better-sqlite3';
 import {
   cleanupTestData,
@@ -582,6 +582,235 @@ describe('Drafts Resolver - Integration Tests', () => {
       expect(blindDrafts).toHaveLength(1);
       expect(normalDrafts).toHaveLength(1);
       expect(legacyDrafts).toHaveLength(1);
+    });
+  });
+
+  describe('Draft Order Reordering (LS-1094)', () => {
+    it('should reorder draft_teams via delete-and-reinsert without violating unique constraint', async () => {
+      const user = getUser(1);
+      const league = getLeague(0);
+      const team1 = getTeam(0);
+      const team2 = getTeam(1);
+      const team3 = getTeam(2);
+
+      await db.insert(users).values({
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        accessLevel: user.accessLevel,
+      });
+
+      await db.insert(leagues).values({
+        id: league.id,
+        name: league.name,
+        owner: user.id,
+        inviteCode: league.inviteCode,
+      });
+
+      await db.insert(teams).values([
+        { id: team1.id, name: team1.name, leagueId: league.id },
+        { id: team2.id, name: team2.name, leagueId: league.id },
+        { id: team3.id, name: team3.name, leagueId: league.id },
+      ]);
+
+      const [draft] = await db
+        .insert(drafts)
+        .values({
+          leagueId: league.id,
+          draftMode: 'live',
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
+        })
+        .returning();
+
+      // Insert initial order: team1=1, team2=2, team3=3
+      await db.insert(draftTeams).values([
+        {
+          draftId: draft.id,
+          teamId: team1.id,
+          leagueId: league.id,
+          draftOrder: 1,
+        },
+        {
+          draftId: draft.id,
+          teamId: team2.id,
+          leagueId: league.id,
+          draftOrder: 2,
+        },
+        {
+          draftId: draft.id,
+          teamId: team3.id,
+          leagueId: league.id,
+          draftOrder: 3,
+        },
+      ]);
+
+      // Reorder: reverse to team3=1, team2=2, team1=3
+      // Uses the delete-and-reinsert pattern (the fix for LS-1094)
+      await db.delete(draftTeams).where(eq(draftTeams.draftId, draft.id));
+      await db.insert(draftTeams).values([
+        {
+          draftId: draft.id,
+          teamId: team3.id,
+          leagueId: league.id,
+          draftOrder: 1,
+        },
+        {
+          draftId: draft.id,
+          teamId: team2.id,
+          leagueId: league.id,
+          draftOrder: 2,
+        },
+        {
+          draftId: draft.id,
+          teamId: team1.id,
+          leagueId: league.id,
+          draftOrder: 3,
+        },
+      ]);
+
+      const result = await db
+        .select()
+        .from(draftTeams)
+        .where(eq(draftTeams.draftId, draft.id))
+        .orderBy(asc(draftTeams.draftOrder));
+
+      expect(result).toHaveLength(3);
+      expect(result[0].teamId).toBe(team3.id);
+      expect(result[0].draftOrder).toBe(1);
+      expect(result[1].teamId).toBe(team2.id);
+      expect(result[1].draftOrder).toBe(2);
+      expect(result[2].teamId).toBe(team1.id);
+      expect(result[2].draftOrder).toBe(3);
+    });
+
+    it('should allow same draft_order across different drafts', async () => {
+      const user = getUser(1);
+      const league = getLeague(0);
+      const team1 = getTeam(0);
+      const team2 = getTeam(1);
+
+      await db.insert(users).values({
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        accessLevel: user.accessLevel,
+      });
+
+      await db.insert(leagues).values({
+        id: league.id,
+        name: league.name,
+        owner: user.id,
+        inviteCode: league.inviteCode,
+      });
+
+      await db.insert(teams).values([
+        { id: team1.id, name: team1.name, leagueId: league.id },
+        { id: team2.id, name: team2.name, leagueId: league.id },
+      ]);
+
+      const [draft1] = await db
+        .insert(drafts)
+        .values({
+          leagueId: league.id,
+          draftMode: 'live',
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
+        })
+        .returning();
+
+      const [draft2] = await db
+        .insert(drafts)
+        .values({
+          leagueId: league.id,
+          draftMode: 'live',
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
+        })
+        .returning();
+
+      // Both drafts can have draftOrder=1 — unique constraint is per-draft
+      await db.insert(draftTeams).values([
+        {
+          draftId: draft1.id,
+          teamId: team1.id,
+          leagueId: league.id,
+          draftOrder: 1,
+        },
+        {
+          draftId: draft2.id,
+          teamId: team2.id,
+          leagueId: league.id,
+          draftOrder: 1,
+        },
+      ]);
+
+      const d1Teams = await db
+        .select()
+        .from(draftTeams)
+        .where(eq(draftTeams.draftId, draft1.id));
+      const d2Teams = await db
+        .select()
+        .from(draftTeams)
+        .where(eq(draftTeams.draftId, draft2.id));
+
+      expect(d1Teams).toHaveLength(1);
+      expect(d2Teams).toHaveLength(1);
+      expect(d1Teams[0].draftOrder).toBe(1);
+      expect(d2Teams[0].draftOrder).toBe(1);
+    });
+
+    it('should reject duplicate draft_order within the same draft', async () => {
+      const user = getUser(1);
+      const league = getLeague(0);
+      const team1 = getTeam(0);
+      const team2 = getTeam(1);
+
+      await db.insert(users).values({
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        accessLevel: user.accessLevel,
+      });
+
+      await db.insert(leagues).values({
+        id: league.id,
+        name: league.name,
+        owner: user.id,
+        inviteCode: league.inviteCode,
+      });
+
+      await db.insert(teams).values([
+        { id: team1.id, name: team1.name, leagueId: league.id },
+        { id: team2.id, name: team2.name, leagueId: league.id },
+      ]);
+
+      const [draft] = await db
+        .insert(drafts)
+        .values({
+          leagueId: league.id,
+          draftMode: 'live',
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
+        })
+        .returning();
+
+      await db.insert(draftTeams).values({
+        draftId: draft.id,
+        teamId: team1.id,
+        leagueId: league.id,
+        draftOrder: 1,
+      });
+
+      // Inserting a second team with the same draftOrder in the same draft should fail
+      await expect(
+        db.insert(draftTeams).values({
+          draftId: draft.id,
+          teamId: team2.id,
+          leagueId: league.id,
+          draftOrder: 1,
+        }),
+      ).rejects.toThrow(/(UNIQUE constraint|duplicate key value)/i);
     });
   });
 });
