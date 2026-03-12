@@ -34,13 +34,12 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { env } from '../../config/environment';
-
-/* ─── Constants ─── */
-
-const MONTHLY_PRICE_DISPLAY = '$4.99';
-const ANNUAL_PRICE_DISPLAY = '$39.99';
-const ANNUAL_MONTHLY_EQUIVALENT = '$3.33';
-const ANNUAL_SAVINGS_PCT = '33%';
+import {
+  ANNUAL_MONTHLY_EQUIVALENT,
+  ANNUAL_PRICE_DISPLAY,
+  ANNUAL_SAVINGS_PCT,
+  MONTHLY_PRICE_DISPLAY,
+} from '../../constants/pricing';
 
 const PREMIUM_FEATURES: { label: string; free: boolean; premium: boolean }[] = [
   { label: 'Join up to 3 leagues', free: true, premium: true },

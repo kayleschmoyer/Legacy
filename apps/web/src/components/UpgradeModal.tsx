@@ -11,6 +11,11 @@ import {
   TEXT_PRIMARY,
   withAlpha,
 } from '../constants/colors';
+import {
+  ANNUAL_PRICE_DISPLAY,
+  ANNUAL_SAVINGS_PCT,
+  MONTHLY_PRICE_DISPLAY,
+} from '../constants/pricing';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -91,14 +96,14 @@ export function UpgradeModal({
         <YStack alignItems="center" gap="$1">
           <XStack alignItems="baseline" gap="$1">
             <Text color={TEXT_PRIMARY} fontSize="$9" fontWeight="bold">
-              $4.99
+              {MONTHLY_PRICE_DISPLAY}
             </Text>
             <Text color={TEXT_MUTED} fontSize="$3">
               / month
             </Text>
           </XStack>
           <Text color={TEXT_MUTED} fontSize="$2">
-            or $39.99 / year — save 33%
+            or {ANNUAL_PRICE_DISPLAY} / year — save {ANNUAL_SAVINGS_PCT}
           </Text>
         </YStack>
 

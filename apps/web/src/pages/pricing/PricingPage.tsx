@@ -28,6 +28,11 @@ import {
   BRAND_SEAM_RED,
   withAlpha,
 } from '../../constants/colors';
+import {
+  ANNUAL_SAVINGS_PCT,
+  ANNUAL_TOTAL,
+  MONTHLY_PRICE,
+} from '../../constants/pricing';
 
 /* ─── Styled Components ─── */
 
@@ -403,9 +408,10 @@ export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const monthlyPrice = 9.99;
-  const annualMonthlyPrice = 6.99;
-  const annualTotal = (annualMonthlyPrice * 12).toFixed(2);
+  const monthlyPrice = MONTHLY_PRICE;
+  const annualTotal = ANNUAL_TOTAL.toFixed(2);
+  // Derive per-month cost from annualTotal so display always matches the billed amount.
+  const annualMonthlyPrice = ANNUAL_TOTAL / 12;
 
   const pageBackground: React.CSSProperties = {
     background: `
@@ -498,7 +504,7 @@ export default function PricingPage() {
                     fontWeight="700"
                     color={BRAND_SEAM_RED}
                   >
-                    Save 30%
+                    Save {ANNUAL_SAVINGS_PCT}
                   </Paragraph>
                 </DiscountBadge>
               </ToggleOption>
@@ -607,11 +613,13 @@ export default function PricingPage() {
 
                 {isAnnual ? (
                   <Paragraph size="$2" color="$gray11" marginBottom={0}>
-                    Billed annually (${annualTotal}/yr) — save 30% vs monthly
+                    Billed annually (${annualTotal}/yr) — save{' '}
+                    {ANNUAL_SAVINGS_PCT} vs monthly
                   </Paragraph>
                 ) : (
                   <Paragraph size="$2" color="$gray11" marginBottom={0}>
-                    Billed monthly. Switch to annual and save 30%.
+                    Billed monthly. Switch to annual and save{' '}
+                    {ANNUAL_SAVINGS_PCT}.
                   </Paragraph>
                 )}
               </PlanHeader>
