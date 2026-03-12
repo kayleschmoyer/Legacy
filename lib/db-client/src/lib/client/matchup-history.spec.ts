@@ -820,15 +820,15 @@ describe('Matchup History', () => {
 
   describe('getMatchupStatusCounts', () => {
     it('should count matchups by status correctly', async () => {
-      const mockMatchups = [
-        { id: 1, leagueId: 1, status: 'completed' },
-        { id: 2, leagueId: 1, status: 'completed' },
-        { id: 3, leagueId: 1, status: 'scheduled' },
-        { id: 4, leagueId: 1, status: 'in_progress' },
-        { id: 5, leagueId: 1, status: 'cancelled' },
+      // New SQL GROUP BY shape: one row per status with aggregate count
+      const mockRows = [
+        { status: 'completed', count: 2 },
+        { status: 'scheduled', count: 1 },
+        { status: 'in_progress', count: 1 },
+        { status: 'cancelled', count: 1 },
       ];
 
-      mockDb = createMockDbChain(mockMatchups) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockRows) as unknown as PublicDb;
 
       const counts = await getMatchupStatusCounts(mockDb, 1);
 

@@ -722,39 +722,43 @@ export async function getMatchupStatusCounts(
   db: PublicDb,
   leagueId: number,
 ): Promise<MatchupStatusCounts> {
-  const conditions = [eq(Schema.matchups.leagueId, leagueId)];
-
   // Note: Season filtering removed - matchups no longer have a selected_season field.
   // Seasons are now per-player (league_week_player_seasons table).
 
-  const matchups = await db
-    .select()
+  const rows = await db
+    .select({
+      status: Schema.matchups.status,
+      count: sql<number>`cast(count(*) as integer)`,
+    })
     .from(Schema.matchups)
-    .where(and(...conditions));
+    .where(eq(Schema.matchups.leagueId, leagueId))
+    .groupBy(Schema.matchups.status);
 
   const counts = {
     scheduled: 0,
     inProgress: 0,
     completed: 0,
     cancelled: 0,
-    total: matchups.length,
+    total: 0,
   };
 
-  for (const matchup of matchups) {
-    switch (matchup.status) {
+  for (const row of rows) {
+    const n = Number(row.count);
+    switch (row.status) {
       case 'scheduled':
-        counts.scheduled++;
+        counts.scheduled += n;
         break;
       case 'in_progress':
-        counts.inProgress++;
+        counts.inProgress += n;
         break;
       case 'completed':
-        counts.completed++;
+        counts.completed += n;
         break;
       case 'cancelled':
-        counts.cancelled++;
+        counts.cancelled += n;
         break;
     }
+    counts.total += n;
   }
 
   return counts;
