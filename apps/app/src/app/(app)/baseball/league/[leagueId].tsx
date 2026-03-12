@@ -147,7 +147,10 @@ export default function LeagueId(): React.JSX.Element {
       getLeagueTeams({
         variables: { leagueId: numLeagueId },
         onError: (error) => {
-          LOGGER.error('Error fetching league teams:', String(error));
+          LOGGER.error(
+            'Error fetching league teams',
+            error instanceof Error ? error : new Error(String(error)),
+          );
         },
       });
     }

@@ -560,11 +560,11 @@ builder.queryField('leagueTeams', (t) =>
 
         return teams;
       } catch (error) {
-        LOGGER.error('Error fetching league teams', {
-          leagueId,
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOGGER.error(
+          'Error fetching league teams',
+          error instanceof Error ? error : new Error(String(error)),
+          { leagueId, userId },
+        );
         throw new Error('Failed to fetch league teams');
       }
     },
