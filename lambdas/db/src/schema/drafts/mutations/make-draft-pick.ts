@@ -826,12 +826,11 @@ builder.mutationField('makeDraftPick', (t) =>
 
         return result.draftPick;
       } catch (error) {
-        LOGGER.error('Error making draft pick', {
-          draftId,
-          playerId,
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOGGER.error(
+          'Error making draft pick',
+          error instanceof Error ? error : new Error(String(error)),
+          { draftId, playerId, userId },
+        );
         throw error;
       }
     },

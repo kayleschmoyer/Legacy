@@ -1004,7 +1004,8 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 : String(draftError);
             LOGGER.error(
               `[autoProcessDraftPicks] Error processing draft ${draftId}`,
-              { draftId, leagueId: draftLeagueId, error: errMsg },
+              draftError instanceof Error ? draftError : new Error(errMsg),
+              { draftId, leagueId: draftLeagueId },
             );
             result.errors.push(`Draft ${draftId}: ${errMsg}`);
           }
@@ -1020,9 +1021,10 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
         return result;
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
-        LOGGER.error('[autoProcessDraftPicks] Fatal error', {
-          error: errMsg,
-        });
+        LOGGER.error(
+          '[autoProcessDraftPicks] Fatal error',
+          error instanceof Error ? error : new Error(errMsg),
+        );
         result.errors.push(errMsg);
         return result;
       }
