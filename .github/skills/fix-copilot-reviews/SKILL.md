@@ -50,6 +50,8 @@ $repoInfo = gh repo view --json owner,name | ConvertFrom-Json
 $owner = $repoInfo.owner.login
 $repo = $repoInfo.name
 
+$toFix = @()   # collect { pr, threads } objects for Step 2
+
 foreach ($pr in $reviewed) {
   # Use GraphQL to get review threads (same query the merge-queue uses)
   $query = @'
@@ -58,6 +60,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
     pullRequest(number: $number) {
       reviewThreads(first: 100) {
         nodes {
+          id
           isResolved
           isOutdated
           comments(first: 50) {
@@ -93,15 +96,21 @@ query($owner: String!, $repo: String!, $number: Int!) {
   } else {
     # --- HAS COMMENTS → collect them for fixing ---
     Write-Host "PR #$($pr.number) ($($pr.title)) — $($unresolved.Count) unresolved comment(s)"
-    # Store for Step 2
+    $toFix += @{ pr = $pr; threads = $unresolved }
   }
 }
 ```
 
 ### Step 2 — Fix Review Comments (per PR)
 
-For each PR that has unresolved comments, create a worktree (or use the
-existing one) and address every comment:
+For each entry in `$toFix`, create a worktree (or use the existing one)
+and address every comment:
+
+```powershell
+foreach ($entry in $toFix) {
+  $pr = $entry.pr
+  $unresolved = $entry.threads
+```
 
 1. **Check out the branch in a worktree**
 
@@ -147,7 +156,31 @@ existing one) and address every comment:
    git push origin HEAD
    ```
 
-5. **Move to the next PR** — repeat from Step 2 for the remaining PRs.
+5. **Resolve the review threads** — after pushing, resolve each thread
+   so the PR shows all feedback as addressed. Uses the `$entry.threads`
+   collected in Step 1 (each thread object has an `id` field).
+
+   ```powershell
+   # $entry.threads was collected in Step 1 — each object has an `id` field
+   foreach ($thread in $entry.threads) {
+     $mutation = @'
+   mutation($threadId: ID!) {
+     resolveReviewThread(input: { threadId: $threadId }) {
+       thread { isResolved }
+     }
+   }
+   '@
+     gh api graphql -f query="$mutation" -f threadId=$($thread.id) | Out-Null
+     Write-Host "  Resolved thread $($thread.id)"
+   }
+   ```
+
+6. **End of loop** — the `foreach ($entry in $toFix)` block repeats
+   steps 1–5 for every PR with unresolved comments.
+
+   ```powershell
+   }  # end foreach ($entry in $toFix)
+   ```
 
 ### Step 3 — Summary
 
