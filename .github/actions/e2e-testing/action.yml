@@ -153,7 +153,7 @@ runs:
         # build directory is missing (e.g. artifact download was skipped).
         if [ -d "${{ inputs.web-build-path }}" ]; then
           echo "📦 Serving pre-built web artifact with static file server..."
-          npx --yes serve@latest "${{ inputs.web-build-path }}" -l ${{ inputs.server-port }} --no-clipboard > "$SERVER_LOG" 2>&1 &
+          npx --yes serve@14.2.4 -s "${{ inputs.web-build-path }}" -l ${{ inputs.server-port }} --no-clipboard > "$SERVER_LOG" 2>&1 &
           SERVER_PID=$!
         else
           echo "⚠️ Pre-built artifact not found at ${{ inputs.web-build-path }}, falling back to nx serve..."
@@ -218,15 +218,17 @@ runs:
         # Run E2E tests with proper error handling
         echo "🎭 Executing E2E test suite..."
 
-        cd apps/web-e2e
         E2E_EXIT_CODE=0
 
         # Set JSON reporter output path via environment variable
         # Playwright doesn't support json:filepath inline syntax
-        export PLAYWRIGHT_JSON_OUTPUT_NAME="test-results/results.json"
+        export PLAYWRIGHT_JSON_OUTPUT_NAME="apps/web-e2e/test-results/results.json"
 
-        # Build Playwright command
-        PLAYWRIGHT_CMD="$PLAYWRIGHT_BIN test"
+        # Build Playwright command — explicitly pass the local config to avoid
+        # picking up the root playwright.config.ts via pnpm workspace resolution.
+        # Run from repo root with an explicit config path (pnpm exec may ignore
+        # shell cwd changes in workspaces).
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_BIN test --config=apps/web-e2e/playwright.config.ts"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --project=${{ inputs.browser }}"
         if [ -n "${{ inputs.test-patterns }}" ]; then
           PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep=\"${{ inputs.test-patterns }}\""
@@ -234,8 +236,7 @@ runs:
         if [ -n "${{ inputs.test-patterns-invert }}" ]; then
           PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep-invert=\"${{ inputs.test-patterns-invert }}\""
         fi
-        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --reporter=line,json,blob"
-        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output=test-results"
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --output=apps/web-e2e/test-results"
 
         if [ -n "${{ inputs.shard }}" ]; then
           PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --shard=${{ inputs.shard }}"
@@ -247,7 +248,7 @@ runs:
 
         # Run critical E2E tests with retry logic and proper reporting
         echo "🎯 Running command: $PLAYWRIGHT_CMD"
-        if eval "$PLAYWRIGHT_CMD" 2>&1 | tee "../${E2E_LOG}"; then
+        if eval "$PLAYWRIGHT_CMD" 2>&1 | tee "${E2E_LOG}"; then
           echo "✅ Critical E2E tests passed"
           E2E_EXIT_CODE=0
         else
@@ -261,7 +262,6 @@ runs:
         wait $SERVER_PID 2>/dev/null || true
 
         # Process results and generate summary
-        cd ..
 
         TOTAL_TESTS=0
         PASSED_TESTS=0

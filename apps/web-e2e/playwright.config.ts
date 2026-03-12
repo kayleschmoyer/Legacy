@@ -22,6 +22,7 @@ export default defineConfig({
   reporter: [
     ['json', { outputFile: 'test-results/results.json' }],
     ['line'], // Console output for real-time feedback
+    ...(process.env.CI ? [['blob'] as const] : []),
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
