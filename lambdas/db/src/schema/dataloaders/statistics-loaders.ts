@@ -87,23 +87,24 @@ export const createCareerYearRangeLoader = (
 ) =>
   new DataLoader<number, { minYear: number; maxYear: number } | null>(
     async (keys) => {
-      const idList = (keys as number[]).join(',');
-      const result = await db.execute(sql`
-        SELECT player_id, MIN(season)::int AS min_year, MAX(season)::int AS max_year
-        FROM public.season_batting
-        WHERE player_id IN (${sql.raw(idList)})
-          AND lg_id IN ('AL', 'NL')
-        GROUP BY player_id
-      `);
-      const rows = result.rows as {
-        player_id: number;
-        min_year: number;
-        max_year: number;
-      }[];
+      const rows = await db
+        .select({
+          playerId: PublicSchema.seasonBatting.playerId,
+          minYear: sql<number>`MIN(${PublicSchema.seasonBatting.season})::int`,
+          maxYear: sql<number>`MAX(${PublicSchema.seasonBatting.season})::int`,
+        })
+        .from(PublicSchema.seasonBatting)
+        .where(
+          and(
+            inArray(PublicSchema.seasonBatting.playerId, keys as number[]),
+            inArray(PublicSchema.seasonBatting.lgId, ['AL', 'NL']),
+          ),
+        )
+        .groupBy(PublicSchema.seasonBatting.playerId);
       const map = new Map(
         rows.map((r) => [
-          Number(r.player_id),
-          { minYear: Number(r.min_year), maxYear: Number(r.max_year) },
+          r.playerId,
+          { minYear: r.minYear, maxYear: r.maxYear },
         ]),
       );
       return (keys as number[]).map((key) => map.get(key) ?? null);
