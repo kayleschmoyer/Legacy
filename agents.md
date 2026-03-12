@@ -43,6 +43,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **Integration testing**         | `.github/skills/integration-testing/SKILL.md`                              |
 | Full workflow (start here)      | `.github/skills/workflow-ticket-to-pr/SKILL.md`                            |
 | **Install packages**            | `.github/skills/install-packages/SKILL.md`                                 |
+| **Fix Copilot reviews (batch)** | `.github/skills/fix-copilot-reviews/SKILL.md`                              |
 | Lint errors                     | `.github/skills/fix-lint/SKILL.md`                                         |
 | **Never edit generated**        | `.github/skills/no-edit-generated/SKILL.md`                                |
 | **Never edit schema.graphql**   | `.github/skills/no-edit-schema-graphql/SKILL.md`                           |     | **No lint disable** | `.github/skills/no-lint-disable/SKILL.md` |     | **New app** | `.github/skills/create-app/SKILL.md` |
