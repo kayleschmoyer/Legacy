@@ -19,19 +19,6 @@ import {
   parseCareerAchievementsFromHtml,
 } from './CareerAchievements';
 
-// Custom error type for detailed debugging information
-interface ErrorWithDetails extends Error {
-  details?: {
-    brefId: string;
-    season?: number;
-    gameNumber?: number;
-    url: string;
-    tableIds: (string | undefined)[];
-    htmlPreview: string;
-    htmlLength: number;
-  };
-}
-
 const GAME_IDENTIFIER_GROUP = 'gameIdentifier';
 const GAME_IDENTIFIER_REGEX = new RegExp(
   `^\\/boxes\\/\\w{3}\\/(?<${GAME_IDENTIFIER_GROUP}>\\w{12}).shtml$`,
@@ -442,24 +429,24 @@ export async function getGameBattingStats(
   const table = getTable(root, 'players_standard_batting');
 
   if (table === null) {
-    // Log details about what we got back to help debug
-    const allTables = root
+    // Some players (e.g. AL pitchers, traded mid-season) have no batting stats
+    // for a season. Returning null matches the per-game "not found" contract and
+    // aligns with getAllGameBattingStats returning [] for the same condition.
+    const availableTableIds = root
       .getElementsByTagName('table')
       .map((t) => t.getAttribute('id'));
-    const bodyPreview = data.substring(0, 500);
-    const error: ErrorWithDetails = new Error(
-      'Could not find Game Batting Stats table',
+    LOGGER.debug(
+      `No batting stats table found for player ${player.brefId} in ${season} - returning null`,
+      {
+        brefId: player.brefId,
+        season,
+        gameNumber,
+        url: `https://www.baseball-reference.com/players/gl.fcgi?id=${player.brefId}&t=b&year=${season}`,
+        availableTableIds,
+        htmlLength: data.length,
+      },
     );
-    error.details = {
-      brefId: player.brefId,
-      season,
-      gameNumber,
-      url: `https://www.baseball-reference.com/players/gl.fcgi?id=${player.brefId}&t=b&year=${season}`,
-      tableIds: allTables,
-      htmlPreview: bodyPreview,
-      htmlLength: data.length,
-    };
-    throw error;
+    return null;
   }
 
   const gameRow = table.getElementsByTagName('tr').find((row) => {
@@ -654,22 +641,12 @@ export async function getAllGameBattingStats(
   const table = getTable(root, 'players_standard_batting');
 
   if (table === null) {
-    const allTables = root
-      .getElementsByTagName('table')
-      .map((t) => t.getAttribute('id'));
-    const bodyPreview = data.substring(0, 500);
-    const error: ErrorWithDetails = new Error(
-      'Could not find Game Batting Stats table',
+    // Some players don't have batting stats for a season (e.g. AL pitchers,
+    // players traded mid-season). This mirrors the pitching/fielding handlers.
+    LOGGER.debug(
+      `No batting stats table found for player ${player.brefId} in ${season} - returning empty array`,
     );
-    error.details = {
-      brefId: player.brefId,
-      season,
-      url: `https://www.baseball-reference.com/players/gl.fcgi?id=${player.brefId}&t=b&year=${season}`,
-      tableIds: allTables,
-      htmlPreview: bodyPreview,
-      htmlLength: data.length,
-    };
-    throw error;
+    return [];
   }
 
   const allRows = table.getElementsByTagName('tr');
