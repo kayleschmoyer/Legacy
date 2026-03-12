@@ -982,13 +982,15 @@ export async function createAllMatchupsForLeague(
         assignedCount: lineupResult.assignedCount,
       });
     } catch (lineupError) {
-      // Non-fatal: users can manually adjust their lineup
-      LOGGER.error('Failed to auto-populate first matchup lineup', {
+      // Non-fatal: users can manually adjust their lineup.
+      // Pass the actual Error instance so Rollbar captures the real stack trace
+      // rather than a synthetic error created from just the log message.
+      const errorToLog =
+        lineupError instanceof Error
+          ? lineupError
+          : new Error(String(lineupError));
+      LOGGER.error('Failed to auto-populate first matchup lineup', errorToLog, {
         leagueId,
-        error:
-          lineupError instanceof Error
-            ? lineupError.message
-            : String(lineupError),
       });
     }
   }
