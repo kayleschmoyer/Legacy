@@ -28,8 +28,8 @@ inputs:
 
 outputs:
   cache-hit:
-    description: "Whether dependencies were restored from cache"
-    value: ${{ steps.cache-pnpm-store.outputs.cache-hit }}
+    description: "Whether dependencies were restored from cache (node_modules or pnpm store)"
+    value: ${{ steps.cache-node-modules.outputs.cache-hit == 'true' && 'true' || steps.cache-pnpm-store.outputs.cache-hit }}
 
 runs:
   using: "composite"
@@ -98,8 +98,19 @@ runs:
     # Note: npm support removed as this repository is pnpm-only
     # Legacy npm cache and install steps consolidated into pnpm-only workflow
 
-    - name: Install Dependencies with pnpm
+    - name: Cache node_modules
       if: inputs.install-dependencies == 'true'
+      id: cache-node-modules
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        # yamllint disable-line rule:line-length
+        key: ${{ runner.os }}-node${{ inputs.node-version }}-${{ runner.arch }}-nm-${{ hashFiles('pnpm-lock.yaml') }}${{ inputs.cache-key-suffix != '' && format('-{0}', inputs.cache-key-suffix) || '' }}
+        restore-keys: |
+          ${{ runner.os }}-node${{ inputs.node-version }}-${{ runner.arch }}-nm-
+
+    - name: Install Dependencies with pnpm
+      if: inputs.install-dependencies == 'true' && steps.cache-node-modules.outputs.cache-hit != 'true'
       shell: bash
       run: |
         echo "Node version: $(node --version)"
@@ -121,7 +132,7 @@ runs:
         echo "✅ pnpm installation complete"
 
     - name: Fix Tamagui Installation
-      if: inputs.install-dependencies == 'true'
+      if: inputs.install-dependencies == 'true' && steps.cache-node-modules.outputs.cache-hit != 'true'
       shell: bash
       run: |
         echo "🔧 Running Tamagui postinstall fix..."
@@ -139,7 +150,9 @@ runs:
       shell: bash
       run: |
         CACHE_SOURCE="fresh install"
-        if [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
+        if [[ "${{ steps.cache-node-modules.outputs.cache-hit }}" == "true" ]]; then
+          CACHE_SOURCE="node_modules cache"
+        elif [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
           CACHE_SOURCE="pnpm store cache"
         fi
 
@@ -179,11 +192,14 @@ runs:
           echo "🔧 Attempting to check package manager linking..."
           pnpm ls nx 2>/dev/null || echo "pnpm ls nx failed"
           
-          # If we had a cache hit but nx binary is missing, force reinstall
-          if [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
-            echo "🔄 pnpm store cache hit but nx binary missing - forcing pnpm reinstall..."
+          # Cache hit (node_modules or pnpm store) but nx binary missing — force reinstall
+          if [[ "${{ steps.cache-node-modules.outputs.cache-hit }}" == "true" ]] || [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
+            echo "🔄 Cache hit but nx binary missing - forcing pnpm reinstall..."
             rm -rf node_modules
             pnpm install "${PNPM_REINSTALL_FLAGS[@]}"
+            if [ -f "scripts/fix-tamagui-install.js" ]; then
+              node scripts/fix-tamagui-install.js
+            fi
           fi
         else
           # Test if the nx binary actually works
@@ -207,11 +223,14 @@ runs:
           if [ "$NX_TEST_PASSED" = "false" ]; then
             echo "⚠️ nx binary exists but not functional or timed out"
             
-            # If cache hit but nx is broken, force reinstall
-            if [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
-              echo "🔄 pnpm cache hit but nx broken - forcing pnpm reinstall..."
+            # Cache hit but nx is broken — force reinstall
+            if [[ "${{ steps.cache-node-modules.outputs.cache-hit }}" == "true" ]] || [[ "${{ steps.cache-pnpm-store.outputs.cache-hit }}" == "true" ]]; then
+              echo "🔄 Cache hit but nx broken - forcing pnpm reinstall..."
               rm -rf node_modules
               pnpm install "${PNPM_REINSTALL_FLAGS[@]}"
+              if [ -f "scripts/fix-tamagui-install.js" ]; then
+                node scripts/fix-tamagui-install.js
+              fi
             fi
           else
             echo "✅ nx binary is functional"
@@ -298,7 +317,16 @@ runs:
         echo "✅ Workspace setup complete"
         echo "   Node.js: $(node --version)"
         echo "   pnpm: $(pnpm --version)"
-        echo "   Dependencies: ${{ steps.cache-pnpm-store.outputs.cache-hit == 'true' && 'Restored from cache' || 'Installed fresh' }}"
+        NM_HIT="${{ steps.cache-node-modules.outputs.cache-hit }}"
+        STORE_HIT="${{ steps.cache-pnpm-store.outputs.cache-hit }}"
+        if [[ "$NM_HIT" == "true" ]]; then
+          DEP_SOURCE="Restored from node_modules cache"
+        elif [[ "$STORE_HIT" == "true" ]]; then
+          DEP_SOURCE="Restored from pnpm store cache"
+        else
+          DEP_SOURCE="Installed fresh"
+        fi
+        echo "   Dependencies: $DEP_SOURCE"
         echo "   Cache Key Suffix: ${{ inputs.cache-key-suffix != '' && inputs.cache-key-suffix || 'none' }}"
         echo "   System Dependencies: ${{ inputs.skip-system-deps == 'true' && 'Skipped' || 'Installed' }}"
         echo ""

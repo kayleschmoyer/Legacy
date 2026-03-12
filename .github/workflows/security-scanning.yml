@@ -144,7 +144,10 @@ jobs:
         uses: ./.github/actions/setup
         with:
           node-version: 22
-          install-dependencies: true
+          # OSV scanner only needs the lockfile (no node_modules).
+          # Snyk needs node_modules but only runs on non-PR events.
+          # Skip install on PRs to save ~1-2 minutes.
+          install-dependencies: ${{ github.event_name != 'pull_request' }}
 
       - name: "🔍 OSV Dependency Scan"
         id: npm-audit

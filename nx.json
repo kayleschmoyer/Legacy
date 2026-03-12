@@ -159,8 +159,7 @@
       "options": {
         "command": "tsc --noEmit -p tsconfig.lib.json",
         "cwd": "{projectRoot}"
-      },
-      "parallelism": false
+      }
     },
     "test": {
       "cache": true,
