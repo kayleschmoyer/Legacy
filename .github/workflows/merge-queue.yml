@@ -181,19 +181,21 @@ jobs:
             }
 
             // Get PRs with merge-when-ready label (or all if force_check is true)
-            const prs = await github.rest.pulls.list({
+            // Use paginate to fetch ALL open PRs (default page size is 30)
+            const allPRs = await github.paginate(github.rest.pulls.list, {
               owner,
               repo,
-              state: 'open'
+              state: 'open',
+              per_page: 100
             });
 
             const mergeReadyPRs = forceCheck 
-              ? prs.data 
-              : prs.data.filter(pr => 
+              ? allPRs 
+              : allPRs.filter(pr => 
                   pr.labels.some(label => label.name === 'merge-when-ready')
                 );
 
-            console.log(`📋 Found ${mergeReadyPRs.length} PRs with merge-when-ready label`);
+            console.log(`📋 Found ${mergeReadyPRs.length} PRs with merge-when-ready label (from ${allPRs.length} open)`);
 
             for (const pr of mergeReadyPRs) {
               console.log(`\n🔍 Processing PR #${pr.number}: ${pr.title}`);
