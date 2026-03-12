@@ -167,7 +167,8 @@
       "inputs": ["default", "^production"],
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "passWithNoTests": true
+        "passWithNoTests": true,
+        "changedSince": "origin/main"
       },
       "configurations": {
         "ci": {
