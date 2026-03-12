@@ -14,7 +14,7 @@
 	ci ci-force ci-full release full-deploy full-check dev-setup \
 	fix-windows-locks diagnose \
 	branch-tree cleanup-merged-branches squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
-	pre-commit pc quick-check \
+	pre-commit pc quick-check format-commit \
 	wt-setup
 .DEFAULT_GOAL := help
 
@@ -231,6 +231,30 @@ format: ## Format code across all projects
 	@pnpm exec nx format:write
 
 fmt: format ## Alias for format command
+
+format-commit: ## Run nx format:write, stage formatting changes, and commit as 'style: apply formatting'. Working tree must be clean first.
+	@$(call echo_blue,Checking working tree is clean before formatting...)
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -Command "$$status = git status --porcelain; if ($$status) { Write-Host 'ERROR: Working tree is not clean. Commit or stash changes before running make format-commit.' -ForegroundColor Red; exit 1 }"
+else
+	@status=$$(git status --porcelain); \
+	if [ -n "$$status" ]; then \
+		echo 'ERROR: Working tree is not clean. Commit or stash changes before running make format-commit.'; \
+		exit 1; \
+	fi
+endif
+	@$(call echo_blue,Applying formatting and committing...)
+	@pnpm exec nx format:write
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -Command "$$changed = git diff --name-only; if ($$changed) { git add -A; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; git commit -m 'style: apply formatting'; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; Write-Host '' ; Write-Host 'Formatting committed. Re-run make pc.' -ForegroundColor Green } else { Write-Host 'No formatting changes to commit.' -ForegroundColor Yellow }"
+else
+	@if ! git diff --quiet; then \
+		git add -A && git commit -m 'style: apply formatting' && \
+		echo '' && echo 'Formatting committed. Re-run make pc.'; \
+	else \
+		echo 'No formatting changes to commit.'; \
+	fi
+endif
 
 typecheck: ## Run TypeScript type checking
 	@$(call echo_blue,Running type checking...)
@@ -672,14 +696,14 @@ endif
 	@$(call echo_plain,5/9 Formatting...)
 	@pnpm exec nx format:write
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -Command "$$changed = git diff --name-only; if ($$changed) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$changed | ForEach-Object { Write-Host ('  ' + $$_) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'Commit the reformatted files and re-run make pc.' -ForegroundColor Red; exit 1 }"
+	@powershell -NoProfile -Command "$$changed = git diff --name-only; if ($$changed) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$changed | ForEach-Object { Write-Host ('  ' + $$_) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'Run: make format-commit' -ForegroundColor Cyan; exit 1 }"
 else
 	@if ! git diff --quiet; then \
 		echo ""; \
 		echo "ERROR: Formatting rewrote the following files:"; \
 		git diff --name-only | sed 's/^/  /'; \
 		echo ""; \
-		echo "Commit the reformatted files and re-run make pc."; \
+		echo "Run: make format-commit"; \
 		exit 1; \
 	fi
 endif

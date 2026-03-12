@@ -356,6 +356,16 @@ Run the full validation suite before opening the PR. Fix any failures and push a
 make pc
 ```
 
+> **Formatting failures?** If `make pc` exits with `ERROR: Formatting rewrote the following files:`, run:
+>
+> ```powershell
+> make format-commit
+> ```
+>
+> This runs `nx format:write`, stages all changes, and commits them as `style: apply formatting` in one step. Then re-run `make pc`.
+>
+> ⚠️ **Before running `make format-commit`, make sure the working tree is otherwise clean** (no uncommitted feature or WIP changes). `make format-commit` will fail fast if the tree is dirty, preventing accidental inclusion of non-formatting changes.
+
 > 🚨 **DO NOT STOP HERE.** Passing `make pc` is a checkpoint, not the finish line. You **must**
 > continue to Step 8 (create PR) and Step 9 (Jira "In Review"). Stopping after validation
 > without opening a PR is the single most common agent failure mode.
@@ -574,6 +584,8 @@ git add . ; git commit -m "feat(scope): description (LS-####)" ; git push -u ori
 
 # 6. Pre-PR validation
 make pc
+# If formatting rewrote files, run:
+#   make format-commit   # formats, stages, and commits ALL current changes; only run when the worktree is otherwise clean, then re-run make pc
 
 # 🚨 DO NOT STOP HERE — make pc passing is a checkpoint, not the finish line.
 # You MUST continue to step 7 (PR + Jira). Stopping here is the #1 agent failure mode.
