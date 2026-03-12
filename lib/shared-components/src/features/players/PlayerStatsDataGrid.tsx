@@ -465,8 +465,10 @@ export function PlayerStatsDataGrid({
    */
   const handlePageChange = useCallback(
     (direction: 'next' | 'prev') => {
+      // Use btoa/atob (browser-native) instead of Buffer (Node.js-only) so
+      // cursor encoding works in the browser environment.
       const currentOffset = queryParams.after
-        ? parseInt(Buffer.from(queryParams.after, 'base64').toString())
+        ? parseInt(atob(queryParams.after))
         : 0;
       const pageSz = queryParams.first ?? 25;
 
@@ -475,7 +477,7 @@ export function PlayerStatsDataGrid({
         // next page, so advance by a full page size.
         const nextOffset = currentOffset + pageSz;
         updateQueryParams({
-          after: Buffer.from(nextOffset.toString()).toString('base64'),
+          after: btoa(String(nextOffset)),
         });
       } else if (direction === 'prev' && hasPreviousPage) {
         // Go back one full page; if we reach offset 0 omit the cursor so the
