@@ -208,6 +208,7 @@ const ComparisonTable = styled(YStack, {
   borderWidth: 1,
   borderColor: '$borderColor',
   overflow: 'hidden',
+  width: '100%',
 });
 
 const TableRow = styled(XStack, {
@@ -216,6 +217,7 @@ const TableRow = styled(XStack, {
   paddingVertical: '$3',
   paddingHorizontal: '$5',
   alignItems: 'center',
+  width: '100%',
   variants: {
     header: {
       true: {
@@ -231,17 +233,24 @@ const TableRow = styled(XStack, {
         backgroundColor: '$backgroundHover',
       },
     } as const,
+    last: {
+      true: {
+        borderBottomWidth: 0,
+      },
+    } as const,
   },
 });
 
 const TableCell = styled(XStack, {
   flex: 1,
+  minWidth: 0,
   alignItems: 'center',
   justifyContent: 'center',
 });
 
 const TableFeatureCell = styled(YStack, {
   flex: 2,
+  minWidth: 0,
   justifyContent: 'center',
 });
 
@@ -654,7 +663,7 @@ export default function PricingPage() {
           </PlansRow>
 
           {/* ── Feature Comparison Table ── */}
-          <YStack gap="$5">
+          <YStack gap="$5" width="100%">
             <SectionHeader>
               <H2 textAlign="center" fontWeight="700">
                 Compare plans
@@ -673,7 +682,12 @@ export default function PricingPage() {
                   </Paragraph>
                 </TableFeatureCell>
                 <TableCell>
-                  <Paragraph size="$3" fontWeight="700" marginBottom={0}>
+                  <Paragraph
+                    size="$3"
+                    fontWeight="700"
+                    textAlign="center"
+                    marginBottom={0}
+                  >
                     Free
                   </Paragraph>
                 </TableCell>
@@ -682,6 +696,7 @@ export default function PricingPage() {
                     size="$3"
                     fontWeight="700"
                     color={BRAND_GOLD_LIGHT}
+                    textAlign="center"
                     marginBottom={0}
                   >
                     Premium
@@ -690,7 +705,11 @@ export default function PricingPage() {
               </TableRow>
 
               {COMPARISON_ROWS.map((row, i) => (
-                <TableRow key={row.feature} even={i % 2 === 0}>
+                <TableRow
+                  key={row.feature}
+                  even={i % 2 === 0}
+                  last={i === COMPARISON_ROWS.length - 1}
+                >
                   <TableFeatureCell>
                     <Paragraph size="$3" marginBottom={0}>
                       {row.feature}
