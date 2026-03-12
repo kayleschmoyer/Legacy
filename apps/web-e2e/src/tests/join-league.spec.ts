@@ -382,3 +382,41 @@ test.describe('Join League — cancel @regression', () => {
     await expect(page).toHaveURL('/baseball', { timeout: 10000 });
   });
 });
+
+// ── regression: LS-1004 — keyboard form submission ───────────────
+//
+// Root cause: the form's onSubmit handler previously referenced
+// `handleSubmit` which was renamed during LS-960, causing a
+// ReferenceError on hot-reload and keyboard-triggered submissions.
+// Regression test: pressing Enter inside an input must trigger the
+// form's onSubmit path (handleFormSubmit → handleJoin) and complete
+// the join flow successfully.
+
+test.describe('Join League — keyboard submission @regression', () => {
+  test('pressing Enter in team-name input submits the form (LS-1004)', async ({
+    page,
+  }) => {
+    await routeGraphQL(page, {
+      validateinvitecode: validateInviteCodeResponse(),
+      joinleaguebycode: joinLeagueByCodeResponse(55),
+    });
+
+    const lp = new LeaguePage(page);
+    await lp.gotoJoin();
+    await lp.expectJoinFormVisible();
+
+    await lp.inviteCodeInput.fill('VALIDCO1');
+    await lp.teamNameInput.fill('Keyboard Team');
+
+    // Wait for server validation to pass and button to become enabled
+    await expect(lp.joinButton).toBeEnabled({ timeout: 10000 });
+
+    // Submit via keyboard — exercises the form onSubmit handler,
+    // not the button onPress handler
+    await lp.teamNameInput.press('Enter');
+
+    await expect(page).toHaveURL(/\/baseball\/league\/55/, {
+      timeout: 15000,
+    });
+  });
+});
