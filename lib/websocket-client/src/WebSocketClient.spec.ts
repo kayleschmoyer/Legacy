@@ -756,6 +756,33 @@ describe('WebSocketClient', () => {
       jest.advanceTimersByTime(100);
     });
 
+    it('should suppress error events for transient errors when reconnect is enabled', () => {
+      mockServer = new Server(mockUrl);
+
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        autoConnect: true,
+        reconnect: true,
+      });
+
+      jest.advanceTimersByTime(50);
+
+      const errorHandler = jest.fn();
+      client.on('error', errorHandler);
+
+      // Simulate an error — with reconnect enabled, handleError should NOT emit
+      mockServer.simulate('error');
+      jest.advanceTimersByTime(100);
+
+      expect(errorHandler).not.toHaveBeenCalled();
+      // Also ensure that an "error" connection state was not emitted
+      expect(client.getState()).not.toBe('error');
+
+      client.dispose();
+    });
+
     it('should handle connection state correctly', () => {
       mockServer = new Server(mockUrl);
 

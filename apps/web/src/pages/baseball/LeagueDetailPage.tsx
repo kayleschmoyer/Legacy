@@ -664,7 +664,10 @@ export function LeagueDetailPage(): React.JSX.Element {
     });
     setWsClient(client);
     client.on('connected', () => {
-      if (active) setWsConnected(true);
+      if (active) {
+        setWsConnected(true);
+        setWsError(null);
+      }
     });
     client.on('disconnected', () => {
       if (active) setWsConnected(false);

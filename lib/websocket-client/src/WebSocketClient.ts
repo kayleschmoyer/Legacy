@@ -410,13 +410,32 @@ export class WebSocketClient {
   }
 
   /**
-   * Handle WebSocket error event
+   * Handle WebSocket error event.
+   *
+   * Per the WebSocket spec, `onerror` is always followed by `onclose`.
+   * When reconnection is enabled, `handleClose` handles recovery so
+   * we only log here.  When reconnection is disabled the error is
+   * unrecoverable and must be surfaced to subscribers.
    */
   private handleError(error: Event): void {
-    LOGGER.warn('WebSocket error', { error });
-    const wsError = new Error('WebSocket error');
+    // Always skip processing when the client has been disposed — avoids
+    // spurious error events leaking to subscribers during normal teardown.
+    if (this.disposed) {
+      return;
+    }
+
+    const errorInfo = { type: error.type };
+
+    if (this.options.reconnect) {
+      LOGGER.warn('WebSocket error (will auto-reconnect)', {
+        error: errorInfo,
+      });
+      return;
+    }
+
+    LOGGER.warn('WebSocket error', { error: errorInfo });
     this.emitConnectionState('error');
-    this.emitError(wsError);
+    this.emitError(new Error('WebSocket error'));
   }
 
   /**
