@@ -34,7 +34,7 @@
 - **PowerShell**: `;` to chain, `$env:` for vars
 - **No suppression**: fix root causes, no `@ts-ignore` / `eslint-disable` (see `skills/no-lint-disable/SKILL.md`)
 - **No console.\***: use `LOGGER` from `@legacy-sports/logging` instead of `console.log/warn/error/debug`. Exceptions: `lib/logging/` (the logger itself), `apps/cli/`, migration files, and build-time scripts (`codegen.ts`, Vite plugins).
-- **Jira**: update status at each step
+- **Jira — MCP tools first**: use the MCP Jira tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent`) for **all** Jira operations. These are provided by the `legacy-sports-jira` MCP server (see `skills/mcp-jira/SKILL.md`). **Never** use `fetch_webpage`, raw HTTP requests, or web fetch to access Jira URLs directly. If MCP tools are unavailable, fall back to `acli` CLI commands — never to direct HTTP. Update Jira status at each workflow step.
 
 ## Environment
 
