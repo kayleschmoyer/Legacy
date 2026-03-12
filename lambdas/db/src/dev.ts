@@ -8,6 +8,19 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import { schema } from './schema';
 import { createLoaders } from './schema/dataloaders';
 
+// Classify client-visible error codes (validation, auth, bad input) that should
+// NOT be reported as errors. Hoisted to module scope to avoid re-allocation.
+const CLIENT_FACING_CODES = new Set([
+  'GRAPHQL_VALIDATION_FAILED',
+  'GRAPHQL_PARSE_FAILED',
+  'BAD_USER_INPUT',
+  'UNAUTHENTICATED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'PERSISTED_QUERY_NOT_FOUND',
+  'PERSISTED_QUERY_NOT_SUPPORTED',
+]);
+
 interface JWTPayload {
   id: number;
   email?: string;
@@ -64,17 +77,37 @@ async function startServer() {
     introspection: true,
     csrfPrevention: false,
     formatError: (formattedError, error) => {
-      // Log all errors with full context
-      LOGGER.error('GraphQL Error', {
+      const code = formattedError.extensions?.code as string | undefined;
+      const isClientFacing = code != null && CLIENT_FACING_CODES.has(code);
+
+      const errorContext = {
         message: formattedError.message,
         path: formattedError.path,
         extensions: formattedError.extensions,
         locations: formattedError.locations,
-        originalError: error,
         stack: error instanceof Error ? error.stack : undefined,
-      });
+      };
 
-      // Return the formatted error to the client
+      if (isClientFacing) {
+        const {
+          stack: _stack,
+          extensions: _ext,
+          ...clientErrorContext
+        } = errorContext;
+        LOGGER.warn('GraphQL client error', clientErrorContext);
+      } else {
+        // Prefer error.originalError so RollbarOutputDestination captures the real stack.
+        if (error instanceof Error) {
+          const originalError =
+            'originalError' in error && error.originalError instanceof Error
+              ? error.originalError
+              : error;
+          LOGGER.error('GraphQL internal error', originalError, errorContext);
+        } else {
+          LOGGER.error('GraphQL internal error', errorContext);
+        }
+      }
+
       return formattedError;
     },
   });
