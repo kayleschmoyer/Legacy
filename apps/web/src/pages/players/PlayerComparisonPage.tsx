@@ -78,7 +78,7 @@ function bestIndex(
   let bestIdx: number | null = null;
   values.forEach((v, i) => {
     if (v == null) return;
-    if (bestIdx === null || (lowerIsBetter ? v < best! : v > best!)) {
+    if (best === null || (lowerIsBetter ? v < best : v > best)) {
       best = v;
       bestIdx = i;
     }
@@ -663,13 +663,15 @@ export function PlayerComparisonPage() {
   // ---------- Handlers ----------
 
   const handleAdd = useCallback((p: PlayerSummary) => {
+    const id = p.id;
+    if (id == null) return;
     const name = `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
     const position = (p.eligiblePositions ?? []).join(', ') || '—';
     setSelected((prev) => {
       const firstEmpty = prev.findIndex((s) => s === null);
       if (firstEmpty === -1) return prev;
       const next = [...prev];
-      next[firstEmpty] = { id: p.id!, name, position, summary: p };
+      next[firstEmpty] = { id, name, position, summary: p };
       return next;
     });
   }, []);

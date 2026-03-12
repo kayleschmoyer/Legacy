@@ -32,7 +32,7 @@ export function DraftIntelligence({
     GetDraftRecommendationsQuery,
     GetDraftRecommendationsQueryVariables
   >(GET_DRAFT_RECOMMENDATIONS, {
-    variables: { draftId: draftId!, teamId: teamId! },
+    variables: { draftId: draftId ?? 0, teamId: teamId ?? 0 },
     skip,
     fetchPolicy: 'cache-and-network',
   });

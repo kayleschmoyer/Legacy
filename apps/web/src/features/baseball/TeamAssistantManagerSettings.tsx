@@ -130,32 +130,34 @@ export function TeamAssistantManagerSettings({
           </Text>
         ) : (
           <YStack gap="$2">
-            {assistantManagers.map((member) =>
-              member?.userId != null ? (
+            {assistantManagers.map((member) => {
+              const userId = member?.userId;
+              if (userId == null) return null;
+              return (
                 <XStack
-                  key={member.userId}
+                  key={userId}
                   justifyContent="space-between"
                   alignItems="center"
                   padding="$2"
                   backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
                   borderRadius="$3"
                 >
-                  <Text fontSize="$3">User #{member.userId}</Text>
+                  <Text fontSize="$3">User #{userId}</Text>
                   <Button
                     size="$2"
                     backgroundColor={withAlpha(BRAND_SEAM_RED, 0.15)}
                     color={BRAND_SEAM_RED}
                     borderColor={withAlpha(BRAND_SEAM_RED, 0.4)}
                     borderWidth={1}
-                    onPress={() => void handleRemove(member.userId!)}
+                    onPress={() => void handleRemove(userId)}
                     disabled={removing}
-                    aria-label={`Remove assistant manager user ${member.userId}`}
+                    aria-label={`Remove assistant manager user ${userId}`}
                   >
                     Remove
                   </Button>
                 </XStack>
-              ) : null,
-            )}
+              );
+            })}
           </YStack>
         )}
 

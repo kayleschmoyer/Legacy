@@ -170,12 +170,13 @@ function PlayerSearchInput({
           elevation={20}
         >
           {results.map((p) => {
-            if (!p?.id) return null;
+            const id = p.id;
+            if (id == null) return null;
             const name = `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
             const pos = (p.eligiblePositions ?? []).join(', ') || '—';
             return (
               <XStack
-                key={p.id}
+                key={id}
                 paddingHorizontal="$3"
                 paddingVertical="$2"
                 borderBottomWidth={1}
@@ -186,7 +187,7 @@ function PlayerSearchInput({
                 }}
                 onPress={() =>
                   handleSelect({
-                    id: p.id!,
+                    id,
                     firstName: p.firstName,
                     lastName: p.lastName,
                   })

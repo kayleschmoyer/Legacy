@@ -160,6 +160,7 @@ export function LeagueTradeBlock({
 
       <YStack gap="$1">
         {displayList.map((member, idx) => {
+          const memberId = member.id;
           const isOwnTeam = userTeamId != null && member.teamId === userTeamId;
           const playerName = member.player
             ? `${member.player.firstName ?? ''} ${member.player.lastName ?? ''}`.trim()
@@ -167,7 +168,7 @@ export function LeagueTradeBlock({
           const initial = playerName[0] ?? '?';
 
           return (
-            <React.Fragment key={member.id ?? idx}>
+            <React.Fragment key={memberId ?? idx}>
               <XStack
                 justifyContent="space-between"
                 alignItems="center"
@@ -201,7 +202,7 @@ export function LeagueTradeBlock({
                   </YStack>
                 </XStack>
 
-                {isOwnTeam ? (
+                {isOwnTeam && memberId != null ? (
                   <Button
                     size="$2"
                     backgroundColor="$red3"
@@ -213,7 +214,7 @@ export function LeagueTradeBlock({
                     onPress={() =>
                       void setTradeBlock({
                         variables: {
-                          teamMemberId: member.id!,
+                          teamMemberId: memberId,
                           onTradeBlock: false,
                         },
                       })
