@@ -579,6 +579,9 @@ jobs:
             const prNumber = context.issue.number;
             if (!prNumber) return;
 
+            // Overall job-level results (always available even when outputs are lost)
+            const qgJobResult = '${{ needs.quality-gates.result }}';
+
             // Map CI stage results to label names
             const labelMap = {
               'CI: Formatting': '${{ needs.quality-gates.outputs.formatting-result }}',
@@ -589,18 +592,32 @@ jobs:
               'CI: E2E Failure': '${{ needs.e2e.result }}',
             };
 
-            const allCiLabels = Object.keys(labelMap);
-
             // Determine which labels to add (failed) and remove (passed/skipped)
             const labelsToAdd = [];
             const labelsToRemove = [];
 
+            // Track whether any quality-gate subsection reported failure
+            const qgLabels = ['CI: Formatting', 'CI: Lint Failure', 'CI: Type Error', 'CI: Test Failure'];
+            let anyQgSubsectionFailed = false;
+
             for (const [label, result] of Object.entries(labelMap)) {
               if (result === 'failure' || result === 'cancelled') {
                 labelsToAdd.push(label);
-              } else {
+                if (qgLabels.includes(label)) anyQgSubsectionFailed = true;
+              } else if (result === 'success' || result === 'skipped') {
                 labelsToRemove.push(label);
               }
+              // Empty/missing results are left alone (don't add or remove)
+            }
+
+            // Fallback: if quality-gates job failed but no subsection reported
+            // failure (outputs lost due to runner interruption), add a generic label
+            if (qgJobResult === 'failure' && !anyQgSubsectionFailed) {
+              labelsToAdd.push('CI: Quality Gates');
+              core.info('Quality gates failed but subsection outputs are missing — adding fallback label');
+            } else {
+              // Quality gates passed or subsections are properly reported — remove fallback
+              labelsToRemove.push('CI: Quality Gates');
             }
 
             // Get existing labels on the PR

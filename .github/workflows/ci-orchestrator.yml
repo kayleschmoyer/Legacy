@@ -255,6 +255,11 @@ jobs:
   # Prevents a failing PR from sitting in the merge queue indefinitely.
   # The label is removed so the author must consciously re-add it after fixing.
   # Only fires on real pipeline failures, not cancellations (new push) or skips.
+  #
+  # NOTE: needs.ci-pipeline.result is unreliable for workflow_call jobs — it
+  # always returns 'failure' regardless of actual outcome (GitHub Actions
+  # limitation with reusable workflows containing if: always() jobs). Use
+  # the explicit overall-status output from ci-pipeline instead.
   # ============================================================================
   remove-merge-label-on-failure:
     name: "🏷️ Remove Merge Label on Failure"
@@ -262,7 +267,7 @@ jobs:
     if: >-
       always() &&
       github.event_name == 'pull_request' &&
-      needs.ci-pipeline.result == 'failure'
+      needs.ci-pipeline.outputs.overall-status == 'failure'
     runs-on: ubuntu-latest
     steps:
       - name: Remove merge-when-ready label

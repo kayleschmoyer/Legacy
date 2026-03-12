@@ -158,58 +158,75 @@ module.exports = async ({ github, context, core }) => {
       failedSteps.push(step);
 
       // Check for quality-gates failure and drill down into subsections
-      if (
-        step === 'quality-gates' &&
-        Object.keys(qualityGatesSubsections).length > 0
-      ) {
-        Object.entries(qualityGatesSubsections).forEach(
-          ([subsection, subResult]) => {
-            if (subResult === 'failure') {
-              failedQualityGatesSections.push(subsection);
+      if (step === 'quality-gates') {
+        // Check if any subsection explicitly reported failure
+        const hasSubsectionFailures =
+          Object.keys(qualityGatesSubsections).length > 0 &&
+          Object.values(qualityGatesSubsections).some((v) => v === 'failure');
 
-              // Use specific subsection guidance if available
-              if (stepAnalysis['quality-gates'].subsections[subsection]) {
-                const subsectionInfo =
-                  stepAnalysis['quality-gates'].subsections[subsection];
-                failureReason = subsectionInfo.reason;
-                reproCommand = subsectionInfo.command;
-                debugSection = subsectionInfo.debug;
-                detailedFailureReason = failureReason;
+        if (hasSubsectionFailures) {
+          Object.entries(qualityGatesSubsections).forEach(
+            ([subsection, subResult]) => {
+              if (subResult === 'failure') {
+                failedQualityGatesSections.push(subsection);
 
-                // Add project-specific information if available
-                if (
-                  projectFailures[subsection] &&
-                  projectFailures[subsection].length > 0
-                ) {
-                  let failedProjects = projectFailures[subsection];
+                // Use specific subsection guidance if available
+                if (stepAnalysis['quality-gates'].subsections[subsection]) {
+                  const subsectionInfo =
+                    stepAnalysis['quality-gates'].subsections[subsection];
+                  failureReason = subsectionInfo.reason;
+                  reproCommand = subsectionInfo.command;
+                  debugSection = subsectionInfo.debug;
+                  detailedFailureReason = failureReason;
 
-                  // Handle case where failedProjects might be a comma-separated string or an array
-                  if (typeof failedProjects === 'string') {
-                    failedProjects = failedProjects
-                      .split(',')
-                      .map((p) => p.trim())
-                      .filter((p) => p);
-                  }
-
+                  // Add project-specific information if available
                   if (
-                    Array.isArray(failedProjects) &&
-                    failedProjects.length > 0
+                    projectFailures[subsection] &&
+                    projectFailures[subsection].length > 0
                   ) {
-                    failureReason += ` in ${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''}`;
-                    detailedFailureReason = failureReason;
+                    let failedProjects = projectFailures[subsection];
 
-                    // Update repro command to target specific projects
-                    const target =
-                      subsection === 'formatting' ? 'format:check' : subsection;
-                    reproCommand = `pnpm exec nx run-many -t ${target} --projects=${failedProjects.join(',')}`;
+                    // Handle case where failedProjects might be a comma-separated string or an array
+                    if (typeof failedProjects === 'string') {
+                      failedProjects = failedProjects
+                        .split(',')
+                        .map((p) => p.trim())
+                        .filter((p) => p);
+                    }
 
-                    debugSection += `\n\n**Failed Projects**: ${failedProjects.map((p) => '`' + p + '`').join(', ')}`;
+                    if (
+                      Array.isArray(failedProjects) &&
+                      failedProjects.length > 0
+                    ) {
+                      failureReason += ` in ${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''}`;
+                      detailedFailureReason = failureReason;
+
+                      // Update repro command to target specific projects
+                      const target =
+                        subsection === 'formatting'
+                          ? 'format:check'
+                          : subsection;
+                      reproCommand = `pnpm exec nx run-many -t ${target} --projects=${failedProjects.join(',')}`;
+
+                      debugSection += `\n\n**Failed Projects**: ${failedProjects.map((p) => '`' + p + '`').join(', ')}`;
+                    }
                   }
                 }
               }
-            }
-          },
-        );
+            },
+          );
+        } else {
+          // Quality gates failed but subsection outputs are missing (e.g., runner
+          // was interrupted before individual results could be recorded).
+          // Fall back to generic quality-gates guidance.
+          const qgInfo = stepAnalysis['quality-gates'];
+          failureReason = qgInfo.reason;
+          detailedFailureReason =
+            qgInfo.reason +
+            ' (subsection details unavailable — runner may have been interrupted)';
+          reproCommand = qgInfo.command;
+          debugSection = qgInfo.debug;
+        }
       } else if (stepAnalysis[step] && !reproCommand.includes('format')) {
         failureReason = stepAnalysis[step].reason;
         detailedFailureReason = failureReason;
@@ -227,6 +244,9 @@ module.exports = async ({ github, context, core }) => {
       '| Step | Status |\n' +
       '|------|--------|\n';
     Object.entries(stepResults).forEach(([step, result]) => {
+      // Skip non-string entries (e.g., metadata object injected by collect-results)
+      if (typeof result !== 'string') return;
+
       const icon =
         result === 'success'
           ? 'PASS'
@@ -247,62 +267,60 @@ module.exports = async ({ github, context, core }) => {
       ) {
         Object.entries(qualityGatesSubsections).forEach(
           ([subsection, subResult]) => {
-            if (subResult) {
-              const subIcon =
-                subResult === 'success'
-                  ? 'PASS'
-                  : subResult === 'failure'
-                    ? 'FAIL'
-                    : subResult === 'skipped'
-                      ? 'SKIP'
-                      : 'UNKNOWN';
-              const subName =
-                subsection.charAt(0).toUpperCase() + subsection.slice(1);
+            // Normalize: treat empty/missing as 'unknown' when quality-gates failed
+            const effectiveResult =
+              subResult || (result === 'failure' ? 'unknown' : 'skipped');
+            const subIcon =
+              effectiveResult === 'success'
+                ? 'PASS'
+                : effectiveResult === 'failure'
+                  ? 'FAIL'
+                  : effectiveResult === 'skipped'
+                    ? 'SKIP'
+                    : 'UNKNOWN';
+            const subName =
+              subsection.charAt(0).toUpperCase() + subsection.slice(1);
 
-              // Add project count if available
-              let projectInfo = '';
-              if (
-                subResult === 'failure' &&
-                projectFailures[subsection] &&
-                projectFailures[subsection].length > 0
-              ) {
-                let failedProjects = projectFailures[subsection];
-                // Handle case where failedProjects might be a comma-separated string
-                if (typeof failedProjects === 'string') {
-                  failedProjects = failedProjects
-                    .split(',')
-                    .map((p) => p.trim())
-                    .filter((p) => p);
-                }
-                if (
-                  Array.isArray(failedProjects) &&
-                  failedProjects.length > 0
-                ) {
-                  projectInfo = ` (${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''})`;
-                }
+            // Add project count if available
+            let projectInfo = '';
+            if (
+              effectiveResult === 'failure' &&
+              projectFailures[subsection] &&
+              projectFailures[subsection].length > 0
+            ) {
+              let failedProjects = projectFailures[subsection];
+              // Handle case where failedProjects might be a comma-separated string
+              if (typeof failedProjects === 'string') {
+                failedProjects = failedProjects
+                  .split(',')
+                  .map((p) => p.trim())
+                  .filter((p) => p);
               }
+              if (Array.isArray(failedProjects) && failedProjects.length > 0) {
+                projectInfo = ` (${failedProjects.length} project${failedProjects.length > 1 ? 's' : ''})`;
+              }
+            }
 
-              stepStatusTable += `| &nbsp;&nbsp;&nbsp;> ${subName}${projectInfo} | ${subIcon} ${subResult} |\n`;
+            stepStatusTable += `| &nbsp;&nbsp;&nbsp;> ${subName}${projectInfo} | ${subIcon} ${effectiveResult} |\n`;
 
-              // List failed projects under subsection
-              if (
-                subResult === 'failure' &&
-                projectFailures[subsection] &&
-                projectFailures[subsection].length > 0
-              ) {
-                let failedProjects = projectFailures[subsection];
-                // Handle case where failedProjects might be a comma-separated string
-                if (typeof failedProjects === 'string') {
-                  failedProjects = failedProjects
-                    .split(',')
-                    .map((p) => p.trim())
-                    .filter((p) => p);
-                }
-                if (Array.isArray(failedProjects)) {
-                  failedProjects.forEach((project) => {
-                    stepStatusTable += `| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- \`${project}\` | FAIL failed |\n`;
-                  });
-                }
+            // List failed projects under subsection
+            if (
+              effectiveResult === 'failure' &&
+              projectFailures[subsection] &&
+              projectFailures[subsection].length > 0
+            ) {
+              let failedProjects = projectFailures[subsection];
+              // Handle case where failedProjects might be a comma-separated string
+              if (typeof failedProjects === 'string') {
+                failedProjects = failedProjects
+                  .split(',')
+                  .map((p) => p.trim())
+                  .filter((p) => p);
+              }
+              if (Array.isArray(failedProjects)) {
+                failedProjects.forEach((project) => {
+                  stepStatusTable += `| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- \`${project}\` | FAIL failed |\n`;
+                });
               }
             }
           },
