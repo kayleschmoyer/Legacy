@@ -1,5 +1,5 @@
-# DB Subnet Group - RDS deployed in public subnets for direct access capability
-# Public subnets allow both RDS Proxy (Lambda) and direct access (CLI/migrations)
+# DB Subnet Group - RDS deployed in public subnets (historical; kept to avoid recreation)
+# Access from Lambda goes through RDS Proxy; external access requires VPN/bastion/SSM
 # Security is controlled via security group rules, not network isolation
 resource "aws_db_subnet_group" "main" {
   name       = "${local.name_prefix}-db-subnet-group-v2" # Keep existing name
@@ -30,10 +30,10 @@ resource "aws_db_instance" "postgres" {
   username = var.database_username
   password = random_password.database_password.result
 
-  # Network & Security - Public subnets with controlled access
+  # Network & Security - Private access only (VPN/bastion/SSM for dev)
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
-  publicly_accessible    = var.environment == "dev" ? true : false # Enable direct access for development
+  publicly_accessible    = false # Never expose RDS to the public internet; use VPN/bastion/SSM for dev access
 
   # Backup & Maintenance - Optimized for dev
   backup_retention_period    = 1 # Reduced from 7 days for dev
@@ -176,6 +176,5 @@ resource "aws_iam_role_policy" "rds_proxy_secrets" {
 # =============================================================================
 # CLI DATABASE ACCESS
 # =============================================================================
-# CLI and development tools now connect directly to RDS for simplicity and performance.
-# Direct access is enabled via publicly_accessible=true and security group rules.
-# Lambda functions continue to use RDS Proxy above for production reliability.
+# CLI and development tools connect via VPN, SSM tunnel, or bastion host.
+# RDS is not publicly accessible; Lambda functions use RDS Proxy above.
