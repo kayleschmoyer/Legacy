@@ -563,6 +563,9 @@ export const gameBatting = pgTable(
       playerIdGameIdentifierIdx: index(
         'game_batting_player_id_game_identifier_idx',
       ).on(table.playerId, table.gameIdentifier),
+      playerIdSeasonGameIdentifierIdx: index(
+        'game_batting_player_id_season_game_identifier_idx',
+      ).on(table.playerId, table.season, table.gameIdentifier),
     };
   },
 );
@@ -610,6 +613,9 @@ export const gamePitching = pgTable(
       playerIdGameIdentifierIdx: index(
         'game_pitching_player_id_game_identifier_idx',
       ).on(table.playerId, table.gameIdentifier),
+      playerIdSeasonGameIdentifierIdx: index(
+        'game_pitching_player_id_season_game_identifier_idx',
+      ).on(table.playerId, table.season, table.gameIdentifier),
     };
   },
 );
@@ -640,6 +646,9 @@ export const gameFielding = pgTable(
       gameIdentifierIdx: index('game_fielding_game_identifier_idx').on(
         table.gameIdentifier,
       ),
+      playerIdSeasonGameIdentifierIdx: index(
+        'game_fielding_player_id_season_game_identifier_idx',
+      ).on(table.playerId, table.season, table.gameIdentifier),
     };
   },
 );
