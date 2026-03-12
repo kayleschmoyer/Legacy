@@ -15,6 +15,7 @@ For each PR, either **fix all review comments** or **label it for merge**.
 - "Fix all Copilot review comments"
 - "Address Copilot feedback on open PRs"
 - "Label clean PRs as merge-when-ready"
+- "Request Copilot reviews on PRs that don't have them"
 - Periodic review-sweep before a release
 
 ## Workflow
@@ -190,6 +191,37 @@ After processing every PR, print a summary table:
 | ---- | ------------------ | ---------------- | ------------------------ |
 | #123 | feat(scoring): ... | Fixed 3 comments | pushed                   |
 | #124 | fix(ui): ...       | No comments      | labeled merge-when-ready |
+
+## Requesting Copilot Reviews on PRs That Don't Have Them
+
+If the user asks to "add Copilot reviews" to PRs, find PRs **without** a
+Copilot review and request one via the GitHub API.
+
+> **IMPORTANT:** `gh pr edit --add-reviewer copilot` and `-f 'reviewers[]=copilot'`
+> do **NOT** work. Copilot's actual bot login is `copilot-pull-request-reviewer[bot]`.
+> You must pipe a JSON body with the full bot login.
+
+```powershell
+# Find PRs without a Copilot review
+$prs = gh pr list --state open --json number,title,headRefName --limit 100 | ConvertFrom-Json
+$noReview = @()
+foreach ($pr in $prs) {
+  $reviews = gh api --paginate "repos/{owner}/{repo}/pulls/$($pr.number)/reviews?per_page=100" 2>$null | ConvertFrom-Json
+  $copilotReview = $reviews | Where-Object { $_.user.login -eq 'copilot-pull-request-reviewer[bot]' }
+  if (-not $copilotReview) { $noReview += $pr }
+}
+
+# Request Copilot review on each
+$body = '{"reviewers":["copilot-pull-request-reviewer[bot]"]}'
+foreach ($pr in $noReview) {
+  $response = echo $body | gh api "repos/{owner}/{repo}/pulls/$($pr.number)/requested_reviewers" --method POST --input - 2>&1
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host "Requested Copilot review on PR #$($pr.number)"
+  } else {
+    Write-Warning "Failed to request Copilot review on PR #$($pr.number) (exit code $LASTEXITCODE). Response:`n$response"
+  }
+}
+```
 
 ## Important Notes
 

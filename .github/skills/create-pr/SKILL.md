@@ -100,14 +100,16 @@ If no e2e project is affected (pure back-end / library change), the command exit
 # Create PR using GitHub CLI with --body-file (preferred — works for both humans and agents)
 gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
-# Request Copilot review via the GitHub API (--reviewer copilot does NOT work)
+# Request Copilot review via the GitHub API
+# IMPORTANT: --reviewer copilot and -f 'reviewers[]=copilot' do NOT work.
+# You must pipe a JSON body with the full bot login:
 $prNumber = gh pr view --json number --jq .number
-gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST -f 'reviewers[]=copilot'
+'{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
 ```
 
 > **Why request Copilot review?** Copilot reviews run instantly, surface issues before human reviewers look at the PR, and are required by team convention.
 >
-> **Note**: `--reviewer copilot` on `gh pr create` does **not** work — Copilot is not a regular GitHub user. Always use the `gh api` call shown above after creating the PR.
+> **Note**: Neither `--reviewer copilot` on `gh pr create` nor `-f 'reviewers[]=copilot'` works — Copilot is a bot account (`copilot-pull-request-reviewer[bot]`), not a regular GitHub user. Always pipe JSON with the full bot login as shown above.
 
 > **Alternative (human-only, opens browser):** `twig github pr create-pr`
 > Twig auto-fills the PR from Jira — convenient for humans but not usable by agents.
@@ -119,10 +121,10 @@ Every PR must have a Copilot code review requested. Use the GitHub API **after**
 ```powershell
 # Request Copilot review (run immediately after gh pr create)
 $prNumber = gh pr view --json number --jq .number
-gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST -f 'reviewers[]=copilot'
+'{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
 ```
 
-> **Do NOT use `--reviewer copilot`** on `gh pr create` — it fails because Copilot is not a regular GitHub user account. The API call above is the only reliable method.
+> **Do NOT use `--reviewer copilot`** on `gh pr create` or `-f 'reviewers[]=copilot'` — neither works because Copilot is a bot account (`copilot-pull-request-reviewer[bot]`), not a regular GitHub user. You must pipe a JSON body with the full bot login as shown above.
 
 **Manual fallback (web UI):** Open the PR in the browser → Reviewers sidebar → gear icon → select "Copilot".
 
@@ -153,7 +155,7 @@ gh pr create --title "LS-#### fix(scope): description" --body-file ".github/tmp-
 
 # 3. Request Copilot review via API
 $prNumber = gh pr view --json number --jq .number
-gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST -f 'reviewers[]=copilot'
+'{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
 
 # 4. Clean up the temp file
 .\scripts\cleanup-pr-body.ps1
@@ -349,7 +351,7 @@ gh pr edit <PR_NUMBER> --body-file ".github/tmp-pr-body.md"
 ## Best Practices
 
 1. **Always use `--body-file`** for PR descriptions — never inline `--body` in PowerShell
-2. **Always request Copilot review** via `gh api` after `gh pr create` — `--reviewer copilot` does not work (see [Requesting Copilot Review](#requesting-copilot-review))
+2. **Always request Copilot review** via `gh api` with piped JSON body after `gh pr create` — neither `--reviewer copilot` nor `-f 'reviewers[]=copilot'` works (see [Requesting Copilot Review](#requesting-copilot-review))
 3. **Use `create_file` tool** to write the temp .md file — it preserves backticks and special chars
 4. **Never use PowerShell heredoc** (`@" "@`) for markdown with backticks — it strips them
 5. **Never escape backticks** in the PR body content — write `` `code` `` not `\`code\`` (escaped backticks render as backslashes)
@@ -495,9 +497,9 @@ gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp
 
 # 6. Request Copilot review via API
 $prNumber = gh pr view --json number --jq .number
-gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST -f 'reviewers[]=copilot'
+'{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
 
-# 6. Clean up temp file
+# 7. Clean up temp file
 .\scripts\cleanup-pr-body.ps1
 
 # 7. Update Jira ticket
