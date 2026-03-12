@@ -56,7 +56,7 @@ export async function encryptCookies(
     parts.push(`${name}=${JSON.stringify(encryptedValue)}`);
   }
 
-  parts.push('HttpOnly', 'Secure');
+  parts.push('HttpOnly', 'Secure', 'SameSite=Strict');
   return parts.join(';');
 }
 
