@@ -4,8 +4,8 @@
 
 ## Workflow
 
-1. Ticket: create if needed: `acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json` ΓåÆ note `$key`
-2. **Jira "In Progress" immediately**: `acli jira workitem transition --key LS-#### --status "In Progress"` ΓÇö do this as soon as you begin working, before any other steps.
+1. Ticket: create if needed using the `jira_create_ticket` MCP tool (or `acli jira workitem create --summary "..." --project LS --type Task`) → note `$key`
+2. **Jira "In Progress" immediately**: use the `jira_transition` MCP tool with status "In Progress" (or `acli jira workitem transition --key LS-#### --status "In Progress"`) — do this as soon as you begin working, before any other steps.
 3. **Dependency check**: inspect the Jira ticket for "blocked-by" linked issues. Query their status before proceeding:
    - **Blocker is not In Review or Done → STOP.** Do not proceed with the ticket. Inform the user that the blocking ticket must reach at least "In Review" before work can begin.
    - **Blocker is In Review → use its branch as the parent.** The worktree must branch from that ticket's branch, not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).

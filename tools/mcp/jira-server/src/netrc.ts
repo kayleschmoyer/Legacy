@@ -8,17 +8,27 @@ export interface NetrcCredentials {
 }
 
 /**
- * Parse ~/.netrc for Atlassian credentials.
- * Looks for machine entries matching atlassian.net.
+ * Get Atlassian credentials from environment variables or ~/.netrc.
+ *
+ * Priority:
+ * 1. JIRA_EMAIL + JIRA_API_TOKEN env vars (cloud agents, CI)
+ * 2. ~/.netrc file (local development)
  */
 export async function getAtlassianCredentials(): Promise<NetrcCredentials> {
+  const email = process.env['JIRA_EMAIL'];
+  const token = process.env['JIRA_API_TOKEN'];
+
+  if (email && token) {
+    return { login: email, password: token };
+  }
+
   const netrcPath = join(homedir(), '.netrc');
   let content: string;
   try {
     content = await readFile(netrcPath, 'utf-8');
   } catch {
     throw new Error(
-      `Cannot read ~/.netrc at ${netrcPath}. Ensure it exists with Atlassian credentials.`,
+      'No Jira credentials found. Set JIRA_EMAIL + JIRA_API_TOKEN env vars, or create ~/.netrc with Atlassian credentials.',
     );
   }
 
@@ -35,7 +45,7 @@ export async function getAtlassianCredentials(): Promise<NetrcCredentials> {
   return { login: match[1], password: match[2] };
 }
 
-/** Build a Basic Auth header value from netrc credentials. */
+/** Build a Basic Auth header value from credentials. */
 export function basicAuthHeader(creds: NetrcCredentials): string {
   return `Basic ${Buffer.from(`${creds.login}:${creds.password}`).toString('base64')}`;
 }

@@ -1,5 +1,5 @@
-import { runAcli } from '../acli.js';
-import type { ToolResult } from '../types.js';
+import { jiraRequest } from '../jira-api.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface CreateTicketParams {
   summary: string;
@@ -8,66 +8,73 @@ interface CreateTicketParams {
   parent?: string;
 }
 
-/**
- * Create a Jira ticket. Avoids the --json duplication bug by parsing plain text output.
- * If parent is specified, sets it at creation time via acli --parent flag.
- */
+interface CreateIssueResponse {
+  key: string;
+  self: string;
+}
+
+/** Create a Jira ticket via REST API. */
 export async function createTicket(
   params: CreateTicketParams,
-): Promise<ToolResult> {
+): Promise<CallToolResult> {
   const { summary, type = 'Task', description, parent } = params;
 
-  const args = [
-    'workitem',
-    'create',
-    '--project',
-    'LS',
-    '--type',
-    type,
-    '--summary',
+  const fields: Record<string, unknown> = {
+    project: { key: 'LS' },
+    issuetype: { name: type },
     summary,
-  ];
-
-  if (parent) {
-    args.push('--parent', parent);
-  }
+  };
 
   if (description) {
-    args.push('--description', description);
+    fields['description'] = {
+      type: 'doc',
+      version: 1,
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: description }],
+        },
+      ],
+    };
   }
 
-  // IMPORTANT: Do NOT pass --json — it causes duplicate ticket creation
-  const output = await runAcli(args);
+  if (parent) {
+    fields['parent'] = { key: parent };
+  }
 
-  // Parse the key from acli plain text output (e.g., "Created LS-1234" or "Key: LS-1234")
-  const keyMatch = /\b(LS-\d+)\b/.exec(output);
-  if (!keyMatch) {
+  try {
+    const result = await jiraRequest<CreateIssueResponse>({
+      method: 'POST',
+      path: '/rest/api/3/issue',
+      body: { fields },
+    });
+
     return {
       content: [
         {
           type: 'text',
           text: JSON.stringify({
-            success: false,
-            error: `Could not parse ticket key from output: ${output}`,
+            success: true,
+            key: result.key,
+            url: `https://bkrupa.atlassian.net/browse/${result.key}`,
           }),
         },
       ],
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    return {
       isError: true,
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            success: false,
+            error: message,
+          }),
+        },
+      ],
     };
   }
-
-  const key = keyMatch[1];
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          key,
-          url: `https://bkrupa.atlassian.net/browse/${key}`,
-        }),
-      },
-    ],
-  };
 }

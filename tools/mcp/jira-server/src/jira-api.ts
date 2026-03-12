@@ -6,6 +6,7 @@ interface JiraRequestOptions {
   method: 'GET' | 'PUT' | 'POST';
   path: string;
   body?: Record<string, unknown>;
+  query?: Record<string, string>;
 }
 
 /** Make an authenticated Jira REST API request. */
@@ -13,7 +14,12 @@ export async function jiraRequest<T = unknown>(
   opts: JiraRequestOptions,
 ): Promise<T> {
   const creds = await getAtlassianCredentials();
-  const url = `${JIRA_BASE}${opts.path}`;
+  let url = `${JIRA_BASE}${opts.path}`;
+
+  if (opts.query) {
+    const params = new URLSearchParams(opts.query);
+    url += `?${params.toString()}`;
+  }
 
   const response = await fetch(url, {
     method: opts.method,

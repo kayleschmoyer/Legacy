@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "legacy-sports-jira": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["tsx", "tools/mcp/jira-server/src/index.ts"],
+      "env": {
+        "JIRA_EMAIL": "${JIRA_EMAIL}",
+        "JIRA_API_TOKEN": "${JIRA_API_TOKEN}"
+      }
+    }
+  }
+}

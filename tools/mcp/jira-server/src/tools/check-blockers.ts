@@ -1,5 +1,5 @@
-import { runAcli } from '../acli.js';
-import type { ToolResult } from '../types.js';
+import { jiraRequest } from '../jira-api.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface CheckBlockersParams {
   key: string;
@@ -17,6 +17,17 @@ interface CheckBlockersResult {
   recommendation: string;
 }
 
+interface JiraIssueLink {
+  type: { name: string; inward: string };
+  inwardIssue?: { key: string; fields: { status: { name: string } } };
+}
+
+interface JiraIssueResponse {
+  fields: {
+    issuelinks: JiraIssueLink[];
+  };
+}
+
 /**
  * Check if a ticket's blockers are resolved.
  * Implements the 3-way dependency check from copilot-instructions.md Step 3:
@@ -26,108 +37,90 @@ interface CheckBlockersResult {
  */
 export async function checkBlockers(
   params: CheckBlockersParams,
-): Promise<ToolResult> {
+): Promise<CallToolResult> {
   const { key } = params;
 
-  // Get linked issues
-  let linkOutput: string;
   try {
-    linkOutput = await runAcli(['workitem', 'link', 'list', '--key', key]);
-  } catch {
-    // No links — no blockers
-    return makeResult({
-      canProceed: true,
-      blockers: [],
-      recommendation: 'base off main',
+    const issue = await jiraRequest<JiraIssueResponse>({
+      method: 'GET',
+      path: `/rest/api/3/issue/${key}`,
+      query: { fields: 'issuelinks' },
     });
-  }
 
-  if (!linkOutput.trim()) {
-    return makeResult({
-      canProceed: true,
-      blockers: [],
-      recommendation: 'base off main',
-    });
-  }
+    // Extract "is blocked by" links with their statuses
+    const blockerLinks = issue.fields.issuelinks.filter(
+      (link) =>
+        link.inwardIssue &&
+        link.type.inward.toLowerCase().includes('is blocked by'),
+    );
 
-  // Parse all "is blocked by" links
-  const blockerKeys: string[] = [];
-  for (const line of linkOutput.split('\n')) {
-    const match = /is blocked by\s+(LS-\d+)/i.exec(line);
-    if (match) {
-      blockerKeys.push(match[1]);
+    if (blockerLinks.length === 0) {
+      return makeResult({
+        canProceed: true,
+        blockers: [],
+        recommendation: 'base off main',
+      });
     }
-  }
 
-  if (blockerKeys.length === 0) {
-    return makeResult({
-      canProceed: true,
-      blockers: [],
-      recommendation: 'base off main',
-    });
-  }
+    const blockers: BlockerInfo[] = blockerLinks.map((link) => {
+      const blockerKey = link.inwardIssue!.key;
+      const status = link.inwardIssue!.fields.status.name;
 
-  // Check status of each blocker
-  const blockers: BlockerInfo[] = [];
-  for (const blockerKey of blockerKeys) {
-    let status = 'Unknown';
-    try {
-      const statusOutput = await runAcli([
-        'workitem',
-        'view',
-        '--key',
-        blockerKey,
-        '--fields',
-        'status',
-      ]);
-      const statusMatch = /Status:\s*(.+)/i.exec(statusOutput);
-      if (statusMatch) {
-        status = statusMatch[1].trim();
+      let reason: string;
+      if (status === 'Done') {
+        reason = 'Resolved — no longer blocking';
+      } else if (status === 'In Review') {
+        reason = 'In Review — use its branch as parent';
+      } else {
+        reason = `Status is "${status}" — must reach at least "In Review" before proceeding`;
       }
-    } catch {
-      status = 'Unknown (could not fetch)';
-    }
 
-    let reason: string;
-    if (status === 'Done') {
-      reason = 'Resolved — no longer blocking';
-    } else if (status === 'In Review') {
-      reason = 'In Review — use its branch as parent';
+      return { key: blockerKey, status, reason };
+    });
+
+    // Determine recommendation based on blocker statuses
+    const unresolvedBlockers = blockers.filter(
+      (b) => b.status !== 'Done' && b.status !== 'In Review',
+    );
+    const inReviewBlockers = blockers.filter((b) => b.status === 'In Review');
+
+    let canProceed: boolean;
+    let recommendation: string;
+
+    if (unresolvedBlockers.length > 0) {
+      canProceed = false;
+      recommendation = `STOP — blocker(s) not ready: ${unresolvedBlockers.map((b) => `${b.key} (${b.status})`).join(', ')}`;
+    } else if (inReviewBlockers.length === 1) {
+      canProceed = true;
+      const parentKey = inReviewBlockers[0].key;
+      recommendation = `base off ${parentKey} branch`;
+    } else if (inReviewBlockers.length > 1) {
+      canProceed = false;
+      const inReviewList = inReviewBlockers.map((b) => b.key).join(', ');
+      recommendation = `STOP — multiple blockers are In Review; a human must choose the parent branch from: ${inReviewList}`;
     } else {
-      reason = `Status is "${status}" — must reach at least "In Review" before proceeding`;
+      canProceed = true;
+      recommendation = 'base off main';
     }
 
-    blockers.push({ key: blockerKey, status, reason });
+    return makeResult({ canProceed, blockers, recommendation });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `Failed to check blockers for ${key}: ${message}`,
+        },
+      ],
+    };
   }
-
-  // Determine recommendation based on blocker statuses
-  const unresolvedBlockers = blockers.filter(
-    (b) => b.status !== 'Done' && b.status !== 'In Review',
-  );
-  const inReviewBlockers = blockers.filter((b) => b.status === 'In Review');
-
-  let canProceed: boolean;
-  let recommendation: string;
-
-  if (unresolvedBlockers.length > 0) {
-    canProceed = false;
-    recommendation = `STOP — blocker(s) not ready: ${unresolvedBlockers.map((b) => `${b.key} (${b.status})`).join(', ')}`;
-  } else if (inReviewBlockers.length > 0) {
-    canProceed = true;
-    // Recommend the first in-review blocker's branch as parent
-    const parentKey = inReviewBlockers[0].key;
-    recommendation = `base off ${parentKey} branch`;
-  } else {
-    canProceed = true;
-    recommendation = 'base off main';
-  }
-
-  return makeResult({ canProceed, blockers, recommendation });
 }
 
-function makeResult(result: CheckBlockersResult): ToolResult {
+function makeResult(result: CheckBlockersResult): CallToolResult {
   return {
-    isError: !result.canProceed,
     content: [
       {
         type: 'text',

@@ -7,7 +7,7 @@ description: 'Use the Jira MCP server tools for ticket operations: create ticket
 
 ## Overview
 
-The Jira MCP server (`tools/mcp/jira-server/`) wraps Jira operations with guardrails, working around known acli bugs and eliminating multi-step REST API workarounds.
+The Jira MCP server (`tools/mcp/jira-server/`) wraps Jira operations with guardrails using the Jira REST API directly. Credentials are resolved from environment variables (`JIRA_EMAIL` / `JIRA_API_TOKEN`) or `~/.netrc`, so no external CLI tools are required.
 
 ## When to Use
 
@@ -19,13 +19,14 @@ The Jira MCP server (`tools/mcp/jira-server/`) wraps Jira operations with guardr
 
 ## Prerequisites
 
-- `acli` CLI on PATH
-- `~/.netrc` with Atlassian credentials (for REST API operations):
-  ```
-  machine bkrupa.atlassian.net
-  login your-email@example.com
-  password your-api-token
-  ```
+- Jira credentials available to the MCP server, resolved in this priority order:
+  1. Environment variables: `JIRA_EMAIL` and `JIRA_API_TOKEN`
+  2. `~/.netrc` with Atlassian credentials:
+     ```
+     machine bkrupa.atlassian.net
+     login your-email@example.com
+     password your-api-token
+     ```
 - MCP server configured in `.vscode/mcp.json` (already included in the repo)
 
 ## Available Tools
@@ -41,7 +42,7 @@ Create a Jira ticket with proper defaults.
 | `description` | string | no       |         | Ticket description       |
 | `parent`      | string | no       |         | Parent epic key (LS-640) |
 
-**Guardrail:** Never uses `--json` flag (avoids the acli duplication bug).
+**Guardrail:** Uses Jira REST API directly (no external CLI dependencies).
 
 ### jira_transition
 
@@ -52,7 +53,7 @@ Transition a ticket to a new status.
 | `key`     | string | yes      | Ticket key (LS-1137)            |
 | `status`  | enum   | yes      | In Progress, In Review, or Done |
 
-**Guardrail:** Validates the status string before calling acli.
+**Guardrail:** Validates the status value and only allows transitions to these statuses via the Jira REST API.
 
 ### jira_view
 
@@ -97,7 +98,7 @@ Set or change the parent epic of an existing ticket.
 | `key`     | string | yes      | Ticket key to update |
 | `parent`  | string | yes      | Parent epic key      |
 
-**Guardrail:** Uses Jira REST API (acli `edit` cannot set the parent field).
+**Guardrail:** Uses Jira REST API PUT to set the parent field on existing issues.
 
 ## Configuration
 
@@ -117,14 +118,20 @@ The server is configured in `.vscode/mcp.json`:
 
 ## Troubleshooting
 
-### "acli not found"
+### Missing Jira credentials
 
-Ensure `acli` is on your PATH. Run `acli --version` to verify.
+The Jira MCP server authenticates to Jira using either environment variables or your `~/.netrc` file.
+
+- Check that `JIRA_EMAIL` and `JIRA_API_TOKEN` are set in your environment.
+- If you prefer `~/.netrc`, ensure it exists and contains your Atlassian email and API token.
 
 ### "No Atlassian credentials found in ~/.netrc"
 
-Create `~/.netrc` with your Atlassian email and API token. The REST API tools (`jira_set_parent`) require this.
+If you see this message, either:
+
+- Create `~/.netrc` with your Atlassian email and API token, **or**
+- Set `JIRA_EMAIL` and `JIRA_API_TOKEN` environment variables for the process running the MCP server.
 
 ### Tool returns error about status validation
 
-Only `In Progress`, `In Review`, and `Done` are supported transitions. Other Jira statuses require using acli directly.
+Only `In Progress`, `In Review`, and `Done` are supported transitions. For other Jira statuses, use the Jira web UI or a direct REST client.
