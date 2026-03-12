@@ -64,6 +64,7 @@ Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
 | **WebSocket refetch UX**        | `.github/skills/websocket-refetch-ux/SKILL.md`                             |
 | **Rebase & conflicts**          | `.github/skills/rebase-conflicts/SKILL.md`                                 |
 | **Resolve merge conflicts**     | `.github/skills/resolve-merge-conflicts/SKILL.md`                          |
+| **MCP Jira server**             | `.github/skills/mcp-jira/SKILL.md`                                         |
 | **Worktree workflow (default)** | `.github/skills/worktree-workflow/SKILL.md`                                |
 | All skills (60 guides)          | `.github/skills/`                                                          |
 | CSV reference data              | `docs/agents/*.csv`                                                        |

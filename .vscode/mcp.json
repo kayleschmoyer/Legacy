@@ -5,6 +5,11 @@
       "type": "stdio",
       "command": "npx",
       "args": ["tsx", "tools/mcp/db-server/src/index.ts"]
+    },
+    "legacy-sports-jira": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["tsx", "tools/mcp/jira-server/src/index.ts"]
     }
   }
 }
