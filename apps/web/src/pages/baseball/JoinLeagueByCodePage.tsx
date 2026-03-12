@@ -92,7 +92,8 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
         });
       }
     } catch (err) {
-      setError((err as Error).message || 'Failed to join league');
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error.message || 'Failed to join league');
       // Only log unexpected errors to Rollbar. BAD_USER_INPUT errors (invalid
       // invite code, already a member, league full) are expected user-facing
       // conditions and should not generate error noise in error tracking.
@@ -100,7 +101,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
         CombinedGraphQLErrors.is(err) &&
         err.errors.some((e) => e.extensions?.['code'] === 'BAD_USER_INPUT');
       if (!isUserInputError) {
-        LOGGER.error('Error joining league:', String(err));
+        LOGGER.error('Error joining league', error);
       }
     }
   };
