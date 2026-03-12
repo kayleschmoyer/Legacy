@@ -14,6 +14,27 @@ import { PublicSchema } from '../client/PublicDbClient';
 import type { PublicDb } from '../client/PublicDbClient';
 
 /**
+ * Build a name-search OR condition that matches first name, last name, or the
+ * full name expression used by the trigram index (idx_players_name_trgm).
+ *
+ * The index is on `lower(first_name || ' ' || last_name)`, so the full-name
+ * branch uses the identical expression with a lowercased pattern to allow
+ * Postgres to use the index.
+ */
+function buildPlayerNameSearch(searchTerm: string): SQL<unknown> | undefined {
+  const searchPattern = `%${searchTerm}%`;
+  const fullNamePattern = `%${searchTerm.toLowerCase()}%`;
+  return or(
+    ilike(PublicSchema.players.firstName, searchPattern),
+    ilike(PublicSchema.players.lastName, searchPattern),
+    ilike(
+      sql`lower(${PublicSchema.players.firstName} || ' ' || ${PublicSchema.players.lastName})`,
+      fullNamePattern,
+    ),
+  );
+}
+
+/**
  * Type-safe query builder using Drizzle's recommended conditional patterns
  * This approach avoids .$dynamic() by building complete queries conditionally
  * following Drizzle best practices for complex queries
@@ -160,11 +181,7 @@ export class CareerBattingQueryBuilder {
     // Add search conditions to existing batting conditions when a search term is provided
     const allConditions = [...battingConditions];
     if (searchTerm) {
-      const searchPattern = `%${searchTerm}%`;
-      const searchCondition = or(
-        ilike(PublicSchema.players.firstName, searchPattern),
-        ilike(PublicSchema.players.lastName, searchPattern),
-      );
+      const searchCondition = buildPlayerNameSearch(searchTerm);
       if (searchCondition) {
         allConditions.push(searchCondition);
       }
@@ -275,11 +292,7 @@ export class CareerBattingQueryBuilder {
     orderByClause: SQL<unknown>,
     options: QueryOptions,
   ) {
-    const searchPattern = `%${searchTerm}%`;
-    const searchCondition = or(
-      ilike(PublicSchema.players.firstName, searchPattern),
-      ilike(PublicSchema.players.lastName, searchPattern),
-    );
+    const searchCondition = buildPlayerNameSearch(searchTerm);
     const positionCondition = ilike(
       PublicSchema.careerFieldingByPosition.pos,
       position,
@@ -479,11 +492,7 @@ export class CareerBattingQueryBuilder {
     // Add search condition if provided
     const allConditions = [...battingConditions];
     if (filters.searchTerm) {
-      const searchPattern = `%${filters.searchTerm}%`;
-      const searchCondition = or(
-        ilike(PublicSchema.players.firstName, searchPattern),
-        ilike(PublicSchema.players.lastName, searchPattern),
-      );
+      const searchCondition = buildPlayerNameSearch(filters.searchTerm);
       if (searchCondition) {
         allConditions.push(searchCondition);
       }
@@ -636,11 +645,7 @@ export class CareerBattingQueryBuilder {
       );
     }
     if (filters.searchTerm) {
-      const searchPattern = `%${filters.searchTerm}%`;
-      const searchCondition = or(
-        ilike(PublicSchema.players.firstName, searchPattern),
-        ilike(PublicSchema.players.lastName, searchPattern),
-      );
+      const searchCondition = buildPlayerNameSearch(filters.searchTerm);
       if (searchCondition) {
         conditions.push(searchCondition);
       }
@@ -738,11 +743,7 @@ export class CareerPitchingQueryBuilder {
   ) {
     // Add search condition
     if (filters.searchTerm) {
-      const searchPattern = `%${filters.searchTerm}%`;
-      const searchCondition = or(
-        ilike(PublicSchema.players.firstName, searchPattern),
-        ilike(PublicSchema.players.lastName, searchPattern),
-      );
+      const searchCondition = buildPlayerNameSearch(filters.searchTerm);
       if (searchCondition) {
         conditions.push(searchCondition);
       }
