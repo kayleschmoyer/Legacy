@@ -44,11 +44,6 @@ const DANGEROUS_PATTERNS = {
     pattern: /SQS.*URL=https:\/\/sqs\.[a-z-]+\d+\.amazonaws\.com\/\d{12}\//,
     description: 'Production SQS queue with account ID detected',
   },
-  NX_CLOUD_TOKEN: {
-    pattern:
-      /NX_CLOUD_ACCESS_TOKEN=(?!your-nx-cloud-access-token|placeholder)[A-Za-z0-9]{20,}/,
-    description: 'Real Nx Cloud access token detected',
-  },
 };
 
 // ✅ Safe placeholder patterns
@@ -63,7 +58,6 @@ const SAFE_PLACEHOLDERS = [
   'your-google-client-id',
   'your-db-host',
   'your-rds-proxy',
-  'your-nx-cloud',
   'localhost',
   'example.com',
   '# SECURITY:',

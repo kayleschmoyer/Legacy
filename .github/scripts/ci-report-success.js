@@ -2,9 +2,8 @@
  * CI Success Report Generator
  *
  * Generates success reports for PR comments with:
- * - Execution summary (DTE/local, agents used)
+ * - Execution summary and parallel process count
  * - Performance metrics and duration analysis
- * - Quota status tracking
  * - List of validated checks
  */
 
@@ -37,22 +36,10 @@ module.exports = async ({ github, context, core }) => {
   const prNumber = parseInt(process.env.PR_NUMBER);
   const executionMode = process.env.EXECUTION_MODE;
   const agents = process.env.OPTIMAL_AGENTS;
-  const fallbackReason = process.env.FALLBACK_REASON;
-  const quotaStatus = process.env.QUOTA_STATUS;
-  const quotaExceeded = process.env.QUOTA_EXCEEDED;
   const workflowDuration = process.env.WORKFLOW_DURATION;
 
   // Build performance note
-  let performanceNote = '';
-  if (executionMode === 'distributed') {
-    performanceNote =
-      '**Performance**: 60-80% faster with Distributed Task Execution';
-  } else {
-    performanceNote = '**Performance**: Standard GitHub Actions';
-    if (!fallbackReason) {
-      performanceNote += ' (add NX_CLOUD_ACCESS_TOKEN for 60-80% speedup)';
-    }
-  }
+  let performanceNote = '**Performance**: Standard GitHub Actions';
 
   // Add duration context if available
   let durationNote = '';
@@ -70,20 +57,6 @@ module.exports = async ({ github, context, core }) => {
     }
   }
 
-  // Build quota information
-  let quotaInfo = '';
-  if (quotaExceeded === 'true') {
-    quotaInfo = '- **DTE Quota (Exhausted)**: Fell back to local runners\n';
-  } else if (quotaStatus) {
-    if (quotaStatus === 'available') {
-      quotaInfo = '- **DTE Quota**: Available\n';
-    } else if (quotaStatus === 'limited') {
-      quotaInfo = '- **DTE Quota**: Limited (consider optimization)\n';
-    } else if (quotaStatus === 'exhausted') {
-      quotaInfo = '- **DTE Quota**: Exhausted\n';
-    }
-  }
-
   // Build comment
   const comment =
     commentMarker +
@@ -91,20 +64,14 @@ module.exports = async ({ github, context, core }) => {
     '## CI Pipeline Passed\n\n' +
     'All checks completed successfully! This PR is ready for review and merge.\n\n' +
     '### Execution Summary\n' +
-    '- **Mode**: ' +
-    (executionMode === 'distributed'
-      ? 'Distributed Task Execution (DTE)'
-      : 'Local GitHub Actions') +
-    '\n' +
-    '- **Agents/Processes**: ' +
+    '- **Mode**: Local GitHub Actions\n' +
+    '- **Parallel Processes**: ' +
     agents +
     '\n' +
     '- ' +
     performanceNote +
     '\n' +
     (durationNote ? '- ' + durationNote + '\n' : '') +
-    quotaInfo +
-    (fallbackReason ? '- **Note**: ' + fallbackReason + '\n' : '') +
     '\n### What Was Validated\n' +
     '- Code formatting and style\n' +
     '- ESLint rules and best practices\n' +

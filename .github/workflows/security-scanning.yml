@@ -446,58 +446,22 @@ jobs:
           install-dependencies: true
           set-nx-shas: true
 
-      - name: "☁️ Detect DTE Availability"
-        id: detect-dte
-        uses: ./.github/actions/detect-dte
-        with:
-          nx-cloud-token: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-
-      - name: "☁️ Start Nx Cloud CI Run"
-        id: start-dte
-        if: steps.detect-dte.outputs.dte-available == 'true' && github.event_name != 'pull_request'
-        continue-on-error: true
-        run: |
-          echo "🚀 Starting Nx Cloud DTE..."
-          DTE_START_OUTPUT=$(mktemp)
-          DTE_START_RESULT=0
-
-          pnpm exec nx-cloud start-ci-run --distribute-on="${{ steps.detect-dte.outputs.optimal-agents }} linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
-
-          if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|authenticate\|401\|invalid.*credential" "$DTE_START_OUTPUT"; then
-            echo "::warning title=DTE Unavailable::Nx Cloud DTE unavailable. Build will proceed with local execution."
-            cat "$DTE_START_OUTPUT"
-            rm -f "$DTE_START_OUTPUT"
-            exit 1
-          fi
-
-          rm -f "$DTE_START_OUTPUT"
-          echo "✅ DTE session started"
-
-      - name: "🛡️ CodeQL Analysis Setup"
-        # Skip CodeQL on PRs for faster feedback (runs on main branch & weekly scans)
+      - name: "� Initialize CodeQL Analysis"
+        # Skip CodeQL on PRs for faster feedback
         if: github.event_name != 'pull_request'
         uses: github/codeql-action/init@v4
         with:
           languages: javascript,typescript
           queries: security-extended,security-and-quality
 
-      - name: "📦 Build for Analysis"
+      - name: "�📦 Build for Analysis"
         # Skip build on PRs when CodeQL is skipped
         if: github.event_name != 'pull_request'
         timeout-minutes: 10
+        env:
+          NX_NO_CLOUD: "true"
         run: |
           echo "🏗️ Building applications for SAST analysis..."
-
-          # Set Nx Cloud token conditionally based on DTE availability
-          if [ "${{ steps.start-dte.outcome }}" = "success" ]; then
-            echo "✅ Using Nx Cloud with DTE"
-            export NX_CLOUD_ACCESS_TOKEN="${{ secrets.NX_CLOUD_ACCESS_TOKEN }}"
-          else
-            echo "⚠️ DTE unavailable - using local execution"
-            unset NX_CLOUD_ACCESS_TOKEN
-            export NX_NO_CLOUD=true
-            export NX_CLOUD_DISTRIBUTED_EXECUTION=false
-          fi
 
           NX_CMD="${NX_COMMAND:-}"
           if [ -z "$NX_CMD" ]; then

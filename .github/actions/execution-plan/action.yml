@@ -6,14 +6,13 @@ inputs:
     description: "JSON array of affected components from change detection"
     required: true
   execution-mode:
-    description: "Execution mode (distributed/local)"
-    required: true
-  dte-available:
-    description: "Whether DTE is available"
-    required: true
+    description: "Execution mode (always local)"
+    required: false
+    default: "local"
   optimal-agents:
-    description: "Number of optimal agents/parallel processes"
-    required: true
+    description: "Number of parallel processes"
+    required: false
+    default: "4"
   requires-full-build:
     description: "Whether changes require full mono-repo build"
     required: true
@@ -67,7 +66,6 @@ runs:
         # Parse inputs
         AFFECTED_COMPONENTS='${{ inputs.affected-components }}'
         EXECUTION_MODE="${{ inputs.execution-mode }}"
-        DTE_AVAILABLE="${{ inputs.dte-available }}"
         OPTIMAL_AGENTS="${{ inputs.optimal-agents }}"
         REQUIRES_FULL_BUILD="${{ inputs.requires-full-build }}"
         IOS_ENABLED="${{ inputs.ios-enabled }}"
@@ -76,14 +74,13 @@ runs:
         echo "📋 Planning inputs:"
         echo "  - Affected Components: $(echo "$AFFECTED_COMPONENTS" | jq -r 'join(", ")')"
         echo "  - Execution Mode: $EXECUTION_MODE"
-        echo "  - DTE Available: $DTE_AVAILABLE" 
-        echo "  - Optimal Agents: $OPTIMAL_AGENTS"
+        echo "  - Parallel Processes: $OPTIMAL_AGENTS"
         echo "  - Full Build Required: $REQUIRES_FULL_BUILD"
         echo "  - Event: $EVENT_NAME"
 
         # Determine execution strategy
         COMPONENT_COUNT=$(echo "$AFFECTED_COMPONENTS" | jq 'length')
-        
+
         if [ "$REQUIRES_FULL_BUILD" == "true" ]; then
           STRATEGY="full"
           ESTIMATED_DURATION=25
@@ -93,11 +90,6 @@ runs:
         else
           STRATEGY="selective"
           ESTIMATED_DURATION=15
-        fi
-
-        # Adjust duration based on execution mode
-        if [ "$DTE_AVAILABLE" == "true" ]; then
-          ESTIMATED_DURATION=$((ESTIMATED_DURATION * 70 / 100)) # 30% faster with DTE
         fi
 
         # Determine what should run based on affected components
@@ -158,7 +150,30 @@ runs:
         fi
 
         # Create comprehensive execution plan JSON
-        EXECUTION_PLAN=$(printf '%s' "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"trigger\":\"$EVENT_NAME\",\"strategy\":\"$STRATEGY\",\"execution_mode\":\"$EXECUTION_MODE\",\"resources\":{\"dte_available\":$DTE_AVAILABLE,\"optimal_agents\":$OPTIMAL_AGENTS,\"estimated_duration_minutes\":$ESTIMATED_DURATION},\"affected_components\":$AFFECTED_COMPONENTS,\"execution_plan\":{\"quality_gates\":true,\"tests\":$SHOULD_RUN_TESTS,\"builds\":{\"web\":$SHOULD_BUILD_WEB,\"mobile\":$SHOULD_BUILD_MOBILE,\"ios\":$([ \"$SHOULD_BUILD_MOBILE\" == \"true\" ] && [ \"$IOS_ENABLED\" == \"true\" ] && echo \"true\" || echo \"false\"),\"android\":$SHOULD_BUILD_MOBILE,\"lambdas\":$SHOULD_BUILD_LAMBDAS},\"validation\":{\"terraform\":$SHOULD_VALIDATE_TERRAFORM,\"e2e\":$SHOULD_RUN_E2E}},\"optimization\":{\"cache_enabled\":true,\"parallel_execution\":true,\"selective_execution\":$([ \"$STRATEGY\" != \"full\" ] && echo \"true\" || echo \"false\")}}")
+        IOS_BUILD=$([ "$SHOULD_BUILD_MOBILE" == "true" ] && \
+          [ "$IOS_ENABLED" == "true" ] && echo "true" || echo "false")
+        SELECTIVE=$([ "$STRATEGY" != "full" ] && echo "true" || echo "false")
+
+        PLAN_JSON="{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
+        PLAN_JSON+="\"trigger\":\"$EVENT_NAME\","
+        PLAN_JSON+="\"strategy\":\"$STRATEGY\","
+        PLAN_JSON+="\"execution_mode\":\"$EXECUTION_MODE\","
+        PLAN_JSON+="\"resources\":{\"optimal_agents\":$OPTIMAL_AGENTS,"
+        PLAN_JSON+="\"estimated_duration_minutes\":$ESTIMATED_DURATION},"
+        PLAN_JSON+="\"affected_components\":$AFFECTED_COMPONENTS,"
+        PLAN_JSON+="\"execution_plan\":{\"quality_gates\":true,"
+        PLAN_JSON+="\"tests\":$SHOULD_RUN_TESTS,"
+        PLAN_JSON+="\"builds\":{\"web\":$SHOULD_BUILD_WEB,"
+        PLAN_JSON+="\"mobile\":$SHOULD_BUILD_MOBILE,"
+        PLAN_JSON+="\"ios\":$IOS_BUILD,"
+        PLAN_JSON+="\"android\":$SHOULD_BUILD_MOBILE,"
+        PLAN_JSON+="\"lambdas\":$SHOULD_BUILD_LAMBDAS},"
+        PLAN_JSON+="\"validation\":{\"terraform\":$SHOULD_VALIDATE_TERRAFORM,"
+        PLAN_JSON+="\"e2e\":$SHOULD_RUN_E2E}},"
+        PLAN_JSON+="\"optimization\":{\"cache_enabled\":true,"
+        PLAN_JSON+="\"parallel_execution\":true,"
+        PLAN_JSON+="\"selective_execution\":$SELECTIVE}}"
+        EXECUTION_PLAN="$PLAN_JSON"
 
         # Set all outputs
         echo "execution-plan=$(echo "$EXECUTION_PLAN" | jq -c .)" >> $GITHUB_OUTPUT
@@ -178,17 +193,32 @@ runs:
         echo "- **Estimated Duration**: ~$ESTIMATED_DURATION minutes" >> $GITHUB_STEP_SUMMARY
         echo "- **Affected Components**: $(echo "$AFFECTED_COMPONENTS" | jq -r 'length') component(s)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         echo "### Execution Matrix" >> $GITHUB_STEP_SUMMARY
         echo "| Component | Action | Reason |" >> $GITHUB_STEP_SUMMARY
         echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
         echo "| Quality Gates | ✅ **Will Run** | Always executed for code standards |" >> $GITHUB_STEP_SUMMARY
-        echo "| Tests | $( [ "$SHOULD_RUN_TESTS" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_RUN_TESTS" == "true" ] && echo "Code changes detected" || echo "No testable changes" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Web Build | $( [ "$SHOULD_BUILD_WEB" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_BUILD_WEB" == "true" ] && echo "Web app or dependencies changed" || echo "No web changes" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Mobile Build | $( [ "$SHOULD_BUILD_MOBILE" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_BUILD_MOBILE" == "true" ] && echo "Mobile app or dependencies changed" || echo "No mobile changes" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Lambda Build | $( [ "$SHOULD_BUILD_LAMBDAS" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_BUILD_LAMBDAS" == "true" ] && echo "Lambda functions or APIs changed" || echo "No lambda changes" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| E2E Tests | $( [ "$SHOULD_RUN_E2E" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_RUN_E2E" == "true" ] && echo "Web changes require user flow validation" || echo "No web UI changes" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Terraform Validation | $( [ "$SHOULD_VALIDATE_TERRAFORM" == "true" ] && echo "✅ **Will Run**" || echo "⏭️ Skipped" ) | $( [ "$SHOULD_VALIDATE_TERRAFORM" == "true" ] && echo "Infrastructure changes detected" || echo "No infrastructure changes" ) |" >> $GITHUB_STEP_SUMMARY
+        # Helper: plan_row <flag> <name> <onMsg> <offMsg>
+        plan_row() {
+          local S; local R
+          if [ "$1" == "true" ]; then
+            S="✅ **Will Run**"; R="$3"
+          else S="⏭️ Skipped"; R="$4"; fi
+          echo "| $2 | $S | $R |" >> $GITHUB_STEP_SUMMARY
+        }
+
+        plan_row "$SHOULD_RUN_TESTS" "Tests" \
+          "Code changes detected" "No testable changes"
+        plan_row "$SHOULD_BUILD_WEB" "Web Build" \
+          "Web app or dependencies changed" "No web changes"
+        plan_row "$SHOULD_BUILD_MOBILE" "Mobile Build" \
+          "Mobile app or dependencies changed" "No mobile changes"
+        plan_row "$SHOULD_BUILD_LAMBDAS" "Lambda Build" \
+          "Lambda functions or APIs changed" "No lambda changes"
+        plan_row "$SHOULD_RUN_E2E" "E2E Tests" \
+          "Web changes require user flow validation" "No web UI changes"
+        plan_row "$SHOULD_VALIDATE_TERRAFORM" "Terraform Validation" \
+          "Infrastructure changes detected" "No infrastructure changes"
 
         # Add strategy-specific notices
         case "$STRATEGY" in

@@ -324,7 +324,6 @@
     "nodemon": "^3.1.5",
     "npkill": "^0.12.2",
     "nx": "21.6.10",
-    "nx-cloud": "^19.1.0",
     "playwright": "^1.55.0",
     "prettier": "^3.8.0",
     "react-native-svg-transformer": "^1.5.3",

@@ -2,7 +2,7 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "defaultBase": "origin/main",
   "useDaemonProcess": true,
-  "//nxCloud": "Nx Cloud auth is handled via the NX_CLOUD_ACCESS_TOKEN env var (set by CI secrets). Do NOT add nxCloudAccessToken here â€” placeholder values cause 401 errors and non-zero exit codes.",
+
   "tasksRunnerOptions": {
     "default": {
       "runner": "nx/tasks-runners/default",

@@ -1,12 +1,12 @@
 # Nx Remote Cache Action
 
-This custom GitHub Action implements Nx remote caching using GitHub Actions cache, providing similar benefits to Nx Cloud DTE without the cost.
+This custom GitHub Action implements Nx remote caching using GitHub Actions cache.
 
 ## Features
 
 - ✅ **Base Branch Cache Restoration**: PRs automatically restore cache from the base branch (typically `main`)
 - ✅ **Incremental Builds**: Nx only rebuilds projects affected by your changes
-- ✅ **Cost Effective**: Uses GitHub Actions cache instead of paid Nx Cloud
+- ✅ **Cost Effective**: Uses free GitHub Actions cache (10 GB per repo)
 - ✅ **Smart Cache Keys**: Considers dependencies and Nx configuration changes
 - ✅ **Automatic Fallbacks**: Multiple restore-keys for partial cache hits
 
@@ -156,48 +156,6 @@ nx-cache-<branch>-<deps-hash>-<config-hash>
 3. nx-cache-main-                     # Any cache from main
 ```
 
-## Disabling Nx Cloud
-
-If you want to exclusively use GitHub Actions cache and disable Nx Cloud:
-
-### Option 1: Remove Nx Cloud Token (Recommended)
-
-Remove or comment out in [nx.json](../../../nx.json):
-
-```json
-{
-  // "nxCloudAccessToken": "$(NX_CLOUD_ACCESS_TOKEN)",
-  "useDaemonProcess": true,
-  ...
-}
-```
-
-### Option 2: Environment Variable
-
-Set in workflow:
-
-```yaml
-env:
-  NX_CLOUD_ACCESS_TOKEN: '' # Disable Nx Cloud
-```
-
-### Comparison: GitHub Actions Cache vs Nx Cloud
-
-| Feature          | GitHub Actions Cache        | Nx Cloud DTE              |
-| ---------------- | --------------------------- | ------------------------- |
-| **Cost**         | Free (10 GB limit per repo) | Paid ($299+/month)        |
-| **Speed**        | Fast (same-region cache)    | Very Fast (optimized CDN) |
-| **Distribution** | Manual (actions/cache)      | Automatic (DTE agents)    |
-| **Cache Size**   | 10 GB total per repo        | Unlimited                 |
-| **Analytics**    | Basic (GitHub logs)         | Advanced (dashboard)      |
-| **Setup**        | This action ✅              | Nx Cloud account          |
-
-**Recommendation**: Start with GitHub Actions cache (this action). Upgrade to Nx Cloud if:
-
-- You exceed 10 GB cache limit
-- You need advanced analytics
-- You want automatic DTE agent distribution
-
 ## Monitoring Cache Performance
 
 ### Check Cache Hit Rate
@@ -269,7 +227,6 @@ gh api repos/:owner/:repo/actions/caches
 
 1. Add more patterns to `.gitignore` for Nx cache
 2. Clean cache periodically
-3. Consider Nx Cloud for unlimited cache
 
 ### Nx Not Using Cache
 
@@ -326,10 +283,6 @@ For release branches:
 ```
 
 ## FAQ
-
-**Q: Will this work with Nx Cloud DTE simultaneously?**
-
-A: Yes! They complement each other. Nx Cloud takes precedence, and GitHub Actions cache is a fallback.
 
 **Q: What happens if the base branch hasn't run CI yet?**
 

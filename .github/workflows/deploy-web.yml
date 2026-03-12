@@ -76,48 +76,6 @@ jobs:
           set-nx-shas: true
           skip-system-deps: true
 
-      - name: "☁️ Detect DTE Availability"
-        id: detect-dte
-        uses: ./.github/actions/detect-dte
-        with:
-          nx-cloud-token: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-
-      - name: "☁️ Start Nx Cloud CI Run"
-        id: start-dte
-        if: steps.detect-dte.outputs.dte-available == 'true'
-        continue-on-error: true
-        run: |
-          echo "🚀 Starting Nx Cloud DTE with ${{ steps.detect-dte.outputs.optimal-agents }} agents..."
-          DTE_START_OUTPUT=$(mktemp)
-          DTE_START_RESULT=0
-
-          if command -v pnpm >/dev/null 2>&1; then
-            pnpm exec nx-cloud start-ci-run --distribute-on="${{ steps.detect-dte.outputs.optimal-agents }} linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
-          else
-            pnpm exec nx-cloud start-ci-run --distribute-on="${{ steps.detect-dte.outputs.optimal-agents }} linux-medium-js" 2>&1 | tee "$DTE_START_OUTPUT" || DTE_START_RESULT=$?
-          fi
-
-          # Check if DTE start failed - distinguish between auth and quota issues
-          if [ $DTE_START_RESULT -ne 0 ] || grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|unauthorized\|authorization\|authenticate\|401\|invalid.*credential" "$DTE_START_OUTPUT"; then
-            # Determine specific failure reason
-            if grep -qi "unauthorized\|authorization\|401\|invalid.*credential\|authenticate" "$DTE_START_OUTPUT"; then
-              echo "::error title=Nx Cloud Authentication Failed::Invalid or expired NX_CLOUD_ACCESS_TOKEN. Please check your token configuration."
-              echo "🔒 Authentication Error Details:"
-            elif grep -qi "minimum.*agent\|distributing on.*agent" "$DTE_START_OUTPUT"; then
-              echo "::warning title=DTE Quota Exhausted::Insufficient agents available for DTE. Build will proceed without DTE."
-              echo "📊 Agent Availability:"
-            else
-              echo "::warning title=DTE Start Failed::Nx Cloud DTE start failed. Build will proceed without DTE."
-              echo "DTE start output:"
-            fi
-            cat "$DTE_START_OUTPUT"
-            rm -f "$DTE_START_OUTPUT"
-            exit 1
-          fi
-
-          rm -f "$DTE_START_OUTPUT"
-          echo "✅ DTE session started"
-
       - name: Build Web App
         env:
           VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
@@ -141,19 +99,8 @@ jobs:
           NODE_ENV: production
           # Rollbar sourcemap upload
           ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          NX_NO_CLOUD: "true"
         run: |
-          # Only enable Nx Cloud if DTE started successfully
-          if [ "${{ steps.start-dte.outcome }}" = "success" ]; then
-            echo "🚀 Building with Nx Cloud DTE enabled"
-            export NX_CLOUD_ACCESS_TOKEN="${{ secrets.NX_CLOUD_ACCESS_TOKEN }}"
-          else
-            echo "📦 Building with local execution (DTE unavailable)"
-            unset NX_CLOUD_ACCESS_TOKEN
-            export NX_CLOUD_NO_TIMEOUTS=true
-            export NX_NO_CLOUD=true
-            export NX_CLOUD_DISTRIBUTED_EXECUTION=false
-          fi
-
           # Display version information
           echo "📋 Version Information:"
           echo "  Version: ${{ needs.setup.outputs.version }}"
@@ -180,17 +127,6 @@ jobs:
           mkdir -p ./dist/apps/web
           echo "legacy-fantasy.com" > ./dist/apps/web/CNAME
           echo "✅ CNAME file created for legacy-fantasy.com"
-
-      - name: "🛑 Stop Nx Cloud Agents"
-        if: always() && steps.start-dte.outcome == 'success'
-        run: |
-          echo "🛑 Stopping Nx Cloud DTE agents..."
-          if command -v pnpm >/dev/null 2>&1; then
-            pnpm exec nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
-          else
-            pnpm exec nx-cloud stop-all-agents || echo "⚠️ Failed to stop agents (they may have already stopped)"
-          fi
-          echo "✅ Agent cleanup complete"
 
       - name: Setup Pages
         if: github.ref == 'refs/heads/main'

@@ -15,11 +15,13 @@ inputs:
     description: "Whether Terraform validation should be executed"
     required: true
   execution-mode:
-    description: "Execution mode (distributed/local)"
-    required: true
+    description: "Execution mode (unused, kept for compatibility)"
+    required: false
+    default: "local"
   optimal-agents:
-    description: "Number of optimal agents/parallel processes"
-    required: true
+    description: "Number of parallel processes"
+    required: false
+    default: "4"
   base-ref:
     description: "Base reference for affected detection"
     required: false
@@ -63,72 +65,28 @@ runs:
       run: |
         echo "::group::📦 Web Application Build"
 
-        # Disable Nx Cloud if not using DTE to avoid quota errors
-        if [ "${{ inputs.execution-mode }}" != "distributed" ]; then
-          unset NX_CLOUD_ACCESS_TOKEN
-          export NX_CLOUD_NO_TIMEOUTS=true
-          export NX_NO_CLOUD=true
-          echo "ℹ️ Nx Cloud disabled for local build"
-        fi
+        export NX_NO_CLOUD=true
 
         echo "::notice::To reproduce locally: pnpm exec nx build web --verbose"
 
         ERROR_CONTEXT="build-web-$(date +%s)"
 
-        # Use appropriate build command based on execution mode
-        if [ "${{ inputs.execution-mode }}" = "distributed" ]; then
-          echo "🚀 Building web application with DTE..."
-          BUILD_CMD="pnpm exec nx build web --configuration=production --parallel=${{ inputs.optimal-agents }}"
-        else
-          echo "🚀 Building web application locally..."
-          BUILD_CMD="pnpm exec nx build web --configuration=production"
-        fi
+        echo "🚀 Building web application..."
+        BUILD_CMD="pnpm exec nx build web --configuration=production"
 
-        # Try the build command, with fallback to local if DTE fails
         if $BUILD_CMD --verbose 2>&1 | tee "${ERROR_CONTEXT}.log"; then
           echo "✅ Web application built successfully"
         else
-          # Check if this was a DTE/Nx Cloud failure
-          if grep -qi "401.*Nx Cloud\|Unable to connect to Nx Cloud\|disabled due to exceeding\|exceeded.*plan\|minimum.*agent.*required\|distributing on.*agent\|unable to complete" "${ERROR_CONTEXT}.log"; then
-            echo "⚠️ Nx Cloud DTE failed - falling back to local build"
-            echo "::warning::Nx Cloud connection failed during build. Retrying with local execution..."
-            
-            # Disable Nx Cloud completely for local fallback
-            unset NX_CLOUD_ACCESS_TOKEN
-            export NX_CLOUD_NO_TIMEOUTS=true
-            export NX_NO_CLOUD=true
-            export NX_DAEMON=false
-            echo "ℹ️ Nx Cloud disabled for local fallback build"
-            
-            # Retry with local execution (no DTE, no Nx Cloud)
-            BUILD_CMD_LOCAL="pnpm exec nx build web --configuration=production --skip-nx-cache"
-            if $BUILD_CMD_LOCAL --verbose 2>&1 | tee "${ERROR_CONTEXT}.log"; then
-              echo "✅ Web application built successfully (local fallback)"
-            else
-              echo "❌ Web application build failed even with local execution"
-              
-              # Parse and report build errors
-              echo "## Build Errors Summary"
-              grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
-              
-              echo "::error::Web build failed. Check ${ERROR_CONTEXT}.log for details."
-              echo "result=failure" >> $GITHUB_OUTPUT
-              echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-          else
-            # Non-DTE failure, exit immediately
-            echo "❌ Web application build failed"
-            
-            # Parse and report build errors
-            echo "## Build Errors Summary"
-            grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
-            
-            echo "::error::Web build failed. Check ${ERROR_CONTEXT}.log for details."
-            echo "result=failure" >> $GITHUB_OUTPUT
-            echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
-            exit 1
-          fi
+          echo "❌ Web application build failed"
+
+          # Parse and report build errors
+          echo "## Build Errors Summary"
+          grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
+
+          echo "::error::Web build failed. Check ${ERROR_CONTEXT}.log for details."
+          echo "result=failure" >> $GITHUB_OUTPUT
+          echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
+          exit 1
         fi
 
         # Check build artifacts and report metrics
@@ -176,13 +134,7 @@ runs:
       run: |
         echo "::group::⚡ Lambda Functions Build"
 
-        # Disable Nx Cloud if not using DTE to avoid quota errors
-        if [ "${{ inputs.execution-mode }}" != "distributed" ]; then
-          unset NX_CLOUD_ACCESS_TOKEN
-          export NX_CLOUD_NO_TIMEOUTS=true
-          export NX_NO_CLOUD=true
-          echo "ℹ️ Nx Cloud disabled for local build"
-        fi
+        export NX_NO_CLOUD=true
 
         echo "::notice::To reproduce locally: pnpm exec nx run-many -t build --projects=draft-processor,game-selection,oauth-proxy,stats-lambda"
 
@@ -191,60 +143,22 @@ runs:
         # Define lambda projects to build
         LAMBDA_PROJECTS="draft-processor,game-selection,oauth-proxy,stats-lambda"
 
-        # Use appropriate build command based on execution mode
-        if [ "${{ inputs.execution-mode }}" = "distributed" ]; then
-          echo "🚀 Building lambda functions with DTE..."
-          BUILD_CMD="pnpm exec nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=${{ inputs.optimal-agents }}"
-        else
-          echo "🚀 Building lambda functions locally..."
-          BUILD_CMD="pnpm exec nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
-        fi
+        echo "🚀 Building lambda functions..."
+        BUILD_CMD="pnpm exec nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
 
-        # Try the build command, with fallback to local if DTE fails
         if $BUILD_CMD 2>&1 | tee "${ERROR_CONTEXT}.log"; then
           echo "✅ Lambda functions built successfully"
         else
-          # Check if this was a DTE/Nx Cloud failure
-          if grep -qi "401.*Nx Cloud\|Unable to connect to Nx Cloud\|disabled due to exceeding\|exceeded.*plan\|minimum.*agent.*required\|distributing on.*agent\|unable to complete" "${ERROR_CONTEXT}.log"; then
-            echo "⚠️ Nx Cloud DTE failed - falling back to local build"
-            echo "::warning::Nx Cloud connection failed during lambda build. Retrying with local execution..."
-            
-            # Disable Nx Cloud for local fallback
-            unset NX_CLOUD_ACCESS_TOKEN
-            export NX_CLOUD_NO_TIMEOUTS=true
-            export NX_NO_CLOUD=true
-            export NX_DAEMON=false
-            echo "ℹ️ Nx Cloud disabled for local fallback build"
-            
-            # Retry with local execution
-            BUILD_CMD_LOCAL="pnpm exec nx run-many -t build --projects=$LAMBDA_PROJECTS --parallel=3"
-            if $BUILD_CMD_LOCAL 2>&1 | tee "${ERROR_CONTEXT}.log"; then
-              echo "✅ Lambda functions built successfully (local fallback)"
-            else
-              echo "❌ Lambda functions build failed even with local execution"
-              
-              # Parse and report build errors
-              echo "## Lambda Build Errors"
-              grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
-              
-              echo "::error::Lambda build failed. Check ${ERROR_CONTEXT}.log for details."
-              echo "result=failure" >> $GITHUB_OUTPUT
-              echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-          else
-            # Non-DTE failure, exit immediately
-            echo "❌ Lambda functions build failed"
-            
-            # Parse and report build errors
-            echo "## Lambda Build Errors"
-            grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
-            
-            echo "::error::Lambda build failed. Check ${ERROR_CONTEXT}.log for details."
-            echo "result=failure" >> $GITHUB_OUTPUT
-            echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
-            exit 1
-          fi
+          echo "❌ Lambda functions build failed"
+
+          # Parse and report build errors
+          echo "## Lambda Build Errors"
+          grep -E "ERROR|Failed|Error:|BUILD FAILED" "${ERROR_CONTEXT}.log" | head -15 || true
+
+          echo "::error::Lambda build failed. Check ${ERROR_CONTEXT}.log for details."
+          echo "result=failure" >> $GITHUB_OUTPUT
+          echo "error-log=${ERROR_CONTEXT}.log" >> $GITHUB_OUTPUT
+          exit 1
         fi
 
         # Attempt to package lambdas for deployment validation
@@ -515,10 +429,33 @@ runs:
         echo "## 🏗️ Build Validation Results" >> $GITHUB_STEP_SUMMARY
         echo "| Component | Status | Result |" >> $GITHUB_STEP_SUMMARY
         echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Web Application | $( [ "$WEB_RESULT" = "success" ] && echo "✅ Built" || [ "$WEB_RESULT" = "failure" ] && echo "❌ Failed" || echo "⏭️ Skipped" ) | $( [ "$WEB_RESULT" = "success" ] && echo "Ready for deployment" || [ "$WEB_RESULT" = "failure" ] && echo "Build errors detected" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Mobile App | $( [ "$MOBILE_RESULT" = "success" ] && echo "✅ Config Valid" || [ "$MOBILE_RESULT" = "failure" ] && echo "❌ Failed" || echo "⏭️ Skipped" ) | $( [ "$MOBILE_RESULT" = "success" ] && echo "Config validated (Gradle build in Android Compatibility job)" || [ "$MOBILE_RESULT" = "failure" ] && echo "Config validation errors" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Lambda Functions | $( [ "$LAMBDAS_RESULT" = "success" ] && echo "✅ Built" || [ "$LAMBDAS_RESULT" = "failure" ] && echo "❌ Failed" || echo "⏭️ Skipped" ) | $( [ "$LAMBDAS_RESULT" = "success" ] && echo "Ready for deployment" || [ "$LAMBDAS_RESULT" = "failure" ] && echo "Build errors detected" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Infrastructure | $( [ "$TERRAFORM_RESULT" = "success" ] && echo "✅ Valid" || [ "$TERRAFORM_RESULT" = "failure" ] && echo "❌ Invalid" || echo "⏭️ Skipped" ) | $( [ "$TERRAFORM_RESULT" = "success" ] && echo "Configuration validated" || [ "$TERRAFORM_RESULT" = "failure" ] && echo "Configuration errors" || echo "No changes detected" ) |" >> $GITHUB_STEP_SUMMARY
+        # Helper: status_cell <result> <ok> <fail> <skip>
+        status_cell() {
+          if [ "$1" = "success" ]; then echo "$2"
+          elif [ "$1" = "failure" ]; then echo "$3"
+          else echo "$4"; fi
+        }
+
+        WEB_S=$(status_cell "$WEB_RESULT" "✅ Built" "❌ Failed" "⏭️ Skipped")
+        WEB_D=$(status_cell "$WEB_RESULT" "Ready for deployment" \
+          "Build errors detected" "No changes detected")
+        echo "| Web Application | $WEB_S | $WEB_D |" >> $GITHUB_STEP_SUMMARY
+
+        MOB_S=$(status_cell "$MOBILE_RESULT" "✅ Config Valid" "❌ Failed" "⏭️ Skipped")
+        MOB_D=$(status_cell "$MOBILE_RESULT" \
+          "Config validated (Gradle build in Android Compatibility job)" \
+          "Config validation errors" "No changes detected")
+        echo "| Mobile App | $MOB_S | $MOB_D |" >> $GITHUB_STEP_SUMMARY
+
+        LAM_S=$(status_cell "$LAMBDAS_RESULT" "✅ Built" "❌ Failed" "⏭️ Skipped")
+        LAM_D=$(status_cell "$LAMBDAS_RESULT" "Ready for deployment" \
+          "Build errors detected" "No changes detected")
+        echo "| Lambda Functions | $LAM_S | $LAM_D |" >> $GITHUB_STEP_SUMMARY
+
+        TF_S=$(status_cell "$TERRAFORM_RESULT" "✅ Valid" "❌ Invalid" "⏭️ Skipped")
+        TF_D=$(status_cell "$TERRAFORM_RESULT" "Configuration validated" \
+          "Configuration errors" "No changes detected")
+        echo "| Infrastructure | $TF_S | $TF_D |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Overall Result**: $( [ "$OVERALL_RESULT" = "success" ] && echo "✅ **All Builds Successful**" || echo "❌ **Build Failures Detected**" )" >> $GITHUB_STEP_SUMMARY
         echo "**Deployment Ready**: $( [ "$ARTIFACTS_READY" = "true" ] && echo "✅ **All Artifacts Ready**" || echo "❌ **Artifacts Not Ready**" )" >> $GITHUB_STEP_SUMMARY

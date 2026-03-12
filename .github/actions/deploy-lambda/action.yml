@@ -70,42 +70,18 @@ runs:
         echo "🚀 Building $LAMBDA_NAME Lambda..."
         echo "::notice::Building $NX_PROJECT project for targeted deployment"
 
+        export NX_NO_CLOUD=true
+
         # Build the project
         if pnpm exec nx build "$NX_PROJECT" --verbose 2>&1 | tee build.log; then
           echo "✅ $LAMBDA_NAME Lambda built successfully"
         else
-          # Check if this was a DTE/Nx Cloud failure
-          if grep -qi "401.*Nx Cloud\|Unable to connect to Nx Cloud\|disabled due to exceeding\|exceeded.*plan\|minimum.*agent.*required\|distributing on.*agent\|unable to complete" build.log; then
-            echo "⚠️ Nx Cloud DTE failed - falling back to local build"
-            echo "::warning::Nx Cloud connection failed during build. Retrying with local execution..."
-            
-            # Disable Nx Cloud completely for local fallback
-            unset NX_CLOUD_ACCESS_TOKEN
-            export NX_CLOUD_NO_TIMEOUTS=true
-            export NX_NO_CLOUD=true
-            export NX_DAEMON=false
-            echo "ℹ️ Nx Cloud disabled for local fallback build"
-            
-            # Retry with local execution (no DTE, no Nx Cloud)
-            if pnpm exec nx build "$NX_PROJECT" --skip-nx-cache --verbose 2>&1 | tee build.log; then
-              echo "✅ $LAMBDA_NAME Lambda built successfully (local fallback)"
-            else
-              echo "❌ $LAMBDA_NAME Lambda build failed even with local execution"
-              echo "## ❌ Build Errors" >> $GITHUB_STEP_SUMMARY
-              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-              tail -20 build.log >> $GITHUB_STEP_SUMMARY
-              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-              exit 1
-            fi
-          else
-            # Non-DTE failure, exit immediately
-            echo "❌ $LAMBDA_NAME Lambda build failed"
-            echo "## ❌ Build Errors" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            tail -20 build.log >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
+          echo "❌ $LAMBDA_NAME Lambda build failed"
+          echo "## ❌ Build Errors" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          tail -20 build.log >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          exit 1
         fi
 
         # Verify build was successful (either from first attempt or fallback)

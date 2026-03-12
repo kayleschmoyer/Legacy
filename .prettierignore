@@ -7,5 +7,7 @@
 static/environment.js
 static/main.js
 pnpm-lock.yaml
+# Env files have no prettier parser
+.env*
 # Migrations are append-only and immutable once merged — never reformat them
 lib/db-client/migrations/

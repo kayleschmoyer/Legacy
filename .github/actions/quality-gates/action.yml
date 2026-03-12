@@ -2,12 +2,8 @@ name: "Code Quality Gates"
 description: "Comprehensive code quality validation with formatting, linting, type checking, and intelligent parallel execution"
 
 inputs:
-  dte-active:
-    description: "Whether a DTE session has already been started by the calling job"
-    required: false
-    default: "false"
   parallel:
-    description: "Number of parallel processes (used for local execution and distributed max-parallel)"
+    description: "Number of parallel processes for local execution"
     required: false
     default: "4"
   base-ref:
@@ -31,9 +27,6 @@ outputs:
   result:
     description: "Overall quality gates result (success/failure)"
     value: ${{ steps.check-results.outputs.result }}
-  dte-quota-exceeded:
-    description: "Whether DTE quota was exceeded during execution"
-    value: ${{ steps.run-tasks.outputs.dte-quota-exceeded || 'false' }}
   formatting-result:
     description: "Code formatting check result"
     value: ${{ steps.formatting.outputs.result }}
@@ -157,63 +150,50 @@ runs:
       run: |
         echo "::group::🎨 Code Formatting Validation"
 
-        # Use the validated Nx command
-        if [ -z "${NX_CMD:-}" ]; then
-          if [ -f pnpm-lock.yaml ] && command -v pnpm >/dev/null 2>&1; then
-            NX_CMD="pnpm exec nx --"
-          else
-            NX_CMD="pnpm exec nx"
-          fi
-        fi
-        echo "🔧 Using Nx command: $NX_CMD"
-        echo "::notice::To reproduce locally: $NX_CMD format:check"
-
-        # First try with affected detection using base/head refs
+        # Run prettier directly instead of nx format:check to avoid
+        # the Nx execSync maxBuffer crash (ERR_CHILD_PROCESS_STDIO_MAXBUFFER)
+        # that occurs when large files like pnpm-lock.yaml are in the
+        # affected set. Direct prettier respects .prettierignore properly.
+        echo "::notice::To reproduce locally: pnpm exec prettier --check ."
         echo "🔍 Checking formatting for affected files..."
         echo "Base ref: ${{ inputs.base-ref }}"
         echo "Head ref: ${{ inputs.head-ref }}"
 
-        if $NX_CMD format:check --base="${{ inputs.base-ref }}" --head="${{ inputs.head-ref }}" 2>&1 | tee format-check.log; then
-          echo "✅ All affected files are properly formatted"
+        # Get changed files between base and head
+        CHANGED=$(git diff --name-only --diff-filter=ACMR \
+          "${{ inputs.base-ref }}" "${{ inputs.head-ref }}" \
+          | sort)
+
+        if [ -z "$CHANGED" ]; then
+          echo "✅ No files changed — nothing to check"
           echo "result=success" >> $GITHUB_OUTPUT
           echo "failed-projects=" >> $GITHUB_OUTPUT
         else
-          # Check if the error was due to affected detection issues
-          if grep -q "Could not find Nx modules\|Unable to determine affected\|No base found" format-check.log; then
-            echo "⚠️ Affected detection failed, falling back to full format check..."
-            
-            # Fallback to full workspace format check
-            if $NX_CMD format:check 2>&1 | tee format-check-full.log; then
-              echo "✅ All files are properly formatted (full check)"
-              echo "result=success" >> $GITHUB_OUTPUT
-              echo "failed-projects=" >> $GITHUB_OUTPUT
-            else
-              echo "❌ Code formatting issues detected (full workspace)"
-              echo "::error::Code formatting check failed. Run '$NX_CMD format:write' to fix."
-              
-              # Show specific files that need formatting
-              echo "Files requiring formatting:"
-              grep -E "would be reformatted|needs formatting|✖" format-check-full.log || true
-              
-              # Extract failed projects from formatting output (files are in projects)
-              FAILED_PROJECTS=$(grep -oE "apps/[^/]+|lib/[^/]+|lambdas/[^/]+" format-check-full.log 2>/dev/null | sort -u | xargs | tr ' ' ',' || echo "formatting")
-              echo "failed-projects=$FAILED_PROJECTS" >> $GITHUB_OUTPUT
-              
-              echo "result=failure" >> $GITHUB_OUTPUT
-              exit 1
-            fi
+          FILE_COUNT=$(echo "$CHANGED" | wc -l | tr -d ' ')
+          echo "📋 Found $FILE_COUNT changed file(s)"
+
+          # prettier --check respects .prettierignore; --ignore-unknown
+          # silently skips files with no parser (e.g. .env, .prettierignore)
+          if echo "$CHANGED" | xargs pnpm exec prettier --check --ignore-unknown \
+               2>&1 | tee format-check.log; then
+            echo "✅ All affected files are properly formatted"
+            echo "result=success" >> $GITHUB_OUTPUT
+            echo "failed-projects=" >> $GITHUB_OUTPUT
           else
-            echo "❌ Code formatting issues detected in affected files"
-            echo "::error::Code formatting check failed. Run '$NX_CMD format:write' to fix."
-            
-            # Show specific files that need formatting
+            echo "❌ Code formatting issues detected"
+            echo "::error::Code formatting check failed."
+            echo "::error::Run 'pnpm exec nx format:write' to fix."
+
             echo "Files requiring formatting:"
-            grep -E "would be reformatted|needs formatting|✖" format-check.log || true
-            
-            # Extract failed projects from formatting output (files are in projects)
-            FAILED_PROJECTS=$(grep -oE "apps/[^/]+|lib/[^/]+|lambdas/[^/]+" format-check.log 2>/dev/null | sort -u | xargs | tr ' ' ',' || echo "formatting")
+            grep -E "^\[warn\]" format-check.log || true
+
+            FAILED_PROJECTS=$(
+              grep -oE "apps/[^/]+|lib/[^/]+|lambdas/[^/]+" \
+                format-check.log 2>/dev/null \
+              | sort -u | paste -sd ',' -) || true
+            : "${FAILED_PROJECTS:=formatting}"
             echo "failed-projects=$FAILED_PROJECTS" >> $GITHUB_OUTPUT
-            
+
             echo "result=failure" >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -228,18 +208,9 @@ runs:
         echo "::group::⚡ Quality Gates (lint · typecheck · test)"
 
         PARALLEL="${{ inputs.parallel }}"
-
-        # When dte-active is true, start-ci-run was already called by the job.
-        # Nx will automatically route tasks to the pre-spawned agent runners.
-        # When dte-active is false, disable cloud completely to preserve quota.
-        if [ "${{ inputs.dte-active }}" = "true" ]; then
-          echo "ℹ️ Nx Cloud DTE active — tasks will be distributed to agents"
-          echo "strategy=distributed" >> $GITHUB_OUTPUT
-        else
-          echo "ℹ️ Running locally with --parallel=$PARALLEL"
-          export NX_NO_CLOUD=true
-          echo "strategy=local" >> $GITHUB_OUTPUT
-        fi
+        echo "ℹ️ Running locally with --parallel=$PARALLEL"
+        export NX_NO_CLOUD=true
+        echo "strategy=local" >> $GITHUB_OUTPUT
 
         LINT_SUCCESS=true
         TYPECHECK_SUCCESS=true
@@ -290,15 +261,6 @@ runs:
           fi
         fi
 
-        # ── DTE quota exceeded detection ───────────────────────────────────────
-        # Surface cloud-specific failures separately from real code failures so
-        # the PR comment can show an informative quota warning.
-        if grep -qi "quota\|limit\|exceeded\|insufficient\|disabled\|401\|minimum.*agent\|unable to complete" quality.log 2>/dev/null; then
-          echo "dte-quota-exceeded=true" >> $GITHUB_OUTPUT
-        else
-          echo "dte-quota-exceeded=false" >> $GITHUB_OUTPUT
-        fi
-
         # ── Final result ───────────────────────────────────────────────────────
         if [ "$LINT_SUCCESS" = false ] || [ "$TYPECHECK_SUCCESS" = false ] || [ "$TEST_SUCCESS" = false ]; then
           echo "❌ One or more quality gates failed"
@@ -338,10 +300,29 @@ runs:
         echo "## 🔍 Quality Gates Results" >> $GITHUB_STEP_SUMMARY
         echo "| Check | Result | Status |" >> $GITHUB_STEP_SUMMARY
         echo "|-------|---------|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Code Formatting | $( [ "$FORMATTING_RESULT" = "success" ] && echo "✅ Passed" || [ "$FORMATTING_RESULT" = "failure" ] && echo "❌ Failed" || echo "⏭️ Skipped" ) | $( [ "$FORMATTING_RESULT" = "success" ] && echo "All files properly formatted" || [ "$FORMATTING_RESULT" = "failure" ] && echo "Formatting issues detected" || echo "Formatting check disabled" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| ESLint Validation | $( [ "$LINT_RESULT" = "success" ] && echo "✅ Passed" || echo "❌ Failed" ) | $( [ "$LINT_RESULT" = "success" ] && echo "No linting issues" || echo "Linting issues detected" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| TypeScript Check | $( [ "$TYPECHECK_RESULT" = "success" ] && echo "✅ Passed" || echo "❌ Failed" ) | $( [ "$TYPECHECK_RESULT" = "success" ] && echo "No type errors" || echo "Type errors detected" ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| Unit Tests | $( [ "$TEST_RESULT" = "success" ] && echo "✅ Passed" || echo "❌ Failed" ) | $( [ "$TEST_RESULT" = "success" ] && echo "All tests passing" || echo "Test failures detected" ) |" >> $GITHUB_STEP_SUMMARY
+        # Helper: qg_cell <result> <pass> <fail> [<skip>]
+        qg_cell() {
+          if [ "$1" = "success" ]; then echo "$2"
+          elif [ "$1" = "failure" ]; then echo "$3"
+          else echo "${4:-$3}"; fi
+        }
+
+        FMT_S=$(qg_cell "$FORMATTING_RESULT" "✅ Passed" "❌ Failed" "⏭️ Skipped")
+        FMT_D=$(qg_cell "$FORMATTING_RESULT" "All files properly formatted" \
+          "Formatting issues detected" "Formatting check disabled")
+        echo "| Code Formatting | $FMT_S | $FMT_D |" >> $GITHUB_STEP_SUMMARY
+
+        LINT_S=$(qg_cell "$LINT_RESULT" "✅ Passed" "❌ Failed")
+        LINT_D=$(qg_cell "$LINT_RESULT" "No linting issues" "Linting issues detected")
+        echo "| ESLint Validation | $LINT_S | $LINT_D |" >> $GITHUB_STEP_SUMMARY
+
+        TC_S=$(qg_cell "$TYPECHECK_RESULT" "✅ Passed" "❌ Failed")
+        TC_D=$(qg_cell "$TYPECHECK_RESULT" "No type errors" "Type errors detected")
+        echo "| TypeScript Check | $TC_S | $TC_D |" >> $GITHUB_STEP_SUMMARY
+
+        UT_S=$(qg_cell "$TEST_RESULT" "✅ Passed" "❌ Failed")
+        UT_D=$(qg_cell "$TEST_RESULT" "All tests passing" "Test failures detected")
+        echo "| Unit Tests | $UT_S | $UT_D |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Overall Result**: $( [ "$OVERALL_RESULT" = "success" ] && echo "✅ **All Quality Gates Passed**" || echo "❌ **Quality Gates Failed**" )" >> $GITHUB_STEP_SUMMARY
 

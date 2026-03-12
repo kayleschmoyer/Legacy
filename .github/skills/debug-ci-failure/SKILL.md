@@ -38,15 +38,13 @@ If a search pattern returns no results, widen your search or save the full logs 
 
 ## CI Pipeline Stages (in order)
 
-| Stage | Job              | What It Does                                   |
-| ----- | ---------------- | ---------------------------------------------- |
-| 1     | detect-dte       | Checks Nx Cloud DTE quota (~30 s)              |
-| 1     | detect-changes   | Determines affected projects (~30 s)           |
-| 2     | agents           | Nx Cloud distributed agents (if DTE available) |
-| 3     | quality-gates    | Formatting → Lint → Typecheck → Unit tests     |
-| 4     | build-validation | Web, mobile, and Lambda builds                 |
-| 5     | e2e              | End-to-end Playwright tests                    |
-| 6     | summarize        | Posts PR comment and badges (always runs)      |
+| Stage | Job              | What It Does                               |
+| ----- | ---------------- | ------------------------------------------ |
+| 1     | detect-changes   | Determines affected projects (~30 s)       |
+| 2     | quality-gates    | Formatting → Lint → Typecheck → Unit tests |
+| 2b    | build-validation | Web, mobile, and Lambda builds             |
+| 3     | e2e              | End-to-end Playwright tests                |
+| 4     | summarize        | Posts PR comment and badges (always runs)  |
 
 Failures most commonly occur in **quality-gates** or **build-validation**.
 
@@ -381,7 +379,6 @@ make pc
 Some CI failures are not caused by your code:
 
 - **GitHub Actions infrastructure** — runner timeouts, service outages
-- **Nx Cloud quota exceeded** — DTE falls back to local execution but may time out
 - **Network issues** — npm registry failures, GitHub API rate limits
 
 In these cases, rerun the failed jobs:
@@ -467,9 +464,9 @@ GitHub truncates very long log lines. Save to file and search locally, or open i
 gh run view RUN_ID --web
 ```
 
-### Failure in detect-dte or detect-changes
+### Failure in detect-changes
 
-These early stages rarely fail. When they do, it is usually an infrastructure issue (runner allocation, checkout failure). Rerun the job:
+This early stage rarely fails. When it does, it is usually an infrastructure issue (runner allocation, checkout failure). Rerun the job:
 
 ```powershell
 gh run rerun RUN_ID --failed
@@ -565,28 +562,7 @@ pnpm exec nx serve web
 pnpm exec nx e2e web-e2e
 ```
 
-### 11. DTE quota / auth failures
-
-When Nx Cloud DTE fails mid-run, tasks fall back to local execution. This can cause timeouts on resource-constrained GitHub runners.
-
-**Pattern in logs:**
-
-```
-DTE quota exceeded, insufficient, or authorization failed
-⚠️ DTE check returned non-zero exit code
-401.*Nx Cloud
-Unable to connect to Nx Cloud
-```
-
-**How to find:**
-
-```powershell
-gh run view RUN_ID --log-failed | Select-String "quota|DTE|Nx Cloud.*fail|401.*Cloud" -Context 5
-```
-
-**Resolution:** DTE failures usually self-resolve — the pipeline falls back to local execution. If builds time out as a result, rerun after the quota resets or check `NX_CLOUD_ACCESS_TOKEN` validity.
-
-### 12. Setup / workspace detection failures
+### 11. Setup / workspace detection failures
 
 The `setup` composite action validates the Nx workspace after installing dependencies. Failures here block every downstream job.
 
@@ -710,9 +686,7 @@ Understanding the CI architecture helps with debugging. The pipeline uses a two-
 ci-orchestrator.yml  (triggered by PR / push / merge_group / schedule)
 ├── determine-scope        ← decides which sub-workflows to run
 ├── ci-pipeline.yml        ← main quality + build pipeline (reusable workflow)
-│   ├── detect-dte         ← probe Nx Cloud quota
 │   ├── detect-changes     ← dorny/paths-filter + git diff
-│   ├── agents [1..3]      ← DTE agents (if available)
 │   ├── quality-gates      ← format → lint → typecheck → test
 │   ├── build-validation   ← web / mobile / lambda builds
 │   ├── e2e                ← Playwright tests
@@ -728,19 +702,18 @@ ci-orchestrator.yml  (triggered by PR / push / merge_group / schedule)
 | `NX_SKIP_NX_CACHE`   | `false`                     | Cache enabled                |
 | `NX_CACHE_DIRECTORY` | `.nx-cache`                 | Local cache path             |
 | `NODE_OPTIONS`       | `--max_old_space_size=4096` | 4GB heap limit               |
-| `NX_NO_CLOUD`        | `true` (when no DTE)        | Disables Nx Cloud            |
+| `NX_NO_CLOUD`        | `true`                      | Disables Nx Cloud            |
 | `NX_VERBOSE_LOGGING` | `true` (debug mode)         | Extra logging                |
 
 **Timeouts per job:**
 
-| Job                         | Timeout |
-| --------------------------- | ------- |
-| detect-dte / detect-changes | 5 min   |
-| agents                      | 45 min  |
-| quality-gates               | 30 min  |
-| build-validation            | 30 min  |
-| e2e                         | 30 min  |
-| summarize                   | 10 min  |
+| Job              | Timeout |
+| ---------------- | ------- |
+| detect-changes   | 5 min   |
+| quality-gates    | 30 min  |
+| build-validation | 30 min  |
+| e2e              | 30 min  |
+| summarize        | 10 min  |
 
 ## Deployment Pipeline Debugging
 
@@ -791,7 +764,6 @@ $categories = @{
   "🧪 Unit Tests"           = "FAIL.*spec\.ts|Test Suites:.*failed"
   "🏗️ Build"                = "Running target.*failed|Failed tasks:|build failed"
   "🌐 E2E"                  = "server.*fail|server.*died|playwright.*error"
-  "☁️ DTE/Nx Cloud"         = "quota|DTE.*fail|Nx Cloud.*fail|401.*Cloud"
   "📚 Skills Lint"          = "skill.*failed validation|✖.*skill"
   "🔒 Terraform Lock"       = "state lock|Lock Info"
   "⏹️ Cancelled"            = "operation was canceled|more recent commit"

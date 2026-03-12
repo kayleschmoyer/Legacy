@@ -69,9 +69,6 @@ jobs:
       - name: "Start Dev Server"
         shell: bash
         run: |
-          # Disable Nx Cloud for local E2E reliability
-          unset NX_CLOUD_ACCESS_TOKEN
-          export NX_CLOUD_DISTRIBUTED_EXECUTION=false
           export NX_NO_CLOUD=true
 
           pnpm exec nx serve web --port=4200 --host=localhost &

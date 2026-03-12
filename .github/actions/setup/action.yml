@@ -248,7 +248,7 @@ runs:
           echo "📁 Created Nx cache directory: $NX_CACHE_DIRECTORY"
         fi
 
-        # Skip Nx validation when dependencies are not installed (e.g. detect-dte / detect-changes jobs)
+        # Skip Nx validation when dependencies are not installed (e.g. detect-changes job)
         if [ "${{ inputs.install-dependencies }}" != "true" ]; then
           echo "⏭️  Skipping Nx validation (install-dependencies=false)"
           exit 0

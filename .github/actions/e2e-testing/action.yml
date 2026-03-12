@@ -104,12 +104,8 @@ runs:
         export CI=true
         export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/playwright"
 
-        # Force local execution for E2E tests - disable Nx Cloud completely
-        unset NX_CLOUD_ACCESS_TOKEN
-        export NX_CLOUD_DISTRIBUTED_EXECUTION=false
-        export NX_CLOUD_NO_TIMEOUTS=true
+        # Ensure Nx Cloud is not used for E2E tests
         export NX_NO_CLOUD=true
-        echo "ℹ️ Nx Cloud disabled - running E2E tests locally for reliability"
 
         echo "�📋 E2E Test Configuration:"
         echo "- **Test Directory**: apps/web-e2e/src/tests" 
@@ -119,7 +115,7 @@ runs:
         echo "- **Workers**: 1 (CI stability)"
         echo "- **Test Patterns**: ${{ inputs.test-patterns }}"
         echo "- **Exclude Patterns**: ${{ inputs.test-patterns-invert }}"
-        echo "- **Execution Mode**: Local (Nx Cloud DTE disabled)"
+        echo "- **Execution Mode**: Local"
 
         # Prefer pnpm-managed executables when available
         if command -v pnpm >/dev/null 2>&1; then
@@ -161,7 +157,7 @@ runs:
           SERVER_PID=$!
         else
           echo "⚠️ Pre-built artifact not found at ${{ inputs.web-build-path }}, falling back to nx serve..."
-          NX_CLOUD_DISTRIBUTED_EXECUTION=false $NX_CMD serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} > "$SERVER_LOG" 2>&1 &
+          $NX_CMD serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} > "$SERVER_LOG" 2>&1 &
           SERVER_PID=$!
         fi
 
@@ -274,10 +270,14 @@ runs:
 
         if [ -f "apps/web-e2e/test-results/results.json" ]; then
           # Extract test results statistics
-          RJ=apps/web-e2e/test-results/results.json
-          TOTAL_TESTS=$(jq '.suites | map(.suites[]?.specs[]? // empty) | length' $RJ 2>/dev/null || echo 0)
-          PASSED_TESTS=$(jq '[.suites | map(.suites[]?.specs[]?.tests[]? // empty) | map(select(.results[]?.status == "passed"))] | length' $RJ 2>/dev/null || echo 0)
-          FAILED_TESTS=$(jq '[.suites | map(.suites[]?.specs[]?.tests[]? // empty) | map(select(.results[]?.status == "failed"))] | length' $RJ 2>/dev/null || echo 0)
+          RESULTS_FILE="apps/web-e2e/test-results/results.json"
+          TOTAL_TESTS=$(jq '.suites | map(.suites[]?.specs[]? // empty) | length' \
+            "$RESULTS_FILE" 2>/dev/null || echo 0)
+          JQ_BASE='.suites | map(.suites[]?.specs[]?.tests[]? // empty)'
+          PASSED_TESTS=$(jq "[$JQ_BASE | map(select(.results[]?.status == \"passed\"))] | length" \
+            "$RESULTS_FILE" 2>/dev/null || echo 0)
+          FAILED_TESTS=$(jq "[$JQ_BASE | map(select(.results[]?.status == \"failed\"))] | length" \
+            "$RESULTS_FILE" 2>/dev/null || echo 0)
           
           if [ "$TOTAL_TESTS" -gt 0 ]; then
             SUCCESS_RATE=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))

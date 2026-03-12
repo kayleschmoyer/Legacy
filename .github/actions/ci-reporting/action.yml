@@ -15,22 +15,13 @@ inputs:
     description: "Pull request number (if applicable)"
     required: false
   execution-mode:
-    description: "Execution mode used (distributed/local)"
+    description: "Execution mode (always local)"
     required: false
     default: "local"
   optimal-agents:
-    description: "Number of agents/processes used"
+    description: "Number of parallel processes used"
     required: false
     default: "4"
-  fallback-reason:
-    description: "Reason for DTE fallback"
-    required: false
-  quota-status:
-    description: "DTE quota remaining status (available/limited/exhausted)"
-    required: false
-  quota-exceeded:
-    description: "Whether DTE quota was exceeded during execution (true/false)"
-    required: false
   execution-plan:
     description: "JSON execution plan"
     required: false
@@ -74,7 +65,6 @@ runs:
         EVENT_NAME="${{ inputs.event-name }}"
         EXECUTION_MODE="${{ inputs.execution-mode }}"
         OPTIMAL_AGENTS="${{ inputs.optimal-agents }}"
-        FALLBACK_REASON="${{ inputs.fallback-reason }}"
         WORKFLOW_DURATION="${{ inputs.workflow-duration || 'unknown' }}"
 
         echo "📋 Generating comprehensive CI report..."
@@ -95,14 +85,25 @@ runs:
           DURATION_CATEGORY="normal"
         fi
 
-        printf '%s\n' "{\"pipeline\":{\"status\":\"$STATUS\",\"timestamp\":\"$TIMESTAMP\",\"duration_seconds\":\"$WORKFLOW_DURATION\",\"trigger\":\"$EVENT_NAME\",\"execution_mode\":\"$EXECUTION_MODE\",\"agents_used\":\"$OPTIMAL_AGENTS\",\"fallback_reason\":\"$FALLBACK_REASON\"},\"performance\":{\"mode_used\":\"$EXECUTION_MODE\",\"agent_count\":\"$OPTIMAL_AGENTS\",\"duration_category\":\"$DURATION_CATEGORY\"}}" > ci-report.json
+        REPORT_JSON="{\"pipeline\":{"
+        REPORT_JSON+="\"status\":\"$STATUS\","
+        REPORT_JSON+="\"timestamp\":\"$TIMESTAMP\","
+        REPORT_JSON+="\"duration_seconds\":\"$WORKFLOW_DURATION\","
+        REPORT_JSON+="\"trigger\":\"$EVENT_NAME\","
+        REPORT_JSON+="\"execution_mode\":\"$EXECUTION_MODE\","
+        REPORT_JSON+="\"agents_used\":\"$OPTIMAL_AGENTS\"},"
+        REPORT_JSON+="\"performance\":{"
+        REPORT_JSON+="\"mode_used\":\"$EXECUTION_MODE\","
+        REPORT_JSON+="\"agent_count\":\"$OPTIMAL_AGENTS\","
+        REPORT_JSON+="\"duration_category\":\"$DURATION_CATEGORY\"}}"
+        printf '%s\n' "$REPORT_JSON" > ci-report.json
 
         echo "report-generated=true" >> $GITHUB_OUTPUT
 
         # Create performance insights
         echo "## 📊 CI Performance Analysis" >> $GITHUB_STEP_SUMMARY
-        echo "- **Execution Mode**: $EXECUTION_MODE" >> $GITHUB_STEP_SUMMARY
-        echo "- **Agents/Processes**: $OPTIMAL_AGENTS" >> $GITHUB_STEP_SUMMARY
+        echo "- **Execution Mode**: Local GitHub Actions" >> $GITHUB_STEP_SUMMARY
+        echo "- **Parallel Processes**: $OPTIMAL_AGENTS" >> $GITHUB_STEP_SUMMARY
 
         if [ "$WORKFLOW_DURATION" != "unknown" ]; then
           echo "- **Duration**: ${WORKFLOW_DURATION}s" >> $GITHUB_STEP_SUMMARY
@@ -113,34 +114,6 @@ runs:
             echo "- **Performance**: 🎉 Excellent" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Performance**: ✅ Good" >> $GITHUB_STEP_SUMMARY
-          fi
-        fi
-
-        # Display DTE quota status
-        QUOTA_STATUS="${{ inputs.quota-status }}"
-        QUOTA_EXCEEDED="${{ inputs.quota-exceeded }}"
-
-        if [ "$EXECUTION_MODE" = "distributed" ]; then
-          echo "- **Optimization**: 🚀 DTE enabled (60-80% faster)" >> $GITHUB_STEP_SUMMARY
-          if [ -n "$QUOTA_STATUS" ]; then
-            case "$QUOTA_STATUS" in
-              "available")
-                echo "- **DTE Quota**: ✅ Available" >> $GITHUB_STEP_SUMMARY
-                ;;
-              "limited")
-                echo "- **DTE Quota**: ⚠️ Limited (consider optimization)" >> $GITHUB_STEP_SUMMARY
-                ;;
-              "exhausted")
-                echo "- **DTE Quota**: ❌ Exhausted" >> $GITHUB_STEP_SUMMARY
-                ;;
-            esac
-          fi
-        else
-          echo "- **Optimization**: ⚡ Local execution" >> $GITHUB_STEP_SUMMARY
-          if [ "$QUOTA_EXCEEDED" = "true" ]; then
-            echo "- **DTE Status**: ⚠️ Quota exceeded during execution - fell back to local runners" >> $GITHUB_STEP_SUMMARY
-          elif [ -n "$FALLBACK_REASON" ]; then
-            echo "- **DTE Fallback**: $FALLBACK_REASON" >> $GITHUB_STEP_SUMMARY
           fi
         fi
 
@@ -159,9 +132,6 @@ runs:
         PROJECT_FAILURES: ${{ inputs.project-failures }}
         EXECUTION_MODE: ${{ inputs.execution-mode }}
         OPTIMAL_AGENTS: ${{ inputs.optimal-agents }}
-        FALLBACK_REASON: ${{ inputs.fallback-reason }}
-        QUOTA_STATUS: ${{ inputs.quota-status }}
-        QUOTA_EXCEEDED: ${{ inputs.quota-exceeded }}
         RUN_ID: ${{ inputs.run-id }}
       with:
         github-token: ${{ inputs.github-token }}
@@ -178,9 +148,6 @@ runs:
         PR_NUMBER: ${{ inputs.pr-number }}
         EXECUTION_MODE: ${{ inputs.execution-mode }}
         OPTIMAL_AGENTS: ${{ inputs.optimal-agents }}
-        FALLBACK_REASON: ${{ inputs.fallback-reason }}
-        QUOTA_STATUS: ${{ inputs.quota-status }}
-        QUOTA_EXCEEDED: ${{ inputs.quota-exceeded }}
         WORKFLOW_DURATION: ${{ inputs.workflow-duration }}
       with:
         github-token: ${{ inputs.github-token }}

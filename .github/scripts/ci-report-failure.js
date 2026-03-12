@@ -333,36 +333,10 @@ module.exports = async ({ github, context, core }) => {
   // Build execution context
   const executionMode = process.env.EXECUTION_MODE;
   const agents = process.env.OPTIMAL_AGENTS;
-  const fallbackReason = process.env.FALLBACK_REASON;
-  const quotaStatus = process.env.QUOTA_STATUS;
-  const quotaExceeded = process.env.QUOTA_EXCEEDED;
   const runId = process.env.RUN_ID;
 
   let executionContext = '### Execution Context\n';
-  executionContext +=
-    '- **Mode**: ' +
-    (executionMode === 'distributed'
-      ? 'Distributed Task Execution (DTE)'
-      : 'Local GitHub Actions') +
-    '\n';
-
-  // Add quota status
-  if (quotaExceeded === 'true') {
-    executionContext +=
-      '- **DTE Quota (Exhausted)**: Fell back to local runners\n';
-  } else if (quotaStatus) {
-    if (quotaStatus === 'available') {
-      executionContext += '- **DTE Quota**: Available\n';
-    } else if (quotaStatus === 'limited') {
-      executionContext += '- **DTE Quota**: Limited\n';
-    } else if (quotaStatus === 'exhausted') {
-      executionContext += '- **DTE Quota**: Exhausted\n';
-    }
-  }
-
-  if (fallbackReason) {
-    executionContext += '- **Fallback Reason**: ' + fallbackReason + '\n';
-  }
+  executionContext += '- **Mode**: Local GitHub Actions\n';
   executionContext += '- **Agents/Processes**: ' + agents + '\n';
   if (failedSteps.length > 0) {
     executionContext += '- **Failed Steps**: ' + failedSteps.join(', ') + '\n';

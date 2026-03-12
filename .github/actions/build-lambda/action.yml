@@ -83,11 +83,8 @@ runs:
         SENTRY_ORG: ${{ inputs.sentry-org }}
         SENTRY_PROJECT: ${{ inputs.sentry-project }}
       run: |
-        # Disable Nx Cloud for lambda builds to avoid quota issues
-        # Lambda builds are typically fast and don't benefit much from DTE
-        unset NX_CLOUD_ACCESS_TOKEN
+        # Ensure Nx Cloud is not used for CI builds
         export NX_NO_CLOUD=true
-        export NX_CLOUD_NO_TIMEOUTS=true
 
         # Inject version information into build
         export VITE_COMMIT_SHA="${GITHUB_SHA}"

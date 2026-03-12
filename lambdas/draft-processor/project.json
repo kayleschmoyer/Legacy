@@ -51,7 +51,7 @@
     "zip": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cd dist && (command -v zip > /dev/null 2>&1 && zip -r ../draft-processor-{args.version}.zip . || echo 'Warning: zip utility not found - skipping packaging. This is expected in DTE environments.') && cd ..",
+        "command": "cd dist && (command -v zip > /dev/null 2>&1 && zip -r ../draft-processor-{args.version}.zip . || echo 'Warning: zip utility not found - skipping packaging.') && cd ..",
         "cwd": "lambdas/draft-processor"
       },
       "dependsOn": ["build"],

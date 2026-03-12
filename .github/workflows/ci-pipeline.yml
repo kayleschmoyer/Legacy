@@ -4,17 +4,13 @@ name: "Legacy Sports CI Pipeline"
 # Legacy Sports CI Pipeline — Multi-Job Architecture
 # =============================================================================
 # Each logical stage runs as its own GitHub Actions job so that:
-#   - detect-dte and detect-changes run in parallel (both ~30 s)
-#   - Nx Cloud agents are spawned as sibling jobs and pick up work in real-time
+#   - detect-changes runs quickly (~30 s) to determine affected components
 #   - quality-gates and build-validation run in PARALLEL on dedicated runners
 #   - e2e runs only after both quality-gates AND build-validation pass
 #   - summarize always runs to post PR comments and update badges
 #
-# Execution modes
-#   DTE available  → agents matrix (3 runners) pick up `nx affected` tasks
-#                    distributed by the Cloud session started in quality-gates
-#   DTE unavailable → single runner uses --parallel for local concurrency;
-#                     Nx remote-cache hits still apply across jobs
+# Nx remote cache (GitHub Actions cache) provides cross-run caching.
+# All tasks run locally with --parallel for concurrency.
 # =============================================================================
 
 on:
@@ -53,12 +49,8 @@ on:
         value: ${{ jobs.detect-changes.outputs.lambdas }}
       terraform-affected:
         value: ${{ jobs.detect-changes.outputs.terraform }}
-      execution-strategy:
-        value: ${{ jobs.detect-dte.outputs.execution-mode }}
       workflow-duration:
         value: ${{ jobs.summarize.outputs.workflow-duration }}
-      dte-available:
-        value: ${{ jobs.detect-dte.outputs.dte-available }}
 
 # Permissions inherited from the calling workflow (ci-orchestrator).
 # See ci-orchestrator.yml for the full permission rationale.
@@ -77,41 +69,7 @@ env:
 
 jobs:
   # ============================================================================
-  # STAGE 1 — Detect DTE availability (lightweight, ~30 s)
-  # Runs in parallel with detect-changes to minimise wall-clock time.
-  # ============================================================================
-  detect-dte:
-    name: "Detect DTE Availability"
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
-    outputs:
-      dte-available: ${{ steps.detect.outputs.dte-available }}
-      execution-mode: ${{ steps.detect.outputs.execution-mode }}
-      optimal-agents: ${{ steps.detect.outputs.optimal-agents }}
-      fallback-reason: ${{ steps.detect.outputs.fallback-reason }}
-      quota-remaining: ${{ steps.detect.outputs.quota-remaining }}
-
-    steps:
-      - name: "Checkout Repository"
-        uses: actions/checkout@v6
-
-      - name: "Setup Workspace"
-        uses: ./.github/actions/setup
-        with:
-          node-version: 22
-          install-dependencies: false # detect-dte uses npx nx-cloud fallback — no full install needed
-          set-nx-shas: false
-          include-optional-deps: false
-
-      - name: "Detect DTE Availability"
-        id: detect
-        uses: ./.github/actions/detect-dte
-        with:
-          nx-cloud-token: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-
-  # ============================================================================
-  # STAGE 1 — Detect project changes (parallel with detect-dte)
+  # STAGE 1 — Detect project changes
   # ============================================================================
   detect-changes:
     name: "Detect Project Changes"
@@ -148,62 +106,21 @@ jobs:
           force-full-build: ${{ github.ref == 'refs/heads/main' || inputs.debug_mode }}
 
   # ============================================================================
-  # STAGE 2 — Nx Cloud agents (3 sibling jobs, only when DTE is available)
+  # STAGE 2 — Quality gates
   #
-  # Each agent checks out the repo, installs deps, then blocks on
-  # `nx-cloud start-agent` — picking up tasks distributed by the CI run
-  # started in the quality-gates job.  They exit when the session ends.
-  # ============================================================================
-  agents:
-    name: "Nx Cloud Agent ${{ matrix.agent }}"
-    needs: [detect-dte]
-    if: >-
-      !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
-      needs.detect-dte.outputs.dte-available == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        # Dynamic matrix: spawns only as many agents as detect-dte deems optimal (capped at 3)
-        agent: ${{ fromJson(needs.detect-dte.outputs.agent-matrix) }}
-    env:
-      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-      NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
-    steps:
-      - name: "Checkout Repository"
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-
-      - name: "Setup Workspace"
-        uses: ./.github/actions/setup
-        with:
-          node-version: 22
-          install-dependencies: true
-          set-nx-shas: false
-          include-optional-deps: false
-
-      - name: "Start Nx Cloud Agent"
-        run: pnpm exec nx-cloud start-agent
-
-  # ============================================================================
-  # STAGE 3 — Quality gates (runs in parallel with agents)
-  #
-  # Starts the Nx Cloud CI run when DTE is available (which lets the agents
-  # above receive tasks), then runs lint + typecheck + test via `nx affected`.
-  # When DTE is unavailable, --parallel handles local concurrency instead.
+  # Runs lint + typecheck + test via `nx affected` with local parallelism.
+  # Nx remote cache (via GitHub Actions cache) avoids redundant work.
   # ============================================================================
   quality-gates:
     name: "Quality Gates"
-    needs: [detect-dte, detect-changes]
+    needs: [detect-changes]
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
       needs.detect-changes.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      NX_PARALLEL: ${{ needs.detect-dte.outputs.optimal-agents }}
+      NX_PARALLEL: 4
       NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
     outputs:
       result: ${{ steps.check-results.outputs.result }}
@@ -215,7 +132,6 @@ jobs:
       typecheck-failed-projects: ${{ steps.quality.outputs.typecheck-failed-projects }}
       test-result: ${{ steps.quality.outputs.test-result }}
       test-failed-projects: ${{ steps.quality.outputs.test-failed-projects }}
-      dte-quota-exceeded: ${{ steps.quality.outputs.dte-quota-exceeded }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@v6
@@ -237,29 +153,11 @@ jobs:
       - name: "Lint Agent Skills"
         run: node scripts/lint-skills.js
 
-      # Start the DTE session — agents (spawned above) will connect and receive
-      # tasks.  Skipped when DTE is unavailable; nx falls back to local execution.
-      - name: "Start Nx Cloud CI Run"
-        id: start-cloud
-        if: needs.detect-dte.outputs.dte-available == 'true'
-        continue-on-error: true
-        run: pnpm exec nx-cloud start-ci-run
-        env:
-          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-
       - name: "Code Quality Gates"
         id: quality
         uses: ./.github/actions/quality-gates
         with:
-          dte-active: ${{ steps.start-cloud.outcome == 'success' }}
-          parallel: ${{ needs.detect-dte.outputs.optimal-agents }}
-
-      # Always stop agents — closes cloud session even on failure
-      - name: "Stop Nx Cloud Agents"
-        if: always() && steps.start-cloud.outcome == 'success'
-        run: pnpm exec nx-cloud stop-all-agents || true
-        env:
-          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+          parallel: "4"
 
       - name: "Collect Quality Gate Results"
         id: check-results
@@ -270,7 +168,7 @@ jobs:
           echo "result=${RESULT:-failure}" >> $GITHUB_OUTPUT
 
   # ============================================================================
-  # STAGE 3b — Build validation (runs in PARALLEL with quality gates)
+  # STAGE 2b — Build validation (runs in PARALLEL with quality gates)
   #
   # Builds are independent of lint/typecheck/test — running them in parallel
   # saves 5–15 min of wall-clock time on the happy path.  The e2e job below
@@ -278,7 +176,7 @@ jobs:
   # ============================================================================
   build-validation:
     name: "Build Validation"
-    needs: [detect-dte, detect-changes]
+    needs: [detect-changes]
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
       needs.detect-changes.result == 'success'
@@ -310,25 +208,29 @@ jobs:
         uses: ./.github/actions/build-validation
         with:
           should-build-web: >-
-            ${{ needs.detect-changes.outputs.requires-full-build == 'true'
-            || needs.detect-changes.outputs.web == 'true'
-            || needs.detect-changes.outputs.core == 'true'
-            || needs.detect-changes.outputs.dependencies == 'true' }}
+            ${{
+              needs.detect-changes.outputs.requires-full-build == 'true'
+              || needs.detect-changes.outputs.web == 'true'
+              || needs.detect-changes.outputs.core == 'true'
+              || needs.detect-changes.outputs.dependencies == 'true'
+            }}
           should-build-mobile: >-
-            ${{ needs.detect-changes.outputs.requires-full-build == 'true'
-            || needs.detect-changes.outputs.mobile == 'true'
-            || needs.detect-changes.outputs.core == 'true'
-            || needs.detect-changes.outputs.dependencies == 'true' }}
+            ${{
+              needs.detect-changes.outputs.requires-full-build == 'true'
+              || needs.detect-changes.outputs.mobile == 'true'
+              || needs.detect-changes.outputs.core == 'true'
+              || needs.detect-changes.outputs.dependencies == 'true'
+            }}
           should-build-lambdas: >-
-            ${{ needs.detect-changes.outputs.requires-full-build == 'true'
-            || needs.detect-changes.outputs.lambdas == 'true'
-            || needs.detect-changes.outputs.core == 'true'
-            || needs.detect-changes.outputs.dependencies == 'true' }}
-          should-validate-terraform: >-
-            ${{ needs.detect-changes.outputs.requires-full-build == 'true'
-            || needs.detect-changes.outputs.terraform == 'true' }}
-          execution-mode: ${{ needs.detect-dte.outputs.execution-mode }}
-          optimal-agents: ${{ needs.detect-dte.outputs.optimal-agents }}
+            ${{
+              needs.detect-changes.outputs.requires-full-build == 'true'
+              || needs.detect-changes.outputs.lambdas == 'true'
+              || needs.detect-changes.outputs.core == 'true'
+              || needs.detect-changes.outputs.dependencies == 'true'
+            }}
+          should-validate-terraform: ${{ needs.detect-changes.outputs.requires-full-build == 'true' || needs.detect-changes.outputs.terraform == 'true' }}
+          execution-mode: "local"
+          optimal-agents: "4"
 
       # Upload web build so the e2e job can consume it without relying solely on Nx remote-cache.
       # Skipped when web wasn't built (artifact won't exist); e2e falls back to cache in that case.
@@ -342,11 +244,11 @@ jobs:
           if-no-files-found: warn
 
   # ============================================================================
-  # STAGE 4 — E2E tests (runs after BOTH quality gates AND build pass)
+  # STAGE 3 — E2E tests (runs after BOTH quality gates AND build pass)
   # ============================================================================
   e2e:
     name: "E2E Tests (Shard ${{ matrix.shard }})"
-    needs: [detect-dte, detect-changes, quality-gates, build-validation]
+    needs: [detect-changes, quality-gates, build-validation]
     if: >-
       needs.quality-gates.result == 'success' &&
       needs.quality-gates.outputs.result == 'success' &&
@@ -401,7 +303,7 @@ jobs:
           if-no-files-found: warn
 
   # ============================================================================
-  # STAGE 4b — Merge E2E shard reports and deploy to GitHub Pages
+  # STAGE 3b — Merge E2E shard reports and deploy to GitHub Pages
   # ============================================================================
   deploy-playwright-report:
     name: "Deploy Playwright Report"
@@ -465,11 +367,11 @@ jobs:
           destination_dir: playwright-report
 
   # ============================================================================
-  # STAGE 5 — Summarize results (always runs — posts PR comment, updates badges)
+  # STAGE 4 — Summarize results (always runs — posts PR comment, updates badges)
   # ============================================================================
   summarize:
     name: "Summarize & Report"
-    needs: [detect-dte, detect-changes, quality-gates, build-validation, e2e]
+    needs: [detect-changes, quality-gates, build-validation, e2e]
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -496,7 +398,6 @@ jobs:
         with:
           step-results: |
             {
-              "detect-dte":       "${{ needs.detect-dte.result }}",
               "detect-changes":   "${{ needs.detect-changes.result }}",
               "quality-gates":    "${{ needs.quality-gates.outputs.result || needs.quality-gates.result }}",
               "build-validation": "${{ needs.build-validation.outputs.overall-result || needs.build-validation.result }}",
@@ -526,11 +427,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           event-name: ${{ github.event_name }}
           pr-number: ${{ github.event.pull_request.number }}
-          execution-mode: ${{ needs.detect-dte.outputs.execution-mode }}
-          optimal-agents: ${{ needs.detect-dte.outputs.optimal-agents }}
-          fallback-reason: ${{ needs.detect-dte.outputs.fallback-reason }}
-          quota-status: ${{ needs.detect-dte.outputs.quota-remaining }}
-          quota-exceeded: ${{ needs.quality-gates.outputs.dte-quota-exceeded }}
+          execution-mode: "local"
+          optimal-agents: "4"
           step-results: ${{ steps.collect-results.outputs.step-results }}
           workflow-duration: ${{ steps.collect-results.outputs.workflow-duration }}
           run-id: ${{ github.run_id }}
@@ -559,7 +457,6 @@ jobs:
           workflow-status: ${{ steps.collect-results.outputs.overall-status }}
           step-results: |
             {
-              "DTE Detection":    "${{ needs.detect-dte.result }}",
               "Change Detection": "${{ needs.detect-changes.result }}",
               "Quality Gates":    "${{ needs.quality-gates.outputs.result || needs.quality-gates.result }}",
               "Build Validation": "${{ needs.build-validation.result }}",
@@ -568,7 +465,6 @@ jobs:
           workflow-run-id: ${{ github.run_id }}
           branch: ${{ github.ref_name }}
           commit-sha: ${{ github.sha }}
-          dte-status: ${{ needs.detect-dte.outputs.dte-available }}
 
       - name: "Label PR on Failure"
         if: always() && github.event.pull_request.number
@@ -662,7 +558,6 @@ jobs:
           STATUS="${{ steps.collect-results.outputs.overall-status }}"
           if [ "$STATUS" = "success" ]; then
             echo "CI Pipeline completed successfully!"
-            echo "Execution Mode: ${{ needs.detect-dte.outputs.execution-mode }}"
             echo "Duration: ${{ steps.collect-results.outputs.workflow-duration }}s"
           else
             echo "FAILED: CI Pipeline failed"

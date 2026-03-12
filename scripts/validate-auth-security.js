@@ -33,8 +33,6 @@ const DANGEROUS_PATTERNS = [
   /^VITE_OAUTH_PROXY_URL=https:\/\/[a-z0-9]+\.execute-api\.[a-z-]+\.amazonaws\.com/m,
   // Real database endpoints
   /DB_HOST=(?!localhost|your-db-host|placeholder)[a-z0-9-]+\.[a-z0-9]+\.us-[a-z]+-\d+\.rds\.amazonaws\.com/,
-  // Nx Cloud access tokens
-  /NX_CLOUD_ACCESS_TOKEN=(?!your-nx-cloud-access-token|placeholder)[A-Za-z0-9]{20,}/,
   // Real RDS Proxy endpoints
   /RDS_PROXY_ENDPOINT=(?!your-rds-proxy|placeholder)[a-z0-9-]+\.proxy-[a-z0-9]+\.[a-z-]+\d+\.rds\.amazonaws\.com/,
 ];

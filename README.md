@@ -7,8 +7,6 @@ A modern sports data management platform built with React Native CLI, Next.js we
 ## 🚀 CI Status
 
 [![CI Pipeline](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/CI-Pipeline.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![DTE Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/DTE-Detection.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Nx DTE Status](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Nx-DTE-Status.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![Change Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Change-Detection.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![Execution Plan](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Execution-Plan.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![Quality Gates](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Quality-Gates.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)

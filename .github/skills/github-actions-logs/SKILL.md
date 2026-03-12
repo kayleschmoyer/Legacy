@@ -700,9 +700,7 @@ Understanding which workflow generates which logs is critical for targeted debug
 ```
 ci-orchestrator.yml  ← entry point for PRs / pushes / merge_group
 ├── ci-pipeline.yml  ← reusable workflow (main CI)
-│   ├── detect-dte            (Job: detect-dte)
 │   ├── detect-changes        (Job: detect-changes)
-│   ├── agents [1..3]         (Job: agents)
 │   ├── quality-gates         (Job: quality-gates)
 │   ├── build-validation      (Job: build-validation)
 │   ├── e2e                   (Job: e2e)
@@ -776,9 +774,6 @@ gh run view RUN_ID --log-failed | Select-String "Dependencies not installed|Nx n
 # Individual gate failures
 gh run view RUN_ID --log-failed | Select-String "formatting issues detected|ESLint.*failed|typecheck.*failed" -Context 5
 
-# DTE quota exceeded mid-run (falls back to local)
-gh run view RUN_ID --log | Select-String "quota|limit|exceeded|insufficient|disabled|401|minimum.*agent" -Context 5
-
 # Which projects failed which gate
 gh run view RUN_ID --log | Select-String "failed-projects" -Context 2
 ```
@@ -791,9 +786,6 @@ gh run view RUN_ID --log-failed | Select-String "Web.*build failed|Lambda.*build
 
 # Build output verification failures
 gh run view RUN_ID --log-failed | Select-String "Build output directory not found|artifacts missing" -Context 3
-
-# DTE fallback during build (disables cloud, retries locally)
-gh run view RUN_ID --log | Select-String "NX_NO_CLOUD|skip-nx-cache" -Context 3
 ```
 
 ### E2E Testing Action (`.github/actions/e2e-testing`)
@@ -847,9 +839,6 @@ gh run view $runId --log-failed | Select-String "sentry.*error|sourcemap.*failed
 
 # GitHub Pages deployment failures
 gh run view $runId --log-failed | Select-String "Pages.*error|deploy.*failed|CNAME" -Context 5
-
-# DTE fallback during web build
-gh run view $runId --log | Select-String "DTE.*fail|NX_CLOUD_NO_TIMEOUTS|NX_NO_CLOUD" -Context 3
 ```
 
 ### Lambda Upload (upload-lambdas.yml)
@@ -932,7 +921,6 @@ $logs = gh run view $runId --log-failed
   "🧪 Tests"        = "FAIL.*spec\.ts|Test Suites:.*failed"
   "🏗️ Build"         = "Running target.*failed|Failed tasks:|build failed"
   "🌐 E2E"          = "server.*fail|server.*died|playwright.*error"
-  "☁️ DTE"           = "quota|DTE.*fail|Nx Cloud.*fail|401.*Cloud"
   "📚 Skills"       = "skill.*failed validation"
   "🔒 Terraform"    = "state lock|Lock Info|terraform.*failed"
   "⏹️ Cancelled"     = "operation was canceled|more recent commit"
@@ -959,7 +947,6 @@ $logs = gh run view $runId --log-failed
 | Find type errors       | `gh run view RUN_ID --log \| Select-String "error TS"`                        |
 | Find failed tasks      | `gh run view RUN_ID --log \| Select-String "Failed tasks"`                    |
 | Find setup errors      | `gh run view RUN_ID --log \| Select-String "Nx CLI not available"`            |
-| Find DTE issues        | `gh run view RUN_ID --log \| Select-String "quota\|DTE.*fail"`                |
 | Find Terraform locks   | `gh run view RUN_ID --log \| Select-String "state lock"`                      |
 | Find E2E server issues | `gh run view RUN_ID --log \| Select-String "server.*fail\|server.*died"`      |
 | List CI pipeline runs  | `gh run list --workflow ci-orchestrator.yml --limit 5`                        |
