@@ -91,6 +91,14 @@ export const matchups = pgTable(
       statsLoadingStatusIdx: index('matchups_stats_loading_status_idx').on(
         table.statsLoadingStatus,
       ),
+      // Composite partial indexes to help the planner use index scans for
+      // getWinStreakMatchupsForTeam (always filters status = 'completed').
+      team1IdEndTimeIdx: index('matchups_team1_id_end_time_idx')
+        .on(table.team1Id, table.endTime)
+        .where(sql`status = 'completed'`),
+      team2IdEndTimeIdx: index('matchups_team2_id_end_time_idx')
+        .on(table.team2Id, table.endTime)
+        .where(sql`status = 'completed'`),
     };
   },
 );

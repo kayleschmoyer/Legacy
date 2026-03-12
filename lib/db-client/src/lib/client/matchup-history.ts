@@ -663,6 +663,51 @@ export async function getRecentMatchupsForTeam(
 }
 
 /**
+ * Lean projection of matchup fields needed for win-streak calculation.
+ * Only the four columns required by getTeamWinStreak are fetched, avoiding
+ * a full SELECT * over the (potentially large) matchups table.
+ */
+export interface WinStreakMatchup {
+  team1Id: number | null;
+  team2Id: number | null;
+  team1Score: string | null;
+  team2Score: string | null;
+}
+
+/**
+ * Get recent completed matchups for a team, projecting only the four columns
+ * needed to compute a win streak (team1Id, team2Id, team1Score, team2Score).
+ * The composite indexes matchups_team1_id_end_time_idx /
+ * matchups_team2_id_end_time_idx help the planner use index scans for this query.
+ */
+export async function getWinStreakMatchupsForTeam(
+  db: PublicDb,
+  teamId: number,
+  limit = 50,
+): Promise<WinStreakMatchup[]> {
+  return await db
+    .select({
+      team1Id: Schema.matchups.team1Id,
+      team2Id: Schema.matchups.team2Id,
+      team1Score: Schema.matchups.team1Score,
+      team2Score: Schema.matchups.team2Score,
+    })
+    .from(Schema.matchups)
+    .where(
+      and(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Drizzle `or` typing limitation with multiple conditions
+        or(
+          eq(Schema.matchups.team1Id, teamId),
+          eq(Schema.matchups.team2Id, teamId),
+        ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
+        eq(Schema.matchups.status, 'completed'),
+      ),
+    )
+    .orderBy(desc(Schema.matchups.endTime))
+    .limit(limit);
+}
+
+/**
  * Get matchup count by status for a league
  */
 export interface MatchupStatusCounts {

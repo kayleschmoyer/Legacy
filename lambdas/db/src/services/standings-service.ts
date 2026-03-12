@@ -13,6 +13,7 @@ import {
   getPlayoffQualifications,
   getRecentMatchupsForTeam,
   getSeasonResults,
+  getWinStreakMatchupsForTeam,
   type HeadToHeadRecord,
   type MatchupHistoryFilters,
   type MatchupStatusCounts,
@@ -219,7 +220,7 @@ export class StandingsService {
     db: GenericDatabase<typeof PublicSchema>,
     teamId: number,
   ): Promise<number> {
-    const recentMatchups = await getRecentMatchupsForTeam(db, teamId, 50);
+    const recentMatchups = await getWinStreakMatchupsForTeam(db, teamId, 50);
 
     let streak = 0;
 
