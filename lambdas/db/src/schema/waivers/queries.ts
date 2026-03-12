@@ -49,25 +49,34 @@ builder.queryField('freeAgents', (t) =>
         throw new Error('League not found');
       }
 
-      // Build WHERE conditions (all reference table alias 'p')
+      // Build JOIN clauses and WHERE conditions for the free-agent query.
+      // JOINs replace correlated subqueries for set-membership tests, which
+      // are cheaper because the planner can use indexes on the joined table
+      // rather than re-executing the subquery once per outer row.
+      const joinClauses: ReturnType<typeof sql>[] = [];
       const sqlConditions: ReturnType<typeof sql>[] = [];
 
-      // Exclude already-rostered players
-      sqlConditions.push(
-        sql`NOT EXISTS (
-          SELECT 1 FROM public.team_members tm
-          WHERE tm.league_id = ${leagueId} AND tm.player_id = p.id
-        )`,
+      // (1) Replace NOT EXISTS correlated subquery with LEFT JOIN … IS NULL.
+      //     idx_team_members_league_player (league_id, player_id) makes this
+      //     an index-only look-up rather than a per-row correlated subquery.
+      joinClauses.push(
+        sql`LEFT JOIN public.team_members tm
+          ON tm.player_id = p.id AND tm.league_id = ${leagueId}`,
       );
+      sqlConditions.push(sql`tm.player_id IS NULL`);
 
-      // Apply player pool restriction (AL / NL)
+      // (2) Replace IN (SELECT DISTINCT …) with a derived-table JOIN.
+      //     idx_season_batting_lgid_playerid (lg_id, player_id) covers the
+      //     GROUP BY scan; the non-correlated derived table avoids repeating
+      //     the DISTINCT full-scan once per player row.
       if (league.playerPool && league.playerPool !== 'all') {
         const poolUpper = league.playerPool.toUpperCase();
-        sqlConditions.push(
-          sql`p.id IN (
-            SELECT DISTINCT sb.player_id FROM season_batting sb
-            WHERE sb.lg_id = ${poolUpper}
-          )`,
+        joinClauses.push(
+          sql`JOIN (
+            SELECT player_id FROM public.season_batting
+            WHERE lg_id = ${poolUpper}
+            GROUP BY player_id
+          ) sb_pool ON sb_pool.player_id = p.id`,
         );
       }
 
@@ -82,6 +91,7 @@ builder.queryField('freeAgents', (t) =>
         sqlConditions.push(careerSeasonsCondition(minCareerSeasons));
       }
 
+      const joinClause = sql.join(joinClauses, sql` `);
       const whereClause =
         sqlConditions.length > 0
           ? sql`WHERE ${sql.join(sqlConditions, sql` AND `)}`
@@ -109,6 +119,7 @@ builder.queryField('freeAgents', (t) =>
           p.all_star_selections, p.gold_gloves, p.silver_sluggers, p.mvp_awards,
           p.cy_young_awards, p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year
         FROM public.players p
+        ${joinClause}
         ${whereClause}
         ORDER BY p.last_name ASC, p.first_name ASC
         LIMIT 200
