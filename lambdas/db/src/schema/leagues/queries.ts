@@ -8,6 +8,7 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq, ilike, sql, SQL } from 'drizzle-orm';
+import { GraphQLError } from 'graphql';
 import {
   League,
   LeagueMember,
@@ -321,7 +322,7 @@ builder.queryField('leaguePositions', (t) =>
           .limit(1);
 
         if (leagueAccess.length === 0) {
-          throw new Error('User does not have access to this league');
+          throw ForbiddenError('User does not have access to this league');
         }
 
         // Fetch league positions
@@ -337,10 +338,13 @@ builder.queryField('leaguePositions', (t) =>
 
         return positions;
       } catch (error) {
-        LOGGER.error('Error fetching league positions', {
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Error fetching league positions', err, {
           leagueId,
           userId,
-          error: error instanceof Error ? error.message : String(error),
         });
         throw new Error('Failed to fetch league positions');
       }
