@@ -1,0 +1,356 @@
+# =============================================================================
+# Run Playwright Tests (On-Demand)
+# =============================================================================
+# Manually trigger Playwright E2E or integration tests with full control over
+# which tests run, which browsers to use, and how many shards to parallelize.
+#
+# Trigger: Actions → "Run Playwright Tests" → Run workflow → fill parameters
+# =============================================================================
+
+name: "Run Playwright Tests"
+
+on:
+  workflow_dispatch:
+    inputs:
+      test-suite:
+        description: "Which test suite to run"
+        required: true
+        default: "e2e"
+        type: choice
+        options:
+          - e2e
+          - integration
+      test-grep:
+        description: "Filter tests by tag (Playwright --grep)"
+        required: false
+        default: "(all)"
+        type: choice
+        options:
+          - "(all)"
+          - "@critical"
+          - "@smoke"
+          - "@regression"
+          - "@visual"
+          - "@slow"
+      test-grep-invert:
+        description: "Exclude tests by tag (Playwright --grep-invert)"
+        required: false
+        default: "(none)"
+        type: choice
+        options:
+          - "(none)"
+          - "@critical"
+          - "@smoke"
+          - "@regression"
+          - "@visual"
+          - "@slow"
+      test-file:
+        description: "Specific test file(s) to run relative to test dir (e.g. 'draft-functionality.spec.ts'). Empty = all files."
+        required: false
+        default: ""
+        type: string
+      browser:
+        description: "Playwright project/browser to use"
+        required: false
+        default: "chromium"
+        type: choice
+        options:
+          - chromium
+          - firefox
+          - webkit
+          - Mobile Chrome
+          - Mobile Safari
+      shard-total:
+        description: "Number of parallel shards (1 = no sharding)"
+        required: false
+        default: "1"
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "3"
+          - "4"
+      retries:
+        description: "Number of retries for failed tests"
+        required: false
+        default: "2"
+        type: choice
+        options:
+          - "0"
+          - "1"
+          - "2"
+          - "3"
+      workers:
+        description: "Number of parallel workers per shard"
+        required: false
+        default: "2"
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "3"
+          - "4"
+      update-snapshots:
+        description: "Update visual snapshots instead of comparing"
+        required: false
+        default: false
+        type: boolean
+      headed:
+        description: "Run in headed mode (useful for debugging via trace)"
+        required: false
+        default: false
+        type: boolean
+      ref:
+        description: "Branch or commit SHA to test (default: branch selected above)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # Compute the shard matrix in a tiny job so the expression stays under line-length limits.
+  prepare:
+    name: "Prepare Matrix"
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    outputs:
+      shards: ${{ steps.set.outputs.shards }}
+    steps:
+      - id: set
+        shell: bash
+        run: |
+          case "${{ inputs.shard-total }}" in
+            1) echo 'shards=["1/1"]' >> "$GITHUB_OUTPUT" ;;
+            2) echo 'shards=["1/2","2/2"]' >> "$GITHUB_OUTPUT" ;;
+            3) echo 'shards=["1/3","2/3","3/3"]' >> "$GITHUB_OUTPUT" ;;
+            4) echo 'shards=["1/4","2/4","3/4","4/4"]' >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  run-tests:
+    name: "Playwright ${{ inputs.test-suite }} (${{ matrix.shard }})"
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.prepare.outputs.shards) }}
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 1
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Install Playwright Browsers"
+        shell: bash
+        run: |
+          BROWSER="${{ inputs.browser }}"
+          # Map project names to browser engines for install
+          case "$BROWSER" in
+            "Mobile Chrome") BROWSER_ENGINE="chromium" ;;
+            "Mobile Safari") BROWSER_ENGINE="webkit" ;;
+            *) BROWSER_ENGINE="$BROWSER" ;;
+          esac
+          pnpm exec playwright install "$BROWSER_ENGINE" --with-deps
+
+      # =======================================================================
+      # E2E suite: build web app and start a local server
+      # =======================================================================
+      - name: "Build Web Application"
+        if: inputs.test-suite == 'e2e'
+        shell: bash
+        run: |
+          export NX_NO_CLOUD=true
+          pnpm exec nx build web
+
+      - name: "Start Dev Server"
+        if: inputs.test-suite == 'e2e'
+        shell: bash
+        run: |
+          export NX_NO_CLOUD=true
+
+          if [ -d "dist/apps/web" ]; then
+            echo "Serving pre-built web artifact..."
+            pnpm dlx serve@14.2.1 dist/apps/web -l 4200 --no-clipboard &
+          else
+            echo "Falling back to nx serve..."
+            pnpm exec nx serve web --port=4200 --host=localhost &
+          fi
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+
+          echo "Waiting for dev server on http://localhost:4200 ..."
+          for i in {1..90}; do
+            if curl -sf http://localhost:4200 >/dev/null 2>&1; then
+              echo "Dev server ready"
+              break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "Dev server crashed"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if ! curl -sf http://localhost:4200 >/dev/null 2>&1; then
+            echo "Dev server did not start within 90 seconds"
+            exit 1
+          fi
+
+      # =======================================================================
+      # Run Playwright tests
+      # =======================================================================
+      - name: "Run Playwright Tests"
+        id: tests
+        shell: bash
+        env:
+          CI: "true"
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          INTEGRATION_BASE_URL: ${{ secrets.INTEGRATION_BASE_URL }}
+        run: |
+          SUITE="${{ inputs.test-suite }}"
+
+          if [ "$SUITE" == "integration" ]; then
+            cd apps/web-e2e
+            CONFIG="playwright.integration.config.ts"
+          else
+            cd apps/web-e2e
+            CONFIG="playwright.config.ts"
+          fi
+
+          # Build Playwright arguments as an array to avoid command injection
+          PLAYWRIGHT_ARGS=( "--config=$CONFIG" )
+
+          # Browser / project
+          PLAYWRIGHT_ARGS+=( "--project=${{ inputs.browser }}" )
+
+          # Grep patterns
+          if [ "${{ inputs.test-grep }}" != "(all)" ]; then
+            PLAYWRIGHT_ARGS+=( "--grep=${{ inputs.test-grep }}" )
+          fi
+          if [ "${{ inputs.test-grep-invert }}" != "(none)" ]; then
+            PLAYWRIGHT_ARGS+=( "--grep-invert=${{ inputs.test-grep-invert }}" )
+          fi
+
+          # Specific test file (passed as positional argument after --)
+          TEST_FILE=""
+          if [ -n "${{ inputs.test-file }}" ]; then
+            TEST_FILE="${{ inputs.test-file }}"
+          fi
+
+          # Sharding
+          if [ "${{ inputs.shard-total }}" != "1" ]; then
+            PLAYWRIGHT_ARGS+=( "--shard=${{ matrix.shard }}" )
+          fi
+
+          # Workers and retries
+          PLAYWRIGHT_ARGS+=( "--workers=${{ inputs.workers }}" )
+          PLAYWRIGHT_ARGS+=( "--retries=${{ inputs.retries }}" )
+
+          # Snapshot update
+          if [ "${{ inputs.update-snapshots }}" == "true" ]; then
+            PLAYWRIGHT_ARGS+=( "--update-snapshots" )
+          fi
+
+          # Headed mode
+          if [ "${{ inputs.headed }}" == "true" ]; then
+            PLAYWRIGHT_ARGS+=( "--headed" )
+          fi
+
+          # Reporters: line for console, html for artifact, blob for potential merge
+          PLAYWRIGHT_ARGS+=( "--reporter=line,html,blob" )
+
+          # Run with test file as a safe positional arg after --
+          if [ -n "$TEST_FILE" ]; then
+            echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]} -- $TEST_FILE"
+            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}" -- "$TEST_FILE"
+          else
+            echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]}"
+            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}"
+          fi
+
+      - name: "Stop Dev Server"
+        if: always() && inputs.test-suite == 'e2e'
+        shell: bash
+        run: kill $SERVER_PID 2>/dev/null || true
+
+      # =======================================================================
+      # Artifacts
+      # =======================================================================
+      - name: "Upload HTML Report"
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ strategy.job-index }}
+          path: apps/web-e2e/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: "Upload Blob Report"
+        if: ${{ !cancelled() && inputs.shard-total != '1' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-blob-${{ strategy.job-index }}
+          path: apps/web-e2e/blob-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: "Upload Test Results"
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ strategy.job-index }}
+          path: apps/web-e2e/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ===========================================================================
+  # Merge sharded reports into a single HTML report
+  # ===========================================================================
+  merge-reports:
+    name: "Merge Playwright Reports"
+    needs: [run-tests]
+    if: ${{ !cancelled() && inputs.shard-total != '1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 1
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: "Download All Blob Reports"
+        uses: actions/download-artifact@v8
+        with:
+          pattern: playwright-blob-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: "Merge Reports"
+        run: npx playwright@1.55.0 merge-reports --reporter html ./all-blob-reports
+
+      - name: "Upload Merged Report"
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-merged
+          path: playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
