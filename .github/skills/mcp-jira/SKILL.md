@@ -1,6 +1,6 @@
 ---
 name: mcp-jira
-description: 'Use the Jira MCP server tools for ticket operations: create tickets (avoids --json duplication bug), transition status with validation, view structured ticket details, check blocker dependencies (3-way check), and set parent epic via REST API. Load when performing any Jira operation through MCP tools.'
+description: 'Use the Jira MCP server tools for ticket operations: create tickets (avoids --json duplication bug), transition status with validation, view structured ticket details (including priority, reporter, labels, timestamps), fetch ticket comments, check blocker dependencies (3-way check), and set parent epic via REST API. Load when performing any Jira operation through MCP tools.'
 ---
 
 # Skill: Jira MCP Server
@@ -16,18 +16,22 @@ The Jira MCP server (`tools/mcp/jira-server/`) wraps Jira operations with guardr
 - Viewing ticket details with blocker information
 - Checking if a ticket's blockers are resolved before starting work
 - Setting or changing a ticket's parent epic
+- Reading ticket comments for additional context
 
 ## Prerequisites
 
-- Jira credentials available to the MCP server, resolved in this priority order:
-  1. Environment variables: `JIRA_EMAIL` and `JIRA_API_TOKEN`
-  2. `~/.netrc` with Atlassian credentials:
-     ```
-     machine bkrupa.atlassian.net
-     login your-email@example.com
-     password your-api-token
-     ```
-- MCP server configured in `.vscode/mcp.json` (already included in the repo)
+- `JIRA_EMAIL` and `JIRA_API_TOKEN` environment variables set in your shell. VS Code passes them through to the server process automatically (see [Configuration](#configuration)).
+- If you prefer not to use environment variables, you can instead create `~/.netrc`:
+  ```
+  machine bkrupa.atlassian.net
+  login your-email@example.com
+  password your-api-token
+  ```
+
+Credentials are resolved in this priority order by the server:
+
+1. `JIRA_EMAIL` + `JIRA_API_TOKEN` env vars
+2. `~/.netrc` Atlassian entry
 
 ## Available Tools
 
@@ -63,7 +67,7 @@ View ticket details in a structured JSON format.
 | --------- | ------ | -------- | -------------------- |
 | `key`     | string | yes      | Ticket key (LS-1137) |
 
-Returns: `{ key, summary, status, type, description, assignee, parent, blockers[] }`
+Returns: `{ key, summary, status, type, priority, description, assignee, reporter, parent, labels[], created, updated, blockers[] }`
 
 ### jira_check_blockers
 
@@ -100,37 +104,47 @@ Set or change the parent epic of an existing ticket.
 
 **Guardrail:** Uses Jira REST API PUT to set the parent field on existing issues.
 
+### jira_get_comments
+
+Fetch all comments on a Jira ticket.
+
+| Parameter | Type   | Required | Description          |
+| --------- | ------ | -------- | -------------------- |
+| `key`     | string | yes      | Ticket key (LS-1137) |
+
+Returns: `{ key, total, comments: [{ id, author, body, created, updated }] }`
+
 ## Configuration
 
-The server is configured in `.vscode/mcp.json`:
+The server is configured in `.vscode/mcp.json`. It reads `JIRA_EMAIL` and `JIRA_API_TOKEN` directly from your shell environment — no prompting required:
 
 ```json
 {
   "servers": {
     "legacy-sports-jira": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["tsx", "tools/mcp/jira-server/src/index.ts"]
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/jira-server/src/index.ts"],
+      "env": {
+        "JIRA_EMAIL": "${env:JIRA_EMAIL}",
+        "JIRA_API_TOKEN": "${env:JIRA_API_TOKEN}"
+      }
     }
   }
 }
 ```
 
+Set the variables in your shell profile (e.g. `~/.zshrc` or `~/.bashrc`) and restart VS Code. Generate an API token at <https://id.atlassian.com/manage-profile/security/api-tokens>.
+
+Alternatively, create `~/.netrc` — the server falls back to it automatically when env vars are absent.
+
 ## Troubleshooting
 
-### Missing Jira credentials
+### Missing Jira credentials / "No Jira credentials found"
 
-The Jira MCP server authenticates to Jira using either environment variables or your `~/.netrc` file.
-
-- Check that `JIRA_EMAIL` and `JIRA_API_TOKEN` are set in your environment.
-- If you prefer `~/.netrc`, ensure it exists and contains your Atlassian email and API token.
-
-### "No Atlassian credentials found in ~/.netrc"
-
-If you see this message, either:
-
-- Create `~/.netrc` with your Atlassian email and API token, **or**
-- Set `JIRA_EMAIL` and `JIRA_API_TOKEN` environment variables for the process running the MCP server.
+1. Confirm `JIRA_EMAIL` and `JIRA_API_TOKEN` are exported in your shell (`echo $JIRA_EMAIL`).
+2. Restart VS Code so it picks up the updated environment.
+3. As a fallback, create `~/.netrc` with your Atlassian email and API token.
 
 ### Tool returns error about status validation
 

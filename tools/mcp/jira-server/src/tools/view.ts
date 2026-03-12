@@ -1,4 +1,5 @@
 import { jiraRequest } from '../jira-api.js';
+import { extractAdfText } from '../adf.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface ViewParams {
@@ -18,49 +19,14 @@ interface JiraIssueResponse {
     issuetype: { name: string };
     description: unknown;
     assignee: { displayName: string } | null;
+    reporter: { displayName: string } | null;
     parent?: { key: string };
     issuelinks: JiraIssueLink[];
+    labels: string[];
+    priority: { name: string } | null;
+    created: string;
+    updated: string;
   };
-}
-
-type AdfNode = {
-  text?: string;
-  content?: AdfNode[];
-  [key: string]: unknown;
-};
-
-/** Extract plain text from Atlassian Document Format (ADF) recursively. */
-function extractAdfText(adf: unknown): string {
-  if (!adf || typeof adf !== 'object') return '';
-  const doc = adf as { content?: AdfNode[] };
-  if (!Array.isArray(doc.content)) return '';
-
-  const parts: string[] = [];
-
-  const collectText = (node: AdfNode): void => {
-    if (typeof node.text === 'string') {
-      parts.push(node.text);
-    }
-    if (Array.isArray(node.content)) {
-      for (const child of node.content) {
-        collectText(child);
-      }
-    }
-  };
-
-  const topLevel = doc.content;
-  topLevel.forEach((block, index) => {
-    const beforeLength = parts.length;
-    collectText(block);
-    if (parts.length > beforeLength && index < topLevel.length - 1) {
-      parts.push('\n\n');
-    }
-  });
-
-  return parts
-    .join('')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
 }
 
 /** Extract blocker keys from issue links. */
@@ -89,7 +55,7 @@ export async function view(params: ViewParams): Promise<CallToolResult> {
       path: `/rest/api/3/issue/${key}`,
       query: {
         fields:
-          'summary,status,issuetype,description,assignee,parent,issuelinks',
+          'summary,status,issuetype,description,assignee,reporter,parent,issuelinks,labels,priority,created,updated',
       },
     });
 
@@ -98,9 +64,14 @@ export async function view(params: ViewParams): Promise<CallToolResult> {
       summary: issue.fields.summary,
       status: issue.fields.status.name,
       type: issue.fields.issuetype.name,
+      priority: issue.fields.priority?.name ?? '',
       description: extractAdfText(issue.fields.description),
       assignee: issue.fields.assignee?.displayName ?? '',
+      reporter: issue.fields.reporter?.displayName ?? '',
       parent: issue.fields.parent?.key ?? '',
+      labels: issue.fields.labels,
+      created: issue.fields.created,
+      updated: issue.fields.updated,
       blockers: extractBlockers(issue.fields.issuelinks),
     };
 

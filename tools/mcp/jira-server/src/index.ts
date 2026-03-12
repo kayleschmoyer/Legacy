@@ -6,6 +6,7 @@ import { transition } from './tools/transition.js';
 import { view } from './tools/view.js';
 import { checkBlockers } from './tools/check-blockers.js';
 import { setParent } from './tools/set-parent.js';
+import { getComments } from './tools/get-comments.js';
 
 const server = new McpServer({
   name: 'legacy-sports-jira',
@@ -76,6 +77,16 @@ server.tool(
     parent: z.string().describe('Parent epic key to set, e.g. LS-640'),
   },
   async (params) => setParent(params),
+);
+
+// --- jira_get_comments ---
+server.tool(
+  'jira_get_comments',
+  'Fetch all comments on a Jira ticket, ordered by creation date. Returns author, plain-text body, and timestamps for each comment.',
+  {
+    key: z.string().describe('Jira ticket key, e.g. LS-1137'),
+  },
+  async (params) => getComments(params),
 );
 
 // Start the server

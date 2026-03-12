@@ -10,8 +10,9 @@ Wraps Jira operations with guardrails using the Jira REST API (with env var / ne
 
 - **jira_create_ticket** — Create tickets via REST API
 - **jira_transition** — Transition ticket status with validation
-- **jira_view** — Structured ticket details with blocker info
+- **jira_view** — Structured ticket details (summary, status, type, priority, description, assignee, reporter, labels, timestamps, blockers)
 - **jira_check_blockers** — Automates the 3-way dependency check
 - **jira_set_parent** — Set parent epic via Jira REST API
+- **jira_get_comments** — Fetch all comments on a ticket with author and plain-text body
 
 See `.github/skills/mcp-jira/SKILL.md` for usage.
