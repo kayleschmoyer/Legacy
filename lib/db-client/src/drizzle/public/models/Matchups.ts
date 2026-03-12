@@ -153,6 +153,9 @@ export const matchupPlayers = pgTable(
         table.matchupId,
         table.teamId,
       ),
+      matchupPlayerTeamUnique: unique(
+        'matchup_players_matchup_player_team_unique',
+      ).on(table.matchupId, table.playerId, table.teamId),
     };
   },
 );

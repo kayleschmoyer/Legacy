@@ -237,32 +237,28 @@ export async function addClaimedPlayerToCurrentMatchup(
       ),
     );
 
-  for (const matchup of weekMatchups) {
-    // Check if already exists (idempotent)
-    const existing = await db
-      .select({ id: PublicSchema.matchupPlayers.id })
-      .from(PublicSchema.matchupPlayers)
-      .where(
-        and(
-          eq(PublicSchema.matchupPlayers.matchupId, matchup.id),
-          eq(PublicSchema.matchupPlayers.playerId, playerId),
-          eq(PublicSchema.matchupPlayers.teamId, teamId),
-        ),
+  if (weekMatchups.length > 0) {
+    await db
+      .insert(PublicSchema.matchupPlayers)
+      .values(
+        weekMatchups.map((matchup) => ({
+          matchupId: matchup.id,
+          playerId,
+          teamId,
+        })),
       )
-      .limit(1);
-
-    if (existing.length === 0) {
-      await db.insert(PublicSchema.matchupPlayers).values({
-        matchupId: matchup.id,
-        playerId,
-        teamId,
+      .onConflictDoNothing({
+        target: [
+          PublicSchema.matchupPlayers.matchupId,
+          PublicSchema.matchupPlayers.playerId,
+          PublicSchema.matchupPlayers.teamId,
+        ],
       });
 
-      LOGGER.info('Added waiver-claimed player to matchup', {
-        matchupId: matchup.id,
-        playerId,
-        teamId,
-      });
-    }
+    LOGGER.info('Ensured waiver-claimed player in matchups', {
+      matchupIds: weekMatchups.map((m) => m.id),
+      playerId,
+      teamId,
+    });
   }
 }
