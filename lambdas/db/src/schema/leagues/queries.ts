@@ -185,12 +185,16 @@ builder.queryField('league', (t) =>
           userMembership,
         };
       } catch (error) {
-        LOGGER.error('Error fetching league', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        if (error instanceof Error && error.message.includes('Access denied')) {
+        // Re-throw GraphQL errors (e.g. ForbiddenError for non-members accessing private leagues)
+        // without logging — these are expected access-control outcomes, not server errors.
+        if (error instanceof GraphQLError) {
           throw error;
         }
+        LOGGER.error(
+          'Error fetching league',
+          error instanceof Error ? error : new Error(String(error)),
+          { leagueId, userId },
+        );
         throw new Error('Failed to fetch league details');
       }
     },
