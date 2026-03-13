@@ -27,6 +27,7 @@ const CLIENT_FACING_CODES = new Set([
   'UNAUTHENTICATED',
   'FORBIDDEN',
   'NOT_FOUND',
+  'PREMIUM_REQUIRED',
   'PERSISTED_QUERY_NOT_FOUND',
   'PERSISTED_QUERY_NOT_SUPPORTED',
 ]);
@@ -100,10 +101,12 @@ export const server = new ApolloServer({
       LOGGER.error('GraphQL internal error', errorContext);
     }
 
-    // Strip internal message; retain path/locations for client-side error correlation.
+    // Return a sanitized response: no internal message, no extensions beyond
+    // the error code, and no SDL locations that could disclose schema internals.
     return {
-      ...formattedError,
       message: 'Internal server error',
+      path: formattedError.path,
+      extensions: { code: code ?? 'INTERNAL_SERVER_ERROR' },
     };
   },
 });
