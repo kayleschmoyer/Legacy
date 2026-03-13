@@ -185,8 +185,8 @@ builder.queryField('getTeamStatistics', (t) =>
       // Calculate statistics using the analytics library
       const { calculateTeamStats } = await import('@legacy-sports/analytics');
       return calculateTeamStats(matchups, teams, {
-        startWeek: args.startWeek || undefined,
-        endWeek: args.endWeek || undefined,
+        startWeek: args.startWeek ?? undefined,
+        endWeek: args.endWeek ?? undefined,
       });
     },
   }),
@@ -235,8 +235,8 @@ builder.queryField('getPlayoffProjections', (t) =>
 
       const teamStats = calculateTeamStats(matchups, teams);
       return calculatePlayoffProjections(teamStats, {
-        playoffTeams: args.playoffTeams || undefined,
-        remainingWeeks: args.remainingWeeks || undefined,
+        playoffTeams: args.playoffTeams ?? undefined,
+        remainingWeeks: args.remainingWeeks ?? undefined,
       });
     },
   }),
@@ -261,6 +261,7 @@ builder.queryField('getLeagueAnalytics', (t) =>
         .select({
           id: PublicSchema.leagues.id,
           name: PublicSchema.leagues.name,
+          currentWeek: PublicSchema.leagues.currentWeek,
           currentMatchup: PublicSchema.leagues.currentMatchup,
         })
         .from(PublicSchema.leagues)
@@ -273,9 +274,12 @@ builder.queryField('getLeagueAnalytics', (t) =>
 
       const league = leagueResults[0];
 
-      // Get current week from current matchup
+      // Prefer the authoritative currentWeek column; fall back to resolving
+      // via currentMatchup FK when currentWeek is null (avoids an extra query)
       let currentWeek = 1;
-      if (league.currentMatchup) {
+      if (league.currentWeek != null) {
+        currentWeek = league.currentWeek;
+      } else if (league.currentMatchup) {
         const currentMatchupResults = await context.db
           .select({ weekNumber: PublicSchema.matchups.weekNumber })
           .from(PublicSchema.matchups)
