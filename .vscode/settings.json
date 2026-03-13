@@ -119,7 +119,8 @@
     "Push-Location": true,
     "Pop-Location": true,
     "Get-Member": true,
-    ".\\.github\\scripts\\cleanup-pr-body.ps1": true
+    ".\\.github\\scripts\\cleanup-pr-body.ps1": true,
+    "pnpm exec tsc": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {
