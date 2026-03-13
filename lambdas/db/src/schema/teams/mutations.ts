@@ -847,12 +847,57 @@ builder.mutationField('updateTeamBranding', (t) =>
         if (raw === undefined) return undefined as unknown as null; // sentinel: skip this field
         if (raw === null || raw.trim() === '') return null; // clear the field
         const trimmed = raw.trim();
-        if (!/^https:\/\//i.test(trimmed)) {
-          throw new Error(`${fieldName} must be an HTTPS URL`);
-        }
         if (trimmed.length > 2048) {
           throw new Error(`${fieldName} URL is too long (max 2048 chars)`);
         }
+
+        // Parse and validate as a proper URL (catches malformed inputs).
+        let parsed: URL;
+        try {
+          parsed = new URL(trimmed);
+        } catch {
+          throw new Error(`${fieldName} must be a valid URL`);
+        }
+
+        // Only allow HTTPS — no http, data:, javascript:, etc.
+        if (parsed.protocol !== 'https:') {
+          throw new Error(`${fieldName} must use HTTPS`);
+        }
+
+        // Reject embedded credentials (user:pass@host) — phishing/confusion vector.
+        if (parsed.username || parsed.password) {
+          throw new Error(`${fieldName} must not contain credentials`);
+        }
+
+        const hostname = parsed.hostname.toLowerCase();
+
+        // Block hostnames that resolve to private/loopback networks (SSRF
+        // prevention). These addresses are unreachable from end-user browsers
+        // and serve no purpose for image hosting.
+        const blockedPatterns = [
+          /^localhost$/,
+          /^127\./,
+          /^10\./,
+          /^172\.(1[6-9]|2\d|3[01])\./,
+          /^192\.168\./,
+          /^169\.254\./, // AWS instance metadata service
+          /^\[?::1\]?$/, // IPv6 loopback
+          /^\[?fc[0-9a-f]{2}:/i, // IPv6 ULA
+          /^\[?fe[89ab][0-9a-f]:/i, // IPv6 link-local
+        ];
+        for (const pattern of blockedPatterns) {
+          if (pattern.test(hostname)) {
+            throw new Error(`${fieldName} must be a public URL`);
+          }
+        }
+
+        // Block bare IPv4 addresses (no legitimate image CDN uses a raw IP).
+        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) {
+          throw new Error(
+            `${fieldName} must use a domain name, not an IP address`,
+          );
+        }
+
         return trimmed;
       };
 
