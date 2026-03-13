@@ -127,8 +127,12 @@ export default defineConfig(({ mode }) => {
         isDeployBuild || process.env.NX_VERBOSE_LOGGING === 'true',
       // Enable minification for production and deploy builds
       minify: isProduction ? 'esbuild' : false,
-      // Generate sourcemaps for deploy builds to aid debugging
-      sourcemap: isDeployBuild ? true : false,
+      // Generate sourcemaps for deploy builds to aid debugging.
+      // Use 'hidden' for deploys: .map files are generated so Rollbar can
+      // upload them, but the //# sourceMappingURL= comment is omitted from
+      // the JS bundles so browsers never request the deleted map files
+      // (preventing the "Failed to load resource: 404" console errors).
+      sourcemap: isDeployBuild ? 'hidden' : false,
       commonjsOptions: {
         transformMixedEsModules: true,
       },
