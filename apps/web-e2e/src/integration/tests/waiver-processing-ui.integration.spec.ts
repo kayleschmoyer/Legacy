@@ -391,9 +391,14 @@ test.describe
 
       expect(commTeamData.userTeamId).not.toBeNull();
       expect(mgr1TeamData.userTeamId).not.toBeNull();
-
-      state.commissionerTeamId = commTeamData.userTeamId!;
-      state.manager1TeamId = mgr1TeamData.userTeamId!;
+      if (commTeamData.userTeamId === undefined) {
+        throw new Error('commTeamData.userTeamId should be set');
+      }
+      if (mgr1TeamData.userTeamId === undefined) {
+        throw new Error('mgr1TeamData.userTeamId should be set');
+      }
+      state.commissionerTeamId = commTeamData.userTeamId;
+      state.manager1TeamId = mgr1TeamData.userTeamId;
     });
 
     await test.step('Fetch waiver orders for both teams', async () => {

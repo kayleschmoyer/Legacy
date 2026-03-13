@@ -747,7 +747,8 @@ test.describe
           t.receivingTeamId === state.commissionerTeamId,
       );
       expect(counter).toBeTruthy();
-      state.counterTradeId = counter!.id;
+      if (!counter) throw new Error('counter should be defined');
+      state.counterTradeId = counter.id;
       expect(state.counterTradeId).toBeGreaterThan(0);
     });
 

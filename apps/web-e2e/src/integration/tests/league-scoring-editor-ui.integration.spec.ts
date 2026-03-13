@@ -209,8 +209,9 @@ test.describe
         (s) => s.definition.displayName === 'Home Runs',
       );
       expect(hrStat).toBeDefined();
-      state.originalMultiplier = hrStat!.multiplier;
-      state.updatedMultiplier = hrStat!.multiplier + 1;
+      if (!hrStat) throw new Error('hrStat should be defined');
+      state.originalMultiplier = hrStat.multiplier;
+      state.updatedMultiplier = hrStat.multiplier + 1;
     });
 
     await test.step('Edit the Home Runs multiplier input', async () => {

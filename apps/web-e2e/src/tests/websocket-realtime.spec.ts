@@ -327,7 +327,9 @@ test.describe('WebSocket real-time updates @critical', () => {
 
     // 2. Intercept the WebSocket connection before navigation.
     //    We capture the route reference so we can push a message later.
-    let wsRoute: WebSocketRoute | null = null;
+    // wsRoute is undefined until the app opens the WebSocket connection;
+    // we poll for it becoming non-undefined before sending messages.
+    let wsRoute: WebSocketRoute | undefined;
     await page.routeWebSocket(/wss?:\/\//, (ws) => {
       wsRoute = ws;
       // Silently absorb heartbeat pings and other browser→server traffic.
@@ -346,11 +348,14 @@ test.describe('WebSocket real-time updates @critical', () => {
     );
 
     // 5. Wait for the app to open the WebSocket connection
-    await expect.poll(() => wsRoute !== null, { timeout: 10_000 }).toBeTruthy();
+    await expect
+      .poll(() => wsRoute !== undefined, { timeout: 10_000 })
+      .toBe(true);
+    if (!wsRoute) throw new Error('WebSocket route not established');
 
     // 6. Push a chat message from the "server"
     const messageText = 'Real-time message via WebSocket!';
-    wsRoute!.send(
+    wsRoute.send(
       wsNotification({
         type: 'LEAGUE_CHAT_MESSAGE',
         leagueId: LEAGUE_ID,
@@ -381,7 +386,7 @@ test.describe('WebSocket real-time updates @critical', () => {
 
     await setupGraphQL(page, { matchupAfterRefetch: updatedMatchup });
 
-    let wsRoute: WebSocketRoute | null = null;
+    let wsRoute: WebSocketRoute | undefined;
     await page.routeWebSocket(/wss?:\/\//, (ws) => {
       wsRoute = ws;
       ws.onMessage(() => {
@@ -400,11 +405,14 @@ test.describe('WebSocket real-time updates @critical', () => {
     await expect(scoreboard).toContainText('0.00');
 
     // Wait for WS connection
-    await expect.poll(() => wsRoute !== null, { timeout: 10_000 }).toBeTruthy();
+    await expect
+      .poll(() => wsRoute !== undefined, { timeout: 10_000 })
+      .toBe(true);
+    if (!wsRoute) throw new Error('WebSocket route not established');
 
     // Push MATCHUP_STATS_COMPLETE — triggers refetchMatchupsRef.current?.()
     // and refetchCurrentWeekRef.current?.()
-    wsRoute!.send(
+    wsRoute.send(
       wsNotification({
         type: 'MATCHUP_STATS_COMPLETE',
         leagueId: LEAGUE_ID,
@@ -429,7 +437,7 @@ test.describe('WebSocket real-time updates @critical', () => {
       draftStartsOnRefetch: true,
     });
 
-    let wsRoute: WebSocketRoute | null = null;
+    let wsRoute: WebSocketRoute | undefined;
     await page.routeWebSocket(/wss?:\/\//, (ws) => {
       wsRoute = ws;
       ws.onMessage(() => {
@@ -444,10 +452,13 @@ test.describe('WebSocket real-time updates @critical', () => {
     await expect(page.getByText('Pre-Draft')).toBeVisible({ timeout: 15_000 });
 
     // Wait for WS connection
-    await expect.poll(() => wsRoute !== null, { timeout: 10_000 }).toBeTruthy();
+    await expect
+      .poll(() => wsRoute !== undefined, { timeout: 10_000 })
+      .toBe(true);
+    if (!wsRoute) throw new Error('WebSocket route not established');
 
     // Push DRAFT_STARTED — triggers handleDraftStarted() → backgroundRefetch()
-    wsRoute!.send(
+    wsRoute.send(
       wsNotification({
         type: 'DRAFT_STARTED',
         leagueId: LEAGUE_ID,

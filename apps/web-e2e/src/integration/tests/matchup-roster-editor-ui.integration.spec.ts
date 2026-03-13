@@ -309,10 +309,11 @@ test.describe
         (m) => m.team1Id === userTeamId || m.team2Id === userTeamId,
       );
       expect(matchup).toBeTruthy();
+      if (!matchup) throw new Error('matchup should be defined');
       // Roster editor works for both scheduled and in-progress matchups
-      expect(['scheduled', 'in_progress']).toContain(matchup!.status);
+      expect(['scheduled', 'in_progress']).toContain(matchup.status);
 
-      state.matchupId = Number(matchup!.id);
+      state.matchupId = Number(matchup.id);
       expect(state.matchupId).toBeGreaterThan(0);
     });
   });
@@ -485,8 +486,9 @@ test.describe
           mp.player.firstName === firstName && mp.player.lastName === lastName,
       );
       expect(benchedRecord).toBeTruthy();
+      if (!benchedRecord) throw new Error('benchedRecord should be defined');
       // positionId should be null (on bench)
-      expect(benchedRecord!.positionId).toBeNull();
+      expect(benchedRecord.positionId).toBeNull();
     });
   });
 
@@ -577,8 +579,9 @@ test.describe
           mp.player.firstName === firstName && mp.player.lastName === lastName,
       );
       expect(playerRecord).toBeTruthy();
+      if (!playerRecord) throw new Error('playerRecord should be defined');
       // positionId should now be non-null (assigned to a position)
-      expect(playerRecord!.positionId).not.toBeNull();
+      expect(playerRecord.positionId).not.toBeNull();
     });
   });
 
@@ -715,12 +718,14 @@ test.describe
       );
 
       expect(player1Record).toBeTruthy();
+      if (!player1Record) throw new Error('player1Record should be defined');
       expect(player2Record).toBeTruthy();
+      if (!player2Record) throw new Error('player2Record should be defined');
 
       // After swap: player 1 should now have player 2's original position
-      expect(player1Record!.positionId).toBe(player2InitialPositionId);
+      expect(player1Record.positionId).toBe(player2InitialPositionId);
       // After swap: player 2 should now have player 1's original position
-      expect(player2Record!.positionId).toBe(player1InitialPositionId);
+      expect(player2Record.positionId).toBe(player1InitialPositionId);
     });
   });
 });

@@ -481,7 +481,8 @@ test.describe
       const benchText = await benchParent.textContent();
       const benchMatch = benchText?.match(/Bench\s*(\d+)/);
       expect(benchMatch).toBeTruthy();
-      expect(parseInt(benchMatch![1], 10)).toBeGreaterThan(0);
+      if (!benchMatch) throw new Error('benchMatch should be defined');
+      expect(parseInt(benchMatch[1], 10)).toBeGreaterThan(0);
     });
 
     await test.step('Verify commissioner-drafted players appear on roster', async () => {
@@ -549,7 +550,8 @@ test.describe
       const benchText = await benchParent.textContent();
       const benchMatch = benchText?.match(/Bench\s*(\d+)/);
       expect(benchMatch).toBeTruthy();
-      expect(parseInt(benchMatch![1], 10)).toBeGreaterThan(0);
+      if (!benchMatch) throw new Error('benchMatch should be defined');
+      expect(parseInt(benchMatch[1], 10)).toBeGreaterThan(0);
     });
 
     await test.step('Verify manager 1-drafted players appear on roster', async () => {
