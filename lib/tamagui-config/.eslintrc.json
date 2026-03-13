@@ -1,6 +1,6 @@
 ﻿{
   "extends": ["../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*", "jest.config.ts"],
+  "ignorePatterns": ["!**/*", "node_modules", "jest.config.ts"],
   "overrides": [
     {
       "files": ["*.ts", "*.tsx"],
@@ -8,6 +8,13 @@
         "project": ["tsconfig.*?.json"]
       },
       "rules": {}
+    },
+    {
+      "files": ["src/lib/tamagui-config.ts"],
+      "rules": {
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-call": "off"
+      }
     },
     {
       "files": ["*.json"],

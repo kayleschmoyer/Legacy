@@ -1,6 +1,6 @@
 import { createAnimations } from '@tamagui/animations-react-native';
 import { config } from '@tamagui/config';
-import { createTamagui, type TamaguiConfig } from 'tamagui';
+import { createTamagui } from 'tamagui';
 
 // Legacy Sports — Heritage-meets-modern brand themes
 // Identity: "Night stadium" dark with vintage sport character
@@ -348,7 +348,6 @@ const customConfig = {
 // web, mobile, and any other platforms using Tamagui
 
 // Create and export the Tamagui configuration
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- createTamagui returns loosely typed config
-export const tamaguiConfig: TamaguiConfig = createTamagui(customConfig);
+export const tamaguiConfig = createTamagui(customConfig);
 
 export default tamaguiConfig;

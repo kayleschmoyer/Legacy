@@ -143,3 +143,22 @@ Peer dependency warnings are common and usually safe to ignore. If a peer dep is
 ```powershell
 pnpm add -w <peer-package>@<required-version>
 ```
+
+## CI / GitHub Actions
+
+### Never Use `npm` in Workflows
+
+This is a **pnpm workspace**. Never use `npm install`, `npm ci`, or bare `npm` in GitHub Actions workflows. npm resolves the entire root `package.json` dependency tree with strict peer-dep checks (npm 7+), which will fail on mismatches that pnpm handles via its lockfile.
+
+```yaml
+# ✅ CORRECT — use pnpm for dependencies
+- run: pnpm install --frozen-lockfile
+
+# ✅ CORRECT — use npx for standalone CLI tools (doesn't touch node_modules)
+- run: npx playwright@1.55.0 merge-reports --reporter html ./all-blob-reports
+
+# ❌ WRONG — triggers full dependency resolution, fails on peer dep mismatches
+- run: npm install --no-save playwright@1.55.0
+```
+
+If a CI step only needs a CLI binary (e.g. Playwright for report merging), use `npx <tool>@<version>` which downloads to a temp cache without touching the project's dependency tree.
