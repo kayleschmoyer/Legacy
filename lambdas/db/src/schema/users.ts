@@ -1,6 +1,7 @@
 import { sign } from 'jsonwebtoken';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
+import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
 import { requireAuth } from './authorization';
 import { AuthenticationError, ForbiddenError } from './graphql-errors';
@@ -302,7 +303,23 @@ builder.mutationField('impersonateUser', (t) =>
         },
       };
 
-      const token = sign(payload, jwtSecret, { expiresIn: '8h' });
+      const IMPERSONATION_TTL = '2h';
+      const token = sign(payload, jwtSecret, { expiresIn: IMPERSONATION_TTL });
+
+      // Audit log: record every impersonation event for security forensics.
+      // Logged at error level so it is forwarded to centralized error monitoring
+      // systems (e.g. Rollbar) while still appearing prominently in server logs.
+      LOGGER.error('Admin impersonation token issued', {
+        audit: true,
+        actor: {
+          id: Number(context.user.id),
+        },
+        target: {
+          id: Number(targetUser.id),
+        },
+        issuedAt: new Date().toISOString(),
+        expiresIn: IMPERSONATION_TTL,
+      });
 
       return { token };
     },
