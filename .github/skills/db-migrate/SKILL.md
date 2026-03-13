@@ -5,6 +5,8 @@ description: 'Apply pending database migrations to update the schema in developm
 
 # Skill: Run Database Migration
 
+> **MCP alternative**: Prefer the `db_migration_status` and `db_migrate` MCP tools (see `skills/mcp-db/SKILL.md`) — they return structured results and work from any directory. Fall back to the CLI commands below when the MCP server is unavailable.
+
 ## Purpose
 
 Apply pending database migrations to update the schema in development or production environments.

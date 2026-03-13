@@ -451,12 +451,12 @@ GitHub renders images pasted directly into the markdown editor, or referenced vi
 When writing the PR body via an **agent** (using `create_file`):
 
 1. Take screenshots locally and upload them to the PR draft (via browser) to get GitHub asset URLs, **or**
-2. Use the Playwright MCP browser tool to navigate to the running dev server and capture a screenshot, then embed it:
+2. Use the Playwright MCP browser tools (`mcp_microsoft_pla_browser_navigate`, `mcp_microsoft_pla_browser_take_screenshot`) to navigate to the running dev server and capture a screenshot, then embed it:
 
 ```markdown
-<!-- Agent workflow: use the Playwright browser tool to open the dev server,
-     navigate to the changed page, and call browser_take_screenshot to capture
-     the current state. Then embed the resulting file path or GitHub URL here. -->
+<!-- Agent workflow: use mcp_microsoft_pla_browser_navigate to open the dev server,
+     navigate to the changed page, and call mcp_microsoft_pla_browser_take_screenshot
+     to capture the current state. Then embed the resulting file path or GitHub URL here. -->
 ```
 
 ### Screenshot Checklist

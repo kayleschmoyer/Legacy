@@ -5,6 +5,8 @@ description: 'Test database connectivity and access the PostgreSQL interactive s
 
 # Skill: Database Connection
 
+> **MCP alternative**: Use the `db_check_health` MCP tool (see `skills/mcp-db/SKILL.md`) for a pre-flight check of Docker, Postgres, and migration status. Fall back to the CLI commands below for interactive shells or detailed credential inspection.
+
 ## Overview
 
 Test database connectivity and access the PostgreSQL interactive shell.
