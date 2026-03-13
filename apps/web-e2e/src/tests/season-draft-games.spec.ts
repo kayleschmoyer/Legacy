@@ -98,7 +98,7 @@ async function mockSeasonDraftGamesGraphQL(
 
 // ── Lobby page ─────────────────────────────────────────────────────────────
 
-test.describe('Season Draft Games Lobby', () => {
+test.describe('Season Draft Games Lobby @critical', () => {
   test('shows page heading and create button @smoke', async ({ page }) => {
     await mockSeasonDraftGamesGraphQL(page, GAMES_RESPONSE_EMPTY);
     await page.goto('/games/season-draft');
@@ -171,7 +171,7 @@ test.describe('Season Draft Games Lobby', () => {
 
 // ── Create game page ───────────────────────────────────────────────────────
 
-test.describe('Season Draft Game Create Page', () => {
+test.describe('Season Draft Game Create Page @critical', () => {
   async function mockCreatePageGraphQL(page: import('@playwright/test').Page) {
     await page.route(isGraphQLEndpoint, async (route, request) => {
       const body = request.postDataJSON() as { operationName?: string };

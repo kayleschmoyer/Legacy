@@ -35,7 +35,7 @@ async function dispatchApolloError(page: Page, message: string) {
 
 // ── ApolloErrorToast ───────────────────────────────────────────────────────
 
-test.describe('ApolloErrorToast', () => {
+test.describe('ApolloErrorToast @critical', () => {
   test.beforeEach(async ({ page }) => {
     // /about renders without GraphQL — stable base page
     await page.goto('/about');
@@ -111,7 +111,7 @@ test.describe('ApolloErrorToast', () => {
 
 // ── GraphQL error state on individual pages ────────────────────────────────
 
-test.describe('GraphQL error states on pages', () => {
+test.describe('GraphQL error states on pages @regression', () => {
   test('player stats page shows error message when query fails @critical', async ({
     page,
   }) => {
@@ -191,7 +191,7 @@ test.describe('GraphQL error states on pages', () => {
 
 // ── Network-level errors ───────────────────────────────────────────────────
 
-test.describe('Network error handling', () => {
+test.describe('Network error handling @regression', () => {
   test('toast appears when GraphQL endpoint returns 500 @regression', async ({
     page,
   }) => {

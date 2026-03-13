@@ -23,7 +23,7 @@ const PREFS_KEY = 'ls_user_preferences';
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-test.describe('Preferences Page', () => {
+test.describe('Preferences Page @smoke', () => {
   test.beforeEach(async ({ page }) => {
     // Clear preferences so each test starts from defaults
     await page.goto('/preferences');

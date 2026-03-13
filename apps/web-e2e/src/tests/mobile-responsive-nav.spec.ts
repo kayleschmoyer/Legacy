@@ -19,7 +19,7 @@ const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
 
 // ── Hamburger button visibility ────────────────────────────────────────────
 
-test.describe('Mobile hamburger button', () => {
+test.describe('Mobile hamburger button @smoke', () => {
   test('is visible on narrow mobile viewport @smoke', async ({ page }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await page.goto('/about');
@@ -45,7 +45,7 @@ test.describe('Mobile hamburger button', () => {
 
 // ── Mobile panel open/close ────────────────────────────────────────────────
 
-test.describe('Mobile navigation panel', () => {
+test.describe('Mobile navigation panel @critical', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await page.goto('/about');
@@ -99,7 +99,7 @@ test.describe('Mobile navigation panel', () => {
 
 // ── Mobile panel link content ──────────────────────────────────────────────
 
-test.describe('Mobile panel navigation links', () => {
+test.describe('Mobile panel navigation links @critical', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await page.goto('/about');
@@ -161,7 +161,7 @@ test.describe('Mobile panel navigation links', () => {
 
 // ── Panel closes on link click ────────────────────────────────────────────
 
-test.describe('Mobile panel interaction: close on link click', () => {
+test.describe('Mobile panel interaction: close on link click @critical', () => {
   test('panel closes when About link is clicked @critical', async ({
     page,
   }) => {

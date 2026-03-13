@@ -86,7 +86,7 @@ async function setupProfileGraphQL(page: import('@playwright/test').Page) {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-test.describe('Profile Settings Page', () => {
+test.describe('Profile Settings Page @smoke', () => {
   test('should load and display the Profile Settings heading', async ({
     page,
   }) => {

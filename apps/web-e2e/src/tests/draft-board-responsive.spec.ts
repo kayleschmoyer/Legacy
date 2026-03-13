@@ -1,7 +1,7 @@
 import { test } from '@playwright/test';
 import { SnapshotUtils } from '../support/snapshot-utils';
 
-test.describe('Draft Board - Responsive @regression', () => {
+test.describe('Draft Board - Responsive @visual', () => {
   test('captures responsive snapshots for /baseball/draft', async ({
     page,
   }) => {

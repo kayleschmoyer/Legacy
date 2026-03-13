@@ -225,7 +225,7 @@ async function setupCommissionerGraphQL(
 
 // ── Draft Order Control ────────────────────────────────────────────────────
 
-test.describe('Draft Order Control', () => {
+test.describe('Draft Order Control @critical', () => {
   test.beforeEach(async ({ page }) => {
     await setupCommissionerGraphQL(page, makeLeague('not-started'));
     await page.goto('/baseball/league/1/commissioner');
@@ -273,7 +273,7 @@ test.describe('Draft Order Control', () => {
 
 // ── Draft Settings Control ─────────────────────────────────────────────────
 
-test.describe('Draft Settings Control', () => {
+test.describe('Draft Settings Control @critical', () => {
   test.beforeEach(async ({ page }) => {
     await setupCommissionerGraphQL(page, makeLeague('not-started'));
     await page.goto('/baseball/league/1/commissioner');
@@ -298,7 +298,7 @@ test.describe('Draft Settings Control', () => {
 
 // ── Locked state when draft is in progress ─────────────────────────────────
 
-test.describe('Draft controls locked when draft is in progress', () => {
+test.describe('Draft controls locked when draft is in progress @regression', () => {
   test('Randomize button is disabled when draft is in-progress @regression', async ({
     page,
   }) => {
