@@ -447,6 +447,19 @@ function App() {
   // Identify the authenticated user in analytics with real subscription tier
   useAnalyticsIdentify();
 
+  const { pathname } = useLocation();
+
+  // Scroll to top on every route change so navigating from a long page
+  // (e.g. /pricing → /help) doesn't land mid-page.
+  useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.scrollTo === 'function'
+    ) {
+      window.scrollTo(0, 0);
+    }
+  }, [pathname]);
+
   return (
     <MainLayout>
       {/* Global screen reader announcer */}
