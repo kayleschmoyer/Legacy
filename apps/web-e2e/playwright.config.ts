@@ -47,11 +47,17 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
 
+  /* OS-agnostic snapshot paths — one baseline per browser, no platform suffix.
+   * Playwright bundles its own browsers so rendering is near-identical across
+   * OSes; sub-pixel font differences are absorbed by maxDiffPixelRatio. */
+  snapshotPathTemplate: '{snapshotDir}/{arg}-{projectName}{ext}',
+
   /* Configure snapshot settings */
   expect: {
     /* Threshold for visual comparisons */
     toHaveScreenshot: {
       threshold: 0.2,
+      maxDiffPixelRatio: 0.01,
       animations: 'disabled',
     },
     /* Maximum difference in pixels for visual comparisons */
