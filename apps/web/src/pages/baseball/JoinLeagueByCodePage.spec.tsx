@@ -1,0 +1,303 @@
+/**
+ * Regression tests for LS-1005: "Can't find variable handleSubmit"
+ *
+ * The original bug: during development of LS-960 the function was partially
+ * renamed (definition changed to handleJoin before all call-sites were
+ * updated), leaving a reference to the non-existent `handleSubmit` in the
+ * form's onSubmit and the button's onPress.  This triggered a ReferenceError
+ * at runtime.  These tests verify that:
+ *   1. The form's onSubmit handler is correctly wired (no ReferenceError).
+ *   2. The join button's onPress handler is correctly wired.
+ *   3. Validation errors are surfaced without calling the mutation.
+ *   4. A successful join navigates to the league page.
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
+/* eslint-disable @typescript-eslint/no-unsafe-return -- mock factory spreads */
+/* eslint-disable @typescript-eslint/no-require-imports -- jest.mock factories need runtime require */
+import React from 'react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+
+// ---------------------------------------------------------------------------
+// Module mocks
+// ---------------------------------------------------------------------------
+
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
+  useParams: () => ({ inviteCode: undefined }),
+}));
+
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
+}));
+
+jest.mock('../../components/PageMeta', () => ({
+  PageMeta: () => null,
+}));
+
+jest.mock('@legacy-sports/shared-components', () => ({
+  Button: ({ children, onPress, disabled }: any) => (
+    <button onClick={onPress} disabled={disabled}>
+      {children}
+    </button>
+  ),
+  Card: ({ children }: any) => <div>{children}</div>,
+  XStack: ({ children }: any) => <div>{children}</div>,
+  YStack: ({ children }: any) => <div>{children}</div>,
+}));
+
+jest.mock('tamagui', () => ({
+  H1: ({ children }: any) => <h1>{children}</h1>,
+  H2: ({ children }: any) => <h2>{children}</h2>,
+  Input: ({ value, onChangeText, placeholder, disabled, id }: any) => (
+    <input
+      id={id}
+      value={value ?? ''}
+      placeholder={placeholder}
+      disabled={disabled}
+      onChange={(e) => onChangeText?.(e.target.value)}
+    />
+  ),
+  Spinner: () => <span data-testid="spinner" />,
+  Text: ({ children }: any) => <span>{children}</span>,
+}));
+
+const mockJoinLeague = jest.fn();
+const mockValidateCode = jest.fn();
+
+jest.mock('../../api/db/graphql.generated', () => ({
+  useJoinLeagueByCodeMutation: jest.fn(() => [
+    mockJoinLeague,
+    { loading: false },
+  ]),
+  useValidateInviteCodeLazyQuery: jest.fn(() => [
+    mockValidateCode,
+    { data: undefined, loading: false },
+  ]),
+}));
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function renderPage() {
+  const { useJoinLeagueByCodeMutation, useValidateInviteCodeLazyQuery } =
+    require('../../api/db/graphql.generated') as {
+      useJoinLeagueByCodeMutation: jest.Mock;
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
+
+  return {
+    ...render(
+      <MemoryRouter initialEntries={['/baseball/join']}>
+        <Routes>
+          <Route
+            path="/baseball/join"
+            element={
+              <React.Suspense fallback={null}>
+                {/* eslint-disable-next-line @typescript-eslint/no-require-imports */}
+                {React.createElement(
+                  require('./JoinLeagueByCodePage').JoinLeagueByCodePage,
+                )}
+              </React.Suspense>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    ),
+    useJoinLeagueByCodeMutation,
+    useValidateInviteCodeLazyQuery,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe('JoinLeagueByCodePage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockJoinLeague.mockResolvedValue({ data: undefined });
+
+    const {
+      useJoinLeagueByCodeMutation,
+      useValidateInviteCodeLazyQuery,
+    } = require('../../api/db/graphql.generated');
+
+    useJoinLeagueByCodeMutation.mockReturnValue([
+      mockJoinLeague,
+      { loading: false },
+    ]);
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      { data: undefined, loading: false },
+    ]);
+  });
+
+  it('renders the join form without errors', () => {
+    renderPage();
+    // "Join League" appears in both the H1 and the submit button
+    expect(screen.getAllByText(/Join League/i).length).toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(
+      screen.getByPlaceholderText(/Enter 8-character code/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/Enter your team name/i),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * Regression: LS-1005 — "handleSubmit is not defined"
+   *
+   * Submitting the HTML form must not throw a ReferenceError.  Before the fix,
+   * the form's onSubmit referenced a renamed (non-existent) function.
+   */
+  it('submitting the form does not throw ReferenceError (LS-1005 regression)', () => {
+    renderPage();
+
+    const form = document.querySelector('form');
+    expect(form).not.toBeNull();
+
+    // Should not throw when the form submit event fires
+    expect(() => fireEvent.submit(form!)).not.toThrow();
+  });
+
+  /**
+   * Regression: LS-1005 — join button onPress is correctly wired
+   *
+   * Before the fix, the button's onPress also referenced the non-existent
+   * `handleSubmit`. Clicking the button must not throw a ReferenceError.
+   */
+  it('clicking the Join League button does not throw ReferenceError (LS-1005 regression)', async () => {
+    // The button is disabled until leagueInfo is present and both inputs are
+    // filled — provide mock data so we can actually click it and verify that
+    // onPress invokes handleJoin without a ReferenceError.
+    const { useValidateInviteCodeLazyQuery } =
+      require('../../api/db/graphql.generated') as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      {
+        data: {
+          validateInviteCode: {
+            isFull: false,
+            leagueName: 'Test League',
+            totalSpots: 10,
+            availableSpots: 5,
+          },
+        },
+        loading: false,
+      },
+    ]);
+
+    renderPage();
+
+    // Fill both inputs so the disabled conditions are cleared
+    act(() => {
+      fireEvent.change(screen.getByPlaceholderText(/Enter 8-character code/i), {
+        target: { value: 'ABC12345' },
+      });
+      fireEvent.change(screen.getByPlaceholderText(/Enter your team name/i), {
+        target: { value: 'Test Team' },
+      });
+    });
+
+    const buttons = screen.getAllByRole('button');
+    const joinButton = buttons.find((b) =>
+      /join league/i.test(b.textContent ?? ''),
+    );
+    expect(joinButton).toBeDefined();
+    expect(joinButton).not.toBeDisabled();
+
+    // Clicking must not throw a ReferenceError (LS-1005 regression check)
+    act(() => {
+      fireEvent.click(joinButton!);
+    });
+
+    // handleJoin was invoked — the mutation was called, proving onPress is
+    // correctly wired to handleJoin (not the non-existent handleSubmit).
+    await waitFor(() => expect(mockJoinLeague).toHaveBeenCalled());
+  });
+
+  it('shows validation error when invite code is empty and form is submitted', () => {
+    renderPage();
+
+    fireEvent.submit(document.querySelector('form')!);
+
+    expect(
+      screen.getByText(/Please enter an invite code/i),
+    ).toBeInTheDocument();
+    expect(mockJoinLeague).not.toHaveBeenCalled();
+  });
+
+  it('shows validation error when team name is empty', () => {
+    renderPage();
+
+    const codeInput = screen.getByPlaceholderText(/Enter 8-character code/i);
+    fireEvent.change(codeInput, { target: { value: 'ABC12XYZ' } });
+
+    fireEvent.submit(document.querySelector('form')!);
+
+    expect(screen.getByText(/Please enter a team name/i)).toBeInTheDocument();
+    expect(mockJoinLeague).not.toHaveBeenCalled();
+  });
+
+  it('shows validation error for invalid invite code format', () => {
+    renderPage();
+
+    const codeInput = screen.getByPlaceholderText(/Enter 8-character code/i);
+    fireEvent.change(codeInput, { target: { value: 'SHORT' } });
+
+    const nameInput = screen.getByPlaceholderText(/Enter your team name/i);
+    fireEvent.change(nameInput, { target: { value: 'My Team' } });
+
+    fireEvent.submit(document.querySelector('form')!);
+
+    expect(
+      screen.getByText(/Invite code must be 8 characters/i),
+    ).toBeInTheDocument();
+    expect(mockJoinLeague).not.toHaveBeenCalled();
+  });
+
+  it('navigates to the league page after a successful join', async () => {
+    mockJoinLeague.mockResolvedValueOnce({
+      data: { joinLeagueByCode: { leagueId: 42 } },
+    });
+
+    renderPage();
+
+    fireEvent.change(screen.getByPlaceholderText(/Enter 8-character code/i), {
+      target: { value: 'ABC12XYZ' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Enter your team name/i), {
+      target: { value: 'My Team' },
+    });
+
+    fireEvent.submit(document.querySelector('form')!);
+
+    await waitFor(() => {
+      expect(mockJoinLeague).toHaveBeenCalledWith({
+        variables: { inviteCode: 'ABC12XYZ', teamName: 'My Team' },
+      });
+      expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42');
+    });
+  });
+
+  it('cancel button navigates back to baseball home', () => {
+    renderPage();
+
+    fireEvent.click(screen.getByText(/Cancel/i));
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball');
+  });
+});
