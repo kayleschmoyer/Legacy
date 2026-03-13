@@ -4,6 +4,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { readFileSync } from 'fs';
 import { BaseDbConnection, InitProperties } from './BaseDbClient';
 import { getDatabaseConfig } from '../../../config/database';
+import { EnvironmentVariable } from '../../../types/EnvironmentVariable';
 
 interface PostgresDbInitProps<
   TSchema extends Record<string, unknown>,
@@ -58,19 +59,35 @@ export class PgDbConnection<
         options.ssl = {
           ca: readFileSync(this.dbCertPath).toString(),
         };
-      } catch {
-        // If cert file can't be read, fall back to basic SSL for AWS RDS
-        options.ssl = {
-          rejectUnauthorized: false,
-        };
+      } catch (error: unknown) {
+        // If self-signed certs are expected, a missing cert file is not alarming;
+        // otherwise treat it as a warning so operators notice the fallback.
+        const allowSelfSigned =
+          process.env[EnvironmentVariable.DB_SSL_SELF_SIGNED] === 'true';
+        const message =
+          `[DB Pool] Failed to read cert file at ${this.dbCertPath}. ` +
+          'Defaulting to rejectUnauthorized: true. Set DB_SSL_SELF_SIGNED=true to override.';
+        if (allowSelfSigned) {
+          LOGGER.debug(message, { error });
+        } else {
+          LOGGER.warn(message, { error });
+        }
+        options.ssl = { rejectUnauthorized: true };
       }
     } else if (process.env.USE_LOCAL_CREDENTIALS !== 'true') {
-      // For AWS RDS connections without cert path, enable SSL with relaxed verification.
-      // Skip when running locally (USE_LOCAL_CREDENTIALS=true) since local Postgres
-      // containers do not have SSL configured.
-      options.ssl = {
-        rejectUnauthorized: false,
-      };
+      // Production / staging: validate the RDS certificate against Node.js
+      // built-in CAs. Modern RDS instances use Amazon Root CA (rds-ca-rsa2048-g1
+      // or later) which is trusted. Set DB_SSL_SELF_SIGNED=true only as a
+      // last resort for legacy cert chains — this disables MITM protection.
+      const allowSelfSigned =
+        process.env[EnvironmentVariable.DB_SSL_SELF_SIGNED] === 'true';
+      if (allowSelfSigned) {
+        LOGGER.warn(
+          '[DB Pool] DB_SSL_SELF_SIGNED=true: SSL certificate validation is disabled. ' +
+            'This is a security risk. Update the RDS certificate to rds-ca-rsa2048-g1.',
+        );
+      }
+      options.ssl = { rejectUnauthorized: !allowSelfSigned };
     }
 
     const pgPool = new Pool(options);

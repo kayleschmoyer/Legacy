@@ -65,16 +65,40 @@ export async function getDatabaseConfig(): Promise<DatabaseConfig> {
           ca: readFileSync(resolve(__dirname, '../../../..', certPath)),
         };
       } else {
-        // For AWS RDS, require SSL but allow self-signed certificates
-        config.ssl = {
-          rejectUnauthorized: false,
-        };
+        // Validate the RDS certificate chain against Node.js built-in CAs.
+        // Modern AWS RDS instances use Amazon Root CA certs (rds-ca-rsa2048-g1
+        // or rds-ca-rsa4096-g1) which are trusted in Node.js. If your RDS still
+        // uses the legacy rds-ca-2019 chain, set DB_SSL_SELF_SIGNED=true AND
+        // update your RDS certificate as soon as possible.
+        const allowSelfSigned =
+          getEnvVarOptional(EnvironmentVariable.DB_SSL_SELF_SIGNED) === 'true';
+        if (allowSelfSigned) {
+          LOGGER.warn(
+            'DB_SSL_SELF_SIGNED=true: SSL certificate validation is disabled. ' +
+              'This is a security risk. Update your RDS certificate to rds-ca-rsa2048-g1 ' +
+              'or later and remove this override.',
+          );
+        }
+        config.ssl = { rejectUnauthorized: !allowSelfSigned };
       }
-    } catch {
-      // Fallback to basic SSL for AWS RDS
-      config.ssl = {
-        rejectUnauthorized: false,
-      };
+    } catch (err) {
+      // If the cert file specified by DB_CERT_PATH cannot be read, fall back to
+      // Node.js built-in CAs, unless DB_SSL_SELF_SIGNED=true is set.
+      const allowSelfSigned =
+        getEnvVarOptional(EnvironmentVariable.DB_SSL_SELF_SIGNED) === 'true';
+      LOGGER.error(
+        'Failed to read DB_CERT_PATH certificate file. DB connection will use ' +
+          `Node.js built-in CAs (rejectUnauthorized: ${!allowSelfSigned}). ` +
+          'Set DB_SSL_SELF_SIGNED=true as a last resort if this causes connection failures.',
+        err instanceof Error ? err : { cause: String(err) },
+      );
+      if (allowSelfSigned) {
+        LOGGER.warn(
+          'DB_SSL_SELF_SIGNED=true is set and the DB_CERT_PATH certificate file could not be read. ' +
+            'Proceeding with rejectUnauthorized: false. This should only be used as a last resort.',
+        );
+      }
+      config.ssl = { rejectUnauthorized: !allowSelfSigned };
     }
   }
 
@@ -149,16 +173,32 @@ export function getDatabaseConfigSync(): DatabaseConfig {
           ca: readFileSync(resolve(__dirname, '../../../..', certPath)),
         };
       } else {
-        // For AWS RDS, require SSL but allow self-signed certificates
-        config.ssl = {
-          rejectUnauthorized: false,
-        };
+        const allowSelfSigned =
+          getEnvVarOptional(EnvironmentVariable.DB_SSL_SELF_SIGNED) === 'true';
+        if (allowSelfSigned) {
+          LOGGER.warn(
+            'DB_SSL_SELF_SIGNED=true: SSL certificate validation is disabled for sync config.',
+          );
+        }
+        config.ssl = { rejectUnauthorized: !allowSelfSigned };
       }
-    } catch {
-      // Fallback to basic SSL for AWS RDS
-      config.ssl = {
-        rejectUnauthorized: false,
-      };
+    } catch (err) {
+      // If the cert file specified by DB_CERT_PATH cannot be read, fall back to
+      // Node.js built-in CAs, unless DB_SSL_SELF_SIGNED=true is set.
+      const allowSelfSigned =
+        getEnvVarOptional(EnvironmentVariable.DB_SSL_SELF_SIGNED) === 'true';
+      LOGGER.error(
+        'Failed to read DB_CERT_PATH certificate file in sync config. ' +
+          `Defaulting to rejectUnauthorized: ${!allowSelfSigned}.`,
+        err instanceof Error ? err : { cause: String(err) },
+      );
+      if (allowSelfSigned) {
+        LOGGER.warn(
+          'DB_SSL_SELF_SIGNED=true is set and the DB_CERT_PATH certificate file could not be read. ' +
+            'Proceeding with rejectUnauthorized: false. This should only be used as a last resort.',
+        );
+      }
+      config.ssl = { rejectUnauthorized: !allowSelfSigned };
     }
   }
 

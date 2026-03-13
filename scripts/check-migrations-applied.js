@@ -15,6 +15,9 @@
  *   CI_READONLY_DB_PASSWORD   Password for ci_readonly
  *   CI_READONLY_DB_NAME       Database name (default postgres)
  *   CI_READONLY_DB_SSL        Set to "true" to require SSL (default true)
+ *   DB_SSL_SELF_SIGNED        Set to "true" to disable SSL cert validation
+ *                             (rejectUnauthorized: false) — last-resort escape
+ *                             hatch for legacy RDS certificate chains only
  *
  * Exit codes:
  *   0  All migration files are applied
@@ -77,7 +80,9 @@ async function main() {
     user,
     password,
     database,
-    ssl: useSsl ? { rejectUnauthorized: false } : false,
+    ssl: useSsl
+      ? { rejectUnauthorized: process.env.DB_SSL_SELF_SIGNED !== 'true' }
+      : false,
     connectionTimeoutMillis: 10_000,
     statement_timeout: 15_000,
   });

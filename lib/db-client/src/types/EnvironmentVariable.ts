@@ -10,4 +10,11 @@ export enum EnvironmentVariable {
   DB_PASSWORD = 'DB_PASSWORD',
   DB_NAME = 'DB_NAME',
   DB_CERT_PATH = 'DB_CERT_PATH',
+
+  // SSL override: set to 'true' ONLY for legacy environments where the RDS
+  // certificate chain has not been updated to Amazon Root CA (rds-ca-rsa2048-g1
+  // or later). Setting this in production is a security risk; prefer updating
+  // the RDS cert instead. Must NOT be set when USE_LOCAL_CREDENTIALS=true since
+  // local connections skip SSL entirely.
+  DB_SSL_SELF_SIGNED = 'DB_SSL_SELF_SIGNED',
 }

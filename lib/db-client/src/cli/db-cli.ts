@@ -112,7 +112,9 @@ program
         database: credentials.database,
         user: credentials.user,
         password: credentials.password,
-        ssl: { rejectUnauthorized: false },
+        ssl: {
+          rejectUnauthorized: process.env.DB_SSL_SELF_SIGNED !== 'true',
+        },
       });
 
       const client = await pool.connect();

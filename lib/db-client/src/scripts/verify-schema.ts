@@ -64,7 +64,10 @@ async function verifyDraftStatusColumn() {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || process.env.DB_DATABASE || 'postgres',
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    ssl:
+      process.env.DB_SSL === 'true'
+        ? { rejectUnauthorized: process.env.DB_SSL_SELF_SIGNED !== 'true' }
+        : false,
   });
 
   try {
