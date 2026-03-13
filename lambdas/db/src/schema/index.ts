@@ -23,6 +23,7 @@ import './on-this-day';
 import './activity-log';
 import './season-draft-game';
 import './season-awards';
+import './analytics';
 import './subscriptions';
 
 // Export the final schema

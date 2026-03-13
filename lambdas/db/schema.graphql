@@ -876,6 +876,20 @@ enum LeagueActivityEventType {
 }
 
 """
+Comprehensive analytics for a league
+"""
+type LeagueAnalytics {
+  averagePointsPerMatchup: Float
+  currentWeek: Int
+  leagueId: Int
+  leagueName: String
+  playoffProjections: [PlayoffProjection!]
+  powerRankings: [PowerRanking!]
+  teamStats: [TeamStatistics!]
+  totalTeams: Int
+}
+
+"""
 A message posted to the league-wide chat room
 """
 type LeagueChatMessage {
@@ -1913,6 +1927,22 @@ enum PlayoffMatchupStatus {
 }
 
 """
+Playoff projection for a team
+"""
+type PlayoffProjection {
+  currentRecord: String
+  eliminationNumber: Int
+  magicNumber: Int
+  playoffProbability: Float
+  projectedLosses: Float
+  projectedWins: Float
+  remainingMatchups: Int
+  strengthOfSchedule: Float
+  teamId: Int
+  teamName: String
+}
+
+"""
 Playoff qualification status for a team
 """
 type PlayoffQualification {
@@ -1944,6 +1974,18 @@ type PlayoffSeed {
   seedNumber: Int
   team: Team
   teamId: Int
+}
+
+"""
+Power ranking for a team
+"""
+type PowerRanking {
+  pointDifferential: Float
+  powerScore: Float
+  rank: Int
+  recentFormScore: Float
+  teamId: Int
+  teamName: String
 }
 
 type PrivacyPolicyStatus {
@@ -2071,6 +2113,7 @@ type Query {
     team1Id: Int!
     team2Id: Int!
   ): HeadToHeadRecord
+  getLeagueAnalytics(leagueId: Int!): LeagueAnalytics
   getLeagueAnnouncements(leagueId: Int!): [LeagueChatMessage!]
   getLeagueDraft(leagueId: Int!): Draft
   getLeagueMessages(leagueId: Int!, limit: Int): [LeagueChatMessage!]
@@ -2097,6 +2140,11 @@ type Query {
   getMyDraftTeamAutoPick(draftId: Int!): Boolean
   getNotificationHistory(limit: Int, offset: Int): [NotificationHistoryItem!]
   getPlayoffBracket(leagueId: Int!, season: Int): PlayoffBracket
+  getPlayoffProjections(
+    leagueId: Int!
+    playoffTeams: Int
+    remainingWeeks: Int
+  ): [PlayoffProjection!]
   getPlayoffRace(
     leagueId: Int!
     playoffSpots: Int!
@@ -2107,6 +2155,11 @@ type Query {
   getSeasonResults(leagueId: Int!, season: Int): SeasonResults
   getTeamMatchupHistory(leagueId: Int!, limit: Int, teamId: Int!): [Matchup!]
   getTeamRecentMatchups(limit: Int, teamId: Int!): [Matchup!]
+  getTeamStatistics(
+    endWeek: Int
+    leagueId: Int!
+    startWeek: Int
+  ): [TeamStatistics!]
   getTiebreakerHistory(leagueId: Int, matchupId: Int): [TiebreakerHistory!]
   getTiebreakerRules(leagueId: Int!): TiebreakerRule
   getUnreadNotificationCount: Int
@@ -2729,6 +2782,25 @@ type TeamStanding {
   teamName: String
   ties: Int
   totalMatchups: Int
+  winPercentage: Float
+  wins: Int
+}
+
+"""
+Statistical analytics for a team
+"""
+type TeamStatistics {
+  averagePoints: Float
+  currentStreak: String
+  currentStreakCount: Int
+  longestLoseStreak: Int
+  longestWinStreak: Int
+  losses: Int
+  matchupsPlayed: Int
+  teamId: Int
+  teamName: String
+  ties: Int
+  totalPoints: Float
   winPercentage: Float
   wins: Int
 }

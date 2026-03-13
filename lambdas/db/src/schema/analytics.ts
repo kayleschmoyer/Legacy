@@ -1,5 +1,5 @@
 import { PublicSchema } from '@legacy-sports/db-client';
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, eq, gte, lte } from 'drizzle-orm';
 import { builder } from './builder';
 import { AuthenticationError } from './graphql-errors';
 
@@ -38,38 +38,6 @@ builder.objectType(TeamStatistics, {
     currentStreakCount: t.exposeInt('currentStreakCount'),
     longestWinStreak: t.exposeInt('longestWinStreak'),
     longestLoseStreak: t.exposeInt('longestLoseStreak'),
-  }),
-});
-
-/**
- * Head-to-Head Record Type
- */
-const HeadToHeadRecord = builder.objectRef<{
-  team1Id: number;
-  team1Name: string;
-  team2Id: number;
-  team2Name: string;
-  team1Wins: number;
-  team2Wins: number;
-  ties: number;
-  totalMatchups: number;
-  team1AveragePoints: number;
-  team2AveragePoints: number;
-}>('HeadToHeadRecord');
-
-builder.objectType(HeadToHeadRecord, {
-  description: 'Head-to-head record between two teams',
-  fields: (t) => ({
-    team1Id: t.exposeInt('team1Id'),
-    team1Name: t.exposeString('team1Name'),
-    team2Id: t.exposeInt('team2Id'),
-    team2Name: t.exposeString('team2Name'),
-    team1Wins: t.exposeInt('team1Wins'),
-    team2Wins: t.exposeInt('team2Wins'),
-    ties: t.exposeInt('ties'),
-    totalMatchups: t.exposeInt('totalMatchups'),
-    team1AveragePoints: t.exposeFloat('team1AveragePoints'),
-    team2AveragePoints: t.exposeFloat('team2AveragePoints'),
   }),
 });
 
@@ -225,116 +193,6 @@ builder.queryField('getTeamStatistics', (t) =>
 );
 
 /**
- * Query: Get Head-to-Head Record
- */
-builder.queryField('getHeadToHeadRecord', (t) =>
-  t.field({
-    type: HeadToHeadRecord,
-    args: {
-      leagueId: t.arg.int({ required: true }),
-      team1Id: t.arg.int({ required: true }),
-      team2Id: t.arg.int({ required: true }),
-    },
-    resolve: async (parent, args, context) => {
-      if (!context.user) {
-        throw AuthenticationError();
-      }
-
-      // Get team names
-      const [team1, team2] = await Promise.all([
-        context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, args.team1Id))
-          .limit(1),
-        context.db
-          .select({
-            id: PublicSchema.teams.id,
-            name: PublicSchema.teams.name,
-          })
-          .from(PublicSchema.teams)
-          .where(eq(PublicSchema.teams.id, args.team2Id))
-          .limit(1),
-      ]);
-
-      if (!team1[0] || !team2[0]) {
-        throw new Error('One or both teams not found');
-      }
-
-      // Get all matchups between these teams
-      const matchups = await context.db
-        .select()
-        .from(PublicSchema.matchups)
-        .where(
-          and(
-            eq(PublicSchema.matchups.leagueId, args.leagueId),
-            eq(PublicSchema.matchups.status, 'completed'),
-            sql`(
-              (${PublicSchema.matchups.team1Id} = ${args.team1Id} AND ${PublicSchema.matchups.team2Id} = ${args.team2Id})
-              OR
-              (${PublicSchema.matchups.team1Id} = ${args.team2Id} AND ${PublicSchema.matchups.team2Id} = ${args.team1Id})
-            )`,
-          ),
-        )
-        .orderBy(desc(PublicSchema.matchups.weekNumber));
-
-      // Calculate head-to-head using the analytics library
-      const { calculateHeadToHead } = await import('@legacy-sports/analytics');
-      return calculateHeadToHead(matchups, team1[0], team2[0]);
-    },
-  }),
-);
-
-/**
- * Query: Get Power Rankings
- */
-builder.queryField('getPowerRankings', (t) =>
-  t.field({
-    type: [PowerRanking],
-    args: {
-      leagueId: t.arg.int({ required: true }),
-    },
-    resolve: async (parent, args, context) => {
-      if (!context.user) {
-        throw AuthenticationError();
-      }
-
-      // Get all teams
-      const teams = await context.db
-        .select({
-          id: PublicSchema.teams.id,
-          name: PublicSchema.teams.name,
-        })
-        .from(PublicSchema.teams)
-        .where(eq(PublicSchema.teams.leagueId, args.leagueId));
-
-      // Get all completed matchups
-      const matchups = await context.db
-        .select()
-        .from(PublicSchema.matchups)
-        .where(
-          and(
-            eq(PublicSchema.matchups.leagueId, args.leagueId),
-            eq(PublicSchema.matchups.status, 'completed'),
-          ),
-        )
-        .orderBy(PublicSchema.matchups.weekNumber);
-
-      // Calculate power rankings using the analytics library
-      const { calculateTeamStats, calculateTrends, calculatePowerRankings } =
-        await import('@legacy-sports/analytics');
-
-      const teamStats = calculateTeamStats(matchups, teams);
-      const trends = calculateTrends(matchups, teams);
-      return calculatePowerRankings(teamStats, trends);
-    },
-  }),
-);
-
-/**
  * Query: Get Playoff Projections
  */
 builder.queryField('getPlayoffProjections', (t) =>
@@ -473,10 +331,4 @@ builder.queryField('getLeagueAnalytics', (t) =>
   }),
 );
 
-export {
-  TeamStatistics,
-  HeadToHeadRecord,
-  PowerRanking,
-  PlayoffProjection,
-  LeagueAnalytics,
-};
+export { TeamStatistics, PowerRanking, PlayoffProjection, LeagueAnalytics };
