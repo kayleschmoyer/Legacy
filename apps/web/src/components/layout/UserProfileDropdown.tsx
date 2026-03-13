@@ -144,7 +144,12 @@ export const UserProfileDropdown: React.FC = () => {
 
   return (
     <YStack position="relative" ref={dropdownRef}>
-      <UserMenuButton onPress={() => setIsOpen(!isOpen)}>
+      <UserMenuButton
+        onPress={() => setIsOpen(!isOpen)}
+        data-testid="user-profile-trigger"
+        aria-label="User profile menu"
+        aria-expanded={isOpen}
+      >
         <XStack alignItems="center" gap="$2">
           <ProfileImage
             style={{
@@ -191,6 +196,7 @@ export const UserProfileDropdown: React.FC = () => {
 
       {isOpen && (
         <DropdownContent
+          data-testid="user-profile-dropdown"
           position="absolute"
           top="100%"
           right={0}
