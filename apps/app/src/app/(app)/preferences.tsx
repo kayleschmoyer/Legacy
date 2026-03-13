@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
 import {
@@ -50,7 +51,9 @@ function loadPrefs(): UserPreferences {
       ...DEFAULT_PREFS,
       ...(JSON.parse(raw) as Partial<UserPreferences>),
     };
-  } catch {
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    LOGGER.error('Failed to load user preferences', err);
     return DEFAULT_PREFS;
   }
 }

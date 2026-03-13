@@ -9,6 +9,7 @@
  * - `useColorScheme()` from react-native is used so the theme updates
  *   reactively when the OS theme changes while in "system" mode.
  */
+import { LOGGER } from '@legacy-sports/logging';
 import React, {
   createContext,
   useCallback,
@@ -32,7 +33,9 @@ function readStoredPreference(): ThemePreference {
     if (!raw) return 'system';
     const parsed = JSON.parse(raw) as { theme?: ThemePreference };
     return parsed.theme ?? 'system';
-  } catch {
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    LOGGER.error('Failed to read stored theme preference', err);
     return 'system';
   }
 }
@@ -42,8 +45,9 @@ function persistPreference(pref: ThemePreference): void {
     const raw = sessionStore[PREFS_KEY];
     const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     sessionStore[PREFS_KEY] = JSON.stringify({ ...existing, theme: pref });
-  } catch {
-    // ignore
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    LOGGER.error('Failed to persist theme preference', err);
   }
 }
 
