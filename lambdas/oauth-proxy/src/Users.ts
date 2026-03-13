@@ -1,44 +1,6 @@
-import { jwtDecode } from 'jwt-decode';
-import { LOGGER } from '@legacy-sports/logging';
 import { compare, genSalt, hash } from 'bcryptjs';
-import {
-  createUser,
-  getUserByEmail,
-  InternalDb,
-  InternalUser,
-} from '@legacy-sports/db-client';
 
 const SALT_ROUNDS = 10;
-
-interface GoogleJwtContents {
-  email: string;
-  email_verified: boolean;
-  name: string;
-  picture: string;
-  given_name: string;
-  family_name: string;
-  iss: string;
-}
-
-export async function getUserFromGoogleJwt(
-  db: InternalDb,
-  googleToken: string,
-): Promise<InternalUser> {
-  const googleJwt = jwtDecode<GoogleJwtContents>(googleToken);
-  let user = await getUserByEmail(db, googleJwt.email);
-
-  // No user exists, let's create one
-  if (user === null) {
-    LOGGER.info('Creating new user from Google JWT');
-    user = await createUser(db, googleJwt.email);
-  }
-
-  if (!user) {
-    throw new Error('Failed to create JWT for user!');
-  }
-
-  return user;
-}
 
 export async function hashPassword(plaintext: string): Promise<string> {
   const salt = await genSalt(SALT_ROUNDS);

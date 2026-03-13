@@ -13,7 +13,7 @@ import { InternalUser } from '@legacy-sports/db-client';
 import { getOrCreateUser } from './UserManager';
 import { completeDeviceFlow } from './DeviceFlow';
 import { EnvironmentVariable, Secret, SECRET_CONFIG } from '../util';
-import { getUserFromGoogleJwt } from '../util/users';
+import { getUserFromGoogleEmail } from '../util/users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { decryptCookies, encryptCookies } from '../util/cookie';
 import { parseEventBody } from '../util/lambda';
@@ -241,44 +241,51 @@ export const handleSecureGoogleAuth = async (
       hasCredential: !!body.credential,
     });
 
-    // Step 1: First, decode the credential/code to get the email WITHOUT full validation
-    // This allows us to check user existence before doing expensive OAuth validation
+    // Get OAuth settings upfront — needed for signature verification in Step 1
+    const { clientId, clientSecret } = await getGoogleAuthSettings();
+    const oauthClient = getOAuthClient(clientId, clientSecret);
+
+    // Step 1: Verify the credential/code to get the cryptographically-confirmed email.
+    // Using oauthClient.verifyIdToken() ensures the Google signature is checked before
+    // the email is trusted for any database operation.
     let userEmail: string;
 
     if (body.credential) {
-      // For One Tap flow, decode the JWT to get email (don't validate signature yet)
-      const { jwtDecode } = await import('jwt-decode');
+      // For One Tap flow, verify the ID token signature with Google's public keys
       try {
-        const payload = jwtDecode<{ email: string }>(body.credential);
+        const ticket = await oauthClient.verifyIdToken({
+          idToken: body.credential,
+          audience: clientId,
+        });
+        const payload = ticket.getPayload();
+        if (!payload?.email) {
+          throw new Error('ID token missing email claim');
+        }
         userEmail = payload.email;
 
-        // Store credential in the event so we can reuse it in the main flow
-        // This avoids re-validation and matches the authorization code pattern
+        // Store credential on the event so the main flow can reuse the same value
+        // without re-reading the request body; the ID token is still re-verified later.
         event._credential = body.credential;
 
-        LOGGER.debug('Email extracted from ID token successfully');
+        LOGGER.debug('Email verified from ID token successfully');
       } catch (error) {
         LOGGER.error(
-          'Failed to decode ID token for email extraction:',
+          'Failed to verify ID token for email extraction:',
           error instanceof Error ? error.message : String(error),
         );
         return {
           statusCode: 400,
           body: JSON.stringify({
-            error: 'Invalid ID token format',
-            message: 'Could not extract email from credential',
+            error: 'Invalid ID token',
+            message: 'Could not verify credential',
           }),
         };
       }
     } else if (body.code) {
-      // For authorization code flow, we need to exchange the code to get the email
-      // We'll store the tokens and reuse them later to avoid double-exchange
+      // For authorization code flow, exchange the code and verify the resulting id_token
       LOGGER.debug(
         'Authorization code flow detected - exchanging code to get user email',
       );
-
-      const { clientId, clientSecret } = await getGoogleAuthSettings();
-      const oauthClient = getOAuthClient(clientId, clientSecret);
 
       try {
         // Use the redirect_uri from the request body if provided (device flow via callback),
@@ -295,8 +302,14 @@ export const handleSecureGoogleAuth = async (
           );
         }
 
-        const { jwtDecode } = await import('jwt-decode');
-        const payload = jwtDecode<{ email: string }>(tokens.id_token);
+        const ticket = await oauthClient.verifyIdToken({
+          idToken: tokens.id_token,
+          audience: clientId,
+        });
+        const payload = ticket.getPayload();
+        if (!payload?.email) {
+          throw new Error('ID token from code exchange missing email claim');
+        }
         userEmail = payload.email;
 
         // Store tokens in the event body so we can reuse them later
@@ -304,7 +317,7 @@ export const handleSecureGoogleAuth = async (
         event._exchangedTokens = tokens;
 
         LOGGER.debug(
-          'Email extracted from authorization code flow successfully',
+          'Email verified from authorization code flow successfully',
         );
       } catch (error) {
         LOGGER.error(
@@ -384,6 +397,8 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   LOGGER.debug('OAuth client created successfully');
 
   let idToken: string;
+  let googleEmail: string;
+  let googlePicture: string | undefined;
 
   if (body.code) {
     // Authorization code flow (web/mobile)
@@ -423,6 +438,19 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
     }
 
     idToken = tokens.id_token;
+
+    // Verify the id_token from the code exchange to extract email and picture safely
+    const codeTicket = await oauthClient.verifyIdToken({
+      idToken,
+      audience: clientId,
+    });
+    const codePayload = codeTicket.getPayload();
+    if (!codePayload?.email) {
+      LOGGER.error('No email in id_token from code exchange');
+      throw new Error('Invalid ID token from Google OAuth code exchange!');
+    }
+    googleEmail = codePayload.email;
+    googlePicture = codePayload.picture;
   } else if (body.credential) {
     // ID token flow (One Tap)
 
@@ -431,7 +459,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
     // Check if we already have a validated credential from the secure flow
     if (event._credential) {
       LOGGER.debug(
-        'Using previously extracted credential from secure flow (avoiding re-validation)',
+        'Using previously extracted credential from secure flow (re-verifying to ensure token integrity)',
       );
       credential = event._credential;
     } else {
@@ -446,7 +474,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       'About to verify ID token with Google - this may take time...',
     );
 
-    // Verify the ID token is valid
+    // Verify the ID token is valid and extract email + picture from the verified payload
     try {
       const ticket = await oauthClient.verifyIdToken({
         idToken: credential,
@@ -461,6 +489,14 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
       }
 
       idToken = credential;
+      if (!payload.email) {
+        LOGGER.error(
+          'Verified ID token payload is missing required email claim',
+        );
+        throw new Error('Invalid ID token from Google: missing email');
+      }
+      googleEmail = payload.email;
+      googlePicture = payload.picture;
     } catch (error) {
       LOGGER.error(
         'ID token verification failed:',
@@ -484,7 +520,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
     const result = await withDbClient(async (db) => {
       LOGGER.debug('Database connection successful, getting user from JWT...');
 
-      const user = await getUserFromGoogleJwt(db, idToken);
+      const user = await getUserFromGoogleEmail(db, googleEmail);
 
       LOGGER.debug('User retrieved from database:', {
         id: user.id,
@@ -492,12 +528,9 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
         accessLevel: user.accessLevel,
       });
 
-      // Extract picture from Google JWT for inclusion in our internal JWT
-      const { jwtDecode } = await import('jwt-decode');
-      const googlePayload = jwtDecode<{ picture?: string }>(idToken);
-
+      // Use picture extracted from the already-verified Google ID token payload
       const jwt = await createJwt(user, {
-        picture: googlePayload.picture,
+        picture: googlePicture,
       });
 
       LOGGER.debug('Internal JWT created successfully');
@@ -629,15 +662,27 @@ export const handleGoogleRefresh = async (event: APIGatewayEvent) => {
 
   const idToken = credentials.id_token;
 
-  return await withDbClient(async (db) => {
-    const userInfo = await getUserFromGoogleJwt(db, idToken);
+  // Verify the refreshed id_token with Google's public keys to ensure it's authentic
+  const oauthClient = getOAuthClient(clientId, clientSecret);
+  const ticket = await oauthClient.verifyIdToken({
+    idToken,
+    audience: clientId,
+  });
+  const googlePayload = ticket.getPayload();
 
-    // Extract picture from Google JWT for inclusion in our internal JWT
-    const { jwtDecode } = await import('jwt-decode');
-    const googlePayload = jwtDecode<{ picture?: string }>(idToken);
+  const email = googlePayload?.email;
+  if (!email) {
+    LOGGER.error(
+      'Verified refresh token payload is missing required email claim',
+    );
+    throw new Error('Invalid ID token from Google: missing email');
+  }
+
+  return await withDbClient(async (db) => {
+    const userInfo = await getUserFromGoogleEmail(db, email);
 
     const internalJwt = await createJwt(userInfo, {
-      picture: googlePayload.picture,
+      picture: googlePayload?.picture,
     });
 
     const result: APIGatewayProxyResult = {

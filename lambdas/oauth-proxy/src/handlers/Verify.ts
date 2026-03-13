@@ -88,7 +88,7 @@ export const handleVerify = async (
     const oauthClient = getOAuthClient(clientId, clientSecret);
 
     let idToken: string;
-    let userInfo: GoogleUserInfo;
+    let verifiedPayload: GoogleUserInfo;
 
     if (body.code) {
       // Authorization code flow (mobile)
@@ -113,13 +113,44 @@ export const handleVerify = async (
       }
 
       idToken = tokens.id_token;
+
+      // Verify the id_token returned by the code exchange with Google's public keys
+      try {
+        const codeTicket = await oauthClient.verifyIdToken({
+          idToken,
+          audience: clientId,
+        });
+        const codePayload = codeTicket.getPayload();
+        if (!codePayload) {
+          return {
+            statusCode: 400,
+            body: JSON.stringify({
+              verified: false,
+              error: 'Invalid ID token payload from code exchange',
+            }),
+          };
+        }
+        verifiedPayload = codePayload as unknown as GoogleUserInfo;
+      } catch (error) {
+        LOGGER.error(
+          'ID token verification failed for code exchange:',
+          error instanceof Error ? error.message : String(error),
+        );
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            verified: false,
+            error: 'Invalid ID token from Google OAuth code exchange!',
+          }),
+        };
+      }
     } else if (body.credential) {
       // ID token flow (web)
       LOGGER.info(
         `Processing Google ID token verification: ${body.credential.substring(0, 20)}...`,
       );
 
-      // Verify the ID token is valid
+      // Verify the ID token is valid with Google's public keys
       try {
         const ticket = await oauthClient.verifyIdToken({
           idToken: body.credential,
@@ -140,6 +171,7 @@ export const handleVerify = async (
         }
 
         idToken = body.credential;
+        verifiedPayload = payload as unknown as GoogleUserInfo;
       } catch (error) {
         LOGGER.error(
           'ID token verification failed:',
@@ -164,54 +196,40 @@ export const handleVerify = async (
       };
     }
 
-    // Decode the verified token to get user info
-    LOGGER.debug('Decoding verified token to extract user info...');
+    // Use the verified payload extracted directly from the signature-checked ticket
+    LOGGER.debug('Successfully extracted user info from verified token');
 
-    try {
-      const { jwtDecode } = await import('jwt-decode');
-      userInfo = jwtDecode<{
-        sub: string;
-        email: string;
-        name?: string;
-        picture?: string;
-      }>(idToken);
-
-      LOGGER.debug('Successfully extracted user info from token');
-
-      const response: VerifyResponse = {
-        verified: true,
-        userInfo: {
-          sub: userInfo.sub || '',
-          email: userInfo.email || '',
-          name: userInfo.name || '',
-          picture: userInfo.picture || '',
-        },
-        googleToken: idToken,
-      };
-
-      return {
-        statusCode: 200,
-        body: JSON.stringify(response),
-      };
-    } catch (decodeError) {
-      LOGGER.error(
-        'Failed to decode token:',
-        decodeError instanceof Error
-          ? decodeError.message
-          : String(decodeError),
-      );
-      captureError(decodeError as Error, {
-        handler: 'handleVerify',
-        context: 'token_decode',
+    // Require sub and email to be present — a token verified but missing identity
+    // claims is ambiguous and should never be treated as "verified".
+    if (!verifiedPayload.sub || !verifiedPayload.email) {
+      LOGGER.error('Verified token is missing required identity claims', {
+        hasSub: !!verifiedPayload.sub,
+        hasEmail: !!verifiedPayload.email,
       });
       return {
-        statusCode: 500,
+        statusCode: 400,
         body: JSON.stringify({
           verified: false,
-          error: 'Failed to decode verified token',
+          error: 'ID token is missing required identity claims (sub, email)',
         }),
       };
     }
+
+    const response: VerifyResponse = {
+      verified: true,
+      userInfo: {
+        sub: verifiedPayload.sub,
+        email: verifiedPayload.email,
+        name: verifiedPayload.name || '',
+        picture: verifiedPayload.picture || '',
+      },
+      googleToken: idToken,
+    };
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify(response),
+    };
   } catch (error) {
     LOGGER.error(
       'OAuth verification error:',

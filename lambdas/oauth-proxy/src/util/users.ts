@@ -1,4 +1,3 @@
-import { jwtDecode } from 'jwt-decode';
 import { LOGGER } from '@legacy-sports/logging';
 import { compare, genSalt, hash } from 'bcryptjs';
 import {
@@ -10,27 +9,24 @@ import {
 
 const SALT_ROUNDS = 10;
 
-interface GoogleJwtContents {
-  email: string;
-  email_verified: boolean;
-  name: string;
-  picture: string;
-  given_name: string;
-  family_name: string;
-  iss: string;
-}
-
-export async function getUserFromGoogleJwt(
+/**
+ * Looks up or creates a user by their Google-verified email address.
+ * Callers are responsible for verifying the Google ID token before extracting
+ * the email — never pass an email from an unverified JWT here.
+ */
+export async function getUserFromGoogleEmail(
   db: InternalDb,
-  googleToken: string,
+  email: string,
 ): Promise<InternalUser> {
-  const googleJwt = jwtDecode<GoogleJwtContents>(googleToken);
-  let user = await getUserByEmail(db, googleJwt.email);
+  if (!email) {
+    throw new Error('Cannot look up user: email address is missing or empty');
+  }
+  let user = await getUserByEmail(db, email);
 
   // No user exists, let's create one
   if (user === null) {
     LOGGER.info('Creating new user from Google JWT');
-    user = await createUser(db, googleJwt.email);
+    user = await createUser(db, email);
   }
 
   if (!user) {
