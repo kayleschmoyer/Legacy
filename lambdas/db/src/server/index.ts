@@ -1,5 +1,5 @@
 export { createApolloHandler, server } from './apollo';
-export { createLambdaHandler, CORS_HEADERS } from './handler';
+export { createLambdaHandler, CORS_HEADERS, getCorsHeaders } from './handler';
 export {
   extractUserFromEvent,
   getJwtSecret,

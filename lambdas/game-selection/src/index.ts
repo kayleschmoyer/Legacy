@@ -36,17 +36,55 @@ if (sentryConfig) {
 }
 
 /**
- * Add CORS headers to API Gateway response
+ * Origins permitted to make cross-origin requests.
+ * Reads from CORS_ALLOWED_ORIGINS env var (comma-separated list).
+ * Defaults to the production web domain when not set.
  */
-function addCorsHeaders(result: APIGatewayProxyResult): APIGatewayProxyResult {
+function getAllowedOrigins(): Set<string> {
+  const raw = process.env.CORS_ALLOWED_ORIGINS ?? 'https://legacy-fantasy.com';
+  return new Set(
+    raw
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
+  );
+}
+
+const BASE_CORS_HEADERS = {
+  'Access-Control-Allow-Headers':
+    'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+  // Security headers
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Content-Security-Policy': "default-src 'none'",
+};
+
+function getCorsHeaders(event: APIGatewayEvent): Record<string, string> {
+  const origin = event.headers?.Origin ?? event.headers?.origin;
+  const allowed = getAllowedOrigins();
+  const headers: Record<string, string> = { ...BASE_CORS_HEADERS };
+  if (origin && allowed.has(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Vary'] = 'Origin';
+  }
+  return headers;
+}
+
+/**
+ * Add CORS and security headers to API Gateway response
+ */
+function addCorsHeaders(
+  result: APIGatewayProxyResult,
+  event: APIGatewayEvent,
+): APIGatewayProxyResult {
   return {
     ...result,
     headers: {
       ...result.headers,
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers':
-        'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+      ...getCorsHeaders(event),
     },
   };
 }
@@ -54,15 +92,10 @@ function addCorsHeaders(result: APIGatewayProxyResult): APIGatewayProxyResult {
 /**
  * Handle OPTIONS preflight requests for CORS
  */
-function handleOptions(): APIGatewayProxyResult {
+function handleOptions(event: APIGatewayEvent): APIGatewayProxyResult {
   return {
     statusCode: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers':
-        'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    },
+    headers: getCorsHeaders(event),
     body: '',
   };
 }
@@ -734,6 +767,9 @@ const baseGameSelectionHandler = async (
   event: APIGatewayEvent,
   _context: Context,
 ): Promise<APIGatewayProxyResult> => {
+  // Request-scoped CORS helper that closes over the incoming origin
+  const cors = (r: APIGatewayProxyResult) => addCorsHeaders(r, event);
+
   LOGGER.info(
     `Game Selection Handler - Method: ${event.httpMethod}, Path: ${event.path}`,
   );
@@ -742,7 +778,7 @@ const baseGameSelectionHandler = async (
   try {
     // Handle OPTIONS preflight requests
     if (event.httpMethod === 'OPTIONS') {
-      return handleOptions();
+      return handleOptions(event);
     }
 
     // Route to appropriate handler based on path
@@ -755,7 +791,7 @@ const baseGameSelectionHandler = async (
         const versionInfo = getVersionInfo('legacy-sports-game-selection');
         LOGGER.debug('Version endpoint called', versionInfo);
 
-        return addCorsHeaders({
+        return cors({
           statusCode: 200,
           body: JSON.stringify({
             status: 'healthy',
@@ -768,7 +804,7 @@ const baseGameSelectionHandler = async (
 
       case '/badge': {
         // shields.io endpoint badge — returns live health JSON consumed directly by the README badge
-        return addCorsHeaders({
+        return cors({
           statusCode: 200,
           body: JSON.stringify({
             schemaVersion: 1,
@@ -795,7 +831,7 @@ const baseGameSelectionHandler = async (
             !('league' in body) ||
             !('week' in body)
           ) {
-            return addCorsHeaders({
+            return cors({
               statusCode: 400,
               body: JSON.stringify({
                 error: 'Missing required parameters',
@@ -808,7 +844,7 @@ const baseGameSelectionHandler = async (
 
           // Validate parameters
           if (typeof league !== 'number' || typeof week !== 'number') {
-            return addCorsHeaders({
+            return cors({
               statusCode: 400,
               body: JSON.stringify({
                 error: 'Invalid parameters',
@@ -827,7 +863,7 @@ const baseGameSelectionHandler = async (
               return await createMatchupForLeagueWeek(db, league, week);
             });
 
-            return addCorsHeaders({
+            return cors({
               statusCode: 200,
               body: JSON.stringify({
                 message: `Successfully processed ${result.matchupsProcessed} matchup(s)`,
@@ -861,7 +897,7 @@ const baseGameSelectionHandler = async (
             !('matchupId' in body) ||
             !('gameNumber' in body)
           ) {
-            return addCorsHeaders({
+            return cors({
               statusCode: 400,
               body: JSON.stringify({
                 error: 'Missing required fields',
@@ -885,7 +921,7 @@ const baseGameSelectionHandler = async (
               return await selectGameForMatchup(db, matchupId, gameNumber);
             });
 
-            return addCorsHeaders({
+            return cors({
               statusCode: 200,
               body: JSON.stringify({
                 message: `Successfully selected game ${gameNumber} for matchup ${matchupId}`,
@@ -910,7 +946,7 @@ const baseGameSelectionHandler = async (
 
       case '':
       case '/':
-        return addCorsHeaders({
+        return cors({
           statusCode: 200,
           body: JSON.stringify({
             service: 'Game Selection Service',
@@ -926,7 +962,7 @@ const baseGameSelectionHandler = async (
     }
 
     // Path not found
-    return addCorsHeaders({
+    return cors({
       statusCode: 404,
       body: JSON.stringify({
         error: 'Not found',
@@ -951,7 +987,7 @@ const baseGameSelectionHandler = async (
       },
     });
 
-    return addCorsHeaders({
+    return cors({
       statusCode: 500,
       body: JSON.stringify({
         error: 'Internal server error',

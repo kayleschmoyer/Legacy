@@ -67,7 +67,60 @@ describe('Jira Proxy Handler', () => {
     const event = makeEvent({ httpMethod: 'OPTIONS' });
     const result = await baseHandler(event);
     expect(result.statusCode).toBe(200);
-    expect(result.headers?.['Access-Control-Allow-Origin']).toBe('*');
+    // Without an Origin header or CORS_ALLOWED_ORIGINS env var the new
+    // per-request allowlist logic omits Access-Control-Allow-Origin.
+    expect(result.headers?.['Access-Control-Allow-Origin']).toBeUndefined();
+  });
+
+  it('reflects allowed origin in CORS headers', async () => {
+    process.env['CORS_ALLOWED_ORIGINS'] =
+      'https://legacy-fantasy.com,https://dev.legacy-fantasy.com';
+    const event = makeEvent({
+      httpMethod: 'OPTIONS',
+      headers: { Origin: 'https://legacy-fantasy.com' },
+    });
+    const result = await baseHandler(event);
+    expect(result.statusCode).toBe(200);
+    expect(result.headers?.['Access-Control-Allow-Origin']).toBe(
+      'https://legacy-fantasy.com',
+    );
+    expect(result.headers?.['Vary']).toBe('Origin');
+    delete process.env['CORS_ALLOWED_ORIGINS'];
+  });
+
+  it('omits ACAO when origin is not in allowlist', async () => {
+    process.env['CORS_ALLOWED_ORIGINS'] = 'https://legacy-fantasy.com';
+    const event = makeEvent({
+      httpMethod: 'OPTIONS',
+      headers: { Origin: 'https://evil.com' },
+    });
+    const result = await baseHandler(event);
+    expect(result.statusCode).toBe(200);
+    expect(result.headers?.['Access-Control-Allow-Origin']).toBeUndefined();
+    delete process.env['CORS_ALLOWED_ORIGINS'];
+  });
+
+  it('includes security headers in responses', async () => {
+    const event = makeEvent({
+      httpMethod: 'GET',
+      path: '/jira/health',
+      body: null,
+    });
+    const result = await baseHandler(event);
+    expect(result.headers?.['X-Content-Type-Options']).toBe('nosniff');
+    expect(result.headers?.['X-Frame-Options']).toBe('DENY');
+    expect(result.headers?.['Strict-Transport-Security']).toBe(
+      'max-age=31536000; includeSubDomains',
+    );
+    expect(result.headers?.['Content-Security-Policy']).toBe(
+      "default-src 'none'",
+    );
+  });
+
+  it('includes GET in Access-Control-Allow-Methods', async () => {
+    const event = makeEvent({ httpMethod: 'OPTIONS' });
+    const result = await baseHandler(event);
+    expect(result.headers?.['Access-Control-Allow-Methods']).toContain('GET');
   });
 
   it('returns 200 for health check', async () => {

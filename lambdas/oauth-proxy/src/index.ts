@@ -32,17 +32,65 @@ if (sentryConfig) {
 }
 
 /**
- * Add CORS headers to API Gateway response
+ * Origins permitted to make cross-origin requests.
+ * Reads from CORS_ALLOWED_ORIGINS env var (comma-separated list).
+ * Defaults to the production web domain when not set.
  */
-function addCorsHeaders(result: APIGatewayProxyResult): APIGatewayProxyResult {
+function getAllowedOrigins(): Set<string> {
+  const raw = process.env.CORS_ALLOWED_ORIGINS ?? 'https://legacy-fantasy.com';
+  return new Set(
+    raw
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
+  );
+}
+
+const BASE_CORS_HEADERS = {
+  'Access-Control-Allow-Headers':
+    'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+  // Security headers
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Content-Security-Policy': "default-src 'none'",
+};
+
+function getCorsHeaders(event: APIGatewayEvent): Record<string, string> {
+  const origin = event.headers?.Origin ?? event.headers?.origin;
+  const allowed = getAllowedOrigins();
+  const headers: Record<string, string> = { ...BASE_CORS_HEADERS };
+  if (origin && allowed.has(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Vary'] = 'Origin';
+  }
+  return headers;
+}
+
+/**
+ * Add CORS and security headers to API Gateway response.
+ * Content-Security-Policy is omitted for HTML responses because
+ * "default-src 'none'" would block inline styles/scripts used by OAuth pages.
+ */
+function addCorsHeaders(
+  result: APIGatewayProxyResult,
+  event: APIGatewayEvent,
+): APIGatewayProxyResult {
+  const corsHeaders = getCorsHeaders(event);
+  const ct =
+    (result.headers?.['Content-Type'] as string | undefined) ??
+    (result.headers?.['content-type'] as string | undefined) ??
+    '';
+  if (ct.includes('text/html')) {
+    delete corsHeaders['Content-Security-Policy'];
+  }
   return {
     ...result,
     headers: {
       ...result.headers,
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers':
-        'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+      ...corsHeaders,
     },
   };
 }
@@ -50,15 +98,10 @@ function addCorsHeaders(result: APIGatewayProxyResult): APIGatewayProxyResult {
 /**
  * Handle OPTIONS preflight requests for CORS
  */
-function handleOptions(): APIGatewayProxyResult {
+function handleOptions(event: APIGatewayEvent): APIGatewayProxyResult {
   return {
     statusCode: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers':
-        'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    },
+    headers: getCorsHeaders(event),
     body: '',
   };
 }
@@ -80,6 +123,10 @@ const baseOAuthHandler = async (
   event: APIGatewayEvent,
   _context: Context,
 ): Promise<APIGatewayProxyResult> => {
+  // Request-scoped CORS helpers that close over the incoming origin
+  const cors = (r: APIGatewayProxyResult) => addCorsHeaders(r, event);
+  const options = () => handleOptions(event);
+
   // Enhanced logging version - 2025-09-26
   LOGGER.info(
     `OAuth Proxy Handler - Method: ${event.httpMethod}, Path: ${event.path}`,
@@ -109,7 +156,7 @@ const baseOAuthHandler = async (
   try {
     // Handle OPTIONS preflight requests
     if (event.httpMethod === 'OPTIONS') {
-      return handleOptions();
+      return options();
     }
 
     // Route to appropriate handler based on path
@@ -122,7 +169,7 @@ const baseOAuthHandler = async (
         const versionInfo = getVersionInfo('legacy-sports-oauth-proxy');
         LOGGER.debug('Version endpoint called', versionInfo);
 
-        return addCorsHeaders({
+        return cors({
           statusCode: 200,
           body: JSON.stringify({
             status: 'healthy',
@@ -136,7 +183,7 @@ const baseOAuthHandler = async (
       case '/oauth/badge':
       case '/dev/oauth/badge': {
         // shields.io endpoint badge — returns live health JSON consumed directly by the README badge
-        return addCorsHeaders({
+        return cors({
           statusCode: 200,
           body: JSON.stringify({
             schemaVersion: 1,
@@ -152,7 +199,7 @@ const baseOAuthHandler = async (
       case '/oauth':
       case '/dev/oauth':
         // Root OAuth path - could be used for health checks or general info
-        return addCorsHeaders({
+        return cors({
           statusCode: 200,
           body: JSON.stringify({
             message: 'Secure OAuth Proxy Service',
@@ -185,7 +232,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/verify':
         if (event.httpMethod === 'POST') {
           const result = await handleVerify(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -194,7 +241,7 @@ const baseOAuthHandler = async (
         if (event.httpMethod === 'POST') {
           // Use the new secure authentication flow that checks user existence first
           const result = await handleSecureGoogleAuth(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -203,7 +250,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/google/legacy':
         if (event.httpMethod === 'POST') {
           const result = await handleGoogleAuth(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -211,7 +258,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/google/authorize':
         if (event.httpMethod === 'GET') {
           const result = await handleGoogleAuthorize(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -219,7 +266,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/google/callback':
         if (event.httpMethod === 'GET') {
           const result = await handleGoogleCallback(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -227,7 +274,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/google/refresh':
         if (event.httpMethod === 'POST') {
           const result = await handleGoogleRefresh(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -235,7 +282,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/refresh-jwt':
         if (event.httpMethod === 'POST') {
           const result = await handleRefreshJwt(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -243,7 +290,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/login':
         if (event.httpMethod === 'POST') {
           const result = await handleLogin(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -251,7 +298,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/register':
         if (event.httpMethod === 'POST') {
           const result = await handleRegister(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -260,7 +307,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/device/authorize':
         if (event.httpMethod === 'POST') {
           const result = await handleDeviceAuthorize(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -268,7 +315,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/device/token':
         if (event.httpMethod === 'POST') {
           const result = await handleDeviceToken(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -276,7 +323,7 @@ const baseOAuthHandler = async (
       case '/dev/oauth/device/verify':
         if (event.httpMethod === 'GET') {
           const result = await handleDeviceVerify(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
@@ -284,20 +331,20 @@ const baseOAuthHandler = async (
       case '/dev/oauth/device/complete-local':
         if (event.httpMethod === 'POST') {
           const result = await handleDeviceCompleteLocal(event);
-          return addCorsHeaders(result);
+          return cors(result);
         }
         break;
 
       default:
         LOGGER.warn(`Unknown path: ${event.path}`);
-        return addCorsHeaders({
+        return cors({
           statusCode: 404,
           body: JSON.stringify({ error: 'Not Found' }),
         });
     }
 
     // Method not allowed
-    return addCorsHeaders({
+    return cors({
       statusCode: 405,
       body: JSON.stringify({ error: 'Method Not Allowed' }),
     });
@@ -316,7 +363,7 @@ const baseOAuthHandler = async (
       operation: 'oauth_request',
     });
 
-    return addCorsHeaders({
+    return cors({
       statusCode: 500,
       body: JSON.stringify({
         error: 'Internal Server Error',

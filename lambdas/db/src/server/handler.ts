@@ -7,13 +7,62 @@ import { LOGGER } from '@legacy-sports/logging';
 import { addBreadcrumb, captureError } from '@legacy-sports/rollbar';
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 
-// CORS headers constant
-export const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
+/**
+ * Origins permitted to make cross-origin requests to this API.
+ * Reads from the CORS_ALLOWED_ORIGINS env var (comma-separated list).
+ * Defaults to the production web domain when the env var is not set.
+ */
+function getAllowedOrigins(): Set<string> {
+  const raw = process.env.CORS_ALLOWED_ORIGINS ?? 'https://legacy-fantasy.com';
+  return new Set(
+    raw
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
+  );
+}
+
+/**
+ * Build CORS + security headers for a request, reflecting the validated origin.
+ * If the request origin is not in the allowlist, Access-Control-Allow-Origin is
+ * omitted so the browser rejects the cross-origin response.
+ */
+export function getCorsHeaders(
+  event: APIGatewayProxyEvent,
+): Record<string, string> {
+  const origin = event.headers?.Origin ?? event.headers?.origin;
+  const allowed = getAllowedOrigins();
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Headers':
+      'Content-Type, Authorization, X-Requested-With, apollo-require-preflight',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+    // Security headers
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Content-Security-Policy': "default-src 'none'",
+  };
+  if (origin && allowed.has(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Vary'] = 'Origin';
+  }
+  return headers;
+}
+
+// Static base headers for backward compatibility; does not include
+// Access-Control-Allow-Origin (which requires a validated request origin).
+export const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Headers':
     'Content-Type, Authorization, X-Requested-With, apollo-require-preflight',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Content-Security-Policy': "default-src 'none'",
 };
 
 /**
@@ -44,7 +93,7 @@ export function createLambdaHandler(
       addBreadcrumb('Handling OPTIONS preflight request');
       return {
         statusCode: 200,
-        headers: CORS_HEADERS,
+        headers: getCorsHeaders(event),
         body: '',
       };
     }
@@ -57,7 +106,7 @@ export function createLambdaHandler(
       return {
         statusCode: 200,
         headers: {
-          ...CORS_HEADERS,
+          ...getCorsHeaders(event),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -74,7 +123,7 @@ export function createLambdaHandler(
       return {
         statusCode: 200,
         headers: {
-          ...CORS_HEADERS,
+          ...getCorsHeaders(event),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -151,12 +200,22 @@ export function createLambdaHandler(
         throw new Error('Apollo Server returned no result');
       }
 
-      // Add CORS headers to the result
+      // Add CORS headers to the result.
+      // Omit Content-Security-Policy for HTML responses (e.g. the Apollo
+      // landing page) because "default-src 'none'" blocks its scripts/styles.
+      const corsHeaders = getCorsHeaders(event);
+      const resultCt =
+        (result.headers?.['Content-Type'] as string | undefined) ??
+        (result.headers?.['content-type'] as string | undefined) ??
+        '';
+      if (resultCt.includes('text/html')) {
+        delete corsHeaders['Content-Security-Policy'];
+      }
       return {
         ...result,
         headers: {
-          ...CORS_HEADERS,
-          ...(result.headers || {}),
+          ...corsHeaders,
+          ...(result.headers ?? {}),
         },
       };
     } catch (error) {
@@ -176,7 +235,7 @@ export function createLambdaHandler(
       return {
         statusCode: 500,
         headers: {
-          ...CORS_HEADERS,
+          ...getCorsHeaders(event),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

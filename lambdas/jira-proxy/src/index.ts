@@ -61,31 +61,63 @@ if (sentryConfig) {
   initSentry(sentryConfig);
 }
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
+/**
+ * Origins permitted to make cross-origin requests.
+ * Reads from CORS_ALLOWED_ORIGINS env var (comma-separated list).
+ * Defaults to the production web domain when not set.
+ */
+function getAllowedOrigins(): Set<string> {
+  const raw = process.env.CORS_ALLOWED_ORIGINS ?? 'https://legacy-fantasy.com';
+  return new Set(
+    raw
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
+  );
+}
+
+const BASE_CORS_HEADERS = {
   'Access-Control-Allow-Headers':
     'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-  'Access-Control-Allow-Methods': 'POST,OPTIONS',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  // Security headers
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Content-Security-Policy': "default-src 'none'",
 };
+
+function getCorsHeaders(event: APIGatewayEvent): Record<string, string> {
+  const origin = event.headers?.Origin ?? event.headers?.origin;
+  const allowed = getAllowedOrigins();
+  const headers: Record<string, string> = { ...BASE_CORS_HEADERS };
+  if (origin && allowed.has(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Vary'] = 'Origin';
+  }
+  return headers;
+}
 
 function jsonResponse(
   statusCode: number,
   body: unknown,
+  event: APIGatewayEvent,
 ): APIGatewayProxyResult {
   return {
     statusCode,
     headers: {
       'Content-Type': 'application/json',
-      ...CORS_HEADERS,
+      ...getCorsHeaders(event),
     },
     body: JSON.stringify(body),
   };
 }
 
-function handleOptions(): APIGatewayProxyResult {
+function handleOptions(event: APIGatewayEvent): APIGatewayProxyResult {
   return {
     statusCode: 200,
-    headers: CORS_HEADERS,
+    headers: getCorsHeaders(event),
     body: '',
   };
 }
@@ -257,7 +289,7 @@ export const baseHandler = async (
   LOGGER.info(`Jira Proxy - Method: ${event.httpMethod}, Path: ${event.path}`);
 
   if (event.httpMethod === 'OPTIONS') {
-    return handleOptions();
+    return handleOptions(event);
   }
 
   const path = event.path.replace(/\/$/, '');
@@ -273,7 +305,7 @@ export const baseHandler = async (
     event.httpMethod === 'GET' &&
     (path === '/jira/health' || path === '/health')
   ) {
-    return jsonResponse(200, { status: 'ok', service: 'jira-proxy' });
+    return jsonResponse(200, { status: 'ok', service: 'jira-proxy' }, event);
   }
 
   if (
@@ -281,19 +313,27 @@ export const baseHandler = async (
     (path === '/jira/badge' || path === '/badge')
   ) {
     // shields.io endpoint badge — returns live health JSON consumed directly by the README badge
-    return jsonResponse(200, {
-      schemaVersion: 1,
-      label: 'Jira Proxy Lambda',
-      message: 'healthy',
-      color: 'brightgreen',
-      cacheSeconds: 60,
-      style: 'flat',
-    });
+    return jsonResponse(
+      200,
+      {
+        schemaVersion: 1,
+        label: 'Jira Proxy Lambda',
+        message: 'healthy',
+        color: 'brightgreen',
+        cacheSeconds: 60,
+        style: 'flat',
+      },
+      event,
+    );
   }
 
-  return jsonResponse(404, {
-    error: `Route ${event.httpMethod} ${event.path} not found`,
-  });
+  return jsonResponse(
+    404,
+    {
+      error: `Route ${event.httpMethod} ${event.path} not found`,
+    },
+    event,
+  );
 };
 
 async function handleCreateBug(
@@ -304,20 +344,24 @@ async function handleCreateBug(
 
   if (!jiraSecretName) {
     LOGGER.error('JIRA_SECRET_NAME environment variable is not set');
-    return jsonResponse(500, { error: 'Server configuration error' });
+    return jsonResponse(500, { error: 'Server configuration error' }, event);
   }
 
   if (!jiraProjectKey) {
     LOGGER.error('JIRA_PROJECT_KEY environment variable is not set');
-    return jsonResponse(500, { error: 'Server configuration error' });
+    return jsonResponse(500, { error: 'Server configuration error' }, event);
   }
 
   // Verify the JWT — reject unauthenticated / tampered tokens.
   const authUser = await verifyAuthToken(event.headers ?? {});
   if (!authUser) {
-    return jsonResponse(401, {
-      error: 'Unauthorized: valid authentication token required',
-    });
+    return jsonResponse(
+      401,
+      {
+        error: 'Unauthorized: valid authentication token required',
+      },
+      event,
+    );
   }
 
   let input: CreateIssueInput;
@@ -325,7 +369,7 @@ async function handleCreateBug(
     input = parseBugReport(event.body);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Invalid request';
-    return jsonResponse(400, { error: message });
+    return jsonResponse(400, { error: message }, event);
   }
 
   // Prefer the server-decoded email over whatever the client sent (trusted source).
@@ -342,11 +386,11 @@ async function handleCreateBug(
 
   try {
     const result = await createJiraBug(input, jiraProjectKey, jiraSecretName);
-    return jsonResponse(201, result);
+    return jsonResponse(201, result, event);
   } catch (err) {
     LOGGER.error(`Failed to create Jira bug: ${String(err)}`);
     captureError(err instanceof Error ? err : new Error(String(err)));
-    return jsonResponse(500, { error: 'Failed to create bug report' });
+    return jsonResponse(500, { error: 'Failed to create bug report' }, event);
   }
 }
 
