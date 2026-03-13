@@ -218,6 +218,32 @@ function getRedirectUri(event: APIGatewayEvent): string {
 }
 
 /**
+ * Return the set of redirect URIs that are permitted for this request.
+ * - 'postmessage': used by Google Identity Services for popup/iframe code flows (web)
+ * - The API Gateway callback URL for this stage: used by CLI/device authorization flows
+ */
+function getAllowedRedirectUris(event: APIGatewayEvent): Set<string> {
+  return new Set(['postmessage', getRedirectUri(event)]);
+}
+
+/**
+ * Validate that a redirect_uri value is in the allowlist for this request.
+ * Returns the validated URI, or throws for unknown values.
+ */
+function validateRedirectUri(
+  redirectUri: string | undefined,
+  event: APIGatewayEvent,
+): string {
+  const normalized = redirectUri?.trim();
+  const resolved = normalized || 'postmessage';
+  if (!getAllowedRedirectUris(event).has(resolved)) {
+    LOGGER.warn('Rejected disallowed redirect_uri', { redirectUri: resolved });
+    throw new Error('Invalid redirect_uri: not in allowlist');
+  }
+  return resolved;
+}
+
+/**
  * Secure Google authentication flow with automatic user provisioning
  * This flow automatically creates new users on their first login
  * Steps:
@@ -287,11 +313,23 @@ export const handleSecureGoogleAuth = async (
         'Authorization code flow detected - exchanging code to get user email',
       );
 
+      // Validate redirect_uri against the allowlist before exchanging the code.
+      // Only 'postmessage' (web GSI flow) and the API Gateway callback URI
+      // (device/CLI flow) are permitted. Reject any other value upfront.
+      let redirectUri: string;
       try {
-        // Use the redirect_uri from the request body if provided (device flow via callback),
-        // otherwise default to 'postmessage' which is what Google Identity Services uses
-        // for popup/iframe code flows (web GSI flow).
-        const redirectUri = body.redirect_uri || 'postmessage';
+        redirectUri = validateRedirectUri(body.redirect_uri, event);
+      } catch {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: 'Invalid redirect_uri',
+            message: 'The redirect_uri is not in the list of allowed values',
+          }),
+        };
+      }
+
+      try {
         const { tokens } = await oauthClient.getToken({
           code: body.code,
           redirect_uri: redirectUri,

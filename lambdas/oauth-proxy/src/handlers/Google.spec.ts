@@ -1,5 +1,9 @@
 import { APIGatewayEvent } from 'aws-lambda';
-import { handleGoogleAuth, handleGoogleRefresh } from './Google';
+import {
+  handleGoogleAuth,
+  handleGoogleRefresh,
+  handleSecureGoogleAuth,
+} from './Google';
 
 // Mock dependencies
 jest.mock('@legacy-sports/logging', () => ({
@@ -300,5 +304,85 @@ describe('handleGoogleRefresh', () => {
     await expect(handleGoogleRefresh(event)).rejects.toThrow(
       'DB connection refused',
     );
+  });
+});
+
+describe('handleSecureGoogleAuth — redirect_uri validation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function makeCodeEvent(
+    overrides: Record<string, unknown> = {},
+  ): APIGatewayEvent & { _credential?: string } {
+    return {
+      ...makeEvent({ code: 'auth-code-123', ...overrides }),
+    };
+  }
+
+  it('defaults to postmessage when redirect_uri is omitted', async () => {
+    const event = makeCodeEvent();
+    const result = await handleSecureGoogleAuth(event);
+    // Should NOT get a 400 "Invalid redirect_uri" — may get another status
+    // if token exchange fails, but the redirect_uri should be accepted.
+    expect(result.statusCode).not.toBe(400);
+  });
+
+  it('defaults to postmessage when redirect_uri is an empty string', async () => {
+    const event = makeCodeEvent({ redirect_uri: '' });
+    const result = await handleSecureGoogleAuth(event);
+    expect(result.statusCode).not.toBe(400);
+  });
+
+  it('accepts postmessage as redirect_uri', async () => {
+    const event = makeCodeEvent({ redirect_uri: 'postmessage' });
+    const result = await handleSecureGoogleAuth(event);
+    expect(result.statusCode).not.toBe(400);
+  });
+
+  it('accepts the API Gateway callback URI', async () => {
+    const event = makeCodeEvent({
+      redirect_uri:
+        'https://test.execute-api.us-east-1.amazonaws.com/dev/oauth/google/callback',
+    });
+    const result = await handleSecureGoogleAuth(event);
+    expect(result.statusCode).not.toBe(400);
+  });
+
+  it('rejects an arbitrary redirect_uri with 400', async () => {
+    const event = makeCodeEvent({
+      redirect_uri: 'https://evil.example.com/steal-token',
+    });
+    const result = await handleSecureGoogleAuth(event);
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body) as { error: string };
+    expect(body.error).toBe('Invalid redirect_uri');
+  });
+
+  it('defaults to postmessage when redirect_uri is whitespace-only', async () => {
+    const event = makeCodeEvent({ redirect_uri: '   ' });
+    const result = await handleSecureGoogleAuth(event);
+    expect(result.statusCode).not.toBe(400);
+  });
+
+  it('rejects a callback URI with a different stage', async () => {
+    const event = makeCodeEvent({
+      redirect_uri:
+        'https://test.execute-api.us-east-1.amazonaws.com/prod/oauth/google/callback',
+    });
+    const result = await handleSecureGoogleAuth(event);
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body) as { error: string };
+    expect(body.error).toBe('Invalid redirect_uri');
+  });
+
+  it('rejects a javascript: scheme redirect_uri', async () => {
+    const event = makeCodeEvent({
+      redirect_uri: 'javascript:alert(document.cookie)',
+    });
+    const result = await handleSecureGoogleAuth(event);
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body) as { error: string };
+    expect(body.error).toBe('Invalid redirect_uri');
   });
 });
