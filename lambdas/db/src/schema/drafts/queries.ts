@@ -286,8 +286,10 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         sqlConditions.length > 0
           ? sql`WHERE ${sql.join(sqlConditions, sql` AND `)}`
           : sql``;
-      const limitVal = sql.raw(String(resultLimit ?? 50));
-      const offsetVal = sql.raw(String(resultOffset ?? 0));
+      // Clamp LIMIT (1–1000) and OFFSET (≥0) to prevent DoS via unbounded queries.
+      // Use plain integers so Drizzle sends them as bind parameters, not raw SQL.
+      const limitVal = Math.min(Math.max(1, resultLimit ?? 50), 1000);
+      const offsetVal = Math.max(0, resultOffset ?? 0);
 
       // ---- Determine ORDER BY strategy ----
       // Scoring column expressions reference the 'cs' alias from compute_career_scores
@@ -407,9 +409,16 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       }
 
       // Scoring sorts: join player_scoring_cache (LS-696 — replaces compute_career_scores)
-      const scoringCol = sql.raw(
-        scoringColMap[orderByKey] ?? scoringColMap['hitterAvgPointsPerGame'],
-      );
+      // Validate orderByKey against the explicit allowlist before calling sql.raw().
+      // sql.raw() is necessary here because column expressions cannot be parameterized,
+      // but the value is always sourced from the hardcoded scoringColMap — never user input.
+      const safeOrderByKey = Object.prototype.hasOwnProperty.call(
+        scoringColMap,
+        orderByKey,
+      )
+        ? orderByKey
+        : 'hitterAvgPointsPerGame';
+      const scoringCol = sql.raw(scoringColMap[safeOrderByKey]);
       const rawQuery = sql`
         ${basePlayerSelectWithScoring}
         ${whereClause}
@@ -726,10 +735,16 @@ builder.queryField('getDraftRecommendations', (t) =>
       // --- Fetch primary position of team's already-drafted players for positional need ---
       const positionCount: Record<string, number> = {};
       if (teamPickedIds.length > 0) {
+        // Parameterize the IN list to prevent injection if teamPickedIds ever
+        // receives non-integer values in future refactors.
+        const pickedIdParams = sql.join(
+          teamPickedIds.map((id) => sql`${id}`),
+          sql`, `,
+        );
         const rosterPositionsResult = await context.db.execute(sql`
           SELECT DISTINCT ON (pep.player_id) pep.player_id, pep.position
           FROM public.player_eligible_positions pep
-          WHERE pep.player_id IN (${sql.raw(teamPickedIds.join(','))})
+          WHERE pep.player_id IN (${pickedIdParams})
           ORDER BY pep.player_id, pep.games DESC
         `);
         for (const row of rosterPositionsResult.rows as {
