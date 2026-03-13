@@ -25,6 +25,10 @@ inputs:
     description: "Include optional dependencies (Storybook, Appium) - set to 'false' to skip for faster CI"
     required: false
     default: "true"
+  validate-lockfile:
+    description: "Reserved for future use: dedicated pre-cache lockfile validation. Currently validation is performed by the always-on pnpm install --frozen-lockfile in the install step."
+    required: false
+    default: "true"
 
 outputs:
   cache-hit:
@@ -109,8 +113,23 @@ runs:
         restore-keys: |
           ${{ runner.os }}-node${{ inputs.node-version }}-${{ runner.arch }}-nm-
 
-    - name: Install Dependencies with pnpm
+    - name: Clear stale node_modules on partial cache restore
       if: inputs.install-dependencies == 'true' && steps.cache-node-modules.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        # When node_modules is restored from a partial cache key (restore-key fallback),
+        # the packages are from a different lockfile version. Letting pnpm reconcile a
+        # stale node_modules triggers JS heap OOM for large package trees (~2GB on a
+        # 2GB default heap). Starting from an empty directory is faster and safer.
+        if [ -d "node_modules" ]; then
+          echo "🧹 Clearing node_modules from partial cache restore (will reinstall from pnpm store)"
+          rm -rf node_modules
+        fi
+
+    - name: Install Dependencies with pnpm
+      if: inputs.install-dependencies == 'true'
+      env:
+        NODE_OPTIONS: "--max-old-space-size=4096"
       shell: bash
       run: |
         echo "Node version: $(node --version)"

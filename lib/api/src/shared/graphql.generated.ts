@@ -803,6 +803,19 @@ export enum LeagueActivityEventType {
   WaiverClaimed = 'waiver_claimed',
 }
 
+/** Comprehensive analytics for a league */
+export type LeagueAnalytics = {
+  __typename?: 'LeagueAnalytics';
+  averagePointsPerMatchup?: Maybe<Scalars['Float']['output']>;
+  currentWeek?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  leagueName?: Maybe<Scalars['String']['output']>;
+  playoffProjections?: Maybe<Array<PlayoffProjection>>;
+  powerRankings?: Maybe<Array<PowerRanking>>;
+  teamStats?: Maybe<Array<TeamStatistics>>;
+  totalTeams?: Maybe<Scalars['Int']['output']>;
+};
+
 /** A message posted to the league-wide chat room */
 export type LeagueChatMessage = {
   __typename?: 'LeagueChatMessage';
@@ -1901,6 +1914,21 @@ export enum PlayoffMatchupStatus {
   Scheduled = 'scheduled',
 }
 
+/** Playoff projection for a team */
+export type PlayoffProjection = {
+  __typename?: 'PlayoffProjection';
+  currentRecord?: Maybe<Scalars['String']['output']>;
+  eliminationNumber?: Maybe<Scalars['Int']['output']>;
+  magicNumber?: Maybe<Scalars['Int']['output']>;
+  playoffProbability?: Maybe<Scalars['Float']['output']>;
+  projectedLosses?: Maybe<Scalars['Float']['output']>;
+  projectedWins?: Maybe<Scalars['Float']['output']>;
+  remainingMatchups?: Maybe<Scalars['Int']['output']>;
+  strengthOfSchedule?: Maybe<Scalars['Float']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+};
+
 /** Playoff qualification status for a team */
 export type PlayoffQualification = {
   __typename?: 'PlayoffQualification';
@@ -1929,6 +1957,17 @@ export type PlayoffSeed = {
   seedNumber?: Maybe<Scalars['Int']['output']>;
   team?: Maybe<Team>;
   teamId?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Power ranking for a team */
+export type PowerRanking = {
+  __typename?: 'PowerRanking';
+  pointDifferential?: Maybe<Scalars['Float']['output']>;
+  powerScore?: Maybe<Scalars['Float']['output']>;
+  rank?: Maybe<Scalars['Int']['output']>;
+  recentFormScore?: Maybe<Scalars['Float']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
 };
 
 export type PrivacyPolicyStatus = {
@@ -1993,6 +2032,7 @@ export type Query = {
   getDraftTeamAutoPickStatuses?: Maybe<Array<DraftTeamAutoPickStatus>>;
   getDraftTeamOrder?: Maybe<Array<DraftTeamOrderEntry>>;
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
+  getLeagueAnalytics?: Maybe<LeagueAnalytics>;
   getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
   getLeagueDraft?: Maybe<Draft>;
   getLeagueMessages?: Maybe<Array<LeagueChatMessage>>;
@@ -2010,12 +2050,14 @@ export type Query = {
   getMyDraftTeamAutoPick?: Maybe<Scalars['Boolean']['output']>;
   getNotificationHistory?: Maybe<Array<NotificationHistoryItem>>;
   getPlayoffBracket?: Maybe<PlayoffBracket>;
+  getPlayoffProjections?: Maybe<Array<PlayoffProjection>>;
   getPlayoffRace?: Maybe<Array<PlayoffQualification>>;
   getPlayoffSeeds?: Maybe<Array<PlayoffSeed>>;
   getPowerRankings?: Maybe<Array<TeamStanding>>;
   getSeasonResults?: Maybe<SeasonResults>;
   getTeamMatchupHistory?: Maybe<Array<Matchup>>;
   getTeamRecentMatchups?: Maybe<Array<Matchup>>;
+  getTeamStatistics?: Maybe<Array<TeamStatistics>>;
   getTiebreakerHistory?: Maybe<Array<TiebreakerHistory>>;
   getTiebreakerRules?: Maybe<TiebreakerRule>;
   getUnreadNotificationCount?: Maybe<Scalars['Int']['output']>;
@@ -2204,6 +2246,10 @@ export type QueryGetHeadToHeadRecordArgs = {
   team2Id: Scalars['Int']['input'];
 };
 
+export type QueryGetLeagueAnalyticsArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
 export type QueryGetLeagueAnnouncementsArgs = {
   leagueId: Scalars['Int']['input'];
 };
@@ -2281,6 +2327,12 @@ export type QueryGetPlayoffBracketArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type QueryGetPlayoffProjectionsArgs = {
+  leagueId: Scalars['Int']['input'];
+  playoffTeams?: InputMaybe<Scalars['Int']['input']>;
+  remainingWeeks?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type QueryGetPlayoffRaceArgs = {
   leagueId: Scalars['Int']['input'];
   playoffSpots: Scalars['Int']['input'];
@@ -2310,6 +2362,12 @@ export type QueryGetTeamMatchupHistoryArgs = {
 export type QueryGetTeamRecentMatchupsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   teamId: Scalars['Int']['input'];
+};
+
+export type QueryGetTeamStatisticsArgs = {
+  endWeek?: InputMaybe<Scalars['Int']['input']>;
+  leagueId: Scalars['Int']['input'];
+  startWeek?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryGetTiebreakerHistoryArgs = {
@@ -2935,6 +2993,24 @@ export type TeamStanding = {
   teamName?: Maybe<Scalars['String']['output']>;
   ties?: Maybe<Scalars['Int']['output']>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
+  winPercentage?: Maybe<Scalars['Float']['output']>;
+  wins?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Statistical analytics for a team */
+export type TeamStatistics = {
+  __typename?: 'TeamStatistics';
+  averagePoints?: Maybe<Scalars['Float']['output']>;
+  currentStreak?: Maybe<Scalars['String']['output']>;
+  currentStreakCount?: Maybe<Scalars['Int']['output']>;
+  longestLoseStreak?: Maybe<Scalars['Int']['output']>;
+  longestWinStreak?: Maybe<Scalars['Int']['output']>;
+  losses?: Maybe<Scalars['Int']['output']>;
+  matchupsPlayed?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+  ties?: Maybe<Scalars['Int']['output']>;
+  totalPoints?: Maybe<Scalars['Float']['output']>;
   winPercentage?: Maybe<Scalars['Float']['output']>;
   wins?: Maybe<Scalars['Int']['output']>;
 };
