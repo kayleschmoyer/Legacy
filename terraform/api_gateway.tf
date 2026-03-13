@@ -78,6 +78,24 @@ resource "aws_api_gateway_stage" "main" {
   tags = local.common_tags
 }
 
+# Stage-level throttle defaults — applied to all REST endpoints (GraphQL, OAuth,
+# Stats, Game Selection, /badge, etc).  Similar approach to websocket.tf but with
+# lower limits (REST 50 rps / 200 burst vs WS 100 rps / 500 burst).
+# For per-IP rate limiting, pair this with an AWS WAF Web ACL (see LS-789).
+# Note: throttling_burst_limit is the token-bucket burst capacity (how many requests
+# can temporarily exceed the steady rate), not a Lambda concurrency limit.
+resource "aws_api_gateway_method_settings" "main" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  stage_name  = aws_api_gateway_stage.main.stage_name
+  # */* applies the settings as defaults for every method/resource in the stage
+  method_path = "*/*"
+
+  settings {
+    throttling_rate_limit  = var.api_gateway_throttle_rate_limit
+    throttling_burst_limit = var.api_gateway_throttle_burst_limit
+  }
+}
+
 # Badge resource — GET /badge routes to GraphQL lambda and returns a shields.io health badge
 resource "aws_api_gateway_resource" "badge" {
   rest_api_id = aws_api_gateway_rest_api.main.id

@@ -141,3 +141,15 @@ variable "stripe_grace_period_days" {
   type        = number
   default     = 7
 }
+
+variable "api_gateway_throttle_rate_limit" {
+  description = "API Gateway REST stage default throttle rate limit in requests per second (steady token-bucket rate; with method_path = \"*/*\" this applies to all REST resources/methods in the stage, including GraphQL, OAuth, Stats, Game Selection, /badge, etc.)"
+  type        = number
+  default     = 50 # 50 req/sec = ~3 000 req/min across all clients
+}
+
+variable "api_gateway_throttle_burst_limit" {
+  description = "API Gateway REST stage default throttle burst limit (token-bucket burst capacity: how many requests can temporarily exceed the steady rate; not a max concurrent in-flight/Lambda concurrency value)"
+  type        = number
+  default     = 200
+}
