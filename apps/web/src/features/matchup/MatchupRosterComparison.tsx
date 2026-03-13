@@ -94,12 +94,7 @@ const SectionTable = styled(YStack, {
 });
 
 // ── Skeleton loading components ─────────────────────────────────────────────
-const skeletonKeyframes = `
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-`;
+// @keyframes skeleton-pulse is declared in apps/web/src/styles.css
 
 const skeletonPulseStyle = {
   animationName: 'skeleton-pulse',
@@ -240,9 +235,6 @@ function SkeletonLoading({
 }) {
   return (
     <RosterCard>
-      {/* Inject keyframes */}
-      <style dangerouslySetInnerHTML={{ __html: skeletonKeyframes }} />
-
       {/* Card Header - real labels */}
       <XStack
         padding="$4"

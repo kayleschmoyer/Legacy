@@ -98,21 +98,18 @@ export function PlayerStatsPage({
       }}
     >
       {/* ── CSS Keyframes ───────────────────────────────────────── */}
-      {}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            @keyframes fadeSlideIn {
-              from { opacity: 0; transform: translateY(8px); }
-              to   { opacity: 1; transform: translateY(0); }
-            }
-            @keyframes glowPulse {
-              0%, 100% { box-shadow: 0 0 8px rgba(196,165,90,0.3); }
-              50%       { box-shadow: 0 0 16px rgba(196,165,90,0.6); }
-            }
-          `,
-        }}
-      />
+      {/* Use text children instead of dangerouslySetInnerHTML — React renders
+          style tag children as textContent (safe), not as innerHTML. */}
+      <style>{`
+        @keyframes playerStats-fadeSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes playerStats-glowPulse {
+          0%, 100% { box-shadow: 0 0 8px rgba(196,165,90,0.3); }
+          50%       { box-shadow: 0 0 16px rgba(196,165,90,0.6); }
+        }
+      `}</style>
 
       {/* ── Glassmorphic Hero Header ────────────────────────────── */}
       {showHeader && (
@@ -201,7 +198,7 @@ export function PlayerStatsPage({
                 background: `rgba(196,165,90,0.1)`,
                 border: `1px solid rgba(196,165,90,0.3)`,
                 borderRadius: 99,
-                animation: 'glowPulse 3s ease-in-out infinite',
+                animation: 'playerStats-glowPulse 3s ease-in-out infinite',
               }}
             >
               <Text
@@ -391,7 +388,9 @@ export function PlayerStatsPage({
             <YStack
               flex={1}
               paddingTop="$4"
-              style={{ animation: 'fadeSlideIn 0.25s ease forwards' }}
+              style={{
+                animation: 'playerStats-fadeSlideIn 0.25s ease forwards',
+              }}
             >
               <PlayerStatsDataGrid
                 title="MLB Career Batting Leaders"
@@ -416,7 +415,9 @@ export function PlayerStatsPage({
             <YStack
               flex={1}
               paddingTop="$4"
-              style={{ animation: 'fadeSlideIn 0.25s ease forwards' }}
+              style={{
+                animation: 'playerStats-fadeSlideIn 0.25s ease forwards',
+              }}
             >
               <PitchingStatsDataGrid
                 title="MLB Career Pitching Leaders"
