@@ -694,17 +694,26 @@ endif
 	@$(call echo_plain,4/9 Type checking...)
 	@pnpm exec nx affected -t typecheck --base=main
 	@$(call echo_plain,5/9 Formatting...)
-	@pnpm exec nx format:write
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -Command "$$changed = git diff --name-only; if ($$changed) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$changed | ForEach-Object { Write-Host ('  ' + $$_) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'Run: make format-commit' -ForegroundColor Cyan; exit 1 }"
+	@powershell -NoProfile -Command "$$preState = git status --porcelain; pnpm exec nx format:write; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = git diff --name-only; if ($$changed) { if ($$preState) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$changed | ForEach-Object { Write-Host ('  ' + $$_) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; auto-amending last commit...' -ForegroundColor Yellow; git add -A; git commit --amend --no-edit; Write-Host '  ✓ Format fixes folded into previous commit.' -ForegroundColor Green } }"
 else
-	@if ! git diff --quiet; then \
-		echo ""; \
-		echo "ERROR: Formatting rewrote the following files:"; \
-		git diff --name-only | sed 's/^/  /'; \
-		echo ""; \
-		echo "Run: make format-commit"; \
-		exit 1; \
+	@pre_state=$$(git status --porcelain); \
+	pnpm exec nx format:write; \
+	changed=$$(git diff --name-only); \
+	if [ -n "$$changed" ]; then \
+		if [ -n "$$pre_state" ]; then \
+			echo ""; \
+			echo "ERROR: Formatting rewrote the following files:"; \
+			git diff --name-only | sed 's/^/  /'; \
+			echo ""; \
+			echo "You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc."; \
+			exit 1; \
+		else \
+			echo "  Formatting changed files; auto-amending last commit..."; \
+			git add -A; \
+			git commit --amend --no-edit; \
+			echo "  ✓ Format fixes folded into previous commit."; \
+		fi; \
 	fi
 endif
 	@$(call echo_plain,6/9 Linting...)

@@ -396,14 +396,15 @@ Always run `make pc` before creating a PR. It catches type errors, lint issues, 
 
 ### ❌ MISTAKE 3b: Ignoring Formatting Failures From `make pc`
 
-`make pc` runs `nx format:write` and then **fails** if any files were reformatted, printing the list.
-Commit the reformatted files and re-run `make pc` before pushing.
+`make pc` runs `nx format:write`. If any files are reformatted and the working tree was **clean** (no staged or unstaged changes before format ran), `make pc` **automatically amends the previous commit** with the format fixes and continues — no manual step required.
+
+If the working tree had **other uncommitted changes** when format ran, `make pc` fails and prints the list of reformatted files. In that case, commit or stash your other changes first, then re-run.
 
 ```powershell
-# WRONG - bypass the failure or push without fixing it
+# WRONG - push when make pc reported a formatting failure
 git push origin HEAD  # ❌ reformatted files never committed — CI will fail!
 
-# CORRECT - commit the reformatted files, then re-run
+# CORRECT (working tree had other changes) — commit/stash first, then re-run
 git add -A
 git commit -m "style: fix code formatting"
 make pc               # ✅ re-run to confirm clean
