@@ -1,5 +1,6 @@
-import * as React from 'react';
 import type { ReactNode } from 'react';
+import { ScrollView as RNScrollView, TextInput } from 'react-native';
+import type { TamaguiElement, TamaguiTextElement } from 'tamagui';
 
 // Core common props that all UI components should support
 export interface BaseUIProps {
@@ -17,9 +18,21 @@ export type SizeValue = number | string;
 export interface LayoutProps extends BaseUIProps {
   flex?: number;
   flexDirection?: 'row' | 'column' | 'row-reverse' | 'column-reverse';
-  justifyContent?: 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly';
+  justifyContent?:
+    | 'flex-start'
+    | 'flex-end'
+    | 'center'
+    | 'space-between'
+    | 'space-around'
+    | 'space-evenly';
   alignItems?: 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
-  alignSelf?: 'auto' | 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
+  alignSelf?:
+    | 'auto'
+    | 'flex-start'
+    | 'flex-end'
+    | 'center'
+    | 'stretch'
+    | 'baseline';
   width?: SizeValue;
   height?: SizeValue;
   minWidth?: SizeValue;
@@ -52,7 +65,18 @@ export interface LayoutProps extends BaseUIProps {
 export interface TextProps extends BaseUIProps {
   color?: string;
   fontSize?: number | string;
-  fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
+  fontWeight?:
+    | 'normal'
+    | 'bold'
+    | '100'
+    | '200'
+    | '300'
+    | '400'
+    | '500'
+    | '600'
+    | '700'
+    | '800'
+    | '900';
   fontFamily?: string;
   lineHeight?: number | string;
   textAlign?: 'left' | 'center' | 'right' | 'justify';
@@ -106,7 +130,11 @@ export interface ViewProps extends BaseUIProps, LayoutProps {
   opacity?: number;
   overflow?: 'visible' | 'hidden' | 'scroll';
   onPress?: () => void;
-  onLayout?: (event: { nativeEvent: { layout: { x: number; y: number; width: number; height: number } } }) => void;
+  onLayout?: (event: {
+    nativeEvent: {
+      layout: { x: number; y: number; width: number; height: number };
+    };
+  }) => void;
 }
 
 // ScrollView props
@@ -179,8 +207,9 @@ export interface UIThemeContextValue {
   setTheme: (theme: 'light' | 'dark') => void;
 }
 
-// Component ref types
-export type ViewRef = React.ElementRef<'div'>;
-export type TextRef = React.ElementRef<'span'>;
-export type ButtonRef = React.ElementRef<'button'>;
-export type InputRef = React.ElementRef<'input'>;
+// Component ref types — use platform-accurate types to avoid `as any` casts
+export type ViewRef = TamaguiElement;
+export type TextRef = TamaguiTextElement;
+export type ButtonRef = TamaguiElement;
+export type InputRef = TextInput;
+export type ScrollViewRef = RNScrollView;

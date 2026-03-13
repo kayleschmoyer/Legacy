@@ -6,6 +6,7 @@ import {
   Separator as TamaguiSeparator,
   Spinner as TamaguiSpinner,
 } from 'tamagui';
+import type { TamaguiElement } from 'tamagui';
 import type { BaseUIProps, ViewProps } from '../types/ui';
 
 // Loading spinner component
@@ -14,7 +15,7 @@ interface SpinnerProps extends BaseUIProps {
   color?: string;
 }
 
-export const Spinner = forwardRef<any, SpinnerProps>(
+export const Spinner = forwardRef<TamaguiElement, SpinnerProps>(
   (
     {
       size = 'small',
@@ -77,7 +78,7 @@ interface SeparatorProps extends BaseUIProps {
   margin?: number | string;
 }
 
-export const Separator = forwardRef<any, SeparatorProps>(
+export const Separator = forwardRef<TamaguiElement, SeparatorProps>(
   (
     {
       orientation = 'horizontal',

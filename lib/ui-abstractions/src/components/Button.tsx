@@ -44,7 +44,7 @@ export const Button = forwardRef<ButtonRef, ButtonProps>(
 
     return (
       <TamaguiButton
-        ref={ref as any}
+        ref={ref}
         variant={tamaguiVariant}
         size={tamaguiSize}
         disabled={disabled || loading}

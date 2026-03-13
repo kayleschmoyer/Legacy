@@ -31,7 +31,7 @@ export const Input = forwardRef<InputRef, InputProps>(
     if (multiline) {
       return (
         <TamaguiTextArea
-          ref={ref as any}
+          ref={ref}
           value={value}
           defaultValue={defaultValue}
           placeholder={placeholder}
@@ -77,7 +77,7 @@ export const Input = forwardRef<InputRef, InputProps>(
 
     return (
       <TamaguiInput
-        ref={ref as any}
+        ref={ref}
         value={value}
         defaultValue={defaultValue}
         placeholder={placeholder}
