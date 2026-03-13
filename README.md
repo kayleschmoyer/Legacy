@@ -119,9 +119,11 @@ For complete security details, see: **[Security Audit Status](docs/security/secu
 git clone https://github.com/bkrupa/legacy-sports.git
 cd legacy-sports
 
-# Install dependencies
+# Install dependencies (also installs git hooks)
 make install
 ```
+
+> **Git hooks:** `make install` automatically installs a pre-push hook that blocks pushes with unformatted code. To fix, run `make format`, commit, and push again. To bypass in an emergency: `git push --no-verify`.
 
 ## 📱 Development
 

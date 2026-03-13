@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# pre-push hook — blocks pushes when code is unformatted.
+# Installed automatically by `make setup-hooks` (called from `make install`).
+#
+# To bypass in an emergency:  git push --no-verify
+
+# Git LFS — always runs, even in docs-only worktrees without node_modules
+command -v git-lfs >/dev/null 2>&1 || { printf >&2 "\nThis repository is configured for Git LFS but 'git-lfs' was not found on your path. If you no longer wish to use Git LFS, remove this hook by deleting the 'pre-push' file in the hooks directory (set by 'core.hookspath'; usually '.git/hooks').\n\n"; exit 2; }
+git lfs pre-push "$@"
+
+# Skip formatting check if node_modules is missing (docs-only worktree without dependencies)
+if [ ! -d "node_modules" ] && [ ! -L "node_modules" ]; then
+  exit 0
+fi
+
+printf "pre-push: checking code formatting...\n"
+pnpm exec nx format:check 2>&1
+status=$?
+if [ $status -ne 0 ]; then
+  printf "\n"
+  printf "ERROR: Code formatting check failed.\n"
+  printf "Run 'make format' to fix, then commit and push again.\n"
+  printf "To bypass: git push --no-verify\n"
+  exit 1
+fi

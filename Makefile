@@ -100,6 +100,7 @@ else
 	pnpm install --frozen-lockfile
 endif
 	@$(CHECK_POETRY)
+	@$(MAKE) setup-hooks
 
 install-force: ## Force install dependencies (handles Windows file locks)
 	@$(call echo_blue,Force installing dependencies...)
@@ -115,6 +116,7 @@ else
 	pnpm install --frozen-lockfile
 endif
 	@$(CHECK_POETRY)
+	@$(MAKE) setup-hooks
 
 install-tools: ## Install additional development tools (npkill, rimraf)
 	@$(call echo_blue,Installing development tools...)
@@ -128,6 +130,7 @@ ifeq ($(DETECTED_OS),Windows)
 else
 	pnpm install --frozen-lockfile
 endif
+	@$(MAKE) setup-hooks
 
 install-python: ## Install only Python dependencies
 	@$(call echo_blue,Installing Python dependencies...)
@@ -145,8 +148,16 @@ setup-force: install-force ## Setup with force install for Windows file lock iss
 wt-setup: ## Set up a worktree (node_modules junction, .env, .twig). Usage: make wt-setup WT=<path>
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -NonInteractive -NoProfile -ExecutionPolicy Bypass -File "$(WORKSPACE_PATH_WIN)\scripts\setup-worktree.ps1" -WorktreePath "$(WT)"
+	@cd "$(WT)" && $(MAKE) setup-hooks
 else
 	@echo "wt-setup is currently Windows-only. Run: make install && cp .env from main repo."
+endif
+
+setup-hooks: ## Install git hooks from .github/hooks/ into .git/hooks/
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -Command "$$hooksDir = (git rev-parse --git-common-dir) + '/hooks'; if (-not (Test-Path $$hooksDir)) { New-Item -ItemType Directory -Path $$hooksDir -Force | Out-Null }; $$src = Get-ChildItem '.github/hooks' -File -ErrorAction SilentlyContinue; if (-not $$src) { exit 0 }; foreach ($$f in $$src) { Copy-Item $$f.FullName (Join-Path $$hooksDir $$f.Name) -Force; Write-Host ('  ✓ ' + $$f.Name + ' hook installed') -ForegroundColor Green }"
+else
+	@hooks_dir=$$(git rev-parse --git-common-dir)/hooks; mkdir -p "$$hooks_dir"; for f in .github/hooks/*; do [ -f "$$f" ] && cp "$$f" "$$hooks_dir/$$(basename $$f)" && chmod +x "$$hooks_dir/$$(basename $$f)" && echo "  ✓ $$(basename $$f) hook installed"; done
 endif
 
 # Cleaning

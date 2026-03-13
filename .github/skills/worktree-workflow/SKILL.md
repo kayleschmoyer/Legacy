@@ -210,6 +210,7 @@ The script (`scripts/setup-worktree.ps1`):
 - **If they differ**: runs `pnpm install --frozen-lockfile` (creates independent `node_modules`)
 - **Copies `.env`** from the main repo (or updates it if stale)
 - **Junctions `.twig`** so twig shares branch-dependency state
+- **Installs git hooks** from `.github/hooks/` into the shared hooks directory (pre-push format check)
 
 > **Why junctions save disk**: With 20+ worktrees and ~1.8 GB per `node_modules`, full copies consume **36+ GB**. Junction-based sharing reduces this to near zero for worktrees whose lockfile matches main.
 
