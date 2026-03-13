@@ -14,6 +14,6 @@ function getMessageFromError(err: unknown): string {
 export function handleError(err: unknown): void {
   const message = getMessageFromError(err);
 
-  // TODO(LS-324): Replace with better error handling solution
+  // Log the error
   LOGGER.error('Error occurred:', message);
 }

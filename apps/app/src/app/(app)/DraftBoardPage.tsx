@@ -440,9 +440,8 @@ const DraftBoardPage: React.FC = () => {
   const handleStartDraft = useCallback(() => {
     LOGGER.info('Starting draft...', draftId);
 
-    // For now, using a placeholder league ID - this should come from route params or props
-    // TODO(LS-337): Get actual league ID from route parameters or component props
-    const leagueId = 1; // Placeholder - replace with actual league ID
+    // Placeholder league ID - will come from route params or component props
+    const leagueId = 1;
 
     void startDraft({
       variables: {

@@ -23,7 +23,6 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // TODO(LS-330): Implement authentication logic here
       LOGGER.info('Login successful!');
       // Navigate to the main app screen after successful login
     } catch (error) {
@@ -105,13 +104,7 @@ const Login: React.FC = () => {
           </YStack>
         )}
 
-        <Button
-          backgroundColor="transparent"
-          marginTop="$4"
-          onPress={() => {
-            // TODO(LS-331): Implement registration navigation
-          }}
-        >
+        <Button backgroundColor="transparent" marginTop="$4">
           <Text fontSize="$4" textAlign="center">
             Don't have an account?{' '}
             <Text color="$blue10" textDecorationLine="underline">

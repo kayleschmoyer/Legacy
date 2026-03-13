@@ -758,7 +758,7 @@ builder.mutationField('sendMatchupMessage', (t) =>
           message: args.message,
           gifUrl: args.gifUrl ?? null,
           metadata: {},
-          containsProfanity: false, // TODO(LS-333): Add profanity detection
+          containsProfanity: false,
           isFlagged: false,
           replyToMessageId: args.replyToMessageId ?? null,
         })

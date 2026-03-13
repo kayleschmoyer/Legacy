@@ -1474,7 +1474,6 @@ async function processDraftMessage(
         await randomlyAssignPlayers(leagueId);
         break;
       case 'standard':
-        // TODO(LS-327): Implement snake/linear draft logic
         throw new Error(
           'Standard (pick-by-pick) draft processing not yet implemented in Lambda',
         );

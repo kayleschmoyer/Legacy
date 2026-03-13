@@ -63,7 +63,9 @@ export default function MatchupDetailScreen() {
   }
 
   const gamesTotal = matchup.gamesPerMatchup ?? 0;
-  const gamesRemaining = 0; // TODO(LS-334): Calculate from selected games
+  // Hardcoded to 0 until the API exposes a gamesCompleted or gamesPlayed
+  // field on the Matchup type — tracked for future GraphQL schema work.
+  const gamesRemaining = 0;
   const gamesCompleted = gamesTotal - gamesRemaining;
 
   return (

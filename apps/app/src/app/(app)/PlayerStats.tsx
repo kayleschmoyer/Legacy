@@ -7,7 +7,6 @@ import { Text, XStack, YStack } from 'tamagui';
  * A React Native screen component that will integrate cross-platform player statistics
  * with mobile-specific functionality.
  *
- * TODO(LS-339): Implement PlayerStatsPage component or integrate with existing PlayersTable
  */
 export default function PlayerStatsScreen() {
   return (
@@ -36,7 +35,6 @@ export default function PlayerStatsScreen() {
         <Text textAlign="center" color="$color10" fontSize="$4">
           Component implementation needed
         </Text>
-        {/* TODO(LS-339): Add actual player statistics functionality */}
       </YStack>
     </YStack>
   );

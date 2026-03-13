@@ -171,11 +171,6 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
 
   const handleUpgrade = async () => {
     // iOS: Platform-aware purchase flow.
-    // TODO(LS-835): When react-native-iap integration merges, replace this with
-    // the native StoreKit purchase flow via useIAP().
-    // For now all platforms fall through to the Stripe-hosted checkout URL which
-    // is opened in the system browser. Deep-link callbacks via legacysports://
-    // scheme return the user to the app after checkout completes.
     if (Platform.OS === 'ios') {
       Alert.alert(
         'Subscribe via App Store',
@@ -256,9 +251,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   };
 
   const handleRestorePurchases = async () => {
-    // TODO(LS-835): When react-native-iap integration merges, call
-    // useIAP().restorePurchases() here for the real StoreKit restore flow.
-    // For now, guide iOS users to the system subscription management screen.
+    // For iOS subscribers, open Apple's subscription management page.
     if (Platform.OS !== 'ios') {
       Alert.alert(
         'Restore Purchases',

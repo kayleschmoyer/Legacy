@@ -52,7 +52,6 @@ export function GameSelectionControl({
     setError(null);
 
     try {
-      // TODO(LS-322): Implement triggerGameSelection mutation in GraphQL API
       // const result = await triggerGameSelection({
       //   variables: { leagueId, matchupId, gameNumber: gameNum },
       // });

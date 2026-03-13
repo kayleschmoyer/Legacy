@@ -7,8 +7,6 @@ import {
   withAlpha,
 } from '../../constants/colors';
 // import { StatsLoadingStatus } from '../../api/db/graphql.generated';
-
-// TODO(LS-53): Placeholder until StatsLoadingStatus is implemented in schema
 enum StatsLoadingStatus {
   NotStarted = 'NOT_STARTED',
   Loading = 'LOADING',

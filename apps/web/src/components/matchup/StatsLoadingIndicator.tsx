@@ -2,8 +2,6 @@ import React from 'react';
 import { Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import { AlertCircle, CheckCircle } from '@tamagui/lucide-icons';
 // import { StatsLoadingStatus } from '../../api/db/graphql.generated';
-
-// TODO(LS-53): Placeholder until StatsLoadingStatus is implemented in schema
 enum StatsLoadingStatus {
   NotStarted = 'NOT_STARTED',
   Loading = 'LOADING',

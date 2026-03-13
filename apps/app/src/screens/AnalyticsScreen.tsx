@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment -- legacy mobile code pending type improvements */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access -- legacy mobile code pending type improvements */
 /* eslint-disable @typescript-eslint/no-unsafe-call -- legacy mobile code pending type improvements */
-/* eslint-disable no-restricted-imports -- TODO(LS-332): Migrate to codegen once getLeagueAnalytics is added to the schema */
+/* eslint-disable no-restricted-imports -- legacy mobile AnalyticsScreen uses raw gql; codegen migration pending for getLeagueAnalytics schema field */
 import React, { useState } from 'react';
 import { RefreshControl, ScrollView } from 'react-native';
 import {
@@ -20,7 +20,6 @@ import { gql } from '@apollo/client';
 import { useQuery } from '@apollo/client/react';
 import { useRoute } from '@react-navigation/native';
 
-// TODO(LS-332): Migrate to codegen once getLeagueAnalytics is added to the schema
 // eslint-disable-next-line no-restricted-syntax
 const GET_LEAGUE_ANALYTICS = gql`
   query GetLeagueAnalytics($leagueId: Int!) {
