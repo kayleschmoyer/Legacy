@@ -400,7 +400,7 @@ jobs:
               "e2e-testing":      "${{ needs.e2e.outputs.result || needs.e2e.result }}"
             }
           workflow-start-time: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
-          failure-threshold: "quality-gates,build-validation"
+          failure-threshold: "quality-gates,build-validation,e2e-testing"
 
       - name: "Deployment Gate"
         id: deployment-gate

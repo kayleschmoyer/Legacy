@@ -7,6 +7,16 @@ import path from 'path';
 export default defineConfig({
   testDir: './src/tests',
 
+  /* Support $env:PLAYWRIGHT_GREP and $env:PLAYWRIGHT_GREP_INVERT so Windows
+   * users can pass grep patterns containing | without CMD interpreting the pipe.
+   * Example: $env:PLAYWRIGHT_GREP='@critical|@smoke' ; pnpm exec nx e2e web-e2e */
+  ...(process.env.PLAYWRIGHT_GREP
+    ? { grep: new RegExp(process.env.PLAYWRIGHT_GREP) }
+    : {}),
+  ...(process.env.PLAYWRIGHT_GREP_INVERT
+    ? { grepInvert: new RegExp(process.env.PLAYWRIGHT_GREP_INVERT) }
+    : {}),
+
   /* Authenticate once via global setup, then share storageState with all tests.
    * CI: signs a JWT using JWT_SECRET env var.
    * Local: uses OAuth device flow (opens browser, caches token). */

@@ -41,7 +41,9 @@ make validate        # Validate package.json and workspace deps
 make test            # Test affected projects
 make test-all        # Test all projects
 make test-watch      # Test in watch mode
-make test-e2e        # End-to-end tests
+make test-e2e        # End-to-end tests (all tags, all browsers)
+# To run CI-equivalent e2e (critical only, exclude @slow):
+pnpm exec nx e2e web-e2e -- --grep='@critical' --grep-invert='@slow'
 ```
 
 ### Building

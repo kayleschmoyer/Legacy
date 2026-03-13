@@ -208,11 +208,18 @@ test.describe('Basic Smoke @smoke', () => {
 | `@regression` | Edge cases, error handling, complex interactions | Runs on merge to main     |
 | `@visual`     | Snapshot / visual regression tests               | Manual trigger or nightly |
 
-CI defaults to `--grep='@critical|@smoke'`. To run all:
+CI defaults to `@critical` (excluding `@slow`). To run all:
 
 ```powershell
-pnpm exec nx e2e web-e2e -- --grep='@critical|@smoke|@regression'
+# IMPORTANT: The pipe `|` in grep patterns is interpreted by Windows CMD
+# (which Nx spawns internally). Always use the $env: variable approach:
+$env:PLAYWRIGHT_GREP='@critical|@smoke|@regression' ; pnpm exec nx e2e web-e2e
 ```
+
+> **Never** pass `--grep='@critical|@smoke'` via `--` args on Windows.
+> CMD interprets `|` as a shell pipe, producing `'smoke' is not recognized`.
+> The `PLAYWRIGHT_GREP` env var is read by `apps/web-e2e/playwright.config.ts`
+> and converted to a `grep` regex — it is not a built-in Playwright env var.
 
 ## Locator Conventions
 
@@ -312,11 +319,17 @@ pnpm exec nx e2e:update-snapshots web-e2e
 # All tests
 pnpm exec nx e2e web-e2e
 
-# Single test file
+# Single test file (no pipe — safe to pass via --)
 pnpm exec nx e2e web-e2e -- --grep='League Detail'
 
-# Specific tag
+# Specific tag (no pipe — safe to pass via --)
 pnpm exec nx e2e web-e2e -- --grep='@critical'
+
+# Multiple tags (pipe in pattern — MUST use env var on Windows)
+$env:PLAYWRIGHT_GREP='@critical|@smoke' ; pnpm exec nx e2e web-e2e
+
+# Chromium only (useful for faster local runs)
+$env:PLAYWRIGHT_GREP='@critical|@smoke' ; pnpm exec nx e2e web-e2e -- --project chromium
 
 # Interactive UI mode
 pnpm exec nx e2e:ui web-e2e
@@ -328,22 +341,72 @@ pnpm exec nx e2e:headed web-e2e
 pnpm exec nx e2e:debug web-e2e
 ```
 
+> **Windows pipe escaping rule:** Any grep pattern containing `|` must be set
+> via `$env:PLAYWRIGHT_GREP` — never passed as a `--grep` CLI argument.
+> CMD (spawned by Node/Nx on Windows) treats `|` as a shell pipe operator.
+> `PLAYWRIGHT_GREP` is read by `apps/web-e2e/playwright.config.ts`, not by Playwright itself.
+
 ## CI Pipeline
 
-E2E tests run in **Stage 4** of the CI pipeline (after quality gates and build validation):
+E2E tests run in **Stage 3** of the CI pipeline (after quality gates and build validation):
 
 1. Pre-built web artifact is downloaded (or falls back to Nx remote cache)
 2. Playwright browsers are installed (cached)
 3. Static file server starts against `dist/apps/web` on port 4200
-4. Tests run with `--grep='@critical|@smoke'` by default
+4. Tests run with `--grep @critical` and `--grep-invert @slow` by default
 5. Results are parsed: passed/failed/success-rate/execution-time
 
 The CI action supports inputs: `test-patterns`, `browser`, `timeout-minutes`, `retry-count`.
 
+**E2E failures block PR merging.** E2E is included in the CI `failure-threshold` alongside quality-gates and build-validation. A failing E2E shard will fail the overall CI pipeline and prevent the PR from landing.
+
+## Pre-Commit: Local E2E Validation (REQUIRED)
+
+When you add, modify, or delete any Playwright test file (`apps/web-e2e/src/**`), page object, fixture, mock, or utility, you **must** run the affected E2E tests locally and confirm they pass **before committing**. This is not optional — E2E failures now block PR merging in CI.
+
+### Steps
+
+1. **Start the dev server** (if not already running):
+
+   ```powershell
+   pnpm exec nx serve web
+   ```
+
+2. **Run the specific test file you changed** (fastest feedback):
+
+   ```powershell
+   pnpm exec nx e2e web-e2e -- --grep='Test Describe Name' --project chromium
+   ```
+
+3. **If you changed shared infrastructure** (fixtures, page objects, mocks, utils), run the full `@critical` suite:
+
+   ```powershell
+   pnpm exec nx e2e web-e2e -- --grep='@critical' --project chromium
+   ```
+
+4. **All tests must pass** before you commit. If a test fails:
+   - Fix the test or the code under test — do not skip or disable the test.
+   - Re-run until green.
+
+> Running with `--project chromium` is sufficient for local validation. CI runs across all browser projects.
+
+### What counts as "changing Playwright tests"
+
+Any edit to files under `apps/web-e2e/src/` — including:
+
+- Test specs (`tests/*.spec.ts`)
+- Fixtures (`fixtures/*.ts`)
+- Page objects (`pages/*.page.ts`)
+- Mocks (`mocks/**/*.ts`)
+- Utilities and support files (`utils/*.ts`, `support/*.ts`)
+- Global setup/teardown (`global-setup.ts`, `global-teardown.ts`)
+
+Also run E2E tests when your changes affect pages tested by existing E2E specs (e.g., editing a web app page component that has a corresponding `*.spec.ts`).
+
 ## Troubleshooting
 
 | Problem                          | Fix                                                            |
-| -------------------------------- | -------------------------------------------------------------- |
+| -------------------------------- | -------------------------------------------------------------- | ------------------------------------ | -------------------------- | ------------------ |
 | Tests timeout on `goto()`        | Ensure `pnpm exec nx serve web` is running on port 4200        |
 | Auth fails locally               | Delete `.auth/token-cache.json` and re-run                     |
 | Snapshots differ on CI vs local  | CI uses Linux Chromium — update snapshots via the GH Action    |
@@ -351,6 +414,7 @@ The CI action supports inputs: `test-patterns`, `browser`, `timeout-minutes`, `r
 | `route.continue()` conflicts     | Use `route.fallback()` instead to allow handler chaining       |
 | Mock never intercepts query      | Check for broad `includes()` match — use quoted operation name |
 | Flaky: some tests pass vacuously | Mock returns `data: null` — use `{ data: { queryName: [] } }`  |
+| `'smoke' is not recognized`      | **Windows pipe bug.** Use `$env:PLAYWRIGHT_GREP='@critical     | @smoke'`instead of`--grep='@critical | @smoke'`. CMD interprets ` | ` as a shell pipe. |
 
 ## Tamagui / Custom Component Pitfalls
 

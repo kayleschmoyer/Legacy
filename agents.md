@@ -21,6 +21,7 @@
 **Never raw `pnpm install`** ΓÇö always use `make install` (or `make install-force`). The Makefile targets acquire a file lock (`.pnpm-install.lock`) that prevents concurrent installs from corrupting the shared `node_modules`. `make wt-setup` also shares this lock.
 Nx only (`pnpm exec nx affected -t <target>`) PowerShell (`;` chains) Fix root causes Update Jira No `console.*` ΓÇö use `LOGGER` from `@legacy-sports/logging` (exceptions: `lib/logging/`, `apps/cli/`, migrations, build scripts)
 **Prefer MCP tools** ΓÇö for Jira and DB operations, prefer the MCP tools (`jira_*`, `db_*`) over CLI commands when available ΓÇö they return structured data and have built-in guardrails. See `.github/skills/mcp-jira/SKILL.md` and `.github/skills/mcp-db/SKILL.md`.
+**Resolve PR review threads** ΓÇö when addressing PR review comments (from Copilot or any reviewer), **always resolve each thread** after pushing the fix. Use the GraphQL `resolveReviewThread` mutation: `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=$threadId`. Fetch thread IDs via GraphQL `reviewThreads` query, filtering for `isResolved: false`. Leaving threads unresolved after fixing them is incomplete work.
 
 ## Environment
 

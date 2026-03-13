@@ -324,11 +324,8 @@ runs:
           echo "result=failure" >> $GITHUB_OUTPUT
           echo "::error::E2E tests failed ($FAILED_TESTS/$TOTAL_TESTS). Critical user functionality may be broken."
           echo "::error::Check Playwright HTML report at apps/web-e2e/playwright-report/index.html"
-          
-          # For now, don't fail the entire CI for E2E failures - make it a warning
-          # This allows teams to gradually improve E2E stability
-          echo "⚠️ E2E failures detected but continuing CI pipeline"
           echo "🔧 To reproduce locally: cd apps/web-e2e && $PLAYWRIGHT_BIN test --ui"
+          exit 1
         fi
 
         echo "::endgroup::"
