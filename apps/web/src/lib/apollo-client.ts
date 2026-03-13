@@ -147,13 +147,35 @@ const errorLink = new ErrorLink(({ error, operation, forward }) => {
   if (!isUnauthenticated && !is401) {
     // Surface uncaught errors to the user via the global ApolloErrorToast.
     if (CombinedGraphQLErrors.is(error) && error.errors.length > 0) {
-      dispatchApolloError(
-        error.errors[0]?.message ?? 'An unexpected error occurred',
+      // PREMIUM_REQUIRED is an expected user-facing condition (free-tier access
+      // attempt on a premium feature). Show the descriptive server message so the
+      // user understands why they were blocked; do NOT report to Rollbar.
+      const premiumError = error.errors.find(
+        (e) =>
+          (e.extensions?.['code'] as string | undefined) === 'PREMIUM_REQUIRED',
       );
+
+      dispatchApolloError(
+        premiumError?.message ??
+          error.errors[0]?.message ??
+          'An unexpected error occurred',
+      );
+
+      if (!premiumError) {
+        // Unexpected server errors are captured explicitly so Rollbar items
+        // include the operation name for easy diagnosis.
+        captureError(
+          error instanceof Error ? error : new Error(String(error)),
+          { context: `apollo:${operation.operationName}` },
+        );
+      }
     } else if (ServerError.is(error)) {
       dispatchApolloError(
         `Server error (${error.statusCode.toString()}): please try again`,
       );
+      captureError(error instanceof Error ? error : new Error(String(error)), {
+        context: `apollo:${operation.operationName}`,
+      });
     } else if (error instanceof Error) {
       // Transient network errors (e.g. "Failed to fetch") surface a
       // user-friendly message instead of the raw TypeError text.
