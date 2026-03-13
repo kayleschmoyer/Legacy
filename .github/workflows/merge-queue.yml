@@ -216,6 +216,11 @@ jobs:
                   
                   if (!isDryRun) {
                     await performMerge(prDetails.data);
+                    // Give GitHub time to recompute mergeable state for remaining PRs
+                    // before continuing the loop — without this, all subsequent PRs
+                    // return mergeable=null and get skipped until the next run.
+                    console.log(`⏳ Waiting 10s for GitHub to recompute mergeability...`);
+                    await new Promise(r => setTimeout(r, 10000));
                   } else {
                     console.log(`🏃 DRY RUN: Would merge PR #${pr.number}`);
                   }
