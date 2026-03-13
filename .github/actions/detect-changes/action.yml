@@ -27,9 +27,9 @@ inputs:
     required: false
     default: "terraform/**"
   core-patterns:
-    description: "File patterns for core library changes (currently fixed in action)"
+    description: "File patterns for universal lib + config changes that trigger full builds (currently fixed in action)"
     required: false
-    default: "lib/**,tools/**,nx.json,tsconfig*.json"
+    default: "lib/logging/**,lib/utils/**,lib/rollbar/**,tools/**,nx.json,tsconfig*.json"
   dependency-patterns:
     description: "File patterns for dependency changes (currently fixed in action)"
     required: false
@@ -230,26 +230,47 @@ runs:
             - apps/web/**
             - lib/shared-components/**
             - lib/tamagui-config/**
+            - lib/websocket-client/**
+            - lib/scoring/**
+            - lib/analytics/**
+            - lib/ui-abstractions/**
           mobile:
             - apps/app/**
             - lib/shared-components/**
             - lib/tamagui-config/**
+            - lib/websocket-client/**
+            - lib/scoring/**
+            - lib/env-utilities/**
           lambdas:
             - lambdas/**
             - lib/api/**
             - lib/db-client/**
+            - lib/aws-utils/**
+            - lib/data-loaders/**
+            - lib/bref-client/**
+            - lib/narrative/**
+            - lib/scheduling/**
+            - lib/env-utilities/**
+            - lib/scoring/**
+            - lib/codegen/**
+            - lib/sentry/**
+            - lib/test-fixtures/**
           terraform:
             - terraform/**
           package-json:
             - package.json
             - package-lock.json
+            - pnpm-lock.yaml
             - apps/*/package.json
             - lib/*/package.json
+            - lambdas/*/package.json
           e2e:
             - apps/web-e2e/**
             - apps/app-e2e/**
           core:
-            - lib/**
+            - lib/logging/**
+            - lib/utils/**
+            - lib/rollbar/**
             - tools/**
             - nx.json
             - tsconfig*.json
@@ -379,10 +400,14 @@ runs:
         echo "### 🎯 Build Strategy" >> $GITHUB_STEP_SUMMARY
         echo "| Component | Status | Action |" >> $GITHUB_STEP_SUMMARY
         echo "|-----------|---------|---------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Web | $([ "$WEB_AFFECTED" = "true" ] && echo "Changed" || echo "Unchanged") | $([ "$WEB_AFFECTED" = "true" ] && echo "Build & Test" || echo "Skip") |" >> $GITHUB_STEP_SUMMARY
-        echo "| Mobile | $([ "$MOBILE_AFFECTED" = "true" ] && echo "Changed" || echo "Unchanged") | $([ "$MOBILE_AFFECTED" = "true" ] && echo "Build & Test" || echo "Skip") |" >> $GITHUB_STEP_SUMMARY
-        echo "| Lambdas | $([ "$LAMBDAS_AFFECTED" = "true" ] && echo "Changed" || echo "Unchanged") | $([ "$LAMBDAS_AFFECTED" = "true" ] && echo "Build & Deploy" || echo "Skip") |" >> $GITHUB_STEP_SUMMARY
-        echo "| Infrastructure | $([ "$TERRAFORM_AFFECTED" = "true" ] && echo "Changed" || echo "Unchanged") | $([ "$TERRAFORM_AFFECTED" = "true" ] && echo "Validate & Plan" || echo "Skip") |" >> $GITHUB_STEP_SUMMARY
+        web_s=$([ "$WEB_AFFECTED" = "true" ] && echo "Changed|Build & Test" || echo "Unchanged|Skip")
+        mob_s=$([ "$MOBILE_AFFECTED" = "true" ] && echo "Changed|Build & Test" || echo "Unchanged|Skip")
+        lam_s=$([ "$LAMBDAS_AFFECTED" = "true" ] && echo "Changed|Build & Deploy" || echo "Unchanged|Skip")
+        tf_s=$([ "$TERRAFORM_AFFECTED" = "true" ] && echo "Changed|Validate & Plan" || echo "Unchanged|Skip")
+        echo "| Web | ${web_s%%|*} | ${web_s#*|} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Mobile | ${mob_s%%|*} | ${mob_s#*|} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Lambdas | ${lam_s%%|*} | ${lam_s#*|} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Infrastructure | ${tf_s%%|*} | ${tf_s#*|} |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
         # Add notes for significant changes

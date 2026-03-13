@@ -211,22 +211,16 @@ jobs:
             ${{
               needs.detect-changes.outputs.requires-full-build == 'true'
               || needs.detect-changes.outputs.web == 'true'
-              || needs.detect-changes.outputs.core == 'true'
-              || needs.detect-changes.outputs.dependencies == 'true'
             }}
           should-build-mobile: >-
             ${{
               needs.detect-changes.outputs.requires-full-build == 'true'
               || needs.detect-changes.outputs.mobile == 'true'
-              || needs.detect-changes.outputs.core == 'true'
-              || needs.detect-changes.outputs.dependencies == 'true'
             }}
           should-build-lambdas: >-
             ${{
               needs.detect-changes.outputs.requires-full-build == 'true'
               || needs.detect-changes.outputs.lambdas == 'true'
-              || needs.detect-changes.outputs.core == 'true'
-              || needs.detect-changes.outputs.dependencies == 'true'
             }}
           should-validate-terraform: ${{ needs.detect-changes.outputs.requires-full-build == 'true' || needs.detect-changes.outputs.terraform == 'true' }}
           execution-mode: "local"
@@ -254,7 +248,7 @@ jobs:
       needs.quality-gates.outputs.result == 'success' &&
       needs.build-validation.result == 'success' &&
       needs.build-validation.outputs.overall-result == 'success' &&
-      (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.e2e == 'true')
+      (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.requires-full-build == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
