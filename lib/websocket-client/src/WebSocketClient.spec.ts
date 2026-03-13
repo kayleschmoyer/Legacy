@@ -746,6 +746,7 @@ describe('WebSocketClient', () => {
 
       client.on('error', (err) => {
         expect(err).toBeInstanceOf(Error);
+        expect(err.message).toBe('WebSocket error');
         client.dispose();
         done();
       });
