@@ -10,30 +10,6 @@ inputs:
     description: "Head reference for change detection"
     required: false
     default: ""
-  web-patterns:
-    description: "File patterns for web project changes (currently fixed in action)"
-    required: false
-    default: "apps/web/**,lib/shared-components/**,lib/tamagui-config/**"
-  mobile-patterns:
-    description: "File patterns for mobile project changes (currently fixed in action)"
-    required: false
-    default: "apps/app/**,lib/shared-components/**,lib/tamagui-config/**"
-  lambdas-patterns:
-    description: "File patterns for lambda changes (currently fixed in action)"
-    required: false
-    default: "lambdas/**,lib/api/**,lib/db-client/**"
-  terraform-patterns:
-    description: "File patterns for infrastructure changes (currently fixed in action)"
-    required: false
-    default: "terraform/**"
-  core-patterns:
-    description: "File patterns for universal lib + config changes that trigger full builds (currently fixed in action)"
-    required: false
-    default: "lib/logging/**,lib/utils/**,lib/rollbar/**,tools/**,nx.json,tsconfig*.json"
-  dependency-patterns:
-    description: "File patterns for dependency changes (currently fixed in action)"
-    required: false
-    default: "package.json,package-lock.json,apps/*/package.json,lib/*/package.json"
   force-full-build:
     description: "Force full build regardless of detected changes (useful for integration builds)"
     required: false
@@ -41,20 +17,17 @@ inputs:
 
 outputs:
   web:
-    description: "Whether web project is affected"
-    value: ${{ steps.detect-changes.outputs.web }}
+    description: "Whether web project is affected (app-code OR lib-code OR config)"
+    value: ${{ steps.analyze.outputs.web }}
   mobile:
-    description: "Whether mobile project is affected"
-    value: ${{ steps.detect-changes.outputs.mobile }}
+    description: "Whether mobile project is affected (app-code OR lib-code OR config)"
+    value: ${{ steps.analyze.outputs.mobile }}
   lambdas:
-    description: "Whether lambda functions are affected"
-    value: ${{ steps.detect-changes.outputs.lambdas }}
+    description: "Whether lambda functions are affected (lambda-code OR lib-code OR config)"
+    value: ${{ steps.analyze.outputs.lambdas }}
   terraform:
     description: "Whether infrastructure is affected"
     value: ${{ steps.detect-changes.outputs.terraform }}
-  core:
-    description: "Whether core libraries are affected"
-    value: ${{ steps.detect-changes.outputs.core }}
   e2e:
     description: "Whether E2E test files are affected"
     value: ${{ steps.detect-changes.outputs.e2e }}
@@ -225,36 +198,22 @@ runs:
       with:
         base: ${{ steps.determine-base.outputs.base-ref }}
         ref: ${{ steps.determine-base.outputs.head-ref }}
+        # Broad source-category filters only. Nx `affected` handles fine-grained
+        # lib→consumer dependency detection inside quality-gates & build jobs,
+        # so we do NOT manually map individual libs to consumers here.
         filters: |
-          web:
+          web-code:
             - apps/web/**
-            - lib/shared-components/**
-            - lib/tamagui-config/**
-            - lib/websocket-client/**
-            - lib/scoring/**
-            - lib/analytics/**
-            - lib/ui-abstractions/**
-          mobile:
+          mobile-code:
             - apps/app/**
-            - lib/shared-components/**
-            - lib/tamagui-config/**
-            - lib/websocket-client/**
-            - lib/scoring/**
-            - lib/env-utilities/**
-          lambdas:
+          lib-code:
+            - lib/**
+          lambda-code:
             - lambdas/**
-            - lib/api/**
-            - lib/db-client/**
-            - lib/aws-utils/**
-            - lib/data-loaders/**
-            - lib/bref-client/**
-            - lib/narrative/**
-            - lib/scheduling/**
-            - lib/env-utilities/**
-            - lib/scoring/**
-            - lib/codegen/**
-            - lib/sentry/**
-            - lib/test-fixtures/**
+          config:
+            - tools/**
+            - nx.json
+            - tsconfig*.json
           terraform:
             - terraform/**
           package-json:
@@ -267,13 +226,6 @@ runs:
           e2e:
             - apps/web-e2e/**
             - apps/app-e2e/**
-          core:
-            - lib/logging/**
-            - lib/utils/**
-            - lib/rollbar/**
-            - tools/**
-            - nx.json
-            - tsconfig*.json
 
     - name: "Analyze Change Impact"
       id: analyze
@@ -281,13 +233,33 @@ runs:
       run: |
         echo "::group::📊 Change Impact Analysis"
 
-        # Collect change detection results
-        WEB_AFFECTED="${{ steps.detect-changes.outputs.web }}"
-        MOBILE_AFFECTED="${{ steps.detect-changes.outputs.mobile }}"
-        LAMBDAS_AFFECTED="${{ steps.detect-changes.outputs.lambdas }}"
+        # Raw paths-filter outputs (broad categories)
+        WEB_CODE="${{ steps.detect-changes.outputs.web-code }}"
+        MOBILE_CODE="${{ steps.detect-changes.outputs.mobile-code }}"
+        LIB_CODE="${{ steps.detect-changes.outputs.lib-code }}"
+        LAMBDA_CODE="${{ steps.detect-changes.outputs.lambda-code }}"
+        CONFIG="${{ steps.detect-changes.outputs.config }}"
         TERRAFORM_AFFECTED="${{ steps.detect-changes.outputs.terraform }}"
-        CORE_AFFECTED="${{ steps.detect-changes.outputs.core }}"
         DEPS_AFFECTED="${{ steps.detect-changes.outputs.package-json }}"
+
+        # Derive per-consumer affected flags.
+        # Any lib change is treated as potentially affecting all consumers;
+        # Nx `affected` handles fine-grained project selection inside each job.
+        WEB_AFFECTED="false"
+        MOBILE_AFFECTED="false"
+        LAMBDAS_AFFECTED="false"
+
+        if [ "$WEB_CODE" = "true" ] || [ "$LIB_CODE" = "true" ] || [ "$CONFIG" = "true" ]; then
+          WEB_AFFECTED="true"
+        fi
+
+        if [ "$MOBILE_CODE" = "true" ] || [ "$LIB_CODE" = "true" ] || [ "$CONFIG" = "true" ]; then
+          MOBILE_AFFECTED="true"
+        fi
+
+        if [ "$LAMBDA_CODE" = "true" ] || [ "$LIB_CODE" = "true" ] || [ "$CONFIG" = "true" ]; then
+          LAMBDAS_AFFECTED="true"
+        fi
 
         # Check for integration build scenarios
         FORCE_FULL_BUILD="${{ inputs.force-full-build }}"
@@ -316,10 +288,9 @@ runs:
         if [ "$IS_INTEGRATION_BUILD" = "true" ]; then
           echo "🚀 Integration build mode: Enabling comprehensive testing"
           WEB_AFFECTED="true"
-          MOBILE_AFFECTED="true"  
+          MOBILE_AFFECTED="true"
           LAMBDAS_AFFECTED="true"
           TERRAFORM_AFFECTED="true"
-          CORE_AFFECTED="true"
           DEPS_AFFECTED="true"
         fi
 
@@ -342,12 +313,12 @@ runs:
           AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["terraform"]')
         fi
 
-        if [ "$CORE_AFFECTED" == "true" ]; then
-          AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["core"]')
-        fi
-
         if [ "$DEPS_AFFECTED" == "true" ]; then
           AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["dependencies"]')
+        fi
+
+        if [ "$CONFIG" == "true" ]; then
+          AFFECTED_COMPONENTS=$(echo "$AFFECTED_COMPONENTS" | jq '. + ["config"]')
         fi
 
         # Determine if full build is required
@@ -355,9 +326,9 @@ runs:
         if [ "$IS_INTEGRATION_BUILD" = "true" ]; then
           REQUIRES_FULL_BUILD="true"
           echo "🚀 Integration build - full build required for comprehensive testing"
-        elif [ "$CORE_AFFECTED" == "true" ] || [ "$DEPS_AFFECTED" == "true" ]; then
+        elif [ "$DEPS_AFFECTED" == "true" ]; then
           REQUIRES_FULL_BUILD="true"
-          echo "⚠️ Core or dependency changes detected - full build required"
+          echo "⚠️ Dependency changes detected - full build required"
         fi
 
         # Generate human-readable summary
@@ -376,6 +347,9 @@ runs:
         fi
 
         # Set outputs
+        echo "web=$WEB_AFFECTED" >> $GITHUB_OUTPUT
+        echo "mobile=$MOBILE_AFFECTED" >> $GITHUB_OUTPUT
+        echo "lambdas=$LAMBDAS_AFFECTED" >> $GITHUB_OUTPUT
         echo "affected-components=$(echo "$AFFECTED_COMPONENTS" | jq -c .)" >> $GITHUB_OUTPUT
         echo "change-summary=$CHANGE_SUMMARY" >> $GITHUB_OUTPUT
         echo "requires-full-build=$REQUIRES_FULL_BUILD" >> $GITHUB_OUTPUT
@@ -392,7 +366,6 @@ runs:
         echo "- **Lambdas**: $([ "$LAMBDAS_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "- **Terraform**: $([ "$TERRAFORM_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "- **E2E Tests**: $([ "${{ steps.detect-changes.outputs.e2e }}" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
-        echo "- **Core Libraries**: $([ "$CORE_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "- **Dependencies**: $([ "$DEPS_AFFECTED" = "true" ] && echo "✅ Affected" || echo "⚪ No changes")" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
@@ -412,7 +385,7 @@ runs:
 
         # Add notes for significant changes
         if [ "$REQUIRES_FULL_BUILD" = "true" ]; then
-          echo "🔴 **Full Build Required**: Core or dependency changes will be rebuilt"
+          echo "🔴 **Full Build Required**: Dependency or integration changes will be rebuilt"
         elif [ "$COMPONENT_COUNT" -gt 0 ]; then
           echo "🟡 **Targeted Build**: Only affected components will have optimized CI execution"
         else
