@@ -77,8 +77,12 @@ async function syncCurrentMatchupPositions(
   for (const m of futureMatchups) {
     for (const teamId of [m.team1Id, m.team2Id]) {
       if (!teamId) continue;
-      if (!matchupIdsByTeam.has(teamId)) matchupIdsByTeam.set(teamId, []);
-      matchupIdsByTeam.get(teamId)!.push(m.id);
+      let teamMatchupIds = matchupIdsByTeam.get(teamId);
+      if (!teamMatchupIds) {
+        teamMatchupIds = [];
+        matchupIdsByTeam.set(teamId, teamMatchupIds);
+      }
+      teamMatchupIds.push(m.id);
     }
   }
 

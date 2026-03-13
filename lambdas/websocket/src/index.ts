@@ -472,17 +472,20 @@ async function getLeagueConnections(
     }),
   );
 
-  return (result.Items ?? [])
-    .filter(
-      (item) =>
-        item.connectionId?.S &&
-        (!excludeConnectionId || item.connectionId.S !== excludeConnectionId),
-    )
-    .map((item) => ({
-      connectionId: item.connectionId.S!,
-      userId: parseInt(item.userId?.N ?? '0', 10),
-      username: item.username?.S ?? '',
-    }));
+  return (result.Items ?? []).flatMap((item) => {
+    const connId = item.connectionId?.S;
+    // Skip items with missing connectionId or the excluded connection
+    if (!connId || (excludeConnectionId && connId === excludeConnectionId)) {
+      return [];
+    }
+    return [
+      {
+        connectionId: connId,
+        userId: parseInt(item.userId?.N ?? '0', 10),
+        username: item.username?.S ?? '',
+      },
+    ];
+  });
 }
 
 /**

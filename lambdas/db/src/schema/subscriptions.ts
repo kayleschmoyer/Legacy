@@ -290,8 +290,8 @@ builder.mutationField('createCheckoutSession', (t) =>
           // Always propagate userId so trial_will_end and other subscription
           // events can correlate back to our user record without a DB lookup.
           metadata: { userId: String(userId) },
-          ...(Number.isInteger(STRIPE_TRIAL_PERIOD_DAYS) &&
-          STRIPE_TRIAL_PERIOD_DAYS! > 0
+          ...(typeof STRIPE_TRIAL_PERIOD_DAYS === 'number' &&
+          STRIPE_TRIAL_PERIOD_DAYS > 0
             ? { trial_period_days: STRIPE_TRIAL_PERIOD_DAYS }
             : {}),
         },

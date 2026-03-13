@@ -912,10 +912,12 @@ builder.mutationField('vetoTrade', (t) =>
 
       const legsByFromTeam = new Map<number, number[]>();
       for (const leg of playerLegs) {
-        if (!legsByFromTeam.has(leg.fromTeamId)) {
-          legsByFromTeam.set(leg.fromTeamId, []);
+        let teamLegs = legsByFromTeam.get(leg.fromTeamId);
+        if (!teamLegs) {
+          teamLegs = [];
+          legsByFromTeam.set(leg.fromTeamId, teamLegs);
         }
-        legsByFromTeam.get(leg.fromTeamId)!.push(leg.playerId);
+        teamLegs.push(leg.playerId);
       }
 
       await Promise.all(

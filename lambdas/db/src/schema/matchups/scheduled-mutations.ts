@@ -223,10 +223,12 @@ builder.mutationField('autoSelectGames', (t) =>
           typeof allActionableMatchups
         >();
         for (const m of allActionableMatchups) {
-          if (!allMatchupsByLeague.has(m.leagueId)) {
-            allMatchupsByLeague.set(m.leagueId, []);
+          let leagueMatchups = allMatchupsByLeague.get(m.leagueId);
+          if (!leagueMatchups) {
+            leagueMatchups = [];
+            allMatchupsByLeague.set(m.leagueId, leagueMatchups);
           }
-          allMatchupsByLeague.get(m.leagueId)!.push(m);
+          leagueMatchups.push(m);
         }
 
         // Resolve the current-week matchups per league (lowest week number)
@@ -611,12 +613,12 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
                 Map<number, number | null>
               >();
               for (const mp of priorMatchupPlayers) {
-                if (!priorPositionsByTeam.has(mp.teamId)) {
-                  priorPositionsByTeam.set(mp.teamId, new Map());
+                let teamPositions = priorPositionsByTeam.get(mp.teamId);
+                if (!teamPositions) {
+                  teamPositions = new Map();
+                  priorPositionsByTeam.set(mp.teamId, teamPositions);
                 }
-                priorPositionsByTeam
-                  .get(mp.teamId)!
-                  .set(mp.playerId, mp.positionId);
+                teamPositions.set(mp.playerId, mp.positionId);
               }
 
               // Bulk-fetch all team members for all playoff teams (one query instead of 2×N)
@@ -650,12 +652,15 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
               >();
               for (const m of allPlayoffTeamMembers) {
                 if (m.teamId === null || m.playerId === null) continue;
-                if (!playoffMembersByTeam.has(m.teamId)) {
-                  playoffMembersByTeam.set(m.teamId, []);
+                let teamMembers = playoffMembersByTeam.get(m.teamId);
+                if (!teamMembers) {
+                  teamMembers = [];
+                  playoffMembersByTeam.set(m.teamId, teamMembers);
                 }
-                playoffMembersByTeam
-                  .get(m.teamId)!
-                  .push({ playerId: m.playerId, positionId: m.positionId });
+                teamMembers.push({
+                  playerId: m.playerId,
+                  positionId: m.positionId,
+                });
               }
 
               let firstMatchupId: number | null = null;

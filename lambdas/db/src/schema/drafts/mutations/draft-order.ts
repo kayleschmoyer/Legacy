@@ -158,6 +158,10 @@ builder.mutationField('setDraftOrder', (t) =>
           ]),
         );
 
+        if (new Set(teamIds).size !== teamIds.length) {
+          throw new Error('teamIds must not contain duplicate values');
+        }
+
         if (teamIds.length !== currentTeamMap.size) {
           throw new Error(
             `Expected ${String(currentTeamMap.size)} team IDs but received ${String(teamIds.length)}`,
@@ -177,7 +181,9 @@ builder.mutationField('setDraftOrder', (t) =>
             .where(eq(PublicSchema.draftTeams.draftId, draftId));
           await tx.insert(PublicSchema.draftTeams).values(
             teamIds.map((teamId, index) => {
-              const meta = currentTeamMap.get(teamId)!;
+              const meta = currentTeamMap.get(teamId);
+              if (!meta)
+                throw new Error(`Team ${String(teamId)} not found in draft`);
               return {
                 draftId,
                 teamId,
