@@ -11,6 +11,12 @@ import { LOGGER } from '@legacy-sports/logging';
 import { extractUserFromEvent, type User } from './context';
 import { createLoaders } from '../schema/dataloaders';
 import { schema } from '../schema';
+import {
+  MAX_QUERY_COMPLEXITY,
+  MAX_QUERY_DEPTH,
+  queryComplexityLimitRule,
+  queryDepthLimitRule,
+} from './graphql-validation-rules';
 
 // Classify client-visible error codes (validation, auth, bad input) that should
 // NOT be reported to Rollbar. Hoisted to module scope to avoid re-allocation.
@@ -30,6 +36,13 @@ export const server = new ApolloServer({
   schema,
   // Enable introspection and playground in development
   introspection: process.env.NODE_ENV !== 'production',
+  // Guard against DoS via deeply-nested or excessively-wide queries.
+  // These run synchronously during the validation phase, before any resolver.
+  // OWASP A05:2021 - Security Misconfiguration
+  validationRules: [
+    queryDepthLimitRule(MAX_QUERY_DEPTH),
+    queryComplexityLimitRule(MAX_QUERY_COMPLEXITY),
+  ],
   plugins: [
     // Enable GraphQL Playground/Studio in non-production environments
     process.env.NODE_ENV !== 'production'
@@ -54,14 +67,24 @@ export const server = new ApolloServer({
     };
 
     if (isClientFacing) {
-      // Client-facing errors are expected — log at warn so they don't reach Rollbar.
       // Omit stack and extensions to reduce log volume and avoid leaking internals.
       const {
         stack: _stack,
         extensions: _ext,
         ...clientErrorContext
       } = errorContext;
-      LOGGER.warn('GraphQL client error', clientErrorContext);
+
+      if (
+        code === 'GRAPHQL_VALIDATION_FAILED' ||
+        code === 'GRAPHQL_PARSE_FAILED'
+      ) {
+        // Validation/parse errors are expected client-input issues (including
+        // depth/complexity rejections) — log at debug to avoid production noise.
+        LOGGER.debug('GraphQL validation error', clientErrorContext);
+      } else {
+        // Auth, permission, not-found — potentially actionable, keep at warn.
+        LOGGER.warn('GraphQL client error', clientErrorContext);
+      }
       return formattedError;
     }
 
