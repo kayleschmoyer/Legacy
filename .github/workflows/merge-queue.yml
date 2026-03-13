@@ -209,18 +209,16 @@ jobs:
                 });
                 
                 // Validate PR state
+                // validatePRForMerge returns the (possibly refreshed) PR object so that
+                // performMerge always uses the same data that was validated, including
+                // the head SHA that will be pinned in the merge API call.
                 const validationResult = await validatePRForMerge(prDetails.data);
                 
                 if (validationResult.canMerge) {
                   console.log(`✅ PR #${pr.number} is ready for merge`);
                   
                   if (!isDryRun) {
-                    await performMerge(prDetails.data);
-                    // Give GitHub time to recompute mergeable state for remaining PRs
-                    // before continuing the loop — without this, all subsequent PRs
-                    // return mergeable=null and get skipped until the next run.
-                    console.log(`⏳ Waiting 10s for GitHub to recompute mergeability...`);
-                    await new Promise(r => setTimeout(r, 10000));
+                    await performMerge(validationResult.pr);
                   } else {
                     console.log(`🏃 DRY RUN: Would merge PR #${pr.number}`);
                   }
@@ -255,13 +253,28 @@ jobs:
                 }
               }
 
-              // Check mergeable state
+              // Check mergeable state — poll if GitHub hasn't computed it yet
+              // (this commonly happens for all PRs immediately after a merge in the same run)
+              if (pr.mergeable === null) {
+                console.log(`⏳ PR #${pr.number}: mergeable=null, polling for up to 60s...`);
+                for (let i = 0; i < 12; i++) {
+                  await new Promise(r => setTimeout(r, 5000));
+                  const refreshed = await github.rest.pulls.get({ owner, repo, pull_number: pr.number });
+                  pr = refreshed.data;
+                  if (pr.mergeable !== null) {
+                    console.log(`✅ PR #${pr.number}: mergeable resolved to ${pr.mergeable} after ${(i + 1) * 5}s`);
+                    break;
+                  }
+                  console.log(`⏳ PR #${pr.number}: still null after ${(i + 1) * 5}s...`);
+                }
+              }
+
               if (pr.mergeable === false) {
                 return { canMerge: false, reason: 'PR has merge conflicts that must be resolved' };
               }
-              
+
               if (pr.mergeable === null) {
-                return { canMerge: false, reason: 'GitHub is still calculating mergeable state, will retry next cycle' };
+                return { canMerge: false, pr, reason: 'GitHub is still calculating mergeable state after 60s, will retry next cycle' };
               }
               
               // Reviews are no longer required - skip review check
@@ -308,7 +321,7 @@ jobs:
                 };
               }
               
-              return { canMerge: true };
+              return { canMerge: true, pr };
             }
 
             async function checkUnresolvedReviewThreads(prNumber) {
@@ -488,7 +501,10 @@ jobs:
                   pull_number: pr.number,
                   merge_method: 'squash',
                   commit_title: sanitize(pr.title + " (#" + pr.number + ")"),
-                  commit_message: sanitize("Merged via automated merge queue\n\n" + (pr.body || ''))
+                  commit_message: sanitize("Merged via automated merge queue\n\n" + (pr.body || '')),
+                  // Pin to the validated SHA — if the branch has advanced since validation,
+                  // GitHub will reject the merge with a 409, preventing merging an unvalidated commit.
+                  sha: pr.head.sha
                 });
                 
                 console.log(`✅ Successfully merged PR #${pr.number}`);
