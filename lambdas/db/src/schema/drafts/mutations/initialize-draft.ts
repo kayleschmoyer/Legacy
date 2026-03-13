@@ -316,11 +316,13 @@ builder.mutationField('initializeDraft', (t) =>
             await sqsService.sendStartDraftMessage(message);
           } catch (sqsError) {
             // Rollback league status if SQS send failed
-            LOGGER.error('SQS send failed, rolling back draft status', {
-              leagueId,
-              error:
-                sqsError instanceof Error ? sqsError.message : String(sqsError),
-            });
+            LOGGER.error(
+              'SQS send failed, rolling back draft status',
+              sqsError instanceof Error
+                ? sqsError
+                : new Error(String(sqsError)),
+              { leagueId },
+            );
             await context.db
               .update(PublicSchema.leagues)
               .set({ draftStatus: 'not-started' })
@@ -344,11 +346,11 @@ builder.mutationField('initializeDraft', (t) =>
 
         return draft;
       } catch (error) {
-        LOGGER.error('Error initializing draft', {
-          leagueId,
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOGGER.error(
+          'Error initializing draft',
+          error instanceof Error ? error : new Error(String(error)),
+          { leagueId, userId },
+        );
         throw error;
       }
     },
