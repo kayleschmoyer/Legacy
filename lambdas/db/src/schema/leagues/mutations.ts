@@ -1690,14 +1690,9 @@ builder.mutationField('joinPublicLeague', (t) =>
         if (error instanceof GraphQLError) {
           throw error;
         }
-        LOGGER.error('Error joining public league', {
-          userId,
-          leagueId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        throw new Error(
-          `Failed to join league: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Error joining public league', err, { userId, leagueId });
+        throw new Error(`Failed to join league: ${err.message}`);
       }
     },
   }),

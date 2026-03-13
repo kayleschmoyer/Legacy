@@ -570,4 +570,45 @@ describe('League Mutations', () => {
       ).rejects.toThrow('Invalid invite code');
     });
   });
+
+  describe('joinPublicLeague mutation', () => {
+    it('should throw UNAUTHENTICATED when no user', async () => {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().joinPublicLeague;
+      if (!field?.resolve) {
+        throw new Error('joinPublicLeague resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { leagueId: 1, teamName: 'My Team' },
+          { user: null, db: mockDb },
+          undefined as never,
+        ),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('should re-throw an Error when a database error occurs', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockRejectedValue(new Error('DB connection failed'));
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().joinPublicLeague;
+      if (!field?.resolve) {
+        throw new Error('joinPublicLeague resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { leagueId: 1, teamName: 'My Team' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('DB connection failed');
+    });
+  });
 });

@@ -9,14 +9,14 @@ import type { GenericDatabase } from '@legacy-sports/db-client';
 import type * as PublicSchema from '@legacy-sports/db-client/src/drizzle/public/schema';
 import { LOGGER } from '@legacy-sports/logging';
 import { extractUserFromEvent, type User } from './context';
-import { createLoaders } from '../schema/dataloaders';
-import { schema } from '../schema';
 import {
   MAX_QUERY_COMPLEXITY,
   MAX_QUERY_DEPTH,
   queryComplexityLimitRule,
   queryDepthLimitRule,
 } from './graphql-validation-rules';
+import { createLoaders } from '../schema/dataloaders';
+import { schema } from '../schema';
 
 // Classify client-visible error codes (validation, auth, bad input) that should
 // NOT be reported to Rollbar. Hoisted to module scope to avoid re-allocation.
