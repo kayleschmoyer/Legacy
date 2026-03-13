@@ -50,10 +50,8 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log via the shared logger (which may forward to Rollbar) — pass Error first
-    // so Rollbar captures the real stack trace; include componentStack as context
-    // rather than a separate LOGGER.error call (which would create a synthetic
-    // "Error: Component stack:" Rollbar item with no useful stack).
+    // Log the error with component stack as context so Rollbar captures one
+    // item with the real Error (not a synthetic "Error: Component stack:" item).
     LOGGER.error('Error Boundary caught an error', error, {
       componentStack: errorInfo.componentStack,
     });
