@@ -35,16 +35,59 @@ const tamaguiPropWarnings = [
   'rowGap',
   'columnGap',
   'cursor',
+  'marginBottom',
+  'marginTop',
+  'marginLeft',
+  'marginRight',
+  'paddingBottom',
+  'paddingTop',
+  'paddingLeft',
+  'paddingRight',
+  'userSelect',
+  'pointerEvents',
 ];
 
 beforeAll(() => {
   console.error = (...args: any[]) => {
     const firstArg = args[0];
     if (typeof firstArg === 'string') {
-      // Skip Tamagui-related React DOM warnings
+      // Skip Tamagui-related React DOM warnings.
+      // React passes prop name as args[1] with a printf-style %s placeholder in
+      // args[0], so check both the message format and the prop name argument.
+      if (firstArg.includes('React does not recognize')) {
+        const propName = typeof args[1] === 'string' ? args[1] : '';
+        if (
+          tamaguiPropWarnings.includes(propName) ||
+          tamaguiPropWarnings.some((prop) => firstArg.includes(`\`${prop}\``))
+        ) {
+          return;
+        }
+      }
+      // Skip "If you want to write it to the DOM, pass a string instead" warnings
+      // for boolean Tamagui props (e.g. active, disabled, checked) — only suppress
+      // when the prop name starts with '$' or is a known Tamagui prop.
+      if (firstArg.includes('pass a string instead')) {
+        const propName = typeof args[1] === 'string' ? args[1] : '';
+        if (
+          propName.startsWith('$') ||
+          tamaguiPropWarnings.includes(propName)
+        ) {
+          return;
+        }
+      }
+      // Skip Tamagui $ media query prop warnings (e.g. $gtMd, $sm)
       if (
         firstArg.includes('React does not recognize') &&
-        tamaguiPropWarnings.some((prop) => firstArg.includes(`\`${prop}\``))
+        typeof args[1] === 'string' &&
+        args[1].startsWith('$')
+      ) {
+        return;
+      }
+      // Skip "Invalid attribute name: `$gtMd`" warnings from Tamagui media props
+      if (
+        firstArg.includes('Invalid attribute name') &&
+        typeof args[1] === 'string' &&
+        args[1].startsWith('$')
       ) {
         return;
       }
