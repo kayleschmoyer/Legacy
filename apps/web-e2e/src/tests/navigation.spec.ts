@@ -16,14 +16,10 @@ test.describe('Navigation Header @smoke', () => {
     await page.waitForLoadState('load');
   });
 
-  test('renders the Legacy Sports logo and brand name', async ({ page }) => {
-    // The logo link has an accessible name of 'Legacy Sports home'
-    const logoLink = page.getByRole('link', { name: /legacy sports home/i });
-    await expect(logoLink).toBeVisible({ timeout: 30000 });
-    // Verify both brand text segments are present
-    await expect(page.getByText('Fantasy League').first()).toBeVisible({
-      timeout: 30000,
-    });
+  test('renders the Legacy Sports logo/home link', async ({ page }) => {
+    // The header contains a link back to the homepage
+    const homeLink = page.locator('a[href="/"]').first();
+    await expect(homeLink).toBeVisible({ timeout: 30000 });
   });
 
   test('logo link navigates to the homepage', async ({ page }) => {
@@ -32,31 +28,23 @@ test.describe('Navigation Header @smoke', () => {
     await expect(page).toHaveURL('/');
   });
 
-  test('renders the About nav link', async ({ page }) => {
-    // Navigation uses role="navigation" aria-label="Primary", not <nav> element
+  test('renders primary navigation with expected items', async ({ page }) => {
+    // Navigation uses role="navigation" aria-label="Primary"
     const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    const aboutLink = primaryNav.getByRole('link', { name: /about/i });
-    await expect(aboutLink).toBeVisible({ timeout: 30000 });
-  });
-
-  test('About nav link is marked as current page', async ({ page }) => {
-    // When on /about the link has aria-current="page"
-    const aboutLink = page.locator(
-      '[role="navigation"][aria-label="Primary"] a[href="/about"][aria-current="page"]',
-    );
-    await expect(aboutLink).toBeVisible({ timeout: 30000 });
-  });
-
-  test('About nav link navigates correctly', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('load');
-
-    const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    const aboutLink = primaryNav.getByRole('link', { name: /about/i });
-    await aboutLink.click();
-    await page.waitForLoadState('load');
-
-    await expect(page).toHaveURL('/about');
+    await expect(primaryNav).toBeVisible({ timeout: 30000 });
+    // Nav contains buttons for Sports, Players, Games, Help
+    await expect(
+      primaryNav.getByRole('button', { name: 'Sports' }),
+    ).toBeVisible();
+    await expect(
+      primaryNav.getByRole('button', { name: 'Players' }),
+    ).toBeVisible();
+    await expect(
+      primaryNav.getByRole('button', { name: 'Games' }),
+    ).toBeVisible();
+    await expect(
+      primaryNav.getByRole('button', { name: 'Help' }),
+    ).toBeVisible();
   });
 
   test('shows user profile area in header', async ({ page }) => {

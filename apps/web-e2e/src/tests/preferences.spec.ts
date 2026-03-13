@@ -54,9 +54,7 @@ test.describe('Preferences Page @smoke', () => {
 
   test('should display Appearance section', async ({ page }) => {
     await page.goto('/preferences');
-    await expect(
-      page.getByRole('heading', { name: 'Appearance' }),
-    ).toBeVisible();
+    await expect(page.getByText('Appearance', { exact: true })).toBeVisible();
     await expect(
       page.getByText('Display theme and visual settings', { exact: true }),
     ).toBeVisible();
@@ -87,7 +85,7 @@ test.describe('Preferences Page @smoke', () => {
   test('should display Sports & Stats section', async ({ page }) => {
     await page.goto('/preferences');
     await expect(
-      page.getByRole('heading', { name: 'Sports & Stats' }),
+      page.getByText('Sports & Stats', { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByText('Default view and statistics display preferences', {

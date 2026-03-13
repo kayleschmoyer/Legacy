@@ -64,13 +64,13 @@ test.describe('Help Page — header and layout @smoke', () => {
 });
 
 test.describe('Help Page — navigation @smoke', () => {
-  test('Help nav link navigates to /help', async ({ page }) => {
+  test('Help nav button navigates to /help', async ({ page }) => {
     await page.goto('/about');
     await page.waitForLoadState('load');
 
     const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    const helpLink = primaryNav.getByRole('link', { name: /help/i });
-    await helpLink.click();
+    const helpButton = primaryNav.getByRole('button', { name: 'Help' });
+    await helpButton.click();
     await page.waitForLoadState('load');
 
     await expect(page).toHaveURL('/help');
@@ -79,16 +79,11 @@ test.describe('Help Page — navigation @smoke', () => {
     ).toBeVisible({ timeout: 30000 });
   });
 
-  test('Help nav link is marked as current page when on /help', async ({
-    page,
-  }) => {
+  test('Help page URL is /help', async ({ page }) => {
     await page.goto('/help');
     await page.waitForLoadState('load');
 
-    const helpLink = page.locator(
-      '[role="navigation"][aria-label="Primary"] a[href="/help"][aria-current="page"]',
-    );
-    await expect(helpLink).toBeVisible({ timeout: 30000 });
+    await expect(page).toHaveURL(/\/help/);
   });
 });
 

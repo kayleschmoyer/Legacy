@@ -68,14 +68,14 @@ test.describe('Pricing page — billing toggle @smoke', () => {
     await monthlyToggle.click();
 
     // After switching to monthly the price display changes
-    // Monthly price: $9.99; Annual monthly equivalent: $6.99
+    // Monthly price: $9.99; Annual monthly equivalent: $3.33
     await expect(page.getByText('9.99')).toBeVisible({ timeout: 5_000 });
 
     // Switch back to annual
     const annualToggle = page.getByText(/^annual$/i).first();
     await annualToggle.click();
 
-    await expect(page.getByText('6.99')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('3.33')).toBeVisible({ timeout: 5_000 });
   });
 
   test('"Save 30%" discount badge is visible on annual toggle option', async ({

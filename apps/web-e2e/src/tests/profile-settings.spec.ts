@@ -104,7 +104,9 @@ test.describe('Profile Settings Page @smoke', () => {
     await page.goto('/profile/settings');
 
     // Profile section heading
-    await expect(page.getByText('Profile')).toBeVisible();
+    await expect(
+      page.getByText('Profile', { exact: true }).first(),
+    ).toBeVisible();
     await expect(
       page.getByText('Your public identity on Legacy Sports'),
     ).toBeVisible();
@@ -168,8 +170,12 @@ test.describe('Profile Settings Page @smoke', () => {
     await setupProfileGraphQL(page);
     await page.goto('/profile/settings');
 
-    await expect(page.getByText('Session')).toBeVisible();
-    await expect(page.getByText('Active')).toBeVisible();
+    await expect(
+      page.getByText('Session', { exact: true }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Active', { exact: true }).first(),
+    ).toBeVisible();
   });
 
   test('should display Sign Out button', async ({ page }) => {
