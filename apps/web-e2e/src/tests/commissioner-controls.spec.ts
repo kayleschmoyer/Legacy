@@ -347,7 +347,7 @@ test.describe('Commissioner Tab — navigation @smoke', () => {
 
     await expect(
       page.getByText('Commissioner', { exact: false }).first(),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows the league name on the commissioner page', async ({ page }) => {
@@ -357,7 +357,7 @@ test.describe('Commissioner Tab — navigation @smoke', () => {
 
     await expect(
       page.getByText('Test Commissioner League', { exact: false }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 });
 
@@ -375,7 +375,7 @@ test.describe('Commissioner Tab — non-commissioner access @regression', () => 
     // Wait for tabs to render
     await expect(
       page.getByText('Overview', { exact: false }).first(),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
 
     // The Commissioner tab should not be present for non-commissioners
     const commissionerTabs = page.getByRole('button', {
@@ -407,7 +407,7 @@ test.describe('Next Step — game selection state @critical', () => {
 
     await expect(
       page.getByRole('button', { name: /select game 1/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows "Select Game 3 of 5" when 2 games are already selected', async ({
@@ -429,7 +429,7 @@ test.describe('Next Step — game selection state @critical', () => {
 
     await expect(
       page.getByRole('button', { name: /select game 3/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('game selection button opens a confirmation dialog', async ({
@@ -450,13 +450,11 @@ test.describe('Next Step — game selection state @critical', () => {
     await page.waitForLoadState('load');
 
     const selectBtn = page.getByRole('button', { name: /select game 1/i });
-    await expect(selectBtn).toBeVisible({ timeout: 30000 });
+    await expect(selectBtn).toBeVisible();
     await selectBtn.click();
 
     // Confirmation dialog should appear
-    await expect(page.getByText(/select game 1/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/select game 1/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /confirm/i })).toBeVisible();
   });
 
@@ -476,7 +474,7 @@ test.describe('Next Step — game selection state @critical', () => {
     await page.waitForLoadState('load');
 
     const selectBtn = page.getByRole('button', { name: /select game 1/i });
-    await expect(selectBtn).toBeVisible({ timeout: 30000 });
+    await expect(selectBtn).toBeVisible();
     await selectBtn.click();
 
     // Cancel the dialog
@@ -486,7 +484,7 @@ test.describe('Next Step — game selection state @critical', () => {
       .click();
 
     // Dialog should close; the select button should still be visible
-    await expect(selectBtn).toBeVisible({ timeout: 10000 });
+    await expect(selectBtn).toBeVisible();
   });
 
   test('confirms game selection and calls autoSelectGames mutation', async ({
@@ -513,7 +511,7 @@ test.describe('Next Step — game selection state @critical', () => {
     await page.waitForLoadState('load');
 
     const selectBtn = page.getByRole('button', { name: /select game 1/i });
-    await expect(selectBtn).toBeVisible({ timeout: 30000 });
+    await expect(selectBtn).toBeVisible();
     await selectBtn.click();
 
     await page.getByRole('button', { name: /confirm/i }).click();
@@ -545,7 +543,7 @@ test.describe('Next Step — matchup advancement state @critical', () => {
 
     await expect(
       page.getByRole('button', { name: /advance league week/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('advance button opens a confirmation dialog with week info', async ({
@@ -568,11 +566,11 @@ test.describe('Next Step — matchup advancement state @critical', () => {
     const advanceBtn = page.getByRole('button', {
       name: /advance league week/i,
     });
-    await expect(advanceBtn).toBeVisible({ timeout: 30000 });
+    await expect(advanceBtn).toBeVisible();
     await advanceBtn.click();
 
     // Confirmation dialog should appear with week numbers
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('button', { name: /confirm/i })).toBeVisible();
   });
 
@@ -602,7 +600,7 @@ test.describe('Next Step — matchup advancement state @critical', () => {
     const advanceBtn = page.getByRole('button', {
       name: /advance league week/i,
     });
-    await expect(advanceBtn).toBeVisible({ timeout: 30000 });
+    await expect(advanceBtn).toBeVisible();
     await advanceBtn.click();
 
     await page.getByRole('button', { name: /confirm/i }).click();
@@ -625,7 +623,7 @@ test.describe('Next Step — pre-season states @critical', () => {
 
     await expect(
       page.getByRole('button', { name: /start draft/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows "Create Week 1 Matchups" when draft is complete but no matchups exist', async ({
@@ -641,7 +639,7 @@ test.describe('Next Step — pre-season states @critical', () => {
 
     await expect(
       page.getByRole('button', { name: /create week 1 matchups/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 });
 
@@ -660,13 +658,13 @@ test.describe('Waiver Processing — commissioner control @critical', () => {
   test('shows "Waiver Processing" section heading', async ({ page }) => {
     await expect(
       page.getByText('Waiver Processing', { exact: false }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows "Process Waivers Now" button', async ({ page }) => {
     await expect(
       page.getByRole('button', { name: /process waivers now/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('"Process Waivers Now" opens a confirmation dialog', async ({
@@ -675,13 +673,11 @@ test.describe('Waiver Processing — commissioner control @critical', () => {
     const processBtn = page.getByRole('button', {
       name: /process waivers now/i,
     });
-    await expect(processBtn).toBeVisible({ timeout: 30000 });
+    await expect(processBtn).toBeVisible();
     await processBtn.click();
 
     // Confirmation dialog should appear
-    await expect(page.getByText('Process Waivers')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Process Waivers')).toBeVisible();
     await expect(page.getByRole('button', { name: /confirm/i })).toBeVisible();
   });
 
@@ -690,20 +686,18 @@ test.describe('Waiver Processing — commissioner control @critical', () => {
 
     await expect(
       page.getByText(/process all pending waiver claims/i),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('cancel button closes the waiver confirm dialog', async ({ page }) => {
     const processBtn = page.getByRole('button', {
       name: /process waivers now/i,
     });
-    await expect(processBtn).toBeVisible({ timeout: 30000 });
+    await expect(processBtn).toBeVisible();
     await processBtn.click();
 
     // Dialog is open
-    await expect(page.getByText('Process Waivers')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Process Waivers')).toBeVisible();
 
     // Cancel closes it
     await page
@@ -712,7 +706,7 @@ test.describe('Waiver Processing — commissioner control @critical', () => {
       .click();
 
     // "Process Waivers Now" button should be visible again
-    await expect(processBtn).toBeVisible({ timeout: 10000 });
+    await expect(processBtn).toBeVisible();
   });
 });
 
@@ -736,7 +730,7 @@ test.describe('Waiver Processing — confirm mutation @regression', () => {
     const processBtn = page.getByRole('button', {
       name: /process waivers now/i,
     });
-    await expect(processBtn).toBeVisible({ timeout: 30000 });
+    await expect(processBtn).toBeVisible();
     await processBtn.click();
 
     await page.getByRole('button', { name: /confirm/i }).click();

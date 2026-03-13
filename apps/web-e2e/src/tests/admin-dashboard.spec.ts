@@ -140,21 +140,19 @@ adminTest.describe('Admin Dashboard – page structure @smoke', () => {
   });
 
   adminTest('shows Admin Console heading', async ({ page }) => {
-    await expect(page.getByText('Admin Console')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Admin Console')).toBeVisible();
   });
 
   adminTest('shows admin dashboard description', async ({ page }) => {
     await expect(
       page.getByText(/manage users and impersonate accounts/i),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 
   adminTest('shows Revenue Analytics link', async ({ page }) => {
     await expect(
       page.getByRole('link', { name: /revenue analytics/i }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 });
 
@@ -168,15 +166,13 @@ adminTest.describe('Admin Dashboard – users section @critical', () => {
     await page.goto('/admin');
     await page.waitForLoadState('load');
     // Wait for users to load
-    await expect(page.getByText('alice@example.com')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('alice@example.com')).toBeVisible();
   });
 
   adminTest('shows Users section with user count badge', async ({ page }) => {
-    await expect(page.getByText('Users')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Users')).toBeVisible();
     // Badge shows number of users (3 in mock)
-    await expect(page.getByText('3')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('3')).toBeVisible();
   });
 
   adminTest('shows user email addresses', async ({ page }) => {
@@ -185,14 +181,14 @@ adminTest.describe('Admin Dashboard – users section @critical', () => {
   });
 
   adminTest('shows user usernames', async ({ page }) => {
-    await expect(page.getByText('alice')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('bob')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('alice')).toBeVisible();
+    await expect(page.getByText('bob')).toBeVisible();
   });
 
   adminTest('shows search input for filtering users', async ({ page }) => {
     await expect(
       page.getByPlaceholder(/search by name, email, or id/i),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 });
 
@@ -205,9 +201,7 @@ adminTest.describe('Admin Dashboard – user search @critical', () => {
     await mockAdminGraphQL(page);
     await page.goto('/admin');
     await page.waitForLoadState('load');
-    await expect(page.getByText('alice@example.com')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('alice@example.com')).toBeVisible();
   });
 
   adminTest(
@@ -218,9 +212,7 @@ adminTest.describe('Admin Dashboard – user search @critical', () => {
       );
       await searchInput.fill('alice');
 
-      await expect(page.getByText('alice@example.com')).toBeVisible({
-        timeout: 5000,
-      });
+      await expect(page.getByText('alice@example.com')).toBeVisible();
       await expect(page.getByText('bob@example.com')).not.toBeVisible();
     },
   );
@@ -233,9 +225,7 @@ adminTest.describe('Admin Dashboard – user search @critical', () => {
       );
       await searchInput.fill('nonexistentuser99999');
 
-      await expect(page.getByText(/no users found/i)).toBeVisible({
-        timeout: 5000,
-      });
+      await expect(page.getByText(/no users found/i)).toBeVisible();
     },
   );
 
@@ -245,9 +235,7 @@ adminTest.describe('Admin Dashboard – user search @critical', () => {
     await expect(page.getByText('bob@example.com')).not.toBeVisible();
 
     await searchInput.clear();
-    await expect(page.getByText('bob@example.com')).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByText('bob@example.com')).toBeVisible();
   });
 });
 
@@ -260,9 +248,7 @@ adminTest.describe('Admin Dashboard – JWT decoder @regression', () => {
     await mockAdminGraphQL(page);
     await page.goto('/admin');
     await page.waitForLoadState('load');
-    await expect(page.getByText('Admin Console')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Admin Console')).toBeVisible();
   });
 
   adminTest('shows JWT decoder UI', async ({ page }) => {
@@ -270,12 +256,12 @@ adminTest.describe('Admin Dashboard – JWT decoder @regression', () => {
     const jwtDecoderSectionToggle = page.getByRole('button', {
       name: /jwt decoder/i,
     });
-    await expect(jwtDecoderSectionToggle).toBeVisible({ timeout: 10000 });
+    await expect(jwtDecoderSectionToggle).toBeVisible();
     await jwtDecoderSectionToggle.click();
 
     // After expanding, the Decode button should be visible
     const decodeButton = page.getByRole('button', { name: /decode/i });
-    await expect(decodeButton).toBeVisible({ timeout: 10000 });
+    await expect(decodeButton).toBeVisible();
   });
 });
 

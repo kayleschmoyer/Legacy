@@ -175,13 +175,13 @@ test.describe('Matchup Detail – page structure @smoke', () => {
   test('shows Matchup Details heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /matchup details/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows Back to League button', async ({ page }) => {
     await expect(
       page.getByRole('button', { name: /back to league/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('clicking Back to League navigates back', async ({ page }) => {
@@ -203,22 +203,20 @@ test.describe('Matchup Detail – scoreboard @critical', () => {
   });
 
   test('does not show loading spinner after data loads', async ({ page }) => {
-    await expect(page.getByText('Loading matchup details...')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading matchup details...'),
+    ).not.toBeVisible();
   });
 
   test('does not show not-found state', async ({ page }) => {
-    await expect(page.getByText('Matchup not found')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Matchup not found')).not.toBeVisible();
   });
 
   test('renders main matchup content area', async ({ page }) => {
     // The main content area has role="main" aria-label="Matchup details"
     await expect(
       page.locator('[role="main"][aria-label="Matchup details"]'),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 });
 
@@ -262,9 +260,7 @@ test.describe('Matchup Detail – loading state @regression', () => {
 
     await page.goto(MATCHUP_URL, { waitUntil: 'commit' });
 
-    await expect(page.getByText('Loading matchup details...')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Loading matchup details...')).toBeVisible();
 
     // Release the gate so the page can finish loading and cleanup
     resolveMatchup!();
@@ -310,6 +306,6 @@ test.describe('Matchup Detail – error state @regression', () => {
     const errorOrNotFound = page
       .getByText(/error loading matchup|matchup not found/i)
       .first();
-    await expect(errorOrNotFound).toBeVisible({ timeout: 15000 });
+    await expect(errorOrNotFound).toBeVisible();
   });
 });

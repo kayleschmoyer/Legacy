@@ -22,7 +22,7 @@ test.describe('Bug Report Button @smoke', () => {
 
   test('bug report button is visible in the header', async ({ page }) => {
     const bugButton = page.getByRole('button', { name: /report a bug/i });
-    await expect(bugButton).toBeVisible({ timeout: 30000 });
+    await expect(bugButton).toBeVisible();
   });
 
   test('clicking the button opens the Report a Bug dialog', async ({
@@ -32,7 +32,7 @@ test.describe('Bug Report Button @smoke', () => {
 
     await expect(
       page.getByRole('dialog').getByText('Report a Bug'),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     await expect(page.getByText(/describe what happened/i)).toBeVisible();
   });
@@ -43,7 +43,7 @@ test.describe('Bug Report Button @smoke', () => {
     await page.getByRole('button', { name: /report a bug/i }).click();
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
     await expect(
       dialog.getByRole('textbox', { name: /bug description/i }),
@@ -61,7 +61,7 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
     await page.getByRole('button', { name: /report a bug/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('dialog')).toBeVisible();
   });
 
   test('Submit button is disabled when description is empty', async ({
@@ -118,13 +118,13 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
 
     await page.getByRole('button', { name: /cancel/i }).click();
 
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('dialog')).not.toBeVisible();
     expect(postCalled).toBe(false);
   });
 
   test('Close (✕) button closes the dialog', async ({ page }) => {
     await page.getByRole('button', { name: /close/i }).first().click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
   test('form resets to blank after closing and reopening the dialog', async ({
@@ -135,11 +135,11 @@ test.describe('Bug Report Dialog Interactions @regression', () => {
 
     // Close via Cancel
     await page.getByRole('button', { name: /cancel/i }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('dialog')).not.toBeVisible();
 
     // Reopen
     await page.getByRole('button', { name: /report a bug/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('dialog')).toBeVisible();
 
     // Textarea should be empty again
     await expect(
@@ -153,7 +153,7 @@ test.describe('Bug Report Submission @regression', () => {
     await page.goto('/about');
     await page.waitForLoadState('load');
     await page.getByRole('button', { name: /report a bug/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('dialog')).toBeVisible();
   });
 
   test('successful submission shows confirmation with the created issue key', async ({
@@ -175,9 +175,7 @@ test.describe('Bug Report Submission @regression', () => {
     await page.getByRole('button', { name: /submit report/i }).click();
 
     // Show loading text briefly, then success
-    await expect(page.getByText('Thanks! Created LS-999.')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Thanks! Created LS-999.')).toBeVisible();
 
     // Success checkmark should be visible
     await expect(page.getByRole('img', { name: /success/i })).toBeVisible();
@@ -199,9 +197,7 @@ test.describe('Bug Report Submission @regression', () => {
 
     await page.getByRole('button', { name: /submit report/i }).click();
 
-    await expect(page.getByText('Thanks for the report!')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Thanks for the report!')).toBeVisible();
   });
 
   test('submission shows loading state while waiting for response', async ({
@@ -227,14 +223,12 @@ test.describe('Bug Report Submission @regression', () => {
     await page.getByRole('button', { name: /submit report/i }).click();
 
     // During loading the button label changes
-    await expect(page.getByText('Submitting...')).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByText('Submitting...')).toBeVisible();
 
     // Unblock the route
     resolveRoute();
 
-    await expect(page.getByText(/Thanks/)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Thanks/)).toBeVisible();
   });
 
   test('server error shows an error message inside the dialog', async ({
@@ -255,9 +249,7 @@ test.describe('Bug Report Submission @regression', () => {
 
     await page.getByRole('button', { name: /submit report/i }).click();
 
-    await expect(page.getByText(/internal server error/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/internal server error/i)).toBeVisible();
 
     // Dialog should remain open so the user can retry or copy their text
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -273,9 +265,7 @@ test.describe('Bug Report Submission @regression', () => {
 
     await page.getByRole('button', { name: /submit report/i }).click();
 
-    await expect(page.getByText(/something went wrong/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/something went wrong/i)).toBeVisible();
 
     await expect(page.getByRole('dialog')).toBeVisible();
   });

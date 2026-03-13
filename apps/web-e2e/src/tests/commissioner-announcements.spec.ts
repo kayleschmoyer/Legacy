@@ -301,9 +301,7 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
     await page.waitForLoadState('load');
 
     // Panel heading is visible
-    await expect(page.getByText('Commissioner Announcements')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Commissioner Announcements')).toBeVisible();
   });
 
   test('commissioner sees the "New Announcement" button', async ({ page }) => {
@@ -316,7 +314,7 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
 
     await expect(
       page.getByRole('button', { name: /new announcement/i }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 
   test('commissioner sees empty-state message when no announcements exist', async ({
@@ -329,9 +327,7 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/no announcements yet/i)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(/no announcements yet/i)).toBeVisible();
   });
 
   test('clicking "New Announcement" opens the compose form', async ({
@@ -347,17 +343,13 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
     await page.getByRole('button', { name: /new announcement/i }).click();
 
     // Textarea is visible
-    await expect(page.getByPlaceholder(/write an announcement/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByPlaceholder(/write an announcement/i)).toBeVisible();
 
     // Post and Cancel buttons appear
     await expect(
       page.getByRole('button', { name: /post announcement/i }),
-    ).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('button', { name: /cancel/i })).toBeVisible({
-      timeout: 5000,
-    });
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /cancel/i })).toBeVisible();
   });
 
   test('"Post Announcement" button is disabled when textarea is empty', async ({
@@ -371,9 +363,7 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
     await page.waitForLoadState('load');
 
     await page.getByRole('button', { name: /new announcement/i }).click();
-    await expect(page.getByPlaceholder(/write an announcement/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByPlaceholder(/write an announcement/i)).toBeVisible();
 
     await expect(
       page.getByRole('button', { name: /post announcement/i }),
@@ -389,9 +379,7 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
     await page.waitForLoadState('load');
 
     await page.getByRole('button', { name: /new announcement/i }).click();
-    await expect(page.getByPlaceholder(/write an announcement/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByPlaceholder(/write an announcement/i)).toBeVisible();
 
     await page.getByRole('button', { name: /cancel/i }).click();
 
@@ -403,7 +391,7 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
     // "New Announcement" button is visible again
     await expect(
       page.getByRole('button', { name: /new announcement/i }),
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible();
   });
 
   test('commissioner can post an announcement and it appears in the list', async ({
@@ -421,9 +409,7 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
 
     // Open compose form
     await page.getByRole('button', { name: /new announcement/i }).click();
-    await expect(page.getByPlaceholder(/write an announcement/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByPlaceholder(/write an announcement/i)).toBeVisible();
 
     // Type the announcement
     await page
@@ -439,9 +425,7 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
     await page.getByRole('button', { name: /post announcement/i }).click();
 
     // The posted announcement text should appear in the list
-    await expect(page.getByText(announcementText)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(announcementText)).toBeVisible();
 
     // Compose form should be closed after posting
     await expect(
@@ -459,13 +443,9 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
     await page.waitForLoadState('load');
 
     // The announcement count badge (shows "1") should be visible
-    await expect(page.getByText('Commissioner Announcements')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Commissioner Announcements')).toBeVisible();
     // The announcement text should render in the list
-    await expect(page.getByText(announcement.messageText)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(announcement.messageText)).toBeVisible();
   });
 
   test('existing announcement shows sender name and "Commissioner" badge', async ({
@@ -479,19 +459,15 @@ test.describe('Commissioner Announcements — commissioner view @critical', () =
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(announcement.messageText)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(announcement.messageText)).toBeVisible();
     // Sender username displayed (exact match to avoid collisions with page chrome)
     await expect(
       page.getByText(announcement.sender.username, { exact: true }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     // "Commissioner" badge
     await expect(
       page.getByText('Commissioner', { exact: true }).first(),
-    ).toBeVisible({
-      timeout: 10000,
-    });
+    ).toBeVisible();
   });
 });
 
@@ -523,14 +499,10 @@ test.describe('Commissioner Announcements — member view @regression', () => {
     await page.waitForLoadState('load');
 
     // Panel heading is visible
-    await expect(page.getByText('Commissioner Announcements')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Commissioner Announcements')).toBeVisible();
 
     // Announcement content is displayed
-    await expect(page.getByText(announcement.messageText)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(announcement.messageText)).toBeVisible();
   });
 
   test('"New Announcement" button is not visible to non-commissioner members', async ({
@@ -545,9 +517,7 @@ test.describe('Commissioner Announcements — member view @regression', () => {
     await page.waitForLoadState('load');
 
     // The announcement panel is shown (there are announcements)
-    await expect(page.getByText('Commissioner Announcements')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Commissioner Announcements')).toBeVisible();
 
     // But the compose button must NOT be shown to regular members
     await expect(
@@ -570,9 +540,7 @@ test.describe('Commissioner Announcements — keyboard shortcut @regression', ()
     const announcementText = 'Keyboard shortcut test announcement';
 
     await page.getByRole('button', { name: /new announcement/i }).click();
-    await expect(page.getByPlaceholder(/write an announcement/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByPlaceholder(/write an announcement/i)).toBeVisible();
 
     await page
       .getByPlaceholder(/write an announcement/i)
@@ -584,8 +552,6 @@ test.describe('Commissioner Announcements — keyboard shortcut @regression', ()
       .press('Control+Enter');
 
     // Announcement should appear in the list
-    await expect(page.getByText(announcementText)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(announcementText)).toBeVisible();
   });
 });

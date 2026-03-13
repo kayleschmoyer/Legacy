@@ -1,4 +1,4 @@
-/**
+﻿/**
  * WebSocket Real-Time Updates E2E Tests (LS-693)
  *
  * Covers three live-update scenarios driven purely by injected WebSocket
@@ -343,14 +343,12 @@ test.describe('WebSocket real-time updates @critical', () => {
     await page.waitForLoadState('load');
 
     // 4. Confirm the chat panel rendered
-    await expect(page.getByRole('log', { name: /chat messages/i })).toBeVisible(
-      { timeout: 15_000 },
-    );
+    await expect(
+      page.getByRole('log', { name: /chat messages/i }),
+    ).toBeVisible();
 
     // 5. Wait for the app to open the WebSocket connection
-    await expect
-      .poll(() => wsRoute !== undefined, { timeout: 10_000 })
-      .toBe(true);
+    await expect.poll(() => wsRoute !== undefined).toBe(true);
     if (!wsRoute) throw new Error('WebSocket route not established');
 
     // 6. Push a chat message from the "server"
@@ -373,7 +371,7 @@ test.describe('WebSocket real-time updates @critical', () => {
     // 7. The message must appear in the chat log without a page refresh
     await expect(
       page.getByRole('log', { name: /chat messages/i }),
-    ).toContainText(messageText, { timeout: 5_000 });
+    ).toContainText(messageText);
   });
 
   test('matchup score update — MATCHUP_STATS_COMPLETE triggers score refresh', async ({
@@ -399,15 +397,13 @@ test.describe('WebSocket real-time updates @critical', () => {
 
     // The scoreboard renders because we have a matchup for week 1 and userTeamId=1
     const scoreboard = page.getByRole('region', { name: /week 1 scoreboard/i });
-    await expect(scoreboard).toBeVisible({ timeout: 15_000 });
+    await expect(scoreboard).toBeVisible();
 
     // Confirm initial state shows 0.00 (no scores yet)
     await expect(scoreboard).toContainText('0.00');
 
     // Wait for WS connection
-    await expect
-      .poll(() => wsRoute !== undefined, { timeout: 10_000 })
-      .toBe(true);
+    await expect.poll(() => wsRoute !== undefined).toBe(true);
     if (!wsRoute) throw new Error('WebSocket route not established');
 
     // Push MATCHUP_STATS_COMPLETE — triggers refetchMatchupsRef.current?.()
@@ -423,8 +419,8 @@ test.describe('WebSocket real-time updates @critical', () => {
 
     // The refetch returns updatedMatchup; scoreboard must show the new scores.
     // Scores are formatted with toFixed(2): 42.5 → "42.50", 38.0 → "38.00"
-    await expect(scoreboard).toContainText('42.50', { timeout: 8_000 });
-    await expect(scoreboard).toContainText('38.00', { timeout: 5_000 });
+    await expect(scoreboard).toContainText('42.50');
+    await expect(scoreboard).toContainText('38.00');
   });
 
   test('draft-started notification — status badge updates from Pre-Draft to Queued', async ({
@@ -449,12 +445,10 @@ test.describe('WebSocket real-time updates @critical', () => {
     await page.waitForLoadState('load');
 
     // Confirm the initial draft status badge says "Pre-Draft"
-    await expect(page.getByText('Pre-Draft')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Pre-Draft')).toBeVisible();
 
     // Wait for WS connection
-    await expect
-      .poll(() => wsRoute !== undefined, { timeout: 10_000 })
-      .toBe(true);
+    await expect.poll(() => wsRoute !== undefined).toBe(true);
     if (!wsRoute) throw new Error('WebSocket route not established');
 
     // Push DRAFT_STARTED — triggers handleDraftStarted() → backgroundRefetch()
@@ -472,6 +466,6 @@ test.describe('WebSocket real-time updates @critical', () => {
     );
 
     // After the refetch resolves, the badge should change to "Queued"
-    await expect(page.getByText('Queued')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Queued')).toBeVisible();
   });
 });

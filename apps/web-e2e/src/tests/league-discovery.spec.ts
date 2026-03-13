@@ -215,7 +215,7 @@ test.describe('League Discovery — empty state @regression', () => {
     await lp.gotoDiscovery();
     await lp.expectDiscoveryLoaded();
 
-    await expect(lp.discoveryEmptyHeading).toBeVisible({ timeout: 10000 });
+    await expect(lp.discoveryEmptyHeading).toBeVisible();
     // Footer CTA should not appear when there are no leagues
     await expect(lp.discoveryFooterCta).not.toBeVisible();
   });
@@ -231,7 +231,7 @@ test.describe('League Discovery — empty state @regression', () => {
 
     await expect(
       page.getByText(/No public leagues are currently open/i),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 });
 
@@ -255,9 +255,9 @@ test.describe('League Discovery — member & full badges @regression', () => {
     await lp.gotoDiscovery();
     await lp.expectDiscoveryLoaded();
 
-    await expect(page.getByText(/You're already in this league/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(
+      page.getByText(/You're already in this league/i),
+    ).toBeVisible();
     // "View League →" button should appear instead of "Join League →"
     await expect(
       page.getByRole('button', { name: /View League/i }),
@@ -282,9 +282,7 @@ test.describe('League Discovery — member & full badges @regression', () => {
     await lp.gotoDiscovery();
     await lp.expectDiscoveryLoaded();
 
-    await expect(page.getByText(/This league is full/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/This league is full/i)).toBeVisible();
     // Join League button should NOT appear for a full league
     await expect(
       page.getByRole('button', { name: /Join League →/i }),
@@ -311,9 +309,7 @@ test.describe('League Discovery — join flow @critical', () => {
     await lp.clickJoinLeague('Open Draft League');
 
     // Team name prompt appears
-    await expect(page.getByText(/Choose a team name/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/Choose a team name/i)).toBeVisible();
     await expect(page.getByPlaceholder('e.g. Shortstop Stars')).toBeVisible();
   });
 
@@ -331,9 +327,7 @@ test.describe('League Discovery — join flow @critical', () => {
     await lp.expectDiscoveryLoaded();
 
     await lp.clickJoinLeague('Empty Name League');
-    await expect(page.getByText(/Choose a team name/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/Choose a team name/i)).toBeVisible();
 
     // The inline Join League submit button should be disabled with empty name
     const joinSubmit = page
@@ -354,9 +348,7 @@ test.describe('League Discovery — join flow @critical', () => {
     await lp.expectDiscoveryLoaded();
 
     await lp.clickJoinLeague('Cancel Test League');
-    await expect(page.getByText(/Choose a team name/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/Choose a team name/i)).toBeVisible();
 
     await page.getByRole('button', { name: /Cancel/i }).click();
 
@@ -380,15 +372,11 @@ test.describe('League Discovery — join flow @critical', () => {
     await lp.expectDiscoveryLoaded();
 
     await lp.clickJoinLeague('Winners Circle');
-    await expect(page.getByText(/Choose a team name/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/Choose a team name/i)).toBeVisible();
 
     await lp.fillAndSubmitDiscoveryJoin('Winners Circle', 'Home Run Heroes');
 
-    await expect(page.getByText(/Successfully joined/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/Successfully joined/i)).toBeVisible();
   });
 });
 

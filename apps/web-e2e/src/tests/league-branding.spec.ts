@@ -47,7 +47,7 @@ test.describe('League Branding @critical', () => {
   }) => {
     const leaguePage = new LeaguePage(page);
 
-    await expect(leaguePage.brandingHeading).toBeVisible({ timeout: 15000 });
+    await expect(leaguePage.brandingHeading).toBeVisible();
     await expect(
       page.getByText(
         /Customise your league.*logo.*header banner.*brand colors/i,
@@ -56,18 +56,16 @@ test.describe('League Branding @critical', () => {
   });
 
   test('should display the league logo picker', async ({ page }) => {
-    await expect(page.getByText('League Logo', { exact: true })).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('League Logo', { exact: true })).toBeVisible();
 
     // The AvatarPicker renders a pressable avatar area
     await expect(page.getByText(/League Logo/i).first()).toBeVisible();
   });
 
   test('should display the header banner picker', async ({ page }) => {
-    await expect(page.getByText('Header Banner', { exact: true })).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Header Banner', { exact: true }),
+    ).toBeVisible();
   });
 
   test('should display the brand color inputs with placeholders', async ({
@@ -76,7 +74,7 @@ test.describe('League Branding @critical', () => {
     const leaguePage = new LeaguePage(page);
 
     // Both color inputs are present
-    await expect(leaguePage.primaryColorInput).toBeVisible({ timeout: 15000 });
+    await expect(leaguePage.primaryColorInput).toBeVisible();
     await expect(leaguePage.secondaryColorInput).toBeVisible();
 
     // Placeholders match the expected format
@@ -95,7 +93,7 @@ test.describe('League Branding @critical', () => {
   }) => {
     const leaguePage = new LeaguePage(page);
 
-    await expect(leaguePage.primaryColorInput).toBeVisible({ timeout: 15000 });
+    await expect(leaguePage.primaryColorInput).toBeVisible();
     // With no input changes, Save Colors should be disabled
     await expect(leaguePage.saveColorsButton).toBeDisabled();
   });
@@ -105,7 +103,7 @@ test.describe('League Branding @critical', () => {
   }) => {
     const leaguePage = new LeaguePage(page);
 
-    await expect(leaguePage.primaryColorInput).toBeVisible({ timeout: 15000 });
+    await expect(leaguePage.primaryColorInput).toBeVisible();
     await leaguePage.primaryColorInput.fill('#1A2B3C');
 
     await expect(leaguePage.saveColorsButton).toBeEnabled();
@@ -116,7 +114,7 @@ test.describe('League Branding @critical', () => {
   }) => {
     const leaguePage = new LeaguePage(page);
 
-    await expect(leaguePage.primaryColorInput).toBeVisible({ timeout: 15000 });
+    await expect(leaguePage.primaryColorInput).toBeVisible();
 
     // Type an invalid hex value
     await leaguePage.primaryColorInput.fill('#ZZZZZZ');
@@ -135,7 +133,7 @@ test.describe('League Branding @critical', () => {
   }) => {
     const leaguePage = new LeaguePage(page);
 
-    await expect(leaguePage.primaryColorInput).toBeVisible({ timeout: 15000 });
+    await expect(leaguePage.primaryColorInput).toBeVisible();
 
     // Change the primary color
     await leaguePage.primaryColorInput.fill('#AABBCC');
@@ -182,7 +180,7 @@ test.describe('League Branding @critical', () => {
     }
 
     const leaguePage = new LeaguePage(page);
-    await expect(leaguePage.primaryColorInput).toBeVisible({ timeout: 15000 });
+    await expect(leaguePage.primaryColorInput).toBeVisible();
 
     await leaguePage.primaryColorInput.fill('#1A2B3C');
     await leaguePage.secondaryColorInput.fill('#FFFFFF');
@@ -190,9 +188,7 @@ test.describe('League Branding @critical', () => {
     await leaguePage.saveColorsButton.click();
 
     // Success banner appears
-    await expect(page.getByText(/Branding saved!/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/Branding saved!/i)).toBeVisible();
   });
 });
 

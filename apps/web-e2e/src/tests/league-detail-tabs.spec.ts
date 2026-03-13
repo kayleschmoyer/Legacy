@@ -359,7 +359,7 @@ test.describe('Overview Tab — navigation @smoke', () => {
 
     await expect(
       page.getByText('Playoff Push League', { exact: false }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('overview tab button is active when on the overview route', async ({
@@ -370,9 +370,7 @@ test.describe('Overview Tab — navigation @smoke', () => {
     await page.waitForLoadState('load');
 
     // The tab bar should contain an "Overview" label
-    await expect(page.getByText('Overview').first()).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Overview').first()).toBeVisible();
   });
 });
 
@@ -386,17 +384,13 @@ test.describe('Activity Feed — section rendering @critical', () => {
   });
 
   test('shows "League Activity" section heading', async ({ page }) => {
-    await expect(page.getByText('League Activity')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('League Activity')).toBeVisible();
   });
 
   test('shows a "Trade accepted" event from mocked activity data', async ({
     page,
   }) => {
-    await expect(page.getByText('Trade accepted')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Trade accepted')).toBeVisible();
   });
 
   test('shows actor usernames from mocked activity events', async ({
@@ -404,9 +398,7 @@ test.describe('Activity Feed — section rendering @critical', () => {
   }) => {
     await expect(
       page.getByText('Alpha Squad', { exact: false }).first(),
-    ).toBeVisible({
-      timeout: 30000,
-    });
+    ).toBeVisible();
   });
 });
 
@@ -420,7 +412,7 @@ test.describe('Activity Feed — empty state @regression', () => {
 
     await expect(
       page.getByText('No activity yet', { exact: false }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 });
 
@@ -434,22 +426,18 @@ test.describe('League Chat — section rendering @critical', () => {
   });
 
   test('shows "League Chat" section heading', async ({ page }) => {
-    await expect(page.getByText('League Chat')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('League Chat')).toBeVisible();
   });
 
   test('shows chat messages from mocked data', async ({ page }) => {
-    await expect(page.getByText('Good luck this week everyone!')).toBeVisible({
-      timeout: 30000,
-    });
-    await expect(page.getByText('May the best roster win!')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Good luck this week everyone!')).toBeVisible();
+    await expect(page.getByText('May the best roster win!')).toBeVisible();
   });
 
   test('shows message send input field', async ({ page }) => {
     // Chat input should be rendered (textarea or input)
     const chatInput = page.getByPlaceholder(/message/i).first();
-    await expect(chatInput).toBeVisible({ timeout: 30000 });
+    await expect(chatInput).toBeVisible();
   });
 });
 
@@ -517,18 +505,16 @@ test.describe('Roster Tab — data rendering @critical', () => {
   });
 
   test('shows a roster player from mocked team members', async ({ page }) => {
-    await expect(page.getByText('Mike Johnson', { exact: false })).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(
+      page.getByText('Mike Johnson', { exact: false }),
+    ).toBeVisible();
   });
 
   test('shows roster position slots for the league', async ({ page }) => {
     // Positions from MOCK_POSITIONS include "Catcher"
     await expect(
       page.getByText('Catcher', { exact: false }).first(),
-    ).toBeVisible({
-      timeout: 30000,
-    });
+    ).toBeVisible();
   });
 });
 
@@ -546,9 +532,9 @@ test.describe('Pending Waivers — with claims @regression', () => {
     await page.waitForLoadState('load');
 
     // PendingWaiverClaims renders when there are pending claims
-    await expect(page.getByText('Waiver Target', { exact: false })).toBeVisible(
-      { timeout: 30000 },
-    );
+    await expect(
+      page.getByText('Waiver Target', { exact: false }),
+    ).toBeVisible();
   });
 });
 

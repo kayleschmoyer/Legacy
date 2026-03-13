@@ -34,28 +34,28 @@ test.describe('Management Page — static elements @smoke', () => {
   test('shows League Management heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /league management/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows Danger Zone section', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /danger zone/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows Delete All Leagues button', async ({ page }) => {
     await expect(
       page.getByRole('button', { name: /delete all leagues/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows Information card with ownership note', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /information/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
     await expect(
       page.getByText(/only leagues you own will be deleted/i),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 });
 
@@ -66,7 +66,7 @@ test.describe('Management Page — delete all leagues dialogs @critical', () => 
     // Wait for the button to be ready
     await expect(
       page.getByRole('button', { name: /delete all leagues/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('clicking Delete All Leagues opens the first confirmation dialog', async ({
@@ -74,17 +74,17 @@ test.describe('Management Page — delete all leagues dialogs @critical', () => 
   }) => {
     await page.getByRole('button', { name: /delete all leagues/i }).click();
 
-    await expect(page.getByRole('alertdialog')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('alertdialog')).toBeVisible();
     await expect(
       page.getByText(/are you sure you want to delete all of your leagues/i),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('first confirmation dialog lists affected data', async ({ page }) => {
     await page.getByRole('button', { name: /delete all leagues/i }).click();
 
     const dialog = page.getByRole('alertdialog').first();
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
     // Key data items listed in the dialog
     await expect(dialog.getByText(/all leagues you own/i)).toBeVisible();
@@ -96,10 +96,10 @@ test.describe('Management Page — delete all leagues dialogs @critical', () => 
     await page.getByRole('button', { name: /delete all leagues/i }).click();
 
     const dialog = page.getByRole('alertdialog').first();
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
     await dialog.getByRole('button', { name: /cancel/i }).click();
-    await expect(dialog).not.toBeVisible({ timeout: 5000 });
+    await expect(dialog).not.toBeVisible();
   });
 
   test('clicking Continue opens the final confirmation dialog', async ({
@@ -108,18 +108,16 @@ test.describe('Management Page — delete all leagues dialogs @critical', () => 
     await page.getByRole('button', { name: /delete all leagues/i }).click();
 
     const firstDialog = page.getByRole('alertdialog').first();
-    await expect(firstDialog).toBeVisible({ timeout: 10000 });
+    await expect(firstDialog).toBeVisible();
 
     await firstDialog.getByRole('button', { name: /continue/i }).click();
 
     // Final confirmation dialog should now be visible
-    await expect(page.getByRole('alertdialog')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/final confirmation/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    await expect(page.getByText(/final confirmation/i)).toBeVisible();
     await expect(
       page.getByText(/this is your last chance to cancel/i),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('canceling from the final confirmation dialog closes it', async ({
@@ -128,17 +126,15 @@ test.describe('Management Page — delete all leagues dialogs @critical', () => 
     // Open first dialog
     await page.getByRole('button', { name: /delete all leagues/i }).click();
     const firstDialog = page.getByRole('alertdialog').first();
-    await expect(firstDialog).toBeVisible({ timeout: 10000 });
+    await expect(firstDialog).toBeVisible();
 
     // Advance to second dialog
     await firstDialog.getByRole('button', { name: /continue/i }).click();
-    await expect(page.getByText(/final confirmation/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/final confirmation/i)).toBeVisible();
 
     const finalDialog = page.getByRole('alertdialog').first();
     await finalDialog.getByRole('button', { name: /cancel/i }).click();
-    await expect(finalDialog).not.toBeVisible({ timeout: 5000 });
+    await expect(finalDialog).not.toBeVisible();
   });
 
   test('completing both dialogs calls the deleteAllLeagues mutation', async ({
@@ -167,13 +163,11 @@ test.describe('Management Page — delete all leagues dialogs @critical', () => 
 
     // Step 2: confirm in first dialog
     const firstDialog = page.getByRole('alertdialog').first();
-    await expect(firstDialog).toBeVisible({ timeout: 10000 });
+    await expect(firstDialog).toBeVisible();
     await firstDialog.getByRole('button', { name: /continue/i }).click();
 
     // Step 3: confirm in final dialog
-    await expect(page.getByText(/final confirmation/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/final confirmation/i)).toBeVisible();
 
     // Handle the success alert that follows
     page.once('dialog', (dialog) => void dialog.accept());
@@ -218,31 +212,27 @@ test.describe('Player Stats Page — static elements @smoke', () => {
   test('shows the MLB Player Statistics heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /player statistics/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows the player search input', async ({ page }) => {
-    await expect(page.getByPlaceholder('Search players...')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByPlaceholder('Search players...')).toBeVisible();
   });
 
   test('shows a Refresh button', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /refresh/i })).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByRole('button', { name: /refresh/i })).toBeVisible();
   });
 
   test('search input accepts text', async ({ page }) => {
     const input = page.getByPlaceholder('Search players...');
-    await expect(input).toBeVisible({ timeout: 30000 });
+    await expect(input).toBeVisible();
     await input.fill('Trout');
     await expect(input).toHaveValue('Trout');
   });
 
   test('search input can be cleared', async ({ page }) => {
     const input = page.getByPlaceholder('Search players...');
-    await expect(input).toBeVisible({ timeout: 30000 });
+    await expect(input).toBeVisible();
     await input.fill('Aaron');
     await input.clear();
     await expect(input).toHaveValue('');
@@ -261,8 +251,6 @@ test.describe('Unknown Routes @regression', () => {
     await page.waitForLoadState('load');
 
     // The app should still render its shell (header etc.) without a JS crash
-    await expect(page.getByText('Legacy Sports')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Legacy Sports')).toBeVisible();
   });
 });

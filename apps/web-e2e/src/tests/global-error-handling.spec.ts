@@ -1,4 +1,4 @@
-/**
+﻿/**
  * E2E Tests: Global Error Handling (LS-613)
  *
  * Covers:
@@ -46,25 +46,25 @@ test.describe('ApolloErrorToast @critical', () => {
     page,
   }) => {
     await dispatchApolloError(page, 'Something went wrong. Please try again.');
-    await expect(page.getByRole('alert')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('alert')).toBeVisible();
   });
 
   test('displays the error message content @critical', async ({ page }) => {
     const msg = 'Failed to load player data.';
     await dispatchApolloError(page, msg);
-    await expect(page.getByRole('alert')).toContainText(msg, { timeout: 5000 });
+    await expect(page.getByRole('alert')).toContainText(msg);
   });
 
   test('has accessible live region role=alert @critical', async ({ page }) => {
     await dispatchApolloError(page, 'Network error occurred.');
     const alert = page.getByRole('alert');
-    await expect(alert).toBeVisible({ timeout: 5000 });
+    await expect(alert).toBeVisible();
     await expect(alert).toHaveAttribute('aria-live', 'assertive');
   });
 
   test('has a dismiss button @critical', async ({ page }) => {
     await dispatchApolloError(page, 'Request failed. Try again later.');
-    await expect(page.getByRole('alert')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('alert')).toBeVisible();
     const dismissBtn = page.getByRole('button', { name: /dismiss error/i });
     await expect(dismissBtn).toBeVisible();
   });
@@ -73,31 +73,23 @@ test.describe('ApolloErrorToast @critical', () => {
     page,
   }) => {
     await dispatchApolloError(page, 'Dismiss test error.');
-    await expect(page.getByRole('alert')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('alert')).toBeVisible();
 
     await page.getByRole('button', { name: /dismiss error/i }).click();
-    await expect(page.getByRole('alert')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('alert')).not.toBeVisible();
   });
 
   test('can be triggered multiple times with updated message @regression', async ({
     page,
   }) => {
     await dispatchApolloError(page, 'First error message.');
-    await expect(page.getByRole('alert')).toContainText(
-      'First error message.',
-      {
-        timeout: 5000,
-      },
-    );
+    await expect(page.getByRole('alert')).toContainText('First error message.');
 
     await page.getByRole('button', { name: /dismiss error/i }).click();
 
     await dispatchApolloError(page, 'Second error message.');
     await expect(page.getByRole('alert')).toContainText(
       'Second error message.',
-      {
-        timeout: 5000,
-      },
     );
   });
 
@@ -135,7 +127,7 @@ test.describe('GraphQL error states on pages @regression', () => {
       page
         .getByRole('alert')
         .or(page.getByText(/error|failed|unavailable/i).first()),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('league discovery page shows error when query fails @regression', async ({
@@ -160,7 +152,7 @@ test.describe('GraphQL error states on pages @regression', () => {
       page
         .getByRole('alert')
         .or(page.getByText(/error|failed|something went wrong/i).first()),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('players directory shows error message when query fails @regression', async ({
@@ -185,7 +177,7 @@ test.describe('GraphQL error states on pages @regression', () => {
       page
         .getByRole('alert')
         .or(page.getByText(/error|failed|unable to load/i).first()),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 });
 
@@ -213,6 +205,6 @@ test.describe('Network error handling @regression', () => {
       page
         .getByRole('alert')
         .or(page.getByText(/error|failed|went wrong/i).first()),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 });

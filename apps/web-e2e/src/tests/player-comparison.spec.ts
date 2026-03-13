@@ -267,25 +267,19 @@ test.describe('Player Comparison – page structure (premium) @smoke', () => {
   test('shows Player Comparison heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /player comparison/i }).first(),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 
   test('shows search input for adding players', async ({ page }) => {
-    await expect(page.getByLabel('Search players to compare')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByLabel('Search players to compare')).toBeVisible();
   });
 
   test('shows placeholder text in search input', async ({ page }) => {
-    await expect(page.getByPlaceholder('Search for a player…')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByPlaceholder('Search for a player…')).toBeVisible();
   });
 
   test('shows "Select Players" label with count', async ({ page }) => {
-    await expect(page.getByText(/Select Players \(0\/4\)/)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(/Select Players \(0\/4\)/)).toBeVisible();
   });
 
   test('shows minimum player hint when fewer than 2 selected', async ({
@@ -293,7 +287,7 @@ test.describe('Player Comparison – page structure (premium) @smoke', () => {
   }) => {
     await expect(
       page.getByText(/add at least 2 players to see the comparison table/i),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 });
 
@@ -306,9 +300,7 @@ adminTest.describe('Player Comparison – player search @critical', () => {
     await mockPlayerComparisonGraphQL(page);
     await page.goto('/players/compare');
     await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByLabel('Search players to compare')).toBeVisible();
   });
 
   adminTest('search input accepts text input', async ({ page }) => {
@@ -323,9 +315,7 @@ adminTest.describe('Player Comparison – player search @critical', () => {
       const input = page.getByLabel('Search players to compare');
       await input.fill('Aa');
       // Wait for the dropdown results from the mock
-      await expect(page.getByText('Aaron Judge')).toBeVisible({
-        timeout: 5000,
-      });
+      await expect(page.getByText('Aaron Judge')).toBeVisible();
     },
   );
 
@@ -334,10 +324,8 @@ adminTest.describe('Player Comparison – player search @critical', () => {
     async ({ page }) => {
       const input = page.getByLabel('Search players to compare');
       await input.fill('Aa');
-      await expect(page.getByText('Aaron Judge')).toBeVisible({
-        timeout: 5000,
-      });
-      await expect(page.getByText('OF').first()).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText('Aaron Judge')).toBeVisible();
+      await expect(page.getByText('OF').first()).toBeVisible();
     },
   );
 
@@ -349,9 +337,7 @@ adminTest.describe('Player Comparison – player search @critical', () => {
       await page.getByText('Aaron Judge').click();
 
       // Player count should now be 1/4
-      await expect(page.getByText(/Select Players \(1\/4\)/)).toBeVisible({
-        timeout: 5000,
-      });
+      await expect(page.getByText(/Select Players \(1\/4\)/)).toBeVisible();
       // Player chip appears
       await expect(page.getByText('Aaron Judge').first()).toBeVisible();
     },
@@ -366,14 +352,10 @@ adminTest.describe('Player Comparison – player search @critical', () => {
 
     // Add second player
     await input.fill('Sh');
-    await expect(page.getByText('Shohei Ohtani')).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByText('Shohei Ohtani')).toBeVisible();
     await page.getByText('Shohei Ohtani').click();
 
-    await expect(page.getByText(/Select Players \(2\/4\)/)).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByText(/Select Players \(2\/4\)/)).toBeVisible();
   });
 });
 
@@ -386,22 +368,18 @@ adminTest.describe('Player Comparison – comparison table @critical', () => {
     await mockPlayerComparisonGraphQL(page);
     await page.goto('/players/compare');
     await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByLabel('Search players to compare')).toBeVisible();
 
     const input = page.getByLabel('Search players to compare');
 
     // Add first player
     await input.fill('Aa');
-    await expect(page.getByText('Aaron Judge')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Aaron Judge')).toBeVisible();
     await page.getByText('Aaron Judge').click();
 
     // Add second player
     await input.fill('Sh');
-    await expect(page.getByText('Shohei Ohtani')).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByText('Shohei Ohtani')).toBeVisible();
     await page.getByText('Shohei Ohtani').click();
   });
 
@@ -415,36 +393,24 @@ adminTest.describe('Player Comparison – comparison table @critical', () => {
   );
 
   adminTest('shows Fantasy Scoring Projections section', async ({ page }) => {
-    await expect(page.getByText(/fantasy scoring projections/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/fantasy scoring projections/i)).toBeVisible();
   });
 
   adminTest('shows Career Batting section', async ({ page }) => {
-    await expect(page.getByText(/career batting/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/career batting/i)).toBeVisible();
   });
 
   adminTest('shows Career Achievements section', async ({ page }) => {
-    await expect(page.getByText(/career achievements/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/career achievements/i)).toBeVisible();
   });
 
   adminTest('shows player names in comparison header', async ({ page }) => {
-    await expect(page.getByText('Aaron Judge').first()).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.getByText('Shohei Ohtani').first()).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Aaron Judge').first()).toBeVisible();
+    await expect(page.getByText('Shohei Ohtani').first()).toBeVisible();
   });
 
   adminTest('shows Avg Pts / Game stat row', async ({ page }) => {
-    await expect(page.getByText('Avg Pts / Game')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Avg Pts / Game')).toBeVisible();
   });
 });
 
@@ -457,21 +423,19 @@ adminTest.describe('Player Comparison – remove player @regression', () => {
     await mockPlayerComparisonGraphQL(page);
     await page.goto('/players/compare');
     await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByLabel('Search players to compare')).toBeVisible();
 
     // Add one player
     const input = page.getByLabel('Search players to compare');
     await input.fill('Aa');
-    await expect(page.getByText('Aaron Judge')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Aaron Judge')).toBeVisible();
     await page.getByText('Aaron Judge').click();
   });
 
   adminTest('Remove button has correct aria-label', async ({ page }) => {
     await expect(
       page.getByRole('button', { name: /remove aaron judge/i }),
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible();
   });
 
   adminTest(
@@ -480,9 +444,7 @@ adminTest.describe('Player Comparison – remove player @regression', () => {
       await page.getByRole('button', { name: /remove aaron judge/i }).click();
 
       // Count returns to 0/4
-      await expect(page.getByText(/Select Players \(0\/4\)/)).toBeVisible({
-        timeout: 5000,
-      });
+      await expect(page.getByText(/Select Players \(0\/4\)/)).toBeVisible();
     },
   );
 
@@ -492,9 +454,7 @@ adminTest.describe('Player Comparison – remove player @regression', () => {
       // Add a second player
       const input = page.getByLabel('Search players to compare');
       await input.fill('Sh');
-      await expect(page.getByText('Shohei Ohtani')).toBeVisible({
-        timeout: 5000,
-      });
+      await expect(page.getByText('Shohei Ohtani')).toBeVisible();
       await page.getByText('Shohei Ohtani').click();
 
       // Now remove one
@@ -502,7 +462,7 @@ adminTest.describe('Player Comparison – remove player @regression', () => {
 
       await expect(
         page.getByText(/add at least 2 players to see the comparison table/i),
-      ).toBeVisible({ timeout: 5000 });
+      ).toBeVisible();
     },
   );
 });
@@ -553,20 +513,14 @@ test.describe('Player Comparison – premium gate @regression', () => {
   test('shows Premium Feature overlay for non-premium users', async ({
     page,
   }) => {
-    await expect(page.getByText(/premium feature/i)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(/premium feature/i)).toBeVisible();
   });
 
   test('shows upgrade button in premium gate overlay', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /upgrade/i })).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByRole('button', { name: /upgrade/i })).toBeVisible();
   });
 
   test('shows player comparison feature description', async ({ page }) => {
-    await expect(page.getByText(/compare up to 4 players/i)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(/compare up to 4 players/i)).toBeVisible();
   });
 });

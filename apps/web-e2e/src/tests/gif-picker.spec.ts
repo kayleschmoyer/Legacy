@@ -278,9 +278,7 @@ async function goToLeagueChatTab(
   // Click the "Chat" sub-tab inside the overview card
   await page.getByText('Chat').first().click();
   // Wait for the message input to confirm the chat area loaded
-  await expect(page.getByPlaceholder(/message/i).first()).toBeVisible({
-    timeout: 15000,
-  });
+  await expect(page.getByPlaceholder(/message/i).first()).toBeVisible();
 }
 
 // ---------------------------------------------------------------------------
@@ -308,7 +306,7 @@ test.describe('GIF Picker — navigation to chat @smoke', () => {
 
     await expect(
       page.getByRole('button', { name: /open gif picker/i }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 });
 
@@ -321,45 +319,37 @@ test.describe('GIF Picker — open and close @critical', () => {
 
   test('clicking GIF button shows "GIF Search" heading', async ({ page }) => {
     await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('GIF Search')).toBeVisible();
   });
 
   test('GIF picker shows search input after opening', async ({ page }) => {
     await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByPlaceholder(/search gifs/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByPlaceholder(/search gifs/i)).toBeVisible();
   });
 
   test('GIF picker shows G rating button', async ({ page }) => {
     await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('GIF Search')).toBeVisible();
 
     // G and PG rating buttons are in the header row
     const buttons = page.locator('button');
-    await expect(buttons.filter({ hasText: 'G' }).first()).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(buttons.filter({ hasText: 'G' }).first()).toBeVisible();
   });
 
   test('GIF picker shows PG rating button', async ({ page }) => {
     await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('GIF Search')).toBeVisible();
 
     const buttons = page.locator('button');
-    await expect(buttons.filter({ hasText: 'PG' }).first()).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(buttons.filter({ hasText: 'PG' }).first()).toBeVisible();
   });
 
   test('close button dismisses the GIF picker', async ({ page }) => {
     await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('GIF Search')).toBeVisible();
 
     await page.getByRole('button', { name: /close gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).not.toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByText('GIF Search')).not.toBeVisible();
   });
 });
 
@@ -369,7 +359,7 @@ test.describe('GIF Picker — GIF grid @critical', () => {
     await mockGiphy(page);
     await goToLeagueChatTab(page);
     await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('GIF Search')).toBeVisible();
   });
 
   test('shows GIF buttons with "Send GIF:" aria-label after Giphy load', async ({
@@ -377,18 +367,18 @@ test.describe('GIF Picker — GIF grid @critical', () => {
   }) => {
     await expect(
       page.getByRole('button', { name: /^Send GIF:/i }).first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('shows the mocked GIF title in aria-label', async ({ page }) => {
     await expect(
       page.getByRole('button', { name: 'Send GIF: Funny Cat' }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('shows multiple GIFs from mock response', async ({ page }) => {
     const gifButtons = page.getByRole('button', { name: /^Send GIF:/i });
-    await expect(gifButtons).toHaveCount(2, { timeout: 10000 });
+    await expect(gifButtons).toHaveCount(2);
   });
 });
 
@@ -401,11 +391,9 @@ test.describe('GIF Picker — empty state @regression', () => {
     await goToLeagueChatTab(page);
 
     await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('GIF Search')).toBeVisible();
 
-    await expect(page.getByText('No GIFs found')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('No GIFs found')).toBeVisible();
   });
 });
 
@@ -416,9 +404,7 @@ test.describe('GIF Picker — "Powered by GIPHY" footer @regression', () => {
     await goToLeagueChatTab(page);
 
     await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText(/Powered by GIPHY/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/Powered by GIPHY/i)).toBeVisible();
   });
 });
 
@@ -429,12 +415,10 @@ test.describe('GIF Picker — Cancel button @regression', () => {
     await goToLeagueChatTab(page);
 
     await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('GIF Search')).toBeVisible();
 
     // The footer Cancel button also calls onClose
     await page.getByRole('button', { name: /^Cancel$/i }).click();
-    await expect(page.getByText('GIF Search')).not.toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByText('GIF Search')).not.toBeVisible();
   });
 });

@@ -155,7 +155,7 @@ test.describe('On This Day Feed @smoke', () => {
 
     await expect(
       page.getByText('On This Day', { exact: true }).first(),
-    ).toBeVisible({ timeout: 20000 });
+    ).toBeVisible();
   });
 
   test('displays a batting entry with player name and stat summary', async ({
@@ -168,13 +168,13 @@ test.describe('On This Day Feed @smoke', () => {
     await page.waitForLoadState('load');
 
     // Player name should appear
-    await expect(page.getByText('Babe Ruth')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText('Babe Ruth')).toBeVisible();
 
     // Season badge
-    await expect(page.getByText('1927')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('1927')).toBeVisible();
 
     // Batting stat summary (hits-for-atBats pattern)
-    await expect(page.getByText(/3-for-4/)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/3-for-4/)).toBeVisible();
   });
 
   test('displays a pitching entry with IP and strikeout summary', async ({
@@ -186,12 +186,12 @@ test.describe('On This Day Feed @smoke', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Bob Gibson')).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText('1968')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Bob Gibson')).toBeVisible();
+    await expect(page.getByText('1968')).toBeVisible();
 
     // Pitching summary includes innings pitched and strikeouts
-    await expect(page.getByText(/9.*IP/)).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/17.*K/)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/9.*IP/)).toBeVisible();
+    await expect(page.getByText(/17.*K/)).toBeVisible();
   });
 
   test('renders multiple entries in a list', async ({ page }) => {
@@ -204,8 +204,8 @@ test.describe('On This Day Feed @smoke', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Babe Ruth')).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText('Bob Gibson')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Babe Ruth')).toBeVisible();
+    await expect(page.getByText('Bob Gibson')).toBeVisible();
   });
 });
 
@@ -220,22 +220,18 @@ test.describe('On This Day Feed — Transactions @smoke', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/transactions.*signings/i).first()).toBeVisible(
-      { timeout: 20000 },
-    );
+    await expect(
+      page.getByText(/transactions.*signings/i).first(),
+    ).toBeVisible();
 
     // Player name and event description
-    await expect(page.getByText('Roger Clemens')).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.getByText(/traded to the yankees/i).first()).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Roger Clemens')).toBeVisible();
+    await expect(
+      page.getByText(/traded to the yankees/i).first(),
+    ).toBeVisible();
 
     // Year badge in the event row
-    await expect(page.getByText(/Trade.*2000/)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/Trade.*2000/)).toBeVisible();
   });
 
   test('shows a signing event with the correct label', async ({ page }) => {
@@ -253,12 +249,8 @@ test.describe('On This Day Feed — Transactions @smoke', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Alex Rodriguez')).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(page.getByText(/Signed.*2001/)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Alex Rodriguez')).toBeVisible();
+    await expect(page.getByText(/Signed.*2001/)).toBeVisible();
   });
 });
 
@@ -272,7 +264,7 @@ test.describe('On This Day Feed — Empty & Error States @regression', () => {
 
     await expect(
       page.getByText(/no notable performances found/i).first(),
-    ).toBeVisible({ timeout: 20000 });
+    ).toBeVisible();
   });
 
   test('shows error message when the query fails', async ({ page }) => {
@@ -282,7 +274,7 @@ test.describe('On This Day Feed — Empty & Error States @regression', () => {
 
     await expect(
       page.getByText(/could not load historical data/i).first(),
-    ).toBeVisible({ timeout: 20000 });
+    ).toBeVisible();
   });
 });
 
@@ -300,7 +292,7 @@ test.describe('On This Day Feed — Player Navigation @critical', () => {
     const entryRow = page.getByRole('link', {
       name: /view babe ruth profile/i,
     });
-    await expect(entryRow).toBeVisible({ timeout: 20000 });
+    await expect(entryRow).toBeVisible();
 
     await entryRow.click();
     await page.waitForLoadState('load');

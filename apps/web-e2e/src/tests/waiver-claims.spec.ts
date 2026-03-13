@@ -340,9 +340,7 @@ test.describe('Pending Waiver Claims — component hidden when empty @regression
     await page.goto(ROSTER_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Pending Waiver Claims')).not.toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Pending Waiver Claims')).not.toBeVisible();
   });
 });
 
@@ -354,9 +352,7 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     await page.goto(ROSTER_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Pending Waiver Claims')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Pending Waiver Claims')).toBeVisible();
   });
 
   test('displays player name for a pending claim', async ({ page }) => {
@@ -366,7 +362,7 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     await page.goto(ROSTER_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('John Doe')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('John Doe')).toBeVisible();
   });
 
   test('shows fallback "Player #N" when playerName is null', async ({
@@ -378,7 +374,7 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     await page.goto(ROSTER_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Player #42')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Player #42')).toBeVisible();
   });
 
   test('renders multiple claims', async ({ page }) => {
@@ -392,11 +388,9 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     await page.goto(ROSTER_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Player One')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Player Two')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Player Three')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Player One')).toBeVisible();
+    await expect(page.getByText('Player Two')).toBeVisible();
+    await expect(page.getByText('Player Three')).toBeVisible();
   });
 
   test('footer shows singular "1 pending claim — processed hourly"', async ({
@@ -410,7 +404,7 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
 
     await expect(
       page.getByText(/1 pending claim — processed hourly/i),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 
   test('footer shows plural "N pending claims — processed hourly"', async ({
@@ -427,7 +421,7 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
 
     await expect(
       page.getByText(/2 pending claims — processed hourly/i),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 });
 
@@ -445,7 +439,7 @@ test.describe('Pending Waiver Claims — cancel button @critical', () => {
       page.getByRole('button', {
         name: /cancel waiver claim for John Doe/i,
       }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 
   test('clicking cancel triggers CancelWaiverClaim mutation', async ({
@@ -477,7 +471,7 @@ test.describe('Pending Waiver Claims — special claim attributes @regression', 
     await page.goto(ROSTER_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('$25 FAAB')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('$25 FAAB')).toBeVisible();
   });
 
   test('does not show FAAB label when faabBid is null', async ({ page }) => {
@@ -487,7 +481,7 @@ test.describe('Pending Waiver Claims — special claim attributes @regression', 
     await page.goto(ROSTER_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/FAAB/)).not.toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/FAAB/)).not.toBeVisible();
   });
 
   test('shows drop player name when dropPlayerId is set', async ({ page }) => {
@@ -503,8 +497,8 @@ test.describe('Pending Waiver Claims — special claim attributes @regression', 
     await page.goto(ROSTER_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/Drop:/i)).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Old Guy')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Drop:/i)).toBeVisible();
+    await expect(page.getByText('Old Guy')).toBeVisible();
   });
 });
 
@@ -514,8 +508,6 @@ test.describe('Pending Waiver Claims — error state @regression', () => {
     await page.goto(ROSTER_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Failed to load waiver claims')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Failed to load waiver claims')).toBeVisible();
   });
 });

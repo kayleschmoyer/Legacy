@@ -234,32 +234,30 @@ test.describe('Draft Order Control @critical', () => {
   test('shows Draft Pick Order heading @smoke', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /draft pick order/i }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 
   test('shows team names in the draft order list @critical', async ({
     page,
   }) => {
-    await expect(page.getByText('Alpha Squad')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Beta Force')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Gamma Raiders')).toBeVisible({
-      timeout: 15000,
-    });
-    await expect(page.getByText('Delta Stars')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Alpha Squad')).toBeVisible();
+    await expect(page.getByText('Beta Force')).toBeVisible();
+    await expect(page.getByText('Gamma Raiders')).toBeVisible();
+    await expect(page.getByText('Delta Stars')).toBeVisible();
   });
 
   test('shows Randomize button @critical', async ({ page }) => {
     const randomizeBtn = page.getByRole('button', {
       name: /randomize.*draft order|randomize/i,
     });
-    await expect(randomizeBtn).toBeVisible({ timeout: 15000 });
+    await expect(randomizeBtn).toBeVisible();
   });
 
   test('shows drag handles for each team @regression', async ({ page }) => {
     // Each drag handle has aria-label "Drag to reorder <teamName>"
     await expect(
       page.getByRole('button', { name: /drag to reorder alpha squad/i }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 
   test('shows drag-to-reorder instruction text @regression', async ({
@@ -267,7 +265,7 @@ test.describe('Draft Order Control @critical', () => {
   }) => {
     await expect(
       page.getByText(/drag to reorder|randomize the pick order/i),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 });
 
@@ -282,17 +280,17 @@ test.describe('Draft Settings Control @critical', () => {
   test('shows Draft Settings heading @smoke', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /draft settings/i }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 
   test('shows Draft Mode label @critical', async ({ page }) => {
-    await expect(page.getByText(/draft mode/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/draft mode/i)).toBeVisible();
   });
 
   test('shows Save Settings button @critical', async ({ page }) => {
     // Save button is rendered in the draft settings card
     const saveBtn = page.getByRole('button', { name: /save.*settings|save/i });
-    await expect(saveBtn.first()).toBeVisible({ timeout: 15000 });
+    await expect(saveBtn.first()).toBeVisible();
   });
 });
 
@@ -308,7 +306,7 @@ test.describe('Draft controls locked when draft is in progress @regression', () 
     // When draftStatus is 'in-progress' the controls should be locked/disabled
     await expect(
       page.getByRole('heading', { name: /draft pick order/i }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
 
     const randomizeBtn = page.getByRole('button', {
       name: /randomize.*draft order|randomize/i,
@@ -330,6 +328,6 @@ test.describe('Draft controls locked when draft is in progress @regression', () 
       page
         .getByText(/draft.*in progress|locked|cannot.*change|started/i)
         .first(),
-    ).toBeVisible({ timeout: 20000 });
+    ).toBeVisible();
   });
 });

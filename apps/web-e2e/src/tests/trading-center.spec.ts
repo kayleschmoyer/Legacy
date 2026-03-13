@@ -273,27 +273,19 @@ test.describe('Trading Center — header and layout @critical', () => {
   });
 
   test('shows "Trading Center" heading', async ({ page }) => {
-    await expect(page.getByText('Trading Center')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Trading Center')).toBeVisible();
   });
 
   test('shows "Propose Trade" button', async ({ page }) => {
-    await expect(page.getByText('Propose Trade')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Propose Trade')).toBeVisible();
   });
 
   test('shows "Incoming Offers" section', async ({ page }) => {
-    await expect(page.getByText('Incoming Offers')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Incoming Offers')).toBeVisible();
   });
 
   test('shows "Outgoing Offers" section', async ({ page }) => {
-    await expect(page.getByText('Outgoing Offers')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Outgoing Offers')).toBeVisible();
   });
 });
 
@@ -307,17 +299,13 @@ test.describe('Trading Center — empty states @critical', () => {
   test('shows empty incoming message when no pending incoming offers', async ({
     page,
   }) => {
-    await expect(page.getByText('No incoming trade offers')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('No incoming trade offers')).toBeVisible();
   });
 
   test('shows empty outgoing message when no pending outgoing offers', async ({
     page,
   }) => {
-    await expect(page.getByText(/No outgoing offers/)).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/No outgoing offers/)).toBeVisible();
   });
 });
 
@@ -331,25 +319,23 @@ test.describe('Trading Center — incoming pending trade @critical', () => {
   });
 
   test('shows proposing team name for incoming offer', async ({ page }) => {
-    await expect(page.getByText(/From: Beta Force/)).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/From: Beta Force/)).toBeVisible();
   });
 
   test('shows PENDING status badge', async ({ page }) => {
-    await expect(page.getByText('PENDING')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('PENDING')).toBeVisible();
   });
 
   test('shows player name being offered (Mike Trout)', async ({ page }) => {
-    await expect(page.getByText('Mike Trout')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Mike Trout')).toBeVisible();
   });
 
   test('shows Accept button for incoming pending trade', async ({ page }) => {
-    await expect(page.getByText('Accept')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Accept')).toBeVisible();
   });
 
   test('shows Reject button for incoming pending trade', async ({ page }) => {
-    await expect(page.getByText('Reject')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Reject')).toBeVisible();
   });
 });
 
@@ -363,21 +349,17 @@ test.describe('Trading Center — outgoing pending trade @critical', () => {
   });
 
   test('shows receiving team name for outgoing offer', async ({ page }) => {
-    await expect(page.getByText(/To: Beta Force/)).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/To: Beta Force/)).toBeVisible();
   });
 
   test('shows player name in outgoing trade (Mookie Betts)', async ({
     page,
   }) => {
-    await expect(page.getByText('Mookie Betts')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Mookie Betts')).toBeVisible();
   });
 
   test('shows Cancel button for outgoing pending trade', async ({ page }) => {
-    await expect(page.getByText('Cancel')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Cancel')).toBeVisible();
   });
 
   test('does not show Accept or Reject for outgoing trade', async ({
@@ -396,9 +378,7 @@ test.describe('Trading Center — trade history @regression', () => {
   });
 
   test('shows Trade History toggle button', async ({ page }) => {
-    await expect(page.getByText('Trade History')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Trade History')).toBeVisible();
   });
 });
 
@@ -416,7 +396,7 @@ test.describe('Trading Center — propose trade dialog @regression', () => {
 
     await expect(
       page.getByRole('dialog', { name: 'Propose Trade' }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('dialog shows step 1 — team selection', async ({ page }) => {
@@ -424,13 +404,13 @@ test.describe('Trading Center — propose trade dialog @regression', () => {
 
     await expect(
       page.getByText('Select the team you want to trade with'),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('dialog shows team names to trade with', async ({ page }) => {
     await page.getByText('Propose Trade').click();
 
     // Beta Force is the other team (not my team)
-    await expect(page.getByText('Beta Force')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Beta Force')).toBeVisible();
   });
 });

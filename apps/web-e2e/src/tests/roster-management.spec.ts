@@ -245,19 +245,19 @@ test.describe('Roster Management — layout @critical', () => {
   });
 
   test('shows "My Roster" heading', async ({ page }) => {
-    await expect(page.getByText('My Roster')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('My Roster')).toBeVisible();
   });
 
   test('shows Lineup quickstat', async ({ page }) => {
-    await expect(page.getByText('Lineup')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Lineup')).toBeVisible();
   });
 
   test('shows Bench quickstat', async ({ page }) => {
-    await expect(page.getByText('Bench')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Bench')).toBeVisible();
   });
 
   test('shows Open quickstat', async ({ page }) => {
-    await expect(page.getByText('Open')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Open')).toBeVisible();
   });
 });
 
@@ -270,25 +270,21 @@ test.describe('Roster Management — player data @critical', () => {
 
   test('shows player in SP lineup slot', async ({ page }) => {
     // Gerrit Cole is assigned to positionId 1 (SP)
-    await expect(page.getByText('Gerrit Cole')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Gerrit Cole')).toBeVisible();
   });
 
   test('shows player in infield lineup slot (1B)', async ({ page }) => {
     // Freddie Freeman is assigned to the 1B slot
-    await expect(page.getByText('Freddie Freeman')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Freddie Freeman')).toBeVisible();
   });
 
   test('shows bench player not in lineup', async ({ page }) => {
     // Mookie Betts has positionId:null → on bench
-    await expect(page.getByText('Mookie Betts')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Mookie Betts')).toBeVisible();
   });
 
   test('shows SP position type label', async ({ page }) => {
-    await expect(page.getByText('SP').first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('SP').first()).toBeVisible();
   });
 });
 
@@ -300,9 +296,7 @@ test.describe('Roster Management — bench/bullpen regions @critical', () => {
   });
 
   test('shows Bench region', async ({ page }) => {
-    await expect(page.getByRole('region', { name: /bench/i })).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByRole('region', { name: /bench/i })).toBeVisible();
   });
 });
 
@@ -317,7 +311,7 @@ test.describe('Roster Management — empty roster @regression', () => {
       'Unexpected Application Error',
     );
     // Roster heading should still appear
-    await expect(page.getByText('My Roster')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('My Roster')).toBeVisible();
   });
 
   test('shows empty bench message when no bench players', async ({ page }) => {
@@ -325,9 +319,7 @@ test.describe('Roster Management — empty roster @regression', () => {
     await page.goto('/baseball/league/1/roster');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Bench is empty')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Bench is empty')).toBeVisible();
   });
 });
 
@@ -344,7 +336,7 @@ test.describe('Roster Management — aria attributes for lineup slots @regressio
     // Gerrit Cole at SP
     await expect(
       page.getByRole('button', { name: /Gerrit Cole at SP/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('empty lineup slot has aria-label indicating open slot', async ({
@@ -353,6 +345,6 @@ test.describe('Roster Management — aria attributes for lineup slots @regressio
     // Positions C, CF, UTIL have no assigned player → open slots
     await expect(
       page.getByRole('button', { name: /open slot/i }).first(),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 });

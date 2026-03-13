@@ -227,22 +227,22 @@ test.describe('Standings Tab — data rendering @critical', () => {
   });
 
   test('shows team names from mocked standings data', async ({ page }) => {
-    await expect(page.getByText('Alpha Squad')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('Beta Force')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('Gamma Stars')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('Delta Kings')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Alpha Squad')).toBeVisible();
+    await expect(page.getByText('Beta Force')).toBeVisible();
+    await expect(page.getByText('Gamma Stars')).toBeVisible();
+    await expect(page.getByText('Delta Kings')).toBeVisible();
   });
 
   test('shows win totals from standings data', async ({ page }) => {
     // Alpha Squad has 8 wins — verify a win count is visible
     const cells = page.getByText('8');
-    await expect(cells.first()).toBeVisible({ timeout: 30000 });
+    await expect(cells.first()).toBeVisible();
   });
 
   test('shows loss totals from standings data', async ({ page }) => {
     // Alpha Squad (8W-2L): loss count 2 should be visible
     const cells = page.getByText('2');
-    await expect(cells.first()).toBeVisible({ timeout: 30000 });
+    await expect(cells.first()).toBeVisible();
   });
 });
 
@@ -353,6 +353,6 @@ test.describe('Standings Tab — empty state @regression', () => {
       'Unexpected Application Error',
     );
     // Teams should show (without standings data, they appear in default order)
-    await expect(page.getByText('Alpha Squad')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Alpha Squad')).toBeVisible();
   });
 });

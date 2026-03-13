@@ -1,4 +1,4 @@
-/**
+﻿/**
  * E2E tests for the Join League flow.
  *
  * Covers:
@@ -82,7 +82,7 @@ test.describe('Join League — page load @critical', () => {
 
     await expect(
       page.getByRole('heading', { name: /How It Works/i }),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
 
     await expect(page.getByText(/8-character code/i)).toBeVisible();
   });
@@ -100,7 +100,7 @@ test.describe('Join League — deep link @critical', () => {
     await expect(lp.inviteCodeInput).toHaveValue('ABC12XYZ');
 
     // Deep-link confirmation banner appears
-    await expect(lp.deepLinkBanner).toBeVisible({ timeout: 10000 });
+    await expect(lp.deepLinkBanner).toBeVisible();
 
     // Subtext changes to indicate code is pre-filled
     await expect(
@@ -138,9 +138,7 @@ test.describe('Join League — invite code validation @critical', () => {
 
     await lp.inviteCodeInput.fill('SLUGGER1');
 
-    await expect(page.getByText(/Summer Sluggers/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/Summer Sluggers/i)).toBeVisible();
     await expect(page.getByText(/3.*of.*10.*spot/i)).toBeVisible();
   });
 
@@ -157,9 +155,7 @@ test.describe('Join League — invite code validation @critical', () => {
 
     await lp.inviteCodeInput.fill('BADCODE1');
 
-    await expect(page.getByText(/Invalid invite code/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/Invalid invite code/i)).toBeVisible();
   });
 
   test('shows league-full state when isFull is true', async ({ page }) => {
@@ -178,9 +174,7 @@ test.describe('Join League — invite code validation @critical', () => {
 
     await lp.inviteCodeInput.fill('FULLLEAG');
 
-    await expect(page.getByText(/League full/i)).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText(/League full/i)).toBeVisible();
     await expect(page.getByText(/all 10 spots taken/i)).toBeVisible();
   });
 });
@@ -249,7 +243,7 @@ test.describe('Join League — form validation @regression', () => {
 
     // Both filled → enabled (validation mock confirms code is valid)
     await lp.inviteCodeInput.fill('VALIDCO1');
-    await expect(lp.joinButton).toBeEnabled({ timeout: 10_000 });
+    await expect(lp.joinButton).toBeEnabled();
   });
 
   test('shows error when submitting invalid code format', async ({ page }) => {
@@ -312,7 +306,7 @@ test.describe('Join League — league full @regression', () => {
     // Banner should appear and submit should be disabled
     await expect(
       page.getByRole('alert').filter({ hasText: /This league is full/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
     await expect(lp.joinButton).toBeDisabled();
   });
 });
@@ -338,7 +332,7 @@ test.describe('Join League — error handling @regression', () => {
     await lp.fillAndSubmitJoinForm('VALIDCO1', 'Repeat Team');
 
     // Error message should appear in a red card
-    await expect(lp.formErrorCard).toBeVisible({ timeout: 10000 });
+    await expect(lp.formErrorCard).toBeVisible();
 
     // Stays on the join page
     await expect(page).toHaveURL('/baseball/league/join');
@@ -364,7 +358,7 @@ test.describe('Join League — error handling @regression', () => {
 
     await lp.fillAndSubmitJoinForm('VALIDCO1', 'Network Team');
 
-    await expect(lp.formErrorCard).toBeVisible({ timeout: 15000 });
+    await expect(lp.formErrorCard).toBeVisible();
     await expect(page).toHaveURL('/baseball/league/join');
   });
 });
@@ -379,7 +373,7 @@ test.describe('Join League — cancel @regression', () => {
 
     await lp.cancelButton.click();
 
-    await expect(page).toHaveURL('/baseball', { timeout: 10000 });
+    await expect(page).toHaveURL('/baseball');
   });
 });
 
@@ -409,14 +403,12 @@ test.describe('Join League — keyboard submission @regression', () => {
     await lp.teamNameInput.fill('Keyboard Team');
 
     // Wait for server validation to pass and button to become enabled
-    await expect(lp.joinButton).toBeEnabled({ timeout: 10000 });
+    await expect(lp.joinButton).toBeEnabled();
 
     // Submit via keyboard — exercises the form onSubmit handler,
     // not the button onPress handler
     await lp.teamNameInput.press('Enter');
 
-    await expect(page).toHaveURL(/\/baseball\/league\/55/, {
-      timeout: 15000,
-    });
+    await expect(page).toHaveURL(/\/baseball\/league\/55/);
   });
 });

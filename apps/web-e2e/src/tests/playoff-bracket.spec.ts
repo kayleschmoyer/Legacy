@@ -372,7 +372,7 @@ test.describe('Playoff Bracket — no bracket state @smoke', () => {
       'Unexpected Application Error',
     );
     // Standings should still render
-    await expect(page.getByText('Alpha Squad')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Alpha Squad')).toBeVisible();
     // Bracket heading should NOT be present
     await expect(
       page.getByRole('heading', { name: 'Playoff Bracket' }),
@@ -390,56 +390,48 @@ test.describe('Playoff Bracket — completed bracket @critical', () => {
   test('shows "Playoff Bracket" heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: 'Playoff Bracket' }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows season and format subtitle', async ({ page }) => {
-    await expect(page.getByText(/2024 Season/)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(/2024 Season/)).toBeVisible();
   });
 
   test('shows Wild Card round header', async ({ page }) => {
     // H4 with textTransform uppercase — DOM text is "Wild Card"
     await expect(
       page.getByRole('heading', { name: 'Wild Card', level: 4 }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows Championship round header', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: 'Championship', level: 4 }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows "Final" badge for completed matchups', async ({ page }) => {
-    await expect(page.getByText('Final').first()).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Final').first()).toBeVisible();
   });
 
   test('shows team names from wild card matchup', async ({ page }) => {
-    await expect(page.getByText('Alpha Squad').first()).toBeVisible({
-      timeout: 30000,
-    });
-    await expect(page.getByText('Delta Kings').first()).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Alpha Squad').first()).toBeVisible();
+    await expect(page.getByText('Delta Kings').first()).toBeVisible();
   });
 
   test('shows scores for completed matchups', async ({ page }) => {
     // Alpha Squad scored 85.5 in wild card
-    await expect(page.getByText('85.5').first()).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('85.5').first()).toBeVisible();
   });
 
   test('shows champion callout when bracket is completed', async ({ page }) => {
-    await expect(page.getByText('Champion')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Champion')).toBeVisible();
   });
 
   test('shows champion team name in callout', async ({ page }) => {
     // Alpha Squad is the champion — their name should appear in champion section
     const championText = page.getByText('Alpha Squad');
-    await expect(championText.first()).toBeVisible({ timeout: 30000 });
+    await expect(championText.first()).toBeVisible();
   });
 });
 
@@ -453,22 +445,22 @@ test.describe('Playoff Bracket — in-progress bracket @critical', () => {
   test('shows Playoffs Bracket heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: 'Playoff Bracket' }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows "Semifinals" round header', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: 'Semifinals', level: 4 }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows "Live" badge for in-progress matchup', async ({ page }) => {
-    await expect(page.getByText('Live')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Live')).toBeVisible();
   });
 
   test('shows in-progress scores', async ({ page }) => {
-    await expect(page.getByText('45.2')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('38.7')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('45.2')).toBeVisible();
+    await expect(page.getByText('38.7')).toBeVisible();
   });
 
   test('does not show Champion callout when bracket is in progress', async ({
@@ -488,11 +480,11 @@ test.describe('Playoff Bracket — scheduled bracket @regression', () => {
   test('shows bracket heading for scheduled bracket', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: 'Playoff Bracket' }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows "TBD" when team seeds are not yet assigned', async ({ page }) => {
-    await expect(page.getByText('TBD').first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('TBD').first()).toBeVisible();
   });
 
   test('does not show Final or Live badges for scheduled matchup', async ({

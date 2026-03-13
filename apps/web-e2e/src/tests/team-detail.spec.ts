@@ -191,7 +191,7 @@ test.describe('Team Detail Page — team identity @critical', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('My Team')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('My Team')).toBeVisible();
   });
 
   test('displays a Back button', async ({ page }) => {
@@ -199,9 +199,7 @@ test.describe('Team Detail Page — team identity @critical', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByRole('button', { name: /back/i })).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByRole('button', { name: /back/i })).toBeVisible();
   });
 
   test('shows the first letter of team name as avatar fallback', async ({
@@ -212,7 +210,7 @@ test.describe('Team Detail Page — team identity @critical', () => {
     await page.waitForLoadState('load');
 
     // Avatar fallback shows 'M' (first char of 'My Team')
-    await expect(page.getByText('M')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('M')).toBeVisible();
   });
 });
 
@@ -224,7 +222,7 @@ test.describe('Team Detail Page — roster @critical', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Roster')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Roster')).toBeVisible();
   });
 
   test('shows player name from team members', async ({ page }) => {
@@ -243,7 +241,7 @@ test.describe('Team Detail Page — roster @critical', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Babe Ruth')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Babe Ruth')).toBeVisible();
   });
 
   test('shows multiple players', async ({ page }) => {
@@ -274,8 +272,8 @@ test.describe('Team Detail Page — roster @critical', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Babe Ruth')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Ty Cobb')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Babe Ruth')).toBeVisible();
+    await expect(page.getByText('Ty Cobb')).toBeVisible();
   });
 
   test('shows position ID for each roster member', async ({ page }) => {
@@ -285,9 +283,7 @@ test.describe('Team Detail Page — roster @critical', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/Position ID: 5/)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(/Position ID: 5/)).toBeVisible();
   });
 });
 
@@ -305,9 +301,7 @@ test.describe('Team Detail Page — GM settings @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Team Settings')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Team Settings')).toBeVisible();
   });
 
   test('GM sees "Team Branding" section', async ({ page }) => {
@@ -315,9 +309,7 @@ test.describe('Team Detail Page — GM settings @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Team Branding')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText('Team Branding')).toBeVisible();
   });
 
   test('visitor does not see Team Settings section', async ({ page }) => {
@@ -326,9 +318,7 @@ test.describe('Team Detail Page — GM settings @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Team Settings')).not.toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Team Settings')).not.toBeVisible();
   });
 
   test('visitor sees "viewing as a visitor" note', async ({ page }) => {
@@ -336,9 +326,9 @@ test.describe('Team Detail Page — GM settings @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/viewing this team as a visitor/i)).toBeVisible(
-      { timeout: 15000 },
-    );
+    await expect(
+      page.getByText(/viewing this team as a visitor/i),
+    ).toBeVisible();
   });
 });
 
@@ -352,8 +342,6 @@ test.describe('Team Detail Page — error state @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/error loading team/i)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByText(/error loading team/i)).toBeVisible();
   });
 });

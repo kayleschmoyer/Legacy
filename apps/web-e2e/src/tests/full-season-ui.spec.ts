@@ -412,7 +412,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       await page.waitForLoadState('domcontentloaded');
       await expect(
         page.getByRole('heading', { name: /Create Baseball League/i }),
-      ).toBeVisible({ timeout: 30000 });
+      ).toBeVisible();
     });
 
     await test.step('Fill in league settings', async () => {
@@ -442,10 +442,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       });
 
       await page.getByRole('button', { name: /create league/i }).click();
-      await expect(page).toHaveURL(
-        new RegExp(`/baseball/league/${LEAGUE_ID}`),
-        { timeout: 15000 },
-      );
+      await expect(page).toHaveURL(new RegExp(`/baseball/league/${LEAGUE_ID}`));
     });
   });
 
@@ -496,13 +493,13 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       await page.waitForLoadState('domcontentloaded');
       await expect(
         page.getByRole('heading', { name: /Join League/i }),
-      ).toBeVisible({ timeout: 30000 });
+      ).toBeVisible();
     });
 
     await test.step('Fill team name and submit', async () => {
-      await expect(page.getByText(/Invite code loaded from link/i)).toBeVisible(
-        { timeout: 15000 },
-      );
+      await expect(
+        page.getByText(/Invite code loaded from link/i),
+      ).toBeVisible();
       await page.getByPlaceholder('Enter your team name').fill(TEAM_2.name);
       await page.getByRole('button', { name: /join league/i }).click();
     });
@@ -520,9 +517,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Navigate to league overview', async () => {
       await page.goto(`/baseball/league/${LEAGUE_ID}/overview`);
       await page.waitForLoadState('load');
-      await expect(page.getByText(LEAGUE_NAME)).toBeVisible({
-        timeout: 30000,
-      });
+      await expect(page.getByText(LEAGUE_NAME)).toBeVisible();
     });
 
     await test.step('Verify all core tabs are rendered', async () => {
@@ -534,9 +529,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
         'Matchup',
         'Trades',
       ]) {
-        await expect(page.getByText(tabLabel).first()).toBeVisible({
-          timeout: 10000,
-        });
+        await expect(page.getByText(tabLabel).first()).toBeVisible();
       }
     });
 
@@ -583,7 +576,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       // At least some of our mocked players should appear
       await expect(
         page.getByText('Mike Johnson', { exact: false }).first(),
-      ).toBeVisible({ timeout: 30000 });
+      ).toBeVisible();
     });
   });
 
@@ -709,7 +702,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Verify player type toggle exists', async () => {
       await expect(
         page.getByRole('button', { name: 'Hitters' }).first(),
-      ).toBeVisible({ timeout: 30000 });
+      ).toBeVisible();
       await expect(
         page.getByRole('button', { name: 'Pitchers' }).first(),
       ).toBeVisible();
@@ -768,19 +761,31 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       // The free-agent table renders player names; clicking opens the
       // WaiverClaimModal. Look for the mocked player "Willie Mays".
       const playerRow = page.getByText('Mays', { exact: false }).first();
-      if (await playerRow.isVisible({ timeout: 15000 })) {
+      const isPlayerVisible = await playerRow
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (isPlayerVisible) {
         await playerRow.click();
         // Wait for modal to potentially open
         await page.waitForTimeout(1000);
 
         // Check if the modal opened
         const modalTitle = page.getByText('Claim Free Agent');
-        if (await modalTitle.isVisible({ timeout: 5000 })) {
+        const isModalVisible = await modalTitle
+          .waitFor({ state: 'visible', timeout: 3000 })
+          .then(() => true)
+          .catch(() => false);
+        if (isModalVisible) {
           await test.step('Submit the claim', async () => {
             const submitButton = page
               .getByRole('button', { name: /submit claim/i })
               .first();
-            if (await submitButton.isVisible({ timeout: 5000 })) {
+            const isSubmitVisible = await submitButton
+              .waitFor({ state: 'visible', timeout: 3000 })
+              .then(() => true)
+              .catch(() => false);
+            if (isSubmitVisible) {
               await submitButton.click();
               await page.waitForTimeout(1000);
             }
@@ -870,14 +875,14 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Verify Trading Center heading', async () => {
       await expect(
         page.getByText('Trading Center', { exact: false }).first(),
-      ).toBeVisible({ timeout: 30000 });
+      ).toBeVisible();
     });
 
     await test.step('Click Propose Trade button', async () => {
       const proposeButton = page
         .getByRole('button', { name: /propose trade/i })
         .first();
-      if (await proposeButton.isVisible({ timeout: 10000 })) {
+      if (await proposeButton.isVisible()) {
         await proposeButton.click();
         await page.waitForTimeout(1000);
 
@@ -885,12 +890,12 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
         const teamStep = page
           .getByText(/select the team/i, { exact: false })
           .first();
-        if (await teamStep.isVisible({ timeout: 5000 })) {
+        if (await teamStep.isVisible()) {
           // Select the opposing team if a selector is visible
           const teamOption = page
             .getByText(TEAM_2.name, { exact: false })
             .first();
-          if (await teamOption.isVisible({ timeout: 3000 })) {
+          if (await teamOption.isVisible()) {
             await teamOption.click();
           }
         }
@@ -967,10 +972,10 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       // Team names should appear in the standings
       await expect(
         page.getByText(TEAM_1.name, { exact: false }).first(),
-      ).toBeVisible({ timeout: 30000 });
+      ).toBeVisible();
       await expect(
         page.getByText(TEAM_2.name, { exact: false }).first(),
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible();
     });
   });
 
@@ -986,15 +991,11 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Navigate to league overview', async () => {
       await page.goto(`/baseball/league/${LEAGUE_ID}/overview`);
       await page.waitForLoadState('load');
-      await expect(page.getByText(LEAGUE_NAME)).toBeVisible({
-        timeout: 30000,
-      });
+      await expect(page.getByText(LEAGUE_NAME)).toBeVisible();
     });
 
     await test.step('Activity sub-tab is shown by default', async () => {
-      await expect(page.getByText('Activity').first()).toBeVisible({
-        timeout: 10000,
-      });
+      await expect(page.getByText('Activity').first()).toBeVisible();
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
       );
@@ -1038,9 +1039,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Navigate to league overview', async () => {
       await page.goto(`/baseball/league/${LEAGUE_ID}/overview`);
       await page.waitForLoadState('load');
-      await expect(page.getByText(LEAGUE_NAME)).toBeVisible({
-        timeout: 30000,
-      });
+      await expect(page.getByText(LEAGUE_NAME)).toBeVisible();
     });
 
     await test.step('Switch to Chat sub-tab', async () => {
@@ -1052,7 +1051,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Chat textarea is visible', async () => {
       await expect(
         page.getByRole('textbox', { name: /message the league/i }),
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible();
     });
 
     await test.step('Type and send a message', async () => {

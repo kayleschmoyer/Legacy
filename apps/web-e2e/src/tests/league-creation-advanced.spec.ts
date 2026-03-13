@@ -92,7 +92,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     // Fill name and submit to verify the selection was accepted (form submits)
     await page.getByPlaceholder('Enter your league name').fill('My League');
     await page.getByRole('button', { name: /create league/i }).click();
-    await expect(page).toHaveURL(/\/baseball\/league\/\d+/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
   });
 
   // ─── Player Pool ──────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.getByRole('button', { name: 'National League' }).click();
     await page.getByPlaceholder('Enter your league name').fill('NL League');
     await page.getByRole('button', { name: /create league/i }).click();
-    await expect(page).toHaveURL(/\/baseball\/league\/\d+/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
   });
 
   // ─── Scheduling Strategy ──────────────────────────────────────────────────
@@ -478,7 +478,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       .getByPlaceholder('Enter your league name')
       .fill('Fixed League Name');
     await page.getByRole('button', { name: /create league/i }).click();
-    await expect(page).toHaveURL(/\/baseball\/league\/\d+/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
   });
 
   test('should display GraphQL network error in inline error card', async ({
@@ -511,7 +511,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.getByRole('button', { name: /create league/i }).click();
 
     // Apollo error card with "Error:" prefix
-    await expect(page.locator('text=Error:')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=Error:')).toBeVisible();
     await expect(page).toHaveURL('/baseball/league/create');
   });
 

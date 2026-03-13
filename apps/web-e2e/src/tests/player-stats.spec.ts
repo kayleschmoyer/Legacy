@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+﻿import { expect, test } from '@playwright/test';
 
 test.describe('Player Statistics Page @critical', () => {
   test.beforeEach(async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe('Player Statistics Page @critical', () => {
       await page
         .locator('[data-testid^="player-row-"]')
         .first()
-        .waitFor({ state: 'visible', timeout: 10000 });
+        .waitFor({ state: 'visible' });
     } catch {
       test.skip(true, 'No player data rows rendered — backend may be offline');
       return;
@@ -103,7 +103,7 @@ test.describe('Player Statistics Page @critical', () => {
       await page
         .locator('[data-testid^="player-row-"]')
         .first()
-        .waitFor({ state: 'visible', timeout: 10000 });
+        .waitFor({ state: 'visible' });
     } catch {
       test.skip(true, 'No player data rows rendered — backend may be offline');
       return;
@@ -133,7 +133,7 @@ test.describe('Player Statistics Page @critical', () => {
     // The grid has inline filter controls: "Filters:", "Min G:", "Min HR:", "Min RBI:"
     const filtersLabel = page.getByText('Filters:');
 
-    if (await filtersLabel.isVisible({ timeout: 5000 })) {
+    if (await filtersLabel.isVisible()) {
       // Take screenshot showing filter controls
       await expect(page).toHaveScreenshot('filter-controls.png');
     }
@@ -146,7 +146,7 @@ test.describe('Player Statistics Page @critical', () => {
       name: /previous|prev/i,
     });
 
-    if (await paginationNext.isVisible({ timeout: 5000 })) {
+    if (await paginationNext.isVisible()) {
       // Check if next button is enabled
       const isNextEnabled = await paginationNext.isEnabled();
 
@@ -177,7 +177,7 @@ test.describe('Player Statistics Page @critical', () => {
     // Wait for player rows to load
     const rowLocator = page.locator('[data-testid^="player-row-"]').first();
     try {
-      await rowLocator.waitFor({ state: 'visible', timeout: 10000 });
+      await rowLocator.waitFor({ state: 'visible' });
     } catch {
       // No player data available (e.g. no backend) — nothing to interact with
       test.skip(true, 'No player data rows rendered — backend may be offline');
@@ -255,7 +255,7 @@ test.describe('Player Statistics Page @critical', () => {
       .locator('[data-testid*="loading"]')
       .or(page.getByText(/loading/i));
 
-    if (await loadingIndicator.isVisible({ timeout: 1000 })) {
+    if (await loadingIndicator.isVisible()) {
       // Take screenshot of loading state
       await expect(page).toHaveScreenshot('loading-state.png');
     }

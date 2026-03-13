@@ -276,7 +276,7 @@ test.describe('Player Detail Modal @critical', () => {
 
     // The modal is always open on the /players/:id route
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
   });
 
   test('displays career hero stats — AVG, HR, RBI chips', async ({ page }) => {
@@ -285,12 +285,12 @@ test.describe('Player Detail Modal @critical', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
     // Wait for stats to load (spinner should disappear)
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
 
     // Hero stat chips (label text rendered inside HeroStat components)
     await expect(dialog.getByText('AVG')).toBeVisible();
@@ -308,11 +308,11 @@ test.describe('Player Detail Modal @critical', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
 
     // "Eligible Positions" label
     await expect(dialog.getByText('Eligible Positions')).toBeVisible();
@@ -337,11 +337,11 @@ test.describe('Player Detail Modal @critical', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
 
     // Career Batting stat card title
     await expect(dialog.getByText('Career Batting')).toBeVisible();
@@ -360,11 +360,11 @@ test.describe('Player Detail Modal @critical', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
 
     // The batting tab should be active by default since the player has batting data
     // Verify column headers in the batting table
@@ -391,11 +391,11 @@ test.describe('Player Detail Modal @critical', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
 
     // Click the Fielding tab
     const fieldingTab = dialog.getByText('Fielding', { exact: true });
@@ -418,14 +418,12 @@ test.describe('Player Detail Modal @critical', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // The spinner / loading text should be visible before data arrives
-    await expect(page.getByText('Loading player statistics…')).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByText('Loading player statistics…')).toBeVisible();
 
     // Eventually data loads and spinner disappears
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 10000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
   });
 
   test('closes when the Close button is clicked', async ({ page }) => {
@@ -434,14 +432,14 @@ test.describe('Player Detail Modal @critical', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
     // The X / Close button in BaseModal has aria-label="Close"
     const closeButton = dialog.getByRole('button', { name: 'Close' });
     await closeButton.click({ force: true });
 
     // After close, the page-level PlayerDetailPage navigates to /players/stats
-    await page.waitForURL('**/players/stats', { timeout: 5000 });
+    await page.waitForURL('**/players/stats');
   });
 });
 
@@ -456,11 +454,11 @@ test.describe('Player Detail Modal — Pitcher @critical', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
 
     // Eligible positions for a pitcher
     await expect(dialog.getByText('SP')).toBeVisible();
@@ -490,11 +488,11 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
 
     await expect(dialog.getByText('No season statistics found')).toBeVisible();
   });
@@ -509,11 +507,11 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
 
     await expect(dialog.getByText('Error loading stats')).toBeVisible();
   });
@@ -526,12 +524,12 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
     await page.keyboard.press('Escape');
 
     // Navigate back to player stats list
-    await page.waitForURL('**/players/stats', { timeout: 5000 });
+    await page.waitForURL('**/players/stats');
   });
 
   test('player nav: back button returns to /players/stats', async ({
@@ -542,7 +540,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
     // The PlayerDetailPage renders a "← Back to Player Statistics" button
     const backButton = page.getByRole('button', {
@@ -551,10 +549,10 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await expect(backButton).toBeVisible();
     await backButton.click();
 
-    await page.waitForURL('**/players/stats', { timeout: 5000 });
+    await page.waitForURL('**/players/stats');
     await expect(
       page.getByRole('heading', { name: /player statistics/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 
   test('batting tab switches back from fielding tab', async ({ page }) => {
@@ -563,11 +561,11 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
 
     // Switch to Fielding
     await dialog.getByText('Fielding', { exact: true }).click({ force: true });
@@ -589,11 +587,11 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.waitForLoadState('networkidle');
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog).toBeVisible();
 
-    await expect(page.getByText('Loading player statistics…')).not.toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText('Loading player statistics…'),
+    ).not.toBeVisible();
 
     // Season subtitle says "2 seasons"
     await expect(dialog.getByText(/2 season/i)).toBeVisible();

@@ -34,7 +34,7 @@ test.describe('League Creation @critical', () => {
     // Verify the page rendered with the correct heading
     await expect(
       page.getByRole('heading', { name: /Create Baseball League/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
 
     // Verify the form is present
     await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
@@ -119,9 +119,7 @@ test.describe('League Creation @critical', () => {
     // Navigate to league creation page
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Fill in valid league data
     const leagueName = `Test League ${Date.now()}`;
@@ -137,9 +135,7 @@ test.describe('League Creation @critical', () => {
     await page.getByRole('button', { name: /create league/i }).click();
 
     // Wait for successful creation and navigation to the new league page
-    await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
-      timeout: 15000,
-    });
+    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
   });
 
   test('should handle GraphQL errors gracefully', async ({ page }) => {
@@ -183,7 +179,7 @@ test.describe('League Creation @critical', () => {
     await page.getByRole('button', { name: /create league/i }).click();
 
     // The Apollo error object is displayed inline in a red error card
-    await expect(page.locator('text=Error:')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=Error:')).toBeVisible();
 
     // Verify form stays on same page
     await expect(page).toHaveURL('/baseball/league/create');
@@ -280,9 +276,7 @@ test.describe('League Creation @critical', () => {
   test('should allow canceling league creation', async ({ page }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Fill in some form data
     await page.getByPlaceholder('Enter your league name').fill('Test League');
@@ -291,7 +285,7 @@ test.describe('League Creation @critical', () => {
     await page.getByRole('button', { name: /cancel/i }).click();
 
     // Should navigate back to baseball homepage
-    await expect(page).toHaveURL('/baseball', { timeout: 15000 });
+    await expect(page).toHaveURL('/baseball');
   });
 
   test('should preserve form state during selection changes', async ({
@@ -328,9 +322,7 @@ test.describe('League Creation @critical', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Wait for page to render
-    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Verify the Draft Date & Time label is visible
     await expect(page.getByText('Draft Date & Time')).toBeVisible();
@@ -341,7 +333,7 @@ test.describe('League Creation @critical', () => {
     const datePickerButton = page
       .locator('button')
       .filter({ hasText: /\d{4}/ });
-    await expect(datePickerButton.first()).toBeVisible({ timeout: 10000 });
+    await expect(datePickerButton.first()).toBeVisible();
   });
 
   test('should display loading state during submission', async ({ page }) => {
@@ -381,9 +373,7 @@ test.describe('League Creation @critical', () => {
 
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
     // Fill in form
     await page
@@ -402,6 +392,6 @@ test.describe('League Creation @critical', () => {
     ).toBeDisabled();
 
     // Wait for completion
-    await expect(page).toHaveURL('/baseball/league/999', { timeout: 15000 });
+    await expect(page).toHaveURL('/baseball/league/999');
   });
 });

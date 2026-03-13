@@ -1,4 +1,4 @@
-/**
+﻿/**
  * E2E tests for subscription flows.
  *
  * Covers:
@@ -79,7 +79,7 @@ test.describe('PremiumGate — free user @critical', () => {
 
     // The lock overlay card should be visible
     const upgradeBtn = page.getByRole('button', { name: /upgrade/i }).first();
-    await expect(upgradeBtn).toBeVisible({ timeout: 15_000 });
+    await expect(upgradeBtn).toBeVisible();
   });
 
   test('clicking Upgrade CTA opens the UpgradeModal', async ({ page }) => {
@@ -99,7 +99,7 @@ test.describe('PremiumGate — free user @critical', () => {
     // UpgradeModal should be visible — check for premium features list heading
     await expect(
       page.getByText(/premium features|upgrade to premium/i),
-    ).toBeVisible({ timeout: 8_000 });
+    ).toBeVisible();
   });
 });
 
@@ -120,7 +120,7 @@ test.describe('PremiumGate — premium user @critical', () => {
     // No lock/upgrade overlay
     await expect(
       page.getByRole('button', { name: /upgrade/i }),
-    ).not.toBeVisible({ timeout: 5_000 });
+    ).not.toBeVisible();
   });
 });
 
@@ -142,12 +142,12 @@ test.describe('SubscriptionPage — free tier @critical', () => {
 
     await expect(
       page.getByRole('heading', { name: /subscription|billing/i }),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible();
 
     // Should show a CTA to upgrade
     await expect(
       page.getByRole('button', { name: /upgrade|get premium/i }),
-    ).toBeVisible({ timeout: 5_000 });
+    ).toBeVisible();
   });
 
   test('shows free tier feature list items', async ({ page }) => {
@@ -160,9 +160,7 @@ test.describe('SubscriptionPage — free tier @critical', () => {
     await page.waitForLoadState('load');
 
     // The feature comparison table lists "Join up to 3 leagues"
-    await expect(page.getByText(/3 league|up to 3/i)).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(page.getByText(/3 league|up to 3/i)).toBeVisible();
   });
 });
 
@@ -177,16 +175,14 @@ test.describe('SubscriptionPage — active premium @critical', () => {
     await page.waitForLoadState('load');
 
     // Should show active plan indicator
-    await expect(page.getByText(/active|premium/i).first()).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(page.getByText(/active|premium/i).first()).toBeVisible();
 
     // Manage billing / portal button
     await expect(
       page.getByRole('button', {
         name: /manage billing|billing portal|cancel|manage/i,
       }),
-    ).toBeVisible({ timeout: 5_000 });
+    ).toBeVisible();
   });
 
   test('billing portal button calls createBillingPortalSession mutation', async ({
@@ -223,7 +219,7 @@ test.describe('SubscriptionPage — active premium @critical', () => {
     const manageBtn = page
       .getByRole('button', { name: /manage billing|billing portal|manage/i })
       .first();
-    await expect(manageBtn).toBeVisible({ timeout: 15_000 });
+    await expect(manageBtn).toBeVisible();
     await manageBtn.click();
 
     // Give the mutation a moment to fire
@@ -246,7 +242,7 @@ test.describe('SubscriptionPage — past due @regression', () => {
 
     await expect(
       page.getByText(/past due|payment failed|fix payment/i),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible();
   });
 });
 
@@ -265,7 +261,7 @@ test.describe('SubscriptionPage — canceled @regression', () => {
     // Should show either "Canceled" status or resubscribe CTA
     await expect(
       page.getByText(/canceled|resubscribe|start new|upgrade/i),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible();
   });
 });
 
@@ -307,7 +303,7 @@ test.describe('Subscription upgrade flow @critical', () => {
     const upgradeBtn = page
       .getByRole('button', { name: /upgrade|get premium/i })
       .first();
-    await expect(upgradeBtn).toBeVisible({ timeout: 15_000 });
+    await expect(upgradeBtn).toBeVisible();
     await upgradeBtn.click();
 
     await page.waitForTimeout(500);

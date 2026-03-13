@@ -101,18 +101,18 @@ test.describe('Players Directory – static elements @smoke', () => {
   test('shows the All Players heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /all players/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows a search input', async ({ page }) => {
     const searchInput = page.getByPlaceholder(/search/i).first();
-    await expect(searchInput).toBeVisible({ timeout: 30000 });
+    await expect(searchInput).toBeVisible();
   });
 
   test('shows a sort/order control', async ({ page }) => {
     // PlayersGrid renders a Select element for sort order
     const sortControl = page.getByText(/name/i).first();
-    await expect(sortControl).toBeVisible({ timeout: 30000 });
+    await expect(sortControl).toBeVisible();
   });
 });
 
@@ -130,19 +130,19 @@ test.describe('Players Directory – player cards @critical', () => {
   test('renders player cards from mocked data', async ({ page }) => {
     await expect(
       page.getByText('Aaron Judge', { exact: false }).first(),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
     await expect(
       page.getByText('Shohei Ohtani', { exact: false }).first(),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('displays multiple players', async ({ page }) => {
     await expect(
       page.getByText('Mookie Betts', { exact: false }).first(),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
     await expect(
       page.getByText('Freddie Freeman', { exact: false }).first(),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 });
 
@@ -159,7 +159,7 @@ test.describe('Players Directory – search @regression', () => {
 
   test('search input accepts text', async ({ page }) => {
     const searchInput = page.getByPlaceholder(/search/i).first();
-    await expect(searchInput).toBeVisible({ timeout: 30000 });
+    await expect(searchInput).toBeVisible();
     await searchInput.fill('Judge');
     await expect(searchInput).toHaveValue('Judge');
   });
@@ -185,7 +185,7 @@ test.describe('Players Directory – empty state @regression', () => {
     // Heading should still be present
     await expect(
       page.getByRole('heading', { name: /all players/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
     // No player cards visible
     await expect(
       page.getByText('Aaron Judge', { exact: false }),

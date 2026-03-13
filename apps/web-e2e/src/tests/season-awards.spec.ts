@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Season Awards Control E2E Tests (LS-689)
  *
  * Covers: "Season Awards" accordion panel on the commissioner tab,
@@ -309,7 +309,7 @@ async function setupGraphQL(
 // Helper: expand the Season Awards accordion section
 async function expandSeasonAwards(page: import('@playwright/test').Page) {
   const toggle = page.getByTestId('commissioner-section-toggle-season-awards');
-  await toggle.waitFor({ state: 'visible', timeout: 15000 });
+  await toggle.waitFor({ state: 'visible' });
   await toggle.click();
 }
 
@@ -325,7 +325,7 @@ test.describe('Season Awards — accordion panel @critical', () => {
 
     await expect(
       page.getByTestId('commissioner-section-toggle-season-awards'),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
   });
 
   test('clicking the toggle expands the Season Awards panel', async ({
@@ -337,9 +337,9 @@ test.describe('Season Awards — accordion panel @critical', () => {
 
     await expandSeasonAwards(page);
 
-    await expect(page.getByText('Season Awards', { exact: true })).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(
+      page.getByText('Season Awards', { exact: true }),
+    ).toBeVisible();
   });
 
   test('"Season Awards" heading is visible inside the panel', async ({
@@ -354,9 +354,7 @@ test.describe('Season Awards — accordion panel @critical', () => {
     // H4 heading inside the panel
     await expect(
       page.getByRole('heading', { name: /season awards/i }),
-    ).toBeVisible({
-      timeout: 10000,
-    });
+    ).toBeVisible();
   });
 });
 
@@ -369,9 +367,7 @@ test.describe('Season Awards — award type rows @critical', () => {
     await page.waitForLoadState('load');
     await expandSeasonAwards(page);
 
-    await expect(page.getByText('Most Valuable Player')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Most Valuable Player')).toBeVisible();
   });
 
   test('displays "Cy Young Award" award row', async ({ page }) => {
@@ -380,9 +376,7 @@ test.describe('Season Awards — award type rows @critical', () => {
     await page.waitForLoadState('load');
     await expandSeasonAwards(page);
 
-    await expect(page.getByText('Cy Young Award')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Cy Young Award')).toBeVisible();
   });
 
   test('displays "Rookie of the Year" award row', async ({ page }) => {
@@ -391,9 +385,7 @@ test.describe('Season Awards — award type rows @critical', () => {
     await page.waitForLoadState('load');
     await expandSeasonAwards(page);
 
-    await expect(page.getByText('Rookie of the Year')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Rookie of the Year')).toBeVisible();
   });
 
   test('displays "Gold Glove" award row', async ({ page }) => {
@@ -402,7 +394,7 @@ test.describe('Season Awards — award type rows @critical', () => {
     await page.waitForLoadState('load');
     await expandSeasonAwards(page);
 
-    await expect(page.getByText('Gold Glove')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Gold Glove')).toBeVisible();
   });
 
   test('displays "Silver Slugger" award row', async ({ page }) => {
@@ -411,9 +403,7 @@ test.describe('Season Awards — award type rows @critical', () => {
     await page.waitForLoadState('load');
     await expandSeasonAwards(page);
 
-    await expect(page.getByText('Silver Slugger')).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('Silver Slugger')).toBeVisible();
   });
 });
 
@@ -428,7 +418,7 @@ test.describe('Season Awards — season picker @regression', () => {
 
     await expect(
       page.getByRole('combobox', { name: /select season/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 });
 
@@ -449,7 +439,7 @@ test.describe('Season Awards — existing award display @regression', () => {
     await page.waitForLoadState('load');
     await expandSeasonAwards(page);
 
-    await expect(page.getByText('Babe Ruth')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Babe Ruth')).toBeVisible();
   });
 
   test('shows delete button for an assigned award', async ({ page }) => {
@@ -463,6 +453,6 @@ test.describe('Season Awards — existing award display @regression', () => {
     // Delete/remove button should be visible for assigned award (Trash2 icon button)
     await expect(
       page.getByRole('button', { name: /remove.*mvp|remove.*award|delete/i }),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
   });
 });

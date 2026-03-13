@@ -264,53 +264,37 @@ test.describe('Player Stats Page (mocked) — page structure @critical', () => {
   });
 
   test('shows "MLB Player Statistics" heading', async ({ page }) => {
-    await expect(page.getByText('MLB Player Statistics')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('MLB Player Statistics')).toBeVisible();
   });
 
   test('shows Batting Stats tab', async ({ page }) => {
-    await expect(page.getByText('Batting Stats')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Batting Stats')).toBeVisible();
   });
 
   test('shows Pitching Stats tab', async ({ page }) => {
-    await expect(page.getByText('Pitching Stats')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Pitching Stats')).toBeVisible();
   });
 
   test('shows batting stats heading in batting tab', async ({ page }) => {
-    await expect(page.getByText('MLB Career Batting Leaders')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('MLB Career Batting Leaders')).toBeVisible();
   });
 
   test('shows player name from mocked batting data', async ({ page }) => {
-    await expect(page.getByText('Barry Bonds')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Barry Bonds')).toBeVisible();
   });
 
   test('shows multiple players from mocked batting data', async ({ page }) => {
-    await expect(page.getByText('Barry Bonds')).toBeVisible({
-      timeout: 30000,
-    });
-    await expect(page.getByText('Pete Rose')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Barry Bonds')).toBeVisible();
+    await expect(page.getByText('Pete Rose')).toBeVisible();
   });
 
   test('shows HR value from mocked batting data', async ({ page }) => {
     // Barry Bonds 762 HR
-    await expect(page.getByText('762')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('762')).toBeVisible();
   });
 
   test('shows search input for batting stats', async ({ page }) => {
-    await expect(page.getByPlaceholder('Search players...')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByPlaceholder('Search players...')).toBeVisible();
   });
 });
 
@@ -325,25 +309,19 @@ test.describe('Player Stats Page (mocked) — pitching tab @critical', () => {
   test('shows pitching stats heading after switching tabs', async ({
     page,
   }) => {
-    await expect(page.getByText('MLB Career Pitching Leaders')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('MLB Career Pitching Leaders')).toBeVisible();
   });
 
   test('shows pitcher name from mocked pitching data', async ({ page }) => {
-    await expect(page.getByText('Roger Clemens')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Roger Clemens')).toBeVisible();
   });
 
   test('shows ERA value for pitcher', async ({ page }) => {
-    await expect(page.getByText('3.19')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('3.19')).toBeVisible();
   });
 
   test('shows search input for pitching stats', async ({ page }) => {
-    await expect(page.getByPlaceholder('Search pitchers...')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByPlaceholder('Search pitchers...')).toBeVisible();
   });
 });
 
@@ -353,9 +331,7 @@ test.describe('Player Stats Page (mocked) — empty states @regression', () => {
     await page.goto('/players/stats');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('No players found')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('No players found')).toBeVisible();
   });
 
   test('shows empty state when no pitchers', async ({ page }) => {
@@ -364,9 +340,7 @@ test.describe('Player Stats Page (mocked) — empty states @regression', () => {
     await page.waitForLoadState('load');
 
     await page.getByText('Pitching Stats').click();
-    await expect(page.getByText('No pitchers found')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('No pitchers found')).toBeVisible();
   });
 });
 
@@ -376,9 +350,7 @@ test.describe('Player Stats Page (mocked) — error states @regression', () => {
     await page.goto('/players/stats');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Error Loading Statistics')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Error Loading Statistics')).toBeVisible();
   });
 
   test('shows error state when pitching query fails', async ({ page }) => {
@@ -387,9 +359,7 @@ test.describe('Player Stats Page (mocked) — error states @regression', () => {
     await page.waitForLoadState('load');
 
     await page.getByText('Pitching Stats').click();
-    await expect(page.getByText('Error Loading Statistics')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Error Loading Statistics')).toBeVisible();
   });
 
   test('page does not crash on stats query failures', async ({ page }) => {
