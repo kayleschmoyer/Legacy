@@ -168,6 +168,20 @@ test.beforeEach(async ({ page }) => {
 
 > **Important:** Always call `route.fallback()` (not `route.continue()`) for unmatched
 > operations so other route handlers can process them.
+>
+> **Hermetic tests (exception to the above):** When writing a fully isolated
+> test that should _never_ hit a real backend, intentionally replace the
+> `route.fallback()` catch-all with `route.fulfill({ json: { data: {} } })`.
+> This breaks the handler chain on purpose — unmatched operations get an
+> empty response instead of leaking to the network, preventing flaky failures
+> from missing mocks. Use this only when full isolation is the goal.
+
+> **Avoid broad `postData.includes()` matches:** A check like
+> `postData.includes('getleague')` will also match `getleagueteams`,
+> `getleaguemembers`, etc. Either:
+>
+> - **Reorder** specific matches before general ones (`getleagueteams` before `getleague`)
+> - **Quote** the operation name: `postData.includes('"getleague"')` to match the exact JSON field
 
 ### 5. Tag the test suite
 
@@ -328,13 +342,15 @@ The CI action supports inputs: `test-patterns`, `browser`, `timeout-minutes`, `r
 
 ## Troubleshooting
 
-| Problem                         | Fix                                                         |
-| ------------------------------- | ----------------------------------------------------------- |
-| Tests timeout on `goto()`       | Ensure `pnpm exec nx serve web` is running on port 4200     |
-| Auth fails locally              | Delete `.auth/token-cache.json` and re-run                  |
-| Snapshots differ on CI vs local | CI uses Linux Chromium — update snapshots via the GH Action |
-| GraphQL mock not intercepting   | Check the URL filter excludes `/@fs/` and `.ts`/`.js` paths |
-| `route.continue()` conflicts    | Use `route.fallback()` instead to allow handler chaining    |
+| Problem                          | Fix                                                            |
+| -------------------------------- | -------------------------------------------------------------- |
+| Tests timeout on `goto()`        | Ensure `pnpm exec nx serve web` is running on port 4200        |
+| Auth fails locally               | Delete `.auth/token-cache.json` and re-run                     |
+| Snapshots differ on CI vs local  | CI uses Linux Chromium — update snapshots via the GH Action    |
+| GraphQL mock not intercepting    | Check the URL filter excludes `/@fs/` and `.ts`/`.js` paths    |
+| `route.continue()` conflicts     | Use `route.fallback()` instead to allow handler chaining       |
+| Mock never intercepts query      | Check for broad `includes()` match — use quoted operation name |
+| Flaky: some tests pass vacuously | Mock returns `data: null` — use `{ data: { queryName: [] } }`  |
 
 ## Tamagui / Custom Component Pitfalls
 

@@ -326,6 +326,11 @@ git commit -m "feat(scope): description (LS-####)"
 git push -u origin HEAD
 ```
 
+> **⚠️ `--no-verify` skips Prettier.** If you use `git commit --no-verify` (e.g., the
+> worktree lacks pre-commit hooks or `node_modules`), formatting is **not checked**.
+> You **must** run Prettier manually before pushing — otherwise CI will fail the
+> formatting gate. See Step 7 for how to run a minimal formatting check.
+
 ### Step 6b: Apply Pending Migrations 🚨 Required
 
 **Always do this step — even if you think no migrations were added.**
@@ -355,6 +360,19 @@ Run the full validation suite before opening the PR. Fix any failures and push a
 ```powershell
 make pc
 ```
+
+> **Docs-only or non-code changes?** `make pc` requires `node_modules` (via `make wt-setup`).
+> If the worktree was created without `make wt-setup` for a docs-only change, you **still
+> must format** before pushing. Use the main repo's Prettier as a minimal check:
+>
+> ```powershell
+> # From the worktree — uses main repo's Prettier install
+> node D:\code\legacy-sports\node_modules\prettier\bin\prettier.cjs --check .
+> # Fix formatting issues:
+> node D:\code\legacy-sports\node_modules\prettier\bin\prettier.cjs --write <files>
+> ```
+>
+> This is the **minimum bar** — even markdown files are checked by CI's formatting gate.
 
 > **Formatting failures?** If `make pc` exits with `ERROR: Formatting rewrote the following files:`, run:
 >

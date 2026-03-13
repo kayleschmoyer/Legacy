@@ -69,7 +69,27 @@ If the branch does not contain a Jira ticket key:
 > Prefer avoiding this by creating a dedicated epic worktree upfront
 > (see worktree-workflow skill, "Epic-Level Work").
 
-### 3. Pending Migrations Must Be Applied
+### 3. Changed Files Must Be Formatted
+
+CI runs Prettier on every changed file. If any file fails the formatting check, the entire Quality Gates job fails — even for docs-only PRs.
+
+```powershell
+# From the worktree root (requires node_modules via make wt-setup)
+pnpm exec prettier --check .
+
+# Fix any issues
+pnpm exec prettier --write <files>
+```
+
+> **No `node_modules` in the worktree?** Use the main repo's Prettier directly:
+>
+> ```powershell
+> node D:\code\legacy-sports\node_modules\prettier\bin\prettier.cjs --check .
+> ```
+
+> **Why this catches what `--no-verify` misses:** Pre-commit hooks run Prettier automatically, but `git commit --no-verify` skips them. If you used `--no-verify`, you must check formatting manually before pushing.
+
+### 4. Pending Migrations Must Be Applied
 
 If a migration file was added or modified as part of this work, apply it before creating the PR:
 
@@ -82,7 +102,7 @@ Verify the output includes `✅ Applied N new migrations` (or `No pending migrat
 
 > **When to run:** Any time a file exists under `lib/db-client/migrations/` that was created or modified in this branch.
 
-### 4. Affected E2E Tests Must Pass
+### 5. Affected E2E Tests Must Pass
 
 Before creating the PR, run all E2E tests affected by your changes:
 
