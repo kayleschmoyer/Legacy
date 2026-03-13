@@ -231,9 +231,15 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
 
       // Apply optional name filter
       if (search && search.trim().length > 0) {
-        const term = `%${search.trim().toLowerCase()}%`;
+        // Escape LIKE metacharacters (%, _, and \) to prevent wildcard injection
+        // that could cause unexpected pattern matches or performance issues.
+        const escaped = search
+          .trim()
+          .toLowerCase()
+          .replace(/[%_\\]/g, '\\$&');
+        const term = `%${escaped}%`;
         sqlConditions.push(
-          sql`(LOWER(p.first_name || ' ' || p.last_name) LIKE ${term})`,
+          sql`(LOWER(p.first_name || ' ' || p.last_name) LIKE ${term} ESCAPE '\\')`,
         );
       }
 
