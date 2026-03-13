@@ -211,6 +211,22 @@ If `make pc` fails with lint or type errors, see the [fix-lint](../fix-lint/SKIL
 
 ---
 
+## Bulk Rebase: Find All Conflicting Open PRs
+
+When asked to "rebase all conflicting PRs" or "fix all merge conflicts", use `--limit 200` to avoid missing PRs. This repo can have 100+ open PRs; the default limit of 30 silently misses most of them.
+
+```powershell
+# Always use --limit 200 to avoid pagination gaps
+$raw = gh pr list --author "@me" --state open --limit 200 --json number,headRefName,mergeable,mergeStateStatus
+$conflicting = ($raw | ConvertFrom-Json) | Where-Object { $_.mergeable -eq "CONFLICTING" }
+$conflicting | Select-Object number, headRefName
+Write-Host "Total conflicting: $($conflicting.Count) of $(($raw | ConvertFrom-Json).Count) open PRs"
+```
+
+> **Never use the default `gh pr list` without `--limit 200`** — it caps at 30 and will silently miss the majority of open PRs.
+
+---
+
 ## Handling Large Rebases (Many Conflicts)
 
 When a branch is far behind `main` and dozens of files conflict across multiple commits, use this systematic approach.
