@@ -177,11 +177,11 @@ builder.mutationField('undoLastDraftPick', (t) =>
 
         return result.lastPick;
       } catch (error) {
-        LOGGER.error('Error undoing draft pick', {
-          draftId,
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOGGER.error(
+          'Error undoing draft pick',
+          error instanceof Error ? error : new Error(String(error)),
+          { draftId, userId },
+        );
         throw error;
       }
     },

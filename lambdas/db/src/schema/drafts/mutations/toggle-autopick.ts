@@ -158,12 +158,11 @@ builder.mutationField('toggleDraftAutoPick', (t) =>
 
         return enable;
       } catch (error) {
-        LOGGER.error('Error toggling auto-pick', {
-          draftId,
-          userId,
-          enable,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOGGER.error(
+          'Error toggling auto-pick',
+          error instanceof Error ? error : new Error(String(error)),
+          { draftId, userId, enable },
+        );
         throw error;
       }
     },

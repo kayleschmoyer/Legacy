@@ -305,13 +305,10 @@ builder.mutationField('commissionerPick', (t) =>
           } catch (matchupError) {
             LOGGER.error(
               'Failed to auto-create matchups after commissioner draft',
-              {
-                leagueId: result.leagueId,
-                error:
-                  matchupError instanceof Error
-                    ? matchupError.message
-                    : String(matchupError),
-              },
+              matchupError instanceof Error
+                ? matchupError
+                : new Error(String(matchupError)),
+              { leagueId: result.leagueId },
             );
           }
 
@@ -343,12 +340,11 @@ builder.mutationField('commissionerPick', (t) =>
 
         return result.draftPick;
       } catch (error) {
-        LOGGER.error('Error making commissioner pick', {
-          draftId,
-          playerId,
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOGGER.error(
+          'Error making commissioner pick',
+          error instanceof Error ? error : new Error(String(error)),
+          { draftId, playerId, userId },
+        );
         throw error;
       }
     },

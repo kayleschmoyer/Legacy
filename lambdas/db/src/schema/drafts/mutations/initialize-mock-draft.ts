@@ -253,10 +253,11 @@ builder.mutationField('initializeMockDraft', (t) =>
 
         return { leagueId: league.id, draftId: draft.id };
       } catch (error) {
-        LOGGER.error('Error initializing mock draft', {
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOGGER.error(
+          'Error initializing mock draft',
+          error instanceof Error ? error : new Error(String(error)),
+          { userId },
+        );
         throw error;
       }
     },

@@ -335,11 +335,11 @@ builder.mutationField('updateDraftSettings', (t) =>
           playerPool: updatedPlayerPool,
         };
       } catch (error) {
-        LOGGER.error('Error updating draft settings', {
-          leagueId,
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOGGER.error(
+          'Error updating draft settings',
+          error instanceof Error ? error : new Error(String(error)),
+          { leagueId, userId },
+        );
         throw error;
       }
     },

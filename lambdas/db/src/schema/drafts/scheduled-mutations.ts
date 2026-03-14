@@ -933,13 +933,10 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 } catch (matchupError) {
                   LOGGER.error(
                     '[autoProcessDraftPicks] Failed to auto-create matchups',
-                    {
-                      leagueId: draftLeagueId,
-                      error:
-                        matchupError instanceof Error
-                          ? matchupError.message
-                          : String(matchupError),
-                    },
+                    matchupError instanceof Error
+                      ? matchupError
+                      : new Error(String(matchupError)),
+                    { leagueId: draftLeagueId },
                   );
                 }
 
@@ -1285,7 +1282,8 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
                 : String(draftError);
             LOGGER.error(
               `[autoStartScheduledDrafts] Error starting draft ${draftId}`,
-              { draftId, leagueId, error: errMsg },
+              draftError instanceof Error ? draftError : new Error(errMsg),
+              { draftId, leagueId },
             );
             result.errors.push(`Draft ${draftId}: ${errMsg}`);
           }
@@ -1299,9 +1297,10 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
         return result;
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
-        LOGGER.error('[autoStartScheduledDrafts] Fatal error', {
-          error: errMsg,
-        });
+        LOGGER.error(
+          '[autoStartScheduledDrafts] Fatal error',
+          error instanceof Error ? error : new Error(errMsg),
+        );
         result.errors.push(errMsg);
         return result;
       }

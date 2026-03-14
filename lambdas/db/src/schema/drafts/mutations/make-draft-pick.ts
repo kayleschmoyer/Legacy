@@ -790,13 +790,13 @@ builder.mutationField('makeDraftPick', (t) =>
             });
           } catch (matchupError) {
             // Log but don't fail the draft pick — matchups can be created manually
-            LOGGER.error('Failed to auto-create matchups after draft', {
-              leagueId: result.leagueId,
-              error:
-                matchupError instanceof Error
-                  ? matchupError.message
-                  : String(matchupError),
-            });
+            LOGGER.error(
+              'Failed to auto-create matchups after draft',
+              matchupError instanceof Error
+                ? matchupError
+                : new Error(String(matchupError)),
+              { leagueId: result.leagueId },
+            );
           }
 
           // Evaluate draft badges for all participants (fire-and-forget, non-fatal)
