@@ -8,18 +8,7 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import { schema } from './schema';
 import { createLoaders } from './schema/dataloaders';
 
-// Classify client-visible error codes (validation, auth, bad input) that should
-// NOT be reported as errors. Hoisted to module scope to avoid re-allocation.
-const CLIENT_FACING_CODES = new Set([
-  'GRAPHQL_VALIDATION_FAILED',
-  'GRAPHQL_PARSE_FAILED',
-  'BAD_USER_INPUT',
-  'UNAUTHENTICATED',
-  'FORBIDDEN',
-  'NOT_FOUND',
-  'PERSISTED_QUERY_NOT_FOUND',
-  'PERSISTED_QUERY_NOT_SUPPORTED',
-]);
+import { CLIENT_FACING_CODES } from './server/graphql-error-codes';
 
 interface JWTPayload {
   id: number;
