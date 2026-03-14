@@ -22,6 +22,10 @@ test.describe('Management Page — static elements @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/management');
     await page.waitForLoadState('load');
+    // Wait for page to fully render with auth — H3 heading confirms React has hydrated
+    await expect(
+      page.getByRole('heading', { name: /league management/i }),
+    ).toBeVisible();
   });
 
   test('loads the management page without errors', async ({ page }) => {
@@ -50,9 +54,9 @@ test.describe('Management Page — static elements @smoke', () => {
   });
 
   test('shows Information card with ownership note', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: /information/i }),
-    ).toBeVisible();
+    // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText (same as
+    // LS-1174 fix for preferences/profile-settings)
+    await expect(page.getByText('Information', { exact: true })).toBeVisible();
     await expect(
       page.getByText(/only leagues you own will be deleted/i),
     ).toBeVisible();

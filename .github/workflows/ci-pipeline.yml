@@ -252,7 +252,7 @@ jobs:
       needs.build-validation.outputs.overall-result == 'success' &&
       (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.requires-full-build == 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

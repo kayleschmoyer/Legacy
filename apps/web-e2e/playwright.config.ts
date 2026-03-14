@@ -27,8 +27,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only — 1 retry catches genuine infra blips without tripling runtime */
   retries: process.env.CI ? 1 : 0,
-  /* 2 workers matches the GitHub Actions runner vCPU count */
-  workers: process.env.CI ? 2 : undefined,
+  /* 4 workers: GHA runners have 7GB RAM; Playwright tests are I/O-bound not CPU-bound,
+   * so 4 parallel browsers (~400MB) finishes in ~5min vs ~15min at 2 workers */
+  workers: process.env.CI ? 4 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['json', { outputFile: 'test-results/results.json' }],
@@ -54,6 +55,9 @@ export default defineConfig({
 
   /* Configure snapshot settings */
   expect: {
+    /* Fast-fail for selector mismatches — mocked tests don't need 5s to determine
+     * an element is absent; saves ~2s per failure × retries */
+    timeout: 3000,
     /* Threshold for visual comparisons */
     toHaveScreenshot: {
       threshold: 0.2,

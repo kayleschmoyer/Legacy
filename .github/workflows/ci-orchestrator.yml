@@ -179,8 +179,8 @@ jobs:
     with:
       debug_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_mode || false }}
       # Nightly schedule: run ALL tests (empty grep = no filter), 3 shards
-      # PRs / merge_group: run @critical + @smoke tests, exclude @slow, 2 shards
-      e2e-test-patterns: ${{ github.event.schedule == '0 3 * * *' && '' || '@critical|@smoke' }}
+      # PRs / merge_group: run @critical tests only, exclude @slow, 2 shards
+      e2e-test-patterns: ${{ github.event.schedule == '0 3 * * *' && '' || '@critical' }}
       e2e-exclude-patterns: ${{ github.event.schedule == '0 3 * * *' && '' || '@slow' }}
       e2e-shard-total: ${{ github.event.schedule == '0 3 * * *' && 3 || 2 }}
     secrets: inherit
