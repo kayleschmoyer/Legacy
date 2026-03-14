@@ -217,24 +217,24 @@ jobs:
         shell: bash
         env:
           CI: "true"
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET_KEY }}
           INTEGRATION_BASE_URL: ${{ secrets.INTEGRATION_BASE_URL }}
         run: |
           SUITE="${{ inputs.test-suite }}"
 
           if [ "$SUITE" == "integration" ]; then
-            cd apps/web-e2e
-            CONFIG="playwright.integration.config.ts"
+            CONFIG="apps/web-e2e/playwright.integration.config.ts"
           else
-            cd apps/web-e2e
-            CONFIG="playwright.config.ts"
+            CONFIG="apps/web-e2e/playwright.config.ts"
           fi
 
           # Build Playwright arguments as an array to avoid command injection
           PLAYWRIGHT_ARGS=( "--config=$CONFIG" )
 
-          # Browser / project
-          PLAYWRIGHT_ARGS+=( "--project=${{ inputs.browser }}" )
+          # Browser / project (integration config has no named projects)
+          if [ "$SUITE" != "integration" ]; then
+            PLAYWRIGHT_ARGS+=( "--project=${{ inputs.browser }}" )
+          fi
 
           # Grep patterns
           if [ "${{ inputs.test-grep }}" != "(all)" ]; then
