@@ -25,7 +25,7 @@ async function openTutorial(page: import('@playwright/test').Page) {
 
 // ── Tests: Tutorial launch ────────────────────────────────────────────────────
 
-test.describe('Onboarding Tutorial — launch @critical', () => {
+test.describe('Onboarding Tutorial — launch @regression', () => {
   test('"Launch Tutorial" button is visible on the Help page', async ({
     page,
   }) => {
@@ -64,7 +64,7 @@ test.describe('Onboarding Tutorial — launch @critical', () => {
 
 // ── Tests: Navigation ─────────────────────────────────────────────────────────
 
-test.describe('Onboarding Tutorial — navigation @critical', () => {
+test.describe('Onboarding Tutorial — navigation @regression', () => {
   test('"Next →" button is visible on the first step', async ({ page }) => {
     await openTutorial(page);
 

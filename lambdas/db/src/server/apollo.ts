@@ -15,9 +15,9 @@ import {
   queryComplexityLimitRule,
   queryDepthLimitRule,
 } from './graphql-validation-rules';
+import { CLIENT_FACING_CODES } from './graphql-error-codes';
 import { createLoaders } from '../schema/dataloaders';
 import { schema } from '../schema';
-import { CLIENT_FACING_CODES } from './graphql-error-codes';
 
 // Create Apollo Server instance
 export const server = new ApolloServer({

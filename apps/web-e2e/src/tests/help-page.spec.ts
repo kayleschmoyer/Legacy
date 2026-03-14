@@ -17,49 +17,49 @@ test.describe('Help Page — header and layout @smoke', () => {
   test('renders the Help & Support heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /help & support/i, level: 1 }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows descriptive subtitle text', async ({ page }) => {
     await expect(
       page.getByText(/find answers to common questions/i),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('renders the Tutorial section heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /new to legacy sports/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('renders the Quick Links section heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /quick links/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('renders the FAQ section heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /frequently asked questions/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('renders the Historical Stats section heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /historical stats.*how it works/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('renders the Getting Started section heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /getting started/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('renders the Contact & Support section heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /contact & support/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 });
 
@@ -76,7 +76,7 @@ test.describe('Help Page — navigation @smoke', () => {
     await expect(page).toHaveURL('/help');
     await expect(
       page.getByRole('heading', { name: /help & support/i, level: 1 }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('Help page URL is /help', async ({ page }) => {
@@ -96,13 +96,11 @@ test.describe('Help Page — tutorial launcher @smoke', () => {
   test('shows the Launch Tutorial button', async ({ page }) => {
     await expect(
       page.getByRole('button', { name: /launch tutorial/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows tutorial walkthrough description text', async ({ page }) => {
-    await expect(page.getByText(/6-step walkthrough/i)).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/6-step walkthrough/i)).toBeVisible();
   });
 });
 
@@ -116,13 +114,13 @@ test.describe('Help Page — quick links @smoke', () => {
     page,
   }) => {
     const link = page.getByRole('link', { name: /my leagues/i });
-    await expect(link).toBeVisible({ timeout: 30000 });
+    await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', '/baseball');
   });
 
   test('shows Players quick link pointing to /players', async ({ page }) => {
     const link = page.getByRole('link', { name: /^players$/i });
-    await expect(link).toBeVisible({ timeout: 30000 });
+    await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', '/players');
   });
 
@@ -130,7 +128,7 @@ test.describe('Help Page — quick links @smoke', () => {
     page,
   }) => {
     const link = page.getByRole('link', { name: /player stats/i });
-    await expect(link).toBeVisible({ timeout: 30000 });
+    await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', '/players/stats');
   });
 
@@ -138,7 +136,7 @@ test.describe('Help Page — quick links @smoke', () => {
     page,
   }) => {
     const link = page.getByRole('link', { name: /create league/i });
-    await expect(link).toBeVisible({ timeout: 30000 });
+    await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', '/baseball/league/create');
   });
 
@@ -146,7 +144,7 @@ test.describe('Help Page — quick links @smoke', () => {
     page,
   }) => {
     const link = page.getByRole('link', { name: /profile settings/i });
-    await expect(link).toBeVisible({ timeout: 30000 });
+    await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', '/profile/settings');
   });
 });
@@ -161,7 +159,7 @@ test.describe('Help Page — FAQ accordion @regression', () => {
     const firstFaqButton = page
       .getByRole('button')
       .filter({ hasText: /how do i create a fantasy baseball league/i });
-    await expect(firstFaqButton).toBeVisible({ timeout: 30000 });
+    await expect(firstFaqButton).toBeVisible();
     await expect(firstFaqButton).toHaveAttribute('aria-expanded', 'false');
   });
 
@@ -222,7 +220,7 @@ test.describe('Help Page — Historical Stats FAQ @regression', () => {
     const faqButton = page.getByRole('button').filter({
       hasText: /what makes legacy sports different from live fantasy/i,
     });
-    await expect(faqButton).toBeVisible({ timeout: 30000 });
+    await expect(faqButton).toBeVisible();
     await expect(faqButton).toHaveAttribute('aria-expanded', 'false');
   });
 
@@ -245,7 +243,7 @@ test.describe('Help Page — Historical Stats FAQ @regression', () => {
     const faqButton = page
       .getByRole('button')
       .filter({ hasText: /how does game selection work/i });
-    await expect(faqButton).toBeVisible({ timeout: 30000 });
+    await expect(faqButton).toBeVisible();
   });
 });
 
@@ -256,27 +254,19 @@ test.describe('Help Page — getting started steps @smoke', () => {
   });
 
   test('shows step 1: Create or join a league', async ({ page }) => {
-    await expect(page.getByText(/create or join a league/i)).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/create or join a league/i)).toBeVisible();
   });
 
   test('shows step 2: Set your roster', async ({ page }) => {
-    await expect(page.getByText(/set your roster/i)).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/set your roster/i)).toBeVisible();
   });
 
   test('shows step 3: Follow the season', async ({ page }) => {
-    await expect(page.getByText(/follow the season/i)).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/follow the season/i)).toBeVisible();
   });
 
   test('shows step 4: Win the championship', async ({ page }) => {
-    await expect(page.getByText(/win the championship/i)).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/win the championship/i)).toBeVisible();
   });
 });
 
@@ -287,27 +277,19 @@ test.describe('Help Page — contact and support @regression', () => {
   });
 
   test('shows Report a Bug contact option', async ({ page }) => {
-    await expect(page.getByText('Report a Bug')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Report a Bug')).toBeVisible();
   });
 
   test('shows Suggest a Feature contact option', async ({ page }) => {
-    await expect(page.getByText('Suggest a Feature')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Suggest a Feature')).toBeVisible();
   });
 
   test('shows Community Discussions contact option', async ({ page }) => {
-    await expect(page.getByText('Community Discussions')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Community Discussions')).toBeVisible();
   });
 
   test('shows urgent account issues notice', async ({ page }) => {
-    await expect(page.getByText(/urgent account issues/i)).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/urgent account issues/i)).toBeVisible();
   });
 
   test('Report a Bug option opens GitHub issues in a new tab', async ({

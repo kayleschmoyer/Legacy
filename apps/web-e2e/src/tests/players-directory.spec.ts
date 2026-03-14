@@ -120,7 +120,7 @@ test.describe('Players Directory – static elements @smoke', () => {
 // Tests – player data rendering
 // ---------------------------------------------------------------------------
 
-test.describe('Players Directory – player cards @critical', () => {
+test.describe('Players Directory – player cards @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockPlayersGraphQL(page);
     await page.goto('/players');

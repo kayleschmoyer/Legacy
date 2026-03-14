@@ -247,7 +247,7 @@ async function setupGraphQL(
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-test.describe('Trade Block Management @critical', () => {
+test.describe('Trade Block Management @regression', () => {
   test('should display Trade Block heading', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1');

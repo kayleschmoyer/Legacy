@@ -225,19 +225,20 @@ async function setupCommissionerGraphQL(
 
 // ── Draft Order Control ────────────────────────────────────────────────────
 
-test.describe('Draft Order Control @critical', () => {
+test.describe('Draft Order Control @regression', () => {
   test.beforeEach(async ({ page }) => {
     await setupCommissionerGraphQL(page, makeLeague('not-started'));
     await page.goto('/baseball/league/1/commissioner');
   });
 
   test('shows Draft Pick Order heading @smoke', async ({ page }) => {
+    // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText
     await expect(
-      page.getByRole('heading', { name: /draft pick order/i }),
+      page.getByText('Draft Pick Order', { exact: true }),
     ).toBeVisible();
   });
 
-  test('shows team names in the draft order list @critical', async ({
+  test('shows team names in the draft order list @regression', async ({
     page,
   }) => {
     await expect(page.getByText('Alpha Squad')).toBeVisible();
@@ -246,7 +247,7 @@ test.describe('Draft Order Control @critical', () => {
     await expect(page.getByText('Delta Stars')).toBeVisible();
   });
 
-  test('shows Randomize button @critical', async ({ page }) => {
+  test('shows Randomize button @regression', async ({ page }) => {
     const randomizeBtn = page.getByRole('button', {
       name: /randomize.*draft order|randomize/i,
     });
@@ -271,23 +272,24 @@ test.describe('Draft Order Control @critical', () => {
 
 // ── Draft Settings Control ─────────────────────────────────────────────────
 
-test.describe('Draft Settings Control @critical', () => {
+test.describe('Draft Settings Control @regression', () => {
   test.beforeEach(async ({ page }) => {
     await setupCommissionerGraphQL(page, makeLeague('not-started'));
     await page.goto('/baseball/league/1/commissioner');
   });
 
   test('shows Draft Settings heading @smoke', async ({ page }) => {
+    // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText
     await expect(
-      page.getByRole('heading', { name: /draft settings/i }),
+      page.getByText('Draft Settings', { exact: true }),
     ).toBeVisible();
   });
 
-  test('shows Draft Mode label @critical', async ({ page }) => {
+  test('shows Draft Mode label @regression', async ({ page }) => {
     await expect(page.getByText(/draft mode/i)).toBeVisible();
   });
 
-  test('shows Save Settings button @critical', async ({ page }) => {
+  test('shows Save Settings button @regression', async ({ page }) => {
     // Save button is rendered in the draft settings card
     const saveBtn = page.getByRole('button', { name: /save.*settings|save/i });
     await expect(saveBtn.first()).toBeVisible();

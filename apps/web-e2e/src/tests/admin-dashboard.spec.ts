@@ -157,10 +157,10 @@ adminTest.describe('Admin Dashboard – page structure @smoke', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: Users section @critical
+// Tests: Users section @regression
 // ---------------------------------------------------------------------------
 
-adminTest.describe('Admin Dashboard – users section @critical', () => {
+adminTest.describe('Admin Dashboard – users section @regression', () => {
   adminTest.beforeEach(async ({ page }) => {
     await mockAdminGraphQL(page);
     await page.goto('/admin');
@@ -193,10 +193,10 @@ adminTest.describe('Admin Dashboard – users section @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: User search @critical
+// Tests: User search @regression
 // ---------------------------------------------------------------------------
 
-adminTest.describe('Admin Dashboard – user search @critical', () => {
+adminTest.describe('Admin Dashboard – user search @regression', () => {
   adminTest.beforeEach(async ({ page }) => {
     await mockAdminGraphQL(page);
     await page.goto('/admin');

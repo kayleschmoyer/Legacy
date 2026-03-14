@@ -289,7 +289,7 @@ async function setupGraphQL(
 
 // ── Commissioner View Tests ───────────────────────────────────────────────────
 
-test.describe('Commissioner Announcements — commissioner view @critical', () => {
+test.describe('Commissioner Announcements — commissioner view @regression', () => {
   test('panel renders for commissioner when there are no announcements', async ({
     page,
   }) => {

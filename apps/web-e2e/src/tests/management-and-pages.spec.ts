@@ -42,9 +42,8 @@ test.describe('Management Page — static elements @smoke', () => {
   });
 
   test('shows Danger Zone section', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: /danger zone/i }),
-    ).toBeVisible();
+    // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText
+    await expect(page.getByText('Danger Zone', { exact: true })).toBeVisible();
   });
 
   test('shows Delete All Leagues button', async ({ page }) => {
@@ -63,7 +62,7 @@ test.describe('Management Page — static elements @smoke', () => {
   });
 });
 
-test.describe('Management Page — delete all leagues dialogs @critical', () => {
+test.describe('Management Page — delete all leagues dialogs @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/management');
     await page.waitForLoadState('load');

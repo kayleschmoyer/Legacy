@@ -185,7 +185,7 @@ async function setupGraphQL(
 
 // ── Tests: Team Identity ──────────────────────────────────────────────────────
 
-test.describe('Team Detail Page — team identity @critical', () => {
+test.describe('Team Detail Page – team identity @regression', () => {
   test('displays the team name', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto(TEAM_URL);
@@ -216,7 +216,7 @@ test.describe('Team Detail Page — team identity @critical', () => {
 
 // ── Tests: Roster ─────────────────────────────────────────────────────────────
 
-test.describe('Team Detail Page — roster @critical', () => {
+test.describe('Team Detail Page – roster @regression', () => {
   test('displays the "Roster" heading', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto(TEAM_URL);

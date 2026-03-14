@@ -25,9 +25,7 @@ test.describe('Navigation – Sports dropdown @smoke', () => {
   });
 
   test('renders the Sports trigger button', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /sports/i })).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByRole('button', { name: /sports/i })).toBeVisible();
   });
 
   test('opens sports menu on click', async ({ page }) => {
@@ -73,9 +71,7 @@ test.describe('Navigation – Players dropdown @smoke', () => {
   });
 
   test('renders the Players trigger button', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /players/i })).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByRole('button', { name: /players/i })).toBeVisible();
   });
 
   test('opens players menu on click', async ({ page }) => {

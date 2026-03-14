@@ -31,13 +31,9 @@ test.describe('Baseball Hub Page @critical', () => {
     page,
   }) => {
     // Wait for the action section to render (it's static HTML — no data needed)
-    await expect(page.getByText('Create League').first()).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Create League').first()).toBeVisible();
 
-    await expect(page.getByText('Join League').first()).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Join League').first()).toBeVisible();
   });
 
   test('Create League button navigates to league creation page', async ({
@@ -46,9 +42,7 @@ test.describe('Baseball Hub Page @critical', () => {
     // The Create League action is present (covered by prior test).
     // A click on the button also fires the parent SportCard's onPress, which
     // redirects to /baseball — so we verify the route directly instead.
-    await expect(page.getByText('Create League').first()).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Create League').first()).toBeVisible();
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('load');
     await expect(page).toHaveURL('/baseball/league/create');
@@ -72,7 +66,7 @@ test.describe('Baseball Hub Page @critical', () => {
   test('Your Leagues section heading is present', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /your leagues/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 });
 
@@ -89,12 +83,12 @@ test.describe('League Creation Form @critical', () => {
   test('shows the Create Baseball League heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /create baseball league/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('league name input is present and accepts text', async ({ page }) => {
     const input = page.getByPlaceholder('Enter your league name');
-    await expect(input).toBeVisible({ timeout: 30000 });
+    await expect(input).toBeVisible();
 
     await input.fill('My Test League');
     await expect(input).toHaveValue('My Test League');
@@ -104,7 +98,7 @@ test.describe('League Creation Form @critical', () => {
     page,
   }) => {
     const createButton = page.getByRole('button', { name: /create league/i });
-    await expect(createButton).toBeVisible({ timeout: 30000 });
+    await expect(createButton).toBeVisible();
     await expect(createButton).toBeDisabled();
   });
 
@@ -112,7 +106,7 @@ test.describe('League Creation Form @critical', () => {
     page,
   }) => {
     const input = page.getByPlaceholder('Enter your league name');
-    await expect(input).toBeVisible({ timeout: 30000 });
+    await expect(input).toBeVisible();
     await input.fill('Valid League Name');
 
     const createButton = page.getByRole('button', { name: /create league/i });
@@ -121,7 +115,7 @@ test.describe('League Creation Form @critical', () => {
 
   test('short league name triggers validation alert', async ({ page }) => {
     const input = page.getByPlaceholder('Enter your league name');
-    await expect(input).toBeVisible({ timeout: 30000 });
+    await expect(input).toBeVisible();
     await input.fill('Ab');
 
     const createButton = page.getByRole('button', { name: /create league/i });
@@ -145,7 +139,7 @@ test.describe('League Creation Form @critical', () => {
     // The form renders team count options (6, 8, 10, 12, 14, 16)
     // Default is 12 so expect the "12" option or a button to be active
     const teamOptions = page.getByText('12 Teams').or(page.getByText('12'));
-    await expect(teamOptions.first()).toBeVisible({ timeout: 30000 });
+    await expect(teamOptions.first()).toBeVisible();
   });
 
   test('league name is cleared after typing and re-emptying disables the button', async ({
@@ -153,7 +147,7 @@ test.describe('League Creation Form @critical', () => {
   }) => {
     const input = page.getByPlaceholder('Enter your league name');
     const createButton = page.getByRole('button', { name: /create league/i });
-    await expect(input).toBeVisible({ timeout: 30000 });
+    await expect(input).toBeVisible();
 
     await input.fill('Some Name');
     await expect(createButton).toBeEnabled();
@@ -176,7 +170,7 @@ test.describe('Join League By Code Form @regression', () => {
   test('shows a heading for joining a league', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /join/i }).first(),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('invite code input is present', async ({ page }) => {
@@ -184,7 +178,7 @@ test.describe('Join League By Code Form @regression', () => {
     const codeInput = page
       .getByPlaceholder(/invite code|enter.*code/i)
       .or(page.locator('input[type="text"]').first());
-    await expect(codeInput).toBeVisible({ timeout: 30000 });
+    await expect(codeInput).toBeVisible();
   });
 
   test('team name input is present', async ({ page }) => {
@@ -192,18 +186,16 @@ test.describe('Join League By Code Form @regression', () => {
     const teamInput = page
       .getByPlaceholder(/team name/i)
       .or(page.locator('input').nth(1));
-    await expect(teamInput).toBeVisible({ timeout: 30000 });
+    await expect(teamInput).toBeVisible();
   });
 
   test('join button is present', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /join/i })).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByRole('button', { name: /join/i })).toBeVisible();
   });
 
   test('invite code input converts to uppercase', async ({ page }) => {
     const codeInput = page.getByPlaceholder(/invite code|enter.*code/i).first();
-    await expect(codeInput).toBeVisible({ timeout: 30000 });
+    await expect(codeInput).toBeVisible();
     await codeInput.fill('abcd1234');
     // The component converts to uppercase on change via .toUpperCase()
     await expect(codeInput).toHaveValue('ABCD1234');
@@ -214,14 +206,14 @@ test.describe('Join League By Code Form @regression', () => {
     await page.waitForLoadState('load');
 
     const codeInput = page.getByPlaceholder(/invite code|enter.*code/i).first();
-    await expect(codeInput).toBeVisible({ timeout: 30000 });
+    await expect(codeInput).toBeVisible();
     await expect(codeInput).toHaveValue('TESTCODE');
   });
 
   test('join button is disabled when form is empty', async ({ page }) => {
     // The join button is intentionally disabled until both fields are filled
     const joinButton = page.getByRole('button', { name: /join league/i });
-    await expect(joinButton).toBeVisible({ timeout: 30000 });
+    await expect(joinButton).toBeVisible();
     await expect(joinButton).toBeDisabled();
   });
 
@@ -229,7 +221,7 @@ test.describe('Join League By Code Form @regression', () => {
     page,
   }) => {
     const codeInput = page.getByPlaceholder(/enter 8-character code/i).first();
-    await expect(codeInput).toBeVisible({ timeout: 30000 });
+    await expect(codeInput).toBeVisible();
     await codeInput.fill('ABCD1234');
 
     const joinButton = page.getByRole('button', { name: /join league/i });
@@ -239,7 +231,7 @@ test.describe('Join League By Code Form @regression', () => {
 
   test('invalid code format shows format error', async ({ page }) => {
     const codeInput = page.getByPlaceholder(/invite code|enter.*code/i).first();
-    await expect(codeInput).toBeVisible({ timeout: 30000 });
+    await expect(codeInput).toBeVisible();
     await codeInput.fill('SHORT');
 
     const teamInput = page.getByPlaceholder(/team name/i).first();

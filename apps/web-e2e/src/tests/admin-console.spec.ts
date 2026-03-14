@@ -101,7 +101,7 @@ async function mockAdminGraphQL(
 // Access control tests (uses regular `test` fixture, not adminTest)
 // ---------------------------------------------------------------------------
 
-test.describe('Admin Console — access control @critical', () => {
+test.describe('Admin Console — access control @regression', () => {
   test('non-admin user is redirected away from /admin', async ({ page }) => {
     // Regular `test` fixture uses a user@test.com JWT with accessLevel 'none'
     await page.goto('/admin');
@@ -149,7 +149,7 @@ adminTest.describe('Admin Console — navigation @smoke', () => {
 // Users section
 // ---------------------------------------------------------------------------
 
-adminTest.describe('Admin Console — Users section @critical', () => {
+adminTest.describe('Admin Console — Users section @regression', () => {
   adminTest.beforeEach(async ({ page }) => {
     await mockAdminGraphQL(page);
     await page.goto('/admin');
@@ -261,7 +261,7 @@ adminTest.describe('Admin Console — users error state @regression', () => {
 // JWT Decoder section
 // ---------------------------------------------------------------------------
 
-adminTest.describe('Admin Console — JWT Decoder @critical', () => {
+adminTest.describe('Admin Console — JWT Decoder @regression', () => {
   adminTest.beforeEach(async ({ page }) => {
     await mockAdminGraphQL(page);
     await page.goto('/admin');

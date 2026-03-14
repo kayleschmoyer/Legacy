@@ -128,7 +128,7 @@ test.describe('PremiumGate — premium user @critical', () => {
 // SubscriptionPage — /profile/subscription
 // ---------------------------------------------------------------------------
 
-test.describe('SubscriptionPage — free tier @critical', () => {
+test.describe('SubscriptionPage — free tier @regression', () => {
   test('renders heading and shows upgrade options for free users', async ({
     page,
   }) => {
@@ -164,7 +164,7 @@ test.describe('SubscriptionPage — free tier @critical', () => {
   });
 });
 
-test.describe('SubscriptionPage — active premium @critical', () => {
+test.describe('SubscriptionPage — active premium @regression', () => {
   test('renders current plan details for premium users', async ({ page }) => {
     await routeGraphQL(page, {
       getmysubscription: myPremiumSubscriptionResponse(),

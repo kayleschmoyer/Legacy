@@ -26,7 +26,7 @@ function isGraphQLEndpoint(url: URL): boolean {
   );
 }
 
-test.describe('League Branding @critical', () => {
+test.describe('League Branding @regression', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the commissioner tab on the league detail page
     await page.goto('/baseball/league/1/commissioner');

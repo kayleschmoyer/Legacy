@@ -23,7 +23,7 @@ test.describe('Homepage @smoke', () => {
   test('displays hero heading', async ({ page }) => {
     // The hero section contains an H1 with "Legacy Sports" branding copy or similar
     const heading = page.getByRole('heading', { level: 1 }).first();
-    await expect(heading).toBeVisible({ timeout: 30000 });
+    await expect(heading).toBeVisible();
   });
 
   test('displays a call-to-action button linking to baseball', async ({
@@ -33,12 +33,12 @@ test.describe('Homepage @smoke', () => {
     const cta = page.getByRole('button', {
       name: /get started|play ball|baseball/i,
     });
-    await expect(cta).toBeVisible({ timeout: 30000 });
+    await expect(cta).toBeVisible();
   });
 
   test('displays the Baseball sport card', async ({ page }) => {
     // Sports grid card with "Baseball" label
-    await expect(page.getByText('Baseball')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Baseball')).toBeVisible();
   });
 
   test('Create League quick-action navigates to league creation', async ({
@@ -48,7 +48,7 @@ test.describe('Homepage @smoke', () => {
     const createLeagueBtn = page.getByRole('button', {
       name: /create league/i,
     });
-    await expect(createLeagueBtn).toBeVisible({ timeout: 30000 });
+    await expect(createLeagueBtn).toBeVisible();
 
     // Verify navigating directly to the create league page works
     await page.goto('/baseball/league/create');
@@ -60,7 +60,7 @@ test.describe('Homepage @smoke', () => {
     // The homepage includes a "features" / "everything you need" marketing section
     await expect(
       page.getByText(/everything you need|features|manage/i).first(),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('page is accessible with skip navigation link', async ({ page }) => {

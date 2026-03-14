@@ -30,15 +30,11 @@ test.describe('Football Hub Page @critical', () => {
   });
 
   test('displays the Football Fantasy heading', async ({ page }) => {
-    await expect(page.getByText(/football fantasy/i).first()).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/football fantasy/i).first()).toBeVisible();
   });
 
   test('displays the coming-soon placeholder text', async ({ page }) => {
-    await expect(page.getByText(/coming soon/i).first()).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText(/coming soon/i).first()).toBeVisible();
   });
 });
 
@@ -59,7 +55,7 @@ test.describe('Football Hub — Sports dropdown navigation @smoke', () => {
     const primaryNav = page.getByRole('navigation', { name: 'Primary' });
     await expect(
       primaryNav.getByRole('button', { name: /sports/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('Sports dropdown opens and shows Football option', async ({ page }) => {
@@ -114,7 +110,7 @@ test.describe('Football Hub — mobile nav @smoke', () => {
     const hamburger = page.getByRole('button', {
       name: /open menu|close menu/i,
     });
-    await expect(hamburger).toBeVisible({ timeout: 30000 });
+    await expect(hamburger).toBeVisible();
     await hamburger.click();
 
     // Wait for the mobile nav to open and find the Football link

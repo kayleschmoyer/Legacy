@@ -256,7 +256,7 @@ test.describe('Player Stats Page (mocked) — navigation @smoke', () => {
   });
 });
 
-test.describe('Player Stats Page (mocked) — page structure @critical', () => {
+test.describe('Player Stats Page (mocked) – page structure @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockPlayerStatsGraphQL(page);
     await page.goto('/players/stats');
@@ -298,7 +298,7 @@ test.describe('Player Stats Page (mocked) — page structure @critical', () => {
   });
 });
 
-test.describe('Player Stats Page (mocked) — pitching tab @critical', () => {
+test.describe('Player Stats Page (mocked) – pitching tab @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockPlayerStatsGraphQL(page);
     await page.goto('/players/stats');

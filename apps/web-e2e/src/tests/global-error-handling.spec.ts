@@ -35,7 +35,7 @@ async function dispatchApolloError(page: Page, message: string) {
 
 // ── ApolloErrorToast ───────────────────────────────────────────────────────
 
-test.describe('ApolloErrorToast @critical', () => {
+test.describe('ApolloErrorToast @regression', () => {
   test.beforeEach(async ({ page }) => {
     // /about renders without GraphQL — stable base page
     await page.goto('/about');
@@ -49,27 +49,29 @@ test.describe('ApolloErrorToast @critical', () => {
     await expect(page.getByRole('alert')).toBeVisible();
   });
 
-  test('displays the error message content @critical', async ({ page }) => {
+  test('displays the error message content @regression', async ({ page }) => {
     const msg = 'Failed to load player data.';
     await dispatchApolloError(page, msg);
     await expect(page.getByRole('alert')).toContainText(msg);
   });
 
-  test('has accessible live region role=alert @critical', async ({ page }) => {
+  test('has accessible live region role=alert @regression', async ({
+    page,
+  }) => {
     await dispatchApolloError(page, 'Network error occurred.');
     const alert = page.getByRole('alert');
     await expect(alert).toBeVisible();
     await expect(alert).toHaveAttribute('aria-live', 'assertive');
   });
 
-  test('has a dismiss button @critical', async ({ page }) => {
+  test('has a dismiss button @regression', async ({ page }) => {
     await dispatchApolloError(page, 'Request failed. Try again later.');
     await expect(page.getByRole('alert')).toBeVisible();
     const dismissBtn = page.getByRole('button', { name: /dismiss error/i });
     await expect(dismissBtn).toBeVisible();
   });
 
-  test('dismisses toast when dismiss button is clicked @critical', async ({
+  test('dismisses toast when dismiss button is clicked @regression', async ({
     page,
   }) => {
     await dispatchApolloError(page, 'Dismiss test error.');
@@ -104,7 +106,7 @@ test.describe('ApolloErrorToast @critical', () => {
 // ── GraphQL error state on individual pages ────────────────────────────────
 
 test.describe('GraphQL error states on pages @regression', () => {
-  test('player stats page shows error message when query fails @critical', async ({
+  test('player stats page shows error message when query fails @regression', async ({
     page,
   }) => {
     await page.route(

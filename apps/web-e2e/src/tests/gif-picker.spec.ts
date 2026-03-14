@@ -310,7 +310,7 @@ test.describe('GIF Picker — navigation to chat @smoke', () => {
   });
 });
 
-test.describe('GIF Picker — open and close @critical', () => {
+test.describe('GIF Picker — open and close @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockGraphQL(page);
     await mockGiphy(page);
@@ -353,7 +353,7 @@ test.describe('GIF Picker — open and close @critical', () => {
   });
 });
 
-test.describe('GIF Picker — GIF grid @critical', () => {
+test.describe('GIF Picker — GIF grid @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockGraphQL(page);
     await mockGiphy(page);

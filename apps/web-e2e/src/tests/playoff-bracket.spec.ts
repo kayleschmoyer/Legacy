@@ -380,7 +380,7 @@ test.describe('Playoff Bracket — no bracket state @smoke', () => {
   });
 });
 
-test.describe('Playoff Bracket — completed bracket @critical', () => {
+test.describe('Playoff Bracket – completed bracket @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockStandingsGraphQL(page, MOCK_BRACKET_COMPLETED);
     await page.goto('/baseball/league/1/standings');
@@ -398,16 +398,13 @@ test.describe('Playoff Bracket — completed bracket @critical', () => {
   });
 
   test('shows Wild Card round header', async ({ page }) => {
-    // H4 with textTransform uppercase — DOM text is "Wild Card"
-    await expect(
-      page.getByRole('heading', { name: 'Wild Card', level: 4 }),
-    ).toBeVisible();
+    // H4 inside Card renders as <p> — DOM text is 'Wild Card' (CSS uppercases it visually)
+    await expect(page.getByText('Wild Card', { exact: true })).toBeVisible();
   });
 
   test('shows Championship round header', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: 'Championship', level: 4 }),
-    ).toBeVisible();
+    // H4 inside Card renders as <p> — use getByText
+    await expect(page.getByText('Championship', { exact: true })).toBeVisible();
   });
 
   test('shows "Final" badge for completed matchups', async ({ page }) => {
@@ -435,7 +432,7 @@ test.describe('Playoff Bracket — completed bracket @critical', () => {
   });
 });
 
-test.describe('Playoff Bracket — in-progress bracket @critical', () => {
+test.describe('Playoff Bracket – in-progress bracket @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockStandingsGraphQL(page, MOCK_BRACKET_IN_PROGRESS);
     await page.goto('/baseball/league/1/standings');
@@ -449,9 +446,8 @@ test.describe('Playoff Bracket — in-progress bracket @critical', () => {
   });
 
   test('shows "Semifinals" round header', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: 'Semifinals', level: 4 }),
-    ).toBeVisible();
+    // H4 inside Card renders as <p> — use getByText
+    await expect(page.getByText('Semifinals', { exact: true })).toBeVisible();
   });
 
   test('shows "Live" badge for in-progress matchup', async ({ page }) => {

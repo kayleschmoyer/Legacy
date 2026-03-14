@@ -33,7 +33,7 @@ test.describe('User Preferences – static elements @smoke', () => {
   test('shows the Preferences heading', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /preferences/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 
   test('shows Customize your Legacy Sports experience copy', async ({
@@ -41,7 +41,7 @@ test.describe('User Preferences – static elements @smoke', () => {
   }) => {
     await expect(
       page.getByText(/customize your legacy sports experience/i),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
   });
 });
 
@@ -49,34 +49,32 @@ test.describe('User Preferences – static elements @smoke', () => {
 // Tests – Appearance section
 // ---------------------------------------------------------------------------
 
-test.describe('User Preferences – Appearance section @critical', () => {
+test.describe('User Preferences – Appearance section @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/preferences');
     await page.waitForLoadState('load');
   });
 
   test('shows the Appearance section heading', async ({ page }) => {
-    await expect(page.getByText('Appearance')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Appearance')).toBeVisible();
   });
 
   test('shows Theme label and options', async ({ page }) => {
-    await expect(page.getByText('Theme')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('System')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('Light')).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('Dark')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Theme')).toBeVisible();
+    await expect(page.getByText('System')).toBeVisible();
+    await expect(page.getByText('Light')).toBeVisible();
+    await expect(page.getByText('Dark')).toBeVisible();
   });
 
   test('shows Enable animations toggle', async ({ page }) => {
-    await expect(page.getByText('Enable animations')).toBeVisible({
-      timeout: 30000,
-    });
+    await expect(page.getByText('Enable animations')).toBeVisible();
   });
 
   test('clicking the Dark theme chip selects it and persists to localStorage', async ({
     page,
   }) => {
     const darkChip = page.getByText('Dark');
-    await expect(darkChip).toBeVisible({ timeout: 30000 });
+    await expect(darkChip).toBeVisible();
     await darkChip.click();
 
     // Chip should show as selected
@@ -109,7 +107,7 @@ test.describe('User Preferences – toggle interaction @regression', () => {
     const toggle = page.locator(
       '[role="switch"][aria-label="Enable animations"]',
     );
-    await expect(toggle).toBeVisible({ timeout: 30000 });
+    await expect(toggle).toBeVisible();
 
     const initialState = await toggle.getAttribute('aria-checked');
     const expectedState = initialState === 'true' ? 'false' : 'true';

@@ -289,7 +289,7 @@ test.describe('Trading Center — header and layout @critical', () => {
   });
 });
 
-test.describe('Trading Center — empty states @critical', () => {
+test.describe('Trading Center — empty states @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockTradesGraphQL(page, { teamTradeOffers: [] });
     await page.goto('/baseball/league/1/trades');

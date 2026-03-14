@@ -195,7 +195,7 @@ test.describe('Matchup Detail – page structure @smoke', () => {
 // Tests – matchup content with mocked data
 // ---------------------------------------------------------------------------
 
-test.describe('Matchup Detail – scoreboard @critical', () => {
+test.describe('Matchup Detail – scoreboard @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockMatchupGraphQL(page);
     await page.goto(MATCHUP_URL);

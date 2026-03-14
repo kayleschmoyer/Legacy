@@ -161,8 +161,8 @@ test.describe('Mobile panel navigation links @critical', () => {
 
 // ── Panel closes on link click ────────────────────────────────────────────
 
-test.describe('Mobile panel interaction: close on link click @critical', () => {
-  test('panel closes when About link is clicked @critical', async ({
+test.describe('Mobile panel interaction: close on link click @regression', () => {
+  test('panel closes when About link is clicked @regression', async ({
     page,
   }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);

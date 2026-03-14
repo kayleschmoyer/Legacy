@@ -1,6 +1,6 @@
 ﻿import { expect, test } from '@playwright/test';
 
-test.describe('Player Statistics Page @critical', () => {
+test.describe('Player Statistics Page @regression', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the player stats page (BrowserRouter — no hash)
     await page.goto('/players/stats');

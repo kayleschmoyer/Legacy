@@ -212,7 +212,7 @@ async function setupGraphQL(
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-test.describe('Commissioner League Settings @critical', () => {
+test.describe('Commissioner League Settings @regression', () => {
   test('should display League Settings heading', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');

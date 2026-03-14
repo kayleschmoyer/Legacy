@@ -315,7 +315,7 @@ async function expandSeasonAwards(page: import('@playwright/test').Page) {
 
 // ── Tests: Accordion ──────────────────────────────────────────────────────────
 
-test.describe('Season Awards — accordion panel @critical', () => {
+test.describe('Season Awards — accordion panel @regression', () => {
   test('"Season Awards" accordion toggle is visible on commissioner tab', async ({
     page,
   }) => {
@@ -351,16 +351,16 @@ test.describe('Season Awards — accordion panel @critical', () => {
 
     await expandSeasonAwards(page);
 
-    // H4 heading inside the panel
+    // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText
     await expect(
-      page.getByRole('heading', { name: /season awards/i }),
+      page.getByText('Season Awards', { exact: true }),
     ).toBeVisible();
   });
 });
 
 // ── Tests: Award types ────────────────────────────────────────────────────────
 
-test.describe('Season Awards — award type rows @critical', () => {
+test.describe('Season Awards — award type rows @regression', () => {
   test('displays "Most Valuable Player" award row', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto(COMMISSIONER_URL);

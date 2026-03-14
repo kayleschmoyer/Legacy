@@ -292,10 +292,10 @@ test.describe('Player Comparison – page structure (premium) @smoke', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: Player search & add @critical
+// Tests: Player search & add @regression
 // ---------------------------------------------------------------------------
 
-adminTest.describe('Player Comparison – player search @critical', () => {
+adminTest.describe('Player Comparison – player search @regression', () => {
   adminTest.beforeEach(async ({ page }) => {
     await mockPlayerComparisonGraphQL(page);
     await page.goto('/players/compare');
@@ -360,10 +360,10 @@ adminTest.describe('Player Comparison – player search @critical', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: Comparison table shown when 2+ players selected @critical
+// Tests: Comparison table shown when 2+ players selected @regression
 // ---------------------------------------------------------------------------
 
-adminTest.describe('Player Comparison – comparison table @critical', () => {
+adminTest.describe('Player Comparison – comparison table @regression', () => {
   adminTest.beforeEach(async ({ page }) => {
     await mockPlayerComparisonGraphQL(page);
     await page.goto('/players/compare');

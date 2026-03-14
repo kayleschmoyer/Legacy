@@ -219,7 +219,7 @@ test.describe('Standings Tab — navigation @smoke', () => {
   });
 });
 
-test.describe('Standings Tab — data rendering @critical', () => {
+test.describe('Standings Tab – data rendering @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockLeagueDetailGraphQL(page);
     await page.goto('/baseball/league/1/standings');

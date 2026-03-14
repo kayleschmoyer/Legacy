@@ -266,7 +266,7 @@ async function setupPlayerDetailMocks(
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
-test.describe('Player Detail Modal @critical', () => {
+test.describe('Player Detail Modal @regression', () => {
   test('renders when navigating to the /players/:id deep-link route', async ({
     page,
   }) => {
@@ -443,7 +443,7 @@ test.describe('Player Detail Modal @critical', () => {
   });
 });
 
-test.describe('Player Detail Modal — Pitcher @critical', () => {
+test.describe('Player Detail Modal – Pitcher @regression', () => {
   test('shows Career Pitching card and pitching tab for a pitcher', async ({
     page,
   }) => {

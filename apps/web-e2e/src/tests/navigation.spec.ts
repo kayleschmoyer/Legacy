@@ -19,7 +19,7 @@ test.describe('Navigation Header @smoke', () => {
   test('renders the Legacy Sports logo/home link', async ({ page }) => {
     // The header contains a link back to the homepage
     const homeLink = page.locator('a[href="/"]').first();
-    await expect(homeLink).toBeVisible({ timeout: 30000 });
+    await expect(homeLink).toBeVisible();
   });
 
   test('logo link navigates to the homepage', async ({ page }) => {
@@ -31,7 +31,7 @@ test.describe('Navigation Header @smoke', () => {
   test('renders primary navigation with expected items', async ({ page }) => {
     // Navigation uses role="navigation" aria-label="Primary"
     const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    await expect(primaryNav).toBeVisible({ timeout: 30000 });
+    await expect(primaryNav).toBeVisible();
     // Nav contains buttons for Sports, Players, Games, Help
     await expect(
       primaryNav.getByRole('button', { name: 'Sports' }),
@@ -50,7 +50,7 @@ test.describe('Navigation Header @smoke', () => {
   test('shows user profile area in header', async ({ page }) => {
     // The header uses 'banner' landmark role
     const header = page.getByRole('banner');
-    await expect(header).toBeVisible({ timeout: 30000 });
+    await expect(header).toBeVisible();
   });
 
   test('mobile hamburger button is visible on narrow viewport', async ({
@@ -64,7 +64,7 @@ test.describe('Navigation Header @smoke', () => {
     const hamburger = page.getByRole('button', {
       name: /open menu|close menu/i,
     });
-    await expect(hamburger).toBeVisible({ timeout: 30000 });
+    await expect(hamburger).toBeVisible();
   });
 
   test('mobile menu opens and shows navigation links', async ({ page }) => {

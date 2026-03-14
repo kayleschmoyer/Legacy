@@ -278,7 +278,7 @@ test.describe('On This Day Feed — Empty & Error States @regression', () => {
   });
 });
 
-test.describe('On This Day Feed — Player Navigation @critical', () => {
+test.describe('On This Day Feed — Player Navigation @regression', () => {
   test('clicking a batting entry row navigates to the player profile page', async ({
     page,
   }) => {

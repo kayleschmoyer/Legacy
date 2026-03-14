@@ -376,7 +376,7 @@ test.describe('Overview Tab — navigation @smoke', () => {
 
 // ── Activity Feed (within Overview) ─────────────────────────────────────────
 
-test.describe('Activity Feed — section rendering @critical', () => {
+test.describe('Activity Feed – section rendering @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockLeagueDetailGraphQL(page);
     await page.goto('/baseball/league/1/overview');
@@ -418,7 +418,7 @@ test.describe('Activity Feed — empty state @regression', () => {
 
 // ── Chat Section (within Overview) ───────────────────────────────────────────
 
-test.describe('League Chat — section rendering @critical', () => {
+test.describe('League Chat – section rendering @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockLeagueDetailGraphQL(page);
     await page.goto('/baseball/league/1/overview');
@@ -497,7 +497,7 @@ test.describe('Roster Tab — navigation @smoke', () => {
   });
 });
 
-test.describe('Roster Tab — data rendering @critical', () => {
+test.describe('Roster Tab – data rendering @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockLeagueDetailGraphQL(page, { teamMembers: MOCK_TEAM_MEMBERS });
     await page.goto('/baseball/league/1/roster');

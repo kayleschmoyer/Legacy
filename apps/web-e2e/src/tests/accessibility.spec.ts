@@ -17,7 +17,7 @@ import { expect, test } from '@playwright/test';
 // 1. Skip Links
 // ---------------------------------------------------------------------------
 
-test.describe('Skip Link @smoke', () => {
+test.describe('Skip Link @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/about');
     await page.waitForLoadState('load');
@@ -120,7 +120,7 @@ test.describe('ARIA Landmarks @smoke', () => {
 // 3. aria-live Regions (Screen Reader Announcements)
 // ---------------------------------------------------------------------------
 
-test.describe('Screen Reader Announcements @smoke', () => {
+test.describe('Screen Reader Announcements @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/about');
     await page.waitForLoadState('load');
@@ -232,7 +232,7 @@ test.describe('Primary Navigation Landmark @smoke', () => {
 // 5. Mobile Menu Accessibility
 // ---------------------------------------------------------------------------
 
-test.describe('Mobile Menu Accessibility @smoke', () => {
+test.describe('Mobile Menu Accessibility @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/about');
@@ -377,7 +377,7 @@ test.describe('Reduced Motion @regression', () => {
     // The page should still render correctly with reduced motion
     await expect(
       page.getByRole('heading', { name: /about legacy sports/i }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
 
     await context.close();
   });

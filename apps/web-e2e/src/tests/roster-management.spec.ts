@@ -237,7 +237,7 @@ test.describe('Roster Management — navigation @smoke', () => {
   });
 });
 
-test.describe('Roster Management — layout @critical', () => {
+test.describe('Roster Management – layout @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockRosterGraphQL(page);
     await page.goto('/baseball/league/1/roster');
@@ -261,7 +261,7 @@ test.describe('Roster Management — layout @critical', () => {
   });
 });
 
-test.describe('Roster Management — player data @critical', () => {
+test.describe('Roster Management – player data @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockRosterGraphQL(page);
     await page.goto('/baseball/league/1/roster');
@@ -288,7 +288,7 @@ test.describe('Roster Management — player data @critical', () => {
   });
 });
 
-test.describe('Roster Management — bench/bullpen regions @critical', () => {
+test.describe('Roster Management – bench/bullpen regions @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockRosterGraphQL(page);
     await page.goto('/baseball/league/1/roster');

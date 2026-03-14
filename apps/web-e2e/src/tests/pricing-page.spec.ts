@@ -15,7 +15,7 @@
 import { expect } from '@playwright/test';
 import { test } from '../fixtures/auth-enhanced';
 
-test.describe('Pricing page — page load @critical', () => {
+test.describe('Pricing page – page load @regression', () => {
   test('renders page heading and billing toggle', async ({ page }) => {
     await page.goto('/pricing');
     await page.waitForLoadState('load');
@@ -58,7 +58,7 @@ test.describe('Pricing page — page load @critical', () => {
   });
 });
 
-test.describe('Pricing page — billing toggle @smoke', () => {
+test.describe('Pricing page — billing toggle @regression', () => {
   test('switches between monthly and annual pricing', async ({ page }) => {
     await page.goto('/pricing');
     await page.waitForLoadState('load');
