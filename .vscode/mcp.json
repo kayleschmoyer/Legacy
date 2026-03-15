@@ -14,6 +14,11 @@
         "JIRA_EMAIL": "${env:JIRA_EMAIL}",
         "JIRA_API_TOKEN": "${env:JIRA_API_TOKEN}"
       }
+    },
+    "worktree": {
+      "type": "stdio",
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/worktree-server/src/index.ts"]
     }
   }
 }

@@ -72,9 +72,6 @@ importers:
       '@graphile-contrib/pg-simplify-inflector':
         specifier: ^6.1.0
         version: 6.1.0
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.27.1
-        version: 1.27.1(zod@4.3.6)
       '@pothos/core':
         specifier: ^4.9.0
         version: 4.12.0(graphql@16.12.0)
@@ -422,6 +419,9 @@ importers:
       '@graphql-codegen/typescript-react-apollo':
         specifier: ^4.4.1
         version: 4.4.1(graphql@16.12.0)
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.27.0
+        version: 1.27.1(zod@4.3.6)
       '@nx/devkit':
         specifier: 21.6.3
         version: 21.6.3(nx@21.6.10(@swc-node/register@1.11.1(@swc/core@1.15.10(@swc/helpers@0.5.18))(@swc/types@0.1.25)(typescript@5.9.3))(@swc/core@1.15.10(@swc/helpers@0.5.18)))

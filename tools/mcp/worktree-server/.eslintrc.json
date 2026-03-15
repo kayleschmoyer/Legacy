@@ -1,0 +1,12 @@
+{
+  "extends": ["../../../.eslintrc.json"],
+  "ignorePatterns": ["!**/*", "dist", "node_modules"],
+  "overrides": [
+    {
+      "files": ["*.ts"],
+      "parserOptions": {
+        "project": ["tools/mcp/worktree-server/tsconfig.*?.json"]
+      }
+    }
+  ]
+}

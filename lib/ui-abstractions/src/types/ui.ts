@@ -1,6 +1,10 @@
-import type { ReactNode } from 'react';
-import { ScrollView as RNScrollView, TextInput } from 'react-native';
-import type { TamaguiElement, TamaguiTextElement } from 'tamagui';
+import type { ComponentRef, ReactNode } from 'react';
+import { TextInput } from 'react-native';
+import type {
+  TamaguiElement,
+  ScrollView as TamaguiScrollView,
+  TamaguiTextElement,
+} from 'tamagui';
 
 // Core common props that all UI components should support
 export interface BaseUIProps {
@@ -212,4 +216,4 @@ export type ViewRef = TamaguiElement;
 export type TextRef = TamaguiTextElement;
 export type ButtonRef = TamaguiElement;
 export type InputRef = TextInput;
-export type ScrollViewRef = RNScrollView;
+export type ScrollViewRef = ComponentRef<typeof TamaguiScrollView>;

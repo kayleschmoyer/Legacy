@@ -1,0 +1,15 @@
+{
+  "name": "mcp-worktree-server",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "tools/mcp/worktree-server/src",
+  "projectType": "application",
+  "tags": ["scope:tool", "platform:node"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p tools/mcp/worktree-server/tsconfig.lib.json"
+      }
+    }
+  }
+}
