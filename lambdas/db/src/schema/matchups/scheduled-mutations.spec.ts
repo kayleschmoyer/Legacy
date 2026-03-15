@@ -21,11 +21,11 @@ jest.mock('@legacy-sports/logging', () => ({
 }));
 
 jest.mock('@legacy-sports/rollbar', () => ({
-  getSentryConfigFromEnv: jest.fn(),
-  initSentry: jest.fn(),
+  getRollbarConfigFromEnv: jest.fn(),
+  initRollbar: jest.fn(),
   addBreadcrumb: jest.fn(),
   captureError: jest.fn(),
-  withSentry: jest.fn((fn) => fn),
+  withRollbar: jest.fn((fn) => fn),
 }));
 
 jest.mock('@legacy-sports/aws-utils', () => ({

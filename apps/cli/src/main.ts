@@ -4,8 +4,8 @@ import { logError } from '@legacy-sports/utils';
 import { FileOutputDestination, LOGGER } from '@legacy-sports/logging';
 import {
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
 } from '@legacy-sports/rollbar';
 import { handleLoadPlayers } from './commands/loadPlayers';
 import { handleLoadCareerStats } from './commands/loadCareerStats';
@@ -54,11 +54,11 @@ import { handleLoadPositionalAdjustments } from './commands/loadPositionalAdjust
 import { handleLoadOnThisDayEvents } from './commands/loadOnThisDayEvents';
 import { handleCleanupTestLeagues } from './commands/cleanupTestLeagues';
 
-// Initialize Sentry for CLI
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
-  LOGGER.info('Sentry initialized for CLI');
+// Initialize Rollbar for CLI
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
+  LOGGER.info('Rollbar initialized for CLI');
 }
 
 async function run(): Promise<void> {

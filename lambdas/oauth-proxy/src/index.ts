@@ -3,9 +3,9 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 import {
@@ -25,10 +25,10 @@ import {
   handleDeviceVerify,
 } from './handlers/DeviceFlow';
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 /**
@@ -372,8 +372,8 @@ const baseOAuthHandler = async (
   }
 };
 
-// Export the Sentry-wrapped handler
-export const handler = withSentry(baseOAuthHandler);
+// Export the Rollbar-wrapped handler
+export const handler = withRollbar(baseOAuthHandler);
 
 // Export individual handlers for backward compatibility and testing
 export * from './handlers/Google';

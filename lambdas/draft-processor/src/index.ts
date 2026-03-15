@@ -22,9 +22,9 @@ import {
 import {
   addBreadcrumb,
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import {
   createAllMatchupsForLeague,
@@ -50,10 +50,10 @@ import {
 } from 'drizzle-orm';
 import { z } from 'zod';
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 // Log version information on cold start
@@ -1714,6 +1714,6 @@ const baseDraftProcessorHandler = async (
 };
 
 /**
- * Main SQS handler function with Sentry integration
+ * Main SQS handler function with Rollbar integration
  */
-export const handler = withSentry(baseDraftProcessorHandler);
+export const handler = withRollbar(baseDraftProcessorHandler);

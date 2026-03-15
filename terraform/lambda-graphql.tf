@@ -210,12 +210,6 @@ resource "aws_lambda_function" "graphql" {
       SQS_AUTOMATIC_DRAFTS_URL  = aws_sqs_queue.automatic_drafts.url
       SQS_SELECT_GAME_URL       = aws_sqs_queue.select_game.url
 
-      # Sentry Configuration
-      SENTRY_DSN                = var.sentry_dsn
-      SENTRY_TRACES_SAMPLE_RATE = var.environment == "dev" ? "1.0" : "0.1"
-      SENTRY_DEBUG              = var.environment == "dev" ? "true" : "false"
-      SENTRY_RELEASE            = "legacy-sports-graphql@${data.aws_ssm_parameter.graphql_lambda_version.value}"
-
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
 

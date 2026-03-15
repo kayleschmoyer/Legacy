@@ -40,7 +40,6 @@ const PROJECT_TAGS = {
   'db-client': ['scope:lib', 'type:data', 'platform:shared'],
   'aws-utils': ['scope:lib', 'type:util', 'platform:node'],
   'bref-client': ['scope:lib', 'type:util', 'platform:node'],
-  sentry: ['scope:lib', 'type:util', 'platform:shared'],
 
   // Libraries - Business Logic
   api: ['scope:lib', 'type:api', 'platform:shared'],

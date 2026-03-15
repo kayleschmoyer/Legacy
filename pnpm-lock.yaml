@@ -842,9 +842,9 @@ importers:
       '@legacy-sports/narrative':
         specifier: workspace:*
         version: link:../../lib/narrative
-      '@legacy-sports/sentry':
+      '@legacy-sports/rollbar':
         specifier: workspace:*
-        version: link:../../lib/sentry
+        version: link:../../lib/rollbar
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -882,9 +882,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
-      '@legacy-sports/sentry':
+      '@legacy-sports/rollbar':
         specifier: workspace:*
-        version: link:../../lib/sentry
+        version: link:../../lib/rollbar
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -919,9 +919,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
-      '@legacy-sports/sentry':
+      '@legacy-sports/rollbar':
         specifier: workspace:*
-        version: link:../../lib/sentry
+        version: link:../../lib/rollbar
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -965,9 +965,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
-      '@legacy-sports/sentry':
+      '@legacy-sports/rollbar':
         specifier: workspace:*
-        version: link:../../lib/sentry
+        version: link:../../lib/rollbar
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -1032,9 +1032,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
-      '@legacy-sports/sentry':
+      '@legacy-sports/rollbar':
         specifier: workspace:*
-        version: link:../../lib/sentry
+        version: link:../../lib/rollbar
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -1096,9 +1096,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
-      '@legacy-sports/sentry':
+      '@legacy-sports/rollbar':
         specifier: workspace:*
-        version: link:../../lib/sentry
+        version: link:../../lib/rollbar
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -1139,9 +1139,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
-      '@legacy-sports/sentry':
+      '@legacy-sports/rollbar':
         specifier: workspace:*
-        version: link:../../lib/sentry
+        version: link:../../lib/rollbar
       '@legacy-sports/utils':
         specifier: workspace:*
         version: link:../../lib/utils
@@ -1201,11 +1201,7 @@ importers:
         specifier: '*'
         version: 2.8.1
 
-  lib/data-loaders:
-    dependencies:
-      '@legacy-sports/sentry':
-        specifier: workspace:*
-        version: link:../sentry
+  lib/data-loaders: {}
 
   lib/db-client:
     dependencies:
@@ -1248,24 +1244,6 @@ importers:
         version: 2.8.1
 
   lib/scoring: {}
-
-  lib/sentry:
-    dependencies:
-      '@legacy-sports/logging':
-        specifier: workspace:*
-        version: link:../logging
-      '@sentry/browser':
-        specifier: '*'
-        version: 10.37.0
-      '@sentry/node':
-        specifier: '*'
-        version: 7.120.4
-      '@sentry/react-native':
-        specifier: '*'
-        version: 7.2.0(encoding@0.1.13)(expo@54.0.33)(react-native@0.81.5(@babel/core@7.29.0)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(@react-native/metro-config@0.81.6(@babel/core@7.29.0))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@6.0.6))(react@19.2.4)
-      tslib:
-        specifier: '*'
-        version: 2.8.1
 
   lib/shared-components:
     dependencies:

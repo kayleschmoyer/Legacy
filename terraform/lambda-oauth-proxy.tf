@@ -205,12 +205,6 @@ resource "aws_lambda_function" "oauth_proxy" {
       LOG_LEVEL                           = "debug"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
-      # Sentry configuration
-      SENTRY_DSN                = var.sentry_dsn
-      SENTRY_TRACES_SAMPLE_RATE = "0.1"
-      SENTRY_DEBUG              = "false"
-      SENTRY_RELEASE            = "legacy-sports-oauth-proxy@${data.aws_ssm_parameter.oauth_proxy_lambda_version.value}"
-
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
 

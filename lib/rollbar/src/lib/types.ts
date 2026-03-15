@@ -52,16 +52,12 @@ export interface RollbarInterface {
   /**
    * Wrap a handler function with Rollbar error handling
    */
-  withSentry<TArgs extends unknown[], TResult>(
+  withRollbar<TArgs extends unknown[], TResult>(
     handler: (...args: TArgs) => TResult | Promise<TResult>,
   ): (...args: TArgs) => TResult | Promise<TResult>;
 
   /**
    * Get Rollbar configuration from environment variables
    */
-  getSentryConfigFromEnv(): RollbarConfig | null;
+  getRollbarConfigFromEnv(): RollbarConfig | null;
 }
-
-// Legacy alias so consumers that reference SentryConfig still compile
-export type SentryConfig = RollbarConfig;
-export type SentryBreadcrumb = RollbarBreadcrumb;

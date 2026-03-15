@@ -87,7 +87,7 @@ function sanitizeValue(
   return typeof value === 'symbol' ? value.toString() : String(value as string);
 }
 
-export function sanitizeSentryContext(
+export function sanitizeContext(
   context: Record<string, unknown>,
   options?: { maxDepth?: number },
 ): Record<string, unknown> {

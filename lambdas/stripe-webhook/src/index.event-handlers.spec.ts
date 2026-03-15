@@ -132,10 +132,10 @@ describe('stripe-webhook event handlers', () => {
     mockClearLeagueTierFreezes = jest.fn().mockResolvedValue(undefined);
 
     jest.doMock('@legacy-sports/rollbar', () => ({
-      getSentryConfigFromEnv: jest.fn(() => null),
-      initSentry: jest.fn(),
+      getRollbarConfigFromEnv: jest.fn(() => null),
+      initRollbar: jest.fn(),
       captureError: jest.fn(),
-      withSentry: jest.fn(
+      withRollbar: jest.fn(
         (fn: (...args: unknown[]) => unknown) =>
           (...args: unknown[]) =>
             fn(...args),

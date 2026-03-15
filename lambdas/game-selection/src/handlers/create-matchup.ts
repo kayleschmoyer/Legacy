@@ -11,17 +11,17 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   addBreadcrumb,
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import { SQSBatchItemFailure, SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { z } from 'zod';
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 const CreateMatchupEventSchema = z.object({
@@ -133,7 +133,7 @@ const baseCreateMatchupHandler = async (
   };
 };
 
-// Export the Sentry-wrapped handler with explicit Promise wrapper
+// Export the Rollbar-wrapped handler with explicit Promise wrapper
 export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
-  return await withSentry(baseCreateMatchupHandler)(event);
+  return await withRollbar(baseCreateMatchupHandler)(event);
 };

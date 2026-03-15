@@ -225,8 +225,6 @@ resource "aws_lambda_function" "websocket" {
     variables = {
       CONNECTIONS_TABLE_NAME              = aws_dynamodb_table.websocket_connections.name
       JWT_SECRET_NAME                     = aws_secretsmanager_secret.jwt_secret.arn
-      SENTRY_DSN                          = var.sentry_dsn
-      SENTRY_ENVIRONMENT                  = var.environment
       NODE_ENV                            = var.environment
       DB_HOST                             = aws_db_instance.postgres.address
       DB_PORT                             = tostring(aws_db_instance.postgres.port)

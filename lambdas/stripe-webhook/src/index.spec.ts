@@ -50,9 +50,14 @@ describe('stripe-webhook handler', () => {
     mockCaptureError = jest.fn();
 
     jest.doMock('@legacy-sports/rollbar', () => ({
-      getSentryConfigFromEnv: jest.fn(() => null),
-      initSentry: jest.fn(),
+      getRollbarConfigFromEnv: jest.fn(() => null),
+      initRollbar: jest.fn(),
       captureError: mockCaptureError,
+      withRollbar: jest.fn(
+        (fn: (...args: unknown[]) => unknown) =>
+          (...args: unknown[]) =>
+            fn(...args),
+      ),
     }));
 
     jest.doMock('@legacy-sports/utils/node', () => ({
@@ -178,7 +183,7 @@ describe('stripe-webhook handler', () => {
       expect(body.received).toBe(true);
     });
 
-    it('captures the error in Sentry when recordEvent throws', async () => {
+    it('captures the error in Rollbar when recordEvent throws', async () => {
       mockConstructEvent.mockReturnValue(
         fakeStripeEvent({ type: 'invoice.voided' }),
       );

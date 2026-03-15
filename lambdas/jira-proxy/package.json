@@ -16,7 +16,7 @@
     "@legacy-sports/aws-utils": "workspace:*",
     "@legacy-sports/env-utilities": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
-    "@legacy-sports/sentry": "workspace:*",
+    "@legacy-sports/rollbar": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "aws-lambda": "*",
     "cors": "*",

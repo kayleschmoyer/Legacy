@@ -23,16 +23,16 @@ import {
 import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import { decodeAndVerifyJws } from './jws';
 import type { AppStoreNotification, NotificationType } from './types';
 
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -429,4 +429,4 @@ const baseAppleIapHandler = async (
   return { statusCode: 200, body: JSON.stringify({ received: true }) };
 };
 
-export const handler = withSentry(baseAppleIapHandler);
+export const handler = withRollbar(baseAppleIapHandler);

@@ -98,13 +98,6 @@ variable "use_nat_instance" {
   default     = true
 }
 
-variable "sentry_dsn" {
-  description = "Sentry DSN for error monitoring in Lambda functions"
-  type        = string
-  default     = "https://9cde57d0dba3d0dd1e85a797ef980e97@o4509922239315968.ingest.us.sentry.io/4510161844043776"
-  sensitive   = true
-}
-
 variable "alert_email" {
   description = "E-mail address to receive CloudWatch ops-alert notifications (leave empty to disable e-mail subscription)"
   type        = string

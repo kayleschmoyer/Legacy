@@ -194,7 +194,7 @@ export default defineConfig(({ mode }) => {
       'process.env.VITE_ROLLBAR_ACCESS_TOKEN': JSON.stringify(
         env.VITE_ROLLBAR_ACCESS_TOKEN || '',
       ),
-      // Release info used by rollbar.web.ts getSentryConfigFromEnv()
+      // Release info used by rollbar.web.ts getRollbarConfigFromEnv()
       'process.env.VITE_COMMIT_SHA': JSON.stringify(commitSha),
       'process.env.VITE_APP_VERSION': JSON.stringify(appVersion),
 

@@ -12,7 +12,7 @@ import {
   RollbarSeverity,
 } from './types';
 import { RollbarOutputDestination } from './RollbarOutputDestination';
-import { sanitizeSentryContext } from './sanitize-context';
+import { sanitizeContext } from './sanitize-context';
 
 /** Maximum number of breadcrumbs retained in memory. Oldest entries are dropped when the buffer is full. */
 const MAX_BREADCRUMBS = 100;
@@ -69,7 +69,7 @@ class NodeRollbarImplementation implements RollbarInterface {
         });
         return;
       }
-      const safeContext = context ? sanitizeSentryContext(context) : undefined;
+      const safeContext = context ? sanitizeContext(context) : undefined;
       const breadcrumbContext =
         this.breadcrumbs.length > 0
           ? { breadcrumbs: this.breadcrumbs.slice() }
@@ -107,7 +107,7 @@ class NodeRollbarImplementation implements RollbarInterface {
     this.breadcrumbs.push(breadcrumb);
   }
 
-  withSentry<TArgs extends unknown[], TResult>(
+  withRollbar<TArgs extends unknown[], TResult>(
     handler: (...args: TArgs) => TResult | Promise<TResult>,
   ): (...args: TArgs) => TResult | Promise<TResult> {
     return async (...args: TArgs): Promise<TResult> => {
@@ -124,7 +124,7 @@ class NodeRollbarImplementation implements RollbarInterface {
     };
   }
 
-  getSentryConfigFromEnv(): RollbarConfig | null {
+  getRollbarConfigFromEnv(): RollbarConfig | null {
     const accessToken = process.env['ROLLBAR_ACCESS_TOKEN'];
     const environment =
       process.env['ROLLBAR_ENVIRONMENT'] ||
@@ -156,4 +156,4 @@ class NodeRollbarImplementation implements RollbarInterface {
 }
 
 // Export singleton instance
-export const sentry = new NodeRollbarImplementation();
+export const rollbar = new NodeRollbarImplementation();

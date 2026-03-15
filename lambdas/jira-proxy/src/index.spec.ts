@@ -5,9 +5,9 @@ import { baseHandler } from './index';
 
 // jest.mock calls are hoisted before imports by babel-jest at runtime
 jest.mock('@legacy-sports/rollbar', () => ({
-  getSentryConfigFromEnv: () => null,
-  initSentry: jest.fn(),
-  withSentry: (fn: unknown) => fn,
+  getRollbarConfigFromEnv: () => null,
+  initRollbar: jest.fn(),
+  withRollbar: (fn: unknown) => fn,
   captureError: jest.fn(),
 }));
 

@@ -23,15 +23,6 @@ inputs:
     description: "Deployment stage (dev, staging, prod)"
     required: false
     default: "dev"
-  sentry-auth-token:
-    description: "Sentry authentication token for sourcemap upload"
-    required: false
-  sentry-org:
-    description: "Sentry organization name"
-    required: false
-  sentry-project:
-    description: "Sentry project name"
-    required: false
 
 outputs:
   version:
@@ -79,9 +70,6 @@ runs:
       env:
         NODE_ENV: production
         APP_VERSION: ${{ github.sha }}
-        SENTRY_AUTH_TOKEN: ${{ inputs.sentry-auth-token }}
-        SENTRY_ORG: ${{ inputs.sentry-org }}
-        SENTRY_PROJECT: ${{ inputs.sentry-project }}
       run: |
         # Ensure Nx Cloud is not used for CI builds
         export NX_NO_CLOUD=true

@@ -55,7 +55,6 @@ COPY lib/db-client/package.json              ./lib/db-client/
 COPY lib/env-utilities/package.json          ./lib/env-utilities/
 COPY lib/logging/package.json                ./lib/logging/
 COPY lib/scoring/package.json                ./lib/scoring/
-COPY lib/sentry/package.json                 ./lib/sentry/
 COPY lib/shared-components/package.json      ./lib/shared-components/
 COPY lib/tamagui-config/package.json         ./lib/tamagui-config/
 COPY lib/ui-abstractions/package.json        ./lib/ui-abstractions/

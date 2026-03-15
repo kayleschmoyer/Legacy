@@ -14,8 +14,8 @@ import './styles.css';
 
 import {
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
 } from '@legacy-sports/rollbar/web';
 import {
   AppProvider,
@@ -36,9 +36,9 @@ import { ThemeProvider, useThemeContext } from './context/ThemeContext';
 import { PublicLandingPage } from './pages/landing/PublicLandingPage';
 
 // Initialize Rollbar for web app
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 // Initialize Google Analytics

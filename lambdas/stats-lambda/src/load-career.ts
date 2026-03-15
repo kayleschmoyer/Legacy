@@ -5,9 +5,9 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   addBreadcrumb,
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import {
   getPlayerByBrefId,
@@ -18,10 +18,10 @@ import {
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 async function loadPlayer(db: PublicDb, brefId: string): Promise<void> {
@@ -198,7 +198,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   });
 };
 
-// Export the Sentry-wrapped handler with explicit Promise wrapper
+// Export the Rollbar-wrapped handler with explicit Promise wrapper
 export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
-  return await withSentry(baseHandler)(event);
+  return await withRollbar(baseHandler)(event);
 };

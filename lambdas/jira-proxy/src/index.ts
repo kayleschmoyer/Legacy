@@ -4,9 +4,9 @@ import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 import {
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import type { AttachmentInput, CreateIssueInput } from './JiraClient';
 import { createJiraBug } from './JiraClient';
@@ -55,10 +55,10 @@ async function verifyAuthToken(
   }
 }
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 /**
@@ -394,4 +394,4 @@ async function handleCreateBug(
   }
 }
 
-export const handler = withSentry(baseHandler);
+export const handler = withRollbar(baseHandler);

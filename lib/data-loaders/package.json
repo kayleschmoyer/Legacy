@@ -8,7 +8,5 @@
     "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
     "codegen": "pnpm run codegen:db"
   },
-  "dependencies": {
-    "@legacy-sports/sentry": "workspace:*"
-  }
+  "dependencies": {}
 }

@@ -4,9 +4,9 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import type { PublicDb } from '@legacy-sports/db-client';
@@ -16,10 +16,10 @@ import { z } from 'zod';
 import { withDb } from '../utils/db';
 import { selectGamesForMatchup } from '../services/season-game-selector';
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 // Initialize SQS client for queueing stats loading
@@ -256,7 +256,7 @@ const baseSelectGameHandler = async (
   };
 };
 
-// Export the Sentry-wrapped handler with explicit Promise wrapper
+// Export the Rollbar-wrapped handler with explicit Promise wrapper
 export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
-  return await withSentry(baseSelectGameHandler)(event);
+  return await withRollbar(baseSelectGameHandler)(event);
 };

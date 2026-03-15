@@ -4,13 +4,12 @@
  */
 
 export * from './lib/types';
-export { sentry } from './lib/rollbar.web';
+export { rollbar } from './lib/rollbar.web';
 
-// Re-export convenience functions matching the legacy Sentry API for drop-in replacement
-import { sentry } from './lib/rollbar.web';
+import { rollbar } from './lib/rollbar.web';
 
-export const initSentry = (config: import('./lib/types').RollbarConfig) => {
-  return sentry.init(config);
+export const initRollbar = (config: import('./lib/types').RollbarConfig) => {
+  return rollbar.init(config);
 };
 
 export const captureError = (
@@ -18,21 +17,21 @@ export const captureError = (
   context?: Record<string, unknown>,
   severity?: import('./lib/types').RollbarSeverity,
 ) => {
-  return sentry.captureError(error, context, severity);
+  return rollbar.captureError(error, context, severity);
 };
 
 export const captureWarning = (
   error: Error,
   context?: Record<string, unknown>,
 ) => {
-  return sentry.captureError(error, context, 'warning');
+  return rollbar.captureError(error, context, 'warning');
 };
 
 export const captureInfo = (
   error: Error,
   context?: Record<string, unknown>,
 ) => {
-  return sentry.captureError(error, context, 'info');
+  return rollbar.captureError(error, context, 'info');
 };
 
 export const addBreadcrumb = (
@@ -40,15 +39,15 @@ export const addBreadcrumb = (
   data?: Record<string, unknown>,
   level?: 'info' | 'warning' | 'error',
 ) => {
-  return sentry.addBreadcrumb({ message, data, level });
+  return rollbar.addBreadcrumb({ message, data, level });
 };
 
-export const withSentry = <TArgs extends unknown[], TResult>(
+export const withRollbar = <TArgs extends unknown[], TResult>(
   handler: (...args: TArgs) => TResult | Promise<TResult>,
 ): ((...args: TArgs) => TResult | Promise<TResult>) => {
-  return sentry.withSentry(handler);
+  return rollbar.withRollbar(handler);
 };
 
-export const getSentryConfigFromEnv = () => {
-  return sentry.getSentryConfigFromEnv();
+export const getRollbarConfigFromEnv = () => {
+  return rollbar.getRollbarConfigFromEnv();
 };

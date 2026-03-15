@@ -12,7 +12,7 @@ import {
   RollbarSeverity,
 } from './types';
 import { RollbarOutputDestination } from './RollbarOutputDestination';
-import { sanitizeSentryContext } from './sanitize-context';
+import { sanitizeContext } from './sanitize-context';
 
 /** Maximum number of breadcrumbs retained in memory. Oldest entries are dropped when the buffer is full. */
 const MAX_BREADCRUMBS = 100;
@@ -105,7 +105,7 @@ class WebRollbarImplementation implements RollbarInterface {
         });
         return;
       }
-      const safeContext = context ? sanitizeSentryContext(context) : undefined;
+      const safeContext = context ? sanitizeContext(context) : undefined;
       const breadcrumbContext =
         this.breadcrumbs.length > 0
           ? { breadcrumbs: this.breadcrumbs.slice() }
@@ -148,7 +148,7 @@ class WebRollbarImplementation implements RollbarInterface {
     this.breadcrumbs.push(breadcrumb);
   }
 
-  withSentry<TArgs extends unknown[], TResult>(
+  withRollbar<TArgs extends unknown[], TResult>(
     handler: (...args: TArgs) => TResult | Promise<TResult>,
   ): (...args: TArgs) => TResult | Promise<TResult> {
     return async (...args: TArgs): Promise<TResult> => {
@@ -165,7 +165,7 @@ class WebRollbarImplementation implements RollbarInterface {
     };
   }
 
-  getSentryConfigFromEnv(): RollbarConfig | null {
+  getRollbarConfigFromEnv(): RollbarConfig | null {
     // process.env.VITE_ROLLBAR_ACCESS_TOKEN is statically replaced by Vite's
     // `define` config at build time (vite.config.mts).  The bare
     // ROLLBAR_ACCESS_TOKEN fallback is kept for test/SSR environments.
@@ -199,4 +199,4 @@ class WebRollbarImplementation implements RollbarInterface {
 }
 
 // Export singleton instance
-export const sentry = new WebRollbarImplementation();
+export const rollbar = new WebRollbarImplementation();

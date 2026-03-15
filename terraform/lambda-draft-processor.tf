@@ -208,12 +208,6 @@ resource "aws_lambda_function" "draft_processor" {
       NODE_ENV                            = var.environment
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
-      # Sentry configuration
-      SENTRY_DSN                = var.sentry_dsn
-      SENTRY_TRACES_SAMPLE_RATE = "0.1"
-      SENTRY_DEBUG              = "false"
-      SENTRY_RELEASE            = "legacy-sports-draft-processor@${data.aws_ssm_parameter.draft_processor_lambda_version.value}"
-
       # WebSocket configuration for notifications
       CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
       WEBSOCKET_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"

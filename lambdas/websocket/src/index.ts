@@ -21,9 +21,9 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 import {
@@ -34,10 +34,10 @@ import {
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { and, eq } from 'drizzle-orm';
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 // Log version information on cold start
@@ -898,9 +898,9 @@ const baseWebSocketHandler = async (
 };
 
 /**
- * Main WebSocket handler with Sentry integration
+ * Main WebSocket handler with Rollbar integration
  */
-export const handler = withSentry(baseWebSocketHandler);
+export const handler = withRollbar(baseWebSocketHandler);
 
 /**
  * Send message to a specific connection

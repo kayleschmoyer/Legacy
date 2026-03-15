@@ -5,9 +5,9 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   addBreadcrumb,
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import {
@@ -23,10 +23,10 @@ import {
   getCacheStats,
 } from '@legacy-sports/bref-client';
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 // Initialize WebSocket notification service
@@ -1100,7 +1100,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   });
 };
 
-// Export the Sentry-wrapped handler
+// Export the Rollbar-wrapped handler
 export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
-  return await withSentry(baseHandler)(event);
+  return await withRollbar(baseHandler)(event);
 };

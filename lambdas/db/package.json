@@ -18,7 +18,7 @@
     "@legacy-sports/env-utilities": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/narrative": "workspace:*",
-    "@legacy-sports/sentry": "workspace:*",
+    "@legacy-sports/rollbar": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "@pothos/core": "*",
     "graphql": "*"

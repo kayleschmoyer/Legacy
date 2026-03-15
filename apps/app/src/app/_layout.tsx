@@ -4,8 +4,8 @@ import { TamaguiProvider } from 'tamagui';
 import Constants from 'expo-constants';
 import {
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
 } from '@legacy-sports/rollbar/native';
 import {
   AppProvider,
@@ -28,9 +28,9 @@ import { setUserId, setUserProperties } from '../utils/analytics';
 import { useGetUserByIdQuery } from '../api/db/graphql.generated';
 
 // Initialize Rollbar for mobile app
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 // Create a wrapper for HomeScreen that provides required props

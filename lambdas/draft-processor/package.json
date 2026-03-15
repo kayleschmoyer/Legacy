@@ -10,7 +10,7 @@
   "dependencies": {
     "@legacy-sports/db-client": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
-    "@legacy-sports/sentry": "workspace:*",
+    "@legacy-sports/rollbar": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "aws-lambda": "*",
     "drizzle-orm": "*"

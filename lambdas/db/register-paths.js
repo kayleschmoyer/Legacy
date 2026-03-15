@@ -20,7 +20,6 @@ register({
     '@legacy-sports/logging': ['lib/logging/src/index.ts'],
     '@legacy-sports/scheduling': ['lib/scheduling/src/index.ts'],
     '@legacy-sports/scoring': ['lib/scoring/src/index.ts'],
-    '@legacy-sports/sentry': ['lib/sentry/src/index.ts'],
     '@legacy-sports/shared-components': ['lib/shared-components/src/index.ts'],
     '@legacy-sports/tamagui-config': ['lib/tamagui-config/src/index.ts'],
     '@legacy-sports/ui-abstractions': ['lib/ui-abstractions/src/index.ts'],

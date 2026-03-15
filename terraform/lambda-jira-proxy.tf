@@ -92,9 +92,6 @@ resource "aws_lambda_function" "jira_proxy" {
       NODE_ENV                       = var.environment
       LOG_LEVEL                      = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
-      SENTRY_DSN                     = var.sentry_dsn
-      SENTRY_TRACES_SAMPLE_RATE     = "0.1"
-      SENTRY_DEBUG                   = "false"
 
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token

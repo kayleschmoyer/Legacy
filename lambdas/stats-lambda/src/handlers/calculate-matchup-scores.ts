@@ -30,14 +30,14 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import {
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
 } from '@legacy-sports/rollbar';
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 export interface CalculateMatchupScoresEvent {

@@ -4,18 +4,18 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 import { handler as careerHandler } from './load-career';
 import { handler as gameHandler } from './load-game';
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 // Log version information on cold start
@@ -107,4 +107,4 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   }
 };
 
-export const handler = withSentry(baseHandler);
+export const handler = withRollbar(baseHandler);

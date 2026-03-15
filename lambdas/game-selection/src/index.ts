@@ -10,9 +10,9 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
@@ -29,10 +29,10 @@ import {
 import { and, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import { handler as selectGameHandler } from './handlers/select-game';
 
-// Initialize Sentry
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 /**
@@ -996,7 +996,7 @@ const baseGameSelectionHandler = async (
   }
 };
 
-// Export the Sentry-wrapped handler
+// Export the Rollbar-wrapped handler
 export const handler = async (
   event: APIGatewayEvent | SQSEvent,
   context: Context,
@@ -1013,7 +1013,7 @@ export const handler = async (
   }
 
   // API Gateway Event - route to main handler
-  return await withSentry(baseGameSelectionHandler)(
+  return await withRollbar(baseGameSelectionHandler)(
     event as APIGatewayEvent,
     context,
   );

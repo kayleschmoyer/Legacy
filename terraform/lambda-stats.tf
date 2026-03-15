@@ -193,12 +193,6 @@ resource "aws_lambda_function" "stats" {
       NODE_ENV                            = var.environment
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
-      # Sentry Configuration
-      SENTRY_DSN                = var.sentry_dsn
-      SENTRY_TRACES_SAMPLE_RATE = var.environment == "dev" ? "1.0" : "0.1"
-      SENTRY_DEBUG              = var.environment == "dev" ? "true" : "false"
-      SENTRY_RELEASE            = "legacy-sports-stats@${data.aws_ssm_parameter.stats_lambda_version.value}"
-
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
     }

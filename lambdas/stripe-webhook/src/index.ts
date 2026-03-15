@@ -15,15 +15,15 @@ import {
 import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   captureError,
-  getSentryConfigFromEnv,
-  initSentry,
-  withSentry,
+  getRollbarConfigFromEnv,
+  initRollbar,
+  withRollbar,
 } from '@legacy-sports/rollbar';
 
-// Initialize Sentry on cold start
-const sentryConfig = getSentryConfigFromEnv();
-if (sentryConfig) {
-  initSentry(sentryConfig);
+// Initialize Rollbar on cold start
+const rollbarConfig = getRollbarConfigFromEnv();
+if (rollbarConfig) {
+  initRollbar(rollbarConfig);
 }
 
 // ── Secrets ──────────────────────────────────────────────────────────────────
@@ -795,4 +795,4 @@ const baseStripeWebhookHandler = async (
   return { statusCode: 200, body: JSON.stringify({ received: true }) };
 };
 
-export const handler = withSentry(baseStripeWebhookHandler);
+export const handler = withRollbar(baseStripeWebhookHandler);

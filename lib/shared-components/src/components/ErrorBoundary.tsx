@@ -7,7 +7,7 @@ interface Props {
   fallback?: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
   /**
-   * Optional error reporter function (e.g., Sentry captureError)
+   * Optional error reporter function (e.g., Rollbar captureError)
    * If provided, will be called with error and context
    */
   reportError?: (error: Error, context: Record<string, unknown>) => void;
@@ -19,7 +19,7 @@ interface State {
 }
 
 /**
- * Error Boundary component that catches React errors and reports them to Sentry
+ * Error Boundary component that catches React errors and reports them to Rollbar
  *
  * Usage:
  * ```tsx
@@ -56,7 +56,7 @@ export class ErrorBoundary extends Component<Props, State> {
       componentStack: errorInfo.componentStack,
     });
 
-    // Report to error tracking service (e.g., Sentry)
+    // Report to error tracking service (Rollbar)
     if (this.props.reportError) {
       this.props.reportError(error, {
         context: 'react-error-boundary',
