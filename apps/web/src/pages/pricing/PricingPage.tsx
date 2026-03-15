@@ -633,7 +633,7 @@ export default function PricingPage() {
                 )}
               </PlanHeader>
 
-              <ActionButton onPress={() => navigate('/')}>
+              <ActionButton onPress={() => navigate('/profile/subscription')}>
                 Upgrade to Premium
               </ActionButton>
 
@@ -881,7 +881,10 @@ export default function PricingPage() {
               fantasy baseball experience.
             </Paragraph>
             <XStack gap="$4" flexWrap="wrap" justifyContent="center">
-              <ActionButton onPress={() => navigate('/')} width={200}>
+              <ActionButton
+                onPress={() => navigate('/profile/subscription')}
+                width={200}
+              >
                 Upgrade to Premium
               </ActionButton>
               <OutlineButton onPress={() => navigate('/')} width={180}>
