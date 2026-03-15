@@ -29,6 +29,10 @@ resources/*.dump.bak
 !.vscode/mcp.json
 *.code-workspace
 
+# MCP cross-client discovery (tracked)
+!.mcp.json
+!.roo/
+
 # misc
 /.sass-cache
 /connect.lock

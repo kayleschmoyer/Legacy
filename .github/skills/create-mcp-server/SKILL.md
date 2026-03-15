@@ -256,6 +256,50 @@ Add the server to `.vscode/mcp.json` so VS Code discovers it:
 - Path is relative to the workspace root
 - Transport is always `stdio` for local MCP servers
 
+### 5b. Register for Cross-Client Discovery
+
+The repo maintains MCP configs for multiple AI clients. After adding to `.vscode/mcp.json`, also add the server to these files:
+
+**`.mcp.json`** (Claude Code CLI):
+
+```json
+{
+  "mcpServers": {
+    "<server-id>": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/<directory-name>/src/index.ts"]
+    }
+  }
+}
+```
+
+**`.roo/mcp.json`** (Roo Code):
+
+```json
+{
+  "mcpServers": {
+    "<server-id>": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/<directory-name>/src/index.ts"]
+    }
+  }
+}
+```
+
+> ⚠️ **Server ID ≠ directory name.** The config key (`<server-id>`) may differ from
+> the on-disk directory (`<directory-name>`). For example, `legacy-sports-jira`
+> points to `tools/mcp/jira-server/`. Check `.vscode/mcp.json` for the canonical mapping.
+
+**Key differences from `.vscode/mcp.json`**:
+
+| Feature         | VS Code           | Claude Code / Roo Code     |
+| --------------- | ----------------- | -------------------------- |
+| Top-level key   | `servers`         | `mcpServers`               |
+| Transport field | `"type": "stdio"` | Omitted (stdio is default) |
+| Env var syntax  | `${env:VAR_NAME}` | `${VAR_NAME}`              |
+
+> ⚠️ **Keep all three files in sync.** When adding or removing a server, update `.vscode/mcp.json`, `.mcp.json`, and `.roo/mcp.json` together. See `tools/mcp/README.md` for the mapping reference.
+
 ### 6. Add a README
 
 Create `tools/mcp/<server-name>/README.md`:

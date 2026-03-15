@@ -1,10 +1,28 @@
 # Legacy Sports MCP Servers
 
-Model Context Protocol (MCP) servers that extend VS Code Copilot with project-specific tools.
+Model Context Protocol (MCP) servers that extend AI coding agents with project-specific tools.
+
+## Cross-Client Discovery
+
+MCP server configuration is maintained in multiple files to support different AI clients:
+
+| File               | Client(s)                         | Top-level key | Env var syntax |
+| ------------------ | --------------------------------- | ------------- | -------------- |
+| `.vscode/mcp.json` | VS Code Copilot, Cursor, Windsurf | `servers`     | `${env:VAR}`   |
+| `.mcp.json`        | Claude Code CLI                   | `mcpServers`  | `${VAR}`       |
+| `.roo/mcp.json`    | Roo Code                          | `mcpServers`  | `${VAR}`       |
+
+**Keep all three files in sync.** When adding or removing a server, update all config files. The `create-mcp-server` skill (`.github/skills/create-mcp-server/SKILL.md`) documents the full registration steps.
+
+### Config Differences
+
+VS Code uses a `"type": "stdio"` field per server; Claude Code and Roo Code omit it (stdio is the default transport). VS Code env var references use `${env:VAR_NAME}` while the other clients use `${VAR_NAME}`.
 
 ## Servers
 
 ### jira-server
+
+> **Server ID:** `legacy-sports-jira`
 
 Wraps Jira operations with guardrails using the Jira REST API (with env var / netrc credential support):
 
@@ -16,3 +34,28 @@ Wraps Jira operations with guardrails using the Jira REST API (with env var / ne
 - **jira_get_comments** — Fetch all comments on a ticket with author and plain-text body
 
 See `.github/skills/mcp-jira/SKILL.md` for usage.
+
+### db-server
+
+> **Server ID:** `legacy-sports-db`
+
+Database operations with built-in safety guardrails:
+
+- **db_migration_status** — Check pending database migration status
+- **db_migrate** — Apply pending database migrations
+- **db_query** — Execute ad-hoc SQL queries (read-only by default)
+- **db_print_schema** — Regenerate `schema.graphql` from Pothos schema
+- **db_check_health** — Pre-flight health check (Docker, Postgres, migrations)
+
+See `.github/skills/mcp-db/SKILL.md` for usage.
+
+### worktree-server
+
+> **Server ID:** `worktree`
+
+Git worktree management for parallel ticket work:
+
+- **worktree_list** — List active worktrees with junction status and branch info
+- **worktree_set** — Set the active worktree for subsequent commands
+- **worktree_run** — Run a shell command in the active worktree
+- **worktree_guard** — Check whether a path is inside the main repo (warns if worktrees are active)
