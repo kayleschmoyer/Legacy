@@ -271,16 +271,16 @@ test.describe
 
     await test.step('All three stat groups are visible', async () => {
       // Groups only render when scoring data finishes loading; allow up to 20s each.
-      // Use .first() because both the editor and summary components render these titles.
-      await expect(page.getByText('Batting').first()).toBeVisible({
-        timeout: 20_000,
-      });
-      await expect(page.getByText('Pitching').first()).toBeVisible({
-        timeout: 20_000,
-      });
-      await expect(page.getByText('Fielding').first()).toBeVisible({
-        timeout: 20_000,
-      });
+      // Target the region landmarks rendered by LeagueScoringSummary for deterministic matching.
+      await expect(
+        page.getByRole('region', { name: 'Batting multipliers' }),
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(
+        page.getByRole('region', { name: 'Pitching multipliers' }),
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(
+        page.getByRole('region', { name: 'Fielding multipliers' }),
+      ).toBeVisible({ timeout: 20_000 });
     });
 
     await test.step('Scoring profile name is displayed', async () => {
