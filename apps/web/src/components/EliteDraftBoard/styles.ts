@@ -2,6 +2,8 @@
 // Component-scoped CSS for EliteDraftBoard
 // ---------------------------------------------------------------------------
 
+import { NAV_HEIGHT_PX } from '../../constants/dimensions';
+
 export const CSS = `
 /* ===== Custom Properties (aligned with Legacy Sports theme) ===== */
 :root {
@@ -118,10 +120,13 @@ export const CSS = `
 /* ===== Layout ===== */
 .d-root {
   /* Use fixed positioning to escape any padded layout wrappers (e.g. nav +
-     YStack padding) so the draft board always fills the full viewport
-     without causing a page-level scrollbar. */
+     YStack padding) so the draft board fills the viewport below the sticky
+     nav bar without causing a page-level scrollbar. */
   position: fixed;
-  inset: 0;
+  top: ${NAV_HEIGHT_PX}px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 100;
   background: var(--d-bg);
   color: var(--d-text);
@@ -133,7 +138,7 @@ export const CSS = `
 /* Subtle noise texture overlay for depth */
 .d-root::after {
   content: '';
-  position: fixed; inset: 0;
+  position: absolute; inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E");
   pointer-events: none; z-index: 0;
 }

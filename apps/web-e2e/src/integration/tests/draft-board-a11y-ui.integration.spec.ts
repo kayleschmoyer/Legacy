@@ -47,6 +47,18 @@ let state: A11yState;
 // Helpers (same pattern as live-draft-ui.integration.spec.ts)
 // ---------------------------------------------------------------------------
 
+/**
+ * Dismiss the pick-announcement overlay if visible.
+ * The overlay is position:fixed z-index 9999 and intercepts clicks.
+ */
+async function dismissPickAnnouncementOverlay(page: Page): Promise<void> {
+  const overlay = page.locator('.d-announce-overlay');
+  if (await overlay.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await overlay.click({ force: true });
+    await overlay.waitFor({ state: 'hidden', timeout: 5_000 });
+  }
+}
+
 async function switchUser(
   page: Page,
   jwt: string,
@@ -336,27 +348,13 @@ test.describe
     const clickWithOverlayDismiss = async (
       btn: ReturnType<typeof viewGroup.getByRole>,
     ) => {
-      if (
-        await announceOverlay.isVisible({ timeout: 1_000 }).catch(() => false)
-      ) {
-        await announceOverlay.click({ force: true });
-        await announceOverlay
-          .waitFor({ state: 'hidden', timeout: 3_000 })
-          .catch(() => null);
-      }
+      await dismissPickAnnouncementOverlay(page);
       await btn.scrollIntoViewIfNeeded();
       // Use dispatchEvent to avoid coordinate-based click landing on overlay
       await btn.dispatchEvent('click');
     };
 
-    if (
-      await announceOverlay.isVisible({ timeout: 3_000 }).catch(() => false)
-    ) {
-      await announceOverlay.click({ force: true });
-      await announceOverlay
-        .waitFor({ state: 'hidden', timeout: 5_000 })
-        .catch(() => null);
-    }
+    await dismissPickAnnouncementOverlay(page);
 
     // The four modes: ⊞ (grid), ☰ (list), ⋯ (compact), ▦ (board)
     const gridBtn = viewGroup.getByRole('radio', { name: '⊞' });
@@ -421,6 +419,9 @@ test.describe
 
     const searchInput = page.getByRole('textbox', { name: /search players/i });
     await expect(searchInput).toBeVisible({ timeout: 15_000 });
+
+    // Dismiss any pick-announcement overlay that may cover the search input
+    await dismissPickAnnouncementOverlay(page);
 
     await test.step('Search input is focusable and accepts text', async () => {
       await searchInput.click();
