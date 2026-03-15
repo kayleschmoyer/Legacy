@@ -564,7 +564,26 @@ jobs:
 
           SECURITY_LOG="eslint-security-$(date +%s).json"
           SCAN_SCOPE="full"
-          ESLINT_CONFIG=".eslintrc.security.json"
+
+          # Security rules applied inline via --rule flags (no external config file needed)
+          SECURITY_RULES=(
+            "security/detect-object-injection: error"
+            "security/detect-non-literal-regexp: error"
+            "security/detect-unsafe-regex: error"
+            "security/detect-buffer-noassert: error"
+            "security/detect-child-process: error"
+            "security/detect-disable-mustache-escape: error"
+            "security/detect-eval-with-expression: error"
+            "security/detect-no-csrf-before-method-override: error"
+            "security/detect-non-literal-fs-filename: error"
+            "security/detect-non-literal-require: error"
+            "security/detect-possible-timing-attacks: error"
+            "security/detect-pseudoRandomBytes: error"
+          )
+          RULE_ARGS=()
+          for rule in "${SECURITY_RULES[@]}"; do
+            RULE_ARGS+=(--rule "$rule")
+          done
 
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
             SCAN_SCOPE="changed-files"
@@ -578,21 +597,9 @@ jobs:
               echo "🔎 Scanning ${#CHANGED_FILES[@]} changed file(s):"
               printf '   - %s\n' "${CHANGED_FILES[@]}"
               pnpm exec eslint \
-                --config "$ESLINT_CONFIG" \
                 --no-eslintrc \
                 --plugin security \
-                --rule "security/detect-object-injection: error" \
-                --rule "security/detect-non-literal-regexp: error" \
-                --rule "security/detect-unsafe-regex: error" \
-                --rule "security/detect-buffer-noassert: error" \
-                --rule "security/detect-child-process: error" \
-                --rule "security/detect-disable-mustache-escape: error" \
-                --rule "security/detect-eval-with-expression: error" \
-                --rule "security/detect-no-csrf-before-method-override: error" \
-                --rule "security/detect-non-literal-fs-filename: error" \
-                --rule "security/detect-non-literal-require: error" \
-                --rule "security/detect-possible-timing-attacks: error" \
-                --rule "security/detect-pseudoRandomBytes: error" \
+                "${RULE_ARGS[@]}" \
                 --format json \
                 --output-file "$SECURITY_LOG" \
                 "${CHANGED_FILES[@]}" \
@@ -601,21 +608,9 @@ jobs:
           else
             echo "🔍 Running full-repository ESLint security scan"
             pnpm exec eslint \
-              --config "$ESLINT_CONFIG" \
               --no-eslintrc \
               --plugin security \
-              --rule "security/detect-object-injection: error" \
-              --rule "security/detect-non-literal-regexp: error" \
-              --rule "security/detect-unsafe-regex: error" \
-              --rule "security/detect-buffer-noassert: error" \
-              --rule "security/detect-child-process: error" \
-              --rule "security/detect-disable-mustache-escape: error" \
-              --rule "security/detect-eval-with-expression: error" \
-              --rule "security/detect-no-csrf-before-method-override: error" \
-              --rule "security/detect-non-literal-fs-filename: error" \
-              --rule "security/detect-non-literal-require: error" \
-              --rule "security/detect-possible-timing-attacks: error" \
-              --rule "security/detect-pseudoRandomBytes: error" \
+              "${RULE_ARGS[@]}" \
               --format json \
               --output-file "$SECURITY_LOG" \
               --ext .ts,.tsx,.js,.jsx \
@@ -625,17 +620,21 @@ jobs:
 
           echo "Scan scope: $SCAN_SCOPE"
 
-          # Parse results
+          # Parse results — ESLint JSON format is an array of file objects,
+          # each with an errorCount. Sum errorCount across all files for the true
+          # number of security violations.
           if [ -f "$SECURITY_LOG" ]; then
-            SECURITY_ISSUES=$(jq length "$SECURITY_LOG" 2>/dev/null || echo 0)
+            SECURITY_ISSUES=$(jq '[.[].errorCount] | add // 0' "$SECURITY_LOG" 2>/dev/null || echo 0)
             echo "📊 ESLint Security: $SECURITY_ISSUES issues found"
-            
+
             if [ "$SECURITY_ISSUES" -gt 0 ]; then
               echo "🚨 Security issues detected:"
-              jq -r '.[] | "- \(.ruleId): \(.message) (\(.filePath))"' "$SECURITY_LOG" | head -10
+              jq -r '.[] | select(.messages | length > 0) | .filePath as $f | .messages[] | "- \($f): \(.ruleId): \(.message)"' "$SECURITY_LOG" | head -10
             fi
-            
+
             echo "eslint-security-issues=$SECURITY_ISSUES" >> $GITHUB_OUTPUT
+          else
+            echo "eslint-security-issues=0" >> $GITHUB_OUTPUT
           fi
 
           echo "::endgroup::"
@@ -646,18 +645,20 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # CodeQL Results
-          CODEQL_STATUS="${{ steps.process-codeql-results.outputs.codeql-status || 'unknown' }}"
+          CODEQL_STATUS="${{ steps.process-codeql-results.outputs.codeql-status || 'skipped' }}"
           echo "### CodeQL Analysis" >> $GITHUB_STEP_SUMMARY
           if [ "$CODEQL_STATUS" = "success" ]; then
             echo "✅ **CodeQL**: Analysis completed successfully (private repo mode)" >> $GITHUB_STEP_SUMMARY
+            echo "- Language: JavaScript/TypeScript" >> $GITHUB_STEP_SUMMARY
+            echo "- Query Suite: security-extended,security-and-quality" >> $GITHUB_STEP_SUMMARY
+            echo "- Results: SARIF files generated for offline review" >> $GITHUB_STEP_SUMMARY
           elif [ "$CODEQL_STATUS" = "no-results" ]; then
             echo "⚠️ **CodeQL**: Analysis completed but no results generated" >> $GITHUB_STEP_SUMMARY
+          elif [ "$CODEQL_STATUS" = "skipped" ]; then
+            echo "⏭️ **CodeQL**: Skipped (runs on push-to-main and scheduled scans only)" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ **CodeQL**: Analysis failed or incomplete" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "- Language: JavaScript/TypeScript" >> $GITHUB_STEP_SUMMARY
-          echo "- Query Suite: security-extended,security-and-quality" >> $GITHUB_STEP_SUMMARY
-          echo "- Results: SARIF files generated for offline review" >> $GITHUB_STEP_SUMMARY
 
           # ESLint Security Results
           ESLINT_ISSUES="${{ steps.eslint-security.outputs.eslint-security-issues || 0 }}"
