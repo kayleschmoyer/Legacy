@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import type { GestureResponderEvent } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -774,7 +775,8 @@ export function HomePage(): React.JSX.Element {
                       <XStack gap="$3" marginTop="$1">
                         <ActionButton
                           size="$3"
-                          onPress={() => {
+                          onPress={(e: GestureResponderEvent) => {
+                            e.stopPropagation();
                             navigate(sport.route);
                           }}
                         >
@@ -783,7 +785,8 @@ export function HomePage(): React.JSX.Element {
                         {sport.key === 'baseball' && (
                           <OutlineButton
                             size="$3"
-                            onPress={() => {
+                            onPress={(e: GestureResponderEvent) => {
+                              e.stopPropagation();
                               navigate('/baseball/league/create');
                             }}
                           >
