@@ -533,7 +533,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   }, [positionsData, dispatch]);
 
   const [getUserTeamId, { data: userTeamData, loading: userTeamLoading }] =
-    useGetUserTeamIdLazyQuery();
+    useGetUserTeamIdLazyQuery({ fetchPolicy: 'network-only' });
 
   const [
     getLeagueTeams,
@@ -807,9 +807,15 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
 
-  // Spectator mode: authenticated user viewing a public league they are not a member of
+  // Spectator mode: authenticated user viewing a public league they are not a member of.
+  // Check both data.league.userMembership (Apollo cache) AND userTeamId (from the separate
+  // GetUserTeamId query), because the Apollo cache may be stale (e.g. user just joined via the
+  // discovery page). Without the userTeamId guard the join button incorrectly appears for
+  // existing members whose cached league data still shows userMembership: null (LS-1033).
   const isSpectator = !!(
-    data?.league?.isPublic && !data?.league?.userMembership
+    data?.league?.isPublic &&
+    !data?.league?.userMembership &&
+    !userTeamId
   );
 
   // LS-1057: Once league data has loaded and commissioner status is known,
