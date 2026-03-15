@@ -212,7 +212,17 @@ async function setupGraphQL(
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-test.describe('Commissioner League Settings @regression', () => {
+/** Click the "League Settings" accordion header so its content is visible. */
+async function expandLeagueSettings(page: import('@playwright/test').Page) {
+  const toggle = page.getByRole('button', {
+    name: 'League Settings',
+    exact: true,
+  });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
+test.describe('Commissioner League Settings @critical', () => {
   test('should display League Settings heading', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');
@@ -223,32 +233,28 @@ test.describe('Commissioner League Settings @regression', () => {
   test('should display Games Per Matchup section', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');
+    await expandLeagueSettings(page);
 
-    await expect(page.getByText('Games Per Matchup')).toBeVisible();
+    await expect(
+      page.getByText('Games Per Matchup', { exact: true }),
+    ).toBeVisible();
   });
 
   test('should display game count options 1 through 7', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');
+    await expandLeagueSettings(page);
 
-    for (const label of [
-      '1 game',
-      '2 games',
-      '3 games',
-      '4 games',
-      '5 games',
-      '6 games',
-      '7 games',
-    ]) {
-      await expect(
-        page.getByRole('button', { name: new RegExp(label) }),
-      ).toBeVisible();
+    for (const n of [1, 2, 3, 4, 5, 6, 7]) {
+      const label = `Games per matchup: ${n} game${n > 1 ? 's' : ''}`;
+      await expect(page.getByRole('button', { name: label })).toBeVisible();
     }
   });
 
   test('should display SP Starts Per Matchup section', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');
+    await expandLeagueSettings(page);
 
     await expect(page.getByText('SP Starts Per Matchup')).toBeVisible();
   });
@@ -256,6 +262,7 @@ test.describe('Commissioner League Settings @regression', () => {
   test('should display Minimum Career Games section', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');
+    await expandLeagueSettings(page);
 
     await expect(page.getByText('Minimum Career Games')).toBeVisible();
   });
@@ -263,6 +270,7 @@ test.describe('Commissioner League Settings @regression', () => {
   test('should display Save Settings button', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');
+    await expandLeagueSettings(page);
 
     await expect(
       page.getByRole('button', { name: 'Save Settings' }),
@@ -272,6 +280,7 @@ test.describe('Commissioner League Settings @regression', () => {
   test('should display Reset button', async ({ page }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');
+    await expandLeagueSettings(page);
 
     await expect(page.getByRole('button', { name: 'Reset' })).toBeVisible();
   });
@@ -283,6 +292,7 @@ test.describe('Commissioner League Settings @regression', () => {
       league: makeLeague({ draftStatus: 'completed' }),
     });
     await page.goto('/baseball/league/1/commissioner');
+    await expandLeagueSettings(page);
 
     await expect(
       page.getByText(
@@ -296,6 +306,7 @@ test.describe('Commissioner League Settings @regression', () => {
   }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');
+    await expandLeagueSettings(page);
 
     await expect(
       page.getByText(/Configure matchup settings for the league/),
@@ -313,6 +324,7 @@ test.describe('Commissioner League Settings @regression', () => {
       },
     });
     await page.goto('/baseball/league/1/commissioner');
+    await expandLeagueSettings(page);
 
     // Change a setting to enable the save button (games per matchup)
     await page

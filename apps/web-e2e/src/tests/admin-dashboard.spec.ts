@@ -170,9 +170,9 @@ adminTest.describe('Admin Dashboard – users section @regression', () => {
   });
 
   adminTest('shows Users section with user count badge', async ({ page }) => {
-    await expect(page.getByText('Users')).toBeVisible();
+    await expect(page.getByText('Users', { exact: true })).toBeVisible();
     // Badge shows number of users (3 in mock)
-    await expect(page.getByText('3')).toBeVisible();
+    await expect(page.getByText('3', { exact: true }).first()).toBeVisible();
   });
 
   adminTest('shows user email addresses', async ({ page }) => {
@@ -181,8 +181,8 @@ adminTest.describe('Admin Dashboard – users section @regression', () => {
   });
 
   adminTest('shows user usernames', async ({ page }) => {
-    await expect(page.getByText('alice')).toBeVisible();
-    await expect(page.getByText('bob')).toBeVisible();
+    await expect(page.getByText('alice', { exact: true })).toBeVisible();
+    await expect(page.getByText('bob', { exact: true })).toBeVisible();
   });
 
   adminTest('shows search input for filtering users', async ({ page }) => {

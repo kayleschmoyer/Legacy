@@ -6,7 +6,7 @@
  * and navigation cards synchronously.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 test.describe('Homepage @smoke', () => {
   test.beforeEach(async ({ page }) => {

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 test.describe('HTML Snapshots @visual', () => {
   test.beforeEach(async ({ page }) => {

@@ -24,10 +24,12 @@ test.describe('Regular User Tests @regression', () => {
     page,
   }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
-    // The auth guard should NOT display the login page
-    await expect(page.locator('text=Sign in with Google')).not.toBeVisible();
+    // The auth guard should NOT display the landing page
+    await expect(
+      page.getByRole('button', { name: /get started with google/i }),
+    ).not.toBeVisible();
   });
 });
 
@@ -40,10 +42,12 @@ adminTest.describe('Admin User Tests @regression', () => {
     'should load authenticated page with admin JWT',
     async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
-      // Should not see login page
-      await expect(page.locator('text=Sign in with Google')).not.toBeVisible();
+      // Should not see landing page
+      await expect(
+        page.getByRole('button', { name: /get started with google/i }),
+      ).not.toBeVisible();
     },
   );
 });
@@ -62,10 +66,12 @@ leagueManagerTest.describe('League Manager Tests @regression', () => {
     'should load authenticated page with custom user JWT',
     async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
-      // Should not see login page
-      await expect(page.locator('text=Sign in with Google')).not.toBeVisible();
+      // Should not see landing page
+      await expect(
+        page.getByRole('button', { name: /get started with google/i }),
+      ).not.toBeVisible();
     },
   );
 });
@@ -76,13 +82,15 @@ leagueManagerTest.describe('League Manager Tests @regression', () => {
 
 unauthTest.describe('Unauthenticated Tests @regression', () => {
   unauthTest(
-    'should show login page when not authenticated',
+    'should show landing page when not authenticated',
     async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
-      // Without a JWT, the auth guard should show the login page
-      await expect(page.locator('text=Sign in with Google')).toBeVisible({
+      // Without a JWT, the auth guard should show the landing page
+      await expect(
+        page.getByRole('button', { name: /get started with google/i }),
+      ).toBeVisible({
         timeout: 10000,
       });
     },
@@ -106,7 +114,7 @@ test.describe('Dynamic JWT Tests @regression', () => {
 
     // Start with the default storageState user
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Inject a different JWT and reload
     const adminJwt = E2EAuth.generateAdminJwt('1h');
@@ -116,10 +124,12 @@ test.describe('Dynamic JWT Tests @regression', () => {
       window.location.reload();
     }, adminJwt);
 
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
-    // Should still be authenticated (not showing login)
-    await expect(page.locator('text=Sign in with Google')).not.toBeVisible();
+    // Should still be authenticated (not showing landing page)
+    await expect(
+      page.getByRole('button', { name: /get started with google/i }),
+    ).not.toBeVisible();
   });
 
   test('should show login after JWT expires', async ({ page, browserName }) => {
@@ -152,7 +162,9 @@ test.describe('Dynamic JWT Tests @regression', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Auth guard should redirect to login since token is expired
-    await expect(page.locator('text=Sign in with Google')).toBeVisible({
+    await expect(
+      page.getByRole('button', { name: /get started with google/i }),
+    ).toBeVisible({
       timeout: 15000,
     });
   });

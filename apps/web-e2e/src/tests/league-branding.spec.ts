@@ -10,7 +10,7 @@
  * - Successful branding mutation shows a success message
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
 import { LeaguePage } from '../pages/league.page';
 import { updateLeagueBrandingResponse } from '../mocks/graphql/league.mocks';
@@ -32,14 +32,15 @@ test.describe('League Branding @regression', () => {
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForLoadState('networkidle');
 
-    // Expand the League Branding accordion section if collapsed
+    // Expand the League Branding accordion section
     const brandingHeader = page.getByRole('button', {
       name: /League Branding/i,
     });
-    if (await brandingHeader.isVisible()) {
-      await brandingHeader.click();
-      await page.waitForTimeout(300);
-    }
+    await brandingHeader.click();
+    // Wait for the accordion content to fully render before proceeding
+    await expect(
+      page.getByRole('heading', { name: /League Branding/i }),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test('should render the League Branding section in the Commissioner tab', async ({

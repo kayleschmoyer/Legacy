@@ -159,7 +159,10 @@ async function mockLeagueDetailGraphQL(page: import('@playwright/test').Page) {
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
 
-    if (postData.includes('getleaguebyid') || postData.includes('getleague')) {
+    if (
+      postData.includes('getleaguebyid') ||
+      postData.includes('"getleague"')
+    ) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -262,7 +265,7 @@ test.describe('Standings Tab — error state @regression', () => {
         });
       } else if (
         postData.includes('getleaguebyid') ||
-        postData.includes('getleague')
+        postData.includes('"getleague"')
       ) {
         await route.fulfill({
           status: 200,
@@ -315,7 +318,7 @@ test.describe('Standings Tab — empty state @regression', () => {
         });
       } else if (
         postData.includes('getleaguebyid') ||
-        postData.includes('getleague')
+        postData.includes('"getleague"')
       ) {
         await route.fulfill({
           status: 200,

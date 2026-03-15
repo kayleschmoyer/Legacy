@@ -8,7 +8,7 @@
  * top-level GraphQL error handling.
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 
 /** URL predicate that matches GraphQL API endpoints but not source file imports */

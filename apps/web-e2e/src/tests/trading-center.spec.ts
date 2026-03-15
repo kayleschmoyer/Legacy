@@ -183,7 +183,6 @@ const MOCK_ACCEPTED_TRADE = {
 interface MockOpts {
   teamTradeOffers?: object[];
   leagueTradeOffers?: object[];
-  isCommissioner?: boolean;
 }
 
 async function mockTradesGraphQL(
@@ -234,7 +233,7 @@ async function mockTradesGraphQL(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          data: { userTeamId: opts.isCommissioner ? 1 : 2 },
+          data: { userTeamId: 1 },
         }),
       });
     } else if (
@@ -285,7 +284,9 @@ test.describe('Trading Center — header and layout @critical', () => {
   });
 
   test('shows "Outgoing Offers" section', async ({ page }) => {
-    await expect(page.getByText('Outgoing Offers')).toBeVisible();
+    await expect(
+      page.getByText('Outgoing Offers', { exact: true }),
+    ).toBeVisible();
   });
 });
 

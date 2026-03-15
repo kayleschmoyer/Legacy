@@ -6,7 +6,7 @@
  * — no GraphQL calls required.  Tests are fast and reliable.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 test.describe('Help Page — header and layout @smoke', () => {
   test.beforeEach(async ({ page }) => {

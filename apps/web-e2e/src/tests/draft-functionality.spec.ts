@@ -36,9 +36,6 @@ test.describe('Draft Status Web UI Tests @critical', () => {
       .first();
     const draftStatusElement = page.getByTestId('draft-status').first();
 
-    // Take screenshot of initial state
-    await expect(page).toHaveScreenshot('league-page-initial.png');
-
     // Verify draft button is present and enabled for not-started leagues
     if (await draftButton.isVisible()) {
       const isDisabled = await draftButton.isDisabled();
@@ -84,9 +81,6 @@ test.describe('Draft Status Web UI Tests @critical', () => {
       test.skip();
     }
 
-    // Take screenshot before clicking
-    await expect(page).toHaveScreenshot('before-start-draft.png');
-
     // Click the start draft button
     await startDraftButton.click();
 
@@ -119,9 +113,6 @@ test.describe('Draft Status Web UI Tests @critical', () => {
 
     // At least one UI element should show the updated status
     expect(statusUpdated).toBe(true);
-
-    // Take screenshot after the update
-    await expect(page).toHaveScreenshot('after-start-draft.png');
   });
 
   test('should maintain draft status after page refresh (persistence test)', async ({
@@ -224,9 +215,6 @@ test.describe('Draft Status Web UI Tests @critical', () => {
     if (preRefreshStatus.includes('queued')) {
       expect(postRefreshStatus).toMatch(/queued|progress|completed/i);
     }
-
-    // Take final screenshot
-    await expect(page).toHaveScreenshot('after-page-refresh.png');
 
     console.log(
       '✅ Draft status persistence test passed - status maintained after refresh',

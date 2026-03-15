@@ -7,7 +7,7 @@
  * present and the assertions are deterministic.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 test.describe('Navigation Header @smoke', () => {
   test.beforeEach(async ({ page }) => {

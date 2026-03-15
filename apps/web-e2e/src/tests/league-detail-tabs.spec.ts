@@ -84,8 +84,8 @@ const MOCK_TEAMS = [
 ];
 
 const MOCK_POSITIONS = [
-  { __typename: 'LeaguePosition', id: 1, name: 'Catcher', abbrev: 'C' },
-  { __typename: 'LeaguePosition', id: 2, name: 'First Base', abbrev: '1B' },
+  { __typename: 'LeaguePosition', id: 1, leagueId: 1, positionType: 'C' },
+  { __typename: 'LeaguePosition', id: 2, leagueId: 1, positionType: '1B' },
 ];
 
 const MOCK_ACTIVITY_EVENTS = [
@@ -151,26 +151,18 @@ const MOCK_TEAM_MEMBERS = [
     teamId: 1,
     playerId: 101,
     positionId: 1,
-    playerName: 'Mike Johnson',
-    position: { id: 1, name: 'Catcher', abbrev: 'C' },
+    leagueId: 1,
+    onTradeBlock: false,
+    salary: null,
     player: {
       id: 101,
       firstName: 'Mike',
       lastName: 'Johnson',
-      primaryPosition: 'C',
       brefId: 'johnmi01',
-      careerGames: 300,
-      careerSeasons: 5,
+      eligiblePositions: ['C'],
+      careerBatting: { games: 300 },
+      seasonsPlayed: 5,
     },
-    battingStats: null,
-    pitchingStats: null,
-    fieldingStats: null,
-    seasonBatting: null,
-    seasonPitching: null,
-    seasonFielding: null,
-    season: 2025,
-    numberOfGames: 10,
-    games: [],
   },
 ];
 
@@ -219,7 +211,10 @@ async function mockLeagueDetailGraphQL(
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
 
-    if (postData.includes('getleaguebyid') || postData.includes('getleague')) {
+    if (
+      postData.includes('getleaguebyid') ||
+      postData.includes('"getleague"')
+    ) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -426,15 +421,19 @@ test.describe('League Chat – section rendering @regression', () => {
   });
 
   test('shows "League Chat" section heading', async ({ page }) => {
-    await expect(page.getByText('League Chat')).toBeVisible();
+    await expect(page.getByText('Chat', { exact: true })).toBeVisible();
   });
 
   test('shows chat messages from mocked data', async ({ page }) => {
+    // Switch to the Chat sub-tab (Activity is selected by default)
+    await page.getByText('Chat', { exact: true }).click();
     await expect(page.getByText('Good luck this week everyone!')).toBeVisible();
     await expect(page.getByText('May the best roster win!')).toBeVisible();
   });
 
   test('shows message send input field', async ({ page }) => {
+    // Switch to the Chat sub-tab first
+    await page.getByText('Chat', { exact: true }).click();
     // Chat input should be rendered (textarea or input)
     const chatInput = page.getByPlaceholder(/message/i).first();
     await expect(chatInput).toBeVisible();
@@ -511,9 +510,9 @@ test.describe('Roster Tab – data rendering @regression', () => {
   });
 
   test('shows roster position slots for the league', async ({ page }) => {
-    // Positions from MOCK_POSITIONS include "Catcher"
+    // Infield section renders with our mock positions (C and 1B)
     await expect(
-      page.getByText('Catcher', { exact: false }).first(),
+      page.getByText('Infield', { exact: true }).first(),
     ).toBeVisible();
   });
 });

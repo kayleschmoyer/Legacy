@@ -13,7 +13,7 @@
  * Default JWT has id=1 — leagues with owner=1 show the Commissioner tab.
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -223,12 +223,35 @@ async function setupCommissionerGraphQL(
   );
 }
 
+// ── Accordion helpers ─────────────────────────────────────────────────────
+
+async function expandDraftOrder(page: import('@playwright/test').Page) {
+  const toggle = page.getByRole('button', {
+    name: 'Draft Pick Order',
+    exact: true,
+  });
+  await toggle.waitFor({ state: 'visible' });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
+async function expandDraftSettings(page: import('@playwright/test').Page) {
+  const toggle = page.getByRole('button', {
+    name: 'Draft Settings',
+    exact: true,
+  });
+  await toggle.waitFor({ state: 'visible' });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
 // ── Draft Order Control ────────────────────────────────────────────────────
 
 test.describe('Draft Order Control @regression', () => {
   test.beforeEach(async ({ page }) => {
     await setupCommissionerGraphQL(page, makeLeague('not-started'));
     await page.goto('/baseball/league/1/commissioner');
+    await expandDraftOrder(page);
   });
 
   test('shows Draft Pick Order heading @smoke', async ({ page }) => {
@@ -276,6 +299,7 @@ test.describe('Draft Settings Control @regression', () => {
   test.beforeEach(async ({ page }) => {
     await setupCommissionerGraphQL(page, makeLeague('not-started'));
     await page.goto('/baseball/league/1/commissioner');
+    await expandDraftSettings(page);
   });
 
   test('shows Draft Settings heading @smoke', async ({ page }) => {
@@ -304,6 +328,7 @@ test.describe('Draft controls locked when draft is in progress @regression', () 
   }) => {
     await setupCommissionerGraphQL(page, makeLeague('in-progress'));
     await page.goto('/baseball/league/1/commissioner');
+    await expandDraftOrder(page);
 
     // When draftStatus is 'in-progress' the controls should be locked/disabled
     await expect(
@@ -324,6 +349,7 @@ test.describe('Draft controls locked when draft is in progress @regression', () 
   }) => {
     await setupCommissionerGraphQL(page, makeLeague('in-progress'));
     await page.goto('/baseball/league/1/commissioner');
+    await expandDraftOrder(page);
 
     // A lock icon or text should indicate settings cannot be changed
     await expect(

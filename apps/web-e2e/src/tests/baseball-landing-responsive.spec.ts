@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test } from '../fixtures/auth-enhanced';
 import { SnapshotUtils } from '../support/snapshot-utils';
 
 test.describe('Baseball Landing Page - Responsive @visual', () => {

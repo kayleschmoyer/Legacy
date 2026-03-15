@@ -58,7 +58,7 @@ export default async function globalSetup(config: FullConfig) {
   console.log('[E2E Auth] Running global auth setup…');
 
   const jwt = await resolveAuthToken();
-  const baseURL = config.projects[0]?.use?.baseURL ?? 'http://localhost:4200';
+  const baseURL = config.projects[0]?.use?.baseURL ?? 'http://localhost:4280';
 
   writeStorageState(baseURL, jwt);
 

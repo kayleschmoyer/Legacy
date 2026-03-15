@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 interface GraphQLRequest {
   query: string;
@@ -186,10 +186,24 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await route.continue();
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                errors: [{ message: '[E2E] Failed to parse GraphQL request' }],
+                data: null,
+              }),
+            });
           }
         } else {
-          await route.continue();
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              errors: [{ message: '[E2E] GraphQL request missing POST body' }],
+              data: null,
+            }),
+          });
         }
       },
     );
@@ -399,8 +413,13 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
         }
       }
 
-      // Continue with normal requests
-      void route.continue();
+      // Catch-all for unmocked operations — prevents CI hangs without
+      // triggering Apollo error boundaries that break the UI.
+      void route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: {} }),
+      });
     });
 
     await page.goto(leagueUrl);

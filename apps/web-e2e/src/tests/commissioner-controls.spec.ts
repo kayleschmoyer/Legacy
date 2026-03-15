@@ -324,6 +324,18 @@ async function setupGraphQL(
   });
 }
 
+// ── Accordion helpers ─────────────────────────────────────────────────────────
+
+async function expandWaiverProcessing(page: import('@playwright/test').Page) {
+  const toggle = page.getByRole('button', {
+    name: 'Waiver Processing',
+    exact: true,
+  });
+  await toggle.waitFor({ state: 'visible' });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
 // ── Commissioner Tab — Navigation ────────────────────────────────────────────
 
 test.describe('Commissioner Tab — navigation @smoke', () => {
@@ -454,7 +466,9 @@ test.describe('Next Step — game selection state @critical', () => {
     await selectBtn.click();
 
     // Confirmation dialog should appear
-    await expect(page.getByText(/select game 1/i)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /select game 1/i }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: /confirm/i })).toBeVisible();
   });
 
@@ -478,10 +492,10 @@ test.describe('Next Step — game selection state @critical', () => {
     await selectBtn.click();
 
     // Cancel the dialog
-    await page
-      .getByRole('button', { name: /cancel/i })
-      .first()
-      .click();
+    await expect(
+      page.getByRole('heading', { name: /select game 1/i }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: /dialog close/i }).click();
 
     // Dialog should close; the select button should still be visible
     await expect(selectBtn).toBeVisible();
@@ -653,11 +667,12 @@ test.describe('Waiver Processing — commissioner control @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForLoadState('load');
+    await expandWaiverProcessing(page);
   });
 
   test('shows "Waiver Processing" section heading', async ({ page }) => {
     await expect(
-      page.getByText('Waiver Processing', { exact: false }),
+      page.getByRole('heading', { name: /waiver processing/i }),
     ).toBeVisible();
   });
 
@@ -677,7 +692,9 @@ test.describe('Waiver Processing — commissioner control @critical', () => {
     await processBtn.click();
 
     // Confirmation dialog should appear
-    await expect(page.getByText('Process Waivers')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Process Waivers' }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: /confirm/i })).toBeVisible();
   });
 
@@ -697,13 +714,12 @@ test.describe('Waiver Processing — commissioner control @critical', () => {
     await processBtn.click();
 
     // Dialog is open
-    await expect(page.getByText('Process Waivers')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Process Waivers' }),
+    ).toBeVisible();
 
     // Cancel closes it
-    await page
-      .getByRole('button', { name: /cancel/i })
-      .first()
-      .click();
+    await page.getByRole('button', { name: /dialog close/i }).click();
 
     // "Process Waivers Now" button should be visible again
     await expect(processBtn).toBeVisible();
@@ -726,6 +742,7 @@ test.describe('Waiver Processing — confirm mutation @regression', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForLoadState('load');
+    await expandWaiverProcessing(page);
 
     const processBtn = page.getByRole('button', {
       name: /process waivers now/i,

@@ -8,7 +8,7 @@
  * Route: /baseball/team/:teamId → tested at /baseball/team/1
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -210,7 +210,7 @@ test.describe('Team Detail Page – team identity @regression', () => {
     await page.waitForLoadState('load');
 
     // Avatar fallback shows 'M' (first char of 'My Team')
-    await expect(page.getByText('M')).toBeVisible();
+    await expect(page.getByText('M', { exact: true }).first()).toBeVisible();
   });
 });
 
@@ -222,7 +222,9 @@ test.describe('Team Detail Page – roster @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Roster')).toBeVisible();
+    await expect(
+      page.getByText('Roster', { exact: true }).first(),
+    ).toBeVisible();
   });
 
   test('shows player name from team members', async ({ page }) => {

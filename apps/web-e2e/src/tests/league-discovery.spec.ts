@@ -16,7 +16,7 @@
  * - Footer CTA: "Can't find the right league?" visible when leagues present
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
 import { LeaguePage } from '../pages/league.page';
 import {
@@ -133,11 +133,10 @@ test.describe('League Discovery — league cards @critical', () => {
     await lp.expectDiscoveryLoaded();
 
     await expect(page.getByText('Rocket League Fantasy')).toBeVisible();
-    await expect(page.getByText('Open')).toBeVisible();
-    await expect(page.getByText('NL Only')).toBeVisible();
+    await expect(page.getByText('Open', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('NL Only').first()).toBeVisible();
     // spots available column: "5 / 12" or similar
-    await expect(page.getByText('5')).toBeVisible();
-    await expect(page.getByText('12')).toBeVisible();
+    await expect(page.getByText('5 / 12')).toBeVisible();
   });
 
   test('shows results count', async ({ page }) => {

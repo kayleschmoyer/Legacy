@@ -11,8 +11,8 @@
  * fast and deterministic without requiring specific timing on the network layer.
  */
 
-import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function isGraphQLEndpoint(url: URL): boolean {
@@ -128,7 +128,8 @@ test.describe('GraphQL error states on pages @regression', () => {
     await expect(
       page
         .getByRole('alert')
-        .or(page.getByText(/error|failed|unavailable/i).first()),
+        .or(page.getByText(/error|failed|unavailable/i))
+        .first(),
     ).toBeVisible();
   });
 

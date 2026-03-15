@@ -225,6 +225,28 @@ async function mockPlayerComparisonGraphQL(
           contentType: 'application/json',
           body: JSON.stringify({ data: { playerSeasonStats: [] } }),
         });
+      } else if (
+        postData.includes('getmysubscription') ||
+        postData.includes('mysubscription')
+      ) {
+        // PremiumGate requires an active premium subscription
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              mySubscription: {
+                __typename: 'SubscriptionInfo',
+                status: 'active',
+                tier: 'premium',
+                currentPeriodEnd: '2026-12-31T00:00:00.000Z',
+                cancelAtPeriodEnd: false,
+                trialEndsAt: null,
+                gracePeriodEndsAt: null,
+              },
+            },
+          }),
+        });
       } else {
         // Safe default: return empty data instead of hitting the real backend
         await route.fulfill({
@@ -350,10 +372,11 @@ adminTest.describe('Player Comparison – player search @regression', () => {
     await input.fill('Aa');
     await page.getByText('Aaron Judge').click();
 
-    // Add second player
+    // Add second player (retry click — dropdown re-renders during debounce)
     await input.fill('Sh');
-    await expect(page.getByText('Shohei Ohtani')).toBeVisible();
-    await page.getByText('Shohei Ohtani').click();
+    await expect(async () => {
+      await page.getByText('Shohei Ohtani').click({ timeout: 2000 });
+    }).toPass({ timeout: 15000 });
 
     await expect(page.getByText(/Select Players \(2\/4\)/)).toBeVisible();
   });
@@ -377,10 +400,11 @@ adminTest.describe('Player Comparison – comparison table @regression', () => {
     await expect(page.getByText('Aaron Judge')).toBeVisible();
     await page.getByText('Aaron Judge').click();
 
-    // Add second player
+    // Add second player (retry click — dropdown re-renders during debounce)
     await input.fill('Sh');
-    await expect(page.getByText('Shohei Ohtani')).toBeVisible();
-    await page.getByText('Shohei Ohtani').click();
+    await expect(async () => {
+      await page.getByText('Shohei Ohtani').click({ timeout: 2000 });
+    }).toPass({ timeout: 15000 });
   });
 
   adminTest(

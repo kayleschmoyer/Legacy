@@ -1,22 +1,14 @@
 name: "End-to-End Testing Orchestration"
-description: "Comprehensive E2E testing with Playwright, development server management, and intelligent test selection for critical user paths"
+description: "Comprehensive E2E testing with Playwright — server lifecycle is managed by Playwright's webServer config for consistent local/CI behavior"
 
 inputs:
   should-run-e2e:
     description: "Whether E2E tests should be executed"
     required: true
   web-build-path:
-    description: "Path to the built web application"
+    description: "Path to the built web application (must exist before this action runs)"
     required: false
     default: "dist/apps/web"
-  server-port:
-    description: "Port for the development server"
-    required: false
-    default: "4200"
-  server-host:
-    description: "Host for the development server"
-    required: false
-    default: "localhost"
   test-patterns:
     description: "Playwright test patterns to run (grep-style). Empty string runs all tests."
     required: false
@@ -29,10 +21,6 @@ inputs:
     description: "Timeout for E2E test execution"
     required: false
     default: "10"
-  retry-count:
-    description: "Number of retries for failed tests"
-    required: false
-    default: "2"
   browser:
     description: "Browser to use for testing"
     required: false
@@ -96,42 +84,18 @@ runs:
 
         echo "🚀 E2E testing enabled - running comprehensive test suite"
 
-        # Set up E2E testing environment
-        E2E_TIMESTAMP=$(date +%s)
-        E2E_LOG="e2e-results-${E2E_TIMESTAMP}.log"
-
         # Configure Playwright for CI
         export CI=true
         export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/playwright"
-
-        # Ensure Nx Cloud is not used for E2E tests
         export NX_NO_CLOUD=true
 
-        echo "�📋 E2E Test Configuration:"
-        echo "- **Test Directory**: apps/web-e2e/src/tests" 
+        PLAYWRIGHT_BIN="pnpm exec playwright"
+
+        echo "📋 E2E Test Configuration:"
+        echo "- **Test Directory**: apps/web-e2e/src/tests"
         echo "- **Browser**: ${{ inputs.browser }} (headless: ${{ inputs.headless }})"
-        echo "- **Base URL**: http://${{ inputs.server-host }}:${{ inputs.server-port }}"
-        echo "- **Retries**: ${{ inputs.retry-count }} (CI environment)"
-        echo "- **Workers**: 1 (CI stability)"
         echo "- **Test Patterns**: ${{ inputs.test-patterns }}"
         echo "- **Exclude Patterns**: ${{ inputs.test-patterns-invert }}"
-        echo "- **Execution Mode**: Local"
-
-        # Prefer pnpm-managed executables when available
-        if command -v pnpm >/dev/null 2>&1; then
-          PLAYWRIGHT_BIN="pnpm exec playwright"
-        else
-          PLAYWRIGHT_BIN="pnpm exec playwright"
-        fi
-
-        NX_CMD="${NX_COMMAND:-}"
-        if [ -z "$NX_CMD" ]; then
-          if command -v pnpm >/dev/null 2>&1; then
-            NX_CMD="pnpm exec nx"
-          else
-            NX_CMD="pnpm exec nx"
-          fi
-        fi
 
         # Install Playwright browsers if needed (cached)
         echo "🔧 Setting up Playwright browsers..."
@@ -140,94 +104,31 @@ runs:
           $PLAYWRIGHT_BIN install-deps ${{ inputs.browser }} || true
         fi
 
-        # Start web application in background for E2E testing
-        echo "🌐 Starting web application for E2E testing..."
-        echo "ℹ️ Development server will build and serve the application automatically"
-
-        # Start development server in background with output logging
-        echo "🚀 Starting development server on port ${{ inputs.server-port }}..."
-
-        SERVER_LOG="dev-server-${E2E_TIMESTAMP}.log"
-        # Prefer a static file server against the pre-built artifact (avoids a
-        # redundant build inside nx serve).  Falls back to nx serve when the
-        # build directory is missing (e.g. artifact download was skipped).
-        if [ -d "${{ inputs.web-build-path }}" ]; then
-          echo "📦 Serving pre-built web artifact with static file server..."
-          npx --yes serve@14.2.4 -s "${{ inputs.web-build-path }}" -l ${{ inputs.server-port }} --no-clipboard > "$SERVER_LOG" 2>&1 &
-          SERVER_PID=$!
-        else
-          echo "⚠️ Pre-built artifact not found at ${{ inputs.web-build-path }}, falling back to nx serve..."
-          $NX_CMD serve web --port=${{ inputs.server-port }} --host=${{ inputs.server-host }} > "$SERVER_LOG" 2>&1 &
-          SERVER_PID=$!
-        fi
-
-        echo "📝 Server output logged to: $SERVER_LOG"
-        echo "🔍 Server PID: $SERVER_PID"
-
-        # Wait for server to be ready (increased timeout for initial build)
-        echo "⏳ Waiting for development server to be ready (max 60 seconds)..."
-        READY=false
-        for i in {1..60}; do
-          # Check if server process is still running
-          if ! kill -0 $SERVER_PID 2>/dev/null; then
-            echo "❌ Development server process died unexpectedly"
-            echo "📋 Last 20 lines of server log:"
-            tail -20 "$SERVER_LOG" || true
-            echo "result=server-failure" >> $GITHUB_OUTPUT
-            echo "total-tests=0" >> $GITHUB_OUTPUT
-            echo "passed-tests=0" >> $GITHUB_OUTPUT
-            echo "failed-tests=0" >> $GITHUB_OUTPUT
-            echo "success-rate=0" >> $GITHUB_OUTPUT
-            echo "execution-time=$(($(date +%s) - START_TIME))" >> $GITHUB_OUTPUT
-            echo "::error::Development server process crashed. Check logs for details."
-            exit 1
-          fi
-          
-          # Check if server is responding
-          if curl -f -s http://${{ inputs.server-host }}:${{ inputs.server-port }} >/dev/null 2>&1; then
-            echo "✅ Development server ready on http://${{ inputs.server-host }}:${{ inputs.server-port }}"
-            READY=true
-            break
-          fi
-          
-          # Show progress every 10 seconds
-          if [ $((i % 10)) -eq 0 ]; then
-            echo "⏳ Still waiting... ($i/60 seconds)"
-            echo "📋 Recent server output:"
-            tail -5 "$SERVER_LOG" || true
-          fi
-          
-          sleep 1
-        done
-
-        if [ "$READY" = false ]; then
-          echo "❌ Development server failed to start within 60 seconds"
-          echo "📋 Full server log:"
-          cat "$SERVER_LOG" || true
-          kill $SERVER_PID 2>/dev/null || true
-          echo "result=server-failure" >> $GITHUB_OUTPUT
+        # Verify the pre-built web artifact exists (required by webServer config)
+        if [ ! -d "${{ inputs.web-build-path }}" ]; then
+          echo "❌ Pre-built web artifact not found at ${{ inputs.web-build-path }}"
+          echo "result=build-failure" >> $GITHUB_OUTPUT
           echo "total-tests=0" >> $GITHUB_OUTPUT
           echo "passed-tests=0" >> $GITHUB_OUTPUT
           echo "failed-tests=0" >> $GITHUB_OUTPUT
           echo "success-rate=0" >> $GITHUB_OUTPUT
           echo "execution-time=$(($(date +%s) - START_TIME))" >> $GITHUB_OUTPUT
-          echo "::error::Development server failed to start - cannot run E2E tests"
+          echo "::error::Web build artifact missing — cannot run E2E tests"
           exit 1
         fi
 
-        # Run E2E tests with proper error handling
+        # Playwright's webServer config (playwright.config.ts) handles starting
+        # and stopping the static file server automatically.  We just run tests.
         echo "🎭 Executing E2E test suite..."
+        echo "ℹ️  Server lifecycle managed by Playwright webServer config"
 
         E2E_EXIT_CODE=0
+        E2E_LOG="e2e-results-$(date +%s).log"
 
         # Set JSON reporter output path via environment variable
-        # Playwright doesn't support json:filepath inline syntax
         export PLAYWRIGHT_JSON_OUTPUT_NAME="apps/web-e2e/test-results/results.json"
 
-        # Build Playwright command — explicitly pass the local config to avoid
-        # picking up the root playwright.config.ts via pnpm workspace resolution.
-        # Run from repo root with an explicit config path (pnpm exec may ignore
-        # shell cwd changes in workspaces).
+        # Build Playwright command
         PLAYWRIGHT_CMD="$PLAYWRIGHT_BIN test --config=apps/web-e2e/playwright.config.ts"
         PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --project=${{ inputs.browser }}"
         if [ -n "${{ inputs.test-patterns }}" ]; then
@@ -246,7 +147,6 @@ runs:
           PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --headed"
         fi
 
-        # Run critical E2E tests with retry logic and proper reporting
         echo "🎯 Running command: $PLAYWRIGHT_CMD"
         if eval "$PLAYWRIGHT_CMD" 2>&1 | tee "${E2E_LOG}"; then
           echo "✅ Critical E2E tests passed"
@@ -255,11 +155,6 @@ runs:
           echo "❌ Critical E2E tests failed"
           E2E_EXIT_CODE=1
         fi
-
-        # Stop the development server
-        echo "🛑 Stopping development server..."
-        kill $SERVER_PID 2>/dev/null || true
-        wait $SERVER_PID 2>/dev/null || true
 
         # Process results and generate summary
 

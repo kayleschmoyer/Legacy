@@ -10,7 +10,7 @@
  * All GraphQL queries are mocked so these tests run without a live backend.
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -208,12 +208,28 @@ test.describe('Season Draft Game Create Page @critical', () => {
     });
   }
 
+  /** Mock the lobby page query so navigating back from create doesn't trigger an unmocked op */
+  async function mockLobbyGraphQL(page: import('@playwright/test').Page) {
+    await page.route(isGraphQLEndpoint, async (route, request) => {
+      const body = request.postDataJSON() as { operationName?: string };
+      if (body?.operationName === 'GetSeasonDraftGames') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getSeasonDraftGames: [] } }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+  }
+
   test('shows create form heading @smoke', async ({ page }) => {
     await mockCreatePageGraphQL(page);
     await page.goto('/games/season-draft/create');
 
     await expect(
-      page.getByRole('heading', { name: /create.*season draft game/i }),
+      page.getByRole('heading', { name: /new season draft/i }),
     ).toBeVisible();
   });
 
@@ -221,17 +237,18 @@ test.describe('Season Draft Game Create Page @critical', () => {
     await mockCreatePageGraphQL(page);
     await page.goto('/games/season-draft/create');
 
-    await expect(page.getByPlaceholder(/game name/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/hr challenge/i)).toBeVisible();
   });
 
   test('cancel button returns to lobby @critical', async ({ page }) => {
+    await mockLobbyGraphQL(page);
     await mockCreatePageGraphQL(page);
     await page.goto('/games/season-draft/create');
 
-    const cancelBtn = page.getByRole('button', { name: /cancel/i });
-    await expect(cancelBtn).toBeVisible();
-    await cancelBtn.click();
-    await expect(page).toHaveURL(/\/games\/season-draft$/);
+    const backBtn = page.getByRole('button', { name: /back/i });
+    await expect(backBtn).toBeVisible();
+    await backBtn.click();
+    await expect(page).toHaveURL(/\/games\/season-draft/);
   });
 
   test('shows hitter and pitcher player type options @regression', async ({

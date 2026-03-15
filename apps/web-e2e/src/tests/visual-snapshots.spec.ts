@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 test.describe('Visual Snapshots @visual', () => {
   test.beforeEach(async ({ page }) => {
@@ -189,11 +189,33 @@ test.describe('Visual Snapshots @visual', () => {
   });
 
   test('should capture loading states', async ({ page }) => {
-    // Intercept network requests to simulate loading states
-    await page.route('**/*', async (route) => {
-      // Delay responses by 2 seconds to capture loading states
+    // Intercept API/GraphQL requests to simulate loading states (static assets still served)
+    await page.route(
+      (url) => {
+        const s = url.toString();
+        return (
+          s.includes('/graphql') &&
+          !s.includes('/@fs/') &&
+          !s.includes('.ts') &&
+          !s.includes('.js')
+        );
+      },
+      async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: {} }),
+        });
+      },
+    );
+    await page.route('**/api/**', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      await route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({}),
+      });
     });
 
     await page.goto('/');

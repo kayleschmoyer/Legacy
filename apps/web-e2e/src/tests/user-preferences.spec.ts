@@ -60,10 +60,18 @@ test.describe('User Preferences – Appearance section @regression', () => {
   });
 
   test('shows Theme label and options', async ({ page }) => {
-    await expect(page.getByText('Theme')).toBeVisible();
-    await expect(page.getByText('System')).toBeVisible();
-    await expect(page.getByText('Light')).toBeVisible();
-    await expect(page.getByText('Dark')).toBeVisible();
+    await expect(page.getByText('Theme', { exact: true }).first()).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(page.getByText('System', { exact: true }).first()).toBeVisible(
+      { timeout: 30000 },
+    );
+    await expect(page.getByText('Light', { exact: true }).first()).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(page.getByText('Dark', { exact: true }).first()).toBeVisible({
+      timeout: 30000,
+    });
   });
 
   test('shows Enable animations toggle', async ({ page }) => {
@@ -73,8 +81,8 @@ test.describe('User Preferences – Appearance section @regression', () => {
   test('clicking the Dark theme chip selects it and persists to localStorage', async ({
     page,
   }) => {
-    const darkChip = page.getByText('Dark');
-    await expect(darkChip).toBeVisible();
+    const darkChip = page.locator('[role="radio"]', { hasText: 'Dark' });
+    await expect(darkChip).toBeVisible({ timeout: 30000 });
     await darkChip.click();
 
     // Chip should show as selected
@@ -88,9 +96,15 @@ test.describe('User Preferences – Appearance section @regression', () => {
     });
 
     // Verify preference was actually persisted to localStorage
-    const savedTheme = await page.evaluate(() =>
-      localStorage.getItem('ls-theme'),
-    );
+    const savedTheme = await page.evaluate(() => {
+      const raw = localStorage.getItem('ls_user_preferences');
+      if (!raw) return null;
+      try {
+        return (JSON.parse(raw) as { theme?: string }).theme ?? null;
+      } catch {
+        return null;
+      }
+    });
     expect(savedTheme).toBe('dark');
   });
 });

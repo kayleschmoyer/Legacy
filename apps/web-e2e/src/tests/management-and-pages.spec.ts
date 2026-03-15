@@ -86,7 +86,7 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
   test('first confirmation dialog lists affected data', async ({ page }) => {
     await page.getByRole('button', { name: /delete all leagues/i }).click();
 
-    const dialog = page.getByRole('alertdialog').first();
+    const dialog = page.locator('div[role="alertdialog"]');
     await expect(dialog).toBeVisible();
 
     // Key data items listed in the dialog
@@ -98,10 +98,10 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
   test('canceling from the first dialog closes it', async ({ page }) => {
     await page.getByRole('button', { name: /delete all leagues/i }).click();
 
-    const dialog = page.getByRole('alertdialog').first();
+    const dialog = page.locator('div[role="alertdialog"]');
     await expect(dialog).toBeVisible();
 
-    await dialog.getByRole('button', { name: /cancel/i }).click();
+    await page.getByRole('button', { name: 'Dialog Close' }).click();
     await expect(dialog).not.toBeVisible();
   });
 
@@ -110,14 +110,16 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
   }) => {
     await page.getByRole('button', { name: /delete all leagues/i }).click();
 
-    const firstDialog = page.getByRole('alertdialog').first();
+    const firstDialog = page.locator('div[role="alertdialog"]');
     await expect(firstDialog).toBeVisible();
 
     await firstDialog.getByRole('button', { name: /continue/i }).click();
 
     // Final confirmation dialog should now be visible
-    await expect(page.getByRole('alertdialog')).toBeVisible();
-    await expect(page.getByText(/final confirmation/i)).toBeVisible();
+    await expect(page.locator('div[role="alertdialog"]')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /final confirmation/i }),
+    ).toBeVisible();
     await expect(
       page.getByText(/this is your last chance to cancel/i),
     ).toBeVisible();
@@ -128,15 +130,17 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
   }) => {
     // Open first dialog
     await page.getByRole('button', { name: /delete all leagues/i }).click();
-    const firstDialog = page.getByRole('alertdialog').first();
+    const firstDialog = page.locator('div[role="alertdialog"]');
     await expect(firstDialog).toBeVisible();
 
     // Advance to second dialog
     await firstDialog.getByRole('button', { name: /continue/i }).click();
-    await expect(page.getByText(/final confirmation/i)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /final confirmation/i }),
+    ).toBeVisible();
 
-    const finalDialog = page.getByRole('alertdialog').first();
-    await finalDialog.getByRole('button', { name: /cancel/i }).click();
+    const finalDialog = page.locator('div[role="alertdialog"]');
+    await page.getByRole('button', { name: 'Dialog Close' }).click();
     await expect(finalDialog).not.toBeVisible();
   });
 
@@ -165,17 +169,19 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
     await page.getByRole('button', { name: /delete all leagues/i }).click();
 
     // Step 2: confirm in first dialog
-    const firstDialog = page.getByRole('alertdialog').first();
+    const firstDialog = page.locator('div[role="alertdialog"]');
     await expect(firstDialog).toBeVisible();
     await firstDialog.getByRole('button', { name: /continue/i }).click();
 
     // Step 3: confirm in final dialog
-    await expect(page.getByText(/final confirmation/i)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /final confirmation/i }),
+    ).toBeVisible();
 
     // Handle the success alert that follows
     page.once('dialog', (dialog) => void dialog.accept());
 
-    const finalDialog = page.getByRole('alertdialog').first();
+    const finalDialog = page.locator('div[role="alertdialog"]');
     await finalDialog
       .getByRole('button', { name: /yes, delete everything/i })
       .click();

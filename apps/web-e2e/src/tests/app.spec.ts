@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 test.describe('Web Application @smoke', () => {
   test('should load the homepage', async ({ page }) => {

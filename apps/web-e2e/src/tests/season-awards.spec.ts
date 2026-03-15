@@ -9,7 +9,7 @@
  * Route: /baseball/league/1/commissioner (Season Awards accordion section)
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -308,9 +308,13 @@ async function setupGraphQL(
 
 // Helper: expand the Season Awards accordion section
 async function expandSeasonAwards(page: import('@playwright/test').Page) {
-  const toggle = page.getByTestId('commissioner-section-toggle-season-awards');
+  const toggle = page.getByRole('button', {
+    name: 'Season Awards',
+    exact: true,
+  });
   await toggle.waitFor({ state: 'visible' });
   await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
 // ── Tests: Accordion ──────────────────────────────────────────────────────────
@@ -324,7 +328,7 @@ test.describe('Season Awards — accordion panel @regression', () => {
     await page.waitForLoadState('load');
 
     await expect(
-      page.getByTestId('commissioner-section-toggle-season-awards'),
+      page.getByRole('button', { name: 'Season Awards', exact: true }),
     ).toBeVisible();
   });
 
@@ -337,8 +341,9 @@ test.describe('Season Awards — accordion panel @regression', () => {
 
     await expandSeasonAwards(page);
 
+    // Verify the section content is now visible (heading inside the panel)
     await expect(
-      page.getByText('Season Awards', { exact: true }),
+      page.getByRole('heading', { name: /season awards/i }),
     ).toBeVisible();
   });
 

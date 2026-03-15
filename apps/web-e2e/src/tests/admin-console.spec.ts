@@ -10,7 +10,16 @@
  * All GraphQL queries are mocked.
  */
 
-import { adminTest, expect, test } from '../fixtures/auth-enhanced';
+import {
+  adminTest,
+  createCustomAuthTest,
+  expect,
+  test,
+} from '../fixtures/auth-enhanced';
+
+/** Non-admin user: global storageState JWT has accessLevel 'admin',
+ *  so we need a custom fixture with accessLevel 'none' for redirect tests. */
+const nonAdminTest = createCustomAuthTest('user@test.com', 'none');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -78,6 +87,24 @@ async function mockAdminGraphQL(
           body: JSON.stringify({ data: { users: MOCK_USERS } }),
         });
       }
+    } else if (postData.includes('"getuserbyid"')) {
+      // Return the admin user that matches the adminTest JWT (admin@test.com)
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            user: {
+              __typename: 'User',
+              id: 1,
+              email: 'admin@test.com',
+              username: 'AdminUser',
+              name: 'AdminUser',
+              accessLevel: 'admin',
+            },
+          },
+        }),
+      });
     } else if (postData.includes('impersonateuser')) {
       await route.fulfill({
         status: 200,
@@ -101,15 +128,17 @@ async function mockAdminGraphQL(
 // Access control tests (uses regular `test` fixture, not adminTest)
 // ---------------------------------------------------------------------------
 
-test.describe('Admin Console — access control @regression', () => {
-  test('non-admin user is redirected away from /admin', async ({ page }) => {
-    // Regular `test` fixture uses a user@test.com JWT with accessLevel 'none'
-    await page.goto('/admin');
-    await page.waitForLoadState('load');
+nonAdminTest.describe('Admin Console — access control @critical', () => {
+  nonAdminTest(
+    'non-admin user is redirected away from /admin',
+    async ({ page }) => {
+      await page.goto('/admin');
+      await page.waitForLoadState('load');
 
-    // Non-admin gets redirected to / (redirected by the component's navigate call)
-    await expect(page).not.toHaveURL('/admin', { timeout: 10000 });
-  });
+      // Non-admin gets redirected to / (redirected by the component's navigate call)
+      await expect(page).not.toHaveURL('/admin', { timeout: 10000 });
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -157,15 +186,17 @@ adminTest.describe('Admin Console — Users section @regression', () => {
   });
 
   adminTest('shows "Users" section accordion', async ({ page }) => {
-    await expect(page.getByText('Users')).toBeVisible();
+    await expect(
+      page.getByText('Users', { exact: true }).first(),
+    ).toBeVisible();
   });
 
   adminTest('shows regular user alice in the user list', async ({ page }) => {
-    await expect(page.getByText('alice')).toBeVisible();
+    await expect(page.getByText('alice', { exact: true })).toBeVisible();
   });
 
   adminTest('shows regular user bob in the user list', async ({ page }) => {
-    await expect(page.getByText('bob')).toBeVisible();
+    await expect(page.getByText('bob', { exact: true })).toBeVisible();
   });
 
   adminTest('shows user email addresses', async ({ page }) => {
@@ -193,12 +224,12 @@ adminTest.describe('Admin Console — Users section @regression', () => {
   adminTest(
     'does not show Impersonate button for other admin users',
     async ({ page }) => {
-      // AdminUser (id:1) is admin — should not have an Impersonate button
+      // AdminUser (id:1) is admin — verify user card is visible
       const userCards = page.locator('text=AdminUser').first();
       await expect(userCards).toBeVisible();
 
-      // The admin user row should not have an Impersonate button adjacent to it
-      // (Only 2 non-admin users, so exactly 2 Impersonate buttons total)
+      // Only non-admin users (alice, bob) should have Impersonate buttons;
+      // the current admin user (admin@test.com / id:1) should not.
       const impersonateButtons = page.getByRole('button', {
         name: /impersonate/i,
       });

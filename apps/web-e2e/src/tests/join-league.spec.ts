@@ -13,7 +13,7 @@
  * - Cancel navigation
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
 import { LeaguePage } from '../pages/league.page';
 import {

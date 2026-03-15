@@ -161,6 +161,14 @@ export default defineConfig(({ mode }) => {
           __dirname,
           '../../lib/shared-components/src/platform-components/index.ts',
         ),
+        // Deduplicate Tamagui packages — defense-in-depth alongside the
+        // pnpm.overrides in the root package.json. Without this, sub-packages
+        // under lib/ could resolve different versions of @tamagui/web and
+        // @tamagui/core, causing the Tamagui config set by createTamagui() in
+        // one copy to be invisible to getSetting() in another, crashing with
+        // "Cannot read properties of null (reading 'settings')".
+        '@tamagui/web': resolve(__dirname, '../../node_modules/@tamagui/web'),
+        '@tamagui/core': resolve(__dirname, '../../node_modules/@tamagui/core'),
       },
       extensions: [
         '.web.tsx',

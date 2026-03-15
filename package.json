@@ -343,7 +343,13 @@
   "pnpm": {
     "overrides": {
       "@esbuild-kit/core-utils>esbuild": "^0.25.10",
-      "axios": "1.12.2"
+      "axios": "1.12.2",
+      "tamagui": "$tamagui",
+      "@tamagui/core": "$@tamagui/core",
+      "@tamagui/web": "1.144.4",
+      "@tamagui/config": "$@tamagui/config",
+      "@tamagui/animations-react-native": "$@tamagui/animations-react-native",
+      "react-native": "$react-native"
     },
     "peerDependencyRules": {
       "allowedVersions": {

@@ -11,7 +11,7 @@
  *  - Reduced-motion preference respected
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 // ---------------------------------------------------------------------------
 // 1. Skip Links

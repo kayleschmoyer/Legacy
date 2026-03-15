@@ -5,7 +5,7 @@
  * constants) — no GraphQL calls.  Tests are fast and reliable.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 test.describe('About Page @smoke', () => {
   test.beforeEach(async ({ page }) => {

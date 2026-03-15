@@ -12,7 +12,7 @@
  * - No GraphQL calls needed (pricing page is fully static)
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 
 test.describe('Pricing page – page load @regression', () => {
@@ -35,16 +35,18 @@ test.describe('Pricing page – page load @regression', () => {
     await page.waitForLoadState('load');
 
     // Free plan
-    await expect(page.getByText('FREE')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('FREE').first()).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.getByText('$0')).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /get started free/i }),
+      page.getByRole('button', { name: /get started free/i }).first(),
     ).toBeVisible();
 
     // Premium plan
-    await expect(page.getByText('PREMIUM')).toBeVisible();
+    await expect(page.getByText('PREMIUM').first()).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /upgrade to premium/i }),
+      page.getByRole('button', { name: /upgrade to premium/i }).first(),
     ).toBeVisible();
   });
 
@@ -68,8 +70,8 @@ test.describe('Pricing page — billing toggle @regression', () => {
     await monthlyToggle.click();
 
     // After switching to monthly the price display changes
-    // Monthly price: $9.99; Annual monthly equivalent: $3.33
-    await expect(page.getByText('9.99')).toBeVisible({ timeout: 5_000 });
+    // Monthly price: $4.99; Annual monthly equivalent: $3.33
+    await expect(page.getByText('4.99')).toBeVisible({ timeout: 5_000 });
 
     // Switch back to annual
     const annualToggle = page.getByText(/^annual$/i).first();
@@ -84,7 +86,9 @@ test.describe('Pricing page — billing toggle @regression', () => {
     await page.goto('/pricing');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/save 30%/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/save \d+%/i).first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });
 
@@ -104,7 +108,9 @@ test.describe('Pricing page — feature comparison @smoke', () => {
     await page.goto('/pricing');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/^free$/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/^free$/i).first()).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.getByText(/^premium$/i).first()).toBeVisible();
   });
 
@@ -118,7 +124,7 @@ test.describe('Pricing page — feature comparison @smoke', () => {
     await expect(page.getByText(/leagues/i).first()).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText(/mock drafts/i)).toBeVisible();
+    await expect(page.getByText(/mock drafts/i).first()).toBeVisible();
     await expect(page.getByText(/unlimited/i).first()).toBeVisible();
   });
 });

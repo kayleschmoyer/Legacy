@@ -8,7 +8,7 @@
  * Tagged @visual — runs on manual trigger or nightly CI.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 import { SnapshotUtils } from '../support/snapshot-utils';
 
 // ---------------------------------------------------------------------------

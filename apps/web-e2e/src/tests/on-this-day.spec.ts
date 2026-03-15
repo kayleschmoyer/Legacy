@@ -288,15 +288,23 @@ test.describe('On This Day Feed — Player Navigation @regression', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
+    // Dismiss the Welcome tutorial dialog if it appears
+    const skipBtn = page.getByRole('button', { name: /skip tutorial/i });
+    try {
+      await expect(skipBtn).toBeVisible({ timeout: 3000 });
+      await skipBtn.click();
+    } catch {
+      // No dialog — continue
+    }
+
     // Wait for the entry to be visible
     const entryRow = page.getByRole('link', {
       name: /view babe ruth profile/i,
     });
     await expect(entryRow).toBeVisible();
 
+    // Click the entry and verify navigation to the player profile page.
     await entryRow.click();
-    await page.waitForLoadState('load');
-
     await expect(page).toHaveURL(/\/players\/101/);
   });
 });

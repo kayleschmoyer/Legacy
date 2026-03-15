@@ -10,7 +10,7 @@
  * All GraphQL queries are mocked so these tests run without a live backend.
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -275,7 +275,7 @@ test.describe('Player Detail Modal @regression', () => {
     await page.waitForLoadState('networkidle');
 
     // The modal is always open on the /players/:id route
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
   });
 
@@ -284,7 +284,7 @@ test.describe('Player Detail Modal @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     // Wait for stats to load (spinner should disappear)
@@ -293,12 +293,12 @@ test.describe('Player Detail Modal @regression', () => {
     ).not.toBeVisible();
 
     // Hero stat chips (label text rendered inside HeroStat components)
-    await expect(dialog.getByText('AVG')).toBeVisible();
-    await expect(dialog.getByText('HR')).toBeVisible();
-    await expect(dialog.getByText('RBI')).toBeVisible();
+    await expect(dialog.getByText('AVG').first()).toBeVisible();
+    await expect(dialog.getByText('HR').first()).toBeVisible();
+    await expect(dialog.getByText('RBI').first()).toBeVisible();
 
     // Computed career AVG from 2 seasons: (165+155)/(550+520) = 320/1070 ≈ .299
-    const avgChip = dialog.getByText('.299');
+    const avgChip = dialog.getByText('.299').first();
     await expect(avgChip).toBeVisible();
   });
 
@@ -307,7 +307,7 @@ test.describe('Player Detail Modal @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     await expect(
@@ -336,7 +336,7 @@ test.describe('Player Detail Modal @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     await expect(
@@ -349,7 +349,7 @@ test.describe('Player Detail Modal @regression', () => {
     // Key row labels in the batting card
     await expect(dialog.getByText('Batting Average')).toBeVisible();
     await expect(dialog.getByText('Home Runs')).toBeVisible();
-    await expect(dialog.getByText('RBI')).toBeVisible();
+    await expect(dialog.getByText('RBI').first()).toBeVisible();
   });
 
   test('shows season-by-season batting table with correct headers', async ({
@@ -359,7 +359,7 @@ test.describe('Player Detail Modal @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     await expect(
@@ -378,7 +378,9 @@ test.describe('Player Detail Modal @regression', () => {
       dialog.getByText('RBI', { exact: true }).first(),
     ).toBeVisible();
     await expect(dialog.getByText('SB')).toBeVisible();
-    await expect(dialog.getByText('AVG', { exact: true })).toBeVisible();
+    await expect(
+      dialog.getByText('AVG', { exact: true }).first(),
+    ).toBeVisible();
 
     // Both season rows should appear
     await expect(dialog.getByText('2024', { exact: true })).toBeVisible();
@@ -390,7 +392,7 @@ test.describe('Player Detail Modal @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     await expect(
@@ -404,9 +406,9 @@ test.describe('Player Detail Modal @regression', () => {
     await page.waitForTimeout(300);
 
     // Fielding table headers
-    await expect(dialog.getByText('POS')).toBeVisible();
-    await expect(dialog.getByText('INN')).toBeVisible();
-    await expect(dialog.getByText('PO')).toBeVisible();
+    await expect(dialog.getByText('POS').first()).toBeVisible();
+    await expect(dialog.getByText('INN').first()).toBeVisible();
+    await expect(dialog.getByText('PO').first()).toBeVisible();
     await expect(dialog.getByText('A', { exact: true }).first()).toBeVisible();
     await expect(dialog.getByText('E', { exact: true }).first()).toBeVisible();
   });
@@ -431,7 +433,7 @@ test.describe('Player Detail Modal @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     // The X / Close button in BaseModal has aria-label="Close"
@@ -453,7 +455,7 @@ test.describe('Player Detail Modal – Pitcher @regression', () => {
     await page.goto('/players/2');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     await expect(
@@ -461,19 +463,25 @@ test.describe('Player Detail Modal – Pitcher @regression', () => {
     ).not.toBeVisible();
 
     // Eligible positions for a pitcher
-    await expect(dialog.getByText('SP')).toBeVisible();
+    await expect(dialog.getByText('SP').first()).toBeVisible();
 
     // Career Pitching card
     await expect(dialog.getByText('Career Pitching')).toBeVisible();
 
     // Pitching hero chips
     await expect(dialog.getByText('W-L')).toBeVisible();
-    await expect(dialog.getByText('SO')).toBeVisible();
+    await expect(dialog.getByText('SO').first()).toBeVisible();
+
+    // Click the Pitching tab to show season-by-season table
+    const pitchingTab = dialog.getByText('Pitching', { exact: true });
+    await expect(pitchingTab).toBeVisible();
+    await pitchingTab.click({ force: true });
+    await page.waitForTimeout(300);
 
     // Season-by-season pitching table headers
-    await expect(dialog.getByText('ERA')).toBeVisible();
-    await expect(dialog.getByText('IP')).toBeVisible();
-    await expect(dialog.getByText('BB')).toBeVisible();
+    await expect(dialog.getByText('ERA').first()).toBeVisible();
+    await expect(dialog.getByText('IP').first()).toBeVisible();
+    await expect(dialog.getByText('BB').first()).toBeVisible();
   });
 });
 
@@ -487,7 +495,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     await expect(
@@ -506,7 +514,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     await expect(
@@ -523,7 +531,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     await page.keyboard.press('Escape');
@@ -539,7 +547,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     // The PlayerDetailPage renders a "← Back to Player Statistics" button
@@ -560,7 +568,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     await expect(
@@ -586,7 +594,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await page.goto('/players/1');
     await page.waitForLoadState('networkidle');
 
-    const dialog = page.getByRole('dialog');
+    const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
     await expect(

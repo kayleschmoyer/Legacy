@@ -121,16 +121,15 @@ test.describe('League Creation Form @critical', () => {
     const createButton = page.getByRole('button', { name: /create league/i });
     await expect(createButton).toBeEnabled();
 
-    let alertMessage = '';
-    page.once('dialog', async (dialog) => {
-      alertMessage = dialog.message();
-      await dialog.accept();
-    });
-
     await createButton.click();
-    await page.waitForTimeout(500);
 
-    expect(alertMessage).toMatch(/at least 3 characters/i);
+    // Validation message appears inline (Card role="alert" or text)
+    await expect(
+      page
+        .getByRole('alert')
+        .or(page.getByText(/at least 3 characters/i))
+        .first(),
+    ).toBeVisible();
   });
 
   test('number-of-teams selector is present with default value', async ({

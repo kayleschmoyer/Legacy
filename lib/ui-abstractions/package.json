@@ -10,8 +10,8 @@
   },
   "peerDependencies": {
     "react": ">=18.0.0",
-    "react-native": ">=0.70.0",
-    "tamagui": ">=1.0.0"
+    "react-native": ">=0.81.0",
+    "tamagui": ">=1.144.0"
   },
   "peerDependenciesMeta": {
     "react-native": {

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 import { SnapshotUtils } from '../support/snapshot-utils';
 
 test.describe('Sports App Snapshots @visual', () => {
@@ -174,10 +174,13 @@ test.describe('Sports App Snapshots @visual', () => {
 
   test('should capture loading and error states', async ({ page }) => {
     // Mock slow API to capture loading state
-    await page.route('**/api/**', (route) => {
-      setTimeout(() => {
-        void route.continue();
-      }, 2000);
+    await page.route('**/api/**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({}),
+      });
     });
 
     await page.goto('/');

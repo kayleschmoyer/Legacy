@@ -1,11 +1,20 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect } from './auth-enhanced';
+
+import { startDraftResponse, userLeaguesResponse } from '../mocks/graphql';
+import { updateLeagueBrandingResponse } from '../mocks/graphql/league.mocks';
 
 /**
- * Auth fixture that provides GraphQL mocking for tests that need mock API responses.
+ * Auth fixture for tests that need an authenticated user with league data.
  *
- * Authentication is handled by the global-setup.ts storageState — the JWT is
- * already in localStorage before the page loads. This fixture only adds
- * route-level mocks for GraphQL and OAuth endpoints.
+ * Extends auth-enhanced (which has _apiIsolation with shared baseline mocks).
+ * This layer adds:
+ *   1. OAuth login endpoint mock
+ *   2. Authenticated-user overrides (GetUserLeagues returns a league)
+ *   3. Mutation mocks for StartDraft and UpdateLeagueBranding
+ *
+ * For unmocked operations, route.fallback() passes to the _apiIsolation
+ * baseline. If the baseline doesn't have the operation either, the test
+ * fails with a clear error message.
  */
 export const test = base.extend({
   page: async ({ page }, use) => {
@@ -28,7 +37,9 @@ export const test = base.extend({
       });
     });
 
-    // Mock only the specific GraphQL endpoint (not file paths containing 'graphql')
+    // Authenticated-user overrides + mutation mocks.
+    // Only handles operations that differ from the _apiIsolation baseline;
+    // everything else falls through via route.fallback().
     await page.route(
       (url) => {
         const urlString = url.toString();
@@ -40,215 +51,30 @@ export const test = base.extend({
         );
       },
       (route) => {
-        const request = route.request();
-        const postData = request.postData()?.toLowerCase() ?? '';
+        const postData = route.request().postData()?.toLowerCase() ?? '';
 
-        if (postData.includes('getleaguebyid')) {
+        if (postData.includes('getuserleagues')) {
+          // Override baseline (which returns empty) → return one league
           void route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                league: {
-                  __typename: 'League',
-                  id: 1,
-                  name: 'Test League',
-                  description: 'A test league for E2E testing',
-                  owner: 1,
-                  maxRosterSize: 25,
-                  draftStatus: 'not-started',
-                  currentMatchup: null,
-                  numberOfTeams: 10,
-                  playerPool: 'all',
-                  draftMode: 'live',
-                  selectionMethod: 'standard',
-                  draftOrder: 'snake',
-                  isPublic: false,
-                  maxBatters: 14,
-                  maxPitchers: 9,
-                  tradingEnabled: true,
-                  waiverEnabled: true,
-                  startDate: null,
-                  logoUrl: null,
-                  bannerUrl: null,
-                  primaryColor: null,
-                  secondaryColor: null,
-                },
-              },
-            }),
+            body: JSON.stringify(userLeaguesResponse()),
           });
         } else if (postData.includes('startdraft')) {
           void route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                startDraft: {
-                  __typename: 'League',
-                  id: 1,
-                  name: 'Test League',
-                  description: 'A test league for E2E testing',
-                  owner: 1,
-                  maxRosterSize: 25,
-                  draftStatus: 'queued',
-                  currentMatchup: null,
-                  numberOfTeams: 10,
-                  playerPool: 'all',
-                  draftMode: 'live',
-                  selectionMethod: 'standard',
-                  draftOrder: 'snake',
-                  isPublic: false,
-                  maxBatters: 14,
-                  maxPitchers: 9,
-                  tradingEnabled: true,
-                  waiverEnabled: true,
-                  startDate: null,
-                },
-              },
-            }),
-          });
-        } else if (postData.includes('getpositionsforleague')) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                leaguePositions: [
-                  {
-                    __typename: 'LeaguePosition',
-                    id: 1,
-                    name: 'Catcher',
-                    abbrev: 'C',
-                  },
-                  {
-                    __typename: 'LeaguePosition',
-                    id: 2,
-                    name: 'First Base',
-                    abbrev: '1B',
-                  },
-                  {
-                    __typename: 'LeaguePosition',
-                    id: 3,
-                    name: 'Second Base',
-                    abbrev: '2B',
-                  },
-                ],
-              },
-            }),
-          });
-        } else if (postData.includes('getteammembers')) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                teamMembers: [],
-              },
-            }),
-          });
-        } else if (postData.includes('getuserteamid')) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                userTeamId: { __typename: 'UserTeamId', teamId: 1 },
-              },
-            }),
-          });
-        } else if (postData.includes('getleagueteams')) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                leagueTeams: [
-                  { __typename: 'Team', id: 1, name: 'Team 1', owner: 1 },
-                  { __typename: 'Team', id: 2, name: 'Team 2', owner: null },
-                ],
-              },
-            }),
-          });
-        } else if (postData.includes('getcurrentweekforleague')) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { getCurrentWeekForLeague: null },
-            }),
-          });
-        } else if (postData.includes('getmatchupsforleague')) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { matchupsForLeague: [] },
-            }),
-          });
-        } else if (postData.includes('getmatchupbyid')) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { matchup: null },
-            }),
-          });
-        } else if (postData.includes('getleaguescoringprofile')) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { leagueScoringProfile: null },
-            }),
-          });
-        } else if (postData.includes('getuserleagues')) {
-          void route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                userLeagues: [
-                  {
-                    __typename: 'League',
-                    id: 1,
-                    name: 'Test League',
-                    description: 'A test league for E2E testing',
-                    owner: 1,
-                    maxRosterSize: 25,
-                    draftStatus: 'not-started',
-                    currentMatchup: null,
-                    numberOfTeams: 10,
-                    playerPool: 'all',
-                    draftMode: 'live',
-                    selectionMethod: 'standard',
-                    draftOrder: 'snake',
-                    isPublic: false,
-                  },
-                ],
-              },
-            }),
+            body: JSON.stringify(startDraftResponse({ draftStatus: 'queued' })),
           });
         } else if (postData.includes('updateleaguebranding')) {
           void route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                updateLeagueSettings: {
-                  __typename: 'League',
-                  id: 1,
-                  name: 'Test League',
-                  logoUrl: null,
-                  bannerUrl: null,
-                  primaryColor: null,
-                  secondaryColor: null,
-                },
-              },
-            }),
+            body: JSON.stringify(updateLeagueBrandingResponse()),
           });
         } else {
-          // Let other GraphQL requests pass through
-          void route.continue();
+          // Unknown operation → fall through to _apiIsolation baseline
+          void route.fallback();
         }
       },
     );

@@ -9,7 +9,7 @@
  * - Successful league creation and navigation
  */
 
-import { expect } from '@playwright/test';
+import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth';
 
 /** URL predicate that matches GraphQL API endpoints but not source file imports */
@@ -56,22 +56,13 @@ test.describe('League Creation @critical', () => {
     const leagueNameInput = page.getByPlaceholder('Enter your league name');
     await leagueNameInput.fill('Ab');
 
-    // Button is enabled for non-empty input (validation is on submit via alert())
+    // Button is enabled for non-empty input (validation is on submit)
     await expect(createButton).toBeEnabled();
 
-    // Set up dialog handler BEFORE clicking — alert() blocks the click action
-    let dialogMessage = '';
-    page.once('dialog', async (dialog) => {
-      dialogMessage = dialog.message();
-      await dialog.accept();
-    });
     await createButton.click();
 
-    // Wait briefly for dialog handling to complete
-    await page.waitForTimeout(500);
-
-    // Should have shown validation error via alert()
-    expect(dialogMessage).toContain(
+    // Validation error is shown inline in a Card with role="alert"
+    await expect(page.getByRole('alert')).toContainText(
       'League name must be at least 3 characters long',
     );
   });
@@ -129,7 +120,7 @@ test.describe('League Creation @critical', () => {
     await page.getByRole('button', { name: '12', exact: true }).click();
 
     // Select draft type
-    await page.getByRole('button', { name: /blind draft/i }).click();
+    await page.getByRole('button', { name: /automated draft/i }).click();
 
     // Submit form
     await page.getByRole('button', { name: /create league/i }).click();
@@ -204,17 +195,11 @@ test.describe('League Creation @critical', () => {
       page.getByRole('button', { name: /create league/i }),
     ).toBeEnabled();
 
-    // Test maximum length (over 50 characters) — triggers alert on submit
+    // Test maximum length (over 50 characters) — shows inline error on submit
     const longName = 'A'.repeat(51);
     await leagueNameInput.fill(longName);
-    let maxLenDialogMsg = '';
-    page.once('dialog', async (dialog) => {
-      maxLenDialogMsg = dialog.message();
-      await dialog.accept();
-    });
     await page.getByRole('button', { name: /create league/i }).click();
-    await page.waitForTimeout(500);
-    expect(maxLenDialogMsg).toContain(
+    await expect(page.getByRole('alert')).toContainText(
       'League name must be less than 50 characters',
     );
 
@@ -231,15 +216,20 @@ test.describe('League Creation @critical', () => {
       ).toBeVisible();
     }
 
-    // Test draft type options
+    // Test draft mode options
     await expect(
-      page.getByRole('button', { name: /standard draft/i }),
+      page.getByRole('button', { name: /live draft/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /blind draft/i }),
+      page.getByRole('button', { name: /automated draft/i }),
+    ).toBeVisible();
+
+    // Test selection method options
+    await expect(
+      page.getByRole('button', { name: 'Standard', exact: true }).first(),
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /random draft/i }),
+      page.getByRole('button', { name: 'Auction', exact: true }),
     ).toBeVisible();
   });
 
@@ -302,7 +292,7 @@ test.describe('League Creation @critical', () => {
     await page.getByRole('button', { name: '8', exact: true }).click();
 
     // Change draft type
-    await page.getByRole('button', { name: /blind draft/i }).click();
+    await page.getByRole('button', { name: /automated draft/i }).click();
 
     // Verify league name is still there
     await expect(page.getByPlaceholder('Enter your league name')).toHaveValue(
@@ -313,7 +303,7 @@ test.describe('League Creation @critical', () => {
     const teamButton = page.getByRole('button', { name: '8', exact: true });
     await expect(teamButton).toBeVisible();
 
-    const draftButton = page.getByRole('button', { name: /blind draft/i });
+    const draftButton = page.getByRole('button', { name: /automated draft/i });
     await expect(draftButton).toBeVisible();
   });
 

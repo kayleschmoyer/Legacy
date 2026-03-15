@@ -422,7 +422,7 @@ test.describe('Playoff Bracket – completed bracket @regression', () => {
   });
 
   test('shows champion callout when bracket is completed', async ({ page }) => {
-    await expect(page.getByText('Champion')).toBeVisible();
+    await expect(page.getByText('Champion', { exact: true })).toBeVisible();
   });
 
   test('shows champion team name in callout', async ({ page }) => {

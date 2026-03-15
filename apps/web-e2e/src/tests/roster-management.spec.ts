@@ -249,15 +249,30 @@ test.describe('Roster Management – layout @regression', () => {
   });
 
   test('shows Lineup quickstat', async ({ page }) => {
-    await expect(page.getByText('Lineup')).toBeVisible();
+    const rosterRegion = page.getByRole('region', {
+      name: /roster management/i,
+    });
+    await expect(
+      rosterRegion.getByText('Lineup', { exact: true }).first(),
+    ).toBeVisible();
   });
 
   test('shows Bench quickstat', async ({ page }) => {
-    await expect(page.getByText('Bench')).toBeVisible();
+    const rosterRegion = page.getByRole('region', {
+      name: /roster management/i,
+    });
+    await expect(
+      rosterRegion.getByText('Bench', { exact: true }).first(),
+    ).toBeVisible();
   });
 
   test('shows Open quickstat', async ({ page }) => {
-    await expect(page.getByText('Open')).toBeVisible();
+    const rosterRegion = page.getByRole('region', {
+      name: /roster management/i,
+    });
+    await expect(
+      rosterRegion.getByText('Open', { exact: true }).first(),
+    ).toBeVisible();
   });
 });
 

@@ -5,9 +5,11 @@
  * and logout — both programmatic and via the profile dropdown UI.
  */
 
-import { test as base } from '@playwright/test';
 import { sign } from 'jsonwebtoken';
 import { adminTest, expect, test, unauthTest } from '../fixtures/auth-enhanced';
+
+/** Read the base URL that Playwright is actually using (set in playwright.config.ts). */
+const E2E_ORIGIN = `http://localhost:${process.env.E2E_PORT || 4280}`;
 
 /** Dev-only fallback secret — matches global-setup.ts and auth-enhanced.ts. */
 const DEV_JWT_SECRET = 'dev-jwt-secret-key-not-for-production-use-only';
@@ -31,13 +33,13 @@ function signExpiredJwt(): string {
 }
 
 /** Custom fixture that loads an expired JWT into localStorage. */
-const expiredSessionTest = base.extend({
+const expiredSessionTest = test.extend({
   storageState: async ({}, use) => {
     await use({
       cookies: [],
       origins: [
         {
-          origin: 'http://localhost:4200',
+          origin: E2E_ORIGIN,
           localStorage: [{ name: 'auth_jwt', value: signExpiredJwt() }],
         },
       ],
@@ -51,22 +53,22 @@ const expiredSessionTest = base.extend({
 
 unauthTest.describe('Login Flow @critical', () => {
   unauthTest(
-    'shows the Sign in with Google button when not authenticated',
+    'shows the Get Started with Google button when not authenticated',
     async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
       await expect(
-        page.getByRole('button', { name: /sign in with google/i }),
+        page.getByRole('button', { name: /get started with google/i }),
       ).toBeVisible({ timeout: 15000 });
     },
   );
 
-  unauthTest('displays the welcome login title', async ({ page }) => {
+  unauthTest('displays the landing page headline', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
-    await expect(page.getByText(/welcome to legacy sports/i)).toBeVisible({
+    await expect(page.getByText(/build your dynasty/i)).toBeVisible({
       timeout: 15000,
     });
   });
@@ -75,10 +77,10 @@ unauthTest.describe('Login Flow @critical', () => {
     'does not render the app navigation when unauthenticated',
     async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
       // The main nav links should not be present — the auth guard replaces
-      // the entire app with the login page.
+      // the entire app with the landing page.
       await expect(
         page.getByRole('navigation', { name: 'Primary' }),
       ).not.toBeVisible();
@@ -104,13 +106,13 @@ unauthTest.describe('Protected Routes @critical', () => {
 
   for (const route of routes) {
     unauthTest(
-      `shows login page on ${route} when not authenticated`,
+      `shows landing page on ${route} when not authenticated`,
       async ({ page }) => {
         await page.goto(route);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('load');
 
         await expect(
-          page.getByRole('button', { name: /sign in with google/i }),
+          page.getByRole('button', { name: /get started with google/i }),
         ).toBeVisible({ timeout: 15000 });
       },
     );
@@ -122,14 +124,14 @@ unauthTest.describe('Protected Routes @critical', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Authenticated Access @critical', () => {
-  test('does not show the login page for an authenticated user', async ({
+  test('does not show the landing page for an authenticated user', async ({
     page,
   }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(
-      page.getByRole('button', { name: /sign in with google/i }),
+      page.getByRole('button', { name: /get started with google/i }),
     ).not.toBeVisible();
   });
 
@@ -137,7 +139,7 @@ test.describe('Authenticated Access @critical', () => {
     page,
   }) => {
     await page.goto('/about');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible(
       { timeout: 15000 },
@@ -151,10 +153,10 @@ test.describe('Authenticated Access @critical', () => {
 
     for (const route of routes) {
       await page.goto(route);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
       await expect(
-        page.getByRole('button', { name: /sign in with google/i }),
+        page.getByRole('button', { name: /get started with google/i }),
       ).not.toBeVisible();
     }
   });
@@ -166,25 +168,25 @@ test.describe('Authenticated Access @critical', () => {
 
 expiredSessionTest.describe('Session Expiry @critical', () => {
   expiredSessionTest(
-    'shows login page when the stored JWT has expired',
+    'shows landing page when the stored JWT has expired',
     async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
       await expect(
-        page.getByRole('button', { name: /sign in with google/i }),
+        page.getByRole('button', { name: /get started with google/i }),
       ).toBeVisible({ timeout: 15000 });
     },
   );
 
   expiredSessionTest(
-    'shows login page on a protected route with an expired JWT',
+    'shows landing page on a protected route with an expired JWT',
     async ({ page }) => {
       await page.goto('/baseball');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
       await expect(
-        page.getByRole('button', { name: /sign in with google/i }),
+        page.getByRole('button', { name: /get started with google/i }),
       ).toBeVisible({ timeout: 15000 });
     },
   );
@@ -193,9 +195,9 @@ expiredSessionTest.describe('Session Expiry @critical', () => {
     'does not show authenticated app content with an expired JWT',
     async ({ page }) => {
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
-      // The primary nav should not be present — auth guard shows login page.
+      // The primary nav should not be present — auth guard shows landing page.
       await expect(
         page.getByRole('navigation', { name: 'Primary' }),
       ).not.toBeVisible();
@@ -218,11 +220,11 @@ test.describe('Logout Flow @regression', () => {
     );
 
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Confirm we are authenticated.
     await expect(
-      page.getByRole('button', { name: /sign in with google/i }),
+      page.getByRole('button', { name: /get started with google/i }),
     ).not.toBeVisible();
 
     // Simulate logout by removing the JWT from localStorage.
@@ -231,11 +233,11 @@ test.describe('Logout Flow @regression', () => {
     });
 
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
-    // The auth guard should now show the login page.
+    // The auth guard should now show the landing page.
     await expect(
-      page.getByRole('button', { name: /sign in with google/i }),
+      page.getByRole('button', { name: /get started with google/i }),
     ).toBeVisible({ timeout: 15000 });
   });
 });
@@ -248,7 +250,7 @@ adminTest.describe('Profile Dropdown Logout @regression', () => {
   adminTest('profile dropdown contains a Sign Out option', async ({ page }) => {
     // Navigate to a stable authenticated page.
     await page.goto('/about');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // The profile button shows the username "admin" on desktop viewports.
     const profileButton = page
@@ -274,7 +276,7 @@ adminTest.describe('Profile Dropdown Logout @regression', () => {
       );
 
       await page.goto('/about');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
 
       // Open the profile dropdown.
       const profileButton = page
@@ -290,9 +292,9 @@ adminTest.describe('Profile Dropdown Logout @regression', () => {
       await expect(signOutButton).toBeVisible({ timeout: 10000 });
       await signOutButton.click();
 
-      // After logout, the auth guard shows the login page.
+      // After logout, the auth guard shows the landing page.
       await expect(
-        page.getByRole('button', { name: /sign in with google/i }),
+        page.getByRole('button', { name: /get started with google/i }),
       ).toBeVisible({ timeout: 15000 });
     },
   );

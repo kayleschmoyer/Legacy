@@ -322,7 +322,7 @@ test.describe('Trade Block Management @regression', () => {
     await page.goto('/baseball/league/1');
 
     await expect(
-      page.getByRole('button', { name: /show more/i }),
+      page.getByRole('button', { name: /show.*more/i }),
     ).toBeVisible();
   });
 
@@ -336,7 +336,7 @@ test.describe('Trade Block Management @regression', () => {
     await expect(page.getByText('Ryan Brown')).not.toBeVisible();
 
     // Click show more
-    await page.getByRole('button', { name: /show more/i }).click();
+    await page.getByRole('button', { name: /show.*more/i }).click();
 
     // Now 6th player should be visible
     await expect(page.getByText('Ryan Brown')).toBeVisible();

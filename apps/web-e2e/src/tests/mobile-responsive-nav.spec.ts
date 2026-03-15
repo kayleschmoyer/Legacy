@@ -12,7 +12,7 @@
  * No GraphQL mocking needed — tests run against /about (no async data).
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 const MOBILE_VIEWPORT = { width: 375, height: 812 };
 const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
@@ -166,7 +166,8 @@ test.describe('Mobile panel interaction: close on link click @regression', () =>
     page,
   }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
-    await page.goto('/');
+    // Start on /pricing (not / which has a presentation overlay blocking the button)
+    await page.goto('/pricing');
     await page.waitForLoadState('load');
 
     await page.getByRole('button', { name: /open menu/i }).click();

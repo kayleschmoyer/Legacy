@@ -1,6 +1,6 @@
 ---
 name: install-packages
-description: 'Install, remove, or update npm packages in the pnpm monorepo; covers workspace-root vs project-level dependencies, dev dependencies, peer dependencies, and post-install validation.'
+description: 'Install, remove, or update npm packages in the pnpm monorepo; covers workspace-root vs project-level dependencies, dev dependencies, peer dependencies, post-install validation, and preventing version duplication across workspace packages (pnpm.overrides, pinned specifiers, nested node_modules detection).'
 ---
 
 # Skill: Installing Packages
@@ -162,3 +162,68 @@ This is a **pnpm workspace**. Never use `npm install`, `npm ci`, or bare `npm` i
 ```
 
 If a CI step only needs a CLI binary (e.g. Playwright for report merging), use `npx <tool>@<version>` which downloads to a temp cache without touching the project's dependency tree.
+
+## Preventing Version Duplication in Workspace Packages
+
+### The Problem
+
+Most dependencies live only in the root `package.json`. However, a few workspace packages under `lib/` declare their own `dependencies` or `peerDependencies` (e.g., `lib/tamagui-config`, `lib/ui-abstractions`). When these use wildcard specifiers (`"*"`, `">=1.0.0"`), pnpm may resolve them to **different versions** than the root, creating nested `node_modules` with duplicate copies.
+
+This causes **silent runtime crashes** when a library initialises global state in one copy and another copy tries to read it. Example: Tamagui's `createTamagui()` sets `globalThis.__tamaguiConfig` in v1.132, but `getSetting()` from v1.144 reads it and finds `null` → crash.
+
+### Prevention Rules
+
+1. **Pin versions in workspace package.json files** — never use `"*"` or overly-broad ranges like `">=1.0.0"`. Use exact versions (`"1.144.4"`) or narrow ranges (`">=1.144.0"`).
+
+2. **Use `pnpm.overrides` in root `package.json`** — the `"$packageName"` syntax pins all resolutions to match the root version. This is the primary defense against duplication:
+
+   ```json
+   "pnpm": {
+     "overrides": {
+       "tamagui": "$tamagui",
+       "@tamagui/core": "$@tamagui/core"
+     }
+   }
+   ```
+
+   Use `"$pkgName"` for packages that exist in root `dependencies`; use an exact version string for transitive-only packages.
+
+3. **After upgrading a root dependency, always check `lib/` packages** — if any workspace package also declares that dependency, update its specifier to match.
+
+4. **Verify no nested duplicates after lockfile changes**:
+
+   ```powershell
+   # Check for nested node_modules in workspace packages
+   Get-ChildItem lib/*/node_modules -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+   ```
+
+   If any appear, investigate whether the lockfile resolved a different version for that workspace package.
+
+5. **Add Vite resolve aliases as defense-in-depth** — for packages that use global state (Tamagui, React context providers), add explicit resolve aliases in `vite.config.mts` to force the bundler to use one copy:
+   ```typescript
+   resolve: {
+     alias: {
+       '@tamagui/web': resolve(__dirname, '../../node_modules/@tamagui/web'),
+     }
+   }
+   ```
+
+### When Upgrading a Shared Package (Checklist)
+
+```powershell
+# 1. Update root version
+pnpm add -w <package>@<new-version>
+
+# 2. Check/update lib package.json files
+Select-String -Path lib/*/package.json -Pattern '"<package>"'
+
+# 3. Regenerate lockfile
+pnpm install
+
+# 4. Verify no nested copies
+Get-ChildItem lib/*/node_modules -ErrorAction SilentlyContinue
+
+# 5. Typecheck + build
+pnpm exec nx affected -t typecheck
+pnpm exec nx affected -t build
+```
