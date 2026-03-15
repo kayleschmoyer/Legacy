@@ -144,7 +144,7 @@ test.describe('Preferences Page @smoke', () => {
       PREFS_KEY,
     );
     expect(saved).not.toBeNull();
-    const prefs = JSON.parse(saved!) as Record<string, unknown>;
+    const prefs = JSON.parse(saved ?? '{}') as Record<string, unknown>;
     expect(prefs.theme).toBe('dark');
   });
 
@@ -163,7 +163,7 @@ test.describe('Preferences Page @smoke', () => {
       PREFS_KEY,
     );
     expect(saved).not.toBeNull();
-    const prefs = JSON.parse(saved!) as Record<string, unknown>;
+    const prefs = JSON.parse(saved ?? '{}') as Record<string, unknown>;
     expect(prefs.defaultSport).toBe('football');
   });
 

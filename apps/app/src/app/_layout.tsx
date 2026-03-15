@@ -95,7 +95,7 @@ function AnalyticsIdentify({ userId }: { userId: number }): null {
     const tier = data.user.subscriptionTier === 'premium' ? 'premium' : 'free';
     setUserId(userId);
     setUserProperties({ userId, subscriptionTier: tier });
-  }, [userId, data?.user?.subscriptionTier]);
+  }, [userId, data]);
 
   return null;
 }

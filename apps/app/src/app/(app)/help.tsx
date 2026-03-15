@@ -254,7 +254,12 @@ export default function HelpScreen(): React.JSX.Element {
                 padding="$4"
                 pressStyle={{ opacity: 0.8 }}
                 onPress={
-                  item.url ? () => void Linking.openURL(item.url!) : undefined
+                  item.url
+                    ? () => {
+                        const { url } = item;
+                        if (url) void Linking.openURL(url);
+                      }
+                    : undefined
                 }
               >
                 <XStack alignItems="center" gap="$3">

@@ -9,7 +9,8 @@
       "executor": "@nx/eslint:lint",
       "outputs": ["{options.outputFile}"],
       "options": {
-        "lintFilePatterns": ["lib/scheduling/**/*.ts"]
+        "lintFilePatterns": ["lib/scheduling/**/*.ts"],
+        "maxWarnings": 0
       }
     }
   },

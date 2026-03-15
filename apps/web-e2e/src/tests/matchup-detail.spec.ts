@@ -263,7 +263,7 @@ test.describe('Matchup Detail – loading state @regression', () => {
     await expect(page.getByText('Loading matchup details...')).toBeVisible();
 
     // Release the gate so the page can finish loading and cleanup
-    resolveMatchup!();
+    if (resolveMatchup) resolveMatchup();
   });
 });
 
