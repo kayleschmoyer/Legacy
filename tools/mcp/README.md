@@ -6,17 +6,17 @@ Model Context Protocol (MCP) servers that extend AI coding agents with project-s
 
 MCP server configuration is maintained in multiple files to support different AI clients:
 
-| File               | Client(s)                         | Top-level key | Env var syntax |
-| ------------------ | --------------------------------- | ------------- | -------------- |
-| `.vscode/mcp.json` | VS Code Copilot, Cursor, Windsurf | `servers`     | `${env:VAR}`   |
-| `.mcp.json`        | Claude Code CLI                   | `mcpServers`  | `${VAR}`       |
-| `.roo/mcp.json`    | Roo Code                          | `mcpServers`  | `${VAR}`       |
+| File                       | Client(s)                         | Top-level key | Env var syntax |
+| -------------------------- | --------------------------------- | ------------- | -------------- |
+| `.vscode/mcp.json`         | VS Code Copilot, Cursor, Windsurf | `servers`     | `${env:VAR}`   |
+| `.github/copilot/mcp.json` | GitHub Copilot (agent mode)       | `servers`     | `${VAR}`       |
+| `.mcp.json`                | Claude Code CLI                   | `mcpServers`  | `${VAR}`       |
 
-**Keep all three files in sync.** When adding or removing a server, update all config files. The `create-mcp-server` skill (`.github/skills/create-mcp-server/SKILL.md`) documents the full registration steps.
+**Keep all files in sync.** When adding or removing a server, update all config files. The `create-mcp-server` skill (`.github/skills/create-mcp-server/SKILL.md`) documents the full registration steps.
 
 ### Config Differences
 
-VS Code uses a `"type": "stdio"` field per server; Claude Code and Roo Code omit it (stdio is the default transport). VS Code env var references use `${env:VAR_NAME}` while the other clients use `${VAR_NAME}`.
+VS Code and GitHub Copilot (agent mode) use a `"type": "stdio"` field per server; Claude Code omits it (stdio is the default transport). VS Code env var references use `${env:VAR_NAME}` while the other clients use `${VAR_NAME}`.
 
 ## Servers
 

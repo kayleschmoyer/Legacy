@@ -31,7 +31,6 @@ resources/*.dump.bak
 
 # MCP cross-client discovery (tracked)
 !.mcp.json
-!.roo/
 
 # misc
 /.sass-cache
