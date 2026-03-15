@@ -151,6 +151,13 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
+        // Use the browser-safe logging entry point — the default index.ts
+        // imports FileOutputDestination which pulls in Node.js fs/path modules,
+        // causing bundler warnings and "not exported" errors in the web build.
+        '@legacy-sports/logging': resolve(
+          __dirname,
+          '../../lib/logging/src/index.native.ts',
+        ),
         // Platform-specific component resolution at build time
         __PLATFORM_COMPONENTS__: resolve(
           __dirname,
