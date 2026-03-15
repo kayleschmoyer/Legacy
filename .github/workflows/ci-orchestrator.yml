@@ -148,15 +148,23 @@ jobs:
                 code_changed=true
               fi
 
-              if [ "$deps_changed" = true ] && [ "$code_changed" = true ]; then
-                run_security=true
-                scan_type=comprehensive
-              elif [ "$deps_changed" = true ]; then
+              # SAST is expensive (10-20 min). Run it on merge_group & schedule only.
+              # PRs get secret scanning (fast) + dependency scanning when deps change.
+              if [ "$deps_changed" = true ]; then
                 run_security=true
                 scan_type=dependencies-only
               elif [ "$code_changed" = true ]; then
                 run_security=true
-                scan_type=sast-only
+                scan_type=secrets-only
+              fi
+            fi
+
+            # Allow 'security-scan' label to force comprehensive scanning on any PR
+            if [ "$event" = "pull_request" ]; then
+              labels='${{ join(github.event.pull_request.labels.*.name, ',') }}'
+              if echo ",$labels," | grep -q ",security-scan,"; then
+                run_security=true
+                scan_type=comprehensive
               fi
             fi
           fi

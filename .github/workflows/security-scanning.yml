@@ -210,7 +210,22 @@ jobs:
         if: github.event_name != 'pull_request' && steps.snyk-cache.outputs.cache-hit != 'true'
         timeout-minutes: 3
         run: |
-          curl -sL "https://static.snyk.io/cli/v1.1293.1/snyk-linux" -o /usr/local/bin/snyk
+          DOWNLOADED=false
+          for attempt in 1 2 3; do
+            if curl -sfSL --connect-timeout 10 --max-time 60 \
+              "https://static.snyk.io/cli/v1.1293.1/snyk-linux" -o /usr/local/bin/snyk; then
+              echo "✅ Snyk CLI downloaded (attempt $attempt)"
+              DOWNLOADED=true
+              break
+            fi
+            echo "⚠️ Download attempt $attempt failed, retrying in 10s..."
+            rm -f /usr/local/bin/snyk
+            sleep 10
+          done
+          if [ "$DOWNLOADED" != "true" ]; then
+            echo "❌ All 3 download attempts failed"
+            exit 1
+          fi
           chmod +x /usr/local/bin/snyk
           snyk --version
 
