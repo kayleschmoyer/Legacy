@@ -84,7 +84,7 @@ runs:
         echo "✅ Validated pnpm workspace (pnpm-lock.yaml found)"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.node-version }}
         cache: ${{ inputs.install-dependencies == 'true' && 'pnpm' || '' }}
@@ -92,7 +92,7 @@ runs:
     - name: Cache pnpm Store
       if: inputs.install-dependencies == 'true'
       id: cache-pnpm-store
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.local/share/pnpm/store
         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}${{ inputs.cache-key-suffix != '' && format('-{0}', inputs.cache-key-suffix) || '' }}
@@ -105,7 +105,7 @@ runs:
     - name: Cache node_modules
       if: inputs.install-dependencies == 'true'
       id: cache-node-modules
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: node_modules
         # yamllint disable-line rule:line-length

@@ -347,7 +347,7 @@ jobs:
       - name: "Generate App Token"
         id: app-token
         if: steps.check-reports.outputs.has-reports == 'true'
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.PREVIEW_APP_ID }}
           private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
