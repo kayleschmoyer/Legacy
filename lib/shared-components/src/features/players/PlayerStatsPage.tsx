@@ -121,7 +121,7 @@ export function PlayerStatsPage({
             borderBottom: `1px solid rgba(196,165,90,0.25)`,
             boxShadow: `0 4px 24px rgba(0,0,0,0.5), 0 1px 0 rgba(196,165,90,0.1)`,
           }}
-          paddingVertical="$5"
+          paddingVertical="$7"
           paddingHorizontal="$8"
         >
           <XStack
@@ -163,8 +163,8 @@ export function PlayerStatsPage({
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
                     lineHeight: 1.3,
-                    paddingTop: 6,
-                    paddingBottom: 8,
+                    paddingTop: 10,
+                    paddingBottom: 12,
                     display: 'inline-block',
                   }}
                 >
