@@ -349,7 +349,7 @@ jobs:
           SECRET_PATTERNS=(
             "AKIA[0-9A-Z]{16}"           # AWS Access Key
             "aws_secret_access_key"      # AWS Secret Key
-            "sk_live_[0-9a-zA-Z]{24}"   # Stripe Live Key  
+            "sk_live_[0-9a-zA-Z]{24}"   # Stripe Live Key
             "sk_test_[0-9a-zA-Z]{24}"   # Stripe Test Key
             "rk_live_[0-9a-zA-Z]{24}"   # Stripe Live Key
             "AIza[0-9A-Za-z\\-_]{35}"   # Google API Key
@@ -359,9 +359,15 @@ jobs:
             "postgres://.*:.*@.*:.*/"   # PostgreSQL connection string with credentials
           )
 
-          # Scan for patterns (excluding common safe files)
+          # False-positive keywords — lines containing these are not real secrets
+          # NOTE: these patterns match the full grep output (path:content), so
+          # avoid broad tokens that could appear in file paths (see --exclude/
+          # --exclude-dir for path-based filtering instead).
+          FALSE_POSITIVE_FILTER="Placeholder|_fake|xxxxxxxx"
+
+          # Scan for patterns (excluding common safe files and test/example artifacts)
           for pattern in "${SECRET_PATTERNS[@]}"; do
-            if grep -r -E "$pattern" . \
+            MATCHES=$(grep -r -E "$pattern" . \
               --exclude-dir=".git" \
               --exclude-dir="node_modules" \
               --exclude-dir="dist" \
@@ -369,19 +375,31 @@ jobs:
               --exclude="*.md" \
               --exclude="*.yml" \
               --exclude="*.yaml" \
-              2>/dev/null; then
-              
+              --exclude="*.example" \
+              --exclude="*.spec.ts" \
+              --exclude="*.test.ts" \
+              --exclude="setup-tests.*" \
+              2>/dev/null | grep -v -E "$FALSE_POSITIVE_FILTER" || true)
+
+            if [ -n "$MATCHES" ]; then
+              echo "$MATCHES"
               echo "⚠️ Potential secret pattern found: $pattern"
               SECRET_PATTERNS_FOUND=$((SECRET_PATTERNS_FOUND + 1))
             fi
           done
 
-          # Check for hardcoded credentials in specific files
+          # Check for hardcoded credentials in source files (not tests)
           echo "🔍 Checking for hardcoded credentials..."
 
-          if grep -r "password\s*[:=]\s*['\"][^'\"]*['\"]" . \
+          PASSWORD_MATCHES=$(grep -r "password\s*[:=]\s*['\"][^'\"]*['\"]" . \
             --include="*.ts" --include="*.js" --include="*.json" \
-            --exclude-dir="node_modules" --exclude-dir=".git" 2>/dev/null; then
+            --exclude-dir="node_modules" --exclude-dir=".git" --exclude-dir="dist" \
+            --exclude="*.spec.ts" --exclude="*.test.ts" --exclude="setup-tests.*" \
+            --exclude-dir="*-e2e*" --exclude-dir="test-fixtures" \
+            2>/dev/null | grep -v -E "\b(fake|mock|dummy)\b|HIDDEN|DB_PASSWORD|process\.env" || true)
+
+          if [ -n "$PASSWORD_MATCHES" ]; then
+            echo "$PASSWORD_MATCHES"
             echo "⚠️ Potential hardcoded passwords found"
             SECRET_PATTERNS_FOUND=$((SECRET_PATTERNS_FOUND + 1))
           fi

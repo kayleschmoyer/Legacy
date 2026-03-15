@@ -1,0 +1,27 @@
+# Gitleaks configuration — suppress known false positives
+# See https://github.com/gitleaks/gitleaks#configuration
+
+title = "Legacy Sports Gitleaks Config"
+
+[allowlist]
+  description = "Known false positives"
+
+  # Development placeholder API keys (not real)
+  regexTarget = "match"
+  regexes = [
+    '''Placeholder''',
+    '''_fake''',
+    '''xxxxxxxx''',
+  ]
+
+  paths = [
+    # Test files contain mock credentials by design
+    '''.*\.spec\.ts$''',
+    '''.*\.test\.ts$''',
+    '''setup-tests\.ts$''',
+    '''test-user-auth\.ts$''',
+    # Example/template files with placeholder values
+    '''.*\.example$''',
+    # Lock files (integrity hashes, not secrets)
+    '''pnpm-lock\.yaml$''',
+  ]
