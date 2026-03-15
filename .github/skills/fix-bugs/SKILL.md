@@ -147,11 +147,61 @@ This is a BUG. Find and fix the root cause.
 
 ---
 
+## LOGGER.error() — Pass Error Objects Directly
+
+A common mistake when fixing bugs is wrapping the caught error in an object:
+
+```typescript
+// ❌ WRONG — Error nested inside { error }, Rollbar can't extract the stack trace
+catch (error) {
+  LOGGER.error('Operation failed', { error });
+}
+
+// ✅ CORRECT — Error as a direct argument, Rollbar extracts the stack trace
+catch (error) {
+  LOGGER.error('Operation failed', error);
+}
+
+// ✅ CORRECT — Error as direct arg + extra context as a separate object
+catch (error) {
+  LOGGER.error('Operation failed', error, { userId, leagueId });
+}
+```
+
+**Why**: `RollbarOutputDestination` scans `LOGGER.error()` args with `arg instanceof Error`. When the Error is wrapped in `{ error }`, `instanceof` returns false and Rollbar synthesizes a generic error — **losing the original stack trace**. This makes production debugging impossible.
+
+See the full explanation in the [fix-lint skill](../fix-lint/SKILL.md#loggererror--error-objects-must-be-direct-arguments).
+
+---
+
+## CLIENT_FACING_CODES — Classifying Error Severity
+
+Not all errors deserve `LOGGER.error()`. The `CLIENT_FACING_CODES` set in `lambdas/db/src/server/graphql-error-codes.ts` defines error codes that represent **expected, client-visible conditions**: validation failures, auth errors, bad input, premium gating.
+
+```typescript
+import { CLIENT_FACING_CODES } from './graphql-error-codes';
+
+// In error handling (e.g. Apollo formatError):
+const code = err.extensions?.code;
+if (CLIENT_FACING_CODES.has(code)) {
+  // Expected client error — don't report to Rollbar/Sentry
+  LOGGER.warn('Client error', { code, message: err.message });
+} else {
+  // Unexpected server error — report to Rollbar/Sentry
+  LOGGER.error('Unexpected server error', err.originalError ?? err);
+}
+```
+
+This pattern prevents noise in error tracking while ensuring genuine bugs are never silenced. When you encounter an error handler that logs everything at `error` level, consider whether the error code belongs in `CLIENT_FACING_CODES` rather than demoting the log level.
+
+---
+
 ## Log Level Guide
 
 | Situation                              | Level   | Report to Sentry/Rollbar? |
 | -------------------------------------- | ------- | ------------------------- |
 | Unexpected exception / unhandled state | `error` | ✅ Yes                    |
+| Client-facing code (auth, validation)  | `warn`  | ❌ No                     |
 | Transient failure, will retry          | `warn`  | ❌ No                     |
 | User input validation failure          | `warn`  | ❌ No                     |
 | Expected no-op (e.g. nothing to do)    | `info`  | ❌ No                     |

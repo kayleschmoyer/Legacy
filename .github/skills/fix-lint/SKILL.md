@@ -104,8 +104,10 @@ console.error('error occurred', error);
 // ✅ Good
 import { LOGGER } from '@legacy-sports/logging';
 LOGGER.info('debug info', { data });
-LOGGER.error('error occurred', { error });
+LOGGER.error('error occurred', error);
 ```
+
+> ⚠️ **Pass Error objects directly** — see the [LOGGER.error() Error Wrapping](#loggererror--error-objects-must-be-direct-arguments) section below.
 
 ---
 
@@ -120,6 +122,30 @@ let value = 123;
 // ✅ Good
 const value = 123;
 ```
+
+---
+
+<a id="loggererror--error-objects-must-be-direct-arguments"></a>
+
+### ❌ `LOGGER.error()` — Error Objects Must Be Direct Arguments
+
+**Cause**: Error wrapped in an object `{ error }` instead of passed directly. This is the **most common mistake** found in batch Copilot review sessions.
+
+**Why it matters**: `RollbarOutputDestination` scans `LOGGER.error()` args for `arg instanceof Error` to extract stack traces. When the Error is nested inside a plain object wrapper like `{ error }`, `instanceof Error` returns false and Rollbar synthesizes a generic `new Error(message)` — **losing the original stack trace entirely**.
+
+```typescript
+// ❌ Bad — Rollbar can't find the Error instance (it's nested inside { error })
+LOGGER.error('Failed to load player stats', { error });
+LOGGER.error('Validation failed', { error, userId });
+
+// ✅ Good — Error is a direct arg, Rollbar extracts the stack trace
+LOGGER.error('Failed to load player stats', error);
+
+// ✅ Good — Error as direct arg + separate context object
+LOGGER.error('Validation failed', error, { userId });
+```
+
+**Reference**: See `lib/rollbar/src/lib/RollbarOutputDestination.ts` lines 33–34 for the `instanceof Error` scan.
 
 ---
 

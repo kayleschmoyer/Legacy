@@ -303,6 +303,25 @@ test.beforeEach(async ({ page }) => {
 >
 > - **Reorder** specific matches before general ones (`getleagueteams` before `getleague`)
 > - **Quote** the operation name: `postData.includes('"getleague"')` to match the exact JSON field
+> - **Best**: Use `extractOperationName()` from `apps/web-e2e/src/fixtures/shared-mocks.ts`
+
+> **Mock response structure must match Apollo's expectations:**
+> Apollo client reads `response.data.<fieldName>`, NOT `response.<fieldName>`.
+> Always wrap mock responses in a `{ data: { ... } }` envelope, and use the
+> correct GraphQL field name (check the actual `.graphql` query file):
+>
+> ```typescript
+> // ❌ WRONG — missing data wrapper
+> await route.fulfill({ json: { getLeagueById: null } });
+>
+> // ❌ WRONG — wrong field name (operation name ≠ field name)
+> await route.fulfill({ json: { data: { GetLeagueById: null } } });
+>
+> // ✅ CORRECT — data wrapper + correct field name from query
+> await route.fulfill({ json: { data: { league: null } } });
+> ```
+>
+> Reference `apps/web-e2e/src/fixtures/shared-mocks.ts` for correct baseline patterns.
 
 ### 5. Tag the test suite
 
