@@ -306,7 +306,7 @@ jobs:
   deploy-playwright-report:
     name: "Deploy Playwright Report"
     needs: [e2e]
-    if: always() && needs.e2e.result != 'skipped'
+    if: "!cancelled() && needs.e2e.result != 'skipped'"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -381,12 +381,12 @@ jobs:
             | **Commit** | `${{ github.event.pull_request.head.sha }}` |
 
   # ============================================================================
-  # STAGE 4 — Summarize results (always runs — posts PR comment, updates badges)
+  # STAGE 4 — Summarize results (runs on failure/skip, but not cancellation — posts PR comment, updates badges)
   # ============================================================================
   summarize:
     name: "Summarize & Report"
     needs: [detect-changes, quality-gates, build-validation, e2e]
-    if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
+    if: "!cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -406,6 +406,18 @@ jobs:
           set-nx-shas: false
           include-optional-deps: false
 
+      - name: "Debug: Job Results"
+        shell: bash
+        run: |
+          echo "::group::Raw needs.*.result values (for phantom-failure debugging)"
+          echo "detect-changes.result     = ${{ needs.detect-changes.result }}"
+          echo "quality-gates.result      = ${{ needs.quality-gates.result }}"
+          echo "quality-gates.output      = ${{ needs.quality-gates.outputs.result }}"
+          echo "build-validation.result   = ${{ needs.build-validation.result }}"
+          echo "build-validation.output   = ${{ needs.build-validation.outputs.overall-result }}"
+          echo "e2e.result                = ${{ needs.e2e.result }}"
+          echo "::endgroup::"
+
       - name: "Collect Results"
         id: collect-results
         uses: ./.github/actions/collect-results
@@ -415,7 +427,7 @@ jobs:
               "detect-changes":   "${{ needs.detect-changes.result }}",
               "quality-gates":    "${{ needs.quality-gates.outputs.result || needs.quality-gates.result }}",
               "build-validation": "${{ needs.build-validation.outputs.overall-result || needs.build-validation.result }}",
-              "e2e-testing":      "${{ needs.e2e.outputs.result || needs.e2e.result }}"
+              "e2e-testing":      "${{ needs.e2e.result }}"
             }
           workflow-start-time: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
           failure-threshold: "quality-gates,build-validation,e2e-testing"

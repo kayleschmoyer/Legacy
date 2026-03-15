@@ -203,7 +203,7 @@ jobs:
   label-pr:
     name: "🏷️ Label PR"
     needs: [security-scanning]
-    if: always() && github.event.pull_request.number
+    if: "!cancelled() && github.event.pull_request.number"
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -256,16 +256,17 @@ jobs:
   # The label is removed so the author must consciously re-add it after fixing.
   # Only fires on real pipeline failures, not cancellations (new push) or skips.
   #
-  # NOTE: needs.ci-pipeline.result is unreliable for workflow_call jobs — it
-  # always returns 'failure' regardless of actual outcome (GitHub Actions
-  # limitation with reusable workflows containing if: always() jobs). Use
-  # the explicit overall-status output from ci-pipeline instead.
+  # NOTE: needs.ci-pipeline.result was unreliable when ci-pipeline.yml used
+  # if: always() on internal jobs (GitHub Actions limitation — workflow_call
+  # result was always 'failure'). Fixed in LS-1115 by replacing always() with
+  # !cancelled() inside ci-pipeline.yml. This job still uses the explicit
+  # overall-status output as a safety net.
   # ============================================================================
   remove-merge-label-on-failure:
     name: "🏷️ Remove Merge Label on Failure"
     needs: [ci-pipeline]
     if: >-
-      always() &&
+      !cancelled() &&
       github.event_name == 'pull_request' &&
       needs.ci-pipeline.outputs.overall-status == 'failure'
     runs-on: ubuntu-latest

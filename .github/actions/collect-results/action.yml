@@ -66,14 +66,17 @@ runs:
           step=$(echo "$step" | xargs) # trim whitespace
           STEP_RESULT=$(echo "$STEP_RESULTS" | jq -r ".[\"$step\"] // \"unknown\"")
           
-          if [ "$STEP_RESULT" = "failure" ]; then
+          if [ "$STEP_RESULT" = "failure" ] || [ "$STEP_RESULT" = "cancelled" ]; then
             OVERALL_STATUS="failure"
             FAILED_STEPS+=("$step")
-            echo "[FAILED] Critical step '$step' failed"
-          elif [ "$STEP_RESULT" = "success" ]; then
-            echo "[SUCCESS] Critical step '$step' passed"
+            echo "[FAILED] Critical step '$step' status: $STEP_RESULT"
+          elif [ "$STEP_RESULT" = "success" ] || [ "$STEP_RESULT" = "skipped" ]; then
+            echo "[PASSED] Critical step '$step' status: $STEP_RESULT"
           else
-            echo "[UNKNOWN] Critical step '$step' status: $STEP_RESULT"
+            # Unknown status — treat as failure to surface misconfiguration
+            OVERALL_STATUS="failure"
+            FAILED_STEPS+=("$step")
+            echo "[UNKNOWN-FAIL] Critical step '$step' has unexpected status: $STEP_RESULT"
           fi
         done
 
@@ -125,7 +128,15 @@ runs:
           JQ_DURATION_ARG="null"
         fi
 
-        ENHANCED_RESULTS=$(echo "$STEP_RESULTS" | jq --argjson duration "$JQ_DURATION_ARG" --arg status "$OVERALL_STATUS" '. + {"metadata": {"overall_status": $status, "workflow_duration": $duration, "timestamp": (now | strftime("%Y-%m-%dT%H:%M:%SZ")), "total_steps": (. | length)}}')
+        ENHANCED_RESULTS=$(echo "$STEP_RESULTS" | jq \
+          --argjson duration "$JQ_DURATION_ARG" \
+          --arg status "$OVERALL_STATUS" \
+          '. + {"metadata": {
+            "overall_status": $status,
+            "workflow_duration": $duration,
+            "timestamp": (now | strftime("%Y-%m-%dT%H:%M:%SZ")),
+            "total_steps": (. | length)
+          }}')
 
         # Set outputs
         echo "step-results=$(echo "$ENHANCED_RESULTS" | jq -c .)" >> $GITHUB_OUTPUT
@@ -149,7 +160,15 @@ runs:
         echo "| Step | Status |" >> $GITHUB_STEP_SUMMARY
         echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
 
-        echo "$STEP_RESULTS" | jq -r 'to_entries[] | "| " + .key + " | " + (if .value == "success" then "[SUCCESS] " + .value elif .value == "failure" then "[FAILED] " + .value else "[UNKNOWN] " + .value end) + " |"' >> $GITHUB_STEP_SUMMARY
+        echo "$STEP_RESULTS" | jq -r '
+          to_entries[] |
+          "| " + .key + " | " +
+          (if .value == "success" then "[SUCCESS] " + .value
+           elif .value == "failure" then "[FAILED] " + .value
+           elif .value == "skipped" then "[SKIPPED] " + .value
+           elif .value == "cancelled" then "[CANCELLED] " + .value
+           else "[UNKNOWN] " + .value end) +
+          " |"' >> $GITHUB_STEP_SUMMARY
 
         echo "Results collection completed: $OVERALL_STATUS"
         echo "::endgroup::"
