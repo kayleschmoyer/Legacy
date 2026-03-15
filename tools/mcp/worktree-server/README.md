@@ -43,8 +43,8 @@ The server is configured in `.vscode/mcp.json`:
   "servers": {
     "worktree": {
       "type": "stdio",
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/worktree-server/src/index.ts"]
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/worktree-server/src/index.ts"]
     }
   }
 }

@@ -65,8 +65,8 @@ The server is configured in `.vscode/mcp.json` (already included in the repo):
   "servers": {
     "worktree": {
       "type": "stdio",
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/worktree-server/src/index.ts"]
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/worktree-server/src/index.ts"]
     }
   }
 }
@@ -76,8 +76,8 @@ No additional setup required — VS Code discovers MCP servers from this file au
 
 ## Troubleshooting
 
-| Problem                     | Fix                                                                               |
-| --------------------------- | --------------------------------------------------------------------------------- |
-| Server won't start          | Run `pnpm exec tsx tools/mcp/worktree-server/src/index.ts` manually to see errors |
-| "No worktree found for key" | Run `worktree_list` to see available keys; ensure the worktree exists             |
-| Command times out           | Default timeout is 2 minutes; long-running commands may need the terminal instead |
+| Problem                     | Fix                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| Server won't start          | Run `node --import tsx tools/mcp/worktree-server/src/index.ts` manually to see errors |
+| "No worktree found for key" | Run `worktree_list` to see available keys; ensure the worktree exists                 |
+| Command times out           | Default timeout is 2 minutes; long-running commands may need the terminal instead     |

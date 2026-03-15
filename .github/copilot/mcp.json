@@ -1,13 +1,23 @@
 {
   "servers": {
+    "legacy-sports-db": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/db-server/src/index.ts"]
+    },
     "legacy-sports-jira": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["tsx", "tools/mcp/jira-server/src/index.ts"],
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/jira-server/src/index.ts"],
       "env": {
         "JIRA_EMAIL": "${JIRA_EMAIL}",
         "JIRA_API_TOKEN": "${JIRA_API_TOKEN}"
       }
+    },
+    "worktree": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/worktree-server/src/index.ts"]
     }
   }
 }

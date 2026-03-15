@@ -123,8 +123,8 @@ The server is configured in `.vscode/mcp.json`. It reads `JIRA_EMAIL` and `JIRA_
   "servers": {
     "legacy-sports-jira": {
       "type": "stdio",
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/jira-server/src/index.ts"],
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/jira-server/src/index.ts"],
       "env": {
         "JIRA_EMAIL": "${env:JIRA_EMAIL}",
         "JIRA_API_TOKEN": "${env:JIRA_API_TOKEN}"

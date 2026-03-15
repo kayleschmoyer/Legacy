@@ -243,8 +243,8 @@ Add the server to `.vscode/mcp.json` so VS Code discovers it:
   "servers": {
     "<server-name>": {
       "type": "stdio",
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/<server-name>/src/index.ts"]
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/<server-name>/src/index.ts"]
     }
   }
 }
@@ -252,7 +252,7 @@ Add the server to `.vscode/mcp.json` so VS Code discovers it:
 
 **Command conventions**:
 
-- Use `pnpm exec tsx` (not `npx tsx`) — consistent with repo conventions
+- Use `node --import tsx` — `pnpm`/`npx` are `.CMD` files on Windows that fail when VS Code spawns them without a shell
 - Path is relative to the workspace root
 - Transport is always `stdio` for local MCP servers
 
@@ -329,6 +329,8 @@ Verify the server starts and responds to tool listing:
 
 ```powershell
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0.1.0"}}}' | pnpm exec tsx tools/mcp/<server-name>/src/index.ts
+# Or without pnpm wrapper:
+node --import tsx tools/mcp/<server-name>/src/index.ts
 ```
 
 Or restart VS Code and check that the server appears in the MCP panel.
@@ -408,5 +410,6 @@ Copy and adapt these patterns rather than importing across MCP servers — each 
 | Server doesn't appear in VS Code      | Check `.vscode/mcp.json` syntax · Reload VS Code (`Developer: Reload Window`)                   |
 | `Cannot find module` at runtime       | Ensure `.js` extensions in imports (ESM requirement) · Check `"type": "module"` in package.json |
 | Tool parameters not validated         | Ensure Zod schemas match expected types · Check `.describe()` on all params                     |
-| Server crashes silently               | Run manually in terminal to see stderr: `pnpm exec tsx tools/mcp/<name>/src/index.ts`           |
+| Server crashes silently               | Run manually in terminal to see stderr: `node --import tsx tools/mcp/<name>/src/index.ts`       |
 | `@modelcontextprotocol/sdk` not found | Run `make install` — package is at workspace root                                               |
+| `spawn pnpm ENOENT` (Windows)         | Use `node --import tsx` as command — `.CMD` wrappers fail without a shell                       |
