@@ -85,7 +85,10 @@ export function LeagueCreatePage(): React.JSX.Element {
       }
     },
     onError: (error: any) => {
-      LOGGER.error('Error creating league:', String(error));
+      LOGGER.error(
+        'Error creating league:',
+        error instanceof Error ? error : String(error),
+      );
       Alert.alert('Error', error.message || 'Failed to create league');
     },
   });

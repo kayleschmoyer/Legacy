@@ -297,7 +297,10 @@ export function LeagueCreatePage(): React.JSX.Element {
         );
       }
     } catch (error) {
-      LOGGER.error('Error creating league:', String(error));
+      LOGGER.error(
+        'Error creating league:',
+        error instanceof Error ? error : String(error),
+      );
       setFormError(
         (error as Error).message ||
           'Failed to create league. Please try again.',
