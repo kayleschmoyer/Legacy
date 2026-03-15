@@ -265,6 +265,12 @@ export const BugReportButton: React.FC = () => {
           exitStyle={{ opacity: 0, y: 8, scale: 0.98 }}
           aria-labelledby="bug-report-title"
           aria-describedby="bug-report-desc"
+          onInteractOutside={(e: { preventDefault(): void }) => {
+            // Prevent accidentally losing typed content or attachments when clicking outside
+            if (description.trim() || attachments.length > 0) {
+              e.preventDefault();
+            }
+          }}
         >
           <YStack gap="$4" padding="$5">
             {/* Header */}
