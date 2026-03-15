@@ -53,6 +53,18 @@ HTTP lambdas serve their own live badge — shields.io fetches directly from the
 
 **Auto-Deploy:** Pushes to `main` branch automatically deploy via GitHub Pages
 
+## 🚀 Deploy Repository
+
+The [legacy-sports-deploys](https://github.com/bkrupa/legacy-sports-deploys) repository hosts CI-generated artifacts served via GitHub Pages:
+
+| Resource               | URL                                                                        | Description                         |
+| ---------------------- | -------------------------------------------------------------------------- | ----------------------------------- |
+| **PR Previews**        | `https://bkrupa.github.io/legacy-sports-deploys/pr-<N>/`                   | Full web app build for each open PR |
+| **Playwright Reports** | `https://bkrupa.github.io/legacy-sports-deploys/playwright-report/pr-<N>/` | E2E test results with traces per PR |
+| **Storybook**          | `https://bkrupa.github.io/legacy-sports-deploys/storybook/`                | Component library documentation     |
+
+These are published automatically by CI workflows — no manual steps required.
+
 ## 📱 Download Mobile App
 
 ### Android APK
