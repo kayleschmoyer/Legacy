@@ -136,7 +136,7 @@ cd legacy-sports
 make install
 ```
 
-> **Git hooks:** `make install` automatically installs a pre-push hook that blocks pushes with unformatted code. To fix, run `make format`, commit, and push again. To bypass in an emergency: `git push --no-verify`.
+> **Git hooks:** `make install` automatically installs a pre-push hook that auto-formats code before pushing. If all changes are committed, the hook amends the last commit with formatting fixes and aborts the push — run `git push` again to push the amended commit. If you have uncommitted changes alongside formatting drift, the hook blocks the push — commit or stash first, then push again. To bypass in an emergency: `git push --no-verify`.
 
 ## 📱 Development
 

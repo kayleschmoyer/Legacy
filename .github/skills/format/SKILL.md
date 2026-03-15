@@ -83,6 +83,10 @@ git diff --name-only --diff-filter=ACMR | Where-Object { $_ -match '\.(ts|tsx|js
 
 ## Integration with Workflow
 
+### Pre-push Hook (automatic)
+
+A pre-push Git hook runs `nx format:write` automatically before every push. If the working tree is clean, it auto-amends the last commit with any formatting fixes and aborts the push — run `git push` again to push the amended commit. If the working tree has other uncommitted changes, it blocks the push — commit or stash first, then push again. To bypass in an emergency: `git push --no-verify`.
+
 ### Recommended Order
 
 ```powershell

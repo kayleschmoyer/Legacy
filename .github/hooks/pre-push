@@ -1,7 +1,16 @@
 #!/bin/sh
 #
-# pre-push hook — blocks pushes when code is unformatted.
+# pre-push hook — auto-formats code and amends the commit before pushing.
 # Installed automatically by `make setup-hooks` (called from `make install`).
+#
+# Behaviour:
+#   1. Runs `nx format:write` to auto-fix any formatting drift.
+#   2. If no files changed → push proceeds normally.
+#   3. If files changed AND working tree was clean → auto-amends the last
+#      commit with the formatting fixes, then ABORTS the push. The developer
+#      must re-run `git push` to push the amended commit.
+#   4. If files changed AND working tree had other uncommitted changes →
+#      blocks the push so the developer can commit/stash first.
 #
 # To bypass in an emergency:  git push --no-verify
 
@@ -9,18 +18,53 @@
 command -v git-lfs >/dev/null 2>&1 || { printf >&2 "\nThis repository is configured for Git LFS but 'git-lfs' was not found on your path. If you no longer wish to use Git LFS, remove this hook by deleting the 'pre-push' file in the hooks directory (set by 'core.hookspath'; usually '.git/hooks').\n\n"; exit 2; }
 git lfs pre-push "$@"
 
-# Skip formatting check if node_modules is missing (docs-only worktree without dependencies)
+# Skip formatting if node_modules is missing (docs-only worktree without dependencies)
 if [ ! -d "node_modules" ] && [ ! -L "node_modules" ]; then
   exit 0
 fi
 
-printf "pre-push: checking code formatting...\n"
-pnpm exec nx format:check 2>&1
+printf "pre-push: running code formatter...\n"
+
+# Snapshot working-tree state BEFORE formatting
+pre_state=$(git status --porcelain)
+
+pnpm exec nx format:write 2>&1
 status=$?
 if [ $status -ne 0 ]; then
+  printf "\nERROR: nx format:write failed (exit %d). Fix the error and try again.\n" "$status"
+  printf "To bypass: git push --no-verify\n"
+  exit 1
+fi
+
+# Check if format:write changed any files
+changed=$(git diff --name-only)
+if [ -z "$changed" ]; then
+  # Nothing changed — formatting was already clean
+  exit 0
+fi
+
+# Files were reformatted
+if [ -z "$pre_state" ]; then
+  # Working tree was clean before format:write → auto-amend is safe
+  printf "  Formatting fixed files; auto-amending last commit...\n"
+  git add -A
+  if ! git commit --amend --no-edit --no-verify; then
+    printf "\nERROR: git commit --amend failed. Please amend manually and push again.\n"
+    exit 1
+  fi
+  printf "  ✓ Format fixes folded into previous commit.\n"
+  printf "  Push aborted — run 'git push' again to push the amended commit.\n"
+  exit 1
+else
+  # Working tree had other uncommitted changes — can't safely amend
   printf "\n"
-  printf "ERROR: Code formatting check failed.\n"
-  printf "Run 'make format' to fix, then commit and push again.\n"
+  printf "ERROR: Formatting fixed the following files:\n"
+  printf "%s\n" "$changed" | sed 's/^/  /'
+  printf "\n"
+  printf "You have other uncommitted changes, so the hook cannot auto-amend.\n"
+  printf "Options:\n"
+  printf "  1. git stash -u && git add -A && git commit --amend --no-edit && git stash pop\n"
+  printf "  2. git add -A && git commit -m 'style: apply formatting'\n"
   printf "To bypass: git push --no-verify\n"
   exit 1
 fi
