@@ -362,7 +362,23 @@ jobs:
           external_repository: bkrupa/legacy-sports-deploys
           publish_branch: gh-pages
           publish_dir: ./playwright-report
-          destination_dir: playwright-report
+          destination_dir: playwright-report/${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+
+      - name: "Comment Playwright Report URL"
+        if: steps.check-reports.outputs.has-reports == 'true' && github.event.pull_request.number
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: playwright-report
+          number: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          message: |
+            ## 🎭 Playwright Report
+
+            | | |
+            |---|---|
+            | **Report** | [View Full Report](https://bkrupa.github.io/legacy-sports-deploys/playwright-report/pr-${{ github.event.pull_request.number }}/) |
+            | **Run** | [Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+            | **Commit** | `${{ github.event.pull_request.head.sha }}` |
 
   # ============================================================================
   # STAGE 4 — Summarize results (always runs — posts PR comment, updates badges)
