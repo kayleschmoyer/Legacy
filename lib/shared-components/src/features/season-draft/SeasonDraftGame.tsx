@@ -127,6 +127,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   const [selectedPosition, setSelectedPosition] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isStartingGame, setIsStartingGame] = useState(false);
   const [statsLoadingPlayerIds, setStatsLoadingPlayerIds] = useState<
     Set<number>
   >(new Set());
@@ -191,13 +192,17 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
 
   // Start game (creator only)
   const handleStartGame = async () => {
-    if (!gameState) return;
+    if (!gameState || isStartingGame) return;
+    setIsStartingGame(true);
     try {
       await startGameMutation({ variables: { gameId } });
       await refetchGame();
     } catch (error) {
-      LOGGER.error('Failed to start game:', String(error));
-      Alert.alert('Error', 'Failed to start game.');
+      const err = error instanceof Error ? error : new Error(String(error));
+      LOGGER.error('Failed to start game', err);
+      Alert.alert('Error', 'Failed to start game. Please try again.');
+    } finally {
+      setIsStartingGame(false);
     }
   };
 
@@ -219,8 +224,10 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               }
             },
             (error: unknown) => {
-              LOGGER.error('Failed to cancel game:', String(error));
-              Alert.alert('Error', 'Failed to cancel game.');
+              const err =
+                error instanceof Error ? error : new Error(String(error));
+              LOGGER.error('Failed to cancel game', err);
+              Alert.alert('Error', 'Failed to cancel game. Please try again.');
             },
           );
         },
@@ -257,7 +264,12 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
           variables: { playerId: player.id },
         });
       } catch (error) {
-        LOGGER.error('Failed to trigger stat loading:', String(error));
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Failed to trigger stat loading', err);
+        Alert.alert(
+          'Error',
+          'Failed to load player statistics. Please try again.',
+        );
         setStatsLoadingPlayerIds((prev) => {
           const next = new Set(prev);
           next.delete(player.id);
@@ -359,7 +371,8 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
       // Reload game state
       await refetchGame();
     } catch (error) {
-      LOGGER.error('Failed to make pick:', String(error));
+      const err = error instanceof Error ? error : new Error(String(error));
+      LOGGER.error('Failed to make pick', err);
       Alert.alert('Error', 'Failed to make pick. Please try again.');
     } finally {
       setSubmitting(false);
@@ -459,9 +472,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
                   size="$4"
                   backgroundColor="$green10"
                   color="white"
+                  disabled={isStartingGame}
+                  opacity={isStartingGame ? 0.6 : 1}
                   onPress={() => void handleStartGame()}
                 >
-                  Start Draft
+                  {isStartingGame ? 'Starting...' : 'Start Draft'}
                 </Button>
                 <Button
                   flex={1}
