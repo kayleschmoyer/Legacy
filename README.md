@@ -16,6 +16,7 @@ A modern sports data management platform built with React Native CLI, Next.js we
 
 [![Branch](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Branch.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
 [![Last Updated](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Last-Updated.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+[![Playwright Report](https://img.shields.io/badge/Playwright-Test%20Report-blue?logo=playwright)](https://bkrupa.github.io/legacy-sports-deploys/playwright-report/)
 
 ## 🚢 Deployment Status
 
