@@ -1,0 +1,112 @@
+name: Deploy Storybook
+
+# =============================================================================
+# Storybook Deploy
+# =============================================================================
+# Builds and deploys Storybook for lib/shared-components to GitHub Pages on
+# the external deploy repo (bkrupa/legacy-sports-deploys) under /storybook/.
+#
+# Triggers:
+#   - On every push to main that touches shared-components or storybook config
+#   - On every PR that touches shared-components (posts a sticky comment)
+#   - Manual dispatch
+# =============================================================================
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lib/shared-components/**"
+      - ".github/workflows/deploy-storybook.yml"
+
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "lib/shared-components/**"
+      - ".github/workflows/deploy-storybook.yml"
+
+  workflow_dispatch:
+
+concurrency:
+  group: storybook-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  DEPLOY_REPO: bkrupa/legacy-sports-deploys
+  STORYBOOK_URL: https://bkrupa.github.io/legacy-sports-deploys/storybook/
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Storybook
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: true
+
+      - name: Build Storybook
+        run: pnpm exec nx run shared-components:build-storybook --configuration=ci
+
+      - name: Verify Build Output
+        run: |
+          if [ ! -f "dist/storybook/index.html" ]; then
+            echo "::error::Storybook build failed — dist/storybook/index.html not found"
+            exit 1
+          fi
+          echo "Storybook build output:"
+          ls -la dist/storybook/
+
+      # ── Deploy (only on push to main or manual dispatch) ──────────────────
+      - name: Generate App Token
+        if: github.event_name != 'pull_request'
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: bkrupa
+          repositories: legacy-sports-deploys
+
+      - name: Deploy Storybook
+        if: github.event_name != 'pull_request'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ steps.app-token.outputs.token }}
+          external_repository: ${{ env.DEPLOY_REPO }}
+          publish_branch: gh-pages
+          publish_dir: ./dist/storybook
+          destination_dir: storybook
+
+      # ── Sticky PR Comment (only on pull requests) ─────────────────────────
+      - name: Comment Storybook URL
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: storybook-preview
+          number: ${{ github.event.pull_request.number }}
+          message: |
+            ## 📖 Storybook
+
+            | | |
+            |---|---|
+            | **URL** | [${{ env.STORYBOOK_URL }}](${{ env.STORYBOOK_URL }}) |
+            | **Status** | ${{ job.status == 'success' && '✅ Storybook build succeeded' || '❌ Storybook build failed' }} |
+            | **Branch** | `${{ github.head_ref }}` |
+            | **Commit** | `${{ github.event.pull_request.head.sha }}` |
+
+            > Storybook is deployed to GitHub Pages on merge to `main`. This comment confirms the build status for this PR.
