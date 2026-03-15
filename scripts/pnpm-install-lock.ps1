@@ -97,6 +97,40 @@ function Exit-InstallLock {
 # Main
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Junction guard — refuse to run if node_modules is a junction
+# ---------------------------------------------------------------------------
+# When a worktree's node_modules is junctioned to the main repo, running
+# pnpm install here MUTATES the shared directory and breaks every other
+# junctioned worktree simultaneously. Detect this and abort with clear
+# instructions instead of silently corrupting the shared state.
+
+$nmPath = Join-Path (Get-Location) "node_modules"
+if (Test-Path $nmPath) {
+    $nmItem = Get-Item $nmPath -Force
+    if (($nmItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        $target = $nmItem.Target
+        Write-Host ""
+        Write-Host "  ============================================================" -ForegroundColor Red
+        Write-Host "  BLOCKED: node_modules is a junction -> $target" -ForegroundColor Red
+        Write-Host "  ============================================================" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  Running pnpm install here would mutate the SHARED node_modules" -ForegroundColor Yellow
+        Write-Host "  and break every other worktree using the same junction." -ForegroundColor Yellow
+        Write-Host ""
+        $mainRepo = Split-Path $target
+        Write-Host "  What to do instead:" -ForegroundColor Cyan
+        Write-Host "    - If node_modules is healthy: do nothing, the junction is working." -ForegroundColor White
+        Write-Host "    - If node_modules is broken: run 'make install' in the MAIN REPO" -ForegroundColor White
+        Write-Host "      ($mainRepo) -- all junctioned worktrees share it." -ForegroundColor White
+        Write-Host "    - If this worktree needs different deps (lockfile diverged):" -ForegroundColor White
+        Write-Host "      1. Remove junction:  cmd /c `"rmdir node_modules`"" -ForegroundColor White
+        Write-Host "      2. Install fresh:    make install" -ForegroundColor White
+        Write-Host ""
+        exit 1
+    }
+}
+
 Enter-InstallLock
 try {
     if ($ForceClean) {

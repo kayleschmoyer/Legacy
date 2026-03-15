@@ -32,6 +32,24 @@ if ($workspaceProcs) {
     Write-Host "   No workspace Node.js/esbuild processes running" -ForegroundColor Green
 }
 
+# Step 1b: Kill node processes holding native addon (.node) file locks
+# These processes may not have the workspace path in their CommandLine but still
+# lock native binaries (e.g. bufferutil.node, utf-8-validate.node) inside node_modules.
+Write-Host "`nStep 1b: Releasing native addon file locks..." -ForegroundColor Cyan
+$nmEsc = [regex]::Escape((Join-Path $workspaceRoot 'node_modules'))
+$addonProcs = Get-Process node -ErrorAction SilentlyContinue | Where-Object {
+    try { ($_.Modules | Where-Object { $_.FileName -match ($nmEsc + '.*\.node$') }).Count -gt 0 } catch { $false }
+}
+if ($addonProcs) {
+    $addonProcs | ForEach-Object {
+        Write-Host "   Stopping $($_.ProcessName) (PID $($_.Id)) - holds native addon lock" -ForegroundColor Yellow
+        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+    }
+    Write-Host "   Stopped $($addonProcs.Count) process(es) holding native addon locks" -ForegroundColor Green
+} else {
+    Write-Host "   No processes holding native addon locks" -ForegroundColor Green
+}
+
 # Step 2: Stop Nx daemon
 Write-Host "`nStep 2: Stopping Nx daemon..." -ForegroundColor Cyan
 try {
@@ -46,12 +64,12 @@ try {
 }
 
 # Step 3: Wait for file handles
-Write-Host "`nStep 4: Waiting for file handles to release..." -ForegroundColor Cyan
+Write-Host "`nStep 3: Waiting for file handles to release..." -ForegroundColor Cyan
 Start-Sleep -Seconds 3
 Write-Host "   File handles released" -ForegroundColor Green
 
 # Step 4: Remove node_modules
-Write-Host "`nStep 5: Removing node_modules..." -ForegroundColor Cyan
+Write-Host "`nStep 4: Removing node_modules..." -ForegroundColor Cyan
 $nodeModulesPath = Join-Path $workspaceRoot "node_modules"
 
 if (Test-Path $nodeModulesPath) {

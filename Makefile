@@ -164,6 +164,9 @@ endif
 clean-safe: clean-cache ## Safely clean build artifacts and cache (alias for clean-cache)
 
 clean: ## Clean all build artifacts and dependencies
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -Command "$$nmPath = Join-Path '$(WORKSPACE_PATH_WIN)' 'node_modules'; $$nmItem = Get-Item $$nmPath -Force -EA SilentlyContinue; if ($$nmItem -and (($$nmItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { Write-Host ''; Write-Host '  BLOCKED: node_modules is a junction' -ForegroundColor Red; Write-Host '  Running make clean here would unlink the junction and break this worktree.' -ForegroundColor Yellow; Write-Host '  Run make clean in the main repo instead.' -ForegroundColor Cyan; Write-Host ''; exit 1 }; if (-not (Test-Path $$nmPath)) { exit 0 }; $$wtDirs = @(); try { $$wtDirs = @(git worktree list --porcelain 2>$$null | Select-String '^worktree ' | ForEach-Object { ($$_ -replace '^worktree ','').Trim() } | Where-Object { $$_ -ne '$(WORKSPACE_PATH_WIN)' }) } catch {}; $$junctions = @(); foreach ($$wt in $$wtDirs) { $$wtNM = Join-Path $$wt 'node_modules'; $$wi = Get-Item $$wtNM -Force -EA SilentlyContinue; if ($$wi -and (($$wi.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { $$junctions += $$wt } }; if ($$junctions.Count -gt 0) { Write-Host ''; Write-Host '  WARNING: These worktrees junction to this node_modules:' -ForegroundColor Yellow; $$junctions | ForEach-Object { Write-Host ('    - ' + $$_) -ForegroundColor Yellow }; Write-Host '  make clean will break them. Run twig worktree clean first, or pass FORCE=1.' -ForegroundColor Yellow; Write-Host ''; if ('$(FORCE)' -ne '1') { exit 1 } }"
+endif
 	@$(call echo_blue,Cleaning workspace...)
 	pnpm run clean:python $(NULL_REDIRECT) || echo Python clean skipped
 	@$(call echo_blue,Clearing Nx cache...)
@@ -177,6 +180,8 @@ endif
 	@$(call echo_blue,Stopping workspace-affiliated processes...)
 	@$(KILL_WORKSPACE_PROCS)
 ifeq ($(DETECTED_OS),Windows)
+	@$(call echo_blue,Releasing native addon file locks...)
+	@powershell -NoProfile -Command "$$nmPath = Join-Path '$(WORKSPACE_PATH_WIN)' 'node_modules'; $$nmEsc = [regex]::Escape($$nmPath); $$procs = Get-Process node -EA SilentlyContinue | Where-Object { try { ($$_.Modules | Where-Object { $$_.FileName -match ($$nmEsc + '.*\.node$$') }).Count -gt 0 } catch { $$false } }; if ($$procs) { $$procs | ForEach-Object { Write-Host ('Stopping {0} (PID {1}) - holds native addon lock' -f $$_.ProcessName, $$_.Id); Stop-Process -Id $$_.Id -Force } } else { Write-Host 'No processes holding native addon locks' }"
 	@$(call echo_blue,Waiting for file handles to release...)
 	@powershell -Command "Start-Sleep -Seconds 3"
 	@$(call echo_blue,Removing node_modules (junction-safe)...)

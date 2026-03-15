@@ -89,12 +89,32 @@ mutates that directory.
    **Never run raw `pnpm install`** — always use the Makefile targets.
 4. **`make clean` and `make force-clean` are junction-safe** — they detect junctions and
    only unlink them (`cmd rmdir`) instead of recursively deleting the target contents.
+5. **Runtime guards enforce these rules** — `make install` (via `pnpm-install-lock.ps1`) will
+   **refuse to run** if `node_modules` is a junction, and `make clean` will **refuse to run** if
+   other worktrees have junctions pointing to the shared `node_modules`. These guards exist
+   because agents ignoring the instructions above caused cascading failures across all worktrees.
 
 **What is safe in parallel:**
 
 - Reading `node_modules` via junctions (builds, tests, lint) — multiple readers are fine.
 - Running `make wt-setup` concurrently (serialized by lock).
 - Running `pnpm install` in a worktree with independent `node_modules`.
+
+**When node_modules appears broken in a junctioned worktree:**
+
+> This is the #1 agent failure mode. An agent sees "missing `.bin/`" or "module not found"
+> and reflexively runs `make install` — which mutates the shared `node_modules` and breaks
+> every other agent's worktree simultaneously, triggering a cascade of install attempts.
+
+1. **Check if `node_modules` is a junction** (it almost always is):
+   ```powershell
+   (Get-Item node_modules -Force).Attributes -band [IO.FileAttributes]::ReparsePoint
+   ```
+2. **If it IS a junction** → the problem is in the main repo's `node_modules`, not yours.
+   **Ask the user** to fix it. An agent must never autonomously run `make install` in the
+   main repo while other worktrees are active.
+3. **If the junction is missing** → re-run `make wt-setup WT=<this-worktree-path>` to
+   recreate it. This is safe — it only creates a symlink, it doesn't mutate `node_modules`.
 
 ## Prerequisites
 

@@ -4,6 +4,7 @@
   "license": "MIT",
   "packageManager": "pnpm@9.12.1",
   "scripts": {
+    "preinstall": "node scripts/preinstall-guard.js",
     "postinstall": "node scripts/postinstall-security.js",
     "all": "nx affected -t build lint:fix lint format test make-cache bundle typecheck",
     "android": "nx run-android app",
