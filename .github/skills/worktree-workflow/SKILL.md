@@ -47,28 +47,7 @@ This ensures the branch name, PR title, and Jira transition all reference the co
 ticket. Do **not** commit epic-scoped work to a child task's branch — it misattributes the
 work and confuses traceability.
 
-## Design Rationale: One Worktree per Branch
-
-This project uses **one worktree per branch** rather than a pool of static, reusable worktrees. Here's why:
-
-**Why one-per-branch wins for async workflows:**
-
-- **Instant context switching** — Multiple tickets sit in-flight simultaneously. Switch by changing directories, not by stashing, checking out, and reinstalling.
-- **Full isolation** — No risk of stale build artifacts, cached Nx state, or leftover generated files bleeding between unrelated tickets.
-- **Stacked branches are trivial** — Each dependent branch lives in its own tree rooted on its parent. No manual branch juggling.
-- **Clean teardown** — `twig worktree clean` removes worktrees whose branches have been merged or deleted.
-
-**Why reusable static worktrees would hurt:**
-
-- Every branch swap requires a full clean: `git checkout`, potentially `pnpm install` (if the lockfile diverged), Nx cache invalidation, `.env` re-copy, and generated file rebuild — most of `make wt-setup` anyway.
-- You lose the ability to park 3-4 tickets mid-work and resume any of them instantly.
-- Leftover Nx cache from a previous branch can cause subtle build bugs that are hard to diagnose.
-
-**Disk cost is minimal:**
-
-- `make wt-setup` junctions `node_modules` to the main repo when lockfiles match, so worktrees share the ~1.8 GB `node_modules` with zero extra disk.
-- pnpm's content-addressable store deduplicates packages globally — multiple worktrees don't multiply download or storage costs.
-- The only per-worktree disk cost is the source files themselves (~50 MB), which is negligible.
+> 📎 **Design rationale** (why one-worktree-per-branch beats reusable static worktrees, disk cost analysis): see [references/worktree-design-rationale.md](references/worktree-design-rationale.md)
 
 ## ⚠️ Concurrent Agent Safety (Shared node_modules)
 
@@ -282,52 +261,7 @@ make sync-worktrees TICKETS=####
 code legacy-sports.code-workspace
 ```
 
-> **About the multi-root workspace:**
->
-> AI agents can only search files inside VS Code workspace folders. To give
-> multiple agents search access to their assigned worktrees from a single
-> VS Code window, generate a multi-root workspace file:
->
-> ```powershell
-> # In the main repo (D:\code\legacy-sports):
->
-> # Include ONLY the worktrees your agents are actively using:
-> make sync-worktrees TICKETS=501,493,498
->
-> # Or include ALL active worktrees (use sparingly — see TS note below):
-> make sync-worktrees
->
-> code legacy-sports.code-workspace
-> ```
->
-> This opens **one** VS Code window with the main repo plus selected worktrees.
-> Agents' semantic search, file search, and grep tools now cover all included
-> folders.
->
-> **Incremental updates** — add or remove individual worktrees without regenerating:
->
-> ```powershell
-> make sync-worktrees-add TICKET=507       # add one worktree
-> make sync-worktrees-remove TICKET=493    # remove one worktree
-> ```
->
-> **Auto-add on create** — `make worktree` creates the worktree AND auto-adds it:
->
-> ```powershell
-> make worktree TICKET=507 DESC=fix-scoring
-> ```
->
-> **TypeScript tradeoff:** Each added worktree is a full monorepo copy with
-> ~99 `tsconfig.json` files. The TS language server creates projects for each
-> one, consuming memory. The generated workspace bumps TS memory to 12 GB and
-> disables proactive diagnostics to mitigate this, but **limit to 3-4 worktrees**
-> for best performance. If IntelliSense becomes slow, reduce the included set.
->
-> **Fallback — per-session file access:**
-> If you don't want a multi-root workspace, the agent can still edit worktree files by
-> referencing absolute paths. VS Code will prompt: **"Allow reading/editing external
-> files?"** — click **Allow** to grant access for the session. However, search/discovery
-> tools will only cover the main repo.
+> 📎 **Multi-root workspace details** (TS tradeoffs, incremental updates, auto-add, per-session fallback): see [references/worktree-multi-root-details.md](references/worktree-multi-root-details.md)
 
 ### Step 5: Implement the Ticket
 
@@ -495,103 +429,7 @@ twig worktree list  # verify
 | **Separate VS Code window** | Open each worktree in its own VS Code window for clean file watching                                                                                                                                                                  |
 | **Multi-root for agents**   | Run `make sync-worktrees TICKETS=501,493` then open `legacy-sports.code-workspace` — limit to 3-4 worktrees for TS performance                                                                                                        |
 
-## Troubleshooting
-
-### twig tree / twig branch commands don't work in worktree
-
-`.twig/state.json` is gitignored and absent. Create a junction pointing to the main repo's `.twig` (substitute `$wt` with the worktree path from `twig worktree list`):
-
-```powershell
-cmd /c mklink /J "$wt\.twig" "D:\code\legacy-sports\.twig"
-```
-
-Verify it worked:
-
-```powershell
-cd $wt
-twig tree
-```
-
-### Permission denied on `git worktree move`
-
-You're inside the worktree being moved. `cd` to the main repo first:
-
-```powershell
-cd "D:\code\legacy-sports"
-git worktree move ...
-```
-
-### Worktree list shows stale entries
-
-```powershell
-twig worktree clean
-twig worktree list
-```
-
-### Twig fails with "Issue not found"
-
-Twig couldn't fetch the Jira issue. Create the branch manually and transition Jira separately:
-
-```powershell
-git checkout -b "LS-####/description"
-git checkout main
-acli jira workitem transition --key LS-#### --status "In Progress"
-```
-
-### node_modules missing in worktree
-
-`node_modules` is gitignored so it is never present in a fresh worktree. Use the smart setup script, which junctions to main when possible:
-
-```powershell
-# From the main repo (recommended — handles .env and .twig too):
-make wt-setup WT=$wt
-
-# Or install independently inside the worktree:
-cd $wt   # path from twig worktree list
-make install
-```
-
-## Maintenance & Cleanup Cadence
-
-Worktrees accumulate over time. Periodic cleanup keeps the workspace lean and prevents confusion from stale branches.
-
-### After Every PR Merge
-
-```powershell
-cd "D:\code\legacy-sports"
-make sync-worktrees-remove TICKET=####   # remove from VS Code workspace
-twig worktree clean                     # removes worktrees with merged/deleted branches
-git branch -d "LS-####/description"     # delete the local branch
-```
-
-### Weekly Housekeeping
-
-Run this periodically (e.g., start of week) to catch any missed cleanups:
-
-```powershell
-cd "D:\code\legacy-sports"
-
-# List all active worktrees — review for any that are done
-twig worktree list
-
-# Clean up merged/deleted branch worktrees
-twig worktree clean
-
-# Prune remote-tracking branches that no longer exist
-git fetch --prune
-
-# Check disk usage of the worktrees directory
-Get-ChildItem "D:\code\legacy-sports-worktrees" -Directory |
-  ForEach-Object { $size = (Get-ChildItem $_.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB; [PSCustomObject]@{ Name = $_.Name; SizeMB = [math]::Round($size, 1) } } |
-  Sort-Object SizeMB -Descending | Format-Table -AutoSize
-```
-
-### Signs You Should Clean Up
-
-- `twig worktree list` shows worktrees for tickets that are already "Done" in Jira
-- `git branch` shows branches with no corresponding open PR
-- VS Code workspace has more than 3-4 worktrees (TypeScript performance degrades — see Step 4)
-- Disk usage on the worktrees directory exceeds expectations
+> 📎 **Troubleshooting** (twig commands, permissions, stale entries, node_modules, cleanup cadence): see [references/worktree-troubleshooting.md](references/worktree-troubleshooting.md)
 
 ## Quick Reference
 
