@@ -322,7 +322,7 @@ export function useWebSocket({
     });
 
     const unsubscribeError = client.on('error', (err) => {
-      LOGGER.error(
+      LOGGER.warn(
         '[useWebSocket] error:',
         err.message,
         '(will auto-reconnect)',
