@@ -623,4 +623,46 @@ describe('Season Draft Game Resolver', () => {
       );
     });
   });
+
+  // ── seasonDraftGamePlayerOptions query ────────────────────────────────────
+
+  describe('seasonDraftGamePlayerOptions query', () => {
+    beforeEach(() => {
+      mockSeasonDraftGameService.getPlayerDraftOptions = jest
+        .fn()
+        .mockResolvedValue([]);
+    });
+
+    it('throws when unauthenticated', async () => {
+      const resolver = getQuery('seasonDraftGamePlayerOptions');
+      await expect(
+        resolver(
+          {},
+          { playerId: 1, gameMode: 'season', playerType: 'hitter' },
+          unauthCtx,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('calls getPlayerDraftOptions with the expected args and returns results', async () => {
+      const options = ['2020', '2021', '2022'];
+      mockSeasonDraftGameService.getPlayerDraftOptions.mockResolvedValue(
+        options,
+      );
+
+      const resolver = getQuery('seasonDraftGamePlayerOptions');
+      const result = await resolver(
+        {},
+        { playerId: 42, gameMode: 'season', playerType: 'hitter' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual(options);
+      expect(
+        mockSeasonDraftGameService.getPlayerDraftOptions,
+      ).toHaveBeenCalledWith(mockDb, 42, 'season', 'hitter');
+    });
+  });
 });

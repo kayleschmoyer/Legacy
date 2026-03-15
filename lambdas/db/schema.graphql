@@ -2302,6 +2302,15 @@ type Query {
   seasonDraftGameAvailablePositions(gameId: Int!): [String!]
 
   """
+  Get available draft options for a player: distinct teams (career_team mode) or seasons (season mode)
+  """
+  seasonDraftGamePlayerOptions(
+    gameMode: SeasonDraftGameMode!
+    playerId: Int!
+    playerType: SeasonDraftPlayerType!
+  ): [String!]
+
+  """
   Get stat value for a player/season/position combination
   """
   seasonDraftGamePlayerSeasonStatValue(

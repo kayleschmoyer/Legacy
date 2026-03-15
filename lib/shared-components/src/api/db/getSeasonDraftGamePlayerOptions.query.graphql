@@ -1,0 +1,13 @@
+# Get available draft options for a player: teams (career_team mode) or seasons (season mode).
+# Used to power the team/season picker after selecting a player in the draft UI.
+query GetSeasonDraftGamePlayerOptions(
+  $playerId: Int!
+  $gameMode: SeasonDraftGameMode!
+  $playerType: SeasonDraftPlayerType!
+) {
+  seasonDraftGamePlayerOptions(
+    playerId: $playerId
+    gameMode: $gameMode
+    playerType: $playerType
+  )
+}

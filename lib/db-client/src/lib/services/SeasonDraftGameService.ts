@@ -554,6 +554,51 @@ export class SeasonDraftGameService {
   }
 
   /**
+   * Get available draft options for a player (teams or seasons with stats).
+   *
+   * Returns distinct teams (career_team mode, sorted alphabetically) or
+   * seasons (season mode, sorted descending — most recent first) that
+   * the player has batting or pitching stats recorded for.
+   * Used to power the team/season picker in the draft UI instead of requiring
+   * the user to type a team abbreviation or year from memory.
+   */
+  static async getPlayerDraftOptions(
+    db: PublicDb,
+    playerId: number,
+    gameMode: GameMode,
+    playerType: PlayerType,
+  ): Promise<string[]> {
+    if (gameMode === 'career_team') {
+      const table =
+        playerType === 'pitcher'
+          ? PublicSchema.seasonPitching
+          : PublicSchema.seasonBatting;
+
+      const rows = await db
+        .selectDistinct({ team: table.team })
+        .from(table)
+        .where(eq(table.playerId, playerId))
+        .orderBy(table.team);
+
+      return rows.map((r) => r.team).filter(Boolean);
+    }
+
+    // Season mode — return distinct years as strings, most recent first
+    const table =
+      playerType === 'pitcher'
+        ? PublicSchema.seasonPitching
+        : PublicSchema.seasonBatting;
+
+    const rows = await db
+      .selectDistinct({ season: table.season })
+      .from(table)
+      .where(eq(table.playerId, playerId))
+      .orderBy(desc(table.season));
+
+    return rows.map((r) => String(r.season));
+  }
+
+  /**
    * Check if a player has stats loaded (statsLastFetchedAt is not null)
    */
   static async checkPlayerHasStats(

@@ -2110,6 +2110,8 @@ export type Query = {
   seasonDraftGame?: Maybe<SeasonDraftGame>;
   /** Get list of available positions to draft for */
   seasonDraftGameAvailablePositions?: Maybe<Array<Scalars['String']['output']>>;
+  /** Get available draft options for a player: distinct teams (career_team mode) or seasons (season mode) */
+  seasonDraftGamePlayerOptions?: Maybe<Array<Scalars['String']['output']>>;
   /** Get stat value for a player/season/position combination */
   seasonDraftGamePlayerSeasonStatValue?: Maybe<Scalars['Int']['output']>;
   /** Get valid stat keys for a given player type */
@@ -2516,6 +2518,12 @@ export type QuerySeasonDraftGameArgs = {
 
 export type QuerySeasonDraftGameAvailablePositionsArgs = {
   gameId: Scalars['Int']['input'];
+};
+
+export type QuerySeasonDraftGamePlayerOptionsArgs = {
+  gameMode: SeasonDraftGameMode;
+  playerId: Scalars['Int']['input'];
+  playerType: SeasonDraftPlayerType;
 };
 
 export type QuerySeasonDraftGamePlayerSeasonStatValueArgs = {
@@ -3547,6 +3555,17 @@ export type GetSeasonDraftGameQuery = {
   } | null;
 };
 
+export type GetSeasonDraftGamePlayerOptionsQueryVariables = Exact<{
+  playerId: Scalars['Int']['input'];
+  gameMode: SeasonDraftGameMode;
+  playerType: SeasonDraftPlayerType;
+}>;
+
+export type GetSeasonDraftGamePlayerOptionsQuery = {
+  __typename?: 'Query';
+  seasonDraftGamePlayerOptions?: Array<string> | null;
+};
+
 export type GetSeasonDraftGameStatValueQueryVariables = Exact<{
   playerId: Scalars['Int']['input'];
   season: Scalars['Int']['input'];
@@ -4490,6 +4509,107 @@ export type GetSeasonDraftGameSuspenseQueryHookResult = ReturnType<
 export type GetSeasonDraftGameQueryResult = Apollo.QueryResult<
   GetSeasonDraftGameQuery,
   GetSeasonDraftGameQueryVariables
+>;
+export const GetSeasonDraftGamePlayerOptions = gql`
+  query GetSeasonDraftGamePlayerOptions(
+    $playerId: Int!
+    $gameMode: SeasonDraftGameMode!
+    $playerType: SeasonDraftPlayerType!
+  ) {
+    seasonDraftGamePlayerOptions(
+      playerId: $playerId
+      gameMode: $gameMode
+      playerType: $playerType
+    )
+  }
+`;
+
+/**
+ * __useGetSeasonDraftGamePlayerOptionsQuery__
+ *
+ * To run a query within a React component, call `useGetSeasonDraftGamePlayerOptionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetSeasonDraftGamePlayerOptionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetSeasonDraftGamePlayerOptionsQuery({
+ *   variables: {
+ *      playerId: // value for 'playerId'
+ *      gameMode: // value for 'gameMode'
+ *      playerType: // value for 'playerType'
+ *   },
+ * });
+ */
+export function useGetSeasonDraftGamePlayerOptionsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetSeasonDraftGamePlayerOptionsQuery,
+    GetSeasonDraftGamePlayerOptionsQueryVariables
+  > &
+    (
+      | {
+          variables: GetSeasonDraftGamePlayerOptionsQueryVariables;
+          skip?: boolean;
+        }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetSeasonDraftGamePlayerOptionsQuery,
+    GetSeasonDraftGamePlayerOptionsQueryVariables
+  >(GetSeasonDraftGamePlayerOptions, options);
+}
+export function useGetSeasonDraftGamePlayerOptionsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetSeasonDraftGamePlayerOptionsQuery,
+    GetSeasonDraftGamePlayerOptionsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetSeasonDraftGamePlayerOptionsQuery,
+    GetSeasonDraftGamePlayerOptionsQueryVariables
+  >(GetSeasonDraftGamePlayerOptions, options);
+}
+export function useGetSeasonDraftGamePlayerOptionsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetSeasonDraftGamePlayerOptionsQuery,
+        GetSeasonDraftGamePlayerOptionsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetSeasonDraftGamePlayerOptionsQuery,
+    GetSeasonDraftGamePlayerOptionsQueryVariables
+  >(
+    GetSeasonDraftGamePlayerOptions,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetSeasonDraftGamePlayerOptionsQuery,
+          GetSeasonDraftGamePlayerOptionsQueryVariables
+        >,
+  );
+}
+export type GetSeasonDraftGamePlayerOptionsQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGamePlayerOptionsQuery
+>;
+export type GetSeasonDraftGamePlayerOptionsLazyQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGamePlayerOptionsLazyQuery
+>;
+export type GetSeasonDraftGamePlayerOptionsSuspenseQueryHookResult = ReturnType<
+  typeof useGetSeasonDraftGamePlayerOptionsSuspenseQuery
+>;
+export type GetSeasonDraftGamePlayerOptionsQueryResult = Apollo.QueryResult<
+  GetSeasonDraftGamePlayerOptionsQuery,
+  GetSeasonDraftGamePlayerOptionsQueryVariables
 >;
 export const GetSeasonDraftGameStatValue = gql`
   query GetSeasonDraftGameStatValue(

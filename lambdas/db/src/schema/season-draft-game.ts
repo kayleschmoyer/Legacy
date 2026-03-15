@@ -297,6 +297,29 @@ builder.queryFields((t) => ({
     },
   }),
 
+  seasonDraftGamePlayerOptions: t.field({
+    type: ['String'],
+    description:
+      'Get available draft options for a player: distinct teams (career_team mode) or seasons (season mode)',
+    args: {
+      playerId: t.arg.int({ required: true }),
+      gameMode: t.arg({ type: SeasonDraftGameMode, required: true }),
+      playerType: t.arg({ type: SeasonDraftPlayerType, required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      return await SeasonDraftGameService.getPlayerDraftOptions(
+        context.db,
+        args.playerId,
+        args.gameMode,
+        args.playerType,
+      );
+    },
+  }),
+
   seasonDraftGameAvailablePositions: t.field({
     type: ['String'],
     description: 'Get list of available positions to draft for',

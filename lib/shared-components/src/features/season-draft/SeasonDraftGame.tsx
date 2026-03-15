@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   ActivityIndicator,
@@ -9,7 +9,10 @@ import {
 } from 'react-native';
 import { Button, Card, H2, H3, Input, Text, XStack, YStack } from 'tamagui';
 import {
+  SeasonDraftGameMode,
+  SeasonDraftPlayerType,
   useCancelSeasonDraftGameMutation,
+  useGetSeasonDraftGamePlayerOptionsLazyQuery,
   useGetSeasonDraftGameQuery,
   useGetSeasonDraftGameStatValueLazyQuery,
   useMakeSeasonDraftPickMutation,
@@ -87,8 +90,8 @@ interface GameState {
   currentTurn: number;
   createdBy: number;
   statKey: string;
-  gameMode: 'season' | 'career_team';
-  playerType: 'hitter' | 'pitcher';
+  gameMode: SeasonDraftGameMode;
+  playerType: SeasonDraftPlayerType;
   players: GamePlayer[];
   picks: Array<{
     pickNumber: number;
@@ -121,8 +124,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   onBack,
 }) => {
   const [playerSearch, setPlayerSearch] = useState('');
-  const [yearInput, setYearInput] = useState('');
-  const [teamInput, setTeamInput] = useState('');
+  const [selectedOption, setSelectedOption] = useState(''); // team or year
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
@@ -149,6 +151,14 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     useSearchPlayersForDraftLazyQuery();
   const playerSuggestions = (searchData?.players ?? []) as Player[];
 
+  // Lazy query for team/season options after a player is selected
+  const [
+    fetchPlayerOptions,
+    { data: playerOptionsData, loading: optionsLoading },
+  ] = useGetSeasonDraftGamePlayerOptionsLazyQuery();
+  const playerOptions: string[] =
+    playerOptionsData?.seasonDraftGamePlayerOptions ?? [];
+
   // Lazy query for stat preview
   const [previewQuery, { data: previewData }] =
     useGetSeasonDraftGameStatValueLazyQuery();
@@ -162,6 +172,8 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   const [cancelGameMutation] = useCancelSeasonDraftGameMutation();
 
   // WebSocket for real-time stat loading notifications
+  const selectedPlayerRef = useRef(selectedPlayer);
+  selectedPlayerRef.current = selectedPlayer;
   useWebSocket({
     url: websocketUrl,
     token: websocketToken,
@@ -180,8 +192,10 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   const statLabel = gameState
     ? (STAT_LABELS[gameState.statKey] ?? gameState.statKey)
     : '';
-  const isCareerTeamMode = gameState?.gameMode === 'career_team';
-  const isPitcherDraft = gameState?.playerType === 'pitcher';
+  const isCareerTeamMode =
+    gameState?.gameMode === SeasonDraftGameMode.CareerTeam;
+  const isPitcherDraft =
+    gameState?.playerType === SeasonDraftPlayerType.Pitcher;
 
   // Get current player
   const currentPlayer = gameState?.players.find(
@@ -282,13 +296,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
 
   // Preview stat value for selection
   const previewSelection = useCallback(() => {
-    if (!selectedPlayer || !selectedPosition) {
+    if (!selectedPlayer || !selectedPosition || !selectedOption) {
       return;
     }
 
     if (isCareerTeamMode) {
-      // Career team mode needs team
-      if (!teamInput) return;
       void previewQuery({
         variables: {
           playerId: selectedPlayer.id,
@@ -297,13 +309,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
           statKey: gameState?.statKey,
           playerType: gameState?.playerType,
           gameMode: 'career_team',
-          team: teamInput,
+          team: selectedOption,
         },
       });
     } else {
-      // Season mode needs year
-      if (!yearInput) return;
-      const year = parseInt(yearInput);
+      const year = parseInt(selectedOption);
       if (isNaN(year) || year < 1900 || year > new Date().getFullYear()) return;
       void previewQuery({
         variables: {
@@ -318,8 +328,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     }
   }, [
     selectedPlayer,
-    yearInput,
-    teamInput,
+    selectedOption,
     selectedPosition,
     previewQuery,
     isCareerTeamMode,
@@ -328,22 +337,14 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
 
   // Make a draft pick
   const makePick = async () => {
-    if (!selectedPlayer || !selectedSlotId || !selectedPosition) {
+    if (
+      !selectedPlayer ||
+      !selectedSlotId ||
+      !selectedPosition ||
+      !selectedOption
+    ) {
       Alert.alert('Error', 'Please complete all fields');
       return;
-    }
-
-    if (isCareerTeamMode) {
-      if (!teamInput) {
-        Alert.alert('Error', 'Please enter a team abbreviation (e.g., NYY)');
-        return;
-      }
-    } else {
-      const year = parseInt(yearInput);
-      if (isNaN(year) || year < 1900 || year > new Date().getFullYear()) {
-        Alert.alert('Error', 'Please enter a valid 4-digit year');
-        return;
-      }
     }
 
     try {
@@ -354,17 +355,16 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
           gameId,
           rosterSlotId: selectedSlotId,
           playerId: selectedPlayer.id,
-          season: isCareerTeamMode ? 0 : parseInt(yearInput),
+          season: isCareerTeamMode ? 0 : parseInt(selectedOption),
           position: selectedPosition,
-          team: isCareerTeamMode ? teamInput : undefined,
+          team: isCareerTeamMode ? selectedOption : undefined,
         },
       });
 
       // Clear selection
       setSelectedPlayer(null);
       setPlayerSearch('');
-      setYearInput('');
-      setTeamInput('');
+      setSelectedOption('');
       setSelectedPosition('');
       setSelectedSlotId(null);
 
@@ -394,6 +394,34 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   useEffect(() => {
     void previewSelection();
   }, [previewSelection]);
+
+  // Re-fetch player options when the selected player's stats finish loading
+  const prevStatsLoadingRef = useRef(statsLoadingPlayerIds);
+  useEffect(() => {
+    const prevLoading = prevStatsLoadingRef.current;
+    prevStatsLoadingRef.current = statsLoadingPlayerIds;
+    const player = selectedPlayerRef.current;
+    if (
+      player &&
+      gameState &&
+      playerOptions.length === 0 &&
+      !statsLoadingPlayerIds.has(player.id) &&
+      prevLoading.has(player.id)
+    ) {
+      void fetchPlayerOptions({
+        variables: {
+          playerId: player.id,
+          gameMode: gameState.gameMode,
+          playerType: gameState.playerType,
+        },
+      });
+    }
+  }, [
+    statsLoadingPlayerIds,
+    gameState,
+    fetchPlayerOptions,
+    playerOptions.length,
+  ]);
 
   if (loading) {
     return (
@@ -565,9 +593,20 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
                         key={player.id}
                         onPress={() => {
                           setSelectedPlayer(player);
+                          setSelectedOption('');
                           setPlayerSearch(
                             `${player.firstName} ${player.lastName}`,
                           );
+                          // Fetch available teams/seasons for this player
+                          if (gameState) {
+                            void fetchPlayerOptions({
+                              variables: {
+                                playerId: player.id,
+                                gameMode: gameState.gameMode,
+                                playerType: gameState.playerType,
+                              },
+                            });
+                          }
                           // Auto-trigger stat loading if needed
                           if (needsStats && !isLoading) {
                             void handleTriggerStatLoading(player);
@@ -619,37 +658,41 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               </Card>
             )}
 
-            {/* Year Input (season mode) or Team Input (career_team mode) */}
-            {isCareerTeamMode ? (
+            {/* Team / Season Picker (shown after a player is selected) */}
+            {selectedPlayer && (
               <YStack marginBottom="$3">
                 <Text fontWeight="bold" marginBottom="$2">
-                  Team (abbreviation):
+                  {isCareerTeamMode ? 'Select Team:' : 'Select Season:'}
                 </Text>
-                <Input
-                  placeholder="e.g., NYY, BOS, LAD"
-                  value={teamInput}
-                  onChangeText={setTeamInput}
-                  size="$4"
-                  autoCapitalize="characters"
-                />
-                <Text fontSize="$2" color="$gray9" marginTop="$1">
-                  Enter the team abbreviation for the player&apos;s career total
-                  with that franchise
-                </Text>
-              </YStack>
-            ) : (
-              <YStack marginBottom="$3">
-                <Text fontWeight="bold" marginBottom="$2">
-                  Season (Year):
-                </Text>
-                <Input
-                  placeholder="e.g., 2023"
-                  value={yearInput}
-                  onChangeText={setYearInput}
-                  keyboardType="numeric"
-                  maxLength={4}
-                  size="$4"
-                />
+                {playerOptions.length === 0 ? (
+                  <Text fontSize="$3" color="$gray9">
+                    {optionsLoading
+                      ? 'Loading options...'
+                      : statsLoadingPlayerIds.has(selectedPlayer.id)
+                        ? 'Loading stats — options will appear once stats are loaded'
+                        : 'No stats available for this player'}
+                  </Text>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <XStack space="$2" flexWrap="wrap">
+                      {playerOptions.map((option) => {
+                        const isSelected = selectedOption === option;
+                        return (
+                          <Button
+                            key={option}
+                            size="$3"
+                            marginBottom="$1"
+                            variant={isSelected ? undefined : 'outlined'}
+                            theme={isSelected ? 'active' : undefined}
+                            onPress={() => setSelectedOption(option)}
+                          >
+                            {option}
+                          </Button>
+                        );
+                      })}
+                    </XStack>
+                  </ScrollView>
+                )}
               </YStack>
             )}
 
@@ -699,7 +742,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
                     Warning:{' '}
                     {isPitcherDraft
                       ? `Player had 0 ${statLabel.toLowerCase()} in this ${isCareerTeamMode ? 'franchise' : 'season'}`
-                      : `Player had no eligibility at this position in ${isCareerTeamMode ? 'this franchise' : yearInput}, or had 0 ${statLabel.toLowerCase()}`}
+                      : `Player had no eligibility at this position in ${isCareerTeamMode ? 'this franchise' : selectedOption}, or had 0 ${statLabel.toLowerCase()}`}
                   </Text>
                 )}
               </Card>
@@ -713,8 +756,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               disabled={
                 !selectedPlayer ||
                 !selectedSlotId ||
-                (!yearInput && !isCareerTeamMode) ||
-                (!teamInput && isCareerTeamMode) ||
+                !selectedOption ||
                 submitting ||
                 (selectedPlayer && statsLoadingPlayerIds.has(selectedPlayer.id))
               }

@@ -2104,6 +2104,8 @@ export type Query = {
   seasonDraftGame?: Maybe<SeasonDraftGame>;
   /** Get list of available positions to draft for */
   seasonDraftGameAvailablePositions?: Maybe<Array<Scalars['String']['output']>>;
+  /** Get available draft options for a player: distinct teams (career_team mode) or seasons (season mode) */
+  seasonDraftGamePlayerOptions?: Maybe<Array<Scalars['String']['output']>>;
   /** Get stat value for a player/season/position combination */
   seasonDraftGamePlayerSeasonStatValue?: Maybe<Scalars['Int']['output']>;
   /** Get valid stat keys for a given player type */
@@ -2510,6 +2512,12 @@ export type QuerySeasonDraftGameArgs = {
 
 export type QuerySeasonDraftGameAvailablePositionsArgs = {
   gameId: Scalars['Int']['input'];
+};
+
+export type QuerySeasonDraftGamePlayerOptionsArgs = {
+  gameMode: SeasonDraftGameMode;
+  playerId: Scalars['Int']['input'];
+  playerType: SeasonDraftPlayerType;
 };
 
 export type QuerySeasonDraftGamePlayerSeasonStatValueArgs = {
