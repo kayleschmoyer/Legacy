@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   H1,
   Paragraph,
@@ -332,10 +338,14 @@ const PreferencesPage: React.FC = () => {
     theme: themePreference,
   }));
   const [saved, setSaved] = useState(false);
+  const isInitialRender = useRef(true);
 
   // Keep local mirror in sync when context changes (e.g. system preference)
   useEffect(() => {
-    setPrefs((prev) => ({ ...prev, theme: themePreference }));
+    setPrefs((prev) => {
+      if (prev.theme === themePreference) return prev;
+      return { ...prev, theme: themePreference };
+    });
   }, [themePreference]);
 
   const update = useCallback(
@@ -350,8 +360,12 @@ const PreferencesPage: React.FC = () => {
     [setThemePreference],
   );
 
-  // Auto-save on changes
+  // Auto-save on changes (skip the initial render)
   useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
     savePrefs(prefs);
     setSaved(true);
     const timer = setTimeout(() => setSaved(false), 2000);
