@@ -1,0 +1,25 @@
+mutation CreateSeasonDraftGame(
+  $name: String!
+  $playerNames: [String!]!
+  $userIds: [Int!]!
+  $statKey: String
+  $gameMode: String
+  $playerType: String
+) {
+  createSeasonDraftGame(
+    name: $name
+    playerNames: $playerNames
+    userIds: $userIds
+    statKey: $statKey
+    gameMode: $gameMode
+    playerType: $playerType
+  )
+}
+
+query SearchUsersForDraft($searchTerm: String!, $limit: Int) {
+  searchUsers(searchTerm: $searchTerm, limit: $limit) {
+    id
+    username
+    avatarUrl
+  }
+}

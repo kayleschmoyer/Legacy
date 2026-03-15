@@ -245,9 +245,9 @@ test.describe('Season Draft Game Create Page @critical', () => {
     await mockCreatePageGraphQL(page);
     await page.goto('/games/season-draft/create');
 
-    const backBtn = page.getByRole('button', { name: /back/i });
-    await expect(backBtn).toBeVisible();
-    await backBtn.click();
+    const cancelBtn = page.getByRole('button', { name: /cancel/i });
+    await expect(cancelBtn).toBeVisible();
+    await cancelBtn.click();
     await expect(page).toHaveURL(/\/games\/season-draft/);
   });
 

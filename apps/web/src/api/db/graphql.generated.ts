@@ -3580,6 +3580,35 @@ export type DeleteLeagueSeasonAwardMutation = {
   deleteLeagueSeasonAward?: boolean | null;
 };
 
+export type CreateSeasonDraftGameMutationVariables = Exact<{
+  name: Scalars['String']['input'];
+  playerNames: Array<Scalars['String']['input']> | Scalars['String']['input'];
+  userIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+  statKey?: InputMaybe<Scalars['String']['input']>;
+  gameMode?: InputMaybe<Scalars['String']['input']>;
+  playerType?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type CreateSeasonDraftGameMutation = {
+  __typename?: 'Mutation';
+  createSeasonDraftGame?: number | null;
+};
+
+export type SearchUsersForDraftQueryVariables = Exact<{
+  searchTerm: Scalars['String']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type SearchUsersForDraftQuery = {
+  __typename?: 'Query';
+  searchUsers?: Array<{
+    __typename?: 'User';
+    id?: number | null;
+    username?: string | null;
+    avatarUrl?: string | null;
+  }> | null;
+};
+
 export type GetOnThisDayQueryVariables = Exact<{
   month: Scalars['Int']['input'];
   day: Scalars['Int']['input'];
@@ -9232,6 +9261,166 @@ export type DeleteLeagueSeasonAwardMutationResult =
 export type DeleteLeagueSeasonAwardMutationOptions = BaseMutationOptions<
   DeleteLeagueSeasonAwardMutation,
   DeleteLeagueSeasonAwardMutationVariables
+>;
+export const CreateSeasonDraftGame = gql`
+  mutation CreateSeasonDraftGame(
+    $name: String!
+    $playerNames: [String!]!
+    $userIds: [Int!]!
+    $statKey: String
+    $gameMode: String
+    $playerType: String
+  ) {
+    createSeasonDraftGame(
+      name: $name
+      playerNames: $playerNames
+      userIds: $userIds
+      statKey: $statKey
+      gameMode: $gameMode
+      playerType: $playerType
+    )
+  }
+`;
+export type CreateSeasonDraftGameMutationFn = MutationFunction<
+  CreateSeasonDraftGameMutation,
+  CreateSeasonDraftGameMutationVariables
+>;
+
+/**
+ * __useCreateSeasonDraftGameMutation__
+ *
+ * To run a mutation, you first call `useCreateSeasonDraftGameMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateSeasonDraftGameMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createSeasonDraftGameMutation, { data, loading, error }] = useCreateSeasonDraftGameMutation({
+ *   variables: {
+ *      name: // value for 'name'
+ *      playerNames: // value for 'playerNames'
+ *      userIds: // value for 'userIds'
+ *      statKey: // value for 'statKey'
+ *      gameMode: // value for 'gameMode'
+ *      playerType: // value for 'playerType'
+ *   },
+ * });
+ */
+export function useCreateSeasonDraftGameMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CreateSeasonDraftGameMutation,
+    CreateSeasonDraftGameMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CreateSeasonDraftGameMutation,
+    CreateSeasonDraftGameMutationVariables
+  >(CreateSeasonDraftGame, options);
+}
+export type CreateSeasonDraftGameMutationHookResult = ReturnType<
+  typeof useCreateSeasonDraftGameMutation
+>;
+export type CreateSeasonDraftGameMutationResult =
+  Apollo.MutationResult<CreateSeasonDraftGameMutation>;
+export type CreateSeasonDraftGameMutationOptions = BaseMutationOptions<
+  CreateSeasonDraftGameMutation,
+  CreateSeasonDraftGameMutationVariables
+>;
+export const SearchUsersForDraft = gql`
+  query SearchUsersForDraft($searchTerm: String!, $limit: Int) {
+    searchUsers(searchTerm: $searchTerm, limit: $limit) {
+      id
+      username
+      avatarUrl
+    }
+  }
+`;
+
+/**
+ * __useSearchUsersForDraftQuery__
+ *
+ * To run a query within a React component, call `useSearchUsersForDraftQuery` and pass it any options that fit your needs.
+ * When your component renders, `useSearchUsersForDraftQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useSearchUsersForDraftQuery({
+ *   variables: {
+ *      searchTerm: // value for 'searchTerm'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useSearchUsersForDraftQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    SearchUsersForDraftQuery,
+    SearchUsersForDraftQueryVariables
+  > &
+    (
+      | { variables: SearchUsersForDraftQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    SearchUsersForDraftQuery,
+    SearchUsersForDraftQueryVariables
+  >(SearchUsersForDraft, options);
+}
+export function useSearchUsersForDraftLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    SearchUsersForDraftQuery,
+    SearchUsersForDraftQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    SearchUsersForDraftQuery,
+    SearchUsersForDraftQueryVariables
+  >(SearchUsersForDraft, options);
+}
+export function useSearchUsersForDraftSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        SearchUsersForDraftQuery,
+        SearchUsersForDraftQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    SearchUsersForDraftQuery,
+    SearchUsersForDraftQueryVariables
+  >(
+    SearchUsersForDraft,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          SearchUsersForDraftQuery,
+          SearchUsersForDraftQueryVariables
+        >,
+  );
+}
+export type SearchUsersForDraftQueryHookResult = ReturnType<
+  typeof useSearchUsersForDraftQuery
+>;
+export type SearchUsersForDraftLazyQueryHookResult = ReturnType<
+  typeof useSearchUsersForDraftLazyQuery
+>;
+export type SearchUsersForDraftSuspenseQueryHookResult = ReturnType<
+  typeof useSearchUsersForDraftSuspenseQuery
+>;
+export type SearchUsersForDraftQueryResult = Apollo.QueryResult<
+  SearchUsersForDraftQuery,
+  SearchUsersForDraftQueryVariables
 >;
 export const GetOnThisDay = gql`
   query GetOnThisDay($month: Int!, $day: Int!, $limit: Int) {
