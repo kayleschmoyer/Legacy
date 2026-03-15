@@ -382,11 +382,6 @@ const FAQ_ITEMS = [
     answer:
       'Yes! Premium unlocks features across all your leagues — salary cap, FAAB waivers, all playoff formats, and more — everywhere.',
   },
-  {
-    question: 'How are AI recaps generated?',
-    answer:
-      'AI recaps are generated weekly using advanced language models trained on sports data, providing unique narrative summaries of your matchup results and key player performances.',
-  },
 ];
 
 const TESTIMONIALS = [
