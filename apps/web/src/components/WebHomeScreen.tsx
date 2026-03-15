@@ -118,8 +118,6 @@ export function WebHomeScreen(): React.JSX.Element {
               minWidth={160}
               backgroundColor="$color2"
               borderColor="$borderColor"
-              hoverStyle={{ backgroundColor: '$color3' }}
-              pressStyle={{ backgroundColor: '$color4' }}
             >
               <YStack alignItems="center" space="$4">
                 <Paragraph size="$8">
@@ -127,13 +125,8 @@ export function WebHomeScreen(): React.JSX.Element {
                     🏈
                   </span>
                 </Paragraph>
-                <Button
-                  variant="primary"
-                  size="$4"
-                  onPress={() => handleSportPress('football')}
-                  width="100%"
-                >
-                  Enter Football
+                <Button variant="secondary" size="$4" disabled width="100%">
+                  Coming Soon
                 </Button>
               </YStack>
             </Card>
