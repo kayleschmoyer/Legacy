@@ -718,7 +718,7 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   useEffect(() => {
     if (wsError) {
-      LOGGER.warn('[LeagueDetailPage] WebSocket error:', wsError);
+      LOGGER.debug('[LeagueDetailPage] WebSocket error:', wsError);
     }
   }, [wsError]);
 

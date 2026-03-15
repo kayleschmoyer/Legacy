@@ -44,16 +44,22 @@ class WebRollbarImplementation implements RollbarInterface {
         // - "Failed to fetch": transient network errors caused by connectivity
         //   drops, browser extension interference, or tab backgrounding (LS-900).
         //   Apollo RetryLink already retries these; logging them is noise.
-        // - "WebSocket error": transient network errors on the WebSocket
-        //   connection (LS-993). Browsers do not expose error details for
-        //   WebSocket onerror events. The WebSocketClient auto-reconnects;
-        //   logging these is noise.
+        // - "WebSocket error" / "WebSocket closed": transient network errors on
+        //   the WebSocket connection (LS-978 / LS-993). Browsers do not expose
+        //   error details for WebSocket onerror events. The WebSocketClient
+        //   auto-reconnects; logging these is noise.
         checkIgnore: (_isUncaught: boolean, args: unknown[]) => {
           const err = args[0];
           if (err instanceof Error && err.name === 'AbortError') {
             return true;
           }
           if (err instanceof Error && err.message === 'Failed to fetch') {
+            return true;
+          }
+          if (err instanceof Error && err.message === 'WebSocket error') {
+            return true;
+          }
+          if (err instanceof Error && err.message === 'WebSocket closed') {
             return true;
           }
           if (typeof err === 'string' && err.includes('ResizeObserver loop')) {
