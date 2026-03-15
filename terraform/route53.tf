@@ -84,14 +84,20 @@ resource "aws_route53_record" "caa" {
   ]
 }
 
-# TXT record for domain verification (if needed)
-# resource "aws_route53_record" "verification" {
-#   zone_id = aws_route53_zone.main.zone_id
-#   name    = ""
-#   type    = "TXT"
-#   ttl     = 300
-#   records = ["verification-string-here"]
-# }
+# WebSocket subdomain pointing to the WebSocket API Gateway custom domain
+resource "aws_route53_record" "ws" {
+  count = var.domain_name != "" ? 1 : 0
+
+  zone_id = aws_route53_zone.main[0].zone_id
+  name    = "ws"
+  type    = "A"
+
+  alias {
+    name                   = aws_apigatewayv2_domain_name.websocket[0].domain_name_configuration[0].target_domain_name
+    zone_id                = aws_apigatewayv2_domain_name.websocket[0].domain_name_configuration[0].hosted_zone_id
+    evaluate_target_health = true
+  }
+}
 
 # Outputs for documentation and reference
 output "route53_zone_id" {
@@ -122,4 +128,9 @@ output "api_url" {
 output "api_custom_domain" {
   description = "API Gateway custom domain name (api.<domain>)"
   value       = var.domain_name != "" ? aws_api_gateway_domain_name.api[0].domain_name : null
+}
+
+output "ws_custom_domain" {
+  description = "WebSocket API custom domain name (ws.<domain>)"
+  value       = var.domain_name != "" ? aws_apigatewayv2_domain_name.websocket[0].domain_name : null
 }

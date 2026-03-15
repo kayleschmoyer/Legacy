@@ -98,34 +98,40 @@ output "lambda_deployment_bucket" {
 }
 
 # API Gateway outputs
+locals {
+  api_base_url_raw    = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}"
+  api_base_url_custom = "https://api.${var.domain_name}"
+  api_base_url        = var.domain_name != "" ? local.api_base_url_custom : local.api_base_url_raw
+}
+
 output "api_gateway_url" {
   description = "Base URL of the API Gateway"
-  value       = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}"
+  value       = local.api_base_url
 }
 
 output "graphql_endpoint" {
   description = "GraphQL endpoint URL"
-  value       = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/graphql"
+  value       = "${local.api_base_url}/graphql"
 }
 
 output "oauth_proxy_endpoint" {
   description = "OAuth Proxy endpoint URL"
-  value       = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/oauth"
+  value       = "${local.api_base_url}/oauth"
 }
 
 output "stats_endpoint" {
   description = "Stats Lambda endpoint URL"
-  value       = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/stats"
+  value       = "${local.api_base_url}/stats"
 }
 
 output "game_selection_endpoint" {
   description = "Game Selection endpoint URL"
-  value       = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/games"
+  value       = "${local.api_base_url}/games"
 }
 
 output "jira_proxy_endpoint" {
   description = "Jira Proxy Lambda endpoint URL"
-  value       = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/jira"
+  value       = "${local.api_base_url}/jira"
 }
 
 
@@ -186,7 +192,7 @@ output "environment_variables_summary" {
     sqs_select_game_url                = aws_sqs_queue.select_game.url
     sqs_load_game_stats_url            = aws_sqs_queue.load_game_stats.url
     google_oauth_client_id             = var.google_oauth_client_id
-    jira_proxy_url                     = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${local.region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}/jira"
+    jira_proxy_url                     = "${local.api_base_url}/jira"
     ci_readonly_db_creds_secret_name   = aws_secretsmanager_secret.ci_readonly_db_credentials.name
     stripe_secret_key_secret_name      = aws_secretsmanager_secret.stripe_secret_key.name
     stripe_webhook_secret_secret_name  = aws_secretsmanager_secret.stripe_webhook_secret.name

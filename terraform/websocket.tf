@@ -315,15 +315,85 @@ resource "aws_apigatewayv2_stage" "websocket" {
   tags = local.common_tags
 }
 
+# ─── Custom domain: ws.<domain> ────────────────────────────────────────────────
+
+# ACM certificate for ws.<domain>
+resource "aws_acm_certificate" "websocket" {
+  count = var.domain_name != "" ? 1 : 0
+
+  domain_name       = "ws.${var.domain_name}"
+  validation_method = "DNS"
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-ws-cert"
+  })
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# DNS validation records for the WebSocket ACM certificate
+resource "aws_route53_record" "ws_cert_validation" {
+  for_each = var.domain_name != "" ? {
+    for dvo in aws_acm_certificate.websocket[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  } : {}
+
+  zone_id         = aws_route53_zone.main[0].zone_id
+  name            = each.value.name
+  type            = each.value.type
+  ttl             = 60
+  records         = [each.value.record]
+  allow_overwrite = true
+}
+
+# Wait for ACM certificate validation to complete
+resource "aws_acm_certificate_validation" "websocket" {
+  count = var.domain_name != "" ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.websocket[0].arn
+  validation_record_fqdns = [for r in aws_route53_record.ws_cert_validation : r.fqdn]
+}
+
+# API Gateway V2 custom domain name for WebSocket
+resource "aws_apigatewayv2_domain_name" "websocket" {
+  count = var.domain_name != "" ? 1 : 0
+
+  domain_name = "ws.${var.domain_name}"
+
+  domain_name_configuration {
+    certificate_arn = aws_acm_certificate_validation.websocket[0].certificate_arn
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-ws-domain"
+  })
+}
+
+# Map the custom domain to the WebSocket API stage
+resource "aws_apigatewayv2_api_mapping" "websocket" {
+  count = var.domain_name != "" ? 1 : 0
+
+  api_id      = aws_apigatewayv2_api.websocket.id
+  domain_name = aws_apigatewayv2_domain_name.websocket[0].id
+  stage       = aws_apigatewayv2_stage.websocket.name
+}
+
 # Outputs
 output "websocket_url" {
   description = "WebSocket URL for client connections"
-  value       = aws_apigatewayv2_stage.websocket.invoke_url
+  value       = var.domain_name != "" ? "wss://ws.${var.domain_name}" : aws_apigatewayv2_stage.websocket.invoke_url
 }
 
 output "websocket_api_endpoint" {
   description = "WebSocket API endpoint for sending messages from lambdas"
-  value       = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
+  value       = var.domain_name != "" ? "https://ws.${var.domain_name}" : "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
 }
 
 output "connections_table_name" {
