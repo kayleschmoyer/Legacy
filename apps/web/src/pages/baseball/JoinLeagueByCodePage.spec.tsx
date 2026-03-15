@@ -1,13 +1,13 @@
 /**
- * Regression tests for LS-1005: "Can't find variable handleSubmit"
+ * Regression tests for LS-1007: "Can't find variable handleSubmit"
  *
  * The original bug: during development of LS-960 the function was partially
- * renamed (definition changed to handleJoin before all call-sites were
- * updated), leaving a reference to the non-existent `handleSubmit` in the
- * form's onSubmit and the button's onPress.  This triggered a ReferenceError
- * at runtime.  These tests verify that:
+ * renamed (definition changed to handleJoin / handleFormSubmit before all
+ * call-sites were updated), leaving a reference to the non-existent
+ * `handleSubmit` in the form's onSubmit and the button's onPress.  This
+ * triggered a ReferenceError at runtime.  These tests verify that:
  *   1. The form's onSubmit handler is correctly wired (no ReferenceError).
- *   2. The join button's onPress handler is correctly wired.
+ *   2. The join button's onPress handler is correctly wired (no ReferenceError).
  *   3. Validation errors are surfaced without calling the mutation.
  *   4. A successful join navigates to the league page.
  */
@@ -103,7 +103,6 @@ function renderPage() {
             path="/baseball/join"
             element={
               <React.Suspense fallback={null}>
-                {/* eslint-disable-next-line @typescript-eslint/no-require-imports */}
                 {React.createElement(
                   require('./JoinLeagueByCodePage').JoinLeagueByCodePage,
                 )}
@@ -157,28 +156,31 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   /**
-   * Regression: LS-1005 — "handleSubmit is not defined"
+   * Regression: LS-1007 — "handleSubmit is not defined"
    *
    * Submitting the HTML form must not throw a ReferenceError.  Before the fix,
    * the form's onSubmit referenced a renamed (non-existent) function.
    */
-  it('submitting the form does not throw ReferenceError (LS-1005 regression)', () => {
+  it('submitting the form does not throw ReferenceError (LS-1007 regression)', () => {
     renderPage();
 
     const form = document.querySelector('form');
     expect(form).not.toBeNull();
 
     // Should not throw when the form submit event fires
-    expect(() => fireEvent.submit(form!)).not.toThrow();
+    act(() => {
+      fireEvent.submit(form!);
+    });
+    // If we reach this line the ReferenceError regression is not present
   });
 
   /**
-   * Regression: LS-1005 — join button onPress is correctly wired
+   * Regression: LS-1007 — join button onPress is correctly wired
    *
    * Before the fix, the button's onPress also referenced the non-existent
    * `handleSubmit`. Clicking the button must not throw a ReferenceError.
    */
-  it('clicking the Join League button does not throw ReferenceError (LS-1005 regression)', async () => {
+  it('clicking the Join League button does not throw ReferenceError (LS-1007 regression)', async () => {
     // The button is disabled until leagueInfo is present and both inputs are
     // filled — provide mock data so we can actually click it and verify that
     // onPress invokes handleJoin without a ReferenceError.
@@ -220,7 +222,7 @@ describe('JoinLeagueByCodePage', () => {
     expect(joinButton).toBeDefined();
     expect(joinButton).not.toBeDisabled();
 
-    // Clicking must not throw a ReferenceError (LS-1005 regression check)
+    // Clicking must not throw a ReferenceError (LS-1007 regression check)
     act(() => {
       fireEvent.click(joinButton!);
     });
@@ -233,7 +235,9 @@ describe('JoinLeagueByCodePage', () => {
   it('shows validation error when invite code is empty and form is submitted', () => {
     renderPage();
 
-    fireEvent.submit(document.querySelector('form')!);
+    act(() => {
+      fireEvent.submit(document.querySelector('form')!);
+    });
 
     expect(
       screen.getByText(/Please enter an invite code/i),
@@ -247,7 +251,9 @@ describe('JoinLeagueByCodePage', () => {
     const codeInput = screen.getByPlaceholderText(/Enter 8-character code/i);
     fireEvent.change(codeInput, { target: { value: 'ABC12XYZ' } });
 
-    fireEvent.submit(document.querySelector('form')!);
+    act(() => {
+      fireEvent.submit(document.querySelector('form')!);
+    });
 
     expect(screen.getByText(/Please enter a team name/i)).toBeInTheDocument();
     expect(mockJoinLeague).not.toHaveBeenCalled();
@@ -262,7 +268,9 @@ describe('JoinLeagueByCodePage', () => {
     const nameInput = screen.getByPlaceholderText(/Enter your team name/i);
     fireEvent.change(nameInput, { target: { value: 'My Team' } });
 
-    fireEvent.submit(document.querySelector('form')!);
+    act(() => {
+      fireEvent.submit(document.querySelector('form')!);
+    });
 
     expect(
       screen.getByText(/Invite code must be 8 characters/i),
@@ -284,7 +292,9 @@ describe('JoinLeagueByCodePage', () => {
       target: { value: 'My Team' },
     });
 
-    fireEvent.submit(document.querySelector('form')!);
+    act(() => {
+      fireEvent.submit(document.querySelector('form')!);
+    });
 
     await waitFor(() => {
       expect(mockJoinLeague).toHaveBeenCalledWith({
