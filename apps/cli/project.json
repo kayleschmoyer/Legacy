@@ -7,17 +7,24 @@
   "targets": {
     "codegen": {
       "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/src/api/db/**/*.graphql",
+        "{projectRoot}/codegen.ts",
+        "{projectRoot}/tsconfig*.json",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/lib/codegen/codegen.base.ts",
+        "{workspaceRoot}/lambdas/db/schema.graphql",
+        { "externalDependencies": ["@graphql-codegen/cli", "tsconfig-paths"] }
+      ],
+      "outputs": ["{projectRoot}/src/api/db/graphql.generated.ts"],
       "options": {
         "command": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
         "cwd": "apps/cli"
       }
     },
     "codegen:db": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
-        "cwd": "apps/cli"
-      }
+      "dependsOn": ["codegen"]
     },
     "typecheck": {
       "options": {

@@ -88,12 +88,31 @@
     },
     "validate:package-json": {
       "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/package.json",
+        "{workspaceRoot}/apps/*/package.json",
+        "{workspaceRoot}/lib/*/package.json",
+        "{workspaceRoot}/lambdas/*/package.json",
+        "{workspaceRoot}/tools/*/package.json",
+        "{workspaceRoot}/scripts/validate-package-json-standards.js"
+      ],
       "options": {
         "command": "node scripts/validate-package-json-standards.js"
       }
     },
     "validate:workspace-deps": {
       "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/package.json",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/apps/*/package.json",
+        "{workspaceRoot}/lib/*/package.json",
+        "{workspaceRoot}/lambdas/*/package.json",
+        "{workspaceRoot}/tools/*/package.json",
+        "{workspaceRoot}/scripts/validate-workspace-deps.js"
+      ],
       "options": {
         "command": "node scripts/validate-workspace-deps.js"
       }
@@ -133,7 +152,7 @@
       "inputs": [
         "default",
         "{workspaceRoot}/.prettierrc",
-        "{workspaceRoot}/prettier.config.js",
+        "{workspaceRoot}/.prettierignore",
         "{projectRoot}/.prettierrc"
       ],
       "outputs": [],

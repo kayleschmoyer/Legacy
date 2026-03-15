@@ -20,6 +20,8 @@
     },
     "test:web": {
       "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": ["default", "^production"],
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}/web"],
       "options": {
         "jestConfig": "lib/shared-components/jest.config.web.ts"
@@ -27,6 +29,8 @@
     },
     "test:mobile": {
       "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": ["default", "^production"],
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}/mobile"],
       "options": {
         "jestConfig": "lib/shared-components/jest.config.mobile.ts"
@@ -34,6 +38,8 @@
     },
     "test:stories": {
       "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": ["default", "^production"],
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}/stories"],
       "options": {
         "jestConfig": "lib/shared-components/jest.storybook.config.ts"

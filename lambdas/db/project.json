@@ -90,6 +90,8 @@
     },
     "test:integration": {
       "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": ["default", "^production"],
       "outputs": ["{workspaceRoot}/coverage/lambdas/db-integration"],
       "options": {
         "jestConfig": "lambdas/db/jest.integration.config.ts",
