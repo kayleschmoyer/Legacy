@@ -237,7 +237,7 @@ jobs:
         with:
           name: web-build-${{ github.run_id }}
           path: dist/apps/web
-          retention-days: 1
+          retention-days: 3
           if-no-files-found: warn
 
   # ============================================================================
@@ -272,9 +272,10 @@ jobs:
           set-nx-shas: false
           include-optional-deps: false
 
-      # Download the pre-built web artifact from build-validation; fall back to
-      # Nx remote-cache if the upload was skipped (e.g. web wasn't affected).
+      # Download the pre-built web artifact from build-validation; skipped when
+      # web wasn't built (artifacts-ready=false) to avoid noisy "Artifact not found" errors.
       - name: "Download Web Build Artifacts"
+        if: needs.build-validation.outputs.artifacts-ready == 'true'
         uses: actions/download-artifact@v8
         with:
           name: web-build-${{ github.run_id }}
