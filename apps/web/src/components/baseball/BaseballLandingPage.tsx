@@ -612,6 +612,7 @@ export function BaseballLandingPage() {
     data,
     loading: isLoading,
     error,
+    refetch,
   } = useGetUserLeaguesQuery({
     // Only run the query if user is authenticated
     skip: !auth?.user,
@@ -973,7 +974,7 @@ export function BaseballLandingPage() {
                 </Paragraph>
               </YStack>
               <SecondaryButton
-                onPress={() => window.location.reload()}
+                onPress={() => void refetch()}
                 accessibilityLabel="Retry loading leagues"
               >
                 <Text fontWeight="700">Retry</Text>
