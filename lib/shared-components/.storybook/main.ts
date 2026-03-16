@@ -1,3 +1,4 @@
+import { resolve } from 'path';
 import type { StorybookConfig } from '@storybook/react-vite';
 
 const enableCoverageAddon =
@@ -43,6 +44,11 @@ const config: StorybookConfig = {
         ...config.resolve?.alias,
         'react-native$': 'react-native-web',
         'react-native/(.*)$': 'react-native-web/dist/$1',
+        // Use the browser-safe logging entry point (matches apps/web/vite.config.mts)
+        '@legacy-sports/logging': resolve(
+          __dirname,
+          '../../../lib/logging/src/index.web.ts',
+        ),
       },
     };
 

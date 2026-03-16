@@ -156,7 +156,7 @@ export default defineConfig(({ mode }) => {
         // causing bundler warnings and "not exported" errors in the web build.
         '@legacy-sports/logging': resolve(
           __dirname,
-          '../../lib/logging/src/index.native.ts',
+          '../../lib/logging/src/index.web.ts',
         ),
         // Platform-specific component resolution at build time
         __PLATFORM_COMPONENTS__: resolve(
