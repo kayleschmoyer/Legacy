@@ -13,8 +13,10 @@ export interface RollbarConfig {
   captureUnhandledRejections?: boolean;
   verbose?: boolean;
   release?: string;
-  /** Maximum error items to send per minute. Set to 0 for unlimited. Defaults to 0. */
+  /** Maximum total error items to send per session/invocation. Defaults to 50. */
   maxItems?: number;
+  /** Maximum error items to send per minute. Defaults to 25. */
+  itemsPerMinute?: number;
 }
 
 export interface RollbarBreadcrumb {

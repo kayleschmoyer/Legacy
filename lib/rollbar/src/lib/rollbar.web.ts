@@ -30,9 +30,8 @@ class WebRollbarImplementation implements RollbarInterface {
         captureUncaught: config.captureUncaught ?? true,
         captureUnhandledRejections: config.captureUnhandledRejections ?? true,
         verbose: config.verbose ?? false,
-        // 0 = unlimited; prevents "item per minute limit reached" when errors
-        // or breadcrumbs are reported in bursts.
-        maxItems: config.maxItems ?? 0,
+        maxItems: config.maxItems ?? 50,
+        itemsPerMinute: config.itemsPerMinute ?? 25,
         payload: {
           code_version: config.release,
         },
