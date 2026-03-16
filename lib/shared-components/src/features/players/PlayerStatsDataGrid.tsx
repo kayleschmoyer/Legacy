@@ -350,7 +350,7 @@ export function PlayerStatsDataGrid({
 
   const [searchTerm, setSearchTerm] = useState('');
   const [localFilters, setLocalFilters] = useState({
-    minGames: initialParams.minGames ?? 10,
+    minGames: initialParams.minGames ?? 0,
     minHomeRuns: initialParams.minHomeRuns ?? 0,
     minRBI: initialParams.minRBI ?? 0,
   });
@@ -657,6 +657,7 @@ export function PlayerStatsDataGrid({
                   width={56}
                   size="$2"
                   value={String(val)}
+                  aria-label={label}
                   onChangeText={(value: string) =>
                     handleFilterChange(key, parseInt(value) || 0)
                   }
@@ -902,9 +903,9 @@ export function PlayerStatsDataGrid({
             <Button
               onPress={() => {
                 setSearchTerm('');
-                setLocalFilters({ minGames: 10, minHomeRuns: 0, minRBI: 0 });
+                setLocalFilters({ minGames: 0, minHomeRuns: 0, minRBI: 0 });
                 updateQueryParams({
-                  minGames: 10,
+                  minGames: 0,
                   minHomeRuns: 0,
                   minRBI: 0,
                   after: undefined,

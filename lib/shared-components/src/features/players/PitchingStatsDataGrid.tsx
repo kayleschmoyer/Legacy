@@ -284,7 +284,7 @@ export function PitchingStatsDataGrid({
   const [searchTerm, setSearchTerm] = useState('');
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [localFilters, setLocalFilters] = useState({
-    minGames: initialParams.minGames ?? 10,
+    minGames: initialParams.minGames ?? 0,
     minWins: initialParams.minWins ?? 0,
     minStrikeouts: initialParams.minStrikeouts ?? 0,
   });

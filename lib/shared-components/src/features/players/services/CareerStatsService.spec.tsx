@@ -388,7 +388,7 @@ describe('CareerStatsService - Configuration', () => {
         first: 25,
         orderBy: 'homeRuns',
         orderDirection: 'desc',
-        minGames: 10,
+        minGames: 0,
         minHomeRuns: 0,
         minRBI: 0,
         minBattingAvg: 0.0,

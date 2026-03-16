@@ -113,7 +113,7 @@ const defaultMock: MockedResponse = {
       after: undefined,
       orderBy: 'homeRuns',
       orderDirection: 'desc',
-      minGames: 10,
+      minGames: 0,
       minHomeRuns: 0,
       minRBI: 0,
       minBattingAvg: 0,
@@ -155,7 +155,7 @@ const baseMock: MockedResponse = {
       after: undefined,
       orderBy: 'battingAverage',
       orderDirection: 'desc',
-      minGames: 10,
+      minGames: 0,
       minHomeRuns: 0,
       minRBI: 0,
       minBattingAvg: 0,
@@ -198,7 +198,7 @@ const pageSize50Mock: MockedResponse = {
       after: undefined,
       orderBy: 'homeRuns',
       orderDirection: 'desc',
-      minGames: 10,
+      minGames: 0,
       minHomeRuns: 0,
       minRBI: 0,
       minBattingAvg: 0,
@@ -466,7 +466,7 @@ describe('PlayerStatsDataGrid - Interactions', () => {
       </TestWrapper>,
     );
 
-    const minGamesInput = screen.getByDisplayValue('10');
+    const minGamesInput = screen.getByLabelText('Min G');
     fireEvent.change(minGamesInput, { target: { value: '100' } });
 
     expect((minGamesInput as HTMLInputElement).value).toBe('100');
@@ -515,7 +515,7 @@ describe('PlayerStatsDataGrid - Interactions', () => {
           after: undefined,
           orderBy: 'homeRuns',
           orderDirection: 'desc',
-          minGames: 10,
+          minGames: 0,
           minHomeRuns: 0,
           minRBI: 0,
           minBattingAvg: 0,
@@ -555,7 +555,7 @@ describe('PlayerStatsDataGrid - Interactions', () => {
           after: btoa('25'),
           orderBy: 'homeRuns',
           orderDirection: 'desc',
-          minGames: 10,
+          minGames: 0,
           minHomeRuns: 0,
           minRBI: 0,
           minBattingAvg: 0,

@@ -400,7 +400,7 @@ export function PlayerStatsPage({
                   first: initialPageSize,
                   orderBy: 'homeRuns',
                   orderDirection: 'desc',
-                  minGames: 100,
+                  minGames: 0,
                 }}
                 onPlayerSelect={handleBattingPlayerClick}
                 showSearch={true}
@@ -428,7 +428,7 @@ export function PlayerStatsPage({
                   offset: 0,
                   orderBy: 'wins',
                   orderDirection: 'desc',
-                  minGames: 10,
+                  minGames: 0,
                 }}
                 onPlayerSelect={handlePitchingPlayerClick}
                 showSearch={true}
