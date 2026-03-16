@@ -1261,7 +1261,14 @@ export function BaseballLandingPage() {
                 </Paragraph>
               </YStack>
 
-              <YStack flex={1} overflow="auto">
+              <YStack
+                flex={1}
+                overflow="auto"
+                pointerEvents={creating ? 'none' : 'auto'}
+                opacity={creating ? 0.5 : 1}
+                {...(creating ? { inert: '' } : {})}
+                aria-disabled={creating}
+              >
                 <YStack space="$3" paddingBottom="$2">
                   {/* League Name */}
                   <YStack space="$1.5">
