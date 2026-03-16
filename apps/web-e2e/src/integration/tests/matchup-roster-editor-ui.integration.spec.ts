@@ -367,7 +367,8 @@ test.describe
       // Starter player cards have a position badge (non-BN) + player name text.
       // The Edit Lineup card is scoped by the "Edit Lineup" heading.
       const editorCard = page
-        .locator(':has(text="Edit Lineup")')
+        .locator('div, section')
+        .filter({ hasText: 'Edit Lineup' })
         .filter({ hasText: 'STARTERS' })
         .first();
 
