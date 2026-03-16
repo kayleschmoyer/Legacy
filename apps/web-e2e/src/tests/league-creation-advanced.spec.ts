@@ -432,19 +432,14 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
   // ─── Form Validation (inline error card) ──────────────────────────────────
 
-  test('should display inline error card for name too short on submit', async ({
-    page,
-  }) => {
+  test('should keep submit disabled for name too short', async ({ page }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
     await page.getByPlaceholder('Enter your league name').fill('Ab');
-    await page.getByRole('button', { name: /create league/i }).click();
-
-    // Inline error card with role="alert"
-    await expect(page.getByRole('alert')).toContainText(
-      'League name must be at least 3 characters long',
-    );
+    await expect(
+      page.getByRole('button', { name: /create league/i }),
+    ).toBeDisabled();
   });
 
   test('should display inline error card for name too long on submit', async ({
@@ -461,24 +456,25 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     );
   });
 
-  test('should clear inline validation error when name is corrected and resubmitted', async ({
+  test('should enable submit once short name is corrected', async ({
     page,
   }) => {
-    await mockCreateLeagueSuccess(page);
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
-    // Trigger validation error
+    // Short names keep the submit button disabled
     await page.getByPlaceholder('Enter your league name').fill('Ab');
-    await page.getByRole('button', { name: /create league/i }).click();
-    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /create league/i }),
+    ).toBeDisabled();
 
-    // Fix the name and resubmit — error should be gone and form should succeed
+    // Fix the name and verify submit becomes enabled
     await page
       .getByPlaceholder('Enter your league name')
       .fill('Fixed League Name');
-    await page.getByRole('button', { name: /create league/i }).click();
-    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
+    await expect(
+      page.getByRole('button', { name: /create league/i }),
+    ).toBeEnabled();
   });
 
   test('should display GraphQL network error in inline error card', async ({

@@ -43,7 +43,9 @@ test.describe('League Creation @critical', () => {
     await expect(page).toHaveURL('/baseball/league/create');
   });
 
-  test('should display form validation errors', async ({ page }) => {
+  test('should keep Create League disabled until name has 3+ characters', async ({
+    page,
+  }) => {
     // Navigate directly to league creation page
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
@@ -56,15 +58,12 @@ test.describe('League Creation @critical', () => {
     const leagueNameInput = page.getByPlaceholder('Enter your league name');
     await leagueNameInput.fill('Ab');
 
-    // Button is enabled for non-empty input (validation is on submit)
+    // Short names must keep submit disabled until 3+ chars are entered
+    await expect(createButton).toBeDisabled();
+
+    // Enter a valid 3-char name and verify submit becomes enabled
+    await leagueNameInput.fill('Abc');
     await expect(createButton).toBeEnabled();
-
-    await createButton.click();
-
-    // Validation error is shown inline in a Card with role="alert"
-    await expect(page.getByRole('alert')).toContainText(
-      'League name must be at least 3 characters long',
-    );
   });
 
   test('should create league successfully with valid data', async ({
@@ -189,11 +188,16 @@ test.describe('League Creation @critical', () => {
       page.getByRole('button', { name: /create league/i }),
     ).toBeDisabled();
 
-    // Test minimum length — button enabled but validates on submit
+    // Test minimum length — button must remain disabled below 3 chars
     await leagueNameInput.fill('A');
     await expect(
       page.getByRole('button', { name: /create league/i }),
-    ).toBeEnabled();
+    ).toBeDisabled();
+
+    await leagueNameInput.fill('Ab');
+    await expect(
+      page.getByRole('button', { name: /create league/i }),
+    ).toBeDisabled();
 
     // Test maximum length (over 50 characters) — shows inline error on submit
     const longName = 'A'.repeat(51);

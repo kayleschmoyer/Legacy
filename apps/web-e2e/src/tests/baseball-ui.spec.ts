@@ -113,23 +113,16 @@ test.describe('League Creation Form @critical', () => {
     await expect(createButton).toBeEnabled();
   });
 
-  test('short league name triggers validation alert', async ({ page }) => {
+  test('short league name keeps create disabled', async ({ page }) => {
     const input = page.getByPlaceholder('Enter your league name');
     await expect(input).toBeVisible();
     await input.fill('Ab');
 
     const createButton = page.getByRole('button', { name: /create league/i });
+    await expect(createButton).toBeDisabled();
+
+    await input.fill('Abc');
     await expect(createButton).toBeEnabled();
-
-    await createButton.click();
-
-    // Validation message appears inline (Card role="alert" or text)
-    await expect(
-      page
-        .getByRole('alert')
-        .or(page.getByText(/at least 3 characters/i))
-        .first(),
-    ).toBeVisible();
   });
 
   test('number-of-teams selector is present with default value', async ({

@@ -189,6 +189,9 @@ export function LeagueCreatePage(): React.JSX.Element {
       ],
     });
 
+  const trimmedLeagueName = formData.leagueName.trim();
+  const isLeagueNameLengthValid = trimmedLeagueName.length >= 3;
+
   const handleInputChange = (
     field: keyof CreateLeagueFormData,
     value: string | number | boolean | Date,
@@ -204,15 +207,15 @@ export function LeagueCreatePage(): React.JSX.Element {
   };
 
   const validateForm = (): string | null => {
-    if (!formData.leagueName.trim()) {
+    if (!trimmedLeagueName) {
       return 'Please enter a league name';
     }
 
-    if (formData.leagueName.trim().length < 3) {
+    if (!isLeagueNameLengthValid) {
       return 'League name must be at least 3 characters long';
     }
 
-    if (formData.leagueName.trim().length > 50) {
+    if (trimmedLeagueName.length > 50) {
       return 'League name must be less than 50 characters';
     }
 
@@ -246,7 +249,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       const result = await createLeagueAndTeams({
         variables: {
           input: {
-            leagueName: formData.leagueName.trim(),
+            leagueName: trimmedLeagueName,
             numberOfTeams: formData.numberOfTeams,
             numberOfDivisions: formData.numberOfDivisions,
             schedulingStrategy: formData.schedulingStrategy,
@@ -1544,7 +1547,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   size="$4"
                   variant="primary"
                   type="submit"
-                  disabled={loading || !formData.leagueName.trim()}
+                  disabled={loading || !isLeagueNameLengthValid}
                   opacity={loading ? 0.6 : 1}
                 >
                   {loading ? 'Creating...' : 'Create League'}
