@@ -34,6 +34,10 @@ import {
   withAlpha,
 } from '../../constants/colors';
 
+/* ─── Constants ─── */
+
+const CREATE_BASEBALL_LEAGUE_ROUTE = '/baseball/league/create';
+
 /* ─── Styled Components ─── */
 
 const PageContainer = styled(YStack, {
@@ -737,9 +741,9 @@ export function HomePage(): React.JSX.Element {
             >
               <ActionButton
                 onPress={() => {
-                  navigate(primarySport.route);
+                  navigate(CREATE_BASEBALL_LEAGUE_ROUTE);
                 }}
-                accessibilityLabel={`Get started with ${primarySport.title.toLowerCase()}`}
+                accessibilityLabel="Create a new baseball league"
               >
                 <Text fontWeight="700">Create a League</Text>
               </ActionButton>
@@ -852,7 +856,7 @@ export function HomePage(): React.JSX.Element {
                             size="$3"
                             onPress={(e: GestureResponderEvent) => {
                               e.stopPropagation();
-                              navigate('/baseball/league/create');
+                              navigate(CREATE_BASEBALL_LEAGUE_ROUTE);
                             }}
                           >
                             <Text fontWeight="700">Create League</Text>
