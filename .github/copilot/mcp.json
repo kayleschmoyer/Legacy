@@ -1,5 +1,10 @@
 {
   "servers": {
+    "legacy-sports-ci": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/ci-server/src/index.ts"]
+    },
     "legacy-sports-db": {
       "type": "stdio",
       "command": "node",

@@ -1,6 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/.mcp.schema.json",
   "mcpServers": {
+    "legacy-sports-ci": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/ci-server/src/index.ts"]
+    },
     "legacy-sports-db": {
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/db-server/src/index.ts"]

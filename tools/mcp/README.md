@@ -20,6 +20,20 @@ VS Code and GitHub Copilot (agent mode) use a `"type": "stdio"` field per server
 
 ## Servers
 
+### ci-server
+
+> **Server ID:** `legacy-sports-ci`
+
+GitHub Actions workflow run triage for CI failures and flaky-job diagnosis:
+
+- **ci_list_runs** — List recent workflow runs with branch/workflow/status filters
+- **ci_view_run** — Inspect run metadata, conclusions, and jobs
+- **ci_get_logs** — Fetch full or failed-only logs for a run or specific job
+- **ci_search_logs** — Search logs with context lines to extract concrete evidence
+- **ci_rerun** — Rerun failed jobs, a specific job, or an entire run
+
+See `.github/skills/debug-ci-failure/SKILL.md` and `.github/skills/github-actions-logs/SKILL.md` for the debugging workflow this server supports.
+
 ### jira-server
 
 > **Server ID:** `legacy-sports-jira`
