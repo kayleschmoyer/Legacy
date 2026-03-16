@@ -1039,7 +1039,7 @@ export function BaseballLandingPage() {
                 Loading your leagues...
               </Paragraph>
             </YStack>
-          ) : filteredLeagues.length > 0 ? (
+          ) : error && !data ? null : filteredLeagues.length > 0 ? (
             <LeaguesList data-testid="leagues-grid">
               {filteredLeagues.map((league) => {
                 const badge = getLeagueBadge(

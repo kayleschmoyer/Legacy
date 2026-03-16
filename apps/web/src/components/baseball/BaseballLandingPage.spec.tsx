@@ -248,6 +248,30 @@ describe('BaseballLandingPage', () => {
     // No "Loading your leagues..." text — the spinner is the only indicator
   });
 
+  it('does not show the no-leagues empty state when the query fails', () => {
+    const {
+      useGetUserLeaguesQuery,
+    }: any = require('../../api/db/graphql.generated');
+    useGetUserLeaguesQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: new Error('Network error'),
+    });
+
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    // Error banner should be visible
+    expect(
+      screen.getByText(/Could not load your leagues/i),
+    ).toBeInTheDocument();
+    // The false empty state must NOT appear when it was an error, not truly no leagues
+    expect(screen.queryByText(/No leagues yet/i)).not.toBeInTheDocument();
+  });
+
   it('shows all leagues when search is whitespace-only', () => {
     const {
       useGetUserLeaguesQuery,
