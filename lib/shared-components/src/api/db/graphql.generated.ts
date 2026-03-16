@@ -311,6 +311,8 @@ export type CareerPitching = {
   outsRecorded?: Maybe<Scalars['Int']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
+  positionsPlayed?: Maybe<Scalars['String']['output']>;
+  primaryPosition?: Maybe<Scalars['String']['output']>;
   runs?: Maybe<Scalars['Int']['output']>;
   saves?: Maybe<Scalars['Int']['output']>;
   shutouts?: Maybe<Scalars['Int']['output']>;
@@ -3312,6 +3314,8 @@ export type CareerBattingFragment = {
 export type CareerPitchingFragment = {
   __typename?: 'CareerPitching';
   playerId?: number | null;
+  primaryPosition?: string | null;
+  positionsPlayed?: string | null;
   wins?: number | null;
   losses?: number | null;
   games?: number | null;
@@ -3458,6 +3462,8 @@ export type GetCareerPitchingStatsQuery = {
   careerPitchingStats?: Array<{
     __typename?: 'CareerPitching';
     playerId?: number | null;
+    primaryPosition?: string | null;
+    positionsPlayed?: string | null;
     wins?: number | null;
     losses?: number | null;
     games?: number | null;
@@ -3767,6 +3773,8 @@ export const CareerBattingFragmentDoc = gql`
 export const CareerPitchingFragmentDoc = gql`
   fragment CareerPitching on CareerPitching {
     playerId
+    primaryPosition
+    positionsPlayed
     wins
     losses
     games

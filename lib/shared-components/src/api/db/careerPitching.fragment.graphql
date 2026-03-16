@@ -1,6 +1,8 @@
 # Career Pitching fragment defining the fields for career pitching statistics
 fragment CareerPitching on CareerPitching {
   playerId
+  primaryPosition
+  positionsPlayed
   wins
   losses
   games

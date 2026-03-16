@@ -305,6 +305,8 @@ export type CareerPitching = {
   outsRecorded?: Maybe<Scalars['Int']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
+  positionsPlayed?: Maybe<Scalars['String']['output']>;
+  primaryPosition?: Maybe<Scalars['String']['output']>;
   runs?: Maybe<Scalars['Int']['output']>;
   saves?: Maybe<Scalars['Int']['output']>;
   shutouts?: Maybe<Scalars['Int']['output']>;

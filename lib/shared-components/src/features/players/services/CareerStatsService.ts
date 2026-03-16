@@ -199,7 +199,7 @@ function parsePositionsPlayed(
  * @param positionsPlayedJson - JSON string of position data from database
  * @returns Formatted string like "1B, OF, DH" (sorted by most games played)
  */
-function formatPositionsPlayed(
+export function formatPositionsPlayed(
   positionsPlayedJson: string | null | undefined,
 ): string {
   if (!positionsPlayedJson) return '';

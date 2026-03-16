@@ -23,6 +23,7 @@ import React, {
 } from 'react';
 import { Button, H2, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import { getPageRange } from './paginationUtils';
+import { formatPositionsPlayed } from './services/CareerStatsService';
 import {
   type CareerPitchingFragment,
   type GetCareerPitchingStatsQueryVariables,
@@ -106,6 +107,16 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
     align: 'left',
     priority: 'high',
     description: 'Player name',
+  },
+  {
+    key: 'formattedPositions',
+    label: 'Pos',
+    sortable: false,
+    width: '100px',
+    minWidth: 80,
+    align: 'left',
+    priority: 'medium',
+    description: 'Positions played, sorted by most games',
   },
   {
     key: 'games',
@@ -771,17 +782,21 @@ export function PitchingStatsDataGrid({
                       {column.key === 'playerName'
                         ? `${player?.player?.firstName ?? ''} ${player?.player?.lastName ?? ''}`.trim() ||
                           `Player ${player?.playerId ?? '-'}`
-                        : column.formatter
-                          ? column.formatter(
-                              player?.[column.key as keyof typeof player],
-                            )
-                          : (() => {
-                              const rawVal =
-                                player?.[column.key as keyof typeof player];
-                              return typeof rawVal === 'object'
-                                ? '-'
-                                : String(rawVal ?? '-');
-                            })()}
+                        : column.key === 'formattedPositions'
+                          ? formatPositionsPlayed(player?.positionsPlayed) ||
+                            player?.primaryPosition ||
+                            '-'
+                          : column.formatter
+                            ? column.formatter(
+                                player?.[column.key as keyof typeof player],
+                              )
+                            : (() => {
+                                const rawVal =
+                                  player?.[column.key as keyof typeof player];
+                                return typeof rawVal === 'object'
+                                  ? '-'
+                                  : String(rawVal ?? '-');
+                              })()}
                     </Text>
                   </XStack>
                 ))}

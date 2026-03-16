@@ -29,6 +29,45 @@ interface PositionGames {
   position?: string;
 }
 
+/** Safely parse positionsPlayed (may be object or JSON string) into entries. */
+function parsePositionEntries(positions: unknown): [string, unknown][] | null {
+  if (typeof positions === 'object' && positions !== null) {
+    const entries = Object.entries(positions);
+    return entries.length > 0 ? entries : null;
+  }
+
+  if (typeof positions === 'string') {
+    const parsed: unknown = JSON.parse(positions);
+    if (typeof parsed === 'object' && parsed !== null) {
+      const entries = Object.entries(parsed);
+      return entries.length > 0 ? entries : null;
+    }
+  }
+
+  return null;
+}
+
+/** Find the position with the most games played from position entries. */
+function findPrimaryPosition(entries: [string, unknown][]): string | null {
+  const primaryPos = entries.reduce((max, current) => {
+    const currentGames = (current[1] as PositionGames)?.games || 0;
+    const maxGames = (max[1] as PositionGames)?.games || 0;
+    return currentGames > maxGames ? current : max;
+  });
+  return (primaryPos[1] as PositionGames)?.position || primaryPos[0];
+}
+
+/** Resolve the positionsPlayed field to a JSON string. */
+function resolvePositionsPlayed(positions: unknown): string | null {
+  if (typeof positions === 'object' && positions !== null) {
+    return JSON.stringify(positions);
+  }
+  if (typeof positions === 'string') {
+    return positions;
+  }
+  return null;
+}
+
 // Game Batting type - stats from a single game
 export const GameBattingRef = builder.objectRef<{
   playerId: number;
@@ -308,48 +347,8 @@ CareerBattingRef.implement({
           );
           if (!fieldingStats?.positionsPlayed) return null;
 
-          // The positions played is already a JSON object from the database
-          const positions = fieldingStats.positionsPlayed;
-          if (typeof positions === 'object' && positions !== null) {
-            const positionEntries = Object.entries(positions);
-            if (positionEntries.length === 0) return null;
-
-            // Find position with most games played
-            const primaryPos = positionEntries.reduce((max, current) => {
-              const currentGames = (current[1] as PositionGames)?.games || 0;
-              const maxGames = (max[1] as PositionGames)?.games || 0;
-              return currentGames > maxGames ? current : max;
-            });
-
-            return (primaryPos[1] as PositionGames)?.position || primaryPos[0];
-          }
-
-          // Fallback: try parsing as string if it somehow comes as a string
-          if (typeof positions === 'string') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- JSON.parse returns any
-            const parsedPositions = JSON.parse(positions);
-            if (
-              typeof parsedPositions === 'object' &&
-              parsedPositions !== null
-            ) {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- JSON.parse result passed to Object.entries
-              const positionEntries = Object.entries(parsedPositions);
-              if (positionEntries.length === 0) return null;
-
-              // Find position with most games played
-              const primaryPos = positionEntries.reduce((max, current) => {
-                const currentGames = (current[1] as PositionGames)?.games || 0;
-                const maxGames = (max[1] as PositionGames)?.games || 0;
-                return currentGames > maxGames ? current : max;
-              });
-
-              return (
-                (primaryPos[1] as PositionGames)?.position || primaryPos[0]
-              );
-            }
-          }
-
-          return null;
+          const entries = parsePositionEntries(fieldingStats.positionsPlayed);
+          return entries ? findPrimaryPosition(entries) : null;
         } catch (error) {
           LOGGER.warn('Error getting primary position for player', {
             playerId: stats.playerId,
@@ -372,18 +371,7 @@ CareerBattingRef.implement({
           );
           if (!fieldingStats?.positionsPlayed) return null;
 
-          // Return the positions played as a JSON string
-          const positions = fieldingStats.positionsPlayed;
-          if (typeof positions === 'object' && positions !== null) {
-            return JSON.stringify(positions);
-          }
-
-          // If it's already a string, return it
-          if (typeof positions === 'string') {
-            return positions;
-          }
-
-          return null;
+          return resolvePositionsPlayed(fieldingStats.positionsPlayed);
         } catch (error) {
           LOGGER.warn('Error getting positions played for player', {
             playerId: stats.playerId,
@@ -479,6 +467,53 @@ CareerPitchingRef.implement({
       resolve: async (stats, _args, context) => {
         if (!stats.playerId) return null;
         return context.loaders.players.load(stats.playerId);
+      },
+    }),
+    // Primary position based on fielding statistics
+    primaryPosition: t.field({
+      type: 'String',
+      nullable: true,
+      resolve: async (stats, _args, context) => {
+        if (!stats.playerId) return null;
+
+        try {
+          const fieldingStats = await context.loaders.careerFielding.load(
+            stats.playerId,
+          );
+          if (!fieldingStats?.positionsPlayed) return null;
+
+          const entries = parsePositionEntries(fieldingStats.positionsPlayed);
+          return entries ? findPrimaryPosition(entries) : null;
+        } catch (error) {
+          LOGGER.warn('Error getting primary position for pitcher', {
+            playerId: stats.playerId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return null;
+        }
+      },
+    }),
+    // All positions played with games count
+    positionsPlayed: t.field({
+      type: 'String',
+      nullable: true,
+      resolve: async (stats, _args, context) => {
+        if (!stats.playerId) return null;
+
+        try {
+          const fieldingStats = await context.loaders.careerFielding.load(
+            stats.playerId,
+          );
+          if (!fieldingStats?.positionsPlayed) return null;
+
+          return resolvePositionsPlayed(fieldingStats.positionsPlayed);
+        } catch (error) {
+          LOGGER.warn('Error getting positions played for pitcher', {
+            playerId: stats.playerId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return null;
+        }
       },
     }),
   }),
