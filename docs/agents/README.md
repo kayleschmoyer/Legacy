@@ -6,9 +6,9 @@ This document provides structured guidance for AI agents working on the Legacy S
 
 ## 🛠️ Skills Documentation
 
-**Detailed Task Guides**: [Agent Skills](../../.github/skills/)
+**Detailed Task Guides**: [Agent Skills](../../.agents/skills/)
 
-⚡ **For concrete command execution** (how to run specific commands), see the **skills documentation** in `.github/skills/`.
+⚡ **For concrete command execution** (how to run specific commands), see the **skills documentation** in `.agents/skills/`.
 
 📋 **For patterns and guidelines** (when to use certain approaches, best practices), see the **CSV files** below.
 

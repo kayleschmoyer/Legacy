@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Validate all agent skills under .github/skills/ using the official agentskills validator.
+// Validate all agent skills under .agents/skills/ using the official agentskills validator.
 // Requires: uvx (from uv) and the skills-ref package on PyPI.
 // Run via: make lint-skills  OR  node scripts/lint-skills.js
 
@@ -8,7 +8,7 @@ const { readdirSync, statSync } = require('fs');
 const { join, resolve } = require('path');
 
 const root = resolve(__dirname, '..');
-const skillsDir = join(root, '.github', 'skills');
+const skillsDir = join(root, '.agents', 'skills');
 
 const dirs = readdirSync(skillsDir).filter((name) =>
   statSync(join(skillsDir, name)).isDirectory(),

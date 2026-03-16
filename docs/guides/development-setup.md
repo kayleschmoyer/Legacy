@@ -111,9 +111,9 @@ make sync-env
 
 **What if sync-env fails?**
 
-- Ensure you have proper AWS SSO access (see `.github/skills/aws-sso-login/SKILL.md`)
+- Ensure you have proper AWS SSO access (see `.agents/skills/aws-sso-login/SKILL.md`)
 - Contact team lead for credential access
-- Without AWS access, use the dev seed: see `.github/skills/db-restore-dev/SKILL.md`
+- Without AWS access, use the dev seed: see `.agents/skills/db-restore-dev/SKILL.md`
 
 ### **Step 4: Build Core Libraries**
 

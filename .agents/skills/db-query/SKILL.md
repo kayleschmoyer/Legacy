@@ -5,7 +5,7 @@ description: 'Execute SQL queries against the Legacy Sports PostgreSQL database 
 
 # Database Query Skill
 
-> **MCP alternative**: Prefer the `db_query` MCP tool (see `skills/mcp-db/SKILL.md`) for ad-hoc queries — it returns structured JSON, enforces read-only by default, and requires no AWS credentials. Fall back to `scripts/db-query.ps1` when the MCP server is unavailable or you need direct RDS access.
+> **MCP alternative**: Prefer the `db_query` MCP tool (see `.agents/skills/mcp-db/SKILL.md`) for ad-hoc queries — it returns structured JSON, enforces read-only by default, and requires no AWS credentials. Fall back to `scripts/db-query.ps1` when the MCP server is unavailable or you need direct RDS access.
 
 ## Quick Start
 

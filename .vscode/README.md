@@ -4,7 +4,7 @@ Workspace-level editor settings for the Legacy Sports monorepo. See `.vscode/set
 
 ## Twig
 
-Use `twig` terminal commands for branch management. See the skills in `.github/skills/` for detailed guidance:
+Use `twig` terminal commands for branch management. See the skills in `.agents/skills/` for detailed guidance:
 - `branch-create` — creating feature branches
 - `branch-tree` — viewing and managing dependent branch trees
 - `create-pr` — creating pull requests

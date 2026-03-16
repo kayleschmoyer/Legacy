@@ -116,12 +116,12 @@ terraform plan -refresh=false -detailed-exitcode
 
 ### Updated Files
 
-1. **`.github/copilot/skills/terraform-apply.md`**
+1. **`.agents/skills/terraform-apply.md`**
    - Added "CRITICAL: Always Check for State Lock First" section
    - Improved troubleshooting steps
    - Updated with new auto-unlock workflow
 
-2. **`.github/copilot/skills/deploy-lambda.md`**
+2. **`.agents/skills/deploy-lambda.md`**
    - Added prerequisites section
    - Documented common errors (wrong parameter names)
    - Added state lock handling workflow
@@ -280,8 +280,8 @@ If issues occur with new automation:
 - [Quick Reference Guide](.github/copilot/quick-reference.md)
 - [Terraform Lock Management](docs/deployment/terraform/terraform-lock-management.md)
 - [CI Troubleshooting](docs/ci-cd/ci-troubleshooting-guide.md)
-- [Deploy Lambda Skill](.github/copilot/skills/deploy-lambda.md)
-- [Terraform Apply Skill](.github/copilot/skills/terraform-apply.md)
+- [Deploy Lambda Skill](.agents/skills/deploy-lambda.md)
+- [Terraform Apply Skill](.agents/skills/terraform-apply.md)
 
 ## Summary
 

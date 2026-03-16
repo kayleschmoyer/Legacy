@@ -28,7 +28,7 @@ gh run view RUN_ID | Select-String "cancel|The operation was canceled"
 
 ### 9. Agent skills lint failure
 
-The `quality-gates` job runs `node scripts/lint-skills.js` before the main quality checks. This validates all skill files under `.github/skills/` using the `agentskills` CLI.
+The `quality-gates` job runs `node scripts/lint-skills.js` before the main quality checks. This validates all skill files under `.agents/skills/` using the `agentskills` CLI.
 
 **Pattern in logs:**
 
@@ -50,7 +50,7 @@ gh run view RUN_ID --log-failed | Select-String "skill.*failed validation|✖"
 node scripts/lint-skills.js
 
 # Validate a single skill
-uvx --from skills-ref agentskills validate .github/skills/SKILL_NAME
+uvx --from skills-ref agentskills validate .agents/skills/SKILL_NAME
 ```
 
 ### 10. E2E test failures

@@ -111,7 +111,7 @@ This directory contains step-by-step guides for setting up and working with the 
 
 ## 🤖 Using AI Assistance
 
-For AI agents working on this project, see the [Agent Instructions](../agents/) directory with CSV-formatted guidelines and the [Skills Documentation](../../.github/skills/) for concrete command execution.
+For AI agents working on this project, see the [Agent Instructions](../agents/) directory with CSV-formatted guidelines and the [Skills Documentation](../../.agents/skills/) for concrete command execution.
 
 ## 📞 Getting Help
 

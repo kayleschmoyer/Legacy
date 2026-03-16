@@ -523,7 +523,7 @@ pnpm run dev
 pnpm exec nx run db:migrate
 
 # 2. Or restore from dev seed (no AWS needed)
-# See: .github/skills/db-restore-dev/SKILL.md
+# See: .agents/skills/db-restore-dev/SKILL.md
 ```
 
 ### Production Rollback

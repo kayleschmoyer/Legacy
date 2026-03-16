@@ -1,10 +1,11 @@
 # setup-worktree.ps1 - Smart worktree dependency setup
 #
-# Automates the four manual steps every worktree needs:
+# Automates the five manual steps every worktree needs:
 #   1. node_modules             - junction to main repo when lockfiles match; full pnpm install otherwise
 #   2. .env                     - copy from main repo
 #   3. terraform/secrets.auto.tfvars - copy from main repo (prevents interactive terraform prompts)
 #   4. .twig                    - junction to main repo (shared branch-dependency state)
+#   5. .github/skills           - junction to .agents/skills (backward-compat for old skill paths)
 #
 # Usage (from any directory):
 #   .\scripts\setup-worktree.ps1 -WorktreePath <path>
@@ -379,6 +380,33 @@ elseif (Test-Path $wtTwig) {
 else {
     cmd /c "mklink /J `"$wtTwig`" `"$mainTwig`"" | Out-Null
     Write-Ok ".twig junctioned -> main repo"
+}
+
+# ---------------------------------------------------------------------------
+# 5. .github/skills -> .agents/skills junction (backward-compat)
+# ---------------------------------------------------------------------------
+
+Write-Step ".github/skills"
+
+$wtAgentsSkills = Join-Path $WorktreePath ".agents" "skills"
+$wtGithubSkills = Join-Path $WorktreePath ".github" "skills"
+
+if (-not (Test-Path $wtAgentsSkills)) {
+    Write-Warn "No .agents/skills in worktree -- skipping"
+}
+elseif (Test-IsJunction $wtGithubSkills) {
+    Write-Ok ".github/skills junction already exists"
+}
+elseif (Test-Path $wtGithubSkills) {
+    Write-Warn ".github/skills exists but is not a junction -- replacing"
+    cmd /c "rmdir `"$wtGithubSkills`"" 2>$null
+    Remove-Item $wtGithubSkills -Recurse -Force -ErrorAction SilentlyContinue
+    cmd /c "mklink /J `"$wtGithubSkills`" `"$wtAgentsSkills`"" | Out-Null
+    Write-Ok ".github/skills junctioned -> .agents/skills"
+}
+else {
+    cmd /c "mklink /J `"$wtGithubSkills`" `"$wtAgentsSkills`"" | Out-Null
+    Write-Ok ".github/skills junctioned -> .agents/skills"
 }
 
 # ---------------------------------------------------------------------------

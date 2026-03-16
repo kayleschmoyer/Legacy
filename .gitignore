@@ -258,7 +258,7 @@ bundle.js
 # Build and distribution artifacts
 **/dist/
 **/build/
-!.github/skills/build/
+!.agents/skills/build/
 **/out/
 **/.next/
 **/.vite/
@@ -313,3 +313,7 @@ logs/
 # Ad-hoc output scratch directory (lint results, CI logs, debug dumps, etc.)
 scratch/*
 !scratch/.gitkeep
+
+# Backward-compat junction: .github/skills/ → .agents/skills/
+# Created by setup scripts; not tracked by git (core.symlinks=false on Windows)
+.github/skills

@@ -52,7 +52,7 @@ pnpm exec nx integration web-e2e
 ### Test times out waiting for async flow
 
 1. Check Lambda logs: `.\scripts\aws-logs.ps1 -Function <lambda> -Since 15m -Filter "ERROR"`
-2. Check SQS DLQ for failed messages (see `skills/debug-distributed/SKILL.md`)
+2. Check SQS DLQ for failed messages (see `.agents/skills/debug-distributed/SKILL.md`)
 3. Increase timeout and intervals — some flows are slower under load
 4. Verify the trigger mutation returned successfully (check for GraphQL errors)
 
@@ -71,4 +71,4 @@ pnpm exec nx integration web-e2e
 
 ### `expect.poll()` passes but data is wrong
 
-The poll succeeded (condition met) but downstream assertions fail — the async process completed with incorrect data. This is a real bug. Follow `skills/debug-distributed/SKILL.md` to root-cause.
+The poll succeeded (condition met) but downstream assertions fail — the async process completed with incorrect data. This is a real bug. Follow `.agents/skills/debug-distributed/SKILL.md` to root-cause.

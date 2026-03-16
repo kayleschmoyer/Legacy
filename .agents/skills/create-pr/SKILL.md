@@ -31,7 +31,7 @@ If you are on `main`, **stop** and use the **branch-create** skill to create a
 feature branch before proceeding:
 
 ```powershell
-# See: .github/skills/branch-create/SKILL.md
+# See: .agents/skills/branch-create/SKILL.md
 .\scripts\branch-create.ps1 -TicketKey LS-####
 # — or —
 twig switch LS-#### -p=main

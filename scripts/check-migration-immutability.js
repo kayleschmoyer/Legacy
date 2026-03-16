@@ -79,7 +79,7 @@ function main() {
   console.error(
     'To change a previously applied schema, create a NEW migration file instead.\n',
   );
-  console.error('See: .github/skills/db-migration-write/SKILL.md\n');
+  console.error('See: .agents/skills/db-migration-write/SKILL.md\n');
   process.exit(1);
 }
 

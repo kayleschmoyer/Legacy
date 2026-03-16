@@ -12,7 +12,7 @@ MCP server configuration is maintained in multiple files to support different AI
 | `.github/copilot/mcp.json` | GitHub Copilot (agent mode)       | `servers`     | `${VAR}`       |
 | `.mcp.json`                | Claude Code CLI                   | `mcpServers`  | `${VAR}`       |
 
-**Keep all files in sync.** When adding or removing a server, update all config files. The `create-mcp-server` skill (`.github/skills/create-mcp-server/SKILL.md`) documents the full registration steps.
+**Keep all files in sync.** When adding or removing a server, update all config files. The `create-mcp-server` skill (`.agents/skills/create-mcp-server/SKILL.md`) documents the full registration steps.
 
 ### Config Differences
 
@@ -33,7 +33,7 @@ Wraps Jira operations with guardrails using the Jira REST API (with env var / ne
 - **jira_set_parent** — Set parent epic via Jira REST API
 - **jira_get_comments** — Fetch all comments on a ticket with author and plain-text body
 
-See `.github/skills/mcp-jira/SKILL.md` for usage.
+See `.agents/skills/mcp-jira/SKILL.md` for usage.
 
 ### db-server
 
@@ -47,7 +47,7 @@ Database operations with built-in safety guardrails:
 - **db_print_schema** — Regenerate `schema.graphql` from Pothos schema
 - **db_check_health** — Pre-flight health check (Docker, Postgres, migrations)
 
-See `.github/skills/mcp-db/SKILL.md` for usage.
+See `.agents/skills/mcp-db/SKILL.md` for usage.
 
 ### worktree-server
 

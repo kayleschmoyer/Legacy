@@ -1,13 +1,13 @@
 ---
 name: create-skill
-description: 'Create a new agent skill in the correct agentskills.io format under .github/skills/; covers directory structure, frontmatter requirements, content guidelines, description writing strategy, gitignore pitfalls, updating both skills indexes (copilot-instructions.md and agents.md), and validation. Load this skill before creating or modifying any agent skill file.'
+description: 'Create a new agent skill in the correct agentskills.io format under .agents/skills/; covers directory structure, frontmatter requirements, content guidelines, description writing strategy, gitignore pitfalls, updating both skills indexes (copilot-instructions.md and agents.md), and validation. Load this skill before creating or modifying any agent skill file.'
 ---
 
 # Skill: Create a New Agent Skill
 
 ## Overview
 
-Agent skills live at `.github/skills/<name>/SKILL.md` and follow the [agentskills.io](https://agentskills.io) open standard. Copilot reads the `description` frontmatter field to decide when to auto-load a skill — write it as if answering "when should this be loaded?"
+Agent skills live at `.agents/skills/<name>/SKILL.md` and follow the [agentskills.io](https://agentskills.io) open standard. Copilot reads the `description` frontmatter field to decide when to auto-load a skill — write it as if answering "when should this be loaded?"
 
 This repo currently has 60+ skills covering everything from workflow automation to infrastructure deployment. Skills are the primary way domain knowledge is packaged for AI agents.
 
@@ -20,7 +20,7 @@ This repo currently has 60+ skills covering everything from workflow automation 
 ## Directory Structure
 
 ```
-.github/skills/
+.agents/skills/
 └── <skill-name>/
     └── SKILL.md
 ```
@@ -130,7 +130,7 @@ Common failures and fixes (use tables for quick scanning).
 - **Include full commands** — agents copy-paste literally; use fenced code blocks with language tags
 - **Show file contents** — when the skill creates files, show the complete template content
 - **Use tables for references** — agents parse tables faster than prose
-- **Link related skills** — reference other skills by path when there's overlap (e.g., "See `skills/codegen/SKILL.md` for regeneration steps")
+- **Link related skills** — reference other skills by path when there's overlap (e.g., "See `.agents/skills/codegen/SKILL.md` for regeneration steps")
 - **PowerShell syntax** — all terminal commands should use PowerShell conventions (`;` to chain, `$env:` for vars)
 
 ## Steps
@@ -140,14 +140,14 @@ Common failures and fixes (use tables for quick scanning).
 Some skill names match common ignore patterns (`build`, `dist`, `out`). Always check:
 
 ```powershell
-git check-ignore -v .github/skills/<name>/SKILL.md
+git check-ignore -v .agents/skills/<name>/SKILL.md
 ```
 
 If ignored, add a negation rule in `.gitignore` immediately after the offending pattern:
 
 ```gitignore
 **/build/
-!.github/skills/build/
+!.agents/skills/build/
 ```
 
 ### 2. Create the directory and SKILL.md
@@ -156,14 +156,14 @@ If ignored, add a negation rule in `.gitignore` immediately after the offending 
 New-Item -ItemType Directory -Path ".github\skills\<name>" -Force
 ```
 
-Create `.github/skills/<name>/SKILL.md` with the frontmatter block at the very top (line 1 must be `---`), followed by the skill content.
+Create `.agents/skills/<name>/SKILL.md` with the frontmatter block at the very top (line 1 must be `---`), followed by the skill content.
 
 ### 3. Validate the file
 
 Run the official validator to confirm the frontmatter parses correctly:
 
 ```powershell
-uvx --from skills-ref agentskills validate .github/skills/<name>
+uvx --from skills-ref agentskills validate .agents/skills/<name>
 ```
 
 Or validate all skills at once:
@@ -181,7 +181,7 @@ Skills are registered in **two** places. You must update both.
 Add the new skill to the "Load When Needed" table (alphabetical order):
 
 ```markdown
-| **New skill** | `skills/<name>/SKILL.md` |
+| **New skill** | `.agents/skills/<name>/SKILL.md` |
 ```
 
 #### b) `agents.md` (repo root)
@@ -189,7 +189,7 @@ Add the new skill to the "Load When Needed" table (alphabetical order):
 Add to the "Docs Index" table in the same format:
 
 ```markdown
-| **New skill** | `.github/skills/<name>/SKILL.md` |
+| **New skill** | `.agents/skills/<name>/SKILL.md` |
 ```
 
 > **Why both?** `copilot-instructions.md` is auto-loaded by GitHub Copilot. `agents.md` is the entry point for non-Copilot agents (Cursor, Windsurf, etc.).
@@ -210,12 +210,12 @@ Run the official validator against all skills:
 make lint-skills
 ```
 
-This calls `uvx --from skills-ref agentskills validate` on every directory under `.github/skills/` using the official [agentskills.io](https://agentskills.io) reference library. All failures are reported before exiting non-zero.
+This calls `uvx --from skills-ref agentskills validate` on every directory under `.agents/skills/` using the official [agentskills.io](https://agentskills.io) reference library. All failures are reported before exiting non-zero.
 
 To validate a single skill during development:
 
 ```powershell
-uvx --from skills-ref agentskills validate .github/skills/<name>
+uvx --from skills-ref agentskills validate .agents/skills/<name>
 ```
 
 ## Troubleshooting

@@ -105,4 +105,4 @@ pnpm exec nx run-many -t codegen \
 git add lambdas/db/schema.graphql **/graphql.generated.ts
 ```
 
-See also: `skills/codegen/SKILL.md`
+See also: `.agents/skills/codegen/SKILL.md`

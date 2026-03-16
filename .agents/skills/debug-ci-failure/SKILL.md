@@ -174,7 +174,7 @@ apps/web/src/App.tsx
 pnpm exec nx affected -t lint --fix
 ```
 
-Then manually resolve any errors that auto-fix cannot handle. See `skills/fix-lint/SKILL.md` for guidance on specific lint rules.
+Then manually resolve any errors that auto-fix cannot handle. See `.agents/skills/fix-lint/SKILL.md` for guidance on specific lint rules.
 
 #### 4d. TypeScript type errors
 
@@ -200,7 +200,7 @@ lib/shared-types/src/index.ts(15,10): error TS2305: Module '"./types"' has no ex
 pnpm exec nx affected -t typecheck
 ```
 
-See `skills/fix-types/SKILL.md` for common patterns.
+See `.agents/skills/fix-types/SKILL.md` for common patterns.
 
 #### 4e. Unit test failures
 
@@ -486,10 +486,10 @@ gh run list --workflow ci-orchestrator.yml --limit 5
 
 ## Related Skills
 
-- `skills/github-actions-logs/SKILL.md` — Detailed log parsing patterns and PowerShell commands
-- `skills/fix-lint/SKILL.md` — Resolving specific ESLint rule violations
-- `skills/fix-types/SKILL.md` — Fixing TypeScript type errors
-- `skills/test/SKILL.md` — Running and debugging unit tests locally
-- `skills/build/SKILL.md` — Building affected projects
-- `skills/troubleshoot/SKILL.md` — General dev-environment troubleshooting
-- `skills/deploy-lambda/SKILL.md` — Lambda deployment workflow
+- `.agents/skills/github-actions-logs/SKILL.md` — Detailed log parsing patterns and PowerShell commands
+- `.agents/skills/fix-lint/SKILL.md` — Resolving specific ESLint rule violations
+- `.agents/skills/fix-types/SKILL.md` — Fixing TypeScript type errors
+- `.agents/skills/test/SKILL.md` — Running and debugging unit tests locally
+- `.agents/skills/build/SKILL.md` — Building affected projects
+- `.agents/skills/troubleshoot/SKILL.md` — General dev-environment troubleshooting
+- `.agents/skills/deploy-lambda/SKILL.md` — Lambda deployment workflow

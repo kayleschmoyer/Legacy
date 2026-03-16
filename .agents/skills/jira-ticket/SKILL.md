@@ -7,7 +7,7 @@ description: 'Manage Jira ticket statuses and metadata using the acli CLI; use w
 
 ## ⚠️ Prefer MCP Tools
 
-**If MCP Jira tools are available** (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent`), **use them instead of `acli`**. They require no CLI installation, work in cloud/CI environments, and are the recommended approach. See `skills/mcp-jira/SKILL.md` for full details.
+**If MCP Jira tools are available** (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent`), **use them instead of `acli`**. They require no CLI installation, work in cloud/CI environments, and are the recommended approach. See `.agents/skills/mcp-jira/SKILL.md` for full details.
 
 **Agents must not use `fetch_webpage` or generic raw HTTP requests to access Jira.** If neither MCP tools nor `acli` are available, inform the user that Jira credentials need to be configured. Local PowerShell scripts that use `Invoke-WebRequest`/`Invoke-RestMethod` with `.netrc` credentials (e.g., attachment downloads, setting parent epic) are allowed as documented below.
 

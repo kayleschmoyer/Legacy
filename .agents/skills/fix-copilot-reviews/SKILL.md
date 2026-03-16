@@ -333,7 +333,7 @@ if (op === 'GetLeague') { ... }
 
 **#5 — route.fallback() in the wrong layer**
 
-Within the 3-layer mock architecture (test → auth.ts → baseline), test handlers should use `route.fallback()` to cascade to the next layer — this is correct. But `route.continue()` is **always forbidden** in E2E tests. See `skills/e2e-testing/SKILL.md` for the full layer architecture.
+Within the 3-layer mock architecture (test → auth.ts → baseline), test handlers should use `route.fallback()` to cascade to the next layer — this is correct. But `route.continue()` is **always forbidden** in E2E tests. See `.agents/skills/e2e-testing/SKILL.md` for the full layer architecture.
 
 **#6 — LOGGER.error() error wrapping**
 
@@ -348,7 +348,7 @@ LOGGER.error('Failed to load', error);
 LOGGER.error('Failed to load', error, { userId });
 ```
 
-Reference: `lib/rollbar/src/lib/RollbarOutputDestination.ts` lines 33–34. See also `skills/fix-lint/SKILL.md` and `skills/fix-bugs/SKILL.md`.
+Reference: `lib/rollbar/src/lib/RollbarOutputDestination.ts` lines 33–34. See also `.agents/skills/fix-lint/SKILL.md` and `.agents/skills/fix-bugs/SKILL.md`.
 
 **#7 — Mock response data structure**
 

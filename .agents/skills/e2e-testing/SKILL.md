@@ -37,7 +37,7 @@ Playwright's `webServer` config in `apps/web-e2e/playwright.config.ts` is the **
 
 Mocked E2E tests (this skill) cover a component or page in **isolation** using `page.route()` to return controlled data. They are fast, deterministic, and require no running backend.
 
-**For comprehensive user stories that involve multiple roles, real persistence, or cross-user visibility, also write a UI integration test** (see `skills/integration-testing/SKILL.md`). Use this table to decide:
+**For comprehensive user stories that involve multiple roles, real persistence, or cross-user visibility, also write a UI integration test** (see `.agents/skills/integration-testing/SKILL.md`). Use this table to decide:
 
 | Scenario                                                   | Here (mocked E2E) | integration-testing skill |
 | ---------------------------------------------------------- | ----------------- | ------------------------- |
@@ -295,7 +295,7 @@ test.beforeEach(async ({ page }) => {
 > want an earlier handler to defer to a later one — but the _final_ handler in
 > the chain must still end with `route.fulfill()`, never `route.continue()`.
 >
-> **Only integration tests hit real services** (see `skills/integration-testing/SKILL.md`).
+> **Only integration tests hit real services** (see `.agents/skills/integration-testing/SKILL.md`).
 
 > **Avoid broad `postData.includes()` matches:** A check like
 > `postData.includes('getleague')` will also match `getleagueteams`,
