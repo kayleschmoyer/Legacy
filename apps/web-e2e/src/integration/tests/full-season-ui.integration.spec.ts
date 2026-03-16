@@ -900,6 +900,8 @@ test.describe
     await test.step('Navigate to league overview (has chat)', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/overview`);
       await page.waitForLoadState('load');
+      // The default sub-tab is "Activity"; click "Chat" to reveal the textarea
+      await page.getByText('Chat').first().click();
     });
 
     await test.step('Switch to Chat sub-tab', async () => {
@@ -908,9 +910,9 @@ test.describe
     });
 
     await test.step('Send a league message via the chat UI', async () => {
-      const chatInput = page.getByRole('textbox', {
-        name: /message the league/i,
-      });
+      const chatInput = page.locator(
+        'textarea[aria-label="Message the league"]',
+      );
       await expect(chatInput).toBeVisible({ timeout: 15000 });
 
       await chatInput.fill('Great draft everyone!');
