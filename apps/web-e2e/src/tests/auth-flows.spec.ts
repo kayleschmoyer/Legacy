@@ -32,15 +32,49 @@ function signExpiredJwt(): string {
   );
 }
 
-/** Custom fixture that loads an expired JWT into localStorage. */
+/** Custom fixture that loads an expired JWT into cookies + stale profile. */
 const expiredSessionTest = test.extend({
   storageState: async ({}, use) => {
+    const jwt = signExpiredJwt();
+    const expiry = Math.floor(Date.now() / 1000) - 3600; // already expired
     await use({
-      cookies: [],
+      cookies: [
+        {
+          name: 'ls_jwt',
+          value: jwt,
+          domain: 'localhost',
+          path: '/',
+          httpOnly: true,
+          secure: false,
+          sameSite: 'Lax' as const,
+          expires: -1, // expired
+        },
+        {
+          name: 'ls_csrf',
+          value: 'e2e-csrf-token',
+          domain: 'localhost',
+          path: '/',
+          httpOnly: false,
+          secure: false,
+          sameSite: 'Lax' as const,
+          expires: -1,
+        },
+      ],
       origins: [
         {
           origin: E2E_ORIGIN,
-          localStorage: [{ name: 'auth_jwt', value: signExpiredJwt() }],
+          localStorage: [
+            {
+              name: 'ls_user_profile',
+              value: JSON.stringify({
+                id: 1,
+                email: 'expired@test.com',
+                username: 'expired',
+                accessLevel: 'none',
+              }),
+            },
+            { name: 'ls_token_expiry', value: String(expiry) },
+          ],
         },
       ],
     });
@@ -227,9 +261,11 @@ test.describe('Logout Flow @regression', () => {
       page.getByRole('button', { name: /get started with google/i }),
     ).not.toBeVisible();
 
-    // Simulate logout by removing the JWT from localStorage.
+    // Simulate logout by clearing auth state from localStorage and cookies.
     await page.evaluate(() => {
-      window.localStorage.removeItem('auth_jwt');
+      window.localStorage.removeItem('ls_user_profile');
+      window.localStorage.removeItem('ls_token_expiry');
+      document.cookie = 'ls_csrf=; Max-Age=0; Path=/';
     });
 
     await page.reload();

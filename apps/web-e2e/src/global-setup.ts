@@ -272,15 +272,61 @@ function sleep(ms: number): Promise<void> {
 function writeStorageState(origin: string, jwt: string) {
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 
+  // Decode user profile from the JWT payload for the frontend's cached profile
+  const payload = JSON.parse(
+    Buffer.from(jwt.split('.')[1], 'base64url').toString(),
+  ) as {
+    id?: number;
+    email?: string;
+    username?: string;
+    accessLevel?: string;
+    exp?: number;
+  };
+
+  const userProfile = {
+    id: payload.id ?? 1,
+    email: payload.email ?? 'user@test.com',
+    username: payload.username ?? 'testuser',
+    accessLevel: payload.accessLevel ?? 'none',
+  };
+
+  const expiry = payload.exp ?? Math.floor(Date.now() / 1000) + 3600;
+  const url = new URL(origin);
+
   const storageState = {
-    cookies: [],
+    cookies: [
+      {
+        name: 'ls_jwt',
+        value: jwt,
+        domain: url.hostname,
+        path: '/',
+        httpOnly: true,
+        secure: false, // E2E uses http://localhost
+        sameSite: 'Lax' as const,
+        expires: expiry,
+      },
+      {
+        name: 'ls_csrf',
+        value: 'e2e-csrf-token',
+        domain: url.hostname,
+        path: '/',
+        httpOnly: false,
+        secure: false,
+        sameSite: 'Lax' as const,
+        expires: expiry,
+      },
+    ],
     origins: [
       {
         origin,
         localStorage: [
           {
-            name: 'auth_jwt',
-            value: jwt,
+            name: 'ls_user_profile',
+            value: JSON.stringify(userProfile),
+          },
+          {
+            name: 'ls_token_expiry',
+            value: String(expiry),
           },
         ],
       },

@@ -8,6 +8,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { Dialog } from 'tamagui';
 import { env } from '../../config/environment';
+import { CSRF_HEADER, getCsrfToken } from '../../lib/csrf';
 
 /** Max length for user description in the text area. */
 const MAX_DESCRIPTION_LENGTH = 1000;
@@ -143,10 +144,7 @@ export const BugReportButton: React.FC = () => {
 
     setSubmitState({ status: 'loading' });
 
-    const token =
-      typeof localStorage !== 'undefined'
-        ? (localStorage.getItem('auth_jwt') ?? '')
-        : '';
+    // Auth is now carried by HttpOnly cookies; no need to read from localStorage.
 
     // Convert any attached files to base64 before building the payload
     let attachmentData: Array<{ name: string; type: string; data: string }> =
@@ -184,12 +182,15 @@ export const BugReportButton: React.FC = () => {
     };
 
     try {
+      const csrfToken = getCsrfToken();
       const res = await fetch(`${jiraProxyUrl}/bug`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
         },
+        // Send HttpOnly JWT cookie for authentication
+        credentials: 'include',
         body: JSON.stringify(payload),
       });
 

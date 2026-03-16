@@ -16,6 +16,7 @@ import { EnvironmentVariable, Secret, SECRET_CONFIG } from '../util';
 import { getUserFromGoogleEmail } from '../util/users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { decryptCookies, encryptCookies } from '../util/cookie';
+import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
 import { parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
 
@@ -661,12 +662,16 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
     }
   }
 
+  // Set HttpOnly JWT cookie + JS-readable CSRF cookie (double-submit pattern)
+  const csrfToken = generateCsrfToken();
+  const authCookies = buildAuthCookies(internalJwt, csrfToken);
+
   const result: APIGatewayProxyResult = {
     body: JSON.stringify({
       jwt: internalJwt,
     }),
-    headers: {
-      'Set-Cookie': cookieHeader,
+    multiValueHeaders: {
+      'Set-Cookie': [cookieHeader, ...authCookies],
     },
     statusCode: 200,
   };

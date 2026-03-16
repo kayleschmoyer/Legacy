@@ -208,15 +208,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   ];
 
   // ---- Auth ----
-  const token = useMemo(() => {
-    try {
-      return typeof localStorage !== 'undefined'
-        ? localStorage.getItem('auth_jwt')
-        : null;
-    } catch {
-      return null;
-    }
-  }, []);
+  const isAuthenticated = !!user;
 
   // ---- League Data ----
   const {
@@ -919,9 +911,12 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const { connected: wsConnected } = useWebSocket({
     url: env.websocketUrl,
     leagueId: leagueId ?? undefined,
-    token: token ?? undefined,
+    // No token — auth is carried by the HttpOnly cookie sent with the WS handshake.
+    // NOTE: If the WS endpoint is on a different domain than the API, the cookie
+    // won't be sent. Set `Domain=.legacy-fantasy.com` on the cookie or use a
+    // query-string token fallback in that case.
     viewContext: 'league',
-    autoConnect: !!leagueId && !!token,
+    autoConnect: !!leagueId && isAuthenticated,
     onDraftStarted: handleDraftStarted,
     onDraftPickMade: handleDraftPickMade,
     onDraftPickUndone: handleDraftPickUndone,

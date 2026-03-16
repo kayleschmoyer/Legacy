@@ -46,6 +46,66 @@ const GQL_BASE =
   process.env.INTEGRATION_BASE_URL ??
   'https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/';
 
+/**
+ * Build a Playwright storageState for cookie-based auth (integration tests).
+ * Sets ls_jwt cookie, ls_csrf cookie, and caches user profile in localStorage.
+ */
+function buildIntegrationStorageState(jwt: string) {
+  const payload = JSON.parse(
+    Buffer.from(jwt.split('.')[1], 'base64url').toString(),
+  ) as {
+    id?: number;
+    email?: string;
+    username?: string;
+    accessLevel?: string;
+    exp?: number;
+  };
+
+  const userProfile = {
+    id: payload.id ?? 1,
+    email: payload.email ?? 'user@test.com',
+    username: payload.username ?? 'testuser',
+    accessLevel: payload.accessLevel ?? 'none',
+  };
+
+  const expiry = payload.exp ?? Math.floor(Date.now() / 1000) + 3600;
+  const url = new URL(WEB_BASE);
+
+  return {
+    cookies: [
+      {
+        name: 'ls_jwt',
+        value: jwt,
+        domain: url.hostname,
+        path: '/',
+        httpOnly: true,
+        secure: url.protocol === 'https:',
+        sameSite: 'None' as const,
+        expires: expiry,
+      },
+      {
+        name: 'ls_csrf',
+        value: 'integration-csrf-token',
+        domain: url.hostname,
+        path: '/',
+        httpOnly: false,
+        secure: url.protocol === 'https:',
+        sameSite: 'None' as const,
+        expires: expiry,
+      },
+    ],
+    origins: [
+      {
+        origin: WEB_BASE,
+        localStorage: [
+          { name: 'ls_user_profile', value: JSON.stringify(userProfile) },
+          { name: 'ls_token_expiry', value: String(expiry) },
+        ],
+      },
+    ],
+  };
+}
+
 interface CliAuthData {
   tokens: Record<string, { jwt: string; expiresAt: number; email: string }>;
   defaultUser: string;
@@ -185,15 +245,7 @@ export const test = base.extend<UIIntegrationFixtures>({
 
     const context = await browser.newContext({
       baseURL: WEB_BASE,
-      storageState: {
-        cookies: [],
-        origins: [
-          {
-            origin: WEB_BASE,
-            localStorage: [{ name: 'auth_jwt', value: jwt }],
-          },
-        ],
-      },
+      storageState: buildIntegrationStorageState(jwt),
     });
     const page = await context.newPage();
     await use(page);
@@ -228,15 +280,7 @@ export const test = base.extend<UIIntegrationFixtures>({
   managerPage1: async ({ browser, managerJwt1 }, use) => {
     const context = await browser.newContext({
       baseURL: WEB_BASE,
-      storageState: {
-        cookies: [],
-        origins: [
-          {
-            origin: WEB_BASE,
-            localStorage: [{ name: 'auth_jwt', value: managerJwt1 }],
-          },
-        ],
-      },
+      storageState: buildIntegrationStorageState(managerJwt1),
     });
     const page = await context.newPage();
     await use(page);
@@ -246,15 +290,7 @@ export const test = base.extend<UIIntegrationFixtures>({
   managerPage2: async ({ browser, managerJwt2 }, use) => {
     const context = await browser.newContext({
       baseURL: WEB_BASE,
-      storageState: {
-        cookies: [],
-        origins: [
-          {
-            origin: WEB_BASE,
-            localStorage: [{ name: 'auth_jwt', value: managerJwt2 }],
-          },
-        ],
-      },
+      storageState: buildIntegrationStorageState(managerJwt2),
     });
     const page = await context.newPage();
     await use(page);
@@ -264,15 +300,7 @@ export const test = base.extend<UIIntegrationFixtures>({
   managerPage3: async ({ browser, managerJwt3 }, use) => {
     const context = await browser.newContext({
       baseURL: WEB_BASE,
-      storageState: {
-        cookies: [],
-        origins: [
-          {
-            origin: WEB_BASE,
-            localStorage: [{ name: 'auth_jwt', value: managerJwt3 }],
-          },
-        ],
-      },
+      storageState: buildIntegrationStorageState(managerJwt3),
     });
     const page = await context.newPage();
     await use(page);

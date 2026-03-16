@@ -34,8 +34,9 @@ export function getCorsHeaders(
   const allowed = getAllowedOrigins();
   const headers: Record<string, string> = {
     'Access-Control-Allow-Headers':
-      'Content-Type, Authorization, X-Requested-With, apollo-require-preflight',
+      'Content-Type, Authorization, X-Requested-With, apollo-require-preflight, X-CSRF-Token',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Max-Age': '86400',
     // Security headers
     'X-Content-Type-Options': 'nosniff',
@@ -55,8 +56,9 @@ export function getCorsHeaders(
 // Access-Control-Allow-Origin (which requires a validated request origin).
 export const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Headers':
-    'Content-Type, Authorization, X-Requested-With, apollo-require-preflight',
+    'Content-Type, Authorization, X-Requested-With, apollo-require-preflight, X-CSRF-Token',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
   'Access-Control-Max-Age': '86400',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',

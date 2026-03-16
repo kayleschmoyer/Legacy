@@ -17,6 +17,13 @@ interface AuthTokens {
   refreshToken?: string;
 }
 
+/** localStorage key for cached user profile (non-sensitive, used for fast reload). */
+const USER_PROFILE_KEY = 'ls_user_profile';
+/** localStorage key for cached token expiry (seconds since epoch). */
+const TOKEN_EXPIRY_KEY = 'ls_token_expiry';
+/** localStorage key for admin profile during impersonation. */
+const ADMIN_PROFILE_KEY = 'ls_admin_profile';
+
 interface SecureOAuthResponse {
   jwt: string;
   refreshToken?: string;
@@ -140,6 +147,7 @@ export class AuthService {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -189,6 +197,7 @@ export class AuthService {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify(requestBody),
     });
 
@@ -307,27 +316,46 @@ export class AuthService {
   }
 
   /**
-   * Store authentication tokens securely (platform-specific)
+   * Store authentication tokens securely (platform-specific).
+   *
+   * On web, the JWT is now stored in an HttpOnly cookie set by the server.
+   * We no longer persist it in localStorage to prevent XSS token theft.
+   * Only the refresh token (if present) is kept in localStorage for mobile.
    */
   private storeTokens(tokens: AuthTokens): void {
     try {
-      // Use secure storage for tokens
       if (typeof localStorage !== 'undefined') {
-        // Web storage
-        localStorage.setItem('auth_jwt', tokens.jwt);
+        // Do NOT store JWT in localStorage — it's now in an HttpOnly cookie.
+        // Only store refresh token for mobile flows that need it.
         if (tokens.refreshToken) {
           localStorage.setItem('auth_refresh_token', tokens.refreshToken);
         }
+        // Store the token expiry so the frontend can schedule proactive refresh.
+        try {
+          const parts = tokens.jwt.split('.');
+          if (parts.length === 3) {
+            const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+            const payload = JSON.parse(atob(padded)) as { exp?: number };
+            if (payload.exp) {
+              localStorage.setItem(TOKEN_EXPIRY_KEY, String(payload.exp));
+            }
+          }
+        } catch {
+          // Token expiry extraction failed — proactive refresh won't schedule
+        }
       }
-      // Mobile storage would use SecureStorageProvider
     } catch (error) {
       LOGGER.error('Failed to store auth tokens:', String(error));
-      // Don't throw here - authentication was successful, storage is optional
     }
   }
 
   /**
-   * Get stored JWT token
+   * Get stored JWT token.
+   *
+   * On web, the JWT is in an HttpOnly cookie (not accessible to JS).
+   * This method only returns a token if one was manually stored in
+   * localStorage (e.g. during admin impersonation).
    */
   getStoredToken(): string | null {
     try {
@@ -342,13 +370,16 @@ export class AuthService {
   }
 
   /**
-   * Clear stored tokens (logout)
+   * Clear stored tokens and cached profile (logout)
    */
   clearTokens(): void {
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('auth_jwt');
         localStorage.removeItem('auth_refresh_token');
+        localStorage.removeItem(USER_PROFILE_KEY);
+        localStorage.removeItem(TOKEN_EXPIRY_KEY);
+        localStorage.removeItem(ADMIN_PROFILE_KEY);
       }
     } catch (error) {
       LOGGER.error('Failed to clear auth tokens:', String(error));
@@ -398,22 +429,36 @@ export class AuthService {
 
   /**
    * Silently refresh an expired JWT by calling the /oauth/refresh-jwt endpoint.
-   * The caller does NOT need a Google refresh token — the endpoint re-validates
-   * the user via the database.
+   * The server reads the JWT from the HttpOnly cookie. During impersonation,
+   * the impersonation token from localStorage is sent as a Bearer header.
    *
    * @returns The new JWT string on success, or null if refresh is not possible.
    */
   async refreshJwt(): Promise<string | null> {
-    const currentToken = this.getStoredToken();
-    if (!currentToken) return null;
-
     try {
+      // During impersonation, send the impersonation JWT as Authorization header
+      const impersonationToken =
+        typeof localStorage !== 'undefined'
+          ? localStorage.getItem('auth_jwt')
+          : null;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (impersonationToken) {
+        headers['Authorization'] = `Bearer ${impersonationToken}`;
+      }
+
+      // Attach CSRF double-submit header so the server can validate the request
+      const csrf = this.getCsrfToken();
+      if (csrf) {
+        headers['X-CSRF-Token'] = csrf;
+      }
+
       const response = await fetch(`${this.oauthProxyUrl}/refresh-jwt`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${currentToken}`,
-        },
+        headers,
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -431,7 +476,7 @@ export class AuthService {
         return null;
       }
 
-      // Persist the new token so subsequent requests use it immediately
+      // Persist the expiry so subsequent proactive refresh can reschedule
       this.storeTokens({ jwt: result.jwt });
 
       return result.jwt;
@@ -502,5 +547,126 @@ export class AuthService {
       LOGGER.error('Failed to validate JWT locally:', String(error));
       return false;
     }
+  }
+
+  // ─── User profile caching ───────────────────────────────────────────────
+
+  /**
+   * Store a decoded user profile in localStorage for fast session restore
+   * on page reload. This is non-sensitive data — the actual JWT stays in
+   * the HttpOnly cookie.
+   */
+  storeUserProfile(user: User): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(user));
+      }
+    } catch (error) {
+      LOGGER.error('Failed to store user profile:', String(error));
+    }
+  }
+
+  /**
+   * Get cached user profile from localStorage.
+   * Returns null if no profile is cached.
+   */
+  getStoredUserProfile(): User | null {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(USER_PROFILE_KEY);
+        if (raw) return JSON.parse(raw) as User;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get the cached token expiry (seconds since epoch) from localStorage.
+   */
+  getStoredTokenExpiry(): number | null {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(TOKEN_EXPIRY_KEY);
+        if (raw) return Number(raw);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  // ─── Admin impersonation profile ────────────────────────────────────────
+
+  storeAdminProfile(user: User): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(ADMIN_PROFILE_KEY, JSON.stringify(user));
+      }
+    } catch (error) {
+      LOGGER.error('Failed to store admin profile:', String(error));
+    }
+  }
+
+  getStoredAdminProfile(): User | null {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(ADMIN_PROFILE_KEY);
+        if (raw) return JSON.parse(raw) as User;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  clearAdminProfile(): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(ADMIN_PROFILE_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // ─── Server-side logout ─────────────────────────────────────────────────
+
+  /**
+   * Call the server logout endpoint to clear HttpOnly cookies.
+   * This must be called before clearing client-side state.
+   */
+  async requestLogout(): Promise<void> {
+    try {
+      const headers: Record<string, string> = {};
+      const csrf = this.getCsrfToken();
+      if (csrf) {
+        headers['X-CSRF-Token'] = csrf;
+      }
+
+      await fetch(`${this.oauthProxyUrl}/logout`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+      });
+    } catch (error) {
+      LOGGER.error('AuthService: Logout request failed:', String(error));
+    }
+  }
+
+  // ─── CSRF helper ──────────────────────────────────────────────────────
+
+  /**
+   * Read the CSRF double-submit token from the `ls_csrf` cookie.
+   * Returns an empty string when running outside a browser (SSR / React Native).
+   */
+  private getCsrfToken(): string {
+    if (typeof document === 'undefined') return '';
+    const match = document.cookie
+      .split(';')
+      .map((c) => c.trim())
+      .find((c) => c.startsWith('ls_csrf='));
+    return match ? match.substring('ls_csrf='.length) : '';
   }
 }

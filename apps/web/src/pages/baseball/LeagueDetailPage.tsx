@@ -588,13 +588,7 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   // ── WebSocket: listen for draft lifecycle events ──
 
-  const authToken = useMemo(
-    () =>
-      typeof localStorage !== 'undefined'
-        ? (localStorage.getItem('auth_jwt') ?? '')
-        : '',
-    [],
-  );
+  const isAuthenticated = !!user;
 
   // Wrap refetchLeague so we can track background-refresh state for the UI
   // indicator without replacing the entire page with a spinner.
@@ -649,15 +643,19 @@ export function LeagueDetailPage(): React.JSX.Element {
     const wsUrl = env.websocketUrl;
     LOGGER.info('[LeagueDetailPage] WebSocket config', {
       websocketUrl: wsUrl ? `${wsUrl.substring(0, 30)}...` : 'NOT SET',
-      hasAuthToken: !!authToken,
+      isAuthenticated,
       leagueId,
     });
-    if (!wsUrl || !authToken || isNaN(leagueId)) return;
+    if (!wsUrl || !isAuthenticated || isNaN(leagueId)) return;
 
     let active = true;
     const client = new WebSocketClient({
       url: wsUrl,
-      token: authToken,
+      // No token — auth is carried by the HttpOnly cookie sent with the WS handshake.
+      // NOTE: If the WS endpoint is on a different domain than the API (e.g.
+      // ws.legacy-fantasy.com vs api.legacy-fantasy.com), the cookie won't be
+      // sent. In that case, set a `Domain=.legacy-fantasy.com` attribute on
+      // the cookie or pass the token via query string.
       leagueId,
       viewContext: 'league',
       autoConnect: false,
@@ -684,7 +682,7 @@ export function LeagueDetailPage(): React.JSX.Element {
       setWsClient(null);
       setWsConnected(false);
     };
-  }, [leagueId, authToken]);
+  }, [leagueId, isAuthenticated]);
 
   // Subscribe to league-level events on the shared socket.
   useEffect(() => {

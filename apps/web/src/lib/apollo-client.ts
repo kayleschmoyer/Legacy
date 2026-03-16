@@ -13,6 +13,7 @@ import { setContext } from '@apollo/client/link/context';
 import type { ApolloLink } from '@apollo/client/link';
 import { LOGGER } from '@legacy-sports/logging';
 import { captureError } from '@legacy-sports/rollbar/web';
+import { CSRF_HEADER, getCsrfToken } from './csrf';
 import { env } from '../config/environment';
 
 // GraphQL endpoint URL from centralized environment config
@@ -27,18 +28,33 @@ const httpLink = createHttpLink({
   headers: {
     'apollo-require-preflight': 'true',
   },
+  // Send HttpOnly cookies (ls_jwt) with every request
+  credentials: 'include',
 });
 
-// Authentication link to add JWT token to requests
+// Authentication link — sends the CSRF double-submit token so the server
+// can validate that the request originated from our frontend.
+// JWT auth is now carried by the HttpOnly cookie (credentials: 'include').
+// Falls back to localStorage only for admin impersonation sessions.
 const authLink = setContext((_, { headers }) => {
-  // Get the authentication token from local storage if it exists
-  const token = localStorage.getItem('auth_jwt');
+  const csrfToken = getCsrfToken();
 
-  // Return the headers to the context so httpLink can read them
+  // Admin impersonation still stores a token in localStorage because the
+  // server-side cookie can't be overridden from JS (HttpOnly).
+  // When an impersonation token is present, send it as a Bearer header.
+  // TODO: When the impersonation token expires, the refresh endpoint will
+  // refresh the *real* user's cookie — not the impersonation session. A
+  // dedicated impersonation refresh flow is needed if long-lived
+  // impersonation sessions are required.
+  const impersonationToken = localStorage.getItem('auth_jwt');
+
   return {
     headers: {
       ...headers,
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
+      ...(impersonationToken
+        ? { authorization: `Bearer ${impersonationToken}` }
+        : {}),
     },
   };
 });
@@ -49,8 +65,9 @@ let refreshInFlight: Promise<string | null> | null = null;
 
 /**
  * Silently refresh the JWT by calling the oauth proxy's /refresh-jwt endpoint.
- * Deduplicates concurrent calls so only one network request is made even when
- * multiple queries fail simultaneously with an auth error.
+ * The server reads the JWT from the HttpOnly cookie and returns a new one
+ * (also set as a cookie). Deduplicates concurrent calls so only one network
+ * request is made even when multiple queries fail simultaneously.
  */
 async function silentlyRefreshJwt(): Promise<string | null> {
   // Deduplicate: if a refresh is already in-flight, wait for it
@@ -58,17 +75,17 @@ async function silentlyRefreshJwt(): Promise<string | null> {
     return refreshInFlight;
   }
 
-  const currentToken = localStorage.getItem('auth_jwt');
-  if (!currentToken) return null;
-
   refreshInFlight = (async () => {
     try {
+      const csrfToken = getCsrfToken();
       const response = await fetch(`${env.oauthProxyUrl}/refresh-jwt`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${currentToken}`,
+          ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
         },
+        // Send the HttpOnly cookie so the server can read the current JWT
+        credentials: 'include',
       });
 
       if (!response.ok) return null;
@@ -76,8 +93,8 @@ async function silentlyRefreshJwt(): Promise<string | null> {
       const result = (await response.json()) as { jwt?: string };
       if (!result.jwt) return null;
 
-      // Persist the new token immediately so retried requests pick it up
-      localStorage.setItem('auth_jwt', result.jwt);
+      // The server also sets updated cookies automatically.
+      // Return the token so the retry flow knows refresh succeeded.
       return result.jwt;
     } catch (err) {
       // Network errors (device offline, CORS, DNS) are expected — swallow silently.

@@ -33,17 +33,46 @@ async function getJwtSecret(): Promise<string> {
   return jwtSecretPromise;
 }
 
+/** Cookie name for the HttpOnly JWT cookie set by the OAuth proxy. */
+const JWT_COOKIE = 'ls_jwt';
+
 /**
- * Verify the Bearer token in the Authorization header against the JWT secret.
+ * Parse the JWT from the Cookie header string.
+ * Returns null if the ls_jwt cookie is not present.
+ */
+function parseJwtFromCookies(cookieHeader: string | undefined): string | null {
+  if (!cookieHeader) return null;
+  for (const cookie of cookieHeader.split(';')) {
+    const [name, ...valueParts] = cookie.trim().split('=');
+    if (name === JWT_COOKIE) {
+      return valueParts.join('=') || null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Verify the JWT from the Authorization Bearer header or HttpOnly cookie.
  * Returns the decoded payload on success, or null if the token is absent or invalid.
  */
 async function verifyAuthToken(
   headers: APIGatewayEvent['headers'],
 ): Promise<JwtUserPayload | null> {
+  // Prefer Authorization header (used by admin impersonation & CLI)
   const authHeader =
     headers?.['Authorization'] ?? headers?.['authorization'] ?? null;
-  if (!authHeader?.startsWith('Bearer ')) return null;
-  const token = authHeader.slice(7);
+  let token: string | null = null;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+  } else {
+    // Fall back to HttpOnly cookie (normal browser sessions)
+    const cookieHeader = headers?.['Cookie'] ?? headers?.['cookie'];
+    token = parseJwtFromCookies(cookieHeader);
+  }
+
+  if (!token) return null;
+
   try {
     const secret = await getJwtSecret();
     const decoded = verify(token, secret, {

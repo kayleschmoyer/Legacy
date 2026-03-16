@@ -1,6 +1,7 @@
 import { verify } from 'jsonwebtoken';
 import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
+import type { APIGatewayProxyEvent } from 'aws-lambda';
 
 export interface ImpersonatedBy {
   id: number;
@@ -87,6 +88,13 @@ export function parseUserFromJwtPayload(payload: JWTPayload): User {
 }
 
 /**
+ * Cookie name for the HttpOnly JWT cookie set by the OAuth proxy.
+ */
+const JWT_COOKIE = 'ls_jwt';
+const CSRF_COOKIE = 'ls_csrf';
+const CSRF_HEADER = 'x-csrf-token';
+
+/**
  * Extract and verify the user from the Authorization header.
  * Returns null if no valid token is present.
  */
@@ -106,6 +114,101 @@ export async function extractUserFromEvent(
     return parseUserFromJwtPayload(decoded);
   } catch (error) {
     LOGGER.warn('Failed to decode JWT', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/**
+ * Parse the JWT value from a Cookie header string.
+ */
+function parseJwtFromCookieHeader(
+  cookieHeader: string | undefined,
+): string | null {
+  if (!cookieHeader) return null;
+  const cookies = cookieHeader.split(';');
+  for (const cookie of cookies) {
+    const [name, ...valueParts] = cookie.trim().split('=');
+    if (name === JWT_COOKIE) {
+      return valueParts.join('=') || null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse the CSRF token from a Cookie header string.
+ */
+function parseCsrfFromCookieHeader(
+  cookieHeader: string | undefined,
+): string | null {
+  if (!cookieHeader) return null;
+  const cookies = cookieHeader.split(';');
+  for (const cookie of cookies) {
+    const [name, ...valueParts] = cookie.trim().split('=');
+    if (name === CSRF_COOKIE) {
+      return valueParts.join('=') || null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Constant-time comparison to prevent timing attacks on CSRF validation.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+/**
+ * Extract and verify the user from an API Gateway event.
+ *
+ * Auth sources (checked in order):
+ * 1. Authorization: Bearer <jwt> header — used by mobile, CLI, system callers
+ * 2. ls_jwt HttpOnly cookie — used by the web frontend (requires valid CSRF)
+ *
+ * When auth comes from a cookie, the X-CSRF-Token header must match the
+ * ls_csrf cookie value (double-submit cookie pattern).
+ */
+export async function extractUserFromApiEvent(
+  event: APIGatewayProxyEvent,
+): Promise<User | null> {
+  // 1. Try Authorization header first (mobile, CLI, system callers)
+  const authorization =
+    event.headers.authorization || event.headers.Authorization;
+  if (authorization?.startsWith('Bearer ')) {
+    return extractUserFromEvent(authorization);
+  }
+
+  // 2. Try HttpOnly cookie
+  const cookieHeader = event.headers.Cookie ?? event.headers.cookie;
+  const cookieJwt = parseJwtFromCookieHeader(cookieHeader);
+  if (!cookieJwt) return null;
+
+  // Validate CSRF double-submit: header must match cookie
+  const csrfHeader =
+    event.headers[CSRF_HEADER] ?? event.headers['X-CSRF-Token'];
+  const csrfCookie = parseCsrfFromCookieHeader(cookieHeader);
+
+  if (!csrfHeader || !csrfCookie || !timingSafeEqual(csrfHeader, csrfCookie)) {
+    LOGGER.warn('CSRF validation failed for cookie-based auth');
+    return null;
+  }
+
+  try {
+    const jwtSecret = await getJwtSecret();
+    const decoded = verify(cookieJwt, jwtSecret, {
+      algorithms: ['HS256'],
+    }) as JWTPayload;
+    return parseUserFromJwtPayload(decoded);
+  } catch (error) {
+    LOGGER.warn('Failed to decode JWT from cookie', {
       error: error instanceof Error ? error.message : String(error),
     });
     return null;

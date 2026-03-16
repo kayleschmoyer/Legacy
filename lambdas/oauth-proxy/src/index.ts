@@ -18,6 +18,7 @@ import {
 import { handleLogin, handleRegister } from './handlers/Local';
 import { handleVerify } from './handlers/Verify';
 import { handleRefreshJwt } from './handlers/RefreshJwt';
+import { handleLogout } from './handlers/Logout';
 import {
   handleDeviceAuthorize,
   handleDeviceCompleteLocal,
@@ -48,8 +49,9 @@ function getAllowedOrigins(): Set<string> {
 
 const BASE_CORS_HEADERS = {
   'Access-Control-Allow-Headers':
-    'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+    'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-CSRF-Token',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+  'Access-Control-Allow-Credentials': 'true',
   // Security headers
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
@@ -282,6 +284,14 @@ const baseOAuthHandler = async (
       case '/dev/oauth/refresh-jwt':
         if (event.httpMethod === 'POST') {
           const result = await handleRefreshJwt(event);
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/logout':
+      case '/dev/oauth/logout':
+        if (event.httpMethod === 'POST') {
+          const result = handleLogout(event);
           return cors(result);
         }
         break;

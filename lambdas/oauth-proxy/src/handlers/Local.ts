@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { hashPassword, testPassword } from '../Users';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
+import { buildAuthCookies, generateCsrfToken } from '../util/jwt-cookie';
 import { parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
 
@@ -52,13 +53,15 @@ export const handleLogin = async (
     };
 
     const cookieHeader = await encryptCookies(cookies);
+    const csrfToken = generateCsrfToken();
+    const authCookies = buildAuthCookies(internalJwt, csrfToken);
 
     return {
       body: JSON.stringify({
         jwt: internalJwt,
       }),
-      headers: {
-        'Set-Cookie': cookieHeader,
+      multiValueHeaders: {
+        'Set-Cookie': [cookieHeader, ...authCookies],
       },
       statusCode: 200,
     };
@@ -101,13 +104,15 @@ export const handleRegister = async (
     };
 
     const cookieHeader = await encryptCookies(cookies);
+    const csrfToken = generateCsrfToken();
+    const authCookies = buildAuthCookies(internalJwt, csrfToken);
 
     return {
       body: JSON.stringify({
         jwt: internalJwt,
       }),
-      headers: {
-        'Set-Cookie': cookieHeader,
+      multiValueHeaders: {
+        'Set-Cookie': [cookieHeader, ...authCookies],
       },
       statusCode: 200,
     };

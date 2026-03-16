@@ -257,23 +257,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
    * expires. When the timer fires it silently obtains a fresh token, updates
    * auth state, and reschedules for the new expiry — keeping the session alive
    * indefinitely while the browser tab stays open.
+   *
+   * Accepts either a JWT string (to decode expiry) or a numeric expiry
+   * (seconds since epoch) when the JWT isn't available in JS (HttpOnly cookie).
    */
   const scheduleProactiveRefresh = useCallback(
-    (token: string) => {
+    (tokenOrExpiry: string | number) => {
       clearRefreshTimer();
 
-      // Read the expiry from the JWT payload
       let expSeconds: number | undefined;
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(
-            atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')),
-          ) as { exp?: number };
-          expSeconds = payload.exp;
+
+      if (typeof tokenOrExpiry === 'number') {
+        expSeconds = tokenOrExpiry;
+      } else {
+        // Decode expiry from JWT string
+        try {
+          const parts = tokenOrExpiry.split('.');
+          if (parts.length === 3) {
+            const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+            const payload = JSON.parse(atob(padded)) as {
+              exp?: number;
+            };
+            expSeconds = payload.exp;
+          }
+        } catch {
+          // Can't decode — skip scheduling
         }
-      } catch {
-        // Can't decode — skip scheduling
       }
 
       if (!expSeconds) return;
@@ -293,6 +303,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             const userInfo = decodeUserFromToken(newToken);
             if (userInfo) {
               dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
+              authService.storeUserProfile(userInfo);
             }
             // Reschedule using the ref so we always call the latest version
             scheduleProactiveRefreshRef.current?.(newToken);
@@ -314,77 +325,73 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
     const initializeAuth = async () => {
       try {
-        const token = authService.getStoredToken();
+        // Check if we're in impersonation mode (impersonation JWT in localStorage)
+        const impersonationToken =
+          typeof localStorage !== 'undefined'
+            ? localStorage.getItem('auth_jwt')
+            : null;
 
-        if (token) {
-          const isValid = authService.verifyToken(token);
-
+        if (impersonationToken) {
+          // Impersonation mode — decode the impersonation JWT
+          const isValid = authService.verifyToken(impersonationToken);
           if (isValid) {
-            // Token is valid — restore session from stored JWT
-            const userInfo = decodeUserFromToken(token);
+            const targetUser = decodeUserFromToken(impersonationToken);
+            const adminProfile = authService.getStoredAdminProfile();
 
-            if (userInfo && isMounted) {
-              // Check if we are currently impersonating
-              const adminToken =
-                typeof localStorage !== 'undefined'
-                  ? localStorage.getItem('admin_original_jwt')
-                  : null;
+            if (targetUser && adminProfile && isMounted) {
+              dispatchAuth({
+                type: 'IMPERSONATE_START',
+                payload: { adminUser: adminProfile, targetUser },
+              });
+              return;
+            }
+          }
+          // Impersonation token invalid — clear it and fall through
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('auth_jwt');
+          }
+          authService.clearAdminProfile();
+        }
 
-              if (adminToken) {
-                const adminUserInfo = decodeUserFromToken(adminToken);
-                if (adminUserInfo) {
+        // Normal flow — restore session from cached user profile.
+        // The actual JWT is in the HttpOnly cookie (not JS-accessible).
+        const cachedProfile = authService.getStoredUserProfile();
+
+        if (cachedProfile && isMounted) {
+          // Restore UI state immediately from cache (no loading flash)
+          dispatchAuth({ type: 'AUTH_SUCCESS', payload: cachedProfile });
+
+          // Schedule proactive refresh using cached expiry
+          const expiry = authService.getStoredTokenExpiry();
+          if (expiry) {
+            const currentTime = Math.floor(Date.now() / 1000);
+            if (expiry > currentTime) {
+              // Token not expired yet — schedule refresh before expiry
+              scheduleProactiveRefresh(expiry);
+            } else {
+              // Token may be expired — attempt a silent refresh
+              const newToken = await authService.refreshJwt();
+              if (newToken && isMounted) {
+                const refreshedUser = decodeUserFromToken(newToken);
+                if (refreshedUser) {
+                  authService.storeUserProfile(refreshedUser);
                   dispatchAuth({
-                    type: 'IMPERSONATE_START',
-                    payload: { adminUser: adminUserInfo, targetUser: userInfo },
+                    type: 'AUTH_SUCCESS',
+                    payload: refreshedUser,
                   });
-                  // Don't schedule proactive refresh during impersonation
+                  scheduleProactiveRefresh(newToken);
                   return;
                 }
               }
-
-              dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
-              scheduleProactiveRefresh(token);
-            }
-          } else if (authService.isTokenExpired(token)) {
-            // Token is expired but may still be refreshable — try a silent refresh
-            const newToken = await authService.refreshJwt();
-
-            if (newToken && isMounted) {
-              const userInfo = decodeUserFromToken(newToken);
-
-              if (userInfo) {
-                const adminToken =
-                  typeof localStorage !== 'undefined'
-                    ? localStorage.getItem('admin_original_jwt')
-                    : null;
-
-                if (adminToken) {
-                  const adminUserInfo = decodeUserFromToken(adminToken);
-                  if (adminUserInfo) {
-                    dispatchAuth({
-                      type: 'IMPERSONATE_START',
-                      payload: {
-                        adminUser: adminUserInfo,
-                        targetUser: userInfo,
-                      },
-                    });
-                    return;
-                  }
-                }
-
-                dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
-                scheduleProactiveRefresh(newToken);
-                return;
+              // Refresh failed — clear state and require re-login
+              authService.clearTokens();
+              if (isMounted) {
+                dispatchAuth({ type: 'AUTH_LOGOUT' });
               }
             }
-
-            // Refresh failed — clear tokens and require re-login
-            authService.clearTokens();
-          } else {
-            // Token is corrupt/invalid — clear it
-            authService.clearTokens();
           }
         }
+        // No cached profile — user is not logged in (or never was on this device)
       } catch (error) {
         LOGGER.error('Auth initialization failed:', String(error));
         authService.clearTokens();
@@ -417,9 +424,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
           email,
           password,
         );
+        authService.storeUserProfile(userInfo);
         dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
-        const storedToken = authService.getStoredToken();
-        if (storedToken) scheduleProactiveRefresh(storedToken);
+        const expiry = authService.getStoredTokenExpiry();
+        if (expiry) scheduleProactiveRefresh(expiry);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Login failed';
@@ -436,9 +444,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
       try {
         const userInfo = await authService.authenticateWithOAuth(oauthResponse);
+        authService.storeUserProfile(userInfo);
         dispatchAuth({ type: 'AUTH_SUCCESS', payload: userInfo });
-        const storedToken = authService.getStoredToken();
-        if (storedToken) scheduleProactiveRefresh(storedToken);
+        const expiry = authService.getStoredTokenExpiry();
+        if (expiry) scheduleProactiveRefresh(expiry);
       } catch (error) {
         LOGGER.error('AuthProvider: loginWithOAuth error:', String(error));
         const errorMessage =
@@ -453,13 +462,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const logout = useCallback(async (): Promise<void> => {
     try {
       clearRefreshTimer();
+      // Clear server-side HttpOnly cookies first
+      await authService.requestLogout();
       authService.clearTokens();
       // Also clear any impersonation state
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('admin_original_jwt');
       }
       dispatchAuth({ type: 'AUTH_LOGOUT' });
-      await Promise.resolve(); // Ensure async behavior to match interface
     } catch (error) {
       LOGGER.error('Logout failed:', String(error));
     }
@@ -471,21 +481,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
   /**
    * Begin impersonating another user.  The calling user must be an admin.
-   * Stores the current admin token so impersonation can be reverted.
+   * Stores the current admin profile so impersonation can be reverted.
+   * The admin's actual JWT stays safely in the HttpOnly cookie.
    *
    * @param impersonationToken - A signed JWT returned by the `impersonateUser` GraphQL mutation.
    */
   const impersonateUser = useCallback(
     (impersonationToken: string) => {
-      const currentToken = authService.getStoredToken();
-      if (!currentToken) {
-        LOGGER.error('impersonateUser: no current token to save');
-        return;
-      }
-
-      const currentAdminUser = decodeUserFromToken(currentToken);
+      // Use current auth state for admin info (can't read HttpOnly cookie JWT)
+      const currentAdminUser = authState.user;
       if (!currentAdminUser) {
-        LOGGER.error('impersonateUser: could not decode current user');
+        LOGGER.error('impersonateUser: no current user in auth state');
         return;
       }
 
@@ -495,9 +501,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         return;
       }
 
-      // Persist admin token so we can restore after impersonation
+      // Save admin profile for restoration when impersonation ends
+      authService.storeAdminProfile(currentAdminUser);
+
+      // Store impersonation JWT in localStorage — Apollo sends it as Bearer
+      // header, which takes priority over the HttpOnly cookie on the server.
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('admin_original_jwt', currentToken);
         localStorage.setItem('auth_jwt', impersonationToken);
       }
 
@@ -510,38 +519,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       // identity never receives another user's cached responses.
       void onUserSwitch?.();
     },
-    [authService, decodeUserFromToken, onUserSwitch],
+    [authService, authState.user, decodeUserFromToken, onUserSwitch],
   );
 
   /** Restore the original admin session, ending impersonation. */
   const stopImpersonating = useCallback(() => {
-    const adminToken =
-      typeof localStorage !== 'undefined'
-        ? localStorage.getItem('admin_original_jwt')
-        : null;
+    // Restore admin profile from cache
+    const adminProfile = authService.getStoredAdminProfile();
 
-    if (!adminToken) {
-      LOGGER.error('stopImpersonating: no admin token stored');
+    if (!adminProfile) {
+      LOGGER.error('stopImpersonating: no admin profile stored');
       return;
     }
 
-    const adminUserInfo = decodeUserFromToken(adminToken);
-    if (!adminUserInfo) {
-      LOGGER.error('stopImpersonating: could not decode admin token');
-      return;
-    }
-
+    // Remove impersonation JWT from localStorage — requests will now use
+    // the admin's HttpOnly cookie JWT automatically.
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('auth_jwt', adminToken);
-      localStorage.removeItem('admin_original_jwt');
+      localStorage.removeItem('auth_jwt');
+      localStorage.removeItem('admin_original_jwt'); // legacy cleanup
     }
+    authService.clearAdminProfile();
 
-    dispatchAuth({ type: 'IMPERSONATE_STOP', payload: adminUserInfo });
+    // Restore admin user profile for UI
+    authService.storeUserProfile(adminProfile);
+
+    dispatchAuth({ type: 'IMPERSONATE_STOP', payload: adminProfile });
 
     // Flush any user-scoped caches (e.g. Apollo InMemoryCache) so the restored
     // admin session never gets stale impersonated-user data.
     void onUserSwitch?.();
-  }, [decodeUserFromToken, onUserSwitch]);
+  }, [authService, onUserSwitch]);
 
   const loginWithProvider = useCallback(async (): Promise<void> => {
     dispatchAuth({ type: 'AUTH_START' });

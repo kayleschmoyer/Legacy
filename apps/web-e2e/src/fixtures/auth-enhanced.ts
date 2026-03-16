@@ -36,6 +36,70 @@ function signTestJwt(overrides: Record<string, unknown> = {}): string {
   );
 }
 
+/**
+ * Build a Playwright storageState object for cookie-based auth.
+ * Sets the HttpOnly JWT cookie, the JS-readable CSRF cookie,
+ * and caches the user profile + token expiry in localStorage.
+ */
+function buildAuthStorageState(
+  jwt: string,
+  userOverrides: Record<string, unknown> = {},
+) {
+  const payload = JSON.parse(
+    Buffer.from(jwt.split('.')[1], 'base64url').toString(),
+  ) as {
+    id?: number;
+    email?: string;
+    username?: string;
+    accessLevel?: string;
+    exp?: number;
+  };
+
+  const userProfile = {
+    id: payload.id ?? 1,
+    email: payload.email ?? 'user@test.com',
+    username: payload.username ?? 'testuser',
+    accessLevel: payload.accessLevel ?? 'none',
+    ...userOverrides,
+  };
+
+  const expiry = payload.exp ?? Math.floor(Date.now() / 1000) + 3600;
+
+  return {
+    cookies: [
+      {
+        name: 'ls_jwt',
+        value: jwt,
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+        secure: false,
+        sameSite: 'Lax' as const,
+        expires: expiry,
+      },
+      {
+        name: 'ls_csrf',
+        value: 'e2e-csrf-token',
+        domain: 'localhost',
+        path: '/',
+        httpOnly: false,
+        secure: false,
+        sameSite: 'Lax' as const,
+        expires: expiry,
+      },
+    ],
+    origins: [
+      {
+        origin: E2E_ORIGIN,
+        localStorage: [
+          { name: 'ls_user_profile', value: JSON.stringify(userProfile) },
+          { name: 'ls_token_expiry', value: String(expiry) },
+        ],
+      },
+    ],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // API isolation — intercept ALL requests that leave the static file server.
 //
@@ -196,15 +260,7 @@ export const adminTest = isolated.extend({
       accessLevel: 'admin',
     });
 
-    await use({
-      cookies: [],
-      origins: [
-        {
-          origin: E2E_ORIGIN,
-          localStorage: [{ name: 'auth_jwt', value: jwt }],
-        },
-      ],
-    });
+    await use(buildAuthStorageState(jwt));
   },
 });
 
@@ -224,15 +280,7 @@ export function createCustomAuthTest(
         accessLevel,
       });
 
-      await use({
-        cookies: [],
-        origins: [
-          {
-            origin: E2E_ORIGIN,
-            localStorage: [{ name: 'auth_jwt', value: jwt }],
-          },
-        ],
-      });
+      await use(buildAuthStorageState(jwt));
     },
   });
 }

@@ -5,6 +5,13 @@ import { readSecret } from '@legacy-sports/aws-utils';
 import { getUserById } from '@legacy-sports/db-client';
 import { Secret, SECRET_CONFIG } from '../util';
 import { createJwt } from '../util/jwt';
+import {
+  buildAuthCookies,
+  CSRF_HEADER,
+  generateCsrfToken,
+  parseJwtFromCookies,
+  validateCsrf,
+} from '../util/jwt-cookie';
 import { withDbClient } from '../util/db';
 
 interface RefreshJwtPayload {
@@ -46,15 +53,39 @@ export const handleRefreshJwt = async (
   const authHeader =
     event.headers['Authorization'] ?? event.headers['authorization'];
 
-  if (!authHeader?.startsWith('Bearer ')) {
-    LOGGER.warn('handleRefreshJwt: missing or malformed Authorization header');
+  // Support reading the JWT from the HttpOnly cookie (primary) or Authorization header (fallback)
+  let token: string | undefined;
+  const cookieHeader = event.headers['Cookie'] ?? event.headers['cookie'];
+
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+  } else {
+    const cookieJwt = parseJwtFromCookies(cookieHeader);
+    if (cookieJwt) {
+      token = cookieJwt;
+    }
+  }
+
+  if (!token) {
+    LOGGER.warn('handleRefreshJwt: no JWT in Authorization header or cookie');
     return {
       statusCode: 401,
-      body: JSON.stringify({ error: 'Authorization header required' }),
+      body: JSON.stringify({ error: 'Authorization required' }),
     };
   }
 
-  const token = authHeader.slice(7);
+  // When auth is cookie-based (not Bearer header), validate CSRF double-submit
+  if (!authHeader?.startsWith('Bearer ')) {
+    const csrfHeaderValue =
+      event.headers[CSRF_HEADER] ?? event.headers['X-CSRF-Token'];
+    if (!validateCsrf(csrfHeaderValue, cookieHeader)) {
+      LOGGER.warn('handleRefreshJwt: CSRF validation failed');
+      return {
+        statusCode: 403,
+        body: JSON.stringify({ error: 'CSRF validation failed' }),
+      };
+    }
+  }
 
   // Read the JWT signing secret
   const jwtKey = await readSecret(SECRET_CONFIG[Secret.JWT_SECRET]);
@@ -123,8 +154,15 @@ export const handleRefreshJwt = async (
 
     LOGGER.info('handleRefreshJwt: issued fresh JWT', { userId: user.id });
 
+    // Set updated HttpOnly cookie + CSRF cookie
+    const csrfToken = generateCsrfToken();
+    const authCookies = buildAuthCookies(newJwt, csrfToken);
+
     return {
       statusCode: 200,
+      multiValueHeaders: {
+        'Set-Cookie': authCookies,
+      },
       body: JSON.stringify({ jwt: newJwt }),
     };
   });

@@ -87,11 +87,17 @@ async function getJwtSecret(): Promise<string> {
 }
 
 /**
+ * Cookie name for the HttpOnly JWT cookie set by the OAuth proxy.
+ */
+const JWT_COOKIE = 'ls_jwt';
+
+/**
  * Extract and validate JWT token from WebSocket connection
  *
- * Supports two token sources for maximum client compatibility:
+ * Supports three token sources for maximum client compatibility:
  * 1. Query string (?token=...) - Required for browser WebSocket API
  * 2. Authorization header (Bearer ...) - Preferred for CLI/native clients
+ * 3. HttpOnly cookie (ls_jwt) - Used by the web frontend
  *
  * Security: Query string tokens work with browsers but may appear in logs.
  * Mitigation: API Gateway access logs are disabled (see terraform/websocket.tf)
@@ -120,11 +126,26 @@ async function validateToken(
           token = match[1];
         }
       }
+
+      // If not in Authorization header, check HttpOnly cookie
+      if (!token) {
+        const cookieHeader = headers?.['cookie'] || headers?.['Cookie'];
+        if (cookieHeader) {
+          const cookies = cookieHeader.split(';');
+          for (const cookie of cookies) {
+            const [name, ...valueParts] = cookie.trim().split('=');
+            if (name === JWT_COOKIE) {
+              token = valueParts.join('=') || undefined;
+              break;
+            }
+          }
+        }
+      }
     }
 
     if (!token || typeof token !== 'string') {
       LOGGER.warn(
-        'No token provided in query parameters or Authorization header',
+        'No token provided in query parameters, Authorization header, or cookie',
       );
       return { valid: false };
     }
@@ -256,6 +277,25 @@ async function handleConnect(
   addBreadcrumb('WebSocket connection request', { connectionId });
 
   try {
+    // Validate Origin header for CSRF protection when using cookie-based auth.
+    // Without this, a malicious page could open a WebSocket to our endpoint and
+    // the browser would attach the HttpOnly cookie automatically.
+    const headers = (event.headers ?? {}) as Record<string, string | undefined>;
+    const origin = headers['Origin'] ?? headers['origin'] ?? undefined;
+    if (origin) {
+      const allowed = (
+        process.env['CORS_ALLOWED_ORIGINS'] ?? 'https://legacy-fantasy.com'
+      )
+        .split(',')
+        .map((o) => o.trim());
+      if (!allowed.includes(origin)) {
+        LOGGER.warn('WebSocket connection rejected: invalid Origin', {
+          origin,
+        });
+        return { statusCode: 403, body: 'Forbidden: Invalid origin' };
+      }
+    }
+
     // Validate JWT token and extract userId
     const { valid, userId, payload } = await validateToken(event);
 

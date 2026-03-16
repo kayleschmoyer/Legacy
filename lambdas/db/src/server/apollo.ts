@@ -8,7 +8,7 @@ import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import type { GenericDatabase } from '@legacy-sports/db-client';
 import type * as PublicSchema from '@legacy-sports/db-client/src/drizzle/public/schema';
 import { LOGGER } from '@legacy-sports/logging';
-import { extractUserFromEvent, type User } from './context';
+import { extractUserFromApiEvent, type User } from './context';
 import {
   MAX_QUERY_COMPLEXITY,
   MAX_QUERY_DEPTH,
@@ -110,10 +110,8 @@ export function createApolloHandler(
     handlers.createAPIGatewayProxyEventRequestHandler(),
     {
       context: async ({ event }) => {
-        // Extract JWT from Authorization header
-        const authorization =
-          event.headers.authorization || event.headers.Authorization;
-        const user: User | null = await extractUserFromEvent(authorization);
+        // Extract JWT from Authorization header or HttpOnly cookie (with CSRF)
+        const user: User | null = await extractUserFromApiEvent(event);
 
         // Check for system API key (EventBridge / admin CLI invocations)
         const systemApiKey = process.env.SYSTEM_API_KEY;
