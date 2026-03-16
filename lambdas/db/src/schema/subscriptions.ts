@@ -10,7 +10,11 @@ import type Stripe from 'stripe';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
-import { AuthenticationError, ForbiddenError } from './graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from './graphql-errors';
 import { getSubscriptionTier, requireAuth } from './authorization';
 import { getStripeClient } from '../server/stripe';
 
@@ -387,14 +391,14 @@ builder.mutationField('setActiveLeagues', (t) =>
 
       const tier = await getSubscriptionTier(context);
       if (tier !== 'free') {
-        throw new Error(
+        throw UserInputError(
           'setActiveLeagues is only available on the free tier. ' +
             'Premium users have all leagues active.',
         );
       }
 
       if (args.leagueIds.length > FREE_TIER_LEAGUE_LIMIT) {
-        throw new Error(
+        throw UserInputError(
           `Free tier allows at most ${FREE_TIER_LEAGUE_LIMIT} active leagues. ` +
             `Received ${args.leagueIds.length} league IDs.`,
         );
