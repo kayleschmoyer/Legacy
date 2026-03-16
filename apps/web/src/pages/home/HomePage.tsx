@@ -344,7 +344,12 @@ export function HomePage(): React.JSX.Element {
   const primarySport = orderedSports[0];
   const defaultSportRoute = primarySport.route;
 
-  const { data: leagueData, loading: leaguesLoading } = useGetUserLeaguesQuery({
+  const {
+    data: leagueData,
+    loading: leaguesLoading,
+    error: leaguesError,
+    refetch: refetchLeagues,
+  } = useGetUserLeaguesQuery({
     skip: !auth?.user,
     fetchPolicy: 'cache-and-network',
   });
@@ -360,16 +365,76 @@ export function HomePage(): React.JSX.Element {
   ).length;
 
   // Auto-show tutorial once for first-time visitors who have no leagues.
+  // Do not trigger when the query failed — that is an error, not a new user.
   useEffect(() => {
-    if (!onboardingComplete && !hasLeagues && !leaguesLoading) {
+    if (
+      !onboardingComplete &&
+      !hasLeagues &&
+      !leaguesLoading &&
+      !leaguesError
+    ) {
       setTutorialOpen(true);
     }
-  }, [onboardingComplete, hasLeagues, leaguesLoading]);
+  }, [onboardingComplete, hasLeagues, leaguesLoading, leaguesError]);
 
   const handleTutorialClose = () => {
     setTutorialOpen(false);
     setOnboardingComplete(true);
   };
+
+  /* ─── Error state: league query failed with no usable cached data ─── */
+  if (leaguesError && !leaguesLoading && !leagueData?.userLeagues) {
+    return (
+      <ScrollView>
+        <PageMeta
+          title="Legacy Sports — Dashboard"
+          description="Your personalized fantasy sports dashboard."
+        />
+        <PageContainer style={pageBackgroundStyle}>
+          <YStack
+            flex={1}
+            alignItems="center"
+            justifyContent="center"
+            gap="$4"
+            padding="$8"
+            minHeight="60vh"
+          >
+            <Text fontSize="$8">
+              <span role="img" aria-label="warning">
+                ⚠️
+              </span>
+            </Text>
+            <H2
+              fontSize="$8"
+              fontWeight="700"
+              color="$color"
+              textAlign="center"
+            >
+              Unable to load your leagues
+            </H2>
+            <Paragraph
+              fontSize="$4"
+              color="$textMuted"
+              textAlign="center"
+              maxWidth={480}
+            >
+              Something went wrong while fetching your leagues. Please try
+              again.
+            </Paragraph>
+            <Button
+              backgroundColor="$brandNavyLight"
+              color="$textOnAccent"
+              pressStyle={{ backgroundColor: '$brandNavyDark' }}
+              hoverStyle={{ backgroundColor: '$brandNavy' }}
+              onPress={() => void refetchLeagues()}
+            >
+              Retry
+            </Button>
+          </YStack>
+        </PageContainer>
+      </ScrollView>
+    );
+  }
 
   /* ─── Personalized dashboard for returning users ─── */
   if (hasLeagues) {
