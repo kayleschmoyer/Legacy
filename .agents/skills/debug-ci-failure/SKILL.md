@@ -50,6 +50,19 @@ Failures most commonly occur in **quality-gates** or **build-validation**.
 
 ## Steps
 
+> **Quick start (PR number known):** Steps 1 + 3 can be combined into a single script
+> call that finds the failed run, downloads the logs, prints a summary, and saves
+> everything to `scratch/pr-<N>-ci.txt` for further reading:
+>
+> ```powershell
+> .\scripts\ci-failure-log.ps1 -PRNumber 1234
+> # Then read the log file it reports:
+> # scratch/pr-1234-ci.txt
+> ```
+>
+> If you don't have a PR number (running from a branch directly), use the manual
+> steps below.
+
 ### 1. Find the failed run
 
 ```powershell
@@ -84,13 +97,21 @@ Look for the **Quality Gates Results** table:
 
 ### 3. Fetch failed logs and extract the actual error
 
+Use the helper script when you have a PR number (preferred — auto-saves to scratch/):
+
+```powershell
+.\scripts\ci-failure-log.ps1 -PRNumber 1234
+# Prints a summary of failing steps and saves full log to scratch/pr-1234-ci.txt
+```
+
+Or manually save by run ID:
+
 ```powershell
 # Show only logs from failed steps (fastest)
 gh run view RUN_ID --log-failed
 
 # Save to a file for easier searching
-gh run view RUN_ID --log-failed > ci-failed.txt
-code ci-failed.txt
+gh run view RUN_ID --log-failed > scratch/pr-<N>-ci.txt
 ```
 
 If `--log-failed` is empty or too short, fetch all logs:

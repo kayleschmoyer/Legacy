@@ -44,6 +44,7 @@ Rebasing replays your branch's commits on top of another branch (usually `main`)
 | Abort and return to pre-rebase state     | `git rebase --abort`                                                                                                       |
 | Resolve generated file conflicts         | `.\scripts\resolve-generated-conflicts.ps1`                                                                                |
 | Skip duplicate migration commits         | `.\scripts\skip-migration-conflict.ps1`                                                                                    |
+| **Rebase a PR worktree (automated)**     | `.\scripts\rebase-pr.ps1 -Branch LS-1234/feature` (fetch + twig rebase + post-rebase stabilization)                        |
 | **Stabilize before push (CRITICAL)**     | `make install ; pnpm exec nx run db:print-schema ; pnpm exec nx affected -t codegen --base=origin/main`                    |
 | **Validate before push**                 | `make pc`                                                                                                                  |
 | **Fix CI formatting failure**            | `pnpm exec nx format:write ; git add -A ; git commit -m "style: fix formatting" ; git push --force-with-lease origin HEAD` |

@@ -118,24 +118,9 @@ foreach ($entry in $toFix) {
    ```powershell
    $branch = $pr.headRefName          # e.g. "LS-1134/upgrade-tamagui"
 
-   # Ensure we're in the main repo for twig/make commands
+   # Get or create the worktree (idempotent):
    Set-Location D:\code\legacy-sports
-
-   # Derive worktree path from twig (never hard-code)
-   $escapedBranch = [regex]::Escape($branch)
-   $wtPath = twig worktree list `
-     | Where-Object { $_ -match $escapedBranch } `
-     | ForEach-Object { ($_ -split '\s+')[0] } `
-     | Select-Object -First 1
-
-   if (-not $wtPath) {
-     twig worktree create $branch
-     $wtPath = twig worktree list `
-       | Where-Object { $_ -match $escapedBranch } `
-       | ForEach-Object { ($_ -split '\s+')[0] } `
-       | Select-Object -First 1
-     make wt-setup WT=$wtPath
-   }
+   $wtPath = .\scripts\pr-enter-worktree.ps1 -Branch $branch
    Set-Location $wtPath
    ```
 
@@ -158,22 +143,11 @@ foreach ($entry in $toFix) {
    ```
 
 5. **Resolve the review threads** — after pushing, resolve each thread
-   so the PR shows all feedback as addressed. Uses the `$entry.threads`
-   collected in Step 1 (each thread object has an `id` field).
+   so the PR shows all feedback as addressed:
 
    ```powershell
-   # $entry.threads was collected in Step 1 — each object has an `id` field
-   foreach ($thread in $entry.threads) {
-     $mutation = @'
-   mutation($threadId: ID!) {
-     resolveReviewThread(input: { threadId: $threadId }) {
-       thread { isResolved }
-     }
-   }
-   '@
-     gh api graphql -f query="$mutation" -f threadId=$($thread.id) | Out-Null
-     Write-Host "  Resolved thread $($thread.id)"
-   }
+   Set-Location D:\code\legacy-sports
+   .\scripts\resolve-review-threads.ps1 -PRNumber $pr.number
    ```
 
 6. **End of loop** — the `foreach ($entry in $toFix)` block repeats
@@ -186,45 +160,14 @@ foreach ($entry in $toFix) {
 ### Step 2b — Re-resolve threads after push
 
 Copilot often **re-reviews** after you push, creating new threads on the same
-or nearby lines. After Step 2's commit & push (step 5 in the loop), re-fetch
-thread IDs and resolve any new unresolved threads. Call this **inside** the
-per-PR loop so each PR is cleaned up before moving on:
+or nearby lines. After Step 2's commit & push (step 5 in the loop), re-run the
+resolve script inside the per-PR loop so each PR is cleaned up before moving on:
 
 ```powershell
-# Define once, before the loop
-$repoInfo = gh repo view --json owner,name | ConvertFrom-Json
-$owner = $repoInfo.owner.login
-$repo = $repoInfo.name
-
-function Resolve-PRThreads($prNum) {
-  $q = @"
-query(\`$owner:String!,\`$repo:String!,\`$number:Int!) {
-  repository(owner:\`$owner,name:\`$repo) {
-    pullRequest(number:\`$number) {
-      reviewThreads(first:100) { nodes { id isResolved } }
-    }
-  }
-}
-"@
-  $result = gh api graphql -f query=$q -f owner=$owner -f repo=$repo -F number=$prNum 2>$null
-  if ($LASTEXITCODE -ne 0) { Write-Warning "Failed to fetch threads for PR #$prNum"; return }
-  $ids = ($result | ConvertFrom-Json).data.repository.pullRequest.reviewThreads.nodes |
-    Where-Object { -not $_.isResolved } | Select-Object -ExpandProperty id
-  if ($ids) {
-    $ids | ForEach-Object {
-      gh api graphql -f query='mutation($t:ID!){resolveReviewThread(input:{threadId:$t}){thread{isResolved}}}' -f t=$_ | Out-Null
-    }
-    Write-Host "Resolved $($ids.Count) threads on PR #$prNum"
-  }
-}
-
 # Inside the foreach ($entry in $toFix) loop, after push:
-Resolve-PRThreads $entry.pr.number
+Set-Location D:\code\legacy-sports
+.\scripts\resolve-review-threads.ps1 -PRNumber $entry.pr.number
 ```
-
-> **GraphQL variable syntax matters**: Use `-f t=$threadId` with `mutation($t:ID!)`,
-> NOT string interpolation inside the query. Interpolating raw IDs is error-prone
-> due to quoting/escaping issues — variables avoid this entirely.
 
 ### Step 2c — Batch-scale considerations
 
