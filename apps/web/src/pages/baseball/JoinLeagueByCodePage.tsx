@@ -363,6 +363,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
               <Button
                 backgroundColor="$gray6"
                 color="$gray11"
+                animation="fast"
                 onPress={() => navigate('/baseball')}
                 disabled={loading}
               >
@@ -371,6 +372,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
               <Button
                 backgroundColor={BRAND_NAVY_LIGHT}
                 color="white"
+                animation="fast"
                 onPress={() => void handleJoin()}
                 disabled={
                   loading ||

@@ -308,16 +308,97 @@ const brandLight = {
 };
 
 // Custom configuration extending the base config
-// Extract the base animation definitions so we can extend them with "fast"
-const baseAnimationDefs =
-  (
-    config.animations as
-      | { animations: Record<string, Record<string, unknown>> }
-      | undefined
-  )?.animations ?? {};
+// Extract the base animation definitions from @tamagui/config.
+// config.animations may be:
+//   1. A driver object: { animations: Record<string, ...>, useAnimations, ... }
+//   2. A plain map: Record<string, AnimationDef>
+// We handle both shapes to survive Tamagui version changes.
+const rawAnimations = config.animations as
+  | { animations?: Record<string, unknown> }
+  | Record<string, unknown>
+  | undefined;
+
+const baseAnimationDefs = ((rawAnimations &&
+  'animations' in rawAnimations &&
+  typeof rawAnimations.animations === 'object' &&
+  rawAnimations.animations) ||
+  {}) as Record<string, Record<string, unknown>>;
 
 const animations = createAnimations({
   ...baseAnimationDefs,
+  // Enumerate critical animation presets explicitly so they are guaranteed
+  // even if baseAnimationDefs extraction silently returns {} on a future
+  // Tamagui upgrade. These override base defs with identical values.
+  '100ms': {
+    type: 'timing' as const,
+    duration: 100,
+  },
+  '75ms': {
+    type: 'timing' as const,
+    duration: 75,
+  },
+  '200ms': {
+    type: 'timing' as const,
+    duration: 200,
+  },
+  bouncy: {
+    type: 'spring' as const,
+    damping: 9,
+    mass: 0.9,
+    stiffness: 150,
+  },
+  lazy: {
+    type: 'spring' as const,
+    damping: 18,
+    stiffness: 50,
+  },
+  medium: {
+    type: 'spring' as const,
+    damping: 15,
+    mass: 1,
+    stiffness: 120,
+  },
+  slow: {
+    type: 'spring' as const,
+    damping: 15,
+    stiffness: 40,
+  },
+  // quick — used by JoinLeagueByCodePage buttons
+  quick: {
+    type: 'spring' as const,
+    damping: 20,
+    mass: 1.2,
+    stiffness: 250,
+  },
+  tooltip: {
+    type: 'spring' as const,
+    damping: 10,
+    mass: 0.9,
+    stiffness: 100,
+  },
+  superBouncy: {
+    type: 'spring' as const,
+    damping: 5,
+    mass: 0.7,
+    stiffness: 200,
+  },
+  slowest: {
+    type: 'spring' as const,
+    damping: 15,
+    stiffness: 10,
+  },
+  quicker: {
+    type: 'spring' as const,
+    damping: 20,
+    mass: 1,
+    stiffness: 250,
+  },
+  quickest: {
+    type: 'spring' as const,
+    damping: 14,
+    mass: 0.1,
+    stiffness: 380,
+  },
   // "fast" — used by PricingPage toggle/FAQ; not in @tamagui/config defaults
   fast: {
     type: 'timing' as const,
