@@ -279,6 +279,70 @@ describe('Trades Resolver', () => {
 
       expect(result).toEqual([]);
     });
+
+    it('returns the pending counter-offer when filtered by team and status', async () => {
+      // Simulates the counter-offer scenario: original trade rejected, counter pending.
+      // The rejected original exists in the DB but the status filter should exclude it —
+      // the mock orderBy result represents what the DB returns after applying the WHERE clause.
+      const _rejectedOriginal = {
+        id: 10,
+        leagueId: 1,
+        proposingTeamId: 1,
+        receivingTeamId: 2,
+        status: 'rejected',
+        message: null,
+        expiresAt: null,
+        respondedAt: new Date(),
+        vetoedAt: null,
+        createdAt: new Date('2026-01-01'),
+        updatedAt: new Date('2026-01-02'),
+      };
+      const counterTrade = {
+        id: 20,
+        leagueId: 1,
+        proposingTeamId: 2,
+        receivingTeamId: 1,
+        status: 'pending',
+        message: null,
+        expiresAt: null,
+        respondedAt: null,
+        vetoedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Main tradeOffers query: select().from().where().orderBy()
+      // The DB would return only the pending trade after filtering by status='pending'
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.orderBy.mockResolvedValueOnce([counterTrade]);
+      // hydrateTrades — teams lookup: select().from().where()
+      mockDb.where.mockResolvedValueOnce([
+        { id: 1, name: 'Commissioner Team' },
+        { id: 2, name: 'Manager Team' },
+      ]);
+      // hydrateTrades — players lookup: innerJoin().where() → default then: []
+
+      const resolver = getResolver('query', 'teamTradeOffers');
+      const result = (await resolver(
+        {},
+        { teamId: 2, status: 'pending' },
+        mockContext,
+        undefined as never,
+      )) as Array<Record<string, unknown>>;
+
+      // Resolver applies a .where() clause that includes the status condition
+      expect(mockDb.where).toHaveBeenCalled();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        id: 20,
+        proposingTeamId: 2,
+        receivingTeamId: 1,
+        status: 'pending',
+        proposingTeamName: 'Manager Team',
+        receivingTeamName: 'Commissioner Team',
+      });
+    });
   });
 
   // ── proposeTrade ───────────────────────────────────────────────────────────

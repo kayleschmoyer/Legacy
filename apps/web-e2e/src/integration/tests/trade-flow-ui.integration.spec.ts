@@ -482,30 +482,51 @@ test.describe
     });
 
     await test.step('Verify the trade was persisted via API', async () => {
-      const data = await gqlFetch<{
-        teamTradeOffers: Array<{
-          id: number;
-          status: string;
-          proposingTeamId: number;
-          receivingTeamId: number;
-        }>;
-      }>(
-        commissionerJwt,
-        `query GetTeamTradeOffers($teamId: Int!, $status: String) {
-            teamTradeOffers(teamId: $teamId, status: $status) {
-              id status proposingTeamId receivingTeamId
-            }
-          }`,
-        { teamId: state.commissionerTeamId, status: 'pending' },
-      );
+      let proposedTradeId = 0;
 
-      const pending = data.teamTradeOffers.filter(
-        (t) =>
-          t.proposingTeamId === state.commissionerTeamId &&
-          t.receivingTeamId === state.managerTeamId,
-      );
-      expect(pending.length).toBeGreaterThan(0);
-      state.proposedTradeId = pending[0].id;
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              teamTradeOffers: Array<{
+                id: number;
+                status: string;
+                proposingTeamId: number;
+                receivingTeamId: number;
+              }>;
+            }>(
+              commissionerJwt,
+              `query GetTeamTradeOffers($teamId: Int!, $status: String) {
+                  teamTradeOffers(teamId: $teamId, status: $status) {
+                    id status proposingTeamId receivingTeamId
+                  }
+                }`,
+              { teamId: state.commissionerTeamId, status: 'pending' },
+            );
+
+            const pending = data.teamTradeOffers.filter(
+              (t) =>
+                t.proposingTeamId === state.commissionerTeamId &&
+                t.receivingTeamId === state.managerTeamId,
+            );
+
+            if (pending.length > 0) {
+              proposedTradeId = pending[0].id;
+            }
+            return pending.length;
+          },
+          {
+            timeout: 20_000,
+            intervals: [1_000, 2_000, 3_000],
+            message:
+              `Proposed trade (proposingTeamId=${state.commissionerTeamId}, ` +
+              `receivingTeamId=${state.managerTeamId}) not found ` +
+              'in teamTradeOffers API response',
+          },
+        )
+        .toBeGreaterThan(0);
+
+      state.proposedTradeId = proposedTradeId;
       expect(state.proposedTradeId).toBeGreaterThan(0);
     });
   });
@@ -724,32 +745,54 @@ test.describe
     });
 
     await test.step('Verify counter-offer persisted via API', async () => {
-      const data = await gqlFetch<{
-        teamTradeOffers: Array<{
-          id: number;
-          status: string;
-          proposingTeamId: number;
-          receivingTeamId: number;
-        }>;
-      }>(
-        managerJwt1,
-        `query GetTeamTradeOffers($teamId: Int!, $status: String) {
-            teamTradeOffers(teamId: $teamId, status: $status) {
-              id status proposingTeamId receivingTeamId
-            }
-          }`,
-        { teamId: state.managerTeamId, status: 'pending' },
-      );
+      // Use polling to account for eventual visibility across Lambda instances.
+      // The mutation commits synchronously, but a subsequent query may hit a
+      // different Lambda/connection that hasn't yet observed the committed row.
+      let counterTradeId = 0;
 
-      const counter = data.teamTradeOffers.find(
-        (t) =>
-          t.proposingTeamId === state.managerTeamId &&
-          t.receivingTeamId === state.commissionerTeamId,
-      );
-      expect(counter).toBeTruthy();
-      if (!counter) throw new Error('counter should be defined');
-      state.counterTradeId = counter.id;
-      expect(state.counterTradeId).toBeGreaterThan(0);
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              teamTradeOffers: Array<{
+                id: number;
+                status: string;
+                proposingTeamId: number;
+                receivingTeamId: number;
+              }>;
+            }>(
+              managerJwt1,
+              `query GetTeamTradeOffers($teamId: Int!, $status: String) {
+                  teamTradeOffers(teamId: $teamId, status: $status) {
+                    id status proposingTeamId receivingTeamId
+                  }
+                }`,
+              { teamId: state.managerTeamId, status: 'pending' },
+            );
+
+            const counter = data.teamTradeOffers.find(
+              (t) =>
+                t.proposingTeamId === state.managerTeamId &&
+                t.receivingTeamId === state.commissionerTeamId,
+            );
+
+            if (counter) {
+              counterTradeId = counter.id;
+            }
+            return counter?.id ?? 0;
+          },
+          {
+            timeout: 20_000,
+            intervals: [1_000, 2_000, 3_000],
+            message:
+              `Counter-offer (proposingTeamId=${state.managerTeamId}, ` +
+              `receivingTeamId=${state.commissionerTeamId}) not found ` +
+              'in teamTradeOffers API response',
+          },
+        )
+        .toBeGreaterThan(0);
+
+      state.counterTradeId = counterTradeId;
     });
 
     await test.step('Restore commissioner identity', async () => {
