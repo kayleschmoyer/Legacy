@@ -498,7 +498,7 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
                   );
                 await context.db
                   .update(PublicSchema.leagues)
-                  .set({ weekAdvanceStatus: 'idle' })
+                  .set({ currentMatchup: null, weekAdvanceStatus: 'idle' })
                   .where(eq(PublicSchema.leagues.id, league.id));
                 result.leaguesAdvanced++;
                 continue;

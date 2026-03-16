@@ -149,30 +149,35 @@ test.describe
     state.leagueId = result.leagueId;
     state.inviteCode = result.inviteCode;
 
-    await test.step('Reduce season to 1 matchup via API (fast-complete)', async () => {
+    await test.step('Reduce season to 1 matchup and disable playoffs via API (fast-complete)', async () => {
       // Setting totalMatchups = 1 before the draft ensures the automated
       // draft will call createAllMatchupsForLeague with only 1 week,
       // so we can advance the entire season in a single API call.
+      // Disabling playoffs ensures the season completes cleanly
+      // (currentMatchup → null) instead of transitioning to a playoff bracket.
       const data = await gqlFetch<{
         updateLeagueSettings: {
           id: number;
           totalMatchups: number | null;
+          playoffEnabled: boolean;
         };
       }>(
         commissionerJwt,
         `mutation SetTotalMatchups($input: UpdateLeagueSettingsInput!) {
              updateLeagueSettings(input: $input) {
-               id totalMatchups
+               id totalMatchups playoffEnabled
              }
            }`,
         {
           input: {
             leagueId: state.leagueId,
             totalMatchups: 1,
+            playoffEnabled: false,
           },
         },
       );
       expect(data.updateLeagueSettings.totalMatchups).toBe(1);
+      expect(data.updateLeagueSettings.playoffEnabled).toBe(false);
     });
   });
 
