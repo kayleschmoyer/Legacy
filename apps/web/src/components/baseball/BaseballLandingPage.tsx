@@ -10,6 +10,7 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
+import { AlertTriangle } from '@tamagui/lucide-icons';
 import {
   Dialog,
   Input,
@@ -606,8 +607,8 @@ export function BaseballLandingPage() {
     DEFAULT_NUM_DIVISIONS,
   );
   const [isPublic, setIsPublic] = React.useState(false);
-  const [search, setSearch] = React.useState('');
   const [createError, setCreateError] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState('');
 
   // Fetch user leagues from GraphQL
   const {
@@ -733,6 +734,7 @@ export function BaseballLandingPage() {
       setMaxRosterSize(25);
       setNumberOfDivisions(DEFAULT_NUM_DIVISIONS);
       setIsPublic(false);
+      setCreateError(null);
     }
   };
 
@@ -762,7 +764,11 @@ export function BaseballLandingPage() {
     })
       .then((result) => {
         const id = result.data?.createLeagueAndTeams?.league?.id;
-        if (id) navigate(`/baseball/league/${id}`);
+        if (id) {
+          navigate(`/baseball/league/${id}`);
+        } else {
+          setCreateError('Failed to create league. Please try again.');
+        }
       })
       .catch((err: unknown) => {
         const msg =
@@ -1635,6 +1641,24 @@ export function BaseballLandingPage() {
               </YStack>
 
               <Separator />
+
+              {createError ? (
+                <XStack
+                  backgroundColor="$red3"
+                  borderColor="$red6"
+                  borderWidth={1}
+                  borderRadius="$3"
+                  padding="$2"
+                  gap="$2"
+                  alignItems="center"
+                  role="alert"
+                >
+                  <AlertTriangle size={14} color="$red10" />
+                  <Text fontSize="$2" color="$red10" flex={1}>
+                    {createError}
+                  </Text>
+                </XStack>
+              ) : null}
 
               <XStack justifyContent="flex-end" gap="$3">
                 {createError && (

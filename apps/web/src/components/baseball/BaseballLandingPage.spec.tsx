@@ -2,9 +2,14 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return -- mock factory returns untyped values */
 /* eslint-disable @typescript-eslint/no-require-imports -- jest.mock factory needs runtime require */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { BaseballLandingPage } from './BaseballLandingPage';
+
+// Mock lucide-icons used for inline error display
+jest.mock('@tamagui/lucide-icons', () => ({
+  AlertTriangle: (props: any) => <span data-testid="alert-icon" {...props} />,
+}));
 
 // Mock shared-components to lightweight HTML equivalents
 jest.mock('@legacy-sports/shared-components', () => ({
@@ -196,6 +201,47 @@ describe('BaseballLandingPage', () => {
       screen.getByRole('button', { name: '1 division' }),
     ).toHaveTextContent('1');
     expect(screen.queryByText('None')).not.toBeInTheDocument();
+  });
+
+  it('shows inline error message when league creation fails', async () => {
+    const {
+      useCreateLeagueAndTeamsMutation,
+    }: any = require('../../api/db/graphql.generated');
+    const mockCreate = jest
+      .fn()
+      .mockRejectedValue(new Error('Network error: request failed'));
+    useCreateLeagueAndTeamsMutation.mockReturnValue([
+      mockCreate,
+      { loading: false },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    // Open the dialog
+    fireEvent.click(screen.getByText(/Create League/i));
+
+    // Type a valid league name to enable the submit button
+    const nameInput = screen.getByPlaceholderText(/Saturday Sluggers/i);
+    fireEvent.change(nameInput, { target: { value: 'My League' } });
+
+    // Submit the form — scope to the dialog; pick the last matching element
+    // because the first is the dialog title <h2>, the second is the submit button
+    const dialog = screen.getByRole('dialog');
+    const createButtons = within(dialog).getAllByText(/Create League/i);
+    fireEvent.click(createButtons[createButtons.length - 1]);
+
+    // Wait for the error to appear
+    const errorMsg = await screen.findByRole('alert');
+    expect(errorMsg).toHaveTextContent('Network error: request failed');
+
+    // Dialog should remain open
+    expect(
+      screen.getByText(/Configure your league settings/i),
+    ).toBeInTheDocument();
   });
 
   it('shows compact hero (not full hero) when user has leagues', () => {
