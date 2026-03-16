@@ -1281,7 +1281,7 @@ export function BaseballLandingPage() {
                                 numberOfDivisions === n ? BRAND_GOLD : '$color'
                               }
                             >
-                              {n === 1 ? 'None' : `${n}`}
+                              {n}
                             </Text>
                           </Button>
                         ))}

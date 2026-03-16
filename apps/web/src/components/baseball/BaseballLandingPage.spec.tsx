@@ -164,6 +164,21 @@ describe('BaseballLandingPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('labels the one-division quick create option as 1 instead of None', () => {
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText(/Create League/i));
+
+    expect(
+      screen.getByRole('button', { name: '1 division' }),
+    ).toHaveTextContent('1');
+    expect(screen.queryByText('None')).not.toBeInTheDocument();
+  });
+
   it('shows compact hero (not full hero) when user has leagues', () => {
     const {
       useGetUserLeaguesQuery,
