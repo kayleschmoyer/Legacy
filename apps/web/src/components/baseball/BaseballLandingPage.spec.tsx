@@ -24,6 +24,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
   ),
   useAuth: () => ({
     isAuthenticated: true,
+    isLoading: false,
     user: { id: '1', username: 'testuser' },
   }),
 }));
@@ -44,6 +45,7 @@ jest.mock('tamagui', () => {
     Paragraph: ({ children, ..._rest }: any) => <p>{children}</p>,
     H1: ({ children, ..._rest }: any) => <h1>{children}</h1>,
     H2: ({ children, ..._rest }: any) => <h2>{children}</h2>,
+    Spinner: ({ ..._rest }: any) => <div role="status">Loading...</div>,
     XStack: ({ children, onPress, ..._rest }: any) => (
       <div onClick={onPress}>{children}</div>
     ),
@@ -225,7 +227,7 @@ describe('BaseballLandingPage', () => {
     expect(screen.queryByText(/\+ Create/)).not.toBeInTheDocument();
   });
 
-  it('keeps hero CTAs visible and shows inline loader during league-load state', () => {
+  it('shows loading spinner during league-load state', () => {
     const {
       useGetUserLeaguesQuery,
     }: any = require('../../api/db/graphql.generated');
@@ -240,12 +242,10 @@ describe('BaseballLandingPage', () => {
       </MemoryRouter>,
     );
 
-    // Full page shell is rendered — hero CTAs are accessible
-    expect(screen.getByText(/Create League/i)).toBeInTheDocument();
-    expect(screen.getByText(/Join League/i)).toBeInTheDocument();
-    expect(screen.getByText(/Mock Draft/i)).toBeInTheDocument();
-    // Inline loading message appears in the leagues section
-    expect(screen.getByText(/Loading your leagues/i)).toBeInTheDocument();
+    // Loading guard shows spinner; hero CTAs are NOT rendered during load
+    expect(screen.queryByText(/Create League/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Join League/i)).not.toBeInTheDocument();
+    // No "Loading your leagues..." text — the spinner is the only indicator
   });
 
   it('shows all leagues when search is whitespace-only', () => {

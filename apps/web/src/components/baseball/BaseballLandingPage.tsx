@@ -13,6 +13,7 @@ import {
   Dialog,
   Input,
   Separator,
+  Spinner,
   styled,
   Text,
   H1 as TH1,
@@ -747,6 +748,28 @@ export function BaseballLandingPage() {
   const filteredLeagues = leagues.filter((l) =>
     (l?.name || '').toLowerCase().includes(search.trim().toLowerCase()),
   );
+
+  /* ─── Loading guards: prevent blank/wrong state while data resolves ─── */
+  if (auth.isLoading || (auth.user && isLoading && !data)) {
+    return (
+      <PageContainer
+        role="main"
+        aria-label="Baseball fantasy landing page"
+        style={pageBackgroundStyle}
+      >
+        <ContentContainer>
+          <YStack
+            flex={1}
+            alignItems="center"
+            justifyContent="center"
+            minHeight="60vh"
+          >
+            <Spinner size="large" color={BRAND_NAVY_LIGHT} />
+          </YStack>
+        </ContentContainer>
+      </PageContainer>
+    );
+  }
 
   /* ─── Helper: full hero for first-time users ─── */
   const fullHero = (
