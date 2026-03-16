@@ -1,4 +1,5 @@
 import React from 'react';
+import type { GestureResponderEvent } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -1156,7 +1157,10 @@ export function BaseballLandingPage() {
 
                     {/* Action */}
                     <ViewLeagueButton
-                      onPress={() => league.id && handleViewLeague(league.id)}
+                      onPress={(e: GestureResponderEvent) => {
+                        e.stopPropagation();
+                        if (league.id) handleViewLeague(league.id);
+                      }}
                       accessibilityLabel={`View ${league.name || 'league'}`}
                     >
                       <Text
