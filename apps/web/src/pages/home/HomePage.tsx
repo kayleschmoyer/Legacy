@@ -11,7 +11,14 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { ScrollView, Separator, styled, Text, H2 as TH2 } from 'tamagui';
+import {
+  ScrollView,
+  Separator,
+  Spinner,
+  styled,
+  Text,
+  H2 as TH2,
+} from 'tamagui';
 import { OnboardingTutorial } from '../../components/onboarding';
 import {
   BrandIcon,
@@ -385,6 +392,24 @@ export function HomePage(): React.JSX.Element {
     setTutorialOpen(false);
     setOnboardingComplete(true);
   };
+
+  /* ─── Loading guard: authenticated user, leagues query in flight, no cache ─── */
+  if (auth?.user && leaguesLoading && !leagueData) {
+    return (
+      <ScrollView>
+        <PageContainer style={pageBackgroundStyle}>
+          <YStack
+            flex={1}
+            alignItems="center"
+            justifyContent="center"
+            minHeight="60vh"
+          >
+            <Spinner size="large" color={BRAND_NAVY_LIGHT} />
+          </YStack>
+        </PageContainer>
+      </ScrollView>
+    );
+  }
 
   /* ─── Error state: league query failed with no usable cached data ─── */
   if (leaguesError && !leaguesLoading && !leagueData?.userLeagues) {
