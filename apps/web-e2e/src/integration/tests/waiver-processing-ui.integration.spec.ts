@@ -417,10 +417,28 @@ test.describe
 
       const byId = new Map(data.leagueTeams.map((t) => [t.id, t]));
 
-      state.commissionerWaiverOrder =
-        byId.get(state.commissionerTeamId)?.waiverOrder ?? 999;
-      state.manager1WaiverOrder =
-        byId.get(state.manager1TeamId)?.waiverOrder ?? 998;
+      const commOrder = byId.get(state.commissionerTeamId)?.waiverOrder ?? null;
+      const mgr1Order = byId.get(state.manager1TeamId)?.waiverOrder ?? null;
+
+      // Waiver orders must be set after league creation — null means a
+      // data integrity issue that would make the priority contest meaningless.
+      expect(
+        commOrder,
+        'Commissioner waiverOrder should not be null',
+      ).not.toBeNull();
+      expect(
+        mgr1Order,
+        'Manager1 waiverOrder should not be null',
+      ).not.toBeNull();
+
+      if (commOrder == null || mgr1Order == null) {
+        throw new Error(
+          'waiverOrder is null — cannot determine expected winner',
+        );
+      }
+
+      state.commissionerWaiverOrder = commOrder;
+      state.manager1WaiverOrder = mgr1Order;
 
       // Pre-compute expected winner: lower waiverOrder value = higher priority
       if (state.commissionerWaiverOrder <= state.manager1WaiverOrder) {

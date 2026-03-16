@@ -61,6 +61,40 @@ interface LeagueSalarySettings {
   salaryCap: number | null;
 }
 
+// ── Sort helper (exported for direct unit testing) ─────────────────────────
+
+/**
+ * Sort waiver claims in-place by priority. For FAAB leagues: highest bid →
+ * lowest waiver order → lowest claim ID. For standard leagues: lowest waiver
+ * order → earliest createdAt → lowest claim ID.
+ */
+export function sortClaimsByPriority(
+  claims: PendingClaim[],
+  waiverType: string,
+  teamSettingsMap: Map<number, TeamSettings>,
+) {
+  claims.sort((a, b) => {
+    if (waiverType === 'faab') {
+      const bidA = a.faabBid ?? 0;
+      const bidB = b.faabBid ?? 0;
+      if (bidB !== bidA) return bidB - bidA;
+      const orderA = teamSettingsMap.get(a.teamId)?.waiverOrder ?? 999;
+      const orderB = teamSettingsMap.get(b.teamId)?.waiverOrder ?? 999;
+      if (orderA !== orderB) return orderA - orderB;
+      // Final deterministic tiebreaker: lower claim ID wins (IDs are
+      // sequential, so a lower ID corresponds to an earlier submission)
+      return a.id - b.id;
+    }
+    const orderA = teamSettingsMap.get(a.teamId)?.waiverOrder ?? 999;
+    const orderB = teamSettingsMap.get(b.teamId)?.waiverOrder ?? 999;
+    if (orderA !== orderB) return orderA - orderB;
+    const timeDiff = a.createdAt.getTime() - b.createdAt.getTime();
+    if (timeDiff !== 0) return timeDiff;
+    // Final deterministic tiebreaker: claim ID (lower = submitted first)
+    return a.id - b.id;
+  });
+}
+
 // ── Service ────────────────────────────────────────────────────────────────
 
 export class WaiverClaimProcessor {
@@ -263,6 +297,7 @@ export class WaiverClaimProcessor {
       .select()
       .from(PublicSchema.waiverClaims)
       .where(and(...conditions))
+      .orderBy(PublicSchema.waiverClaims.id)
       .limit(500);
   }
 
@@ -321,20 +356,7 @@ export class WaiverClaimProcessor {
     waiverType: string,
     teamSettingsMap: Map<number, TeamSettings>,
   ) {
-    claims.sort((a, b) => {
-      if (waiverType === 'faab') {
-        const bidA = a.faabBid ?? 0;
-        const bidB = b.faabBid ?? 0;
-        if (bidB !== bidA) return bidB - bidA;
-        const orderA = teamSettingsMap.get(a.teamId)?.waiverOrder ?? 999;
-        const orderB = teamSettingsMap.get(b.teamId)?.waiverOrder ?? 999;
-        return orderA - orderB;
-      }
-      const orderA = teamSettingsMap.get(a.teamId)?.waiverOrder ?? 999;
-      const orderB = teamSettingsMap.get(b.teamId)?.waiverOrder ?? 999;
-      if (orderA !== orderB) return orderA - orderB;
-      return a.createdAt.getTime() - b.createdAt.getTime();
-    });
+    sortClaimsByPriority(claims, waiverType, teamSettingsMap);
   }
 
   private async cancelLosingClaim(claim: PendingClaim) {
