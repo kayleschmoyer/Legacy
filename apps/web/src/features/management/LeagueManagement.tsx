@@ -11,6 +11,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { useAuth } from '@legacy-sports/shared-components';
 import { useDeleteAllLeaguesMutation } from '../../api/db/graphql.generated';
 import {
   BRAND_GOLD_LIGHT,
@@ -19,6 +20,8 @@ import {
 } from '../../constants/colors';
 
 export const LeagueManagement: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.accessLevel === 'admin';
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
@@ -96,9 +99,9 @@ export const LeagueManagement: React.FC = () => {
                   Delete All Leagues
                 </Text>
                 <Text fontSize="$2" color="$gray10">
-                  Permanently delete all leagues you own, including all teams,
-                  roster data, positions, and member information. This action
-                  cannot be undone.
+                  {isAdmin
+                    ? 'Permanently delete all leagues you are a member of, including all teams, roster data, positions, and member information. This action cannot be undone.'
+                    : 'Permanently delete all leagues you own, including all teams, roster data, positions, and member information. This action cannot be undone.'}
                 </Text>
               </YStack>
 
@@ -134,13 +137,27 @@ export const LeagueManagement: React.FC = () => {
         >
           <YStack space="$3">
             <H4 color={BRAND_GOLD_LIGHT}>Information</H4>
-            <Text fontSize="$3" color="$gray10">
-              • Only leagues you own will be deleted
-            </Text>
-            <Text fontSize="$3" color="$gray10">
-              • Leagues where you're a member (but not the owner) will not be
-              affected
-            </Text>
+            {isAdmin ? (
+              <>
+                <Text fontSize="$3" color="$gray10">
+                  • All leagues you are a member of will be deleted (leagues you
+                  own and leagues you have joined)
+                </Text>
+                <Text fontSize="$3" color="$gray10">
+                  • Leagues you are not a member of will not be affected
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text fontSize="$3" color="$gray10">
+                  • Only leagues you own will be deleted
+                </Text>
+                <Text fontSize="$3" color="$gray10">
+                  • Leagues where you're a member (but not the owner) will not
+                  be affected
+                </Text>
+              </>
+            )}
             <Text fontSize="$3" color="$gray10">
               • You can create new leagues after deletion
             </Text>
@@ -165,12 +182,17 @@ export const LeagueManagement: React.FC = () => {
               Delete All Leagues
             </Dialog.Title>
             <Dialog.Description id="delete-dialog-desc">
-              Are you sure you want to delete ALL of your leagues? This action
-              cannot be undone and will remove:
+              {isAdmin
+                ? 'Are you sure you want to delete ALL leagues you are a member of? This action cannot be undone and will remove:'
+                : 'Are you sure you want to delete ALL leagues you own? This action cannot be undone and will remove:'}
             </Dialog.Description>
 
             <YStack id="delete-dialog-list" space="$2" paddingLeft="$2">
-              <Text fontSize="$3">• All leagues you own</Text>
+              <Text fontSize="$3">
+                {isAdmin
+                  ? '• All leagues you are a member of (owned or joined)'
+                  : '• All leagues you own'}
+              </Text>
               <Text fontSize="$3">• All teams in those leagues</Text>
               <Text fontSize="$3">• All roster data</Text>
               <Text fontSize="$3">• All league positions</Text>
@@ -210,8 +232,9 @@ export const LeagueManagement: React.FC = () => {
               fontWeight="600"
               color="$red10"
             >
-              This is your last chance to cancel. Are you absolutely sure you
-              want to delete ALL your leagues?
+              {isAdmin
+                ? 'This is your last chance to cancel. Are you absolutely sure you want to delete ALL leagues you are a member of?'
+                : 'This is your last chance to cancel. Are you absolutely sure you want to delete ALL your leagues?'}
             </Dialog.Description>
 
             <XStack space="$3" justifyContent="flex-end">
