@@ -1032,7 +1032,9 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
         }
       }
 
-      // Record announcement in the activity log
+      // Record announcement in the activity log (awaited so the entry is
+      // persisted before the mutation returns — prevents Lambda context
+      // freeze from silently dropping the insert).
       await insertActivityLog(context, {
         leagueId: args.leagueId,
         actorUserId: context.user.id,
