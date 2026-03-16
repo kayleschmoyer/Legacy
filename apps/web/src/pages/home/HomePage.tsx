@@ -419,13 +419,22 @@ export function HomePage(): React.JSX.Element {
   /* ─── Loading state — prevents unauthenticated hero flash ─── */
   if (auth.isLoading || (!!auth.user && leaguesLoading)) {
     return (
-      <PageContainer
-        style={pageBackgroundStyle}
-        alignItems="center"
-        justifyContent="center"
-      >
-        <Spinner size="large" color={BRAND_NAVY_LIGHT} />
-      </PageContainer>
+      <ScrollView>
+        <PageMeta
+          title="Legacy Sports"
+          description="Your personalized fantasy sports dashboard."
+        />
+        <PageContainer style={pageBackgroundStyle}>
+          <YStack
+            flex={1}
+            alignItems="center"
+            justifyContent="center"
+            minHeight="60vh"
+          >
+            <Spinner size="large" color="$brandGoldLight" />
+          </YStack>
+        </PageContainer>
+      </ScrollView>
     );
   }
 
