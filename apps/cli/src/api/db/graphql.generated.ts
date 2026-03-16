@@ -1221,6 +1221,8 @@ export type Mutation = {
   updateUserAvatar?: Maybe<User>;
   /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
   updateUserRole?: Maybe<User>;
+  /** Update the username for the currently authenticated user. */
+  updateUsername?: Maybe<User>;
   /** Create or update a single achievement restriction for a league. Commissioner / General Manager access required. */
   upsertAchievementRestriction?: Maybe<AchievementRestriction>;
   /** Create or update a season award for a player in a league. Commissioner / General Manager access required. */
@@ -1709,6 +1711,10 @@ export type MutationUpdateUserAvatarArgs = {
 export type MutationUpdateUserRoleArgs = {
   accessLevel: Scalars['String']['input'];
   userId: Scalars['Int']['input'];
+};
+
+export type MutationUpdateUsernameArgs = {
+  username: Scalars['String']['input'];
 };
 
 export type MutationUpsertAchievementRestrictionArgs = {

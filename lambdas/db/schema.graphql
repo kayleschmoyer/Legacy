@@ -1657,6 +1657,11 @@ type Mutation {
   updateUserRole(accessLevel: String!, userId: Int!): User
 
   """
+  Update the username for the currently authenticated user.
+  """
+  updateUsername(username: String!): User
+
+  """
   Create or update a single achievement restriction for a league. Commissioner / General Manager access required.
   """
   upsertAchievementRestriction(

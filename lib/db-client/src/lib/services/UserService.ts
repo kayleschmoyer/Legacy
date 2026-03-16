@@ -215,6 +215,21 @@ export class UserService {
   }
 
   /**
+   * Update a user's username in the internal schema.
+   * Returns the updated user record from the public view, or null if not found.
+   */
+  async updateUsername(userId: number, username: string): Promise<User | null> {
+    await runWithInternalClient(this.options, async (db) => {
+      await db
+        .update(InternalSchema.usersInAppInternal)
+        .set({ username })
+        .where(eq(InternalSchema.usersInAppInternal.id, userId));
+    });
+
+    return this.getUserById(userId);
+  }
+
+  /**
    * Update a user's avatar URL in the internal schema.
    * Returns the updated user record from the public view, or null if not found.
    */

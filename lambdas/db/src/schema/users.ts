@@ -4,7 +4,11 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
 import { requireAuth } from './authorization';
-import { AuthenticationError, ForbiddenError } from './graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from './graphql-errors';
 import { getJwtSecret } from '../server/context';
 
 // Create a single database service instance to reuse across all resolvers
@@ -208,6 +212,59 @@ builder.mutationField('updateUserRole', (t) =>
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
       };
+    },
+  }),
+);
+
+builder.mutationField('updateUsername', (t) =>
+  t.field({
+    type: UserRef,
+    nullable: true,
+    description: 'Update the username for the currently authenticated user.',
+    args: {
+      username: t.arg.string({ required: true }),
+    },
+    resolve: async (parent, { username }, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const trimmed = username.trim();
+      if (trimmed.length < 3 || trimmed.length > 50) {
+        throw UserInputError('Username must be between 3 and 50 characters');
+      }
+      if (!/^[a-zA-Z0-9_.-]+$/.test(trimmed)) {
+        throw UserInputError(
+          'Username can only contain letters, numbers, underscores, hyphens, and periods',
+        );
+      }
+
+      try {
+        const updated = await dbService.users.updateUsername(
+          context.user.id,
+          trimmed,
+        );
+
+        if (!updated) return null;
+
+        return {
+          id: Number(updated.id),
+          email: updated.email,
+          username: updated.username,
+          accessLevel: updated.accessLevel,
+          avatarUrl: updated.avatarUrl ?? null,
+        };
+      } catch (error: unknown) {
+        // Check for Postgres unique constraint violation (code 23505)
+        const pgError = error as { code?: string; constraint?: string };
+        if (
+          pgError.code === '23505' &&
+          pgError.constraint === 'users_username_uk'
+        ) {
+          throw UserInputError('Username is already taken');
+        }
+        throw error;
+      }
     },
   }),
 );

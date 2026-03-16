@@ -1221,6 +1221,8 @@ export type Mutation = {
   updateUserAvatar?: Maybe<User>;
   /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
   updateUserRole?: Maybe<User>;
+  /** Update the username for the currently authenticated user. */
+  updateUsername?: Maybe<User>;
   /** Create or update a single achievement restriction for a league. Commissioner / General Manager access required. */
   upsertAchievementRestriction?: Maybe<AchievementRestriction>;
   /** Create or update a season award for a player in a league. Commissioner / General Manager access required. */
@@ -1709,6 +1711,10 @@ export type MutationUpdateUserAvatarArgs = {
 export type MutationUpdateUserRoleArgs = {
   accessLevel: Scalars['String']['input'];
   userId: Scalars['Int']['input'];
+};
+
+export type MutationUpdateUsernameArgs = {
+  username: Scalars['String']['input'];
 };
 
 export type MutationUpsertAchievementRestrictionArgs = {
@@ -7682,6 +7688,23 @@ export type AdminGetUsersQuery = {
     username?: string | null;
     accessLevel?: string | null;
   }> | null;
+};
+
+export type UpdateUsernameMutationVariables = Exact<{
+  username: Scalars['String']['input'];
+}>;
+
+export type UpdateUsernameMutation = {
+  __typename?: 'Mutation';
+  updateUsername?: {
+    __typename?: 'User';
+    id?: number | null;
+    email?: string | null;
+    username?: string | null;
+    accessLevel?: string | null;
+    avatarUrl?: string | null;
+    subscriptionTier?: string | null;
+  } | null;
 };
 
 export type ImpersonateUserMutationVariables = Exact<{
@@ -18575,6 +18598,57 @@ export type AdminGetUsersSuspenseQueryHookResult = ReturnType<
 export type AdminGetUsersQueryResult = Apollo.QueryResult<
   AdminGetUsersQuery,
   AdminGetUsersQueryVariables
+>;
+export const UpdateUsername = gql`
+  mutation UpdateUsername($username: String!) {
+    updateUsername(username: $username) {
+      ...User
+    }
+  }
+  ${UserFragmentDoc}
+`;
+export type UpdateUsernameMutationFn = MutationFunction<
+  UpdateUsernameMutation,
+  UpdateUsernameMutationVariables
+>;
+
+/**
+ * __useUpdateUsernameMutation__
+ *
+ * To run a mutation, you first call `useUpdateUsernameMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateUsernameMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateUsernameMutation, { data, loading, error }] = useUpdateUsernameMutation({
+ *   variables: {
+ *      username: // value for 'username'
+ *   },
+ * });
+ */
+export function useUpdateUsernameMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateUsernameMutation,
+    UpdateUsernameMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateUsernameMutation,
+    UpdateUsernameMutationVariables
+  >(UpdateUsername, options);
+}
+export type UpdateUsernameMutationHookResult = ReturnType<
+  typeof useUpdateUsernameMutation
+>;
+export type UpdateUsernameMutationResult =
+  Apollo.MutationResult<UpdateUsernameMutation>;
+export type UpdateUsernameMutationOptions = BaseMutationOptions<
+  UpdateUsernameMutation,
+  UpdateUsernameMutationVariables
 >;
 export const ImpersonateUser = gql`
   mutation ImpersonateUser($userId: Int!) {

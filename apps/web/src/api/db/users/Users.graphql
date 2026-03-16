@@ -48,6 +48,12 @@ query AdminGetUsers($limit: Int, $offset: Int) {
   }
 }
 
+mutation UpdateUsername($username: String!) {
+  updateUsername(username: $username) {
+    ...User
+  }
+}
+
 mutation ImpersonateUser($userId: Int!) {
   impersonateUser(userId: $userId) {
     token

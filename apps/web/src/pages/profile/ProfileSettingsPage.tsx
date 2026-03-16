@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   H1,
   Paragraph,
@@ -7,11 +7,12 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { ScrollView, styled } from 'tamagui';
+import { Input, ScrollView, styled } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import {
   useGetUserByIdQuery,
   useUpdateUserAvatarMutation,
+  useUpdateUsernameMutation,
 } from '../../api/db/graphql.generated';
 import { AvatarPicker } from '../../components/common';
 import {
@@ -213,8 +214,21 @@ const ProfileSettingsPage: React.FC = () => {
   });
   const [updateUserAvatar, { loading: avatarLoading }] =
     useUpdateUserAvatarMutation();
+  const [updateUsername, { loading: usernameLoading }] =
+    useUpdateUsernameMutation();
 
   const currentAvatarUrl = userData?.user?.avatarUrl ?? null;
+  const dbUsername = userData?.user?.username ?? userName;
+
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [editedUsername, setEditedUsername] = useState(dbUsername);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isEditingUsername) {
+      setEditedUsername(dbUsername);
+    }
+  }, [dbUsername, isEditingUsername]);
 
   const handleAvatarSelect = (url: string | null) => {
     void updateUserAvatar({
@@ -222,6 +236,53 @@ const ProfileSettingsPage: React.FC = () => {
       onCompleted: () => void refetchUser(),
     });
   };
+
+  const handleUsernameEdit = useCallback(() => {
+    setIsEditingUsername(true);
+    setUsernameError(null);
+  }, []);
+
+  const handleUsernameCancel = useCallback(() => {
+    setIsEditingUsername(false);
+    setEditedUsername(dbUsername);
+    setUsernameError(null);
+  }, [dbUsername]);
+
+  const handleUsernameSave = useCallback(() => {
+    const trimmed = editedUsername.trim();
+    if (trimmed.length < 3 || trimmed.length > 50) {
+      setUsernameError('Username must be between 3 and 50 characters');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_.-]+$/.test(trimmed)) {
+      setUsernameError(
+        'Only letters, numbers, underscores, hyphens, and periods allowed',
+      );
+      return;
+    }
+    if (trimmed === dbUsername) {
+      setEditedUsername(dbUsername);
+      setUsernameError(null);
+      setIsEditingUsername(false);
+      return;
+    }
+    setUsernameError(null);
+    void updateUsername({
+      variables: { username: trimmed },
+      onCompleted: () => {
+        setIsEditingUsername((editing) => {
+          if (editing) void refetchUser();
+          return false;
+        });
+      },
+      onError: (err) => {
+        setIsEditingUsername((editing) => {
+          if (editing) setUsernameError(err.message);
+          return editing;
+        });
+      },
+    });
+  }, [editedUsername, dbUsername, updateUsername, refetchUser]);
 
   if (!user) {
     return null;
@@ -351,7 +412,66 @@ const ProfileSettingsPage: React.FC = () => {
               <YStack gap="$3">
                 <FieldRow>
                   <FieldLabel>Username</FieldLabel>
-                  <FieldValue>{userName}</FieldValue>
+                  {isEditingUsername ? (
+                    <YStack flex={1} gap="$2">
+                      <XStack gap="$2" alignItems="center" flex={1}>
+                        <Input
+                          value={editedUsername}
+                          onChangeText={setEditedUsername}
+                          maxLength={50}
+                          autoFocus
+                          flex={1}
+                          size="$4"
+                          borderColor={
+                            usernameError ? BRAND_SEAM_RED : '$glassBorder'
+                          }
+                          onKeyPress={(e: { nativeEvent: { key: string } }) => {
+                            if (e.nativeEvent.key === 'Enter')
+                              handleUsernameSave();
+                            if (e.nativeEvent.key === 'Escape')
+                              handleUsernameCancel();
+                          }}
+                        />
+                        <EditButton
+                          onPress={handleUsernameSave}
+                          disabled={usernameLoading}
+                          opacity={usernameLoading ? 0.6 : 1}
+                        >
+                          <Paragraph size="$2" fontWeight="600" color="white">
+                            {usernameLoading ? '...' : 'Save'}
+                          </Paragraph>
+                        </EditButton>
+                        <EditButton
+                          onPress={handleUsernameCancel}
+                          disabled={usernameLoading}
+                          opacity={usernameLoading ? 0.6 : 1}
+                          style={{ backgroundColor: withAlpha(BG_DARK, 0.6) }}
+                        >
+                          <Paragraph
+                            size="$2"
+                            fontWeight="600"
+                            color="$colorPress"
+                          >
+                            Cancel
+                          </Paragraph>
+                        </EditButton>
+                      </XStack>
+                      {usernameError && (
+                        <Paragraph size="$2" style={{ color: BRAND_SEAM_RED }}>
+                          {usernameError}
+                        </Paragraph>
+                      )}
+                    </YStack>
+                  ) : (
+                    <XStack flex={1} alignItems="center" gap="$3">
+                      <FieldValue>{dbUsername}</FieldValue>
+                      <EditButton onPress={handleUsernameEdit}>
+                        <Paragraph size="$2" fontWeight="600" color="white">
+                          Edit
+                        </Paragraph>
+                      </EditButton>
+                    </XStack>
+                  )}
                 </FieldRow>
                 <FieldRow>
                   <FieldLabel>Email</FieldLabel>
@@ -379,9 +499,8 @@ const ProfileSettingsPage: React.FC = () => {
                   </span>
                 </Paragraph>
                 <Paragraph size="$3" color="$colorPress" flex={1}>
-                  Profile details are managed through your Google account. To
-                  update your name or profile photo, visit your Google Account
-                  settings.
+                  You can change your username above. Email and profile photo
+                  are managed through your Google account.
                 </Paragraph>
               </InfoBanner>
             </SectionBody>
@@ -559,6 +678,24 @@ const SignOutButton = styled(YStack, {
   alignItems: 'center',
   justifyContent: 'center',
   backgroundColor: BRAND_SEAM_RED,
+  hoverStyle: {
+    opacity: 0.85,
+  },
+  pressStyle: {
+    scale: 0.97,
+    opacity: 0.9,
+  },
+  animation: 'quick',
+});
+
+const EditButton = styled(YStack, {
+  paddingHorizontal: '$3',
+  paddingVertical: '$1.5',
+  borderRadius: '$4',
+  cursor: 'pointer',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: BRAND_NAVY_LIGHT,
   hoverStyle: {
     opacity: 0.85,
   },
