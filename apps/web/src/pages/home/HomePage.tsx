@@ -749,6 +749,14 @@ export function HomePage(): React.JSX.Element {
               </ActionButton>
               <OutlineButton
                 onPress={() => {
+                  navigate('/baseball/league/join');
+                }}
+                accessibilityLabel="Join an existing league with an invite code"
+              >
+                <Text fontWeight="700">Join a League</Text>
+              </OutlineButton>
+              <OutlineButton
+                onPress={() => {
                   navigate('/players/stats');
                 }}
                 accessibilityLabel="Browse player statistics"
