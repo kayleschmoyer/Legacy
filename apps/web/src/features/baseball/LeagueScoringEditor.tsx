@@ -436,6 +436,14 @@ export function LeagueScoringEditor(
       });
 
       await onRefetch();
+
+      setFormValues((prev) => {
+        const next = { ...prev };
+        for (const update of updatesToSave) {
+          next[update.statDefinitionId] = formatMultiplier(update.multiplier);
+        }
+        return next;
+      });
       setSaveSuccess(true);
       setSaveError(null);
     } catch (mutationError) {
