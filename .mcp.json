@@ -16,6 +16,10 @@
     "worktree": {
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/worktree-server/src/index.ts"]
+    },
+    "legacy-sports-aws": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/aws-server/src/index.ts"]
     }
   }
 }

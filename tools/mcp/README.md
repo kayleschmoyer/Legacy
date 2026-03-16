@@ -59,3 +59,14 @@ Git worktree management for parallel ticket work:
 - **worktree_set** — Set the active worktree for subsequent commands
 - **worktree_run** — Run a shell command in the active worktree
 - **worktree_guard** — Check whether a path is inside the main repo (warns if worktrees are active)
+
+### aws-server
+
+> **Server ID:** `legacy-sports-aws`
+
+AWS CloudWatch logs and SSO authentication health:
+
+- **aws_logs_tail** — Fetch recent CloudWatch logs for a Lambda function (wraps `aws logs tail`; auto-sets `AWS_PAGER=""` and `PYTHONIOENCODING=utf-8`)
+- **aws_sso_status** — Check AWS SSO authentication status via `aws sts get-caller-identity`; returns caller identity or a structured remedy on failure
+
+See `.github/skills/cloudwatch-logs/SKILL.md` and `.github/skills/aws-sso-login/SKILL.md` for context.

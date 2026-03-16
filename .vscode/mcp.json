@@ -19,6 +19,11 @@
       "type": "stdio",
       "command": "node",
       "args": ["--import", "tsx", "tools/mcp/worktree-server/src/index.ts"]
+    },
+    "legacy-sports-aws": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/aws-server/src/index.ts"]
     }
   }
 }
