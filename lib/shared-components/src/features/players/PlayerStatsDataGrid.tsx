@@ -673,17 +673,29 @@ export function PlayerStatsDataGrid({
             ))}
             {(localFilters.minGames > 0 ||
               localFilters.minHomeRuns > 0 ||
-              localFilters.minRBI > 0) && (
+              localFilters.minRBI > 0 ||
+              searchTerm.length > 0 ||
+              positionFilter.length > 0) && (
               <Button
                 size="$2"
                 onPress={() => {
+                  if (searchDebounceRef.current) {
+                    clearTimeout(searchDebounceRef.current);
+                  }
                   const cleared = {
-                    minGames: 0,
+                    minGames: DEFAULT_CAREER_STATS_PARAMS.minGames ?? 10,
                     minHomeRuns: 0,
                     minRBI: 0,
                   };
+                  setSearchTerm('');
+                  setPositionFilter('');
                   setLocalFilters(cleared);
-                  updateQueryParams({ ...cleared, after: undefined });
+                  updateQueryParams({
+                    ...cleared,
+                    searchTerm: undefined,
+                    position: undefined,
+                    after: undefined,
+                  });
                 }}
                 style={{
                   background: `rgba(197,165,90,0.12)`,
@@ -902,12 +914,21 @@ export function PlayerStatsDataGrid({
             </Text>
             <Button
               onPress={() => {
-                setSearchTerm('');
-                setLocalFilters({ minGames: 0, minHomeRuns: 0, minRBI: 0 });
-                updateQueryParams({
-                  minGames: 0,
+                if (searchDebounceRef.current) {
+                  clearTimeout(searchDebounceRef.current);
+                }
+                const cleared = {
+                  minGames: DEFAULT_CAREER_STATS_PARAMS.minGames ?? 10,
                   minHomeRuns: 0,
                   minRBI: 0,
+                };
+                setSearchTerm('');
+                setPositionFilter('');
+                setLocalFilters(cleared);
+                updateQueryParams({
+                  ...cleared,
+                  searchTerm: undefined,
+                  position: undefined,
                   after: undefined,
                 });
               }}
