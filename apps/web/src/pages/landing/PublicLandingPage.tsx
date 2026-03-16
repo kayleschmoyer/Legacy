@@ -8,6 +8,11 @@ import {
 } from '@legacy-sports/shared-components';
 import { ScrollView, Spinner, styled, Text } from 'tamagui';
 import {
+  BrandIcon,
+  BrandIconBadge,
+  type BrandIconName,
+} from '../../components/icons';
+import {
   BG_DARK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -188,28 +193,28 @@ const sportCardGlassStyle = (accentColor: string): React.CSSProperties => ({
 
 const FEATURES = [
   {
-    emoji: '📊',
+    icon: 'stats' as const,
     label: 'stats',
     title: 'Live Stats',
     description:
       'Real-time player statistics, projections, and performance trends updated as the game unfolds.',
   },
   {
-    emoji: '🏆',
+    icon: 'draft' as const,
     label: 'draft',
     title: 'Draft Tools',
     description:
       'Snake and auction drafts with smart rankings, position analysis, and mock draft simulations.',
   },
   {
-    emoji: '⚡',
+    icon: 'live' as const,
     label: 'realtime',
     title: 'Instant Updates',
     description:
       'WebSocket-powered live scoring and lineup lock notifications so you never miss a move.',
   },
   {
-    emoji: '🔒',
+    icon: 'secure' as const,
     label: 'secure',
     title: 'Secure Leagues',
     description:
@@ -219,7 +224,7 @@ const FEATURES = [
 
 const SPORTS = [
   {
-    emoji: '⚾',
+    icon: 'baseball' as const,
     label: 'baseball',
     title: 'Baseball',
     description:
@@ -228,7 +233,7 @@ const SPORTS = [
     available: true,
   },
   {
-    emoji: '🏈',
+    icon: 'football' as const,
     label: 'football',
     title: 'Football',
     description:
@@ -236,7 +241,14 @@ const SPORTS = [
     accent: withAlpha('#16A34A', 0.35),
     available: false,
   },
-];
+] satisfies Array<{
+  icon: BrandIconName;
+  label: string;
+  title: string;
+  description: string;
+  accent: string;
+  available: boolean;
+}>;
 
 /* ─── Component ─── */
 
@@ -307,11 +319,13 @@ export function PublicLandingPage(): React.JSX.Element {
       >
         {/* Logo */}
         <XStack alignItems="center" gap="$2">
-          <Text fontSize={22} lineHeight={28}>
-            <span role="img" aria-label="baseball">
-              ⚾
-            </span>
-          </Text>
+          <BrandIconBadge
+            name="baseball"
+            size={34}
+            iconSize={18}
+            title="Legacy Sports baseball"
+            decorative={false}
+          />
           <Text
             fontSize="$5"
             fontWeight="800"
@@ -348,11 +362,7 @@ export function PublicLandingPage(): React.JSX.Element {
           <ContentContainer alignItems="center" gap="$6">
             {/* Badge */}
             <HeroBadge>
-              <Text fontSize={14} lineHeight={18}>
-                <span role="img" aria-label="baseball">
-                  ⚾
-                </span>
-              </Text>
+              <BrandIcon name="baseball" size={16} />
               <Text
                 fontSize="$2"
                 color="$accentPrimary"
@@ -418,14 +428,7 @@ export function PublicLandingPage(): React.JSX.Element {
                     <Spinner size="small" color="$color1" />
                   ) : (
                     <>
-                      {/* Google "G" icon */}
-                      <Text
-                        fontSize={16}
-                        lineHeight={20}
-                        style={{ marginTop: -1 }}
-                      >
-                        G
-                      </Text>
+                      <BrandIcon name="google" size={18} />
                       <Text fontSize="$4" color="$color1" fontWeight="700">
                         Continue with Google
                       </Text>
@@ -479,13 +482,12 @@ export function PublicLandingPage(): React.JSX.Element {
               {FEATURES.map((feature) => (
                 <FeatureCard key={feature.label} style={featureCardGlassStyle}>
                   <FeatureIconCircle>
-                    <Text
-                      fontSize={20}
-                      lineHeight={24}
-                      aria-label={feature.label}
-                    >
-                      {feature.emoji}
-                    </Text>
+                    <BrandIcon
+                      name={feature.icon}
+                      size={22}
+                      title={feature.title}
+                      decorative={false}
+                    />
                   </FeatureIconCircle>
                   <YStack gap="$1">
                     <Text fontSize="$4" fontWeight="700" color="$color">
@@ -548,13 +550,12 @@ export function PublicLandingPage(): React.JSX.Element {
                       borderWidth={1}
                       borderColor="$glassBorder"
                     >
-                      <Text
-                        fontSize={28}
-                        lineHeight={34}
-                        aria-label={sport.label}
-                      >
-                        {sport.emoji}
-                      </Text>
+                      <BrandIcon
+                        name={sport.icon}
+                        size={28}
+                        title={sport.title}
+                        decorative={false}
+                      />
                     </YStack>
                     <YStack gap="$1" flex={1}>
                       <XStack alignItems="center" gap="$2">

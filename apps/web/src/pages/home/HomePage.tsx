@@ -13,6 +13,11 @@ import {
 } from '@legacy-sports/shared-components';
 import { ScrollView, Separator, styled, Text, H2 as TH2 } from 'tamagui';
 import { OnboardingTutorial } from '../../components/onboarding';
+import {
+  BrandIcon,
+  BrandIconBadge,
+  type BrandIconName,
+} from '../../components/icons';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { PageMeta } from '../../components/PageMeta';
 import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
@@ -238,8 +243,7 @@ const featureCardGlassStyle: React.CSSProperties = {
 
 interface SportConfig {
   key: string;
-  emoji: string;
-  emojiLabel: string;
+  icon: BrandIconName;
   title: string;
   description: string;
   route: string;
@@ -250,8 +254,7 @@ interface SportConfig {
 const SPORTS: SportConfig[] = [
   {
     key: 'baseball',
-    emoji: '⚾',
-    emojiLabel: 'baseball',
+    icon: 'baseball',
     title: 'Baseball',
     description:
       'Build your roster, dominate the draft, and track real-time stats across every matchup.',
@@ -261,8 +264,7 @@ const SPORTS: SportConfig[] = [
   },
   {
     key: 'football',
-    emoji: '🏈',
-    emojiLabel: 'football',
+    icon: 'football',
     title: 'Football',
     description:
       'Manage lineups, trade players, and lead your team through every game week.',
@@ -274,28 +276,28 @@ const SPORTS: SportConfig[] = [
 
 const FEATURES = [
   {
-    emoji: '📊',
+    icon: 'stats' as const,
     label: 'stats',
     title: 'Live Stats',
     description:
       'Real-time player statistics, projections, and performance trends.',
   },
   {
-    emoji: '🏆',
+    icon: 'draft' as const,
     label: 'draft',
     title: 'Draft Tools',
     description:
       'Snake and auction drafts with smart rankings and position analysis.',
   },
   {
-    emoji: '⚡',
+    icon: 'live' as const,
     label: 'realtime',
     title: 'Instant Updates',
     description:
       'WebSocket-powered live scoring and lineup lock notifications.',
   },
   {
-    emoji: '🔒',
+    icon: 'secure' as const,
     label: 'secure',
     title: 'Secure Leagues',
     description:
@@ -443,12 +445,10 @@ export function HomePage(): React.JSX.Element {
                 }}
                 accessibilityLabel="Open preferences"
               >
-                <Text fontWeight="700">
-                  <span role="img" aria-label="gear">
-                    ⚙️
-                  </span>{' '}
-                  Preferences
-                </Text>
+                <XStack alignItems="center" gap="$2">
+                  <BrandIcon name="settings" size={16} />
+                  <Text fontWeight="700">Preferences</Text>
+                </XStack>
               </OutlineButton>
             </XStack>
           </HeroSection>
@@ -575,11 +575,12 @@ export function HomePage(): React.JSX.Element {
                           background: `linear-gradient(135deg, ${sport.accent}, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)})`,
                         }}
                       >
-                        <Text fontSize="$8">
-                          <span role="img" aria-label={sport.emojiLabel}>
-                            {sport.emoji}
-                          </span>
-                        </Text>
+                        <BrandIcon
+                          name={sport.icon}
+                          size={28}
+                          title={sport.title}
+                          decorative={false}
+                        />
                       </SportIcon>
                       <YStack gap="$1" flex={1}>
                         <H3 fontSize="$8" fontWeight="700" color="$color">
@@ -689,12 +690,10 @@ export function HomePage(): React.JSX.Element {
                 onPress={() => setTutorialOpen(true)}
                 accessibilityLabel="How historical stats work — open tutorial"
               >
-                <Text fontWeight="700">
-                  <span role="img" aria-label="open book">
-                    📖
-                  </span>{' '}
-                  How It Works
-                </Text>
+                <XStack alignItems="center" gap="$2">
+                  <BrandIcon name="book" size={16} />
+                  <Text fontWeight="700">How It Works</Text>
+                </XStack>
               </OutlineButton>
             </XStack>
           </HeroSection>
@@ -739,11 +738,12 @@ export function HomePage(): React.JSX.Element {
                           background: `linear-gradient(135deg, ${sport.accent}, ${withAlpha(BRAND_NAVY_LIGHT, 0.08)})`,
                         }}
                       >
-                        <Text fontSize="$8">
-                          <span role="img" aria-label={sport.emojiLabel}>
-                            {sport.emoji}
-                          </span>
-                        </Text>
+                        <BrandIcon
+                          name={sport.icon}
+                          size={28}
+                          title={sport.title}
+                          decorative={false}
+                        />
                       </SportIcon>
                       <YStack gap="$1" flex={1}>
                         <H3 fontSize="$8" fontWeight="700" color="$color">
@@ -818,11 +818,12 @@ export function HomePage(): React.JSX.Element {
                     style={featureCardGlassStyle}
                   >
                     <FeatureIconCircle>
-                      <Text fontSize="$5">
-                        <span role="img" aria-label={feature.label}>
-                          {feature.emoji}
-                        </span>
-                      </Text>
+                      <BrandIcon
+                        name={feature.icon}
+                        size={22}
+                        title={feature.title}
+                        decorative={false}
+                      />
                     </FeatureIconCircle>
                     <H3 fontSize="$6" fontWeight="700" color="$color">
                       {feature.title}
@@ -871,11 +872,14 @@ export function HomePage(): React.JSX.Element {
                 WebkitBackdropFilter: 'blur(18px)',
               }}
             >
-              <Text fontSize="$9">
-                <span role="img" aria-label="chart">
-                  📊
-                </span>
-              </Text>
+              <BrandIconBadge
+                name="stats"
+                size={56}
+                iconSize={28}
+                title="Player statistics"
+                decorative={false}
+                rounded="square"
+              />
               <H2
                 fontSize="$8"
                 fontWeight="700"
