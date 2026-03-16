@@ -2,12 +2,22 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Button, Card, H2, H3, Input, Text, XStack, YStack } from 'tamagui';
+import {
+  Button,
+  Card,
+  Dialog,
+  H2,
+  H3,
+  Input,
+  Paragraph,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
 import {
   SeasonDraftGameMode,
   SeasonDraftPlayerType,
@@ -133,6 +143,8 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   const [statsLoadingPlayerIds, setStatsLoadingPlayerIds] = useState<
     Set<number>
   >(new Set());
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Query game state
   const {
@@ -214,39 +226,36 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       LOGGER.error('Failed to start game', err);
-      Alert.alert('Error', 'Failed to start game. Please try again.');
+      setErrorMessage('Failed to start game.');
     } finally {
       setIsStartingGame(false);
     }
   };
 
-  // Cancel game (creator only)
+  // Cancel game (creator only) — opens the confirmation dialog
   const handleCancelGame = () => {
     if (!gameState) return;
-    Alert.alert('Cancel Game', 'Are you sure you want to cancel this game?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, Cancel',
-        style: 'destructive',
-        onPress: () => {
-          void cancelGameMutation({ variables: { gameId } }).then(
-            () => {
-              if (onBack) {
-                onBack();
-              } else {
-                void refetchGame();
-              }
-            },
-            (error: unknown) => {
-              const err =
-                error instanceof Error ? error : new Error(String(error));
-              LOGGER.error('Failed to cancel game', err);
-              Alert.alert('Error', 'Failed to cancel game. Please try again.');
-            },
-          );
-        },
+    setCancelConfirmOpen(true);
+  };
+
+  // Performs the actual cancellation after user confirms
+  const handleConfirmCancel = () => {
+    void cancelGameMutation({ variables: { gameId } }).then(
+      () => {
+        setCancelConfirmOpen(false);
+        if (onBack) {
+          onBack();
+        } else {
+          void refetchGame();
+        }
       },
-    ]);
+      (error: unknown) => {
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Failed to cancel game', err);
+        setCancelConfirmOpen(false);
+        setErrorMessage('Failed to cancel game.');
+      },
+    );
   };
 
   // Search for players
@@ -280,10 +289,6 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         LOGGER.error('Failed to trigger stat loading', err);
-        Alert.alert(
-          'Error',
-          'Failed to load player statistics. Please try again.',
-        );
         setStatsLoadingPlayerIds((prev) => {
           const next = new Set(prev);
           next.delete(player.id);
@@ -337,18 +342,27 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
 
   // Make a draft pick
   const makePick = async () => {
-    if (
-      !selectedPlayer ||
-      !selectedSlotId ||
-      !selectedPosition ||
-      !selectedOption
-    ) {
-      Alert.alert('Error', 'Please complete all fields');
+    if (!selectedPlayer || !selectedSlotId || !selectedPosition) {
+      setErrorMessage('Please complete all fields');
       return;
+    }
+
+    if (isCareerTeamMode) {
+      if (!selectedOption) {
+        setErrorMessage('Please enter a team abbreviation (e.g., NYY)');
+        return;
+      }
+    } else {
+      const year = parseInt(selectedOption);
+      if (isNaN(year) || year < 1900 || year > new Date().getFullYear()) {
+        setErrorMessage('Please enter a valid 4-digit year');
+        return;
+      }
     }
 
     try {
       setSubmitting(true);
+      setErrorMessage(null);
 
       await makePickMutation({
         variables: {
@@ -373,7 +387,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       LOGGER.error('Failed to make pick', err);
-      Alert.alert('Error', 'Failed to make pick. Please try again.');
+      setErrorMessage('Failed to make pick. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -443,6 +457,85 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
 
   return (
     <YStack flex={1} backgroundColor="$background">
+      {/* Cancel Game Confirmation Dialog */}
+      <Dialog
+        modal
+        open={cancelConfirmOpen}
+        onOpenChange={setCancelConfirmOpen}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay
+            key="overlay"
+            animation="quick"
+            opacity={0.5}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
+          <Dialog.Content
+            bordered
+            elevate
+            key="content"
+            role="alertdialog"
+            animation={[
+              'quick',
+              {
+                opacity: {
+                  overshootClamping: true,
+                },
+              },
+            ]}
+            enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
+            exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+            x={0}
+            scale={1}
+            opacity={1}
+            y={0}
+            maxWidth={400}
+            padding="$4"
+          >
+            <YStack space="$3">
+              <Dialog.Title>Cancel Game</Dialog.Title>
+              <Dialog.Description>
+                Are you sure you want to cancel this game? This cannot be
+                undone.
+              </Dialog.Description>
+              <XStack space="$3" justifyContent="flex-end">
+                <Dialog.Close asChild>
+                  <Button>No, Keep Playing</Button>
+                </Dialog.Close>
+                <Button theme="red" onPress={handleConfirmCancel}>
+                  Yes, Cancel Game
+                </Button>
+              </XStack>
+            </YStack>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog>
+
+      {/* Inline error message */}
+      {errorMessage !== null && (
+        <Card
+          margin="$4"
+          padding="$3"
+          backgroundColor="$red3"
+          borderColor="$red6"
+          bordered
+        >
+          <XStack justifyContent="space-between" alignItems="center">
+            <Paragraph color="$red11">{errorMessage}</Paragraph>
+            <Button
+              size="$2"
+              chromeless
+              aria-label="Dismiss error"
+              accessibilityLabel="Dismiss error"
+              onPress={() => setErrorMessage(null)}
+            >
+              ✕
+            </Button>
+          </XStack>
+        </Card>
+      )}
+
       {/* Header */}
       <XStack
         padding="$4"
