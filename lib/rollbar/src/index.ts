@@ -8,7 +8,7 @@
 export * from './lib/types';
 export { rollbar } from './lib/rollbar.node';
 
-import { registerGlobalErrorCapture } from '@legacy-sports/logging';
+import { registerGlobalErrorCapture } from '@legacy-sports/logging/server';
 import { rollbar } from './lib/rollbar.node';
 
 export const initRollbar = (config: import('./lib/types').RollbarConfig) => {

@@ -1,7 +1,7 @@
 import './.startup';
 import { Command } from 'commander';
 import { logError } from '@legacy-sports/utils';
-import { FileOutputDestination, LOGGER } from '@legacy-sports/logging';
+import { FileOutputDestination, LOGGER } from '@legacy-sports/logging/server';
 import {
   captureError,
   getRollbarConfigFromEnv,

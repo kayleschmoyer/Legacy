@@ -27,6 +27,7 @@
       "@legacy-sports/db-client/src/*": ["lib/db-client/src/*"],
       "@legacy-sports/env-utilities": ["lib/env-utilities/src/index.ts"],
       "@legacy-sports/logging": ["lib/logging/src/index.ts"],
+      "@legacy-sports/logging/server": ["lib/logging/src/server.ts"],
       "@legacy-sports/narrative": ["lib/narrative/src/index.ts"],
       "@legacy-sports/rollbar": ["lib/rollbar/src/index.ts"],
       "@legacy-sports/rollbar/native": ["lib/rollbar/src/native.ts"],
