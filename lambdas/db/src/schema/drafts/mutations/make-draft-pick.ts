@@ -97,9 +97,7 @@ builder.mutationField('makeDraftPick', (t) =>
             .limit(1);
 
           if (!league) {
-            throw new GraphQLError('League not found', {
-              extensions: { code: 'INTERNAL_SERVER_ERROR' },
-            });
+            throw UserInputError('League not found');
           }
 
           if (league.draftStatus === 'paused') {
@@ -118,9 +116,7 @@ builder.mutationField('makeDraftPick', (t) =>
           const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
 
           if (!currentPickInfo) {
-            throw new GraphQLError('Could not determine current pick', {
-              extensions: { code: 'INTERNAL_SERVER_ERROR' },
-            });
+            throw UserInputError('Could not determine current pick');
           }
 
           if (currentPickInfo.isComplete) {
