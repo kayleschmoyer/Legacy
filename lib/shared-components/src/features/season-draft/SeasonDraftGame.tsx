@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   TouchableOpacity,
   View,
@@ -286,6 +287,21 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
         await triggerStatLoading({
           variables: { playerId: player.id },
         });
+        // Stats have been loaded (or were already present on the server).
+        // Clear the loading state here so the draft form becomes usable.
+        // The WebSocket notification also does this cleanup, but it requires
+        // websocketUrl/websocketToken to be connected — clearing here ensures
+        // correct behaviour when WebSocket is unavailable.
+        setStatsLoadingPlayerIds((prev) => {
+          const next = new Set(prev);
+          next.delete(player.id);
+          return next;
+        });
+        // Only refetch when WebSocket is not connected; when WS is connected,
+        // onPlayerStatsUpdated will trigger the refetch to avoid duplicate calls.
+        if (!websocketUrl || !websocketToken) {
+          void refetchGame();
+        }
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         LOGGER.error('Failed to trigger stat loading', err);
@@ -294,9 +310,19 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
           next.delete(player.id);
           return next;
         });
+        Alert.alert(
+          'Stats Unavailable',
+          'Could not load stats for this player. They may not have a Baseball Reference page. You can still draft them, but their stat value will be 0.',
+        );
       }
     },
-    [triggerStatLoading, statsLoadingPlayerIds],
+    [
+      triggerStatLoading,
+      statsLoadingPlayerIds,
+      refetchGame,
+      websocketUrl,
+      websocketToken,
+    ],
   );
 
   // Preview stat value for selection
