@@ -902,11 +902,15 @@ test.describe
       await page.waitForLoadState('load');
     });
 
+    await test.step('Switch to Chat sub-tab', async () => {
+      await page.getByText('Chat').first().click();
+      await page.waitForTimeout(500);
+    });
+
     await test.step('Send a league message via the chat UI', async () => {
-      // The chat input has aria-label "Message the league"
-      const chatInput = page.locator(
-        'textarea[aria-label="Message the league"]',
-      );
+      const chatInput = page.getByRole('textbox', {
+        name: /message the league/i,
+      });
       await expect(chatInput).toBeVisible({ timeout: 15000 });
 
       await chatInput.fill('Great draft everyone!');
@@ -925,9 +929,9 @@ test.describe
     });
 
     await test.step('Send a second message', async () => {
-      const chatInput = page.locator(
-        'textarea[aria-label="Message the league"]',
-      );
+      const chatInput = page.getByRole('textbox', {
+        name: /message the league/i,
+      });
       await chatInput.fill('Who wants to trade?');
       await page.getByRole('button', { name: /Send/i }).click();
 
