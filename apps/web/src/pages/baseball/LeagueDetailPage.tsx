@@ -2571,7 +2571,15 @@ export function LeagueDetailPage(): React.JSX.Element {
               ? viewingTeamMembersLoading
               : isViewingHistoricalRosterWeek
                 ? historicalRosterLoading
-                : positionsLoading || teamMembersLoading || userTeamLoading
+                : positionsLoading ||
+                  teamMembersLoading ||
+                  userTeamLoading ||
+                  // LS-1243: The getUserTeamId lazy query hasn't returned yet,
+                  // so teamMembers is skipped (userTeamId is null) and both
+                  // teamMembersLoading and userTeamLoading are false. Without
+                  // this guard the roster renders with 0 players before the
+                  // real data arrives.
+                  (!userTeamId && userTeamData === undefined && !!user?.id)
           }
           playerMatchupData={
             isViewingHistoricalRosterWeek ? undefined : playerMatchupDataMap
