@@ -25,6 +25,29 @@ Playwright's `webServer` config in `apps/web-e2e/playwright.config.ts` is the **
 
 > **If you need to change the server command, port, or startup logic, change it ONLY in `apps/web-e2e/playwright.config.ts`.** Never duplicate server management in CI actions, scripts, or Makefiles.
 
+## Shutdown Hygiene (Windows Lock Prevention)
+
+When running E2E locally, always stop any manually started Playwright/static servers once you are done debugging.
+
+- Processes like `playwright test-server` can keep native `.node` addons loaded (`bufferutil.node`, `utf-8-validate.node`).
+- In this repo, many worktrees share `node_modules` via junctions, so one stale server process can block installs for everyone.
+- The symptom is usually: `ERR_PNPM_EPERM ... unlink ... node_modules\\bufferutil\\...\\bufferutil.node`.
+
+Use these commands before `make install`/`make install-force` if you suspect a stale server:
+
+```powershell
+# Show node processes holding native addons under shared node_modules
+$nmRoot='D:\code\legacy-sports\node_modules'; $nmEsc=[regex]::Escape($nmRoot)
+Get-Process node -ErrorAction SilentlyContinue | Where-Object {
+  try { ($_.Modules | Where-Object { $_.FileName -match ($nmEsc + '.*\.node$') }).Count -gt 0 } catch { $false }
+} | Select-Object Id, ProcessName
+
+# Stop only the lock-holding node processes
+Get-Process node -ErrorAction SilentlyContinue | Where-Object {
+  try { ($_.Modules | Where-Object { $_.FileName -match ($nmEsc + '.*\.node$') }).Count -gt 0 } catch { $false }
+} | ForEach-Object { Stop-Process -Id $_.Id -Force }
+```
+
 ## When to Use
 
 - Writing a new E2E test for a web feature
