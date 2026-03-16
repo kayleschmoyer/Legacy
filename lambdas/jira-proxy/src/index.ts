@@ -341,6 +341,7 @@ async function handleCreateBug(
 ): Promise<APIGatewayProxyResult> {
   const jiraSecretName = process.env['JIRA_SECRET_NAME'];
   const jiraProjectKey = process.env['JIRA_PROJECT_KEY'];
+  const bugEpicKey = (process.env['BUG_EPIC_KEY'] ?? '').trim();
 
   if (!jiraSecretName) {
     LOGGER.error('JIRA_SECRET_NAME environment variable is not set');
@@ -385,7 +386,12 @@ async function handleCreateBug(
   );
 
   try {
-    const result = await createJiraBug(input, jiraProjectKey, jiraSecretName);
+    const result = await createJiraBug(
+      input,
+      jiraProjectKey,
+      jiraSecretName,
+      bugEpicKey || undefined,
+    );
     return jsonResponse(201, result, event);
   } catch (err) {
     LOGGER.error(`Failed to create Jira bug: ${String(err)}`);

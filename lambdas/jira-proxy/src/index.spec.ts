@@ -263,7 +263,36 @@ describe('Jira Proxy Handler', () => {
         }),
         'LS',
         'test-secret',
+        undefined,
       );
+    });
+
+    it('passes BUG_EPIC_KEY to createJiraBug when set', async () => {
+      const originalEpicKey = process.env['BUG_EPIC_KEY'];
+      try {
+        process.env['BUG_EPIC_KEY'] = 'LS-1322';
+        mockCreateJiraBug.mockResolvedValueOnce({
+          issueKey: 'LS-101',
+          issueUrl: 'https://test.atlassian.net/browse/LS-101',
+        });
+
+        const event = makeEvent();
+        const result = await baseHandler(event);
+        expect(result.statusCode).toBe(201);
+
+        expect(mockCreateJiraBug).toHaveBeenCalledWith(
+          expect.objectContaining({ summary: 'Test bug' }),
+          'LS',
+          'test-secret',
+          'LS-1322',
+        );
+      } finally {
+        if (originalEpicKey === undefined) {
+          delete process.env['BUG_EPIC_KEY'];
+        } else {
+          process.env['BUG_EPIC_KEY'] = originalEpicKey;
+        }
+      }
     });
 
     it('returns 500 when Jira API fails', async () => {
@@ -307,6 +336,7 @@ describe('Jira Proxy Handler', () => {
         }),
         'LS',
         'test-secret',
+        undefined,
       );
     });
 
@@ -334,6 +364,7 @@ describe('Jira Proxy Handler', () => {
         }),
         'LS',
         'test-secret',
+        undefined,
       );
     });
   });
@@ -431,6 +462,7 @@ describe('Jira Proxy Handler', () => {
         }),
         'LS',
         'test-secret',
+        undefined,
       );
     });
   });

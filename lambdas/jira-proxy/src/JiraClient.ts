@@ -17,6 +17,7 @@ interface JiraIssueFields {
   labels?: string[];
   issuetype: { name: string };
   project: { key: string };
+  parent?: { key: string };
   reporter?: { id: string };
 }
 
@@ -242,6 +243,7 @@ export async function createJiraBug(
   input: CreateIssueInput,
   projectKey: string,
   secretName: string,
+  epicKey?: string,
 ): Promise<CreateIssueResult> {
   const credentials = await getJiraCredentials(secretName);
   const { api_token, email, base_url } = credentials;
@@ -254,6 +256,11 @@ export async function createJiraBug(
     summary: input.summary,
     description: buildDescription(input),
   };
+
+  const trimmedEpicKey = epicKey?.trim();
+  if (trimmedEpicKey) {
+    fields.parent = { key: trimmedEpicKey };
+  }
 
   if (input.priority) {
     fields.priority = { name: input.priority };

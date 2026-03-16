@@ -159,3 +159,44 @@ describe('createJiraBug — reporter resolution', () => {
     expect(headers['Authorization']).toBe(`Basic ${EXPECTED_AUTH}`);
   });
 });
+
+describe('createJiraBug — epic parent field', () => {
+  let fetchSpy: jest.MockedFunction<typeof fetch>;
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(global, 'fetch') as jest.MockedFunction<typeof fetch>;
+  });
+
+  it('sets parent field when epicKey is provided', async () => {
+    fetchSpy.mockResolvedValueOnce(makeCreateIssueResponse());
+
+    await createJiraBug(
+      { summary: 'Test bug' },
+      'LS',
+      'jira-secret',
+      'LS-1322',
+    );
+
+    const calls = fetchSpy.mock.calls as unknown as FetchCall[];
+    const createCall = findCreateIssueFetchCall(calls);
+    expect(createCall).toBeDefined();
+    const body = JSON.parse(createCall![1].body as string) as {
+      fields: { parent?: { key: string } };
+    };
+    expect(body.fields.parent).toEqual({ key: 'LS-1322' });
+  });
+
+  it('does not set parent field when epicKey is omitted', async () => {
+    fetchSpy.mockResolvedValueOnce(makeCreateIssueResponse());
+
+    await createJiraBug({ summary: 'Test bug' }, 'LS', 'jira-secret');
+
+    const calls = fetchSpy.mock.calls as unknown as FetchCall[];
+    const createCall = findCreateIssueFetchCall(calls);
+    expect(createCall).toBeDefined();
+    const body = JSON.parse(createCall![1].body as string) as {
+      fields: { parent?: { key: string } };
+    };
+    expect(body.fields.parent).toBeUndefined();
+  });
+});
