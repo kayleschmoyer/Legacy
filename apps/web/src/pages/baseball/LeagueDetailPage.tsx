@@ -1887,7 +1887,7 @@ export function LeagueDetailPage(): React.JSX.Element {
             {overviewSubTab === 'activity' && (
               <YStack
                 maxHeight={480}
-                overflow="hidden"
+                overflow="auto"
                 borderTopLeftRadius={0}
                 borderTopRightRadius={0}
               >

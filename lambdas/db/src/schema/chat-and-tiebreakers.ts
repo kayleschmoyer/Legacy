@@ -1032,8 +1032,8 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
         }
       }
 
-      // Record announcement in the activity log (fire-and-forget, non-fatal)
-      void insertActivityLog(context, {
+      // Record announcement in the activity log
+      await insertActivityLog(context, {
         leagueId: args.leagueId,
         actorUserId: context.user.id,
         eventType: 'league_announcement',
