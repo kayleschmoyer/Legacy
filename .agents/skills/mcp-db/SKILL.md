@@ -7,7 +7,7 @@ description: 'MCP server exposing database operations (migration status, query e
 
 ## Overview
 
-The `legacy-sports-db` MCP server exposes five database tools that replace the multiple terminal commands agents previously had to piece together. It runs over stdio and is configured in `.vscode/mcp.json`.
+The `legacy-sports-db` MCP server exposes seven database tools that replace the multiple terminal commands agents previously had to piece together. It runs over stdio and is configured in `.vscode/mcp.json`.
 
 ## When to Use
 
@@ -31,7 +31,9 @@ tools/mcp/db-server/
         ├── migrate.ts
         ├── query.ts
         ├── print-schema.ts
-        └── check-health.ts
+        ├── check-health.ts
+        ├── codegen.ts
+        └── restore-dev-seed.ts
 ```
 
 ## Tools
@@ -78,6 +80,23 @@ Regenerate `schema.graphql` from the Pothos schema.
 - **Returns**: `{ success, schemaChanged, output }`
 - Equivalent to `pnpm exec nx run db:print-schema`.
 
+### db_codegen
+
+Run GraphQL codegen using Nx affected.
+
+- **Parameters**: `worktreePath?`, `printSchemaFirst?` (default `false`), `base?`, `skipNxCache?` (default `false`)
+- **Returns**: `{ success, ranPrintSchema, output }`
+- Equivalent to `pnpm exec nx affected -t codegen` (optionally runs `pnpm exec nx run db:print-schema` first).
+
+### db_restore_dev_seed
+
+Restore the scrubbed dev seed into the local Docker Postgres database.
+
+- **Parameters**: `worktreePath?`, `confirmDestructive` (required `true`), `runMigrationsAfter?` (default `true`)
+- **Returns**: `{ success, migrationsRun, output }`
+- Equivalent to running `scripts/db-restore-dev.ps1` (with required confirmation) and optionally `make db-migrate`.
+- **Destructive**: drops and recreates local `legacy_sports_dev`.
+
 ## Configuration
 
 Registered in `.vscode/mcp.json`:
@@ -87,8 +106,8 @@ Registered in `.vscode/mcp.json`:
   "servers": {
     "legacy-sports-db": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["tsx", "tools/mcp/db-server/src/index.ts"]
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/db-server/src/index.ts"]
     }
   }
 }

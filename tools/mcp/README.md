@@ -60,6 +60,8 @@ Database operations with built-in safety guardrails:
 - **db_query** — Execute ad-hoc SQL queries (read-only by default)
 - **db_print_schema** — Regenerate `schema.graphql` from Pothos schema
 - **db_check_health** — Pre-flight health check (Docker, Postgres, migrations)
+- **db_codegen** — Run GraphQL codegen via Nx affected (optional print-schema first)
+- **db_restore_dev_seed** — Restore `resources/dev-seed.dump` into local DB (destructive, explicit confirmation required)
 
 See `.agents/skills/mcp-db/SKILL.md` for usage.
 

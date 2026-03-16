@@ -10,17 +10,18 @@ export function getRepoRoot(): string {
   return resolve(thisDir, '..', '..', '..', '..');
 }
 
-/** Run a shell command in a given directory and return stdout. Throws on non-zero exit. */
+/** Run a command in a given directory and return stdout. Throws on non-zero exit. */
 export function runCommand(
   command: string,
   args: string[],
   cwd: string,
+  timeoutMs = COMMAND_TIMEOUT,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       command,
       args,
-      { cwd, timeout: COMMAND_TIMEOUT, shell: true },
+      { cwd, timeout: timeoutMs },
       (err, stdout, stderr) => {
         if (err) {
           const msg = stderr?.trim() || stdout?.trim() || err.message;
@@ -34,6 +35,10 @@ export function runCommand(
 }
 
 /** Run a pnpm script in a given directory. */
-export function runPnpm(args: string[], cwd: string): Promise<string> {
-  return runCommand('pnpm', args, cwd);
+export function runPnpm(
+  args: string[],
+  cwd: string,
+  timeoutMs?: number,
+): Promise<string> {
+  return runCommand('pnpm', args, cwd, timeoutMs);
 }

@@ -6,6 +6,8 @@ import { migrate } from './tools/migrate.js';
 import { query } from './tools/query.js';
 import { printSchema } from './tools/print-schema.js';
 import { checkHealth } from './tools/check-health.js';
+import { codegen } from './tools/codegen.js';
+import { restoreDevSeed } from './tools/restore-dev-seed.js';
 
 const server = new McpServer({
   name: 'legacy-sports-db',
@@ -83,6 +85,60 @@ server.tool(
   'Pre-flight health check: is Docker running, is Postgres reachable, are migrations current? Run this before starting work.',
   {},
   async () => checkHealth(),
+);
+
+// --- db_codegen ---
+server.tool(
+  'db_codegen',
+  'Run GraphQL code generation via Nx affected. Optionally runs db:print-schema first when Pothos schema code changed.',
+  {
+    worktreePath: z
+      .string()
+      .optional()
+      .describe(
+        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
+      ),
+    printSchemaFirst: z
+      .boolean()
+      .default(false)
+      .describe('Set true to run `nx run db:print-schema` before codegen.'),
+    base: z
+      .string()
+      .optional()
+      .describe(
+        'Optional Nx affected base ref, for example `origin/main` or a stacked parent branch.',
+      ),
+    skipNxCache: z
+      .boolean()
+      .default(false)
+      .describe('Set true to run codegen with --skip-nx-cache.'),
+  },
+  async (params) => codegen(params),
+);
+
+// --- db_restore_dev_seed ---
+server.tool(
+  'db_restore_dev_seed',
+  'Restore resources/dev-seed.dump into local Docker postgres. DESTRUCTIVE: drops and recreates local legacy_sports_dev. Requires confirmDestructive=true.',
+  {
+    worktreePath: z
+      .string()
+      .optional()
+      .describe(
+        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
+      ),
+    confirmDestructive: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Safety guard. Must be true to run because local DB data will be replaced.',
+      ),
+    runMigrationsAfter: z
+      .boolean()
+      .default(true)
+      .describe('Set false to skip automatic `make db-migrate` after restore.'),
+  },
+  async (params) => restoreDevSeed(params),
 );
 
 // Start the server
