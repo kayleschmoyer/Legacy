@@ -22,6 +22,7 @@ import React, {
   useState,
 } from 'react';
 import { Button, H2, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
+import { getPageRange } from './paginationUtils';
 import {
   type CareerPitchingFragment,
   type GetCareerPitchingStatsQueryVariables,
@@ -379,6 +380,13 @@ export function PitchingStatsDataGrid({
       updateQueryParams({ limit: newPageSize, offset: 0 });
     },
     [updateQueryParams],
+  );
+
+  const handleGoToPage = useCallback(
+    (page: number) => {
+      updateQueryParams({ offset: (page - 1) * (queryParams.limit || 25) });
+    },
+    [queryParams.limit, updateQueryParams],
   );
 
   const handleRowClick = useCallback(
@@ -785,97 +793,156 @@ export function PitchingStatsDataGrid({
     </YStack>
   );
 
-  const renderPagination = () => (
-    <YStack gap="$2">
-      <XStack
-        justifyContent="space-between"
-        alignItems="center"
-        padding="$3"
-        flexWrap="wrap"
-        gap="$2"
-        style={{
-          background: `rgba(22,34,58,0.65)`,
-          border: `1px solid rgba(44,74,124,0.35)`,
-          borderRadius: 12,
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-        }}
-      >
-        <XStack gap="$2" alignItems="center">
-          <Text
-            fontSize="$3"
-            fontWeight="600"
-            style={{ color: TEXT_HIGH_CONTRAST }}
-          >
-            Page {currentPageNumber} of {totalPages}
-          </Text>
-          <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
-            ({totalCount.toLocaleString()} total)
-          </Text>
-        </XStack>
+  const renderPagination = () => {
+    const pageRange = getPageRange(currentPageNumber, totalPages);
 
-        <XStack gap="$2" alignItems="center">
-          <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
-            Show:
-          </Text>
-          {[10, 25, 50, 100].map((size) => (
+    return (
+      <YStack gap="$2">
+        <XStack
+          justifyContent="space-between"
+          alignItems="center"
+          padding="$3"
+          flexWrap="wrap"
+          gap="$2"
+          style={{
+            background: `rgba(22,34,58,0.65)`,
+            border: `1px solid rgba(44,74,124,0.35)`,
+            borderRadius: 12,
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+          }}
+        >
+          <XStack gap="$2" alignItems="center">
+            <Text
+              fontSize="$3"
+              fontWeight="600"
+              style={{ color: TEXT_HIGH_CONTRAST }}
+            >
+              Page {currentPageNumber} of {totalPages}
+            </Text>
+            <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
+              ({totalCount.toLocaleString()} total)
+            </Text>
+          </XStack>
+
+          <XStack gap="$2" alignItems="center">
+            <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
+              Show:
+            </Text>
+            {[10, 25, 50, 100].map((size) => (
+              <Button
+                key={size}
+                size="$2"
+                onPress={() => handlePageSizeChange(size)}
+                disabled={loading}
+                style={{
+                  background:
+                    pageSize === size
+                      ? `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`
+                      : 'rgba(10,15,26,0.5)',
+                  border:
+                    pageSize === size
+                      ? `1px solid rgba(196,165,90,0.4)`
+                      : `1px solid rgba(44,74,124,0.35)`,
+                  borderRadius: 8,
+                  color: pageSize === size ? BRAND_GOLD_LIGHT : TEXT_MUTED,
+                  minWidth: 36,
+                }}
+              >
+                {size}
+              </Button>
+            ))}
+          </XStack>
+
+          <XStack gap="$2">
             <Button
-              key={size}
-              size="$2"
-              onPress={() => handlePageSizeChange(size)}
-              disabled={loading}
+              size="$3"
+              disabled={!hasPreviousPage || loading}
+              onPress={() => handlePageChange('prev')}
               style={{
-                background:
-                  pageSize === size
-                    ? `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`
-                    : 'rgba(10,15,26,0.5)',
-                border:
-                  pageSize === size
-                    ? `1px solid rgba(196,165,90,0.4)`
-                    : `1px solid rgba(44,74,124,0.35)`,
-                borderRadius: 8,
-                color: pageSize === size ? BRAND_GOLD_LIGHT : TEXT_MUTED,
-                minWidth: 36,
+                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+                border: `1px solid rgba(196,165,90,0.25)`,
+                borderRadius: 10,
+                color: BRAND_GOLD_LIGHT,
+                opacity: !hasPreviousPage || loading ? 0.4 : 1,
               }}
             >
-              {size}
+              ← Prev
             </Button>
-          ))}
+            <Button
+              size="$3"
+              disabled={!hasNextPage || loading}
+              onPress={() => handlePageChange('next')}
+              style={{
+                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
+                border: `1px solid rgba(196,165,90,0.25)`,
+                borderRadius: 10,
+                color: BRAND_GOLD_LIGHT,
+                opacity: !hasNextPage || loading ? 0.4 : 1,
+              }}
+            >
+              Next →
+            </Button>
+          </XStack>
         </XStack>
 
-        <XStack gap="$2">
-          <Button
-            size="$3"
-            disabled={!hasPreviousPage || loading}
-            onPress={() => handlePageChange('prev')}
+        {/* Page number quick-jump buttons */}
+        {totalPages > 1 && (
+          <XStack
+            justifyContent="center"
+            alignItems="center"
+            padding="$2"
+            flexWrap="wrap"
+            gap="$1"
             style={{
-              background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-              border: `1px solid rgba(196,165,90,0.25)`,
+              background: `rgba(22,34,58,0.5)`,
+              border: `1px solid rgba(44,74,124,0.25)`,
               borderRadius: 10,
-              color: BRAND_GOLD_LIGHT,
-              opacity: !hasPreviousPage || loading ? 0.4 : 1,
             }}
           >
-            ← Prev
-          </Button>
-          <Button
-            size="$3"
-            disabled={!hasNextPage || loading}
-            onPress={() => handlePageChange('next')}
-            style={{
-              background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-              border: `1px solid rgba(196,165,90,0.25)`,
-              borderRadius: 10,
-              color: BRAND_GOLD_LIGHT,
-              opacity: !hasNextPage || loading ? 0.4 : 1,
-            }}
-          >
-            Next →
-          </Button>
-        </XStack>
-      </XStack>
-    </YStack>
-  );
+            {pageRange.map((page, index) => {
+              if (page === -1) {
+                return (
+                  <Text
+                    key={`ellipsis-${index}`}
+                    fontSize="$3"
+                    paddingHorizontal="$2"
+                    style={{ color: TEXT_MUTED }}
+                  >
+                    ...
+                  </Text>
+                );
+              }
+
+              const isCurrentPage = page === currentPageNumber;
+              return (
+                <Button
+                  key={page}
+                  size="$2"
+                  onPress={() => handleGoToPage(page)}
+                  disabled={loading || isCurrentPage}
+                  minWidth={32}
+                  style={{
+                    background: isCurrentPage
+                      ? `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`
+                      : 'transparent',
+                    border: isCurrentPage
+                      ? `1px solid rgba(196,165,90,0.45)`
+                      : `1px solid transparent`,
+                    borderRadius: 8,
+                    color: isCurrentPage ? BRAND_GOLD_LIGHT : TEXT_MUTED,
+                    fontWeight: isCurrentPage ? '700' : '400',
+                  }}
+                >
+                  {page}
+                </Button>
+              );
+            })}
+          </XStack>
+        )}
+      </YStack>
+    );
+  };
 
   // =============================================================================
   // Main Render

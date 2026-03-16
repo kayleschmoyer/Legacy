@@ -31,6 +31,7 @@ import {
   type PlayerCareerStats,
   useCareerStatsWithNames,
 } from './services/CareerStatsService';
+import { getPageRange } from './paginationUtils';
 
 // ─── Brand color constants (mirror apps/web/src/constants/colors.ts) ──────────
 const BRAND_NAVY = '#1B3A5C';
@@ -974,44 +975,7 @@ export function PlayerStatsDataGrid({
    * Renders pagination controls with page jumping
    */
   const renderPagination = () => {
-    // Calculate page range for quick jump buttons (show 5 pages around current)
-    const getPageRange = () => {
-      const range: number[] = [];
-      const maxButtons = 5;
-
-      if (totalPages <= maxButtons) {
-        // Show all pages if total is small
-        for (let i = 1; i <= totalPages; i++) {
-          range.push(i);
-        }
-      } else {
-        // Show current page with 2 pages on each side
-        const start = Math.max(1, currentPageNumber - 2);
-        const end = Math.min(totalPages, currentPageNumber + 2);
-
-        for (let i = start; i <= end; i++) {
-          range.push(i);
-        }
-
-        // Add first page if not in range
-        if (!range.includes(1)) {
-          range.unshift(1);
-          if (range[1] !== 2) {
-            range.splice(1, 0, -1); // -1 represents ellipsis
-          }
-        }
-
-        // Add last page if not in range
-        if (!range.includes(totalPages)) {
-          if (range[range.length - 1] !== totalPages - 1) {
-            range.push(-1); // -1 represents ellipsis
-          }
-          range.push(totalPages);
-        }
-      }
-
-      return range;
-    };
+    const pageRange = getPageRange(currentPageNumber, totalPages);
 
     return (
       <YStack gap="$2">
@@ -1121,7 +1085,7 @@ export function PlayerStatsDataGrid({
               borderRadius: 10,
             }}
           >
-            {getPageRange().map((page, index) => {
+            {pageRange.map((page, index) => {
               if (page === -1) {
                 return (
                   <Text
