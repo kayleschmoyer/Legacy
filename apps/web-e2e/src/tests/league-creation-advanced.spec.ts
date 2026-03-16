@@ -274,7 +274,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await expect(page.getByText('Teams have a priority order')).toBeVisible();
   });
 
-  test('should show FAAB budget options when FAAB waiver is selected', async ({
+  test('should show upgrade modal when free user clicks FAAB waiver option', async ({
     page,
   }) => {
     await page.goto('/baseball/league/create');
@@ -286,18 +286,11 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await expect(faabButton).toBeVisible();
     await faabButton.click();
 
-    // After clicking FAAB, the FAAB budget section should appear
-    await expect(page.getByText('FAAB Budget Per Team')).toBeVisible();
-    await expect(page.getByText('$50')).toBeVisible();
-    await expect(page.getByText('$100')).toBeVisible();
-    await expect(
-      page.getByText('Each team starts with this budget'),
-    ).toBeVisible();
+    // Free user should see upgrade modal instead of FAAB budget options
+    await expect(page.getByText(/upgrade|premium/i)).toBeVisible();
 
-    // Description text changes
-    await expect(
-      page.getByText('Teams bid from a budget to claim free agents'),
-    ).toBeVisible();
+    // Waiver type should remain Standard
+    await expect(page.getByText('Teams have a priority order')).toBeVisible();
   });
 
   // ─── Hall of Fame Only ────────────────────────────────────────────────────

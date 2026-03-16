@@ -9,7 +9,8 @@ import {
 } from '../../constants/league';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { UpgradeModal } from '../../components/UpgradeModal';
+import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import {
   GetUserLeagues,
   GetUserLeaguesQuery,
@@ -22,6 +23,7 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../constants/colors';
+import { trackPremiumFeatureClick } from '../../utils/analytics';
 
 // Now using codegen-generated hooks and types
 
@@ -125,8 +127,10 @@ const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500];
 
 export function LeagueCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
-  const isPremium = useIsPremium();
+  const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
   const [formError, setFormError] = useState<string | null>(null);
+  const [showWaiverUpgradeModal, setShowWaiverUpgradeModal] =
+    useState<boolean>(false);
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
     numberOfTeams: DEFAULT_NUM_TEAMS,
@@ -237,6 +241,13 @@ export function LeagueCreatePage(): React.JSX.Element {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+
+    if (!isPremium && formData.waiverType === 'faab') {
+      trackPremiumFeatureClick('FAAB Waiver Settings');
+      setShowWaiverUpgradeModal(true);
+      setFormError('FAAB waiver settings require Premium.');
+      return;
+    }
 
     // Form validation
     const validationError = validateForm();
@@ -1125,6 +1136,15 @@ export function LeagueCreatePage(): React.JSX.Element {
                           : 'outlined'
                       }
                       onPress={() => {
+                        if (
+                          option.value === 'faab' &&
+                          (!isPremium || premiumLoading)
+                        ) {
+                          trackPremiumFeatureClick('FAAB Waiver Settings');
+                          setShowWaiverUpgradeModal(true);
+                          handleInputChange('waiverType', 'standard');
+                          return;
+                        }
                         handleInputChange('waiverType', option.value);
                       }}
                       disabled={loading}
@@ -1169,6 +1189,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                         }
                       >
                         {option.label}
+                        {!isPremium && option.value === 'faab'
+                          ? ' (Premium)'
+                          : ''}
                       </Text>
                     </Button>
                   ))}
@@ -1178,6 +1201,12 @@ export function LeagueCreatePage(): React.JSX.Element {
                     ? 'Teams bid from a budget to claim free agents — highest bid wins'
                     : 'Teams have a priority order — lower-ranked teams get first pick'}
                 </Text>
+                {!isPremium && (
+                  <Text size="$2" color="$brandGoldLight">
+                    FAAB is available on Premium. Tap FAAB to view upgrade
+                    options.
+                  </Text>
+                )}
               </YStack>
 
               {/* FAAB Budget (only when FAAB selected) */}
@@ -1585,6 +1614,13 @@ export function LeagueCreatePage(): React.JSX.Element {
           </YStack>
         </Card>
       </YStack>
+
+      <UpgradeModal
+        open={showWaiverUpgradeModal}
+        onOpenChange={setShowWaiverUpgradeModal}
+        featureName="FAAB Waiver Settings"
+        featureDescription="Use Free Agent Acquisition Budget (FAAB) bidding for waiver claims, where the highest bid wins."
+      />
     </ScrollView>
   );
 }
