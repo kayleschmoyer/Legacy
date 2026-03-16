@@ -13,6 +13,7 @@ import {
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import { GraphQLError } from 'graphql';
 
 import { DraftPick } from '../types';
 import {
@@ -26,7 +27,11 @@ import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { insertActivityLog } from '../../../services/activity-log';
 import { checkRosterCapacity } from '../../../services/roster-service';
-import { AuthenticationError } from '../../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../../graphql-errors';
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -81,7 +86,7 @@ builder.mutationField('makeDraftPick', (t) =>
             | undefined;
 
           if (!draft) {
-            throw new Error('Draft not found');
+            throw UserInputError('Draft not found');
           }
 
           // Fetch league to validate draft status and get maxRosterSize
@@ -92,17 +97,19 @@ builder.mutationField('makeDraftPick', (t) =>
             .limit(1);
 
           if (!league) {
-            throw new Error('League not found');
+            throw new GraphQLError('League not found', {
+              extensions: { code: 'INTERNAL_SERVER_ERROR' },
+            });
           }
 
           if (league.draftStatus === 'paused') {
-            throw new Error(
+            throw UserInputError(
               'Draft is currently paused. Wait for the commissioner to resume.',
             );
           }
 
           if (league.draftStatus !== 'in-progress') {
-            throw new Error(
+            throw UserInputError(
               `Draft is not in progress (current status: ${league.draftStatus ?? 'unknown'})`,
             );
           }
@@ -111,11 +118,13 @@ builder.mutationField('makeDraftPick', (t) =>
           const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
 
           if (!currentPickInfo) {
-            throw new Error('Could not determine current pick');
+            throw new GraphQLError('Could not determine current pick', {
+              extensions: { code: 'INTERNAL_SERVER_ERROR' },
+            });
           }
 
           if (currentPickInfo.isComplete) {
-            throw new Error('Draft is already complete');
+            throw UserInputError('Draft is already complete');
           }
 
           // Idempotency: if this exact pick was already made, return it
@@ -166,7 +175,7 @@ builder.mutationField('makeDraftPick', (t) =>
           const membership = leagueMembers[0];
 
           if (!membership || membership.teamId !== currentPickInfo.teamId) {
-            throw new Error(
+            throw ForbiddenError(
               'Not authorized: It is not your turn to pick or you do not own this team',
             );
           }
@@ -184,7 +193,7 @@ builder.mutationField('makeDraftPick', (t) =>
             .limit(1);
 
           if (existingPick.length > 0) {
-            throw new Error('Player has already been drafted');
+            throw UserInputError('Player has already been drafted');
           }
 
           // Verify player exists
@@ -195,19 +204,19 @@ builder.mutationField('makeDraftPick', (t) =>
             .limit(1);
 
           if (!player) {
-            throw new Error('Player not found');
+            throw UserInputError('Player not found');
           }
 
           // Validate player is in the league's player pool (AL/NL restriction)
           if (!(await isPlayerInPool(tx, playerId, league.playerPool))) {
-            throw new Error(
+            throw UserInputError(
               `Player is not in the ${league.playerPool.toUpperCase()} player pool`,
             );
           }
 
           // Validate Hall of Fame eligibility (LS-295)
           if (league.hofOnly && !player.hallOfFame) {
-            throw new Error(
+            throw UserInputError(
               'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
             );
           }
@@ -253,7 +262,7 @@ builder.mutationField('makeDraftPick', (t) =>
                 const eraLabel = league.eraFilter
                   .replace(/_/g, ' ')
                   .replace(/\b\w/g, (c: string) => c.toUpperCase());
-                throw new Error(
+                throw UserInputError(
                   `Player has no recorded seasons in the ${eraLabel} era and is not eligible for this league.`,
                 );
               }
@@ -268,7 +277,7 @@ builder.mutationField('makeDraftPick', (t) =>
               league.minCareerGames,
             ))
           ) {
-            throw new Error(
+            throw UserInputError(
               `Player does not meet the minimum career games requirement (${league.minCareerGames})`,
             );
           }
@@ -281,7 +290,7 @@ builder.mutationField('makeDraftPick', (t) =>
               league.minCareerSeasons,
             ))
           ) {
-            throw new Error(
+            throw UserInputError(
               `Player does not meet the minimum career seasons requirement (${league.minCareerSeasons})`,
             );
           }
@@ -295,7 +304,7 @@ builder.mutationField('makeDraftPick', (t) =>
           );
 
           if (rosterFull) {
-            throw new Error(
+            throw UserInputError(
               `Team roster is full (${league.maxRosterSize} players maximum)`,
             );
           }
@@ -826,11 +835,20 @@ builder.mutationField('makeDraftPick', (t) =>
 
         return result.draftPick;
       } catch (error) {
-        LOGGER.error(
-          'Error making draft pick',
-          error instanceof Error ? error : new Error(String(error)),
-          { draftId, playerId, userId },
-        );
+        // Skip error-level logging for expected user-facing errors
+        const isExpected =
+          error instanceof GraphQLError &&
+          typeof error.extensions?.code === 'string' &&
+          ['BAD_USER_INPUT', 'FORBIDDEN', 'UNAUTHENTICATED'].includes(
+            error.extensions.code,
+          );
+        if (!isExpected) {
+          LOGGER.error(
+            'Error making draft pick',
+            error instanceof Error ? error : new Error(String(error)),
+            { draftId, playerId, userId },
+          );
+        }
         throw error;
       }
     },
