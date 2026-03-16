@@ -416,21 +416,16 @@ export function HomePage(): React.JSX.Element {
     }
   };
 
-  /* ─── Loading guard: authenticated user, leagues query in flight, no cache ─── */
-  if (auth?.user && leaguesLoading && !leagueData) {
+  /* ─── Loading state — prevents unauthenticated hero flash ─── */
+  if (auth.isLoading || (!!auth.user && leaguesLoading)) {
     return (
-      <ScrollView>
-        <PageContainer style={pageBackgroundStyle}>
-          <YStack
-            flex={1}
-            alignItems="center"
-            justifyContent="center"
-            minHeight="60vh"
-          >
-            <Spinner size="large" color={BRAND_NAVY_LIGHT} />
-          </YStack>
-        </PageContainer>
-      </ScrollView>
+      <PageContainer
+        style={pageBackgroundStyle}
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Spinner size="large" color={BRAND_NAVY_LIGHT} />
+      </PageContainer>
     );
   }
 
