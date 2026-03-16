@@ -75,6 +75,7 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 | **New skill**                   | `skills/create-skill/SKILL.md`             |
 | **Platform file convention**    | `skills/platform-file-convention/SKILL.md` |
 | PR creation                     | `skills/create-pr/SKILL.md`                |
+| **PR operations (sweep/label)** | `skills/pr-operations/SKILL.md`            |
 | **Refresh dev seed**            | `skills/db-dump-dev/SKILL.md`              |
 | **Restore dev seed**            | `skills/db-restore-dev/SKILL.md`           |
 | **Restore from S3 dump**        | `skills/db-restore/SKILL.md`               |
@@ -92,5 +93,5 @@ Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig bran
 | **MCP DB operations**           | `skills/mcp-db/SKILL.md`                   |
 | **MCP Jira server**             | `skills/mcp-jira/SKILL.md`                 |
 | **Worktree workflow (default)** | `skills/worktree-workflow/SKILL.md`        |
-| All skills (62 guides)          | `skills/`                                  |
+| All skills                      | `skills/`                                  |
 | CSV reference data              | `docs/agents/*.csv`                        |
