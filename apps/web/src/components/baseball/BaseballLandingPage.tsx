@@ -606,6 +606,7 @@ export function BaseballLandingPage() {
   );
   const [isPublic, setIsPublic] = React.useState(false);
   const [search, setSearch] = React.useState('');
+  const [createError, setCreateError] = React.useState<string | null>(null);
 
   // Fetch user leagues from GraphQL
   const {
@@ -736,6 +737,39 @@ export function BaseballLandingPage() {
 
   const handleCreateLeague = () => {
     setShowCreateDialog(true);
+  };
+
+  const handleSubmit = () => {
+    if (creating || leagueName.trim().length < 3) return;
+    setCreateError(null);
+    void createLeague({
+      variables: {
+        input: {
+          leagueName: leagueName.trim(),
+          numberOfTeams: teamCount,
+          numberOfDivisions,
+          playerPool,
+          draftMode,
+          selectionMethod,
+          draftOrder,
+          maxRosterSize,
+          isPublic,
+          tradingEnabled: true,
+          waiverEnabled: true,
+        },
+      },
+    })
+      .then((result) => {
+        const id = result.data?.createLeagueAndTeams?.league?.id;
+        if (id) navigate(`/baseball/league/${id}`);
+      })
+      .catch((err: unknown) => {
+        const msg =
+          err instanceof Error && err.message
+            ? err.message
+            : 'Failed to create league. Please try again.';
+        setCreateError(msg);
+      });
   };
 
   const handleJoinLeague = () => {
@@ -1234,6 +1268,7 @@ export function BaseballLandingPage() {
                       placeholder="e.g., Saturday Sluggers"
                       value={leagueName}
                       onChangeText={setLeagueName}
+                      onSubmitEditing={handleSubmit}
                       autoFocus
                       size="$3"
                       aria-label="League name"
@@ -1591,33 +1626,17 @@ export function BaseballLandingPage() {
               <Separator />
 
               <XStack justifyContent="flex-end" gap="$3">
+                {createError && (
+                  <Text color="$red10" fontSize="$2" role="alert">
+                    {createError}
+                  </Text>
+                )}
                 <Dialog.Close asChild>
                   <SecondaryButton disabled={creating}>Cancel</SecondaryButton>
                 </Dialog.Close>
                 <PrimaryButton
                   disabled={creating || leagueName.trim().length < 3}
-                  onPress={() => {
-                    void createLeague({
-                      variables: {
-                        input: {
-                          leagueName: leagueName.trim(),
-                          numberOfTeams: teamCount,
-                          numberOfDivisions,
-                          playerPool,
-                          draftMode,
-                          selectionMethod,
-                          draftOrder,
-                          maxRosterSize,
-                          isPublic,
-                          tradingEnabled: true,
-                          waiverEnabled: true,
-                        },
-                      },
-                    }).then((result) => {
-                      const id = result.data?.createLeagueAndTeams?.league?.id;
-                      if (id) navigate(`/baseball/league/${id}`);
-                    });
-                  }}
+                  onPress={handleSubmit}
                 >
                   {creating ? 'Creating…' : 'Create League'}
                 </PrimaryButton>

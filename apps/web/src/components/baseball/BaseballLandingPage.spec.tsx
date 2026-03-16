@@ -52,11 +52,22 @@ jest.mock('tamagui', () => {
     YStack: ({ children, onPress, ..._rest }: any) => (
       <div onClick={onPress}>{children}</div>
     ),
-    Input: ({ value, onChangeText, placeholder, ..._rest }: any) => (
+    Input: ({
+      value,
+      onChangeText,
+      onSubmitEditing,
+      placeholder,
+      ..._rest
+    }: any) => (
       <input
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChangeText?.(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            onSubmitEditing?.();
+          }
+        }}
       />
     ),
     Dialog: Object.assign(
@@ -99,14 +110,20 @@ jest.mock('../../api/db/graphql.generated', () => ({
 
 describe('BaseballLandingPage', () => {
   beforeEach(() => {
-    // Reset the mock to the default (no leagues) before each test
     const {
       useGetUserLeaguesQuery,
+      useCreateLeagueAndTeamsMutation,
     }: any = require('../../api/db/graphql.generated');
+    // Reset the mock to the default (no leagues) before each test
     useGetUserLeaguesQuery.mockReturnValue({
       data: { userLeagues: [] },
       loading: false,
     });
+    // Reset the create mutation to a no-op so tests are order-independent
+    useCreateLeagueAndTeamsMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
   });
 
   it('shows empty state when user has no leagues', () => {
@@ -296,5 +313,47 @@ describe('BaseballLandingPage', () => {
     expect(
       screen.queryByText(/Create your first league/i),
     ).not.toBeInTheDocument();
+  });
+
+  it('submits create league form when Enter key is pressed in league name input', () => {
+    // Use a never-resolving promise to avoid act() warnings from async updates
+    const mockCreateLeague = jest
+      .fn()
+      .mockReturnValue(new Promise((_resolve) => undefined));
+    const {
+      useCreateLeagueAndTeamsMutation,
+    }: any = require('../../api/db/graphql.generated');
+    useCreateLeagueAndTeamsMutation.mockReturnValue([
+      mockCreateLeague,
+      { loading: false },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    // Open the create league dialog
+    fireEvent.click(screen.getByText(/Create League/i));
+    expect(
+      screen.getByText(/Configure your league settings/i),
+    ).toBeInTheDocument();
+
+    // Enter a valid league name
+    const nameInput = screen.getByPlaceholderText(/e\.g\., Saturday Sluggers/i);
+    fireEvent.change(nameInput, { target: { value: 'Test League' } });
+
+    // Press Enter to submit
+    fireEvent.keyDown(nameInput, { key: 'Enter', code: 'Enter' });
+
+    // Verify mutation was called with the league name
+    expect(mockCreateLeague).toHaveBeenCalledWith({
+      variables: {
+        input: expect.objectContaining({
+          leagueName: 'Test League',
+        }),
+      },
+    });
   });
 });
