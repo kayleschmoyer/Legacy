@@ -241,7 +241,11 @@ function createInitialErrors(stats: ProfileStat[]): FieldErrorState {
   return next;
 }
 
-function valuesToUpdates(stats: ProfileStat[], values: FormValueState) {
+function valuesToUpdates(
+  stats: ProfileStat[],
+  values: FormValueState,
+  baselineMultipliers?: Record<number, number>,
+) {
   return stats
     .map((stat) => {
       const value = values[stat.id];
@@ -251,7 +255,8 @@ function valuesToUpdates(stats: ProfileStat[], values: FormValueState) {
         return null;
       }
 
-      const isChanged = Math.abs(parsed - stat.multiplier) > 0.0001;
+      const baseline = baselineMultipliers?.[stat.id] ?? stat.multiplier;
+      const isChanged = Math.abs(parsed - baseline) > 0.0001;
 
       if (!isChanged) {
         return null;
@@ -311,10 +316,22 @@ export function LeagueScoringEditor(
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Server-confirmed multiplier per stat, used for dirty-checking. Updated from
+  // props when stats change AND optimistically from the save payload on
+  // successful mutation. This ensures the "unsaved" badge clears immediately
+  // after save without waiting for the async refetch → parent re-render →
+  // stats-update pipeline.
+  const [baselineMultipliers, setBaselineMultipliers] = useState<
+    Record<number, number>
+  >(() => Object.fromEntries(stats.map((s) => [s.id, s.multiplier])));
+
   const [updateScoring, { loading: saving }] =
     useUpdateLeagueScoringProfileMutation();
 
   useEffect(() => {
+    setBaselineMultipliers(
+      Object.fromEntries(stats.map((s) => [s.id, s.multiplier])),
+    );
     setFormValues(createInitialValues(stats));
     setFieldErrors(createInitialErrors(stats));
     setSaveError(null);
@@ -337,8 +354,8 @@ export function LeagueScoringEditor(
   );
 
   const pendingUpdates = useMemo(
-    () => valuesToUpdates(stats, formValues),
-    [stats, formValues],
+    () => valuesToUpdates(stats, formValues, baselineMultipliers),
+    [stats, formValues, baselineMultipliers],
   );
 
   const isLocked = draftStatus === 'completed';
@@ -396,12 +413,26 @@ export function LeagueScoringEditor(
       return;
     }
 
+    // Snapshot the updates before the async gap — state may change mid-flight.
+    const updatesToSave = pendingUpdates;
+
     try {
       await updateScoring({
         variables: {
           leagueId,
-          updates: pendingUpdates,
+          updates: updatesToSave,
         },
+      });
+
+      // Optimistically update the baseline so pendingUpdates clears immediately.
+      // Without this, the "unsaved" badge persists until the refetch → parent
+      // re-render → stats-update pipeline completes asynchronously.
+      setBaselineMultipliers((prev) => {
+        const next = { ...prev };
+        for (const update of updatesToSave) {
+          next[update.statDefinitionId] = update.multiplier;
+        }
+        return next;
       });
 
       await onRefetch();
