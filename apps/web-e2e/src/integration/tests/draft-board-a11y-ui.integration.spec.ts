@@ -424,7 +424,14 @@ test.describe
     await dismissPickAnnouncementOverlay(page);
 
     await test.step('Search input is focusable and accepts text', async () => {
+      // Dismiss any overlay that may have reappeared since the earlier check
+      // (live draft picks can trigger new announcement overlays at any time).
+      await dismissPickAnnouncementOverlay(page);
+      await searchInput.scrollIntoViewIfNeeded();
+      // Use a real click to verify the z-index fix actually prevents
+      // interception from higher elements (this PR's core assertion).
       await searchInput.click();
+      await expect(searchInput).toBeFocused();
       await searchInput.fill('Smith');
       await expect(searchInput).toHaveValue('Smith');
     });

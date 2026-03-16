@@ -2,7 +2,7 @@
 // Component-scoped CSS for EliteDraftBoard
 // ---------------------------------------------------------------------------
 
-import { NAV_HEIGHT_PX } from '../../constants/dimensions';
+import { NAV_HEIGHT_PX, NAV_Z_INDEX } from '../../constants/dimensions';
 
 export const CSS = `
 /* ===== Custom Properties (aligned with Legacy Sports theme) ===== */
@@ -127,7 +127,7 @@ export const CSS = `
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 100;
+  z-index: ${NAV_Z_INDEX + 1};
   background: var(--d-bg);
   color: var(--d-text);
   font-family: 'Playfair Display', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
