@@ -230,14 +230,24 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
               {!validating &&
                 leagueInfo &&
                 (leagueInfo.isFull ? (
-                  <Text color="$orange10" fontSize="$2" fontWeight="600">
+                  <Text
+                    color="$orange10"
+                    fontSize="$2"
+                    fontWeight="600"
+                    data-testid="invite-status-full"
+                  >
                     <span role="img" aria-label="no entry">
                       🚫
                     </span>{' '}
                     League full &mdash; all {leagueInfo.totalSpots} spots taken
                   </Text>
                 ) : (
-                  <Text color="$green10" fontSize="$2" fontWeight="600">
+                  <Text
+                    color="$green10"
+                    fontSize="$2"
+                    fontWeight="600"
+                    data-testid="invite-status-available"
+                  >
                     <span role="img" aria-label="check mark">
                       ✅
                     </span>{' '}
@@ -296,6 +306,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
             {/* League Full Banner */}
             {isLeagueFull && (
               <Card
+                data-testid="alert-league-full"
                 backgroundColor="$orange2"
                 borderColor="$orange6"
                 padding="$4"
@@ -320,6 +331,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
             {/* Error Message */}
             {error && !isLeagueFull && (
               <Card
+                data-testid="join-form-error"
                 backgroundColor="$red2"
                 borderColor="$red6"
                 padding="$3"

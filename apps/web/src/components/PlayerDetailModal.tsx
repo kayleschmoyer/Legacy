@@ -78,10 +78,12 @@ type StatsTab = 'batting' | 'pitching' | 'fielding';
 
 function TabButton({
   label,
+  tabKey,
   active,
   onPress,
 }: {
   label: string;
+  tabKey: string;
   active: boolean;
   onPress: () => void;
 }) {
@@ -98,6 +100,7 @@ function TabButton({
       pressStyle={{ scale: 0.97 }}
       animation="quick"
       onPress={onPress}
+      data-testid={`modal-tab-${tabKey}`}
     >
       <Text
         fontSize="$3"
@@ -502,7 +505,11 @@ export function PlayerDetailModal({
         <YStack padding="$4" gap="$4">
           {/* ── Loading ── */}
           {loading && (
-            <YStack alignItems="center" paddingVertical="$8">
+            <YStack
+              alignItems="center"
+              paddingVertical="$8"
+              data-testid="player-detail-loading"
+            >
               <Spinner size="large" color={BRAND_NAVY_LIGHT} />
               <Text marginTop="$3" color={TEXT_MUTED}>
                 Loading player statistics…
@@ -513,6 +520,7 @@ export function PlayerDetailModal({
           {/* ── Error ── */}
           {error && (
             <YStack
+              data-testid="player-detail-error"
               backgroundColor={withAlpha(BRAND_SEAM_RED, 0.12)}
               padding="$4"
               borderRadius="$3"
@@ -539,6 +547,7 @@ export function PlayerDetailModal({
               paddingVertical="$8"
               backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.08)}
               borderRadius="$3"
+              data-testid="player-detail-empty"
             >
               <Text color={TEXT_MUTED} fontSize="$4">
                 No season statistics found
@@ -548,7 +557,12 @@ export function PlayerDetailModal({
 
           {/* ── Eligible positions ── */}
           {!loading && !error && eligiblePositions.length > 0 && (
-            <XStack gap="$2" alignItems="center" flexWrap="wrap">
+            <XStack
+              gap="$2"
+              alignItems="center"
+              flexWrap="wrap"
+              data-testid="eligible-positions"
+            >
               <Text fontSize="$2" fontWeight="600" color={TEXT_MUTED}>
                 Eligible Positions
               </Text>
@@ -593,12 +607,20 @@ export function PlayerDetailModal({
           {!loading && !error && careerTotals && (
             <XStack gap="$3" flexWrap="wrap" alignItems="flex-start">
               {battingCardRows.length > 0 && (
-                <YStack flex={1} minWidth={280}>
+                <YStack
+                  flex={1}
+                  minWidth={280}
+                  data-testid="career-batting-card"
+                >
                   <StatCard title="Career Batting" rows={battingCardRows} />
                 </YStack>
               )}
               {pitchingCardRows.length > 0 && (
-                <YStack flex={1} minWidth={280}>
+                <YStack
+                  flex={1}
+                  minWidth={280}
+                  data-testid="career-pitching-card"
+                >
                   <StatCard title="Career Pitching" rows={pitchingCardRows} />
                 </YStack>
               )}
@@ -620,6 +642,7 @@ export function PlayerDetailModal({
                   <TabButton
                     key={tab.key}
                     label={tab.label}
+                    tabKey={tab.key}
                     active={activeTab === tab.key}
                     onPress={() => setActiveTab(tab.key)}
                   />

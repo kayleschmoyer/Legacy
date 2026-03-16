@@ -43,7 +43,7 @@ export class DraftPage {
     this.playerSearch = page.getByPlaceholder(/search.*player/i);
 
     this.draftStatus = page.getByTestId('draft-status');
-    this.roundIndicator = page.getByText(/round \d+/i).first();
+    this.roundIndicator = page.getByTestId('round-indicator');
     this.pickTimer = page.getByTestId('pick-timer');
   }
 

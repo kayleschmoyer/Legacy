@@ -26,7 +26,7 @@ export class NavigationPage {
     this.page = page;
 
     this.logoLink = page.getByRole('link', { name: /legacy sports home/i });
-    this.brandText = page.getByText('Fantasy League').first();
+    this.brandText = page.getByTestId('brand-text');
 
     this.primaryNav = page.getByRole('navigation', { name: 'Primary' });
     this.aboutLink = this.primaryNav.getByRole('link', { name: /about/i });

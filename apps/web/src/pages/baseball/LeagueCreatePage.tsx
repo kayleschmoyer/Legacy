@@ -385,7 +385,11 @@ export function LeagueCreatePage(): React.JSX.Element {
                 <Text size="$4" fontWeight="600" color="$gray12">
                   Number of Teams *
                 </Text>
-                <XStack space="$2" flexWrap="wrap">
+                <XStack
+                  space="$2"
+                  flexWrap="wrap"
+                  data-testid="team-count-select"
+                >
                   {TEAM_COUNT_OPTIONS.map((count) => (
                     <Button
                       key={count}

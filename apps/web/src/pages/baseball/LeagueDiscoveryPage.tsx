@@ -262,7 +262,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
 
       {/* Results Header */}
       <XStack justifyContent="space-between" alignItems="center">
-        <Text size="$4" color="$gray11">
+        <Text size="$4" color="$gray11" data-testid="discovery-results-count">
           {loading
             ? 'Loading…'
             : `${leagues.length} league${leagues.length !== 1 ? 's' : ''} found`}
@@ -361,8 +361,12 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
 
       {/* League Cards */}
       <YStack space="$3">
-        {leagues.map((league) => {
+        {leagues.map((league, idx) => {
           const leagueId = league.id ?? 0;
+          const cardKey =
+            league.id != null
+              ? `league-card-${league.id}`
+              : `league-card-idx-${idx}`;
           const isJoiningThis = joiningLeagueId === leagueId;
           const draftStatus = league.draftStatus ?? '';
           const statusColor = DRAFT_STATUS_COLORS[draftStatus] ?? '$gray10';
@@ -371,223 +375,235 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             PLAYER_POOL_LABELS[league.playerPool ?? ''] ?? league.playerPool;
 
           return (
-            <Card
-              key={leagueId}
-              elevate
-              bordered
-              backgroundColor="$color2"
-              borderColor={
-                league.isAlreadyMember
-                  ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                  : '$borderColor'
-              }
-              borderWidth={league.isAlreadyMember ? 2 : 1}
-              animation="quick"
-              hoverStyle={{
-                borderColor: BRAND_NAVY_LIGHT,
-                backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.06),
-              }}
-            >
-              <YStack padding="$4" space="$3">
-                {/* League Header */}
-                <XStack justifyContent="space-between" alignItems="flex-start">
-                  <YStack flex={1} space="$1" marginRight="$3">
-                    <Text size="$5" fontWeight="700" color="$color">
-                      {league.name}
-                    </Text>
-                    <XStack space="$2" flexWrap="wrap">
-                      {/* Draft Status Badge */}
-                      <Text
-                        size="$2"
-                        color={statusColor}
-                        backgroundColor={withAlpha('#ffffff', 0.08)}
-                        paddingHorizontal="$2"
-                        paddingVertical="$1"
-                        borderRadius="$2"
-                        fontWeight="600"
-                      >
-                        {statusLabel}
-                      </Text>
-                      {/* Player Pool Badge */}
-                      <Text
-                        size="$2"
-                        color="$blue10"
-                        backgroundColor={withAlpha('#ffffff', 0.08)}
-                        paddingHorizontal="$2"
-                        paddingVertical="$1"
-                        borderRadius="$2"
-                      >
-                        {poolLabel}
-                      </Text>
-                    </XStack>
-                  </YStack>
-
-                  {/* Spots Available */}
-                  <YStack alignItems="flex-end" space="$1">
-                    <Text size="$3" fontWeight="700" color="$color">
-                      {league.availableSpots} / {league.totalSpots}
-                    </Text>
-                    <Text size="$2" color="$gray10">
-                      spots open
-                    </Text>
-                  </YStack>
-                </XStack>
-
-                {/* Metadata Row */}
-                <XStack space="$4" flexWrap="wrap">
-                  <Text size="$3" color="$gray10">
-                    <span role="img" aria-label="baseball cap">
-                      🧢
-                    </span>{' '}
-                    {league.maxRosterSize} players/roster
-                  </Text>
-                </XStack>
-
-                {/* Already Member Banner */}
-                {league.isAlreadyMember && (
+            <div key={leagueId || `league-${idx}`} data-testid={cardKey}>
+              <Card
+                elevate
+                bordered
+                backgroundColor="$color2"
+                borderColor={
+                  league.isAlreadyMember
+                    ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                    : '$borderColor'
+                }
+                borderWidth={league.isAlreadyMember ? 2 : 1}
+                animation="quick"
+                hoverStyle={{
+                  borderColor: BRAND_NAVY_LIGHT,
+                  backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.06),
+                }}
+              >
+                <YStack padding="$4" space="$3">
+                  {/* League Header */}
                   <XStack
-                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
-                    borderRadius="$3"
-                    padding="$3"
-                    alignItems="center"
                     justifyContent="space-between"
+                    alignItems="flex-start"
                   >
-                    <Text size="$3" color={BRAND_GOLD} fontWeight="600">
-                      ✓ You're already in this league
-                    </Text>
-                    <Button
-                      size="$3"
-                      onPress={() => navigate(`/baseball/league/${leagueId}`)}
-                      backgroundColor={BRAND_NAVY_LIGHT}
-                      borderColor={BRAND_NAVY_LIGHT}
-                      pressStyle={{ scale: 0.97 }}
-                    >
-                      <Text color={BRAND_GOLD} fontWeight="600" size="$3">
-                        View League →
+                    <YStack flex={1} space="$1" marginRight="$3">
+                      <Text size="$5" fontWeight="700" color="$color">
+                        {league.name}
                       </Text>
-                    </Button>
-                  </XStack>
-                )}
-
-                {/* Full Banner */}
-                {league.isFull && !league.isAlreadyMember && (
-                  <YStack
-                    backgroundColor={withAlpha('#ff4444', 0.1)}
-                    borderRadius="$3"
-                    padding="$3"
-                  >
-                    <Text size="$3" color="$red10" fontWeight="600">
-                      <span role="img" aria-label="no entry">
-                        ⛔
-                      </span>{' '}
-                      This league is full
-                    </Text>
-                  </YStack>
-                )}
-
-                {/* Join Section */}
-                {!league.isAlreadyMember &&
-                  !league.isFull &&
-                  (isJoiningThis ? (
-                    <YStack space="$3">
-                      {/* Join success */}
-                      {joinSuccess && (
-                        <YStack
-                          backgroundColor={withAlpha('#22c55e', 0.15)}
-                          borderRadius="$3"
-                          padding="$3"
+                      <XStack space="$2" flexWrap="wrap">
+                        {/* Draft Status Badge */}
+                        <Text
+                          size="$2"
+                          color={statusColor}
+                          backgroundColor={withAlpha('#ffffff', 0.08)}
+                          paddingHorizontal="$2"
+                          paddingVertical="$1"
+                          borderRadius="$2"
+                          fontWeight="600"
                         >
-                          <Text size="$3" color="$green10" fontWeight="600">
-                            ✓ {joinSuccess} Redirecting…
-                          </Text>
-                        </YStack>
-                      )}
-
-                      {/* Join error */}
-                      {joinError && (
-                        <YStack
-                          backgroundColor={withAlpha('#ff4444', 0.1)}
-                          borderRadius="$3"
-                          padding="$3"
-                        >
-                          <Text size="$3" color="$red10">
-                            {joinError}
-                          </Text>
-                        </YStack>
-                      )}
-
-                      <YStack space="$2">
-                        <Text size="$3" fontWeight="600" color="$gray12">
-                          Choose a team name
+                          {statusLabel}
                         </Text>
-                        <Input
-                          size="$4"
-                          placeholder="e.g. Shortstop Stars"
-                          value={teamName}
-                          onChangeText={setTeamName}
-                          borderColor="$borderColor"
-                          backgroundColor="$color1"
-                          disabled={joining || !!joinSuccess}
-                          maxLength={40}
-                        />
-                        <Text size="$2" color="$gray10">
-                          Your team name will be visible to all league members
+                        {/* Player Pool Badge */}
+                        <Text
+                          size="$2"
+                          color="$blue10"
+                          backgroundColor={withAlpha('#ffffff', 0.08)}
+                          paddingHorizontal="$2"
+                          paddingVertical="$1"
+                          borderRadius="$2"
+                        >
+                          {poolLabel}
                         </Text>
-                      </YStack>
-
-                      <XStack space="$2" justifyContent="flex-end">
-                        <Button
-                          size="$3"
-                          onPress={handleJoinCancel}
-                          disabled={joining || !!joinSuccess}
-                          backgroundColor="$color3"
-                          pressStyle={{ scale: 0.97 }}
-                        >
-                          <Text size="$3">Cancel</Text>
-                        </Button>
-                        <Button
-                          size="$3"
-                          onPress={() => void handleJoinSubmit(leagueId)}
-                          disabled={
-                            joining || !!joinSuccess || !teamName.trim()
-                          }
-                          backgroundColor={BRAND_NAVY_LIGHT}
-                          borderColor={BRAND_NAVY_LIGHT}
-                          opacity={joining ? 0.7 : 1}
-                          pressStyle={{ scale: 0.97 }}
-                        >
-                          {joining ? (
-                            <Spinner size="small" />
-                          ) : (
-                            <Text color={BRAND_GOLD} fontWeight="600" size="$3">
-                              Join League
-                            </Text>
-                          )}
-                        </Button>
                       </XStack>
                     </YStack>
-                  ) : (
-                    <XStack justifyContent="flex-end">
+
+                    {/* Spots Available */}
+                    <YStack
+                      alignItems="flex-end"
+                      space="$1"
+                      data-testid={`league-spots-${leagueId}`}
+                    >
+                      <Text size="$3" fontWeight="700" color="$color">
+                        {league.availableSpots} / {league.totalSpots}
+                      </Text>
+                      <Text size="$2" color="$gray10">
+                        spots open
+                      </Text>
+                    </YStack>
+                  </XStack>
+
+                  {/* Metadata Row */}
+                  <XStack space="$4" flexWrap="wrap">
+                    <Text size="$3" color="$gray10">
+                      <span role="img" aria-label="baseball cap">
+                        🧢
+                      </span>{' '}
+                      {league.maxRosterSize} players/roster
+                    </Text>
+                  </XStack>
+
+                  {/* Already Member Banner */}
+                  {league.isAlreadyMember && (
+                    <XStack
+                      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                      borderRadius="$3"
+                      padding="$3"
+                      alignItems="center"
+                      justifyContent="space-between"
+                    >
+                      <Text size="$3" color={BRAND_GOLD} fontWeight="600">
+                        ✓ You're already in this league
+                      </Text>
                       <Button
                         size="$3"
-                        onPress={() => handleJoinStart(leagueId)}
+                        onPress={() => navigate(`/baseball/league/${leagueId}`)}
                         backgroundColor={BRAND_NAVY_LIGHT}
                         borderColor={BRAND_NAVY_LIGHT}
-                        borderWidth={2}
-                        hoverStyle={{ backgroundColor: BRAND_NAVY }}
-                        pressStyle={{
-                          scale: 0.97,
-                          backgroundColor: BRAND_NAVY_DARK,
-                        }}
+                        pressStyle={{ scale: 0.97 }}
                       >
                         <Text color={BRAND_GOLD} fontWeight="600" size="$3">
-                          Join League →
+                          View League →
                         </Text>
                       </Button>
                     </XStack>
-                  ))}
-              </YStack>
-            </Card>
+                  )}
+
+                  {/* Full Banner */}
+                  {league.isFull && !league.isAlreadyMember && (
+                    <YStack
+                      backgroundColor={withAlpha('#ff4444', 0.1)}
+                      borderRadius="$3"
+                      padding="$3"
+                    >
+                      <Text size="$3" color="$red10" fontWeight="600">
+                        <span role="img" aria-label="no entry">
+                          ⛔
+                        </span>{' '}
+                        This league is full
+                      </Text>
+                    </YStack>
+                  )}
+
+                  {/* Join Section */}
+                  {!league.isAlreadyMember &&
+                    !league.isFull &&
+                    (isJoiningThis ? (
+                      <YStack space="$3">
+                        {/* Join success */}
+                        {joinSuccess && (
+                          <YStack
+                            backgroundColor={withAlpha('#22c55e', 0.15)}
+                            borderRadius="$3"
+                            padding="$3"
+                          >
+                            <Text size="$3" color="$green10" fontWeight="600">
+                              ✓ {joinSuccess} Redirecting…
+                            </Text>
+                          </YStack>
+                        )}
+
+                        {/* Join error */}
+                        {joinError && (
+                          <YStack
+                            backgroundColor={withAlpha('#ff4444', 0.1)}
+                            borderRadius="$3"
+                            padding="$3"
+                          >
+                            <Text size="$3" color="$red10">
+                              {joinError}
+                            </Text>
+                          </YStack>
+                        )}
+
+                        <YStack space="$2">
+                          <Text size="$3" fontWeight="600" color="$gray12">
+                            Choose a team name
+                          </Text>
+                          <Input
+                            size="$4"
+                            placeholder="e.g. Shortstop Stars"
+                            value={teamName}
+                            onChangeText={setTeamName}
+                            borderColor="$borderColor"
+                            backgroundColor="$color1"
+                            disabled={joining || !!joinSuccess}
+                            maxLength={40}
+                          />
+                          <Text size="$2" color="$gray10">
+                            Your team name will be visible to all league members
+                          </Text>
+                        </YStack>
+
+                        <XStack space="$2" justifyContent="flex-end">
+                          <Button
+                            size="$3"
+                            onPress={handleJoinCancel}
+                            disabled={joining || !!joinSuccess}
+                            backgroundColor="$color3"
+                            pressStyle={{ scale: 0.97 }}
+                          >
+                            <Text size="$3">Cancel</Text>
+                          </Button>
+                          <Button
+                            size="$3"
+                            onPress={() => void handleJoinSubmit(leagueId)}
+                            disabled={
+                              joining || !!joinSuccess || !teamName.trim()
+                            }
+                            backgroundColor={BRAND_NAVY_LIGHT}
+                            borderColor={BRAND_NAVY_LIGHT}
+                            opacity={joining ? 0.7 : 1}
+                            pressStyle={{ scale: 0.97 }}
+                          >
+                            {joining ? (
+                              <Spinner size="small" />
+                            ) : (
+                              <Text
+                                color={BRAND_GOLD}
+                                fontWeight="600"
+                                size="$3"
+                              >
+                                Join League
+                              </Text>
+                            )}
+                          </Button>
+                        </XStack>
+                      </YStack>
+                    ) : (
+                      <XStack justifyContent="flex-end">
+                        <Button
+                          size="$3"
+                          onPress={() => handleJoinStart(leagueId)}
+                          backgroundColor={BRAND_NAVY_LIGHT}
+                          borderColor={BRAND_NAVY_LIGHT}
+                          borderWidth={2}
+                          hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                          pressStyle={{
+                            scale: 0.97,
+                            backgroundColor: BRAND_NAVY_DARK,
+                          }}
+                        >
+                          <Text color={BRAND_GOLD} fontWeight="600" size="$3">
+                            Join League →
+                          </Text>
+                        </Button>
+                      </XStack>
+                    ))}
+                </YStack>
+              </Card>
+            </div>
           );
         })}
       </YStack>

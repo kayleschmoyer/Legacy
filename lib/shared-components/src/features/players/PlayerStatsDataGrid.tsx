@@ -737,7 +737,12 @@ export function PlayerStatsDataGrid({
       {/* Sort hint */}
       {showSorting && (
         <XStack justifyContent="center" paddingTop="$1">
-          <Text fontSize="$2" style={{ color: TEXT_MUTED }} textAlign="center">
+          <Text
+            fontSize="$2"
+            style={{ color: TEXT_MUTED }}
+            textAlign="center"
+            data-testid="player-stats-sort-hint"
+          >
             <span role="img" aria-label="Tip">
               💡
             </span>{' '}

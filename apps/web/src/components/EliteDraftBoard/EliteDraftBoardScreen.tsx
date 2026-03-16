@@ -1889,7 +1889,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                   'LIVE DRAFT'
                 )}
               </div>
-              <div className="d-status-sub">
+              <div className="d-status-sub" data-testid="round-indicator">
                 Pick #{currentPick} &middot; Round {round}
               </div>
             </div>

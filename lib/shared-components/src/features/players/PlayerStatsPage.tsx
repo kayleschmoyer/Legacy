@@ -264,6 +264,7 @@ export function PlayerStatsPage({
             <Tabs.Tab
               flex={1}
               value="batting"
+              data-testid="tab-trigger-batting"
               style={{
                 background:
                   activeTab === 'batting'
@@ -325,6 +326,7 @@ export function PlayerStatsPage({
             <Tabs.Tab
               flex={1}
               value="pitching"
+              data-testid="tab-trigger-pitching"
               style={{
                 background:
                   activeTab === 'pitching'

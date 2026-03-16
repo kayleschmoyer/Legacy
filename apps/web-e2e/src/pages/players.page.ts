@@ -44,9 +44,9 @@ export class PlayersPage {
     });
     this.searchInput = page.getByPlaceholder('Search players...');
     this.refreshButton = page.getByRole('button', { name: /refresh/i });
-    this.sortHint = page.getByText('Click column headers to sort');
-    this.battingTab = page.getByText(/batting stats/i).first();
-    this.pitchingTab = page.getByText(/pitching stats/i).first();
+    this.sortHint = page.getByTestId('player-stats-sort-hint');
+    this.battingTab = page.getByTestId('tab-trigger-batting');
+    this.pitchingTab = page.getByTestId('tab-trigger-pitching');
     this.playerRows = page.locator('[data-testid^="player-row-"]');
 
     // Player detail
@@ -58,26 +58,23 @@ export class PlayersPage {
     this.detailModalCloseButton = this.detailModal.getByRole('button', {
       name: 'Close',
     });
-    this.detailModalLoading = page.getByText('Loading player statistics…');
-    this.detailModalError = this.detailModal.getByText('Error loading stats');
-    this.detailModalEmpty = this.detailModal.getByText(
-      'No season statistics found',
-    );
+    this.detailModalLoading = page.getByTestId('player-detail-loading');
+    this.detailModalError = this.detailModal.getByTestId('player-detail-error');
+    this.detailModalEmpty = this.detailModal.getByTestId('player-detail-empty');
     this.detailModalEligiblePositions =
-      this.detailModal.getByText('Eligible Positions');
-    this.detailModalBattingTab = this.detailModal.getByText('Batting', {
-      exact: true,
-    });
-    this.detailModalPitchingTab = this.detailModal.getByText('Pitching', {
-      exact: true,
-    });
-    this.detailModalFieldingTab = this.detailModal.getByText('Fielding', {
-      exact: true,
-    });
-    this.detailModalCareerBattingCard =
-      this.detailModal.getByText('Career Batting');
-    this.detailModalCareerPitchingCard =
-      this.detailModal.getByText('Career Pitching');
+      this.detailModal.getByTestId('eligible-positions');
+    this.detailModalBattingTab =
+      this.detailModal.getByTestId('modal-tab-batting');
+    this.detailModalPitchingTab =
+      this.detailModal.getByTestId('modal-tab-pitching');
+    this.detailModalFieldingTab =
+      this.detailModal.getByTestId('modal-tab-fielding');
+    this.detailModalCareerBattingCard = this.detailModal.getByTestId(
+      'career-batting-card',
+    );
+    this.detailModalCareerPitchingCard = this.detailModal.getByTestId(
+      'career-pitching-card',
+    );
   }
 
   /** Navigate to the player stats page. */

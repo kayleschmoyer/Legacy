@@ -19,9 +19,7 @@ test.describe('Player Statistics Page @regression', () => {
     // Check that the stats interface components are present
     await expect(page.getByPlaceholder('Search players...')).toBeVisible();
     // Click column headers hint is embedded in the info paragraph
-    await expect(
-      page.getByText('Click column headers to sort').first(),
-    ).toBeVisible();
+    await expect(page.getByTestId('player-stats-sort-hint')).toBeVisible();
   });
 
   test('should display player statistics data grid', async ({ page }) => {
@@ -55,8 +53,8 @@ test.describe('Player Statistics Page @regression', () => {
 
   test('should support view mode switching', async ({ page }) => {
     // Tamagui Tabs — look for tab triggers with batting/pitching text
-    const battingTab = page.getByText(/batting stats/i).first();
-    const pitchingTab = page.getByText(/pitching stats/i).first();
+    const battingTab = page.getByTestId('tab-trigger-batting');
+    const pitchingTab = page.getByTestId('tab-trigger-pitching');
 
     if (await battingTab.isVisible()) {
       await battingTab.click();

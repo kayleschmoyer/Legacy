@@ -58,10 +58,7 @@ export class LeaguePage {
     this.leagueTitle = page.getByTestId('league-title');
     this.leagueName = page.getByRole('heading', { level: 1 }).first();
     this.draftStatusBadge = page.getByTestId('draft-status');
-    this.startDraftButton = page
-      .locator('button')
-      .filter({ hasText: /start.*draft/i })
-      .first();
+    this.startDraftButton = page.getByTestId('start-draft-button');
     this.leagueTeams = page.getByTestId('league-teams');
 
     // Create form
@@ -70,10 +67,7 @@ export class LeaguePage {
     });
     this.leagueNameInput = page.getByPlaceholder('Enter your league name');
     this.createButton = page.getByRole('button', { name: /create league/i });
-    this.teamCountSelect = page
-      .locator('select, [role="combobox"]')
-      .filter({ hasText: /team/i })
-      .first();
+    this.teamCountSelect = page.getByTestId('team-count-select');
 
     // Discovery list
     this.leaguesGrid = page.getByTestId('leagues-grid');
@@ -82,7 +76,7 @@ export class LeaguePage {
       level: 1,
     });
     this.discoverySearch = page.getByPlaceholder('Search leagues by name…');
-    this.discoveryResultsCount = page.getByText(/\d+ leagues? found/i);
+    this.discoveryResultsCount = page.getByTestId('discovery-results-count');
     this.discoveryRefreshButton = page.getByRole('button', {
       name: /Refresh/i,
     });
@@ -112,15 +106,9 @@ export class LeaguePage {
     this.joinButton = page.getByRole('button', { name: /join league/i });
     this.cancelButton = page.getByRole('button', { name: /cancel/i });
     this.deepLinkBanner = page.getByText(/Invite code loaded from link/i);
-    this.leagueFullBanner = page.getByRole('alert').filter({
-      hasText: /league is full/i,
-    });
-    this.inviteCodePreview = page.getByRole('status').filter({
-      hasText: /spot/i,
-    });
-    this.formErrorCard = page.getByRole('alert').filter({
-      hasText: /❌/,
-    });
+    this.leagueFullBanner = page.getByTestId('alert-league-full');
+    this.inviteCodePreview = page.getByTestId(/^invite-status-/);
+    this.formErrorCard = page.getByTestId('join-form-error');
   }
 
   /** Navigate to the league creation page. */
@@ -204,13 +192,16 @@ export class LeaguePage {
 
   /** Return the locator for a league card by its displayed name. */
   leagueCard(name: string): Locator {
-    return this.page.locator('*').filter({ hasText: name }).first();
+    return this.page
+      .locator('[data-testid^="league-card-"]')
+      .filter({ hasText: name })
+      .first();
   }
 
   /** Click the "Join League →" button on a specific league card. */
   async clickJoinLeague(leagueName: string) {
     await this.page
-      .locator('*')
+      .locator('[data-testid^="league-card-"]')
       .filter({ hasText: leagueName })
       .getByRole('button', { name: /Join League/i })
       .first()
@@ -220,7 +211,7 @@ export class LeaguePage {
   /** Fill the inline team name input and submit join on a specific league card. */
   async fillAndSubmitDiscoveryJoin(leagueName: string, teamName: string) {
     const card = this.page
-      .locator('*')
+      .locator('[data-testid^="league-card-"]')
       .filter({ hasText: leagueName })
       .filter({ hasText: /Choose a team name/i })
       .first();

@@ -465,6 +465,7 @@ export function NextStepControl({
               </Link>
             ) : (
               <Button
+                data-testid="start-draft-button"
                 backgroundColor={BRAND_NAVY_LIGHT}
                 color="white"
                 pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}

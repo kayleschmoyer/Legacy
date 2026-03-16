@@ -288,9 +288,7 @@ test.describe('Player Detail Modal @regression', () => {
     await expect(dialog).toBeVisible();
 
     // Wait for stats to load (spinner should disappear)
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // Hero stat chips (label text rendered inside HeroStat components)
     await expect(dialog.getByText('AVG').first()).toBeVisible();
@@ -310,12 +308,10 @@ test.describe('Player Detail Modal @regression', () => {
     const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // "Eligible Positions" label
-    await expect(dialog.getByText('Eligible Positions')).toBeVisible();
+    await expect(dialog.getByTestId('eligible-positions')).toBeVisible();
 
     // CF and OF position badges
     const cfBadge = dialog
@@ -339,12 +335,10 @@ test.describe('Player Detail Modal @regression', () => {
     const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // Career Batting stat card title
-    await expect(dialog.getByText('Career Batting')).toBeVisible();
+    await expect(dialog.getByTestId('career-batting-card')).toBeVisible();
 
     // Key row labels in the batting card
     await expect(dialog.getByText('Batting Average')).toBeVisible();
@@ -362,9 +356,7 @@ test.describe('Player Detail Modal @regression', () => {
     const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // The batting tab should be active by default since the player has batting data
     // Verify column headers in the batting table
@@ -395,12 +387,10 @@ test.describe('Player Detail Modal @regression', () => {
     const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // Click the Fielding tab
-    const fieldingTab = dialog.getByText('Fielding', { exact: true });
+    const fieldingTab = dialog.getByTestId('modal-tab-fielding');
     await expect(fieldingTab).toBeVisible();
     await fieldingTab.click({ force: true });
     await page.waitForTimeout(300);
@@ -420,12 +410,10 @@ test.describe('Player Detail Modal @regression', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // The spinner / loading text should be visible before data arrives
-    await expect(page.getByText('Loading player statistics…')).toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).toBeVisible();
 
     // Eventually data loads and spinner disappears
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
   });
 
   test('closes when the Close button is clicked', async ({ page }) => {
@@ -458,22 +446,20 @@ test.describe('Player Detail Modal – Pitcher @regression', () => {
     const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // Eligible positions for a pitcher
     await expect(dialog.getByText('SP').first()).toBeVisible();
 
     // Career Pitching card
-    await expect(dialog.getByText('Career Pitching')).toBeVisible();
+    await expect(dialog.getByTestId('career-pitching-card')).toBeVisible();
 
     // Pitching hero chips
     await expect(dialog.getByText('W-L')).toBeVisible();
     await expect(dialog.getByText('SO').first()).toBeVisible();
 
     // Click the Pitching tab to show season-by-season table
-    const pitchingTab = dialog.getByText('Pitching', { exact: true });
+    const pitchingTab = dialog.getByTestId('modal-tab-pitching');
     await expect(pitchingTab).toBeVisible();
     await pitchingTab.click({ force: true });
     await page.waitForTimeout(300);
@@ -498,11 +484,9 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
-    await expect(dialog.getByText('No season statistics found')).toBeVisible();
+    await expect(dialog.getByTestId('player-detail-empty')).toBeVisible();
   });
 
   test('shows error state when the stats query fails', async ({ page }) => {
@@ -517,11 +501,9 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
-    await expect(dialog.getByText('Error loading stats')).toBeVisible();
+    await expect(dialog.getByTestId('player-detail-error')).toBeVisible();
   });
 
   test('pressing Escape closes the modal and navigates back', async ({
@@ -571,17 +553,15 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // Switch to Fielding
-    await dialog.getByText('Fielding', { exact: true }).click({ force: true });
+    await dialog.getByTestId('modal-tab-fielding').click({ force: true });
     await page.waitForTimeout(300);
     await expect(dialog.getByText('POS')).toBeVisible();
 
     // Switch back to Batting
-    await dialog.getByText('Batting', { exact: true }).click({ force: true });
+    await dialog.getByTestId('modal-tab-batting').click({ force: true });
     await page.waitForTimeout(300);
 
     // Batting table headers should reappear
@@ -597,9 +577,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     const dialog = page.locator('div[role="dialog"]');
     await expect(dialog).toBeVisible();
 
-    await expect(
-      page.getByText('Loading player statistics…'),
-    ).not.toBeVisible();
+    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
 
     // Season subtitle says "2 seasons"
     await expect(dialog.getByText(/2 season/i)).toBeVisible();

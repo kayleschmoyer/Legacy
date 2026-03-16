@@ -261,6 +261,7 @@ function Navigation() {
                 color={BRAND_GOLD}
                 letterSpacing={0.5}
                 userSelect="none"
+                data-testid="brand-text"
               >
                 Legacy Sports
               </Paragraph>
