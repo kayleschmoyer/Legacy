@@ -25,7 +25,6 @@ import {
   BrandIconBadge,
   type BrandIconName,
 } from '../../components/icons';
-import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { PageMeta } from '../../components/PageMeta';
 import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
 import { OnThisDayFeed } from '../../features/baseball';
@@ -338,10 +337,7 @@ function readDefaultSport(): 'baseball' | 'football' {
 export function HomePage(): React.JSX.Element {
   const navigate = useNavigate();
   const auth = useAuth();
-  const [onboardingComplete, setOnboardingComplete] = useLocalStorage<boolean>(
-    'ls_onboarding_complete',
-    false,
-  );
+  const userId = auth?.user?.id;
   const [tutorialOpen, setTutorialOpen] = useState(false);
 
   const defaultSport = useMemo(() => readDefaultSport(), []);
@@ -375,22 +371,49 @@ export function HomePage(): React.JSX.Element {
       : false,
   ).length;
 
-  // Auto-show tutorial once for first-time visitors who have no leagues.
-  // Do not trigger when the query failed — that is an error, not a new user.
+  // Auto-show tutorial once per user for first-time visitors who have no leagues.
+  // Key is scoped to the user ID so each user gets their own tutorial state.
+  const getOnboardingKey = (uid: number) => `ls_onboarding_complete_${uid}`;
+
   useEffect(() => {
-    if (
-      !onboardingComplete &&
-      !hasLeagues &&
-      !leaguesLoading &&
-      !leaguesError
-    ) {
-      setTutorialOpen(true);
+    if (!userId) return;
+    if (!hasLeagues && !leaguesLoading) {
+      const key = getOnboardingKey(userId);
+      try {
+        // Migrate previously-onboarded users from the legacy global key so they
+        // don't see the tutorial again after upgrading to the per-user key.
+        const legacyDone = window.localStorage.getItem(
+          'ls_onboarding_complete',
+        );
+        if (legacyDone !== null && (JSON.parse(legacyDone) as boolean)) {
+          window.localStorage.setItem(key, JSON.stringify(true));
+          window.localStorage.removeItem('ls_onboarding_complete');
+          return;
+        }
+        const stored = window.localStorage.getItem(key);
+        const completed =
+          stored !== null ? (JSON.parse(stored) as boolean) : false;
+        if (!completed) {
+          setTutorialOpen(true);
+        }
+      } catch {
+        setTutorialOpen(true);
+      }
     }
-  }, [onboardingComplete, hasLeagues, leaguesLoading, leaguesError]);
+  }, [userId, hasLeagues, leaguesLoading]);
 
   const handleTutorialClose = () => {
     setTutorialOpen(false);
-    setOnboardingComplete(true);
+    if (userId) {
+      try {
+        window.localStorage.setItem(
+          getOnboardingKey(userId),
+          JSON.stringify(true),
+        );
+      } catch {
+        // ignore
+      }
+    }
   };
 
   /* ─── Loading guard: authenticated user, leagues query in flight, no cache ─── */
