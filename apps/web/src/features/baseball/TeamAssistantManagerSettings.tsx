@@ -172,46 +172,54 @@ export function TeamAssistantManagerSettings({
         <Separator />
 
         {/* Invite form */}
-        <YStack gap="$2">
-          <Text fontSize="$3" fontWeight="600" color={BRAND_GOLD_LIGHT}>
-            Invite by username
-          </Text>
-          <XStack gap="$2" alignItems="center">
-            <Input
-              flex={1}
-              size="$3"
-              placeholder="Enter username…"
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-              autoCorrect={false}
-              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
-              focusStyle={{ borderColor: BRAND_NAVY_LIGHT }}
-              aria-label="Username to invite as assistant manager"
-            />
-            <Button
-              size="$3"
-              backgroundColor={BRAND_NAVY_LIGHT}
-              color="white"
-              onPress={() => void handleInvite()}
-              disabled={inviting || !username.trim()}
-              aria-label="Send assistant manager invitation"
-            >
-              {inviting ? <Spinner size="small" color="white" /> : 'Invite'}
-            </Button>
-          </XStack>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (inviting || !username.trim()) return;
+            void handleInvite();
+          }}
+        >
+          <YStack gap="$2">
+            <Text fontSize="$3" fontWeight="600" color={BRAND_GOLD_LIGHT}>
+              Invite by username
+            </Text>
+            <XStack gap="$2" alignItems="center">
+              <Input
+                flex={1}
+                size="$3"
+                placeholder="Enter username…"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoCorrect={false}
+                borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
+                focusStyle={{ borderColor: BRAND_NAVY_LIGHT }}
+                aria-label="Username to invite as assistant manager"
+              />
+              <Button
+                size="$3"
+                backgroundColor={BRAND_NAVY_LIGHT}
+                color="white"
+                onPress={() => void handleInvite()}
+                disabled={inviting || !username.trim()}
+                aria-label="Send assistant manager invitation"
+              >
+                {inviting ? <Spinner size="small" color="white" /> : 'Invite'}
+              </Button>
+            </XStack>
 
-          {inviteError && (
-            <Text fontSize="$3" color={BRAND_SEAM_RED}>
-              {inviteError}
-            </Text>
-          )}
-          {inviteSuccess && (
-            <Text fontSize="$3" color="$green9">
-              {inviteSuccess}
-            </Text>
-          )}
-        </YStack>
+            {inviteError && (
+              <Text fontSize="$3" color={BRAND_SEAM_RED}>
+                {inviteError}
+              </Text>
+            )}
+            {inviteSuccess && (
+              <Text fontSize="$3" color="$green9">
+                {inviteSuccess}
+              </Text>
+            )}
+          </YStack>
+        </form>
       </YStack>
     </Card>
   );

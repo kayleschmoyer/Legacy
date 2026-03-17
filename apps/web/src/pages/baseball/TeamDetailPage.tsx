@@ -382,112 +382,121 @@ export function TeamDetailPage() {
                 HTTPS image URLs (e.g. from Imgur, Discord CDN, or similar).
               </Text>
 
-              {/* Avatar URL */}
-              <YStack gap="$2">
-                <Text fontSize="$3" fontWeight="500">
-                  Avatar URL{' '}
-                  <Text fontSize="$2" color="$gray11">
-                    (team logo / icon)
-                  </Text>
-                </Text>
-                {currentAvatarUrl && (
-                  <XStack gap="$2" alignItems="center">
-                    <Text
-                      fontSize="$2"
-                      color="$gray11"
-                      flex={1}
-                      numberOfLines={1}
-                      style={{ wordBreak: 'break-all' }}
-                    >
-                      Current: {currentAvatarUrl}
-                    </Text>
-                    <Button
-                      size="$2"
-                      chromeless
-                      onPress={handleClearAvatar}
-                      disabled={brandingLoading}
-                      style={{ color: BRAND_SEAM_RED }}
-                    >
-                      Clear
-                    </Button>
-                  </XStack>
-                )}
-                <Input
-                  value={avatarInput}
-                  onChangeText={setAvatarInput}
-                  placeholder="https://example.com/my-logo.png"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </YStack>
-
-              {/* Banner URL */}
-              <YStack gap="$2">
-                <Text fontSize="$3" fontWeight="500">
-                  Banner URL{' '}
-                  <Text fontSize="$2" color="$gray11">
-                    (header image)
-                  </Text>
-                </Text>
-                {currentBannerUrl && (
-                  <XStack gap="$2" alignItems="center">
-                    <Text
-                      fontSize="$2"
-                      color="$gray11"
-                      flex={1}
-                      numberOfLines={1}
-                      style={{ wordBreak: 'break-all' }}
-                    >
-                      Current: {currentBannerUrl}
-                    </Text>
-                    <Button
-                      size="$2"
-                      chromeless
-                      onPress={handleClearBanner}
-                      disabled={brandingLoading}
-                      style={{ color: BRAND_SEAM_RED }}
-                    >
-                      Clear
-                    </Button>
-                  </XStack>
-                )}
-                <Input
-                  value={bannerInput}
-                  onChangeText={setBannerInput}
-                  placeholder="https://example.com/my-banner.jpg"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </YStack>
-
-              {/* Feedback */}
-              {brandingError && (
-                <Text fontSize="$3" style={{ color: BRAND_SEAM_RED }}>
-                  {brandingError}
-                </Text>
-              )}
-              {brandingSuccess && (
-                <Text fontSize="$3" style={{ color: '#22c55e' }}>
-                  Branding saved!
-                </Text>
-              )}
-
-              <Button
-                onPress={handleSaveBranding}
-                disabled={brandingLoading || (!avatarInput && !bannerInput)}
-                style={{
-                  backgroundColor:
-                    brandingLoading || (!avatarInput && !bannerInput)
-                      ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
-                      : BRAND_NAVY_LIGHT,
-                  color: 'white',
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (brandingLoading || (!avatarInput && !bannerInput)) return;
+                  void handleSaveBranding();
                 }}
-                hoverStyle={{ backgroundColor: BRAND_NAVY }}
-                pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
-                alignSelf="flex-start"
+                style={{ display: 'contents' }}
               >
-                {brandingLoading ? 'Saving…' : 'Save Branding'}
-              </Button>
+                {/* Avatar URL */}
+                <YStack gap="$2">
+                  <Text fontSize="$3" fontWeight="500">
+                    Avatar URL{' '}
+                    <Text fontSize="$2" color="$gray11">
+                      (team logo / icon)
+                    </Text>
+                  </Text>
+                  {currentAvatarUrl && (
+                    <XStack gap="$2" alignItems="center">
+                      <Text
+                        fontSize="$2"
+                        color="$gray11"
+                        flex={1}
+                        numberOfLines={1}
+                        style={{ wordBreak: 'break-all' }}
+                      >
+                        Current: {currentAvatarUrl}
+                      </Text>
+                      <Button
+                        size="$2"
+                        chromeless
+                        onPress={handleClearAvatar}
+                        disabled={brandingLoading}
+                        style={{ color: BRAND_SEAM_RED }}
+                      >
+                        Clear
+                      </Button>
+                    </XStack>
+                  )}
+                  <Input
+                    value={avatarInput}
+                    onChangeText={setAvatarInput}
+                    placeholder="https://example.com/my-logo.png"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </YStack>
+
+                {/* Banner URL */}
+                <YStack gap="$2">
+                  <Text fontSize="$3" fontWeight="500">
+                    Banner URL{' '}
+                    <Text fontSize="$2" color="$gray11">
+                      (header image)
+                    </Text>
+                  </Text>
+                  {currentBannerUrl && (
+                    <XStack gap="$2" alignItems="center">
+                      <Text
+                        fontSize="$2"
+                        color="$gray11"
+                        flex={1}
+                        numberOfLines={1}
+                        style={{ wordBreak: 'break-all' }}
+                      >
+                        Current: {currentBannerUrl}
+                      </Text>
+                      <Button
+                        size="$2"
+                        chromeless
+                        onPress={handleClearBanner}
+                        disabled={brandingLoading}
+                        style={{ color: BRAND_SEAM_RED }}
+                      >
+                        Clear
+                      </Button>
+                    </XStack>
+                  )}
+                  <Input
+                    value={bannerInput}
+                    onChangeText={setBannerInput}
+                    placeholder="https://example.com/my-banner.jpg"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </YStack>
+
+                {/* Feedback */}
+                {brandingError && (
+                  <Text fontSize="$3" style={{ color: BRAND_SEAM_RED }}>
+                    {brandingError}
+                  </Text>
+                )}
+                {brandingSuccess && (
+                  <Text fontSize="$3" color="$green9">
+                    Branding saved!
+                  </Text>
+                )}
+
+                <Button
+                  onPress={handleSaveBranding}
+                  disabled={brandingLoading || (!avatarInput && !bannerInput)}
+                  style={{
+                    backgroundColor:
+                      brandingLoading || (!avatarInput && !bannerInput)
+                        ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
+                        : BRAND_NAVY_LIGHT,
+                    color: 'white',
+                  }}
+                  hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                  pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                  alignSelf="flex-start"
+                >
+                  {brandingLoading ? 'Saving…' : 'Save Branding'}
+                </Button>
+              </form>
             </YStack>
 
             {/* Assistant Manager Settings */}
