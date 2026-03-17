@@ -238,7 +238,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
-    // Auction budget section not visible initially (under salary cap premium gate)
+    // Auction budget section not visible until Auction selection method is chosen
     // Select Auction selection method
     await page.getByRole('button', { name: 'Auction' }).click();
 

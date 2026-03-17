@@ -1387,55 +1387,49 @@ export function LeagueCreatePage(): React.JSX.Element {
                       </Text>
                     </YStack>
                   )}
-
-                  {formData.selectionMethod === 'auction' && (
-                    <>
-                      <YStack space="$2">
-                        <Text size="$3" fontWeight="600" color="$gray12">
-                          Auction Budget per Team
-                        </Text>
-                        <Input
-                          value={String(formData.auctionBudget)}
-                          onChangeText={(text: string) => {
-                            const n = parseInt(text, 10);
-                            handleInputChange(
-                              'auctionBudget',
-                              isNaN(n) ? 200 : n,
-                            );
-                          }}
-                          placeholder="200"
-                          keyboardType="numeric"
-                          disabled={loading}
-                        />
-                        <Text size="$2" color="$gray10">
-                          Each team's total budget for the auction draft
-                        </Text>
-                      </YStack>
-                      <YStack space="$2">
-                        <Text size="$3" fontWeight="600" color="$gray12">
-                          Minimum Bid
-                        </Text>
-                        <Input
-                          value={String(formData.auctionMinBid)}
-                          onChangeText={(text: string) => {
-                            const n = parseInt(text, 10);
-                            handleInputChange(
-                              'auctionMinBid',
-                              isNaN(n) ? 1 : n,
-                            );
-                          }}
-                          placeholder="1"
-                          keyboardType="numeric"
-                          disabled={loading}
-                        />
-                        <Text size="$2" color="$gray10">
-                          Minimum amount a team can bid on any player
-                        </Text>
-                      </YStack>
-                    </>
-                  )}
                 </YStack>
               </PremiumGate>
+
+              {formData.selectionMethod === 'auction' && (
+                <YStack space="$3">
+                  <YStack space="$2">
+                    <Text size="$3" fontWeight="600" color="$gray12">
+                      Auction Budget per Team
+                    </Text>
+                    <Input
+                      value={String(formData.auctionBudget)}
+                      onChangeText={(text: string) => {
+                        const n = parseInt(text, 10);
+                        handleInputChange('auctionBudget', isNaN(n) ? 200 : n);
+                      }}
+                      placeholder="200"
+                      keyboardType="numeric"
+                      disabled={loading}
+                    />
+                    <Text size="$2" color="$gray10">
+                      Each team's total budget for the auction draft
+                    </Text>
+                  </YStack>
+                  <YStack space="$2">
+                    <Text size="$3" fontWeight="600" color="$gray12">
+                      Minimum Bid
+                    </Text>
+                    <Input
+                      value={String(formData.auctionMinBid)}
+                      onChangeText={(text: string) => {
+                        const n = parseInt(text, 10);
+                        handleInputChange('auctionMinBid', isNaN(n) ? 1 : n);
+                      }}
+                      placeholder="1"
+                      keyboardType="numeric"
+                      disabled={loading}
+                    />
+                    <Text size="$2" color="$gray10">
+                      Minimum amount a team can bid on any player
+                    </Text>
+                  </YStack>
+                </YStack>
+              )}
 
               {/* Draft Date and Time */}
               <YStack space="$2">
