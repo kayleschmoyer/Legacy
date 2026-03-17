@@ -1628,25 +1628,47 @@ export function BaseballLandingPage() {
                 </XStack>
               ) : null}
 
-              <XStack justifyContent="flex-end" gap="$3">
-                {createError && (
-                  <Text color="$red10" fontSize="$2" role="alert">
-                    {createError}
-                  </Text>
-                )}
-                <Dialog.Close asChild>
-                  <SecondaryButton disabled={creating}>Cancel</SecondaryButton>
-                </Dialog.Close>
-                <PrimaryButton
-                  disabled={
-                    creating ||
-                    leagueName.trim().length < 3 ||
-                    leagueName.trim().length > MAX_LEAGUE_NAME_LENGTH
-                  }
-                  onPress={handleSubmit}
+              <XStack
+                justifyContent="space-between"
+                alignItems="center"
+                gap="$3"
+              >
+                <Text
+                  fontSize="$2"
+                  color="$brandGoldLight"
+                  cursor="pointer"
+                  textDecorationLine="underline"
+                  hoverStyle={{ opacity: 0.8 }}
+                  onPress={() => {
+                    handleDialogOpenChange(false);
+                    navigate('/baseball/league/create');
+                  }}
+                  role="link"
                 >
-                  {creating ? 'Creating…' : 'Create League'}
-                </PrimaryButton>
+                  Advanced settings
+                </Text>
+                <XStack gap="$3">
+                  {createError && (
+                    <Text color="$red10" fontSize="$2" role="alert">
+                      {createError}
+                    </Text>
+                  )}
+                  <Dialog.Close asChild>
+                    <SecondaryButton disabled={creating}>
+                      Cancel
+                    </SecondaryButton>
+                  </Dialog.Close>
+                  <PrimaryButton
+                    disabled={
+                      creating ||
+                      leagueName.trim().length < 3 ||
+                      leagueName.trim().length > MAX_LEAGUE_NAME_LENGTH
+                    }
+                    onPress={handleSubmit}
+                  >
+                    {creating ? 'Creating…' : 'Create League'}
+                  </PrimaryButton>
+                </XStack>
               </XStack>
             </YStack>
           </Dialog.Content>
