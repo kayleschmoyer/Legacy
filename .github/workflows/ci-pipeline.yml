@@ -366,7 +366,7 @@ jobs:
 
       - name: "Comment Playwright Report URL"
         if: steps.check-reports.outputs.has-reports == 'true' && github.event.pull_request.number
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: playwright-report
           number: ${{ github.event.pull_request.number }}

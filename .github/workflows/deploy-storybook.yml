@@ -95,7 +95,7 @@ jobs:
       # ── Sticky PR Comment (only on pull requests) ─────────────────────────
       - name: Comment Storybook URL
         if: always() && github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: storybook-preview
           number: ${{ github.event.pull_request.number }}

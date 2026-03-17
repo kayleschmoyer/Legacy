@@ -209,7 +209,7 @@ jobs:
 
       - name: Comment Preview URL
         if: steps.pr.outputs.skip != 'true'
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: pr-preview
           number: ${{ steps.pr.outputs.number }}
@@ -266,7 +266,7 @@ jobs:
 
       - name: Remove Preview Comment
         if: always()
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: pr-preview
           delete: true
