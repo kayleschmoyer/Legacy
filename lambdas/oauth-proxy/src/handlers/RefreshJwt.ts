@@ -163,7 +163,7 @@ export const handleRefreshJwt = async (
       multiValueHeaders: {
         'Set-Cookie': authCookies,
       },
-      body: JSON.stringify({ jwt: newJwt }),
+      body: JSON.stringify({ jwt: newJwt, csrfToken }),
     };
   });
 };

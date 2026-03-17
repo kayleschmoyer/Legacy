@@ -59,6 +59,7 @@ export const handleLogin = async (
     return {
       body: JSON.stringify({
         jwt: internalJwt,
+        csrfToken,
       }),
       multiValueHeaders: {
         'Set-Cookie': [cookieHeader, ...authCookies],
@@ -110,6 +111,7 @@ export const handleRegister = async (
     return {
       body: JSON.stringify({
         jwt: internalJwt,
+        csrfToken,
       }),
       multiValueHeaders: {
         'Set-Cookie': [cookieHeader, ...authCookies],

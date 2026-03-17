@@ -669,6 +669,7 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   const result: APIGatewayProxyResult = {
     body: JSON.stringify({
       jwt: internalJwt,
+      csrfToken,
     }),
     multiValueHeaders: {
       'Set-Cookie': [cookieHeader, ...authCookies],

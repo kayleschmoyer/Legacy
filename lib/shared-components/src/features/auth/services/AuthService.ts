@@ -27,6 +27,7 @@ const ADMIN_PROFILE_KEY = 'ls_admin_profile';
 interface SecureOAuthResponse {
   jwt: string;
   refreshToken?: string;
+  csrfToken?: string;
 }
 
 // Type for Vite environment configuration
@@ -121,6 +122,11 @@ export class AuthService {
         refreshToken: authResult.refreshToken,
       });
 
+      // Persist CSRF token from response body (cross-origin safe)
+      if (authResult.csrfToken) {
+        this.storeCsrfToken(authResult.csrfToken);
+      }
+
       // Extract user from response or decode from JWT
       const user = authResult.user || this.getUserFromToken(authResult.jwt);
 
@@ -152,14 +158,25 @@ export class AuthService {
       });
 
       if (!response.ok) {
-        const errorData = (await response.json()) as { message?: string };
-        throw new Error(errorData.message || 'Login failed');
+        const errorData = (await response.json()) as {
+          message?: string;
+          error?: string;
+        };
+        throw new Error(errorData.message || errorData.error || 'Login failed');
       }
 
-      const result = (await response.json()) as { jwt: string };
+      const result = (await response.json()) as {
+        jwt: string;
+        csrfToken?: string;
+      };
 
       // Store the JWT token
       this.storeTokens({ jwt: result.jwt });
+
+      // Persist CSRF token from response body (cross-origin safe)
+      if (result.csrfToken) {
+        this.storeCsrfToken(result.csrfToken);
+      }
 
       // Decode user info from JWT or fetch from user manager
       const user = this.getUserFromToken(result.jwt);
@@ -381,6 +398,10 @@ export class AuthService {
         localStorage.removeItem(TOKEN_EXPIRY_KEY);
         localStorage.removeItem(ADMIN_PROFILE_KEY);
       }
+      // Also clear the cross-origin CSRF token from sessionStorage
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('ls_csrf_token');
+      }
     } catch (error) {
       LOGGER.error('Failed to clear auth tokens:', String(error));
     }
@@ -469,11 +490,19 @@ export class AuthService {
         return null;
       }
 
-      const result = (await response.json()) as { jwt?: string };
+      const result = (await response.json()) as {
+        jwt?: string;
+        csrfToken?: string;
+      };
 
       if (!result.jwt) {
         LOGGER.warn('AuthService: JWT refresh endpoint did not return a jwt');
         return null;
+      }
+
+      // Persist the refreshed CSRF token so subsequent requests include it
+      if (result.csrfToken) {
+        this.storeCsrfToken(result.csrfToken);
       }
 
       // Persist the expiry so subsequent proactive refresh can reschedule
@@ -657,16 +686,52 @@ export class AuthService {
 
   // ─── CSRF helper ──────────────────────────────────────────────────────
 
+  /** In-memory fallback when localStorage is unavailable */
+  private csrfTokenFallback = '';
+
   /**
-   * Read the CSRF double-submit token from the `ls_csrf` cookie.
-   * Returns an empty string when running outside a browser (SSR / React Native).
+   * Read the CSRF double-submit token. Checks in-memory first, then
+   * localStorage (persists across browser restarts to match cookie lifetime),
+   * then falls back to document.cookie (same-origin only).
    */
   private getCsrfToken(): string {
+    // 1. In-memory
+    if (this.csrfTokenFallback) return this.csrfTokenFallback;
+
+    // 2. localStorage (persists across browser restarts)
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('ls_csrf_token');
+        if (stored) {
+          this.csrfTokenFallback = stored;
+          return stored;
+        }
+      }
+    } catch {
+      // localStorage not available
+    }
+
+    // Fallback: read from cookie (only works when API is same-origin)
     if (typeof document === 'undefined') return '';
     const match = document.cookie
       .split(';')
       .map((c) => c.trim())
       .find((c) => c.startsWith('ls_csrf='));
     return match ? match.substring('ls_csrf='.length) : '';
+  }
+
+  /**
+   * Store the CSRF token in localStorage so it persists across browser
+   * restarts (matching auth cookie lifetime). Falls back to in-memory.
+   */
+  private storeCsrfToken(token: string): void {
+    this.csrfTokenFallback = token;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('ls_csrf_token', token);
+      }
+    } catch {
+      // Storage full or disabled
+    }
   }
 }

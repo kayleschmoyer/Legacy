@@ -13,7 +13,7 @@ import { setContext } from '@apollo/client/link/context';
 import type { ApolloLink } from '@apollo/client/link';
 import { LOGGER } from '@legacy-sports/logging';
 import { captureError } from '@legacy-sports/rollbar/web';
-import { CSRF_HEADER, getCsrfToken } from './csrf';
+import { CSRF_HEADER, getCsrfToken, storeCsrfToken } from './csrf';
 import { env } from '../config/environment';
 
 // GraphQL endpoint URL from centralized environment config
@@ -90,8 +90,16 @@ async function silentlyRefreshJwt(): Promise<string | null> {
 
       if (!response.ok) return null;
 
-      const result = (await response.json()) as { jwt?: string };
+      const result = (await response.json()) as {
+        jwt?: string;
+        csrfToken?: string;
+      };
       if (!result.jwt) return null;
+
+      // Persist the refreshed CSRF token so subsequent requests include it.
+      if (result.csrfToken) {
+        storeCsrfToken(result.csrfToken);
+      }
 
       // The server also sets updated cookies automatically.
       // Return the token so the retry flow knows refresh succeeded.
