@@ -1,19 +1,28 @@
 ---
 name: jira-ticket
-description: 'Manage Jira ticket statuses and metadata using the acli CLI; use when transitioning tickets to In Progress, In Review, or other workflow states. Includes investigation ticket workflow: resolve immediately after creating a follow-up backlog ticket.'
+description: 'Manage Jira ticket statuses and metadata; MCP tools are primary, acli CLI is the fallback. Covers transitions, ticket creation, attachments, links, sprints, and investigation ticket workflow.'
 ---
 
 # Skill: Jira Ticket Management
 
-## ⚠️ Prefer MCP Tools
+## Tool Priority
 
-**If MCP Jira tools are available** (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent`), **use them instead of `acli`**. They require no CLI installation, work in cloud/CI environments, and are the recommended approach. See `.agents/skills/mcp-jira/SKILL.md` for full details.
+| Operation         | MCP Tool (preferred)  | acli CLI (fallback)                                                  |
+| ----------------- | --------------------- | -------------------------------------------------------------------- |
+| View ticket       | `jira_view`           | `acli jira workitem view LS-####`                                    |
+| Create ticket     | `jira_create_ticket`  | `acli jira workitem create --project LS --type Task --summary "..."` |
+| Transition status | `jira_transition`     | `acli jira workitem transition --key LS-#### --status "In Progress"` |
+| Check blockers    | `jira_check_blockers` | `acli jira workitem link list --key LS-####`                         |
+| Set parent epic   | `jira_set_parent`     | REST API (see below)                                                 |
+| Fetch comments    | `jira_get_comments`   | `acli jira workitem comment list --key LS-####`                      |
 
-**Agents must not use `fetch_webpage` or generic raw HTTP requests to access Jira.** If neither MCP tools nor `acli` are available, inform the user that Jira credentials need to be configured. Local PowerShell scripts that use `Invoke-WebRequest`/`Invoke-RestMethod` with `.netrc` credentials (e.g., attachment downloads, setting parent epic) are allowed as documented below.
+**Always use MCP tools when available.** They require no CLI installation, work in cloud/CI, and return structured data. See [mcp-jira](../mcp-jira/SKILL.md) for full MCP tool documentation.
+
+**Never use `fetch_webpage` or raw HTTP to access Jira.** If neither MCP tools nor `acli` are available, inform the user that Jira credentials need configuration.
 
 ## Overview
 
-Manage Jira ticket statuses and information using the acli command-line tool (local fallback when MCP tools are unavailable).
+Manage Jira ticket statuses and information. MCP tools are the recommended approach; `acli` commands below are the local fallback when MCP tools are unavailable.
 
 ## When to Use
 
@@ -23,7 +32,9 @@ Manage Jira ticket statuses and information using the acli command-line tool (lo
 - Viewing ticket details
 - Creating new tickets
 
-## Command
+## acli CLI Commands (Fallback)
+
+### Common Operations
 
 ```powershell
 # View ticket details
@@ -375,8 +386,8 @@ acli jira workitem comment create --key LS-ORIG \
 
 ## Related Skills
 
-- [Branch Creation](branch-create.md) - Creating branches for tickets
-- [Pull Request Creation](create-pr.md) - Creating PRs
+- [Branch Creation](../branch-create/SKILL.md) - Creating branches for tickets
+- [Pull Request Creation](../create-pr/SKILL.md) - Creating PRs
 - [Jira CLI Reference](https://developer.atlassian.com/cloud/jira/platform/rest/v3/)
 
 ## Related Documentation

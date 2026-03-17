@@ -348,11 +348,11 @@ if ($LASTEXITCODE -ne 0) {
 
 ## Related Skills
 
-- [Jira Ticket Management](jira-ticket.md) - Update tickets based on CI results
-- [Create PR](create-pr.md) - PR creation after `make pc` passes locally
-- [Testing](test.md) - Local testing to prevent CI failures
-- [Type Checking](typecheck.md) - Fix type errors before CI
-- [Linting](lint.md) - Fix lint errors before CI
+- [Jira Ticket Management](../jira-ticket/SKILL.md) - Update tickets based on CI results
+- [Create PR](../create-pr/SKILL.md) - PR creation after `make pc` passes locally
+- [Testing](../test/SKILL.md) - Local testing to prevent CI failures
+- [Type Checking](../typecheck/SKILL.md) - Fix type errors before CI
+- [Linting](../lint/SKILL.md) - Fix lint errors before CI
 
 ## Related Documentation
 

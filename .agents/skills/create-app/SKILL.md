@@ -309,6 +309,6 @@ Use the same React web pattern, plus:
 
 ## Related Skills
 
-- [Create Lib](create-lib.md) — Create a shared library instead
-- [Create Lambda](create-lambda.md) — Create a Lambda instead
-- [Config Standards](config-standards.md) — Full config reference
+- [Create Lib](../create-lib/SKILL.md) — Create a shared library instead
+- [Create Lambda](../create-lambda/SKILL.md) — Create a Lambda instead
+- [Config Standards](../config-standards/SKILL.md) — Full config reference

@@ -249,10 +249,10 @@ Get-Process -Name node | Where-Object {$_.Path -like "*legacy-sports*"} | Stop-P
 
 ## Related Skills
 
-- [Dev DB Lambda](dev-db-lambda.md) - Local database Lambda
-- [Sync Environment](sync-env.md) - Environment variable management
-- [Building](build.md) - Production builds
-- [Testing](test.md) - Running tests
+- [Dev DB Lambda](../dev-db-lambda/SKILL.md) - Local database Lambda
+- [Sync Environment](../sync-env/SKILL.md) - Environment variable management
+- [Building](../build/SKILL.md) - Production builds
+- [Testing](../test/SKILL.md) - Running tests
 
 ## Troubleshooting Checklist
 

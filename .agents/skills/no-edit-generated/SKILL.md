@@ -1,6 +1,6 @@
 ---
 name: no-edit-generated
-description: 'Never manually edit *.generated.ts files; always regenerate them via the codegen process. Use when you are about to edit a generated file, see generated file conflicts, or need to update GraphQL types after a schema change.'
+description: 'Never manually edit *.generated.ts or schema.graphql files; always regenerate them via the codegen process. Use when you are about to edit a generated file, see generated file conflicts, or need to update GraphQL types after a schema change.'
 ---
 
 # Skill: Never Edit Generated Files Directly
@@ -22,6 +22,20 @@ Always regenerate them from source instead.
 | `*.generated.ts` | `lib/shared-components/src/api/db/graphql.generated.ts` |
 
 If you see one of these paths in a diff, a task, or a conflict — **stop and regenerate** instead of editing.
+
+## schema.graphql: Source of Truth
+
+The schema source of truth is the Pothos type/resolver definitions in TypeScript:
+
+```
+lambdas/db/src/schema/
+├── types/          ← Pothos object types
+├── queries/        ← Query resolvers
+├── mutations/      ← Mutation resolvers
+└── builder.ts      ← Pothos schema builder
+```
+
+`schema.graphql` is produced by running the schema builder and printing the resulting SDL. Codegen downstream reads this file to generate TypeScript client types for every app and library.
 
 > **🚨 `schema.graphql` is NEVER manually edited.**  
 > It is the canonical SDL output generated from the Pothos schema implementation.
@@ -106,3 +120,12 @@ git add lambdas/db/schema.graphql **/graphql.generated.ts
 ```
 
 See also: `.agents/skills/codegen/SKILL.md`
+
+## Resolving a schema.graphql Merge Conflict
+
+**Never use the merge editor to resolve conflicts in `schema.graphql`.** Instead:
+
+1. Accept either side (or abort the merge/rebase)
+2. Regenerate from the Pothos source: `pnpm exec nx run db:print-schema`
+3. Stage the regenerated file: `git add lambdas/db/schema.graphql`
+4. Continue the merge/rebase

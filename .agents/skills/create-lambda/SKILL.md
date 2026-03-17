@@ -289,7 +289,7 @@ pnpm exec nx run <name>:build
 
 ### 5. Add Terraform resource
 
-Define the Lambda's AWS infrastructure in `terraform/`. See [Terraform Apply](terraform-apply.md) and [Deploy Lambda](deploy-lambda.md) for guidance.
+Define the Lambda's AWS infrastructure in `terraform/`. See [Terraform Apply](../terraform-apply/SKILL.md) and [Deploy Lambda](../deploy-lambda/SKILL.md) for guidance.
 
 ## Differences from Library
 
@@ -317,6 +317,6 @@ Define the Lambda's AWS infrastructure in `terraform/`. See [Terraform Apply](te
 
 ## Related Skills
 
-- [Deploy Lambda](deploy-lambda.md) — Deploy to AWS
-- [Create Lib](create-lib.md) — Create a shared library instead
-- [Config Standards](config-standards.md) — Full config reference
+- [Deploy Lambda](../deploy-lambda/SKILL.md) — Deploy to AWS
+- [Create Lib](../create-lib/SKILL.md) — Create a shared library instead
+- [Config Standards](../config-standards/SKILL.md) — Full config reference

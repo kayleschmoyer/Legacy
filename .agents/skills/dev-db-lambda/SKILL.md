@@ -356,10 +356,10 @@ terraform apply
 
 ## Related Skills
 
-- [Dev Web Server](dev-web.md) - Web application server
-- [Sync Environment](sync-env.md) - Environment variable management
-- [Testing](test.md) - Running Lambda tests
-- [Building](build.md) - Building Lambda for deployment
+- [Dev Web Server](../dev-web/SKILL.md) - Web application server
+- [Sync Environment](../sync-env/SKILL.md) - Environment variable management
+- [Testing](../test/SKILL.md) - Running Lambda tests
+- [Building](../build/SKILL.md) - Building Lambda for deployment
 
 ## Troubleshooting Checklist
 

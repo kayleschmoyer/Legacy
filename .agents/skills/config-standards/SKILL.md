@@ -311,6 +311,6 @@ export default {
 
 ## Related Skills
 
-- [Create Lib](create-lib.md) — Step-by-step library creation
-- [Create Lambda](create-lambda.md) — Step-by-step lambda creation
-- [Create App](create-app.md) — Step-by-step app creation
+- [Create Lib](../create-lib/SKILL.md) — Step-by-step library creation
+- [Create Lambda](../create-lambda/SKILL.md) — Step-by-step lambda creation
+- [Create App](../create-app/SKILL.md) — Step-by-step app creation

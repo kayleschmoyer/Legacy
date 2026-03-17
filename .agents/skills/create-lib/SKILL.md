@@ -196,7 +196,7 @@ All three must pass before committing.
 
 ## Related Skills
 
-- [Typecheck](typecheck.md) — Validate types
-- [Lint](lint.md) — Run ESLint
-- [Test](test.md) — Run Jest tests
-- [Config Standards](config-standards.md) — Full reference for config conventions
+- [Typecheck](../typecheck/SKILL.md) — Validate types
+- [Lint](../lint/SKILL.md) — Run ESLint
+- [Test](../test/SKILL.md) — Run Jest tests
+- [Config Standards](../config-standards/SKILL.md) — Full reference for config conventions

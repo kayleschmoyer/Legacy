@@ -237,9 +237,9 @@ The PowerShell script provides:
 
 ## Related Skills
 
-- [Jira Ticket Management](jira-ticket.md) - Managing ticket status
-- [Branch Tree Management](branch-tree.md) - Managing dependent branches
-- [Pull Request Creation](create-pr.md) - Creating PRs after work
+- [Jira Ticket Management](../jira-ticket/SKILL.md) - Managing ticket status
+- [Branch Tree Management](../branch-tree/SKILL.md) - Managing dependent branches
+- [Pull Request Creation](../create-pr/SKILL.md) - Creating PRs after work
 
 ## Related Documentation
 

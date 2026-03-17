@@ -251,10 +251,10 @@ pnpm run validate:workspace-deps
 
 ## Related Skills
 
-- [Dev Web Server](dev-web.md) - Requires updated dependencies
-- [Dev DB Lambda](dev-db-lambda.md) - May need dependency updates
-- [Building](build.md) - Depends on correct dependencies
-- [Testing](test.md) - Tests may fail with wrong versions
+- [Dev Web Server](../dev-web/SKILL.md) - Requires updated dependencies
+- [Dev DB Lambda](../dev-db-lambda/SKILL.md) - May need dependency updates
+- [Building](../build/SKILL.md) - Depends on correct dependencies
+- [Testing](../test/SKILL.md) - Tests may fail with wrong versions
 
 ## Common Scenarios
 

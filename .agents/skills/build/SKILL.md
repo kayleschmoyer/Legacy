@@ -117,20 +117,7 @@ pnpm exec nx run <lib-name>:build
 
 ## Integration with Workflow
 
-### Pre-commit Sequence
-
-```powershell
-pnpm exec nx affected -t typecheck   # Step 1
-pnpm exec nx affected -t lint --fix  # Step 2
-pnpm exec nx affected -t test        # Step 3
-pnpm exec nx affected -t build       # Step 4 ← This command
-```
-
-### Full Pre-commit (Makefile)
-
-```powershell
-make pre-commit  # Runs all 4 validation steps
-```
+Build is Step 4 of the pre-commit sequence (typecheck → lint → test → build). Run the full suite with `make pc`. See [makefile](../makefile/SKILL.md) for all targets.
 
 ## Exit Codes
 
@@ -212,6 +199,6 @@ pnpm exec nx affected -t build --dry-run
 
 ## Related Skills
 
-- [Type Checking](typecheck.md)
-- [Linting](lint.md)
-- [Testing](test.md)
+- [Type Checking](../typecheck/SKILL.md)
+- [Linting](../lint/SKILL.md)
+- [Testing](../test/SKILL.md)

@@ -73,12 +73,12 @@ pnpm run build:libs
 
 1. Run `pnpm run build:libs` — resolves most "module not found" type errors
 2. If generated types are stale: `pnpm exec nx run <project>:codegen`
-3. For other errors: see [fix-types.md](fix-types.md)
+3. For other errors: see [fix-types.md](../fix-types/SKILL.md)
 
 ### Linting Errors
 
 1. `pnpm exec nx affected -t lint --fix` — auto-fixes ~80%
-2. For remaining errors: see [fix-lint.md](fix-lint.md)
+2. For remaining errors: see [fix-lint.md](../fix-lint/SKILL.md)
 
 ### Test Failures
 
@@ -138,21 +138,21 @@ make rebase-tree
 
 ## Quick Issue → Fix Lookup
 
-| Problem                | Fix                                |
-| ---------------------- | ---------------------------------- |
-| `acli not found`       | Refresh PATH (see above)           |
-| Module not found       | `pnpm run build:libs`              |
-| Type errors            | See [fix-types.md](fix-types.md)   |
-| DB connection fails    | `pnpm run sync-env`                |
-| Port in use            | `pnpm dlx kill-port 3000`          |
-| Nx cache issues        | `pnpm exec nx reset`               |
-| AWS CLI encoding error | `$env:PYTHONIOENCODING = "utf-8"`  |
-| Terraform state locked | `node scripts/terraform-unlock.js` |
+| Problem                | Fix                                       |
+| ---------------------- | ----------------------------------------- |
+| `acli not found`       | Refresh PATH (see above)                  |
+| Module not found       | `pnpm run build:libs`                     |
+| Type errors            | See [fix-types.md](../fix-types/SKILL.md) |
+| DB connection fails    | `pnpm run sync-env`                       |
+| Port in use            | `pnpm dlx kill-port 3000`                 |
+| Nx cache issues        | `pnpm exec nx reset`                      |
+| AWS CLI encoding error | `$env:PYTHONIOENCODING = "utf-8"`         |
+| Terraform state locked | `node scripts/terraform-unlock.js`        |
 
 ## Related Skills
 
-- [fix-types.md](fix-types.md) — TypeScript error fixes
-- [fix-lint.md](fix-lint.md) — ESLint error fixes
-- [nx-reset.md](nx-reset.md) — Nx cache reset
-- [sync-env.md](sync-env.md) — Environment sync
-- [aws-sso-login.md](aws-sso-login.md) — AWS authentication
+- [fix-types.md](../fix-types/SKILL.md) — TypeScript error fixes
+- [fix-lint.md](../fix-lint/SKILL.md) — ESLint error fixes
+- [nx-reset.md](../nx-reset/SKILL.md) — Nx cache reset
+- [sync-env.md](../sync-env/SKILL.md) — Environment sync
+- [aws-sso-login.md](../aws-sso-login/SKILL.md) — AWS authentication

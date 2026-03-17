@@ -322,9 +322,9 @@ aws ssm put-parameter --name "/legacy-sports/dev/my-param" --value "new-value" -
 
 ## Related Skills
 
-- [Dev Web Server](dev-web.md) - Requires synced environment
-- [Dev DB Lambda](dev-db-lambda.md) - Requires database credentials
-- [Building](build.md) - May need environment for builds
+- [Dev Web Server](../dev-web/SKILL.md) - Requires synced environment
+- [Dev DB Lambda](../dev-db-lambda/SKILL.md) - Requires database credentials
+- [Building](../build/SKILL.md) - May need environment for builds
 
 ## Integration with Other Tools
 

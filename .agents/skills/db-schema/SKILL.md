@@ -213,10 +213,10 @@ WHERE tm.team_id = 5 AND tm.league_id = 16;
 .\scripts\db-query.ps1 -Query "SELECT * FROM public.matchups LIMIT 5" -Format json
 ```
 
-See [db-query.md](db-query.md) for full query script usage, connection details, and troubleshooting.
+See [db-query.md](../db-query/SKILL.md) for full query script usage, connection details, and troubleshooting.
 
 ## Related Skills
 
-- [db-query.md](db-query.md) — Running SQL queries
-- [db-migration-write.md](db-migration-write.md) — Writing new migrations
-- [db-migrate.md](db-migrate.md) — Running migrations
+- [db-query.md](../db-query/SKILL.md) — Running SQL queries
+- [db-migration-write.md](../db-migration-write/SKILL.md) — Writing new migrations
+- [db-migrate.md](../db-migrate/SKILL.md) — Running migrations

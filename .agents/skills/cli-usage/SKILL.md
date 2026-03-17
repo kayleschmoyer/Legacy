@@ -446,11 +446,11 @@ AWS_ACCOUNT_ID=123456789012
 
 ## Related Skills
 
-- [AWS SSO Login](aws-sso-login.md) - Handling AWS authentication issues
-- [Database Migration](db-migrate.md) - Running database migrations
-- [Database Connection](db-connect.md) - Testing database connectivity
-- [Sync Environment](sync-env.md) - Environment variable management
-- [GraphQL Codegen](codegen.md) - Regenerating GraphQL types
+- [AWS SSO Login](../aws-sso-login/SKILL.md) - Handling AWS authentication issues
+- [Database Migration](../db-migrate/SKILL.md) - Running database migrations
+- [Database Connection](../db-connect/SKILL.md) - Testing database connectivity
+- [Sync Environment](../sync-env/SKILL.md) - Environment variable management
+- [GraphQL Codegen](../codegen/SKILL.md) - Regenerating GraphQL types
 
 ## Additional Resources
 

@@ -111,20 +111,7 @@ The `*.integration.spec.ts` suffix is used for Jest resolver tests that start a 
 
 ## Integration with Workflow
 
-### Pre-commit Sequence
-
-```powershell
-pnpm exec nx affected -t typecheck   # Step 1
-pnpm exec nx affected -t lint --fix  # Step 2
-pnpm exec nx affected -t test        # Step 3 ← This command
-pnpm exec nx affected -t build       # Step 4
-```
-
-### Full Pre-commit (Makefile)
-
-```powershell
-make pre-commit  # Runs all 4 validation steps
-```
+Testing is Step 3 of the pre-commit sequence (typecheck → lint → test → build). Run the full suite with `make pc`. See [makefile](../makefile/SKILL.md) for all targets.
 
 ## Exit Codes
 
@@ -166,6 +153,6 @@ pnpm exec nx run <project-name>:test --runInBand --no-cache
 
 ## Related Skills
 
-- [Type Checking](typecheck.md)
-- [Linting](lint.md)
-- [Building](build.md)
+- [Type Checking](../typecheck/SKILL.md)
+- [Linting](../lint/SKILL.md)
+- [Building](../build/SKILL.md)

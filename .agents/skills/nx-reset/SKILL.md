@@ -253,9 +253,9 @@ make reset
 
 ## Related Skills
 
-- [Building](build.md) - Rebuilding after cache clear
-- [Type Checking](typecheck.md) - Validating after rebuild
-- [Affected Check](affected-check.md) - Verifying affected projects
+- [Building](../build/SKILL.md) - Rebuilding after cache clear
+- [Type Checking](../typecheck/SKILL.md) - Validating after rebuild
+- [Affected Check](../affected-check/SKILL.md) - Verifying affected projects
 
 ## Related Documentation
 

@@ -220,9 +220,9 @@ pnpm exec nx run shared-components:codegen
 
 ## Related Skills
 
-- [Write Database Migration](db-migration-write.md)
-- [Database Connection](db-connect.md)
-- [Sync Environment](sync-env.md)
+- [Write Database Migration](../db-migration-write/SKILL.md)
+- [Database Connection](../db-connect/SKILL.md)
+- [Sync Environment](../sync-env/SKILL.md)
 
 ## Related Documentation
 
@@ -318,9 +318,9 @@ lib/db-client/src/drizzle/
 
 ## Related Skills
 
-- [Database Connection](db-connect.md) - Testing database connectivity
-- [Sync Environment](sync-env.md) - Syncing database credentials
-- [Dev DB Lambda](dev-db-lambda.md) - Running local GraphQL server
+- [Database Connection](../db-connect/SKILL.md) - Testing database connectivity
+- [Sync Environment](../sync-env/SKILL.md) - Syncing database credentials
+- [Dev DB Lambda](../dev-db-lambda/SKILL.md) - Running local GraphQL server
 
 ## Related Documentation
 

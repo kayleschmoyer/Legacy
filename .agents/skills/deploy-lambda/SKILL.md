@@ -462,9 +462,9 @@ After deployment, artifacts stored in:
 
 ## Related Skills
 
-- [Building](build.md) - Building Lambda before deploy
-- [Testing](test.md) - Testing Lambda before deploy
-- [Terraform Apply](terraform-apply.md) - Infrastructure changes
+- [Building](../build/SKILL.md) - Building Lambda before deploy
+- [Testing](../test/SKILL.md) - Testing Lambda before deploy
+- [Terraform Apply](../terraform-apply/SKILL.md) - Infrastructure changes
 
 ## Related Documentation
 

@@ -107,7 +107,7 @@ pnpm exec nx run <project>:codegen
 
 Common projects needing codegen: `shared-components`, `api`, `db`
 
-See: [codegen.md](codegen.md)
+See: [codegen.md](../codegen/SKILL.md)
 
 ---
 
@@ -146,6 +146,6 @@ pnpm exec nx affected -t lint --fix
 
 ## Related Skills
 
-- [typecheck.md](typecheck.md) — running the type checker
-- [fix-lint.md](fix-lint.md) — fixing lint errors
-- [codegen.md](codegen.md) — regenerating GraphQL types
+- [typecheck.md](../typecheck/SKILL.md) — running the type checker
+- [fix-lint.md](../fix-lint/SKILL.md) — fixing lint errors
+- [codegen.md](../codegen/SKILL.md) — regenerating GraphQL types

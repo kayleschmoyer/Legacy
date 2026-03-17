@@ -184,8 +184,8 @@ Five echo macros are available: `echo_blue`, `echo_green`, `echo_yellow`, `echo_
 
 ## Related Skills
 
-- [Building](build.md)
-- [Testing](test.md)
-- [Type Checking](typecheck.md)
-- [Linting](lint.md)
-- [Formatting](format.md)
+- [Building](../build/SKILL.md)
+- [Testing](../test/SKILL.md)
+- [Type Checking](../typecheck/SKILL.md)
+- [Linting](../lint/SKILL.md)
+- [Formatting](../format/SKILL.md)

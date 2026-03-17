@@ -336,9 +336,9 @@ pnpm run db:psql
 
 ## Related Skills
 
-- [Run Database Migration](db-migrate.md)
-- [Database Connection](db-connect.md)
-- [GraphQL Codegen](codegen.md)
+- [Run Database Migration](../db-migrate/SKILL.md)
+- [Database Connection](../db-connect/SKILL.md)
+- [GraphQL Codegen](../codegen/SKILL.md)
 
 ## Related Documentation
 

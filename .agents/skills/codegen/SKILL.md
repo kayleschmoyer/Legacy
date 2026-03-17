@@ -294,9 +294,9 @@ GraphQL Codegen is configured in:
 
 ## Related Skills
 
-- [Dev DB Lambda](dev-db-lambda.md) - Starting GraphQL server
-- [Type Checking](typecheck.md) - Validating generated types
-- [Building](build.md) - Building with generated types
+- [Dev DB Lambda](../dev-db-lambda/SKILL.md) - Starting GraphQL server
+- [Type Checking](../typecheck/SKILL.md) - Validating generated types
+- [Building](../build/SKILL.md) - Building with generated types
 
 ## Related Documentation
 

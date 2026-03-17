@@ -93,20 +93,7 @@ pnpm exec nx run-many -t lint --fix
 
 ## Integration with Workflow
 
-### Pre-commit Sequence
-
-```powershell
-pnpm exec nx affected -t typecheck   # Step 1
-pnpm exec nx affected -t lint --fix  # Step 2 ← This command
-pnpm exec nx affected -t test        # Step 3
-pnpm exec nx affected -t build       # Step 4
-```
-
-### Quick Check (Makefile)
-
-```powershell
-make quick-check  # Runs typecheck + lint
-```
+Linting is Step 2 of the pre-commit sequence (typecheck → lint → test → build). Run the full suite with `make pc`. See [makefile](../makefile/SKILL.md) for all targets.
 
 ## Exit Codes
 
@@ -127,6 +114,6 @@ make quick-check  # Runs typecheck + lint
 
 ## Related Skills
 
-- [Type Checking](typecheck.md)
-- [Testing](test.md)
-- [Formatting](format.md)
+- [Type Checking](../typecheck/SKILL.md)
+- [Testing](../test/SKILL.md)
+- [Formatting](../format/SKILL.md)

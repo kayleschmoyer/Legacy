@@ -278,9 +278,9 @@ make rebase-tree-skip SKIP_COMMITS="abc1234,def5678"
 
 ## Related Skills
 
-- [Branch Creation](branch-create.md) - Creating feature branches
-- [Create PR](create-pr.md) - Creating pull requests
-- [Nx Reset](nx-reset.md) - Clearing caches if rebases cause issues
+- [Branch Creation](../branch-create/SKILL.md) - Creating feature branches
+- [Create PR](../create-pr/SKILL.md) - Creating pull requests
+- [Nx Reset](../nx-reset/SKILL.md) - Clearing caches if rebases cause issues
 
 ## Related Documentation
 

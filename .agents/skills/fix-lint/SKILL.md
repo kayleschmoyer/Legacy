@@ -3,9 +3,7 @@ name: fix-lint
 description: 'Diagnose and fix ESLint errors that remain after auto-fix, including floating promises, unsafe any types, console statements, and import order issues.'
 ---
 
-# Skill: Fix Linting Errors# Skill: Fix Linting Errors
-
-- [fix-types.md](fix-types.md) — fixing TypeScript errors- [lint.md](lint.md) — running the linter## Related Skills`pnpm exec nx affected -t test`powershellAfter fixing lint errors, continue to testing:## Next Step---**Never use file-level disables** — target only the specific line.`const data: any = response;// eslint-disable-next-line @typescript-eslint/no-explicit-any// ❌ Bad — no justification(window as any).StyleSheet = StyleSheet;// eslint-disable-next-line @typescript-eslint/no-explicit-any// Platform compatibility requires any type here// ✅ Good — documented reason`typescriptOnly disable a rule when **absolutely necessary**, and always include a justification comment:## Using `eslint-disable` (Last Resort)---`const value = 123;// ✅ Goodlet value = 123;// ❌ Bad`typescript**Cause**: Variable declared with `let` but never reassigned.### ❌ `prefer-const`---`LOGGER.error('error occurred', { error });LOGGER.info('debug info', { data });import { LOGGER } from '@legacy-sports/logging';// ✅ Goodconsole.error('error occurred', error);console.log('debug info', data);// ❌ Bad`typescript**Cause**: `console.log` used in production code.### ❌ `no-console`---`function process(data: DataType) {}}  name: string;  id: number;interface DataType {// ✅ Goodfunction process(data: any) {}// ❌ Bad`typescript**Cause**: `any` type reduces type safety.### ❌ `@typescript-eslint/no-explicit-any`---`const _unused = fetchData();// ✅ Prefix with _ if intentionally unusedprocessData(data);const data = fetchData();// ✅ Use it or remove itconst unused = fetchData();// ❌ Bad`typescript**Cause**: Variable declared but never used.### ❌ `@typescript-eslint/no-unused-vars`---`someAsyncFunction().catch(err => LOGGER.error(err));// ✅ Handledawait someAsyncFunction();// ✅ Awaitedvoid someAsyncFunction();// ✅ Explicitly voidsomeAsyncFunction();// ❌ Bad`typescript**Cause**: Async function called without `await` or `void`.### ❌ `@typescript-eslint/no-floating-promises`## Manual Fixes Required---- Unused imports- Trailing commas- Semicolons- Quote style- Spacing and formatting- Import orderingThe `--fix` flag handles ~80% of issues automatically:`pnpm exec nx affected -t lint --fix`powershell## Step 1: Run Auto-Fix- Writing new code that needs to follow project ESLint rules- CI fails on lint step- `pnpm exec nx affected -t lint` reports errors## When to UseDiagnose and fix ESLint errors in the Nx monorepo. Most issues are auto-fixable; this skill covers the common manual fixes required after auto-fix runs.## Overview
+# Skill: Fix Linting Errors
 
 ## Overview
 
@@ -174,5 +172,5 @@ pnpm exec nx affected -t test
 
 ## Related Skills
 
-- [lint.md](lint.md) — running the linter
-- [fix-types.md](fix-types.md) — fixing TypeScript errors
+- [lint.md](../lint/SKILL.md) — running the linter
+- [fix-types.md](../fix-types/SKILL.md) — fixing TypeScript errors

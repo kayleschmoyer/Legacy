@@ -344,8 +344,8 @@ make pc
 
 ## Related Skills
 
-- [Jira Ticket Management](jira-ticket.md) - Updating ticket status
-- [Branch Creation](branch-create.md) - Creating branches
+- [Jira Ticket Management](../jira-ticket/SKILL.md) - Updating ticket status
+- [Branch Creation](../branch-create/SKILL.md) - Creating branches
 - [Pre-commit Validation](../../../docs/guides/ai-agent-contribution-workflow.md#step-4-pre-commit-validation)
 
 ## Related Documentation

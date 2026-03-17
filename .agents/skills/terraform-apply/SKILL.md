@@ -287,9 +287,9 @@ terraform apply
 
 ## Related Skills
 
-- [Lambda Deployment](deploy-lambda.md) - Deploying Lambda code
-- [Database Connection](db-connect.md) - Testing infrastructure
-- [Validate Workspace](validate-workspace.md) - Pre-deployment checks
+- [Lambda Deployment](../deploy-lambda/SKILL.md) - Deploying Lambda code
+- [Database Connection](../db-connect/SKILL.md) - Testing infrastructure
+- [Validate Workspace](../validate-workspace/SKILL.md) - Pre-deployment checks
 
 ## Related Documentation
 

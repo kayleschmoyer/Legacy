@@ -185,5 +185,5 @@ Automatically format staged files before commit:
 
 ## Related Skills
 
-- [Linting](lint.md)
-- [Type Checking](typecheck.md)
+- [Linting](../lint/SKILL.md)
+- [Type Checking](../typecheck/SKILL.md)

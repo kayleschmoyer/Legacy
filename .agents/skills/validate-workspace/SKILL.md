@@ -297,9 +297,9 @@ pnpm run security:install-hooks
 
 ## Related Skills
 
-- [Nx Reset](nx-reset.md) - Clearing cache after fixes
-- [Building](build.md) - Rebuilding after validation
-- [Type Checking](typecheck.md) - Additional validation
+- [Nx Reset](../nx-reset/SKILL.md) - Clearing cache after fixes
+- [Building](../build/SKILL.md) - Rebuilding after validation
+- [Type Checking](../typecheck/SKILL.md) - Additional validation
 
 ## Related Documentation
 

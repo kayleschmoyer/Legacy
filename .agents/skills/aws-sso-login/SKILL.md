@@ -181,10 +181,10 @@ aws sso login --profile legacy-sports-dev
 
 This skill should be checked before:
 
-- [Sync Environment Variables](sync-env.md)
-- [CLI Usage](cli-usage.md) - Database operations
-- [Deploy Lambda](deploy-lambda.md)
-- [Terraform Apply](terraform-apply.md)
+- [Sync Environment Variables](../sync-env/SKILL.md)
+- [CLI Usage](../cli-usage/SKILL.md) - Database operations
+- [Deploy Lambda](../deploy-lambda/SKILL.md)
+- [Terraform Apply](../terraform-apply/SKILL.md)
 
 ## Best Practices
 

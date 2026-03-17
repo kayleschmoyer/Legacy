@@ -293,10 +293,10 @@ pnpm exec nx run-many -t build
 
 ## Related Skills
 
-- [Type Checking](typecheck.md) - Running affected typecheck
-- [Testing](test.md) - Running affected tests
-- [Building](build.md) - Building affected projects
-- [Nx Reset](nx-reset.md) - Clearing cache if graph issues
+- [Type Checking](../typecheck/SKILL.md) - Running affected typecheck
+- [Testing](../test/SKILL.md) - Running affected tests
+- [Building](../build/SKILL.md) - Building affected projects
+- [Nx Reset](../nx-reset/SKILL.md) - Clearing cache if graph issues
 
 ## Related Documentation
 

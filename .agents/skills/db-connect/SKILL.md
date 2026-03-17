@@ -320,9 +320,9 @@ The db-client library uses connection pooling:
 
 ## Related Skills
 
-- [Sync Environment](sync-env.md) - Syncing database credentials
-- [Database Migration](db-migrate.md) - Running migrations
-- [Dev DB Lambda](dev-db-lambda.md) - Starting GraphQL server
+- [Sync Environment](../sync-env/SKILL.md) - Syncing database credentials
+- [Database Migration](../db-migrate/SKILL.md) - Running migrations
+- [Dev DB Lambda](../dev-db-lambda/SKILL.md) - Starting GraphQL server
 
 ## Related Documentation
 
