@@ -84,8 +84,13 @@ export function DateTimePicker({
   };
 
   const isDateDisabled = (date: Date): boolean => {
-    if (minDate && date < minDate) return true;
-    if (maxDate && date > maxDate) return true;
+    // Compare calendar dates only (ignoring time) so that "today" remains
+    // selectable even when minDate carries a non-midnight timestamp.
+    const startOfDay = (d: Date) =>
+      new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+    if (minDate && startOfDay(date) < startOfDay(minDate)) return true;
+    if (maxDate && startOfDay(date) > startOfDay(maxDate)) return true;
     return false;
   };
 
@@ -143,6 +148,16 @@ export function DateTimePicker({
         ampm === 'AM' ? (hour === 12 ? 0 : hour) : hour === 12 ? 12 : hour + 12;
 
       newDateTime.setHours(adjustedHour, minute, 0, 0);
+
+      // Clamp to min/max so that selecting a time on the boundary day
+      // cannot produce a value outside the allowed range.
+      if (minDate && newDateTime.getTime() < minDate.getTime()) {
+        newDateTime.setTime(minDate.getTime());
+      }
+      if (maxDate && newDateTime.getTime() > maxDate.getTime()) {
+        newDateTime.setTime(maxDate.getTime());
+      }
+
       onChange(newDateTime);
       setIsOpen(false);
     }
