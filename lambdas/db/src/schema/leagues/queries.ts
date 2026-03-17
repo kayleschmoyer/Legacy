@@ -630,9 +630,14 @@ builder.queryField('validateInviteCode', (t) =>
         .where(eq(PublicSchema.teams.leagueId, league.id));
       const totalSpots = Number(totalResult[0]?.total ?? 0);
 
-      // Count assigned teams (those with a league_members entry)
+      // Count assigned teams (those with at least one league_members entry).
+      // Use COUNT(DISTINCT team_id) so that teams with multiple members
+      // (e.g. GM + assistant manager) are counted only once, and commissioner
+      // rows without a team (team_id IS NULL) are excluded.
       const assignedResult = await context.db
-        .select({ assigned: count() })
+        .select({
+          assigned: sql<number>`count(distinct ${PublicSchema.leagueMembers.teamId})::int`,
+        })
         .from(PublicSchema.leagueMembers)
         .where(eq(PublicSchema.leagueMembers.leagueId, league.id));
       const assignedSpots = Number(assignedResult[0]?.assigned ?? 0);
