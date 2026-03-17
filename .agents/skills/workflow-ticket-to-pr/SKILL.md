@@ -44,16 +44,24 @@ Write-Host "Created ticket: $key"
 
 Common `--type` values: `Task`, `Bug`, `Story`. Add `--parent LS-####` to nest under an Epic.
 
-### Step 2: Transition Jira to In Progress
+### Step 2: Check Blockers Before Any Status Transition
 
-**Do this immediately** — as soon as you begin working on a ticket, before creating the worktree or writing any code:
+Before transitioning the ticket, inspect Jira "blocked-by" links and verify blocker status:
+
+- **Blocker not In Review or Done → STOP**. Do not proceed.
+- **Blocker In Review → use blocker branch as parent** when creating the worktree.
+- **Blocker Done (or no blockers) → base from** `origin/main`.
+
+### Step 3: Transition Jira to In Progress
+
+Run this only after Step 2 passes:
 
 ```powershell
 # Transition ticket to "In Progress"
 acli jira workitem transition --key LS-1234 --status "In Progress"
 ```
 
-### Step 3: Verify You Are on Main
+### Step 4: Verify You Are on Main
 
 ```powershell
 # Must be on main before creating a worktree
@@ -64,7 +72,7 @@ git checkout main
 git pull
 ```
 
-### Step 4: Create Branch + Worktree
+### Step 5: Create Branch + Worktree
 
 ```powershell
 cd "D:\code\legacy-sports"
@@ -98,7 +106,7 @@ code $wt   # open in a new VS Code window; do all work there
 > edit, terminal command, and git operation must happen inside `$wt`. Never edit files
 > under `D:\code\legacy-sports` when working on a ticket.
 
-> **Reminder**: The Jira ticket should already be "In Progress" from Step 2. If you skipped
+> **Reminder**: The Jira ticket should already be "In Progress" from Step 3. If you skipped
 > that step, run the transition command now before proceeding.
 
 > For tickets that depend on an unmerged parent ticket, create the branch first so twig tracks the dependency, then add the worktree:
@@ -126,14 +134,14 @@ code $wt   # open in a new VS Code window; do all work there
 > twig switch LS-1234 -p=current
 > ```
 
-> **⚠️ DEPENDENCY CHECK**: Before branching, check the Jira ticket for "blocked-by" linked issues and query their status:
+> **⚠️ DEPENDENCY CHECK**: Step 2 must be completed before transitioning status or branching:
 >
 > - **Blocker not In Review or Done → 🛑 STOP.** Do not proceed — the blocking ticket must reach at least "In Review" first.
 > - **Blocker In Review → branch from the blocker's branch** (use the dependent path above).
 > - **Blocker Done (or no blockers) → branch from `origin/main`** (use the independent path).
 >   Always verify with `twig tree` that the new branch appears under the right parent.
 
-### Step 5: Make Your Changes
+### Step 6: Make Your Changes
 
 - Edit files
 - Write code
@@ -148,7 +156,7 @@ code $wt   # open in a new VS Code window; do all work there
 > - If unforeseen complexity makes full completion impractical: implement what you can, then **create follow-up Jira tickets** for the remaining work before opening the PR. Reference the follow-up ticket keys in your PR description.
 > - **Never silently drop acceptance criteria** or leave work partially done without tracking it.
 
-### Step 6: Commit Changes
+### Step 7: Commit Changes
 
 ```powershell
 # Stage all changes
@@ -161,7 +169,7 @@ git commit -m "feat(scope): description (LS-1234)"
 git push origin HEAD
 ```
 
-### Step 7: Rebase onto Parent Branch
+### Step 8: Rebase onto Parent Branch
 
 Before validating, rebase onto the parent branch (either `main` or a stacked feature branch) so `make pc` reflects the same base CI will use.
 
@@ -172,7 +180,7 @@ twig rebase   # rebases onto twig-tracked parent: main for independent branches,
 
 If conflicts occur, see the [rebase-conflicts skill](../rebase-conflicts/SKILL.md). After resolving:
 
-### Step 7b: Post-Rebase Stabilization + Validation
+### Step 8b: Post-Rebase Stabilization + Validation
 
 > 🚨 **Do NOT push until `make pc` passes.** Pushing before validating is the #1 cause of post-rebase CI failures.
 
@@ -202,10 +210,10 @@ git push --force-with-lease origin HEAD
 ```
 
 > 🚨 **DO NOT STOP HERE.** Passing `make pc` is a checkpoint, not the finish line. You **must**
-> continue to Step 8 (create PR) and Step 9 (Jira "In Review"). Stopping after validation
+> continue to Step 9 (create PR) and Step 10 (Jira "In Review"). Stopping after validation
 > without opening a PR is the single most common agent failure mode.
 
-### Step 7c: Apply Pending Migrations 🚨
+### Step 8c: Apply Pending Migrations 🚨
 
 If you added or modified any migration files under `lib/db-client/migrations/`, apply them now — **before** opening the PR:
 
@@ -218,13 +226,13 @@ Confirm the output shows `Applied N new migrations`. If it throws, fix the migra
 
 > ⚠️ **Do not skip this step.** A PR with an unapplied migration leaves the local DB out of sync and means reviewers cannot run the app without manual intervention.
 
-### Step 7d: User Testing (Optional)
+### Step 8d: User Testing (Optional)
 
 If you want live UI verification before opening the PR, see the [user-testing skill](../user-testing/SKILL.md).
 This temporarily checks the branch out in the main repo (where dev servers run) so you can test changes
 visually, then returns `main` to main.
 
-### Step 8: Create Pull Request
+### Step 9: Create Pull Request
 
 See the [create-pr skill](../create-pr/SKILL.md) for the full PR template workflow. For a quick PR:
 
@@ -232,14 +240,14 @@ See the [create-pr skill](../create-pr/SKILL.md) for the full PR template workfl
 gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 ```
 
-### Step 9: Update Jira Status
+### Step 10: Update Jira Status
 
 ```powershell
 # Transition to "In Review"
 acli jira workitem transition --key LS-1234 --status "In Review"
 ```
 
-### Step 10: After PR Merge
+### Step 11: After PR Merge
 
 ```powershell
 # Transition to "Done"

@@ -103,14 +103,7 @@ mutates that directory.
 
 ## Complete Workflow
 
-> **🔔 Transition Jira to "In Progress" immediately** — the very first action after being asked
-> to work on any ticket is to run:
->
-> ```powershell
-> acli jira workitem transition --key LS-#### --status "In Progress"
-> ```
->
-> Do this **before** creating the worktree, installing dependencies, or writing any code. Don't wait.
+> **🔔 Blocker check comes first** — always verify "blocked-by" dependencies before changing Jira status.
 
 ### Step 0: Check for Parent Dependencies
 
@@ -131,6 +124,14 @@ acli jira workitem view --key LS-XXXX --fields status
 
 > **⚠️ Getting this wrong creates sibling branches that will conflict when both merge to main.** Always check before proceeding.
 > **⚠️ Working on a ticket whose blocker is still in progress wastes effort** — the blocker's changes may invalidate your work.
+
+### Step 0b: Transition Jira to In Progress (Only After Step 0 Passes)
+
+Once blockers are verified as In Review/Done (or absent), transition the ticket:
+
+```powershell
+acli jira workitem transition --key LS-#### --status "In Progress"
+```
 
 ### Step 1: Create the Branch + Worktree
 

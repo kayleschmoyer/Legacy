@@ -27,7 +27,7 @@ Create feature branches with automatic Jira integration using the branch-create 
 - Starting work on a new Jira ticket
 - Creating a feature branch from main
 - Creating a dependent branch from current branch
-- Need automatic Jira status update to "In Progress"
+- Need automatic Jira status update to "In Progress" (caller must verify blockers first — the script does not enforce this)
 
 ## Command
 
@@ -86,7 +86,7 @@ git checkout -b feature/LS-1234-description
 ## Expected Output
 
 - **Success**: Branch created and checked out
-- **Jira Update**: Ticket status updated to "In Progress" (with branch-create.ps1)
+- **Jira Update**: Ticket status updated to "In Progress" (the script transitions unconditionally — the caller must check blockers before invoking it)
 - **Console**: Branch name and Jira confirmation
 
 ## Common Issues
@@ -170,7 +170,7 @@ twig switch LS-200 -p=current
 ### Other Best Practices
 
 1. **Always set parent explicitly** with `-p=main`, `-p=current`, or `-p=LS-####` (equals-sign syntax, not space-separated) to avoid incorrect parent tracking
-2. **Check for in-progress dependencies** before branching — if the ticket depends on another unmerged ticket, use `-p=LS-####` (Jira key) or `-p=<branch-name>` rather than `-p=main`
+2. **Check blockers before any status transition** — if the ticket depends on another unmerged ticket and the blocker is not In Review/Done, stop. If unblocked and dependency is In Review, use `-p=LS-####` (Jira key) or `-p=<branch-name>` rather than `-p=main`
 3. **Verify parent with `twig tree`** after creating branch — the new branch must appear nested under the correct parent
 4. **Verify ticket exists** before creating branch
 5. **Pull latest main** before branching from main (script does this automatically)
@@ -192,10 +192,17 @@ The script automatically generates proper names:
 # 1. Verify ticket exists
 acli jira workitem view LS-1234
 
-# 2. Add ticket to current sprint (if new)
+# 2. Check blocker status before any transition
+# If blocked by LS-1222 and LS-1222 is not In Review/Done -> STOP
+# Use MCP: jira_check_blockers, or:
+acli jira workitem link list --key LS-1234
+# Then verify each linked blocker's status:
+acli jira workitem view --key LS-1222  # must be In Review or Done
+
+# 3. Add ticket to current sprint (if new)
 # Do this in Jira UI
 
-# 3. Create branch (automatically updates to "In Progress")
+# 4. Create branch (transitions to In Progress — only run after blockers are clear)
 .\scripts\branch-create.ps1 -TicketKey LS-1234
 ```
 
