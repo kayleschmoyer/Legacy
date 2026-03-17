@@ -1,6 +1,6 @@
 ---
 name: db-restore-dev
-description: 'Restore the scrubbed anonymized dev seed dump into the local Docker PostgreSQL container without requiring AWS access; use when onboarding a new developer or when AWS credentials are unavailable. Requires git lfs pull first.'
+description: 'Restore the scrubbed anonymized dev seed dump into the local Docker PostgreSQL container without requiring AWS access; use when onboarding a new developer or when AWS credentials are unavailable. Automatically pulls LFS files if needed.'
 ---
 
 # Skill: Restore Dev Seed (No AWS Required)
@@ -31,15 +31,7 @@ The seed contains real game/league/player/stats data with all user PII replaced:
 
 ## Steps
 
-### 1. Pull the seed dump from Git LFS
-
-```powershell
-git lfs pull
-```
-
-This downloads `resources/dev-seed.dump` (~11 MB) from the LFS store.
-
-### 2. Restore
+### 1. Restore
 
 ```powershell
 make db-restore-dev
@@ -47,13 +39,13 @@ make db-restore-dev
 
 Prompts for confirmation, then:
 
-1. Verifies `resources/dev-seed.dump` exists (prompts `git lfs pull` if missing)
+1. Auto-pulls `resources/dev-seed.dump` from Git LFS if missing or is a pointer stub
 2. `docker cp` into `ls-postgres:/tmp/restore.dump`
 3. Drops and recreates `legacy_sports_dev`
 4. Runs `pg_restore -j 4 -Fc`
 5. Cleans up
 
-### 3. Apply any pending migrations
+### 2. Apply any pending migrations
 
 ```powershell
 make db-migrate
@@ -71,19 +63,14 @@ make db-migrate
 
 ## Troubleshooting
 
-**Seed file not found / appears as LFS pointer text**
+**Seed file not found after auto-pull**
+
+The restore script automatically runs `git lfs pull`. If it still fails, install Git LFS manually:
 
 ```powershell
-git lfs pull
-```
-
-**Git LFS not installed**
-
-```powershell
-# Windows — install via winget or download from git-lfs.com
 winget install GitHub.GitLFS
 git lfs install
-git lfs pull
+make db-restore-dev   # retry
 ```
 
 **Postgres container not running**

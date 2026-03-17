@@ -429,7 +429,7 @@ else
 	@echo "db-dump-dev is Windows-only (PowerShell script). Run on Windows or adapt for bash."
 endif
 
-db-restore-dev: ## Restore scrubbed dev seed from repo (no AWS needed - run git lfs pull first)
+db-restore-dev: ## Restore scrubbed dev seed from repo (no AWS needed - auto-pulls LFS)
 	@$(call echo_blue,Restoring database from dev seed dump...)
 ifeq ($(DETECTED_OS),Windows)
 	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)db-restore-dev.ps1

@@ -32,18 +32,30 @@ $repoRoot = Join-Path $PSScriptRoot ".."
 $seedPath = Join-Path $repoRoot $SEED_FILE
 
 # ---------------------------------------------------------------------------
-# Check seed file exists
+# Ensure seed file is materialized (auto-pull from LFS if needed)
 # ---------------------------------------------------------------------------
+$needsPull = $false
 if (-not (Test-Path $seedPath)) {
-    Write-Host ""
-    Write-Err "Seed file not found: $SEED_FILE"
-    Write-Host ""
-    Write-Host "Pull it from Git LFS first:" -ForegroundColor Yellow
-    Write-Host "  git lfs pull" -ForegroundColor White
-    Write-Host ""
-    Write-Host "Or create a fresh one (requires AWS access):" -ForegroundColor Yellow
-    Write-Host "  make db-dump-dev" -ForegroundColor White
-    exit 1
+    $needsPull = $true
+} elseif ((Get-Item $seedPath).Length -lt 1000) {
+    # File exists but is an LFS pointer stub (typically ~130 bytes)
+    $needsPull = $true
+}
+
+if ($needsPull) {
+    Write-Step "Seed file missing or is an LFS pointer — running git lfs pull"
+    git lfs pull
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "git lfs pull failed (exit code $LASTEXITCODE)"
+        Write-Host "  Install Git LFS: winget install GitHub.GitLFS" -ForegroundColor Yellow
+        exit 1
+    }
+    if (-not (Test-Path $seedPath) -or (Get-Item $seedPath).Length -lt 1000) {
+        Write-Err "Seed file still missing after git lfs pull: $SEED_FILE"
+        Write-Host "  Create a fresh one (requires AWS access): make db-dump-dev" -ForegroundColor Yellow
+        exit 1
+    }
+    Write-OK "Seed file pulled from LFS"
 }
 
 $sizeMB = [math]::Round((Get-Item $seedPath).Length / 1MB, 1)
