@@ -120,7 +120,12 @@
     "Pop-Location": true,
     "Get-Member": true,
     ".\\scripts\\cleanup-pr-body.ps1": true,
-    "pnpm exec tsc": true
+    "pnpm exec tsc": true,
+    "uvx": true,
+    "git restore": true,
+    "git mv": true,
+    "mkdir": true,
+    "git rm": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {

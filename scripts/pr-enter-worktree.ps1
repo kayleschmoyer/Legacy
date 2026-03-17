@@ -50,8 +50,10 @@ function Write-Info { param([string]$msg) Write-Host "  [..] $msg" -ForegroundCo
 # file's gitdir: pointer (git rev-parse --show-toplevel returns the worktree
 # root, not the main repo).
 $scriptDir = $PSScriptRoot
-$gitPath = Join-Path $scriptDir ".." ".git"
+$gitPath = Join-Path (Join-Path $scriptDir "..") ".git"
 $gitPath = (Resolve-Path $gitPath -ErrorAction SilentlyContinue).Path
+
+$mainRepo = $null
 
 if ($gitPath -and (Test-Path $gitPath) -and -not (Test-Path $gitPath -PathType Container)) {
     # .git is a file (worktree) — parse "gitdir: …" to find main repo
@@ -59,7 +61,7 @@ if ($gitPath -and (Test-Path $gitPath) -and -not (Test-Path $gitPath -PathType C
     if ($gitdirLine -match '^gitdir:\s*(.+)$') {
         $worktreeGitDir = $Matches[1].Trim()
         # worktreeGitDir is like <main>/.git/worktrees/<name>
-        $mainRepo = (Resolve-Path (Join-Path $worktreeGitDir ".." ".." "..")).Path
+        $mainRepo = (Resolve-Path (Join-Path (Join-Path (Join-Path $worktreeGitDir "..") "..") "..")).Path
     }
 }
 

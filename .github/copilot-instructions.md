@@ -1,6 +1,6 @@
 # Legacy Sports Copilot Instructions
 
-> **NEVER commit to main** — create a worktree first: `twig worktree create LS-####/description`
+> **NEVER commit to main** — create a worktree first: `make worktree TICKET=#### DESC=description`
 
 ## Workflow
 
@@ -10,7 +10,7 @@
    - **Blocker is In Review — use its branch as the parent.** The worktree must branch from that ticket's branch, not from `main` (see `skills/worktree-workflow/SKILL.md` Step 1).
    - **Blocker is Done (or no blockers) — base off `origin/main`.**
 3. **Jira "In Progress" after blocker check passes**: use the `jira_transition` MCP tool with status "In Progress" (or `acli jira workitem transition --key LS-#### --status "In Progress"`) only after confirming blockers are In Review/Done (or absent).
-4. Worktree: `twig worktree create $key/description` then `twig worktree list` (note path)
+4. Worktree: `make worktree TICKET=#### DESC=description` (or `PARENT=LS-XXXX/branch` for dependent tickets) — this creates the branch, worktree, **and registers the parent dependency** in one step. Run `twig worktree list` to note the path. **Do NOT use `twig worktree create` directly** — it skips parent registration and creates orphaned branches.
 5. Setup worktree: `make wt-setup WT=$wt` (or manually: `cd $wt` then `make install`, copy `.env`, junction `.twig`)
    - 5b. **Agent multi-root access** (optional): `make sync-worktrees` then `code legacy-sports.code-workspace` — gives agents search access across all worktrees in one window.
 6. **All remaining work happens at the worktree path (`$wt`), NOT `D:\code\legacy-sports`.** Every file edit, terminal command, and git operation must target `$wt`.
@@ -22,7 +22,7 @@
 11. Validate: `make pc` — must pass before pushing or opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
     - 11b. **Push only after `make pc` passes**: `git push --force-with-lease origin HEAD` — pushing before validating is the #1 cause of post-rebase CI failures.
 12. **Ship (REQUIRED — do NOT stop before this step)**: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` then `.\scripts\cleanup-pr-body.ps1` then Jira "In Review" (see `skills/create-pr/SKILL.md`)
-13. Cleanup: `twig worktree clean` then `git branch -d LS-####/description` then Jira "Done"
+13. Cleanup: `twig worktree clean` then `git branch -d LS-####/description` then Jira "Done" — **NEVER use `git worktree remove` directly** (see Rules)
 
 ## Rules
 
@@ -37,6 +37,7 @@
 - **No suppression**: fix root causes, no `@ts-ignore` / `eslint-disable` (see `skills/no-lint-disable/SKILL.md`)
 - **No console.\***: use `LOGGER` from `@legacy-sports/logging` instead of `console.log/warn/error/debug`. Exceptions: `lib/logging/` (the logger itself), `apps/cli/`, migration files, and build-time scripts (`codegen.ts`, Vite plugins).
 - **E2E tests are hermetic**: never use `route.continue()` in E2E tests — there is no backend in CI. Use `route.fulfill()` for unmatched operations (return a diagnostic error so missing mocks surface immediately). When changing login/landing page UI, update E2E selectors in the same PR (see `skills/e2e-testing/SKILL.md`).
+- **Never manually remove worktrees**: always use `twig worktree clean` to remove worktrees — **never** run `git worktree remove` or delete worktree directories manually. Manual removal destroys `node_modules` junctions, which are symlinks to the main repo's shared `node_modules`. Deleting the junction target breaks every other junctioned worktree simultaneously. `twig worktree clean` safely unlinks junctions before removing the worktree directory.
 - **Stop Playwright servers after use**: if you manually run Playwright server processes (for example `playwright test-server` or custom `serve` commands), stop them when done. On Windows these processes can hold native addon binaries (for example `node_modules/bufferutil/*.node`) and cause `ERR_PNPM_EPERM` during `make install`/`pnpm install`.
 - **Jira — MCP tools first**: use the MCP Jira tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent`) for **all** Jira operations. These are provided by the `legacy-sports-jira` MCP server (see `skills/mcp-jira/SKILL.md`). **Never** use `fetch_webpage`, raw HTTP requests, or web fetch to access Jira URLs directly. If MCP tools are unavailable, fall back to `acli` CLI commands — never to direct HTTP. Update Jira status at each workflow step.
 - **Resolve PR review threads**: when addressing PR review comments (from Copilot or any reviewer), **always resolve each thread** after pushing the fix. Use the GraphQL `resolveReviewThread` mutation: `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=$threadId`. Fetch thread IDs via GraphQL `reviewThreads` query, filtering for `isResolved: false`. Leaving threads unresolved after fixing them is incomplete work.

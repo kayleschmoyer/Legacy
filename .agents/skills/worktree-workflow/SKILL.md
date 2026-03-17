@@ -79,6 +79,13 @@ mutates that directory.
 - Running `make wt-setup` concurrently (serialized by lock).
 - Running `pnpm install` in a worktree with independent `node_modules`.
 
+**Never manually remove worktrees:**
+
+> Running `git worktree remove` or deleting a worktree directory (e.g., `Remove-Item -Recurse`)
+> **destroys the `node_modules` junction target** — the main repo's `node_modules`. This breaks
+> every other junctioned worktree and requires a full `make install` to recover. Always use
+> `twig worktree clean`, which safely unlinks junctions before removing the directory.
+
 **When node_modules appears broken in a junctioned worktree:**
 
 > This is the #1 agent failure mode. An agent sees "missing `.bin/`" or "module not found"
@@ -408,6 +415,15 @@ twig worktree list
 
 `twig worktree clean` detects worktrees with merged/deleted branches and prompts to remove them. It is safer than `git worktree remove` because it will not remove a worktree that still has an active branch.
 
+> **🚨 NEVER use `git worktree remove` or manually delete a worktree directory.**
+> Worktrees contain `node_modules` **junctions** (Windows symlinks) pointing to the main
+> repo's shared `node_modules`. Running `git worktree remove --force` or deleting the
+> directory recursively **destroys the junction target** — wiping out the main repo's
+> `node_modules` and breaking every other junctioned worktree simultaneously. This is
+> catastrophic and requires a full `make install` in the main repo to recover.
+>
+> `twig worktree clean` safely unlinks junctions before removing the directory. Always use it.
+
 ## Moving an Existing Worktree
 
 If a worktree was created at the wrong path, use `git worktree move` (not `mv`). You **must not** be inside the worktree directory when running this:
@@ -426,6 +442,7 @@ twig worktree list  # verify
 | **No edits in main**        | Never edit, stage, or commit files in `D:\code\legacy-sports` for ticket work. All file edits must happen inside `$wt`. Staging changes there and "forgetting" them is a common source of phantom diffs that linger until discovered. |
 | **One worktree per branch** | Git prevents two worktrees sharing the same branch                                                                                                                                                                                    |
 | **Don't run from inside**   | `git worktree move/remove` must be run from outside the target worktree                                                                                                                                                               |
+| **Never manual remove**     | **Always** use `twig worktree clean` — never `git worktree remove` or manual directory deletion. Manual removal destroys `node_modules` junctions, breaking every other worktree that shares them.                                    |
 | **Run make install**        | `node_modules` and Python deps are absent in a fresh worktree — always run `make install` inside it                                                                                                                                   |
 | **Separate VS Code window** | Open each worktree in its own VS Code window for clean file watching                                                                                                                                                                  |
 | **Multi-root for agents**   | Run `make sync-worktrees TICKETS=501,493` then open `legacy-sports.code-workspace` — limit to 3-4 worktrees for TS performance                                                                                                        |
