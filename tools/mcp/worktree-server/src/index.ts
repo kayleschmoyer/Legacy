@@ -113,6 +113,41 @@ function resolveWorktreePath(key: string): string | null {
   return worktrees.find((w) => w.key === normalised)?.path ?? null;
 }
 
+/**
+ * Resolve the target worktree directory from an optional key, the active
+ * worktree, or return an error message.
+ */
+function resolveTargetDir(
+  worktreeKey?: string,
+): { path: string } | { error: string } {
+  if (worktreeKey) {
+    const resolved = resolveWorktreePath(worktreeKey);
+    if (!resolved)
+      return { error: `No worktree found for key '${worktreeKey}'.` };
+    return { path: resolved };
+  }
+  if (activeWorktree) return { path: activeWorktree };
+  return {
+    error:
+      'No active worktree set. Use worktree_set first or pass the worktree parameter.',
+  };
+}
+
+/** Run a command in a directory and return stdout. Throws on non-zero exit. */
+function run(
+  command: string,
+  cwd: string,
+  opts?: { timeout?: number; env?: Record<string, string> },
+): string {
+  return execSync(command, {
+    cwd,
+    encoding: 'utf-8',
+    timeout: opts?.timeout ?? 120_000,
+    maxBuffer: 10 * 1024 * 1024,
+    env: { ...process.env, ...opts?.env },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // MCP server
 // ---------------------------------------------------------------------------
@@ -177,6 +212,66 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           path: { type: 'string', description: 'Path to check' },
         },
         required: ['path'],
+      },
+    },
+    {
+      name: 'worktree_rebase',
+      description:
+        'Fetch origin and rebase the active worktree branch onto its parent ' +
+        '(via twig rebase). Sets GIT_EDITOR to prevent blocking in agent workflows. ' +
+        'Use worktree_stabilize after a successful rebase before pushing.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+          abort: {
+            type: 'boolean',
+            description:
+              'If true, aborts an in-progress rebase instead of starting one.',
+          },
+        },
+      },
+    },
+    {
+      name: 'worktree_stabilize',
+      description:
+        'Run post-rebase stabilization: make install, regenerate schema, ' +
+        'and run codegen on affected projects. Must be run BEFORE pushing ' +
+        'after a rebase to prevent CI failures.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+        },
+      },
+    },
+    {
+      name: 'worktree_push',
+      description:
+        'Push the current branch with --force-with-lease. Refuses to push ' +
+        'the main branch. Intended for use after rebase + stabilize + make pc.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+          setUpstream: {
+            type: 'boolean',
+            description:
+              'If true, adds -u to set the upstream tracking branch. Default false.',
+          },
+        },
       },
     },
   ],
@@ -398,6 +493,263 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_rebase
+    // -----------------------------------------------------------------------
+    case 'worktree_rebase': {
+      const { worktree, abort } = args as {
+        worktree?: string;
+        abort?: boolean;
+      };
+
+      const target = resolveTargetDir(worktree);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+      const log: string[] = [`[cwd: ${cwd}]`];
+
+      // Agent-safe: prevent Git from opening an editor
+      const agentEnv = {
+        GIT_EDITOR: 'true',
+        GIT_SEQUENCE_EDITOR: 'true',
+      };
+
+      try {
+        if (abort) {
+          const out = run('git rebase --abort', cwd, { env: agentEnv });
+          log.push('$ git rebase --abort', out);
+          return { content: [{ type: 'text', text: log.join('\n') }] };
+        }
+
+        // Check for clean working directory
+        const status = run('git status --porcelain', cwd).trim();
+        if (status) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Working directory is not clean in ${cwd}:\n${status}\n\n` +
+                  'Commit or stash changes before rebasing.',
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Fetch origin
+        log.push('$ git fetch origin');
+        const fetchOut = run('git fetch origin', cwd, { timeout: 30_000 });
+        if (fetchOut.trim()) log.push(fetchOut.trim());
+
+        // Rebase via twig (knows the parent branch)
+        log.push('$ twig rebase');
+        const rebaseOut = run('twig rebase', cwd, {
+          timeout: 120_000,
+          env: agentEnv,
+        });
+        log.push(rebaseOut.trim());
+
+        log.push(
+          '',
+          'Rebase complete. Next steps:',
+          '1. worktree_stabilize — run post-rebase stabilization',
+          '2. worktree_run(command: "make pc") — validate',
+          '3. worktree_push — push the validated branch',
+        );
+        return { content: [{ type: 'text', text: log.join('\n') }] };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+        };
+        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+        const hasConflicts =
+          output.includes('CONFLICT') || output.includes('could not apply');
+
+        log.push(`Exit code: ${e.status ?? 'unknown'}`, output);
+
+        if (hasConflicts) {
+          log.push(
+            '',
+            'Rebase paused due to conflicts. Resolve them, then:',
+            '  git add <resolved-files>',
+            '  worktree_run(command: "git rebase --continue")',
+            'Or: worktree_rebase(abort: true) to abort.',
+          );
+        }
+
+        return {
+          content: [{ type: 'text', text: log.join('\n') }],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_stabilize
+    // -----------------------------------------------------------------------
+    case 'worktree_stabilize': {
+      const { worktree: wtKey } = args as { worktree?: string };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+      const log: string[] = [`[cwd: ${cwd}]`, '', 'Post-rebase stabilization:'];
+      const steps = [
+        { label: 'make install', cmd: 'make install', timeout: 300_000 },
+        {
+          label: 'pnpm exec nx run db:print-schema',
+          cmd: 'pnpm exec nx run db:print-schema',
+          timeout: 60_000,
+        },
+        {
+          label: 'pnpm exec nx affected -t codegen --base=origin/main',
+          cmd: 'pnpm exec nx affected -t codegen --base=origin/main',
+          timeout: 120_000,
+        },
+      ];
+
+      for (const step of steps) {
+        log.push(``, `$ ${step.label}`);
+        try {
+          const out = run(step.cmd, cwd, { timeout: step.timeout });
+          const trimmed = out.trim();
+          if (trimmed) log.push(trimmed);
+          log.push(`✓ ${step.label} succeeded`);
+        } catch (err: unknown) {
+          const e = err as {
+            stdout?: string;
+            stderr?: string;
+            status?: number;
+          };
+          const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+          log.push(
+            `✗ ${step.label} failed (exit code ${e.status ?? 'unknown'})`,
+            output,
+          );
+          return {
+            content: [{ type: 'text', text: log.join('\n') }],
+            isError: true,
+          };
+        }
+      }
+
+      log.push(
+        '',
+        'Stabilization complete. Next: worktree_run(command: "make pc") to validate.',
+      );
+      return { content: [{ type: 'text', text: log.join('\n') }] };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_push
+    // -----------------------------------------------------------------------
+    case 'worktree_push': {
+      const { worktree: wtKey, setUpstream } = args as {
+        worktree?: string;
+        setUpstream?: boolean;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+
+      // Safety: refuse to push main or in detached HEAD / mid-rebase state
+      try {
+        const branch = run('git branch --show-current', cwd).trim();
+        if (!branch) {
+          // Detached HEAD — check if a rebase is in progress
+          const gitDir = run('git rev-parse --git-dir', cwd).trim();
+          const inRebase =
+            existsSync(join(gitDir, 'rebase-merge')) ||
+            existsSync(join(gitDir, 'rebase-apply'));
+          return {
+            content: [
+              {
+                type: 'text',
+                text: inRebase
+                  ? 'Refused: rebase is in progress. Finish the rebase before pushing.'
+                  : 'Refused: HEAD is detached (no branch checked out). Aborting push.',
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (branch === 'main') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Refused: cannot force-push main. Use git revert instead.',
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch {
+        // If we can't determine the branch, refuse to proceed
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Could not determine current branch. Aborting push.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const upstreamFlag = setUpstream ? ' -u' : '';
+      const cmd = `git push${upstreamFlag} --force-with-lease origin HEAD`;
+
+      try {
+        const out = run(cmd, cwd, { timeout: 30_000 });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[cwd: ${cwd}]\n$ ${cmd}\n\n${out.trim()}`,
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+        };
+        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[cwd: ${cwd}]\n$ ${cmd}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
 
     default:

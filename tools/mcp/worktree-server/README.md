@@ -34,6 +34,32 @@ Check whether a path is inside the main repo and warn if worktrees are active.
 | --------- | ------ | -------- | ------------- |
 | `path`    | string | Yes      | Path to check |
 
+### `worktree_rebase`
+
+Fetch origin and rebase the active worktree branch onto its parent (via `twig rebase`). Sets `GIT_EDITOR` to prevent blocking in agent workflows.
+
+| Parameter  | Type    | Required | Description                                    |
+| ---------- | ------- | -------- | ---------------------------------------------- |
+| `worktree` | string  | No       | Ticket key. Uses active worktree if omitted.   |
+| `abort`    | boolean | No       | If true, aborts an in-progress rebase instead. |
+
+### `worktree_stabilize`
+
+Run post-rebase stabilization: `make install`, regenerate schema, and run codegen on affected projects. Must be run **before** pushing after a rebase.
+
+| Parameter  | Type   | Required | Description                                  |
+| ---------- | ------ | -------- | -------------------------------------------- |
+| `worktree` | string | No       | Ticket key. Uses active worktree if omitted. |
+
+### `worktree_push`
+
+Push the current branch with `--force-with-lease`. Refuses to push the `main` branch.
+
+| Parameter     | Type    | Required | Description                                  |
+| ------------- | ------- | -------- | -------------------------------------------- |
+| `worktree`    | string  | No       | Ticket key. Uses active worktree if omitted. |
+| `setUpstream` | boolean | No       | If true, adds `-u` to set upstream tracking. |
+
 ## Setup
 
 The server is configured in `.vscode/mcp.json`:
@@ -61,3 +87,4 @@ The server is configured in `.vscode/mcp.json`:
 2. **Junction detection** — checks `node_modules` in each worktree via `fs.lstatSync` to distinguish junctioned (shared) vs independent installs.
 3. **Main-repo guard** — `worktree_run` refuses to execute commands in the main repo when any worktrees are active, preventing accidental mutation of the shared `node_modules` or dirty commits on `main`.
 4. **Active tracking** — `worktree_set` stores the active worktree in memory (session-scoped) so subsequent `worktree_run` calls don't need to specify the target.
+5. **Rebase workflow** — `worktree_rebase` → `worktree_stabilize` → `worktree_push` provides a complete rebase-to-push pipeline with agent-safe defaults (no editor blocking) and main-branch push protection.

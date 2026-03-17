@@ -1,6 +1,6 @@
 ---
 name: mcp-worktree
-description: 'Use the MCP worktree server to run commands in the correct git worktree directory; covers worktree_list, worktree_set, worktree_run, and worktree_guard tools. Load when working with multiple worktrees, running make/nx/git commands, or when you need to ensure commands target the right worktree instead of the main repo.'
+description: 'Use the MCP worktree server to run commands in the correct git worktree directory; covers worktree_list, worktree_set, worktree_run, worktree_guard, worktree_rebase, worktree_stabilize, and worktree_push tools. Load when working with multiple worktrees, running make/nx/git commands, rebasing branches, or when you need to ensure commands target the right worktree instead of the main repo.'
 ---
 
 # Skill: MCP Worktree Server
@@ -15,6 +15,7 @@ The worktree MCP server prevents the #1 agent failure mode: running commands in 
 - Running `make`, `nx`, or `git` commands when multiple worktrees are active
 - Checking whether a path is in the main repo vs a worktree
 - Listing worktree status (junction info, branch names)
+- Rebasing a branch, stabilizing post-rebase, and pushing
 
 ## Available Tools
 
@@ -49,12 +50,48 @@ worktree_guard(path: "D:\\code\\legacy-sports")
 // → { isMainRepo: true, activeWorktrees: ["LS-1134", ...], warning: "..." }
 ```
 
+### `worktree_rebase`
+
+Fetches origin and rebases the active worktree branch onto its parent via `twig rebase`. Sets `GIT_EDITOR=true` to prevent blocking.
+
+```
+worktree_rebase()                      // rebase active worktree
+worktree_rebase(worktree: "LS-1134")   // rebase specific worktree
+worktree_rebase(abort: true)           // abort an in-progress rebase
+```
+
+### `worktree_stabilize`
+
+Runs post-rebase stabilization: `make install` → `print-schema` → `codegen`. Must be run **before** pushing after a rebase.
+
+```
+worktree_stabilize()                   // stabilize active worktree
+worktree_stabilize(worktree: "LS-1134")
+```
+
+### `worktree_push`
+
+Pushes the current branch with `--force-with-lease`. Refuses to push `main`.
+
+```
+worktree_push()                        // push active worktree branch
+worktree_push(setUpstream: true)       // push with -u
+```
+
 ## Typical Workflow
 
 1. Start work on a ticket → agent creates worktree
 2. `worktree_set(key: "LS-1136")` → sets active worktree
 3. `worktree_run(command: "make pc")` → runs in the worktree, not main repo
 4. If the agent accidentally targets main repo → gets a clear refusal with guidance
+
+## Rebase Workflow
+
+1. `worktree_rebase()` → fetch + rebase onto parent
+2. Resolve conflicts if any (manually or via `worktree_run`)
+3. `worktree_stabilize()` → install deps + regenerate schema + codegen
+4. `worktree_run(command: "make pc")` → validate everything passes
+5. `worktree_push()` → force-push the validated branch
 
 ## Setup
 
