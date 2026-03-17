@@ -848,6 +848,9 @@ export function LeagueDetailPage(): React.JSX.Element {
       });
       setSpectatorJoinSuccess(true);
       void refetchLeague();
+      // Refresh the user's team ID so member-specific tabs (Roster, Trades,
+      // My Team) become active without requiring a full page reload.
+      void getUserTeamId({ variables: { leagueId } });
       setTimeout(() => navigate(`/baseball/league/${leagueId}/overview`), 1200);
     } catch (err) {
       setSpectatorJoinError((err as Error).message || 'Failed to join league');
