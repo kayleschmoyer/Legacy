@@ -846,6 +846,7 @@ export type LeagueMember = {
   team?: Maybe<Team>;
   teamId?: Maybe<Scalars['Int']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
+  username?: Maybe<Scalars['String']['output']>;
 };
 
 /** A position configuration in a league */

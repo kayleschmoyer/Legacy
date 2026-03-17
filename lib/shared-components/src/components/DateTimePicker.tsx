@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  X,
 } from '@tamagui/lucide-icons';
 import { Platform } from '../platform-components';
 
@@ -25,6 +26,8 @@ export interface DateTimePickerProps {
   inputClassName?: string;
   /** Inline style overrides merged onto the native <input> on web. */
   inputStyle?: React.CSSProperties;
+  /** Called when the user clears the selected date. Only shown when a value is set. */
+  onClear?: () => void;
 }
 
 export function DateTimePicker({
@@ -37,6 +40,7 @@ export function DateTimePicker({
   useNativeInput = true,
   inputClassName,
   inputStyle,
+  onClear,
 }: DateTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(
@@ -162,41 +166,66 @@ export function DateTimePicker({
       : false;
   };
 
+  const handleClear = () => {
+    setSelectedDate(null);
+    setIsOpen(false);
+    onClear?.();
+  };
+
   // On web, optionally use native datetime-local input
   if (Platform.OS === 'web' && useNativeInput) {
     return (
-      <YStack>
-        <input
-          type="datetime-local"
-          className={inputClassName}
-          value={value ? formatInputDateTime(value) : ''}
-          onChange={(e) => {
-            const parsedDate = parseInputDateTime(e.target.value);
-            if (parsedDate) {
-              onChange(parsedDate);
-            }
-          }}
-          placeholder={placeholder}
-          disabled={disabled}
-          min={minDate ? formatInputDateTime(minDate) : undefined}
-          max={maxDate ? formatInputDateTime(maxDate) : undefined}
-          style={{
-            colorScheme: 'dark',
-            fontFamily: 'inherit',
-            width: '100%',
-            padding: '10px 14px',
-            fontSize: '14px',
-            border: '1px solid var(--gray7)',
-            borderRadius: '8px',
-            backgroundColor: 'var(--gray4)',
-            color: 'var(--color)',
-            opacity: disabled ? 0.5 : 1,
-            cursor: disabled ? 'not-allowed' : 'default',
-            outline: 'none',
-            ...inputStyle,
-          }}
-        />
-      </YStack>
+      <XStack alignItems="center" space="$2">
+        <YStack flex={1}>
+          <input
+            type="datetime-local"
+            className={inputClassName}
+            value={value ? formatInputDateTime(value) : ''}
+            onChange={(e) => {
+              if (!e.target.value) {
+                handleClear();
+                return;
+              }
+              const parsedDate = parseInputDateTime(e.target.value);
+              if (parsedDate) {
+                onChange(parsedDate);
+              }
+            }}
+            placeholder={placeholder}
+            disabled={disabled}
+            min={minDate ? formatInputDateTime(minDate) : undefined}
+            max={maxDate ? formatInputDateTime(maxDate) : undefined}
+            style={{
+              colorScheme: 'dark',
+              fontFamily: 'inherit',
+              width: '100%',
+              padding: '10px 14px',
+              fontSize: '14px',
+              border: '1px solid var(--gray7)',
+              borderRadius: '8px',
+              backgroundColor: 'var(--gray4)',
+              color: 'var(--color)',
+              opacity: disabled ? 0.5 : 1,
+              cursor: disabled ? 'not-allowed' : 'default',
+              outline: 'none',
+              ...inputStyle,
+            }}
+          />
+        </YStack>
+        {value && onClear && (
+          <Button
+            size="$3"
+            chromeless
+            onPress={handleClear}
+            disabled={disabled}
+            pressStyle={{ opacity: 0.7 }}
+            aria-label="Clear date/time"
+            accessibilityLabel="Clear date/time"
+          >
+            <X size="$1" color="$color10" />
+          </Button>
+        )}
+      </XStack>
     );
   }
 
@@ -209,28 +238,44 @@ export function DateTimePicker({
       open={isOpen}
       onOpenChange={setIsOpen}
     >
-      <Popover.Trigger asChild>
-        <Button
-          size="$4"
-          backgroundColor="$color1"
-          borderColor="$borderColor"
-          borderWidth={1}
-          justifyContent="space-between"
-          disabled={disabled}
-          pressStyle={{ opacity: 0.8 }}
-          onPress={() => {
-            setIsOpen(!isOpen);
-          }}
-        >
-          <Text color={value ? '$color' : '$placeholderColor'}>
-            {value ? formatDateTime(value) : placeholder}
-          </Text>
-          <XStack alignItems="center" space="$1">
-            <Calendar size="$1" color="$color10" />
-            <Clock size="$1" color="$color10" />
-          </XStack>
-        </Button>
-      </Popover.Trigger>
+      <XStack alignItems="center" space="$2">
+        <Popover.Trigger asChild flex={1}>
+          <Button
+            size="$4"
+            flex={1}
+            backgroundColor="$color1"
+            borderColor="$borderColor"
+            borderWidth={1}
+            justifyContent="space-between"
+            disabled={disabled}
+            pressStyle={{ opacity: 0.8 }}
+            onPress={() => {
+              setIsOpen(!isOpen);
+            }}
+          >
+            <Text color={value ? '$color' : '$placeholderColor'} flex={1}>
+              {value ? formatDateTime(value) : placeholder}
+            </Text>
+            <XStack alignItems="center" space="$1">
+              <Calendar size="$1" color="$color10" />
+              <Clock size="$1" color="$color10" />
+            </XStack>
+          </Button>
+        </Popover.Trigger>
+        {value && onClear && (
+          <Button
+            size="$3"
+            chromeless
+            onPress={handleClear}
+            disabled={disabled}
+            aria-label="Clear date/time"
+            accessibilityLabel="Clear date/time"
+            pressStyle={{ opacity: 0.7 }}
+          >
+            <X size={14} color="$color10" />
+          </Button>
+        )}
+      </XStack>
 
       <Popover.Content
         borderWidth={1}

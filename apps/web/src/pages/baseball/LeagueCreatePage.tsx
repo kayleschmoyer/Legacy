@@ -1443,6 +1443,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                   onChange={(date: Date) =>
                     handleInputChange('draftDate', date)
                   }
+                  onClear={() =>
+                    setFormData((prev) => ({ ...prev, draftDate: undefined }))
+                  }
                   placeholder="Select draft date and time"
                   disabled={loading}
                   minDate={new Date()} // Can't select past dates
