@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { XStack, YStack } from '@legacy-sports/shared-components';
-import { Card, Separator, Spinner, styled, Text } from 'tamagui';
+import { Button, Card, Separator, Spinner, styled, Text } from 'tamagui';
 import { AlertTriangle, Trophy } from '@tamagui/lucide-icons';
 import { useStandings } from '../../hooks/useStandings';
 import {
@@ -75,7 +75,12 @@ export function LeagueStandings({
   onTeamClick,
 }: LeagueStandingsProps): React.JSX.Element {
   const navigate = useNavigate();
-  const { standings, loading: standingsLoading } = useStandings(leagueId);
+  const {
+    standings,
+    loading: standingsLoading,
+    error: standingsError,
+    refetch: refetchStandings,
+  } = useStandings(leagueId);
 
   // Merge teams with standings data, sorted by standings rank
   const rankedTeams = useMemo(() => {
@@ -365,6 +370,38 @@ export function LeagueStandings({
             Team data could not be retrieved. Please refresh the page to try
             again.
           </Text>
+        </YStack>
+      </Card>
+    );
+  }
+
+  if (standingsError && standings.length === 0) {
+    return (
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$red7"
+        borderWidth={1}
+        borderRadius="$6"
+        padding="$8"
+        alignItems="center"
+        role="alert"
+        aria-live="assertive"
+      >
+        <YStack alignItems="center" gap="$3">
+          <AlertTriangle size={32} color="$red10" />
+          <Text color="$red11" fontSize="$5" fontWeight="600">
+            Failed to load standings
+          </Text>
+          <Text color="$textMuted" fontSize="$3" textAlign="center">
+            Standings data could not be retrieved. Please try again.
+          </Text>
+          <Button
+            size="$3"
+            theme="active"
+            onPress={() => void refetchStandings()}
+          >
+            Retry
+          </Button>
         </YStack>
       </Card>
     );
