@@ -179,7 +179,14 @@ export function LeagueStandings({
   const renderTeamRow = (team: RankedTeam, index: number, total: number) => {
     const isUserTeam = userTeamId === team.id;
     const rank = index + 1;
-    const rankStyle = getRankStyle(rank);
+    // Only show rank numbers and award gold/silver/bronze styles when this
+    // specific team has a standings record (post-season-start). During the
+    // preseason, appended teams have null record fields and must not render
+    // numeric ranks or top-3 glow regardless of the global standings array.
+    const hasStandingsRecord = team.wins != null;
+    const rankStyle = hasStandingsRecord
+      ? getRankStyle(rank)
+      : { bg: '$surfaceSubtle', border: '$outlineSubtle', color: '$textMuted' };
     const isEven = index % 2 === 0;
 
     return (
@@ -213,7 +220,7 @@ export function LeagueStandings({
               ? {
                   boxShadow: `inset 0 0 24px ${withAlpha(BRAND_NAVY_LIGHT, 0.1)}`,
                 }
-              : rank <= 3
+              : hasStandingsRecord && rank <= 3
                 ? {
                     boxShadow: `inset 0 0 20px ${withAlpha(AMBER, 0.06)}`,
                   }
@@ -228,7 +235,7 @@ export function LeagueStandings({
               borderWidth={1}
             >
               <Text fontSize="$2" fontWeight="800" color={rankStyle.color}>
-                {rank}
+                {hasStandingsRecord ? rank : '—'}
               </Text>
             </RankBadge>
           </YStack>
