@@ -189,9 +189,17 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
               <Input
                 placeholder="Enter 8-character code"
                 value={inviteCode}
-                onChangeText={(text: string) =>
-                  setInviteCode(text.toUpperCase())
-                }
+                onChangeText={(text: string) => {
+                  setInviteCode(text.toUpperCase());
+                  // Only clear errors that relate to the invite-code field so
+                  // unrelated form-level errors (e.g. league-full) stay visible
+                  if (
+                    error?.toLowerCase().includes('invite code') ||
+                    error?.toLowerCase().includes('8')
+                  ) {
+                    setError(null);
+                  }
+                }}
                 maxLength={8}
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -282,7 +290,14 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
               <Input
                 placeholder="Enter your team name"
                 value={teamName}
-                onChangeText={setTeamName}
+                onChangeText={(text: string) => {
+                  setTeamName(text);
+                  // Only clear errors that relate to the team-name field so
+                  // unrelated form-level errors (e.g. league-full) stay visible
+                  if (error?.toLowerCase().includes('team name')) {
+                    setError(null);
+                  }
+                }}
                 maxLength={50}
                 backgroundColor="$background"
                 borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}

@@ -310,4 +310,94 @@ describe('JoinLeagueByCodePage', () => {
     fireEvent.click(screen.getByText(/Cancel/i));
     expect(mockNavigate).toHaveBeenCalledWith('/baseball');
   });
+
+  /**
+   * Regression: LS-1299 — invite-code field errors clear on edit, but other errors persist
+   */
+  it('clears invite-code error when user edits the code field (LS-1299 regression)', async () => {
+    const { useJoinLeagueByCodeMutation } =
+      require('../../api/db/graphql.generated') as {
+        useJoinLeagueByCodeMutation: jest.Mock;
+      };
+
+    // Use a unique message so it won't be confused with the static
+    // '!leagueInfo && code.length===8' display text in the component
+    mockJoinLeague.mockRejectedValueOnce(
+      new Error('Invite code has already been claimed by another team'),
+    );
+    useJoinLeagueByCodeMutation.mockReturnValue([
+      mockJoinLeague,
+      { loading: false },
+    ]);
+
+    renderPage();
+
+    const codeInput = screen.getByPlaceholderText(/Enter 8-character code/i);
+    const teamInput = screen.getByPlaceholderText(/Enter your team name/i);
+
+    act(() => {
+      fireEvent.change(codeInput, { target: { value: 'BADCODE1' } });
+      fireEvent.change(teamInput, { target: { value: 'My Team' } });
+    });
+
+    act(() => {
+      fireEvent.submit(document.querySelector('form')!);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Invite code has already been claimed/i),
+      ).toBeInTheDocument();
+    });
+
+    // Editing the invite-code field should clear the invite-code-related error
+    act(() => {
+      fireEvent.change(codeInput, { target: { value: 'BADCODE2' } });
+    });
+
+    expect(
+      screen.queryByText(/Invite code has already been claimed/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not clear unrelated errors when user edits the invite code field (LS-1299 regression)', async () => {
+    const { useJoinLeagueByCodeMutation } =
+      require('../../api/db/graphql.generated') as {
+        useJoinLeagueByCodeMutation: jest.Mock;
+      };
+
+    // Simulate a league-full error (unrelated to invite-code field)
+    mockJoinLeague.mockRejectedValueOnce(
+      new Error('This league is full and no longer accepting new members'),
+    );
+    useJoinLeagueByCodeMutation.mockReturnValue([
+      mockJoinLeague,
+      { loading: false },
+    ]);
+
+    renderPage();
+
+    const codeInput = screen.getByPlaceholderText(/Enter 8-character code/i);
+    const teamInput = screen.getByPlaceholderText(/Enter your team name/i);
+
+    act(() => {
+      fireEvent.change(codeInput, { target: { value: 'FULL0000' } });
+      fireEvent.change(teamInput, { target: { value: 'My Team' } });
+    });
+
+    act(() => {
+      fireEvent.submit(document.querySelector('form')!);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/This league is full/i)).toBeInTheDocument();
+    });
+
+    // Editing the invite-code field should NOT clear a league-full error
+    act(() => {
+      fireEvent.change(codeInput, { target: { value: 'FULL0001' } });
+    });
+
+    expect(screen.getByText(/This league is full/i)).toBeInTheDocument();
+  });
 });
