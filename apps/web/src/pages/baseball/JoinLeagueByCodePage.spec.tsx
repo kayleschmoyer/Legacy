@@ -312,6 +312,71 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   /**
+   * Regression: LS-1296 — stale invite-code validation
+   *
+   * After entering a valid 8-char code the league preview appears and the
+   * submit button is enabled.  Deleting a character must hide the preview
+   * and disable the button, even though the lazy-query still holds its
+   * previous result.
+   */
+  it('clears league preview when the invite code is shortened below 8 chars (LS-1296 regression)', () => {
+    const { useValidateInviteCodeLazyQuery } =
+      require('../../api/db/graphql.generated') as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+
+    // Start with a successful validation result so leagueInfo is populated
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      {
+        data: {
+          validateInviteCode: {
+            isFull: false,
+            leagueName: 'Stale League',
+            totalSpots: 10,
+            availableSpots: 5,
+          },
+        },
+        loading: false,
+      },
+    ]);
+
+    renderPage();
+
+    const codeInput = screen.getByPlaceholderText(/Enter 8-character code/i);
+    const teamNameInput = screen.getByPlaceholderText(/Enter your team name/i);
+
+    // Fill in a team name so invite-code gating is the only remaining blocker
+    act(() => {
+      fireEvent.change(teamNameInput, { target: { value: 'My Team' } });
+    });
+
+    // Enter a valid 8-char code — league preview should be visible and button enabled
+    act(() => {
+      fireEvent.change(codeInput, { target: { value: 'ABC12345' } });
+    });
+    expect(screen.getByText(/Stale League/)).toBeInTheDocument();
+    const buttons = screen.getAllByRole('button');
+    const joinButton = buttons.find((b) =>
+      /join league/i.test(b.textContent ?? ''),
+    );
+    expect(joinButton).not.toBeDisabled();
+
+    // Now delete one character — preview must disappear and button must be disabled
+    act(() => {
+      fireEvent.change(codeInput, { target: { value: 'ABC1234' } });
+    });
+    expect(screen.queryByText(/Stale League/)).not.toBeInTheDocument();
+
+    // The join button must be disabled (no leagueInfo)
+    const updatedButtons = screen.getAllByRole('button');
+    const updatedJoinButton = updatedButtons.find((b) =>
+      /join league/i.test(b.textContent ?? ''),
+    );
+    expect(updatedJoinButton).toBeDisabled();
+  });
+
+  /**
    * Regression: LS-1299 — invite-code field errors clear on edit, but other errors persist
    */
   it('clears invite-code error when user edits the code field (LS-1299 regression)', async () => {

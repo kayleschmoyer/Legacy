@@ -34,15 +34,21 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
     useValidateInviteCodeLazyQuery();
 
   // Validate the code against the server whenever it reaches 8 chars
-  useEffect(() => {
-    const code = inviteCode.trim().toUpperCase();
-    const codePattern = /^[A-Z0-9]{8}$/;
-    if (codePattern.test(code)) {
-      void validateCode({ variables: { code } });
-    }
-  }, [inviteCode, validateCode]);
+  const codePattern = /^[A-Z0-9]{8}$/;
+  const trimmedCode = inviteCode.trim().toUpperCase();
+  const isCodeComplete = codePattern.test(trimmedCode);
 
-  const leagueInfo = validateData?.validateInviteCode;
+  useEffect(() => {
+    if (isCodeComplete) {
+      void validateCode({ variables: { code: trimmedCode } });
+    }
+  }, [trimmedCode, isCodeComplete, validateCode]);
+
+  // Only expose league info when the code is still a valid 8-char input;
+  // this prevents stale preview data from lingering after the user edits the code.
+  const leagueInfo = isCodeComplete
+    ? (validateData?.validateInviteCode ?? null)
+    : null;
   const isLeagueFull =
     leagueInfo?.isFull ??
     Boolean(
@@ -66,7 +72,6 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
     }
 
     // Validate invite code format (8 uppercase alphanumeric characters)
-    const codePattern = /^[A-Z0-9]{8}$/;
     if (!codePattern.test(inviteCode.trim().toUpperCase())) {
       setError('Invite code must be 8 characters (letters and numbers only)');
       return;
