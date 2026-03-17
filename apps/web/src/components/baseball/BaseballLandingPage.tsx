@@ -266,32 +266,6 @@ const StatsHeader = styled(YStack, {
   gap: '$1',
 });
 
-const StatsGrid = styled(XStack, {
-  flexWrap: 'wrap',
-  gap: '$4',
-});
-
-const StatItem = styled(YStack, {
-  minWidth: 120,
-  flexGrow: 1,
-  gap: '$1',
-});
-
-const StatValue = styled(TH2, {
-  fontSize: '$9',
-  fontWeight: '800',
-  color: BRAND_GOLD_LIGHT,
-  animation: 'medium',
-  enterStyle: { opacity: 0, scale: 0.8 },
-});
-
-const StatLabel = styled(TParagraph, {
-  fontSize: '$3',
-  color: '$glassTextMuted',
-  textTransform: 'uppercase',
-  letterSpacing: 1,
-});
-
 const QuickGlanceCard = styled(YStack, {
   backgroundColor: withAlpha(SURFACE_PANEL, 0.72),
   borderRadius: '$7',
@@ -676,11 +650,6 @@ export function BaseballLandingPage() {
           : maxWeek,
       1,
     ) || 1;
-  const upcomingDrafts = leagues.filter((league) =>
-    league.draftStatus
-      ? ['not-started', 'queued', 'scheduled'].includes(league.draftStatus)
-      : false,
-  ).length;
   const userName = auth?.user?.username || 'Manager';
   const hasLeagues = leaguesCount > 0;
   const safeCurrentWeek = currentWeek > 0 ? currentWeek : 1;
@@ -884,31 +853,19 @@ export function BaseballLandingPage() {
               textTransform="uppercase"
               letterSpacing={1}
             >
-              Season Snapshot
+              Getting Started
             </Paragraph>
             <H3 size="$7" color="$color">
-              Stay ahead of every matchup
+              Build your first roster
             </H3>
           </StatsHeader>
           <Separator backgroundColor="$glassBorder" />
-          <StatsGrid>
-            <StatItem>
-              <StatValue>{leaguesCount}</StatValue>
-              <StatLabel>Active Leagues</StatLabel>
-            </StatItem>
-            <StatItem>
-              <StatValue>{safeCurrentWeek}</StatValue>
-              <StatLabel>Current Week</StatLabel>
-            </StatItem>
-            <StatItem>
-              <StatValue>{averageRosterSize}</StatValue>
-              <StatLabel>Avg Roster Size</StatLabel>
-            </StatItem>
-            <StatItem>
-              <StatValue>{upcomingDrafts}</StatValue>
-              <StatLabel>Upcoming Drafts</StatLabel>
-            </StatItem>
-          </StatsGrid>
+          <YStack gap="$3" paddingVertical="$2">
+            <Paragraph fontSize="$3" color="$glassTextSubdued">
+              Create or join a league to start tracking your season — weekly
+              matchups, roster stats, and draft countdowns will appear here.
+            </Paragraph>
+          </YStack>
         </StatsCard>
 
         <QuickGlanceCard
