@@ -408,14 +408,18 @@ export function LeagueDetailPage(): React.JSX.Element {
     isCommissioner: reduxIsCommissioner,
   } = useAppSelector((state) => state.league);
 
-  const getTabFromUrl = useCallback((): TabId => {
-    if (tabParam && tabParam in TAB_ALIASES) {
+  const getTabFromUrl = useCallback((): TabId | null => {
+    if (!tabParam) return 'overview';
+    if (Object.prototype.hasOwnProperty.call(TAB_ALIASES, tabParam)) {
       return TAB_ALIASES[tabParam];
     }
-    return 'overview';
+    // Unknown tab segment — signal to the redirect effect below
+    return null;
   }, [tabParam]);
 
-  const [activeTab, setActiveTab] = useState<TabId>(getTabFromUrl());
+  const [activeTab, setActiveTab] = useState<TabId>(
+    getTabFromUrl() ?? 'overview',
+  );
   const [linkCopied, setLinkCopied] = useState(false);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
   const [headerInviteCopied, setHeaderInviteCopied] = useState(false);
@@ -483,10 +487,16 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   useEffect(() => {
     const tabFromUrl = getTabFromUrl();
+    if (tabFromUrl === null) {
+      // LS-1304: unknown tab URL — replace history entry so pressing Back
+      // doesn't loop back to the invalid route.
+      navigate(`/baseball/league/${leagueId}/overview`, { replace: true });
+      return;
+    }
     if (tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl);
     }
-  }, [getTabFromUrl, activeTab]);
+  }, [getTabFromUrl, activeTab, navigate, leagueId]);
 
   const changeTab = useCallback(
     (newTab: TabId) => {
@@ -828,14 +838,15 @@ export function LeagueDetailPage(): React.JSX.Element {
     !userTeamId
   );
 
-  // LS-1057: Once league data has loaded and commissioner status is known,
+  // LS-1057 / LS-1303: Once league data has loaded and commissioner status is known,
   // redirect any non-commissioner who navigated directly to the commissioner
-  // tab back to the overview tab so they don't see a blank panel.
+  // tab back to the overview tab. Use replace:true so pressing Back doesn't
+  // re-trigger the redirect and create an infinite back-button loop.
   useEffect(() => {
     if (league && activeTab === 'commissioner' && !isCommissioner) {
-      changeTab('overview');
+      navigate(`/baseball/league/${leagueId}/overview`, { replace: true });
     }
-  }, [league, activeTab, isCommissioner, changeTab]);
+  }, [league, activeTab, isCommissioner, navigate, leagueId]);
 
   // ── Spectator join flow ──────────────────────────────────────────────────
   const [spectatorTeamName, setSpectatorTeamName] = useState('');

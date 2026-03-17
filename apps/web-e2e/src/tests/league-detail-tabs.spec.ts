@@ -554,3 +554,39 @@ test.describe('Pending Waivers — no claims @regression', () => {
     ).not.toBeVisible();
   });
 });
+
+// ── LS-1303: Unknown tab and commissioner redirect @regression ────────────────
+
+test.describe('Unknown Tab Redirect — LS-1303 regression @regression', () => {
+  test('unknown tab segment is replaced with /overview in URL', async ({
+    page,
+  }) => {
+    await mockLeagueDetailGraphQL(page);
+    // Navigate to an unknown tab; the component should replace-navigate to /overview
+    await page.goto('/baseball/league/1/unknown-tab-xyz');
+    await page.waitForLoadState('load');
+
+    await expect(page).toHaveURL(/\/baseball\/league\/1\/overview/);
+  });
+
+  test('navigating back after unknown-tab redirect does not loop', async ({
+    page,
+  }) => {
+    await mockLeagueDetailGraphQL(page);
+
+    // First land on a known page so there is history to go back to
+    await page.goto('/baseball/league/1/overview');
+    await page.waitForLoadState('load');
+
+    // Then navigate to an unknown tab — replace-navigate means history stays clean
+    await page.goto('/baseball/league/1/not-a-real-tab');
+    await page.waitForLoadState('load');
+
+    await expect(page).toHaveURL(/\/baseball\/league\/1\/overview/);
+
+    // Going back should leave the league detail page, not loop
+    await page.goBack();
+    // We should be back at the pre-league URL (overview from first visit), not stuck on the redirect target
+    await expect(page).not.toHaveURL(/not-a-real-tab/);
+  });
+});
