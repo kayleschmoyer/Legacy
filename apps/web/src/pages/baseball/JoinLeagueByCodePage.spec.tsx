@@ -504,6 +504,36 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   /**
+   * Regression: LS-1298 — network error banner must show when validateInviteCode returns an error
+   */
+  it('shows network error when validateInviteCode query returns an error (LS-1298 regression)', () => {
+    const { useValidateInviteCodeLazyQuery } =
+      require('../../api/db/graphql.generated') as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      {
+        data: undefined,
+        loading: false,
+        error: new Error('Network error'),
+      },
+    ]);
+
+    renderPage();
+
+    const codeInput = screen.getByPlaceholderText(/Enter 8-character code/i);
+
+    // Enter a valid 8-char code to trigger the validateError display path
+    act(() => {
+      fireEvent.change(codeInput, { target: { value: 'ABC12345' } });
+    });
+
+    expect(screen.getByText(/Unable to verify code/i)).toBeInTheDocument();
+  });
+
+  /**
    * Regression: LS-1299 — invite-code field errors clear on edit, but other errors persist
    */
   it('clears invite-code error when user edits the code field (LS-1299 regression)', async () => {

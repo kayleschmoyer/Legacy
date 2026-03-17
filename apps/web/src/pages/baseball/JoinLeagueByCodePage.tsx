@@ -30,8 +30,10 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
   }, [urlInviteCode]);
 
   const [joinLeague, { loading }] = useJoinLeagueByCodeMutation();
-  const [validateCode, { data: validateData, loading: validating }] =
-    useValidateInviteCodeLazyQuery();
+  const [
+    validateCode,
+    { data: validateData, loading: validating, error: validateError },
+  ] = useValidateInviteCodeLazyQuery();
 
   const codePattern = /^[A-Z0-9]{8}$/;
   const trimmedCode = inviteCode.trim().toUpperCase();
@@ -278,14 +280,28 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                     {leagueInfo.availableSpots !== 1 ? 's' : ''} available
                   </Text>
                 ))}
-              {!validating && !leagueInfo && inviteCode.trim().length === 8 && (
-                <Text color="$red10" fontSize="$2" fontWeight="600">
-                  <span role="img" aria-label="error">
-                    ❌
-                  </span>{' '}
-                  Invalid invite code
-                </Text>
-              )}
+              {!validating &&
+                isCodeComplete &&
+                (validateError ? (
+                  <Text
+                    color="$orange10"
+                    fontSize="$2"
+                    fontWeight="600"
+                    data-testid="invite-status-error"
+                  >
+                    <span role="img" aria-label="warning">
+                      ⚠️
+                    </span>{' '}
+                    Unable to verify code — check your connection and try again
+                  </Text>
+                ) : !leagueInfo ? (
+                  <Text color="$red10" fontSize="$2" fontWeight="600">
+                    <span role="img" aria-label="error">
+                      ❌
+                    </span>{' '}
+                    Invalid invite code
+                  </Text>
+                ) : null)}
             </YStack>
 
             {/* Team Name Input */}
