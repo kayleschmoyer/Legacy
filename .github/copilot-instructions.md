@@ -1,6 +1,6 @@
 # Legacy Sports Copilot Instructions
 
-> **NEVER commit to main** — create a worktree first: `make worktree TICKET=#### DESC=description`
+> **NEVER commit to main** — locally: create a worktree first (`make worktree TICKET=#### DESC=description`). Cloud agents already have an isolated branch checkout.
 
 ## Workflow
 
@@ -42,9 +42,45 @@
 - **Jira — MCP tools first**: use the MCP Jira tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent`) for **all** Jira operations. These are provided by the `legacy-sports-jira` MCP server (see `skills/mcp-jira/SKILL.md`). **Never** use `fetch_webpage`, raw HTTP requests, or web fetch to access Jira URLs directly. If MCP tools are unavailable, fall back to `acli` CLI commands — never to direct HTTP. Update Jira status at each workflow step.
 - **Resolve PR review threads**: when addressing PR review comments (from Copilot or any reviewer), **always resolve each thread** after pushing the fix. Use the GraphQL `resolveReviewThread` mutation: `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=$threadId`. Fetch thread IDs via GraphQL `reviewThreads` query, filtering for `isResolved: false`. Leaving threads unresolved after fixing them is incomplete work.
 
+## Cloud Agent Mode (Copilot Coding Agent)
+
+When running as a **cloud coding agent** (GitHub Copilot coding agent in a Codespace-like environment), the following overrides apply. The environment is set up by `.github/copilot-setup-steps.yml`.
+
+**What's different:**
+
+- **No worktrees** — you already have an isolated branch checkout. Skip `twig worktree create`, `make wt-setup`, and `twig worktree clean`. Work directly in the repo root.
+- **No `twig` CLI** — not installed. Use `git` directly for branch operations.
+- **No `acli` CLI** — not installed. Use the `jira_create_ticket`, `jira_transition`, `jira_view`, and `jira_check_blockers` MCP tools exclusively for all Jira operations.
+- **No AWS access** — no SSO, no OIDC role. The DB MCP server uses a local Docker PostgreSQL seeded from `resources/dev-seed.dump`. Do not attempt `sync-env`, `aws` CLI commands, or CloudWatch log queries.
+- **Linux environment** — use `bash` shell, `/` paths. The Makefile handles Linux automatically (the `ifeq ($(OS),Windows_NT)` guards are skipped). No PowerShell-specific scripts or Windows junctions.
+- **No shared `node_modules`** — dependencies are installed directly via `pnpm install`. The junction and file-lock rules do not apply.
+
+**Cloud workflow (simplified):**
+
+1. Jira: use `jira_create_ticket` MCP tool if needed, then `jira_check_blockers` to verify no blocking tickets are outstanding, then `jira_transition` to "In Progress"
+2. Code directly in the repo (no worktree setup needed)
+3. `make <target>` for build/test/lint/typecheck
+4. Migrations: `cd lib/db-client && pnpm run db:status && pnpm run db:migrate`
+5. Validate: `make pc`
+6. Commit + push: `git commit -m "type(scope): msg" && git push origin HEAD`
+7. PR: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main`
+8. Jira: use `jira_transition` MCP tool to move to "In Review"
+
+**Available MCP servers in cloud:**
+
+- `legacy-sports-ci` — CI log queries, workflow reruns
+- `legacy-sports-db` — local Docker Postgres queries, migrations, schema generation
+- `legacy-sports-jira` — ticket CRUD, transitions, blocker checks (requires `JIRA_EMAIL` and `JIRA_API_TOKEN` secrets)
+
+**Unavailable in cloud (by design):**
+
+- `worktree` — no worktree management needed
+- `legacy-sports-aws` — no AWS credentials
+
 ## Environment
 
-Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig branches
+**Local:** Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira project LS · twig branches
+**Cloud:** Ubuntu Linux · Nx monorepo · pnpm 9.12.1 · Jira project LS · Docker PostgreSQL
 
 ## Load When Needed
 

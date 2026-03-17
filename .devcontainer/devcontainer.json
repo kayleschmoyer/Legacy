@@ -1,0 +1,23 @@
+{
+  "name": "Legacy Sports",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/git-lfs:1": {}
+  },
+  "postCreateCommand": "corepack enable && corepack prepare pnpm@9.12.1 --activate && pnpm install --frozen-lockfile",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "nrwl.angular-console",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  },
+  "forwardPorts": [5432],
+  "remoteEnv": {
+    "NX_DAEMON": "false"
+  }
+}

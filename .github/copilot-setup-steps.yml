@@ -1,0 +1,122 @@
+# =============================================================================
+# Copilot Coding Agent — Cloud Environment Setup
+# =============================================================================
+# This file defines the steps GitHub Copilot's coding agent runs to bootstrap
+# its cloud environment before working on tasks. It runs in a Codespace-like
+# Ubuntu container with Docker support.
+#
+# What this sets up:
+#   - Node.js 22 + pnpm 9.12.1 (matches .nvmrc / packageManager)
+#   - All workspace dependencies (pnpm install)
+#   - Local PostgreSQL via Docker Compose (no AWS needed)
+#   - Dev seed database restore (anonymized data)
+#   - Database migrations
+#   - Git LFS (for dev-seed.dump)
+#
+# What this does NOT set up (by design):
+#   - twig CLI (not needed — cloud agents work in single-branch ephemeral envs)
+#   - acli CLI (Jira operations use the MCP server exclusively)
+#   - AWS credentials (no cloud AWS interactions from agent environment)
+#   - Worktree management (agent gets its own isolated checkout)
+# =============================================================================
+
+steps:
+  - name: Install Node.js
+    uses: actions/setup-node@v4
+    with:
+      node-version-file: .nvmrc
+
+  - name: Enable pnpm via corepack
+    run: |
+      corepack enable
+      corepack prepare pnpm@9.12.1 --activate
+
+  - name: Install dependencies
+    run: pnpm install --frozen-lockfile
+
+  - name: Pull Git LFS objects
+    run: |
+      if ! command -v git-lfs &> /dev/null && ! git lfs version &> /dev/null; then
+        echo "git-lfs not found — installing..."
+        apt-get update && apt-get install -y git-lfs
+      fi
+      git lfs install
+      git lfs pull
+
+  - name: Start PostgreSQL
+    run: docker compose up -d postgres
+
+  - name: Wait for PostgreSQL to be healthy
+    run: |
+      echo "Waiting for PostgreSQL..."
+      for i in $(seq 1 60); do
+        if docker compose exec -T postgres pg_isready -U legacy_sports -d legacy_sports_dev > /dev/null 2>&1; then
+          echo "PostgreSQL is ready (after ${i}s)"
+          exit 0
+        fi
+        sleep 1
+      done
+      echo "PostgreSQL failed to start within 60s"
+      exit 1
+
+  - name: Restore dev seed database
+    run: |
+      SEED_FILE="resources/dev-seed.dump"
+      PG_CONTAINER="ls-postgres"
+      PG_USER="legacy_sports"
+      PG_DB="legacy_sports_dev"
+
+      # Verify seed dump exists (requires git lfs pull)
+      if [ ! -f "$SEED_FILE" ] || [ $(stat -c%s "$SEED_FILE" 2>/dev/null || echo 0) -lt 1000 ]; then
+        echo "ERROR: $SEED_FILE is missing or is an LFS pointer. Run 'git lfs pull' first."
+        exit 1
+      fi
+
+      # Copy dump into container
+      docker cp "$SEED_FILE" "${PG_CONTAINER}:/tmp/restore.dump"
+
+      # Drop and recreate database
+      docker exec "$PG_CONTAINER" psql -U "$PG_USER" -d postgres -c \
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$PG_DB' AND pid <> pg_backend_pid();" > /dev/null 2>&1
+      docker exec "$PG_CONTAINER" psql -U "$PG_USER" -d postgres -c "DROP DATABASE IF EXISTS $PG_DB;"
+      docker exec "$PG_CONTAINER" psql -U "$PG_USER" -d postgres -c "CREATE DATABASE $PG_DB OWNER $PG_USER;"
+
+      # Recreate schemas
+      docker exec "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -c "CREATE SCHEMA IF NOT EXISTS app_internal;"
+      docker exec "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -c "GRANT ALL PRIVILEGES ON SCHEMA public TO $PG_USER;"
+      docker exec "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -c "GRANT ALL PRIVILEGES ON SCHEMA app_internal TO $PG_USER;"
+
+      # Restore from dump (pg_restore returns non-zero for warnings like "table does not exist" during --clean;
+      # capture exit code and warn but don't fail on minor issues)
+      RESTORE_EXIT=0
+      docker exec "$PG_CONTAINER" pg_restore -U "$PG_USER" -d "$PG_DB" --no-owner --no-privileges --clean --if-exists /tmp/restore.dump || RESTORE_EXIT=$?
+      if [ $RESTORE_EXIT -ne 0 ]; then
+        echo "WARNING: pg_restore exited with code $RESTORE_EXIT (non-fatal warnings are expected with --clean --if-exists)"
+      fi
+
+      echo "Dev seed restored (exit code: $RESTORE_EXIT)"
+
+  - name: Apply database migrations
+    run: cd lib/db-client && pnpm run db:migrate
+    env:
+      USE_LOCAL_CREDENTIALS: "true"
+      DATABASE_URL: postgresql://legacy_sports:legacy_sports_dev@localhost:5432/legacy_sports_dev
+
+  - name: Create local .env for MCP servers
+    run: |
+      if [ -f .env ]; then
+        echo ".env already exists — skipping creation"
+        exit 0
+      fi
+      cat > .env <<'EOF'
+      USE_LOCAL_CREDENTIALS=true
+      DB_HOST=localhost:5432
+      DB_USER=legacy_sports
+      DB_PASSWORD=legacy_sports_dev
+      DB_NAME=legacy_sports_dev
+      DATABASE_URL=postgresql://legacy_sports:legacy_sports_dev@localhost:5432/legacy_sports_dev
+      DB_CERT_PATH=
+      DB_SECRET_NAME=
+      JWT_SECRET=cloud-agent-jwt-secret-not-for-production
+      COOKIE_SECRET=cloud-agent-cookie-secret-not-for-production
+      EOF
