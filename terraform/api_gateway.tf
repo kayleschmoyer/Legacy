@@ -172,18 +172,17 @@ resource "aws_api_gateway_integration" "graphql_get" {
   uri                     = aws_lambda_function.graphql.invoke_arn
 }
 
-# GraphQL OPTIONS integration for CORS
+# GraphQL OPTIONS integration for CORS — routed through the Lambda so it can
+# reflect the validated origin (MOCK integration returned Access-Control-Allow-Origin: *
+# which is incompatible with credentials: 'include').
 resource "aws_api_gateway_integration" "graphql_options" {
   rest_api_id = aws_api_gateway_rest_api.main.id
   resource_id = aws_api_gateway_resource.graphql.id
   http_method = aws_api_gateway_method.graphql_options.http_method
 
-  type = "MOCK"
-  request_templates = {
-    "application/json" = jsonencode({
-      statusCode = 200
-    })
-  }
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.graphql.invoke_arn
 }
 
 # GraphQL POST method response
@@ -228,53 +227,9 @@ resource "aws_api_gateway_method_response" "graphql_options" {
   }
 }
 
-# GraphQL POST integration response
-resource "aws_api_gateway_integration_response" "graphql_post" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.graphql.id
-  http_method = aws_api_gateway_method.graphql_post.http_method
-  status_code = aws_api_gateway_method_response.graphql_post.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,apollo-require-preflight'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
-  }
-
-  depends_on = [aws_api_gateway_integration.graphql_post]
-}
-
-# GraphQL GET integration response for Explorer/Playground
-resource "aws_api_gateway_integration_response" "graphql_get" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.graphql.id
-  http_method = aws_api_gateway_method.graphql_get.http_method
-  status_code = aws_api_gateway_method_response.graphql_get.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,apollo-require-preflight'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
-  }
-
-  depends_on = [aws_api_gateway_integration.graphql_get]
-}
-
-# GraphQL OPTIONS integration response for CORS
-resource "aws_api_gateway_integration_response" "graphql_options" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.graphql.id
-  http_method = aws_api_gateway_method.graphql_options.http_method
-  status_code = aws_api_gateway_method_response.graphql_options.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,apollo-require-preflight'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
-  }
-
-  depends_on = [aws_api_gateway_integration.graphql_options]
-}
+# NOTE: With AWS_PROXY integrations the Lambda controls its own response headers
+# (including CORS). Integration response blocks are not needed — the Lambda in
+# lambdas/db/src/server/handler.ts reflects the validated origin via getCorsHeaders().
 
 # ─── Custom domain: api.<domain> ───────────────────────────────────────────────
 
