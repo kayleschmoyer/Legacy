@@ -37,6 +37,7 @@ import { PickAnnouncement } from './PickAnnouncement';
 import { BaseballCard } from './BaseballCard';
 import { PlayerCard } from './PlayerCard';
 import { SkeletonCard } from './SkeletonCard';
+import { DraftCompleteView } from './DraftCompleteView';
 import { DraftGrid } from './DraftGrid';
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
@@ -1491,86 +1492,17 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
   if (draftComplete || currentPickInfo?.isComplete) {
     return (
-      <div className="d-root">
-        <style>{CSS}</style>
-        <div className="d-bg-fx" />
-        <div className="d-state-center">
-          <div className="d-state-icon">
-            <span role="img" aria-label="trophy">
-              🏆
-            </span>
-          </div>
-          <div className="d-state-title">Draft Complete!</div>
-          <div className="d-state-desc">
-            {league?.isMockDraft
-              ? `All ${pickHistory.length} picks have been made. No rosters were saved — this was a practice draft.`
-              : `All ${pickHistory.length} picks have been made. Your roster is set!`}
-          </div>
-          {myTeam.length > 0 && (
-            <div style={{ maxWidth: 400, width: '100%', marginTop: 16 }}>
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  marginBottom: 12,
-                  color: 'var(--d-accent)',
-                  letterSpacing: 1,
-                  textTransform: 'uppercase',
-                }}
-              >
-                Your Roster ({myTeam.length} players)
-              </div>
-              <div className="bc-wide-grid">
-                {myTeamPicks.map((pick, i) => {
-                  const p = myTeam[i];
-                  if (!p) return null;
-                  return (
-                    <BaseballCard
-                      key={pick.id}
-                      player={p}
-                      round={pick.round}
-                      pickNumber={pick.pickNumber}
-                      overallPick={pick.overallPick}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {league?.isMockDraft ? (
-            <div
-              style={{
-                display: 'flex',
-                gap: 12,
-                flexWrap: 'wrap',
-                justifyContent: 'center',
-                marginTop: 8,
-              }}
-            >
-              <button
-                className="d-state-btn"
-                onClick={() => navigate('/baseball/mock-draft')}
-              >
-                Practice Again
-              </button>
-              <button
-                className="d-state-btn"
-                style={{ background: 'rgba(255,255,255,0.1)' }}
-                onClick={() => navigate('/baseball')}
-              >
-                Go to My Leagues
-              </button>
-            </div>
-          ) : (
-            <button
-              className="d-state-btn"
-              onClick={() => navigate(`/baseball/league/${leagueId}`)}
-            >
-              Back to League
-            </button>
-          )}
-        </div>
-      </div>
+      <DraftCompleteView
+        league={league}
+        leagueId={leagueId}
+        pickHistory={pickHistory}
+        myTeamId={myTeamId}
+        myTeam={myTeam}
+        myTeamPicks={myTeamPicks}
+        leagueTeams={leagueTeams}
+        statsLookup={statsLookup}
+        navigate={navigate}
+      />
     );
   }
 
