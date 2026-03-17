@@ -279,6 +279,7 @@ else {
                     Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
                     Write-Ok "pnpm install completed (independent node_modules, main repo still needs repair)"
                 }
+            }
             else {
                 Write-Error "Aborting: fix main repo node_modules first (cd $MainRepoPath ; make install), then re-run wt-setup."
             }

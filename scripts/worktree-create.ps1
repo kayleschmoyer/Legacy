@@ -64,7 +64,7 @@ function Resolve-ParentBranch([string]$raw) {
                 Select-Object -First 1
         }
         if ($match) {
-            Write-Host "[INFO] Resolved parent Jira key $raw → branch $match" -ForegroundColor Yellow
+            Write-Host "[INFO] Resolved parent Jira key $raw -> branch $match" -ForegroundColor Yellow
             return $match
         }
         Write-Host "[ERROR] Could not find a local branch for parent '$raw'." -ForegroundColor Red
@@ -98,12 +98,12 @@ if ($currentBranch -and $currentBranch -ne 'main') {
 # ---------------------------------------------------------------------------
 # Fetch latest refs so the worktree is cut from the current remote state.
 # Without this, origin/main (or the parent branch) may be stale and the
-# worktree starts from an outdated base — requiring a post-create rebase.
+# worktree starts from an outdated base -- requiring a post-create rebase.
 # ---------------------------------------------------------------------------
 Write-Host "[PRE] Fetching origin..." -ForegroundColor DarkGray
 git fetch origin 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "[WARN] git fetch origin failed — continuing with local refs" -ForegroundColor Yellow
+    Write-Host "[WARN] git fetch origin failed -- continuing with local refs" -ForegroundColor Yellow
 }
 
 Write-Host ""
