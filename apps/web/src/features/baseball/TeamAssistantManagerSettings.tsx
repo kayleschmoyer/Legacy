@@ -46,6 +46,7 @@ export function TeamAssistantManagerSettings({
   const {
     data: membersData,
     loading: membersLoading,
+    error: membersError,
     refetch: refetchMembers,
   } = useGetTeamLeagueMembersQuery({
     variables: { teamId },
@@ -124,6 +125,10 @@ export function TeamAssistantManagerSettings({
         {/* Existing assistant managers */}
         {membersLoading ? (
           <Spinner color={BRAND_NAVY_LIGHT} />
+        ) : membersError ? (
+          <Text fontSize="$3" color={BRAND_SEAM_RED}>
+            Failed to load assistant managers. Please try refreshing the page.
+          </Text>
         ) : assistantManagers.length === 0 ? (
           <Text fontSize="$3" color="$gray9" fontStyle="italic">
             No assistant managers yet.
