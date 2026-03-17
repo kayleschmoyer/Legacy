@@ -82,6 +82,7 @@ import { env } from '../../config/environment';
 // Helper – is this a pitcher position?
 // ===========================================================================
 const PITCHER_POSITIONS = new Set(['P', 'SP', 'RP']);
+const OUTFIELD_POSITIONS = new Set(['OF', 'CF', 'LF', 'RF']);
 const isPitcherPosition = (pos: string): boolean =>
   PITCHER_POSITIONS.has(pos.toUpperCase());
 
@@ -1410,6 +1411,20 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     [myTeamPicks, statsLookup],
   );
 
+  const positionCounts = useMemo(
+    () =>
+      myTeam.reduce<Record<string, number>>((acc, p) => {
+        const key = OUTFIELD_POSITIONS.has(p.position)
+          ? 'OF'
+          : PITCHER_POSITIONS.has(p.position)
+            ? 'P'
+            : p.position;
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+      }, {}),
+    [myTeam],
+  );
+
   // =========================================================================
   // No leagueId — show prompt
   // =========================================================================
@@ -2224,35 +2239,37 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
             {/* Position needs */}
             <div className="d-roster-grid">
-              {['C', '1B', '2B', '3B', 'SS', 'OF'].map((pos) => {
-                const count = myTeam.filter((p) => p.position === pos).length;
-                return (
-                  <div className="d-roster-cell" key={pos}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        background: getPositionColor(pos),
-                        borderRadius: 4,
-                        padding: '1px 5px',
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: '#fff',
-                        marginBottom: 3,
-                      }}
-                    >
-                      {pos}
-                    </span>
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        color: count > 0 ? '#10b981' : 'var(--d-text-muted)',
-                      }}
-                    >
-                      {count}
+              {(['C', '1B', '2B', '3B', 'SS', 'OF', 'P'] as const).map(
+                (pos) => {
+                  const count = positionCounts[pos] ?? 0;
+                  return (
+                    <div className="d-roster-cell" key={pos}>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          background: getPositionColor(pos),
+                          borderRadius: 4,
+                          padding: '1px 5px',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: '#fff',
+                          marginBottom: 3,
+                        }}
+                      >
+                        {pos}
+                      </span>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          color: count > 0 ? '#10b981' : 'var(--d-text-muted)',
+                        }}
+                      >
+                        {count}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                },
+              )}
             </div>
 
             {/* Drafted list */}

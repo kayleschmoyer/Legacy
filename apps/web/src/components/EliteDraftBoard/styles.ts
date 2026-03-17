@@ -279,7 +279,7 @@ export const CSS = `
 
 /* ===== Roster ===== */
 .d-roster-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
   gap: 5px; margin-bottom: 12px;
 }
 .d-roster-cell {
