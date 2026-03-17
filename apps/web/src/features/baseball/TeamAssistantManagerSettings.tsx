@@ -142,7 +142,9 @@ export function TeamAssistantManagerSettings({
                   backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
                   borderRadius="$3"
                 >
-                  <Text fontSize="$3">User #{userId}</Text>
+                  <Text fontSize="$3">
+                    {member?.username ?? `User #${userId}`}
+                  </Text>
                   <Button
                     size="$2"
                     backgroundColor={withAlpha(BRAND_SEAM_RED, 0.15)}
@@ -151,7 +153,7 @@ export function TeamAssistantManagerSettings({
                     borderWidth={1}
                     onPress={() => void handleRemove(userId)}
                     disabled={removing}
-                    aria-label={`Remove assistant manager user ${userId}`}
+                    aria-label={`Remove assistant manager ${member?.username ?? `user ${userId}`}`}
                   >
                     Remove
                   </Button>

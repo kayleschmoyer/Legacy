@@ -354,6 +354,14 @@ LeagueMember.implement({
         return context.loaders.teams.load(parent.teamId);
       },
     }),
+    username: t.field({
+      type: 'String',
+      nullable: true,
+      resolve: async (parent, _args, context) => {
+        const user = await context.loaders.users.load(parent.userId);
+        return user?.username ?? null;
+      },
+    }),
   }),
 });
 

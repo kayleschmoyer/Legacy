@@ -60,6 +60,7 @@ fragment LeagueMember on LeagueMember {
   userId
   teamId
   permissionLevel
+  username
 }
 
 fragment LeaguePosition on LeaguePosition {

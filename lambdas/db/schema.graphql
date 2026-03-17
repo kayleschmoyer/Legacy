@@ -915,6 +915,7 @@ type LeagueMember {
   team: Team
   teamId: Int
   userId: Int
+  username: String
 }
 
 """

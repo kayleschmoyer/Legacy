@@ -840,6 +840,7 @@ export type LeagueMember = {
   team?: Maybe<Team>;
   teamId?: Maybe<Scalars['Int']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
+  username?: Maybe<Scalars['String']['output']>;
 };
 
 /** A position configuration in a league */
@@ -3860,6 +3861,7 @@ export type LeagueFragment = {
     userId?: number | null;
     teamId?: number | null;
     permissionLevel?: string | null;
+    username?: string | null;
   } | null;
 };
 
@@ -3869,6 +3871,7 @@ export type LeagueMemberFragment = {
   userId?: number | null;
   teamId?: number | null;
   permissionLevel?: string | null;
+  username?: string | null;
 };
 
 export type LeaguePositionFragment = {
@@ -3936,6 +3939,7 @@ export type GetLeagueByIdQuery = {
       userId?: number | null;
       teamId?: number | null;
       permissionLevel?: string | null;
+      username?: string | null;
     } | null;
   } | null;
 };
@@ -4000,6 +4004,7 @@ export type CreateLeagueAndTeamsMutation = {
         userId?: number | null;
         teamId?: number | null;
         permissionLevel?: string | null;
+        username?: string | null;
       } | null;
     } | null;
   } | null;
@@ -4061,6 +4066,7 @@ export type GetUserLeaguesQuery = {
       userId?: number | null;
       teamId?: number | null;
       permissionLevel?: string | null;
+      username?: string | null;
     } | null;
   }>;
 };
@@ -4154,6 +4160,7 @@ export type StartDraftMutation = {
       userId?: number | null;
       teamId?: number | null;
       permissionLevel?: string | null;
+      username?: string | null;
     } | null;
   } | null;
 };
@@ -4352,6 +4359,7 @@ export type UpdateLeagueSettingsMutation = {
       userId?: number | null;
       teamId?: number | null;
       permissionLevel?: string | null;
+      username?: string | null;
     } | null;
   } | null;
 };
@@ -4457,6 +4465,7 @@ export type RenewLeagueMutation = {
       userId?: number | null;
       teamId?: number | null;
       permissionLevel?: string | null;
+      username?: string | null;
     } | null;
   } | null;
 };
@@ -7227,6 +7236,7 @@ export type GetTeamLeagueMembersQuery = {
     userId?: number | null;
     teamId?: number | null;
     permissionLevel?: string | null;
+    username?: string | null;
   }> | null;
 };
 
@@ -7243,6 +7253,7 @@ export type InviteAssistantManagerMutation = {
     userId?: number | null;
     teamId?: number | null;
     permissionLevel?: string | null;
+    username?: string | null;
   } | null;
 };
 
@@ -7771,6 +7782,7 @@ export const LeagueMemberFragmentDoc = gql`
     userId
     teamId
     permissionLevel
+    username
   }
 `;
 export const LeagueFragmentDoc = gql`
