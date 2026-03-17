@@ -168,8 +168,8 @@ test.describe('League Creation @critical', () => {
     // Submit form
     await page.getByRole('button', { name: /create league/i }).click();
 
-    // The Apollo error object is displayed inline in a red error card
-    await expect(page.locator('text=Error:')).toBeVisible();
+    // The error message is displayed inline in a red error card (without "Error:" prefix)
+    await expect(page.getByText(/League name already exists/i)).toBeVisible();
 
     // Verify form stays on same page
     await expect(page).toHaveURL('/baseball/league/create');

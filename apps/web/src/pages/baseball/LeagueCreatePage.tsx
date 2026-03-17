@@ -156,44 +156,43 @@ export function LeagueCreatePage(): React.JSX.Element {
     auctionMinBid: 1,
   });
 
-  const [createLeagueAndTeams, { loading, error }] =
-    useCreateLeagueAndTeamsMutation({
-      update: (cache, { data }) => {
-        // Update the cache with the new league
-        if (data?.createLeagueAndTeams?.league) {
-          const newLeague = data.createLeagueAndTeams.league;
+  const [createLeagueAndTeams, { loading }] = useCreateLeagueAndTeamsMutation({
+    update: (cache, { data }) => {
+      // Update the cache with the new league
+      if (data?.createLeagueAndTeams?.league) {
+        const newLeague = data.createLeagueAndTeams.league;
 
-          try {
-            // Read the existing user leagues from cache
-            const existingData = cache.readQuery<GetUserLeaguesQuery>({
+        try {
+          // Read the existing user leagues from cache
+          const existingData = cache.readQuery<GetUserLeaguesQuery>({
+            query: GetUserLeagues,
+          });
+
+          // If we have existing data, add the new league to it
+          if (existingData?.userLeagues) {
+            cache.writeQuery({
               query: GetUserLeagues,
+              data: {
+                userLeagues: [...existingData.userLeagues, newLeague],
+              },
             });
-
-            // If we have existing data, add the new league to it
-            if (existingData?.userLeagues) {
-              cache.writeQuery({
-                query: GetUserLeagues,
-                data: {
-                  userLeagues: [...existingData.userLeagues, newLeague],
-                },
-              });
-            }
-          } catch (error) {
-            // If cache read fails (e.g., query hasn't been executed yet),
-            // fallback to refetchQueries approach
-            LOGGER.info(
-              'Cache read failed, will refetch queries instead:',
-              String(error),
-            );
           }
+        } catch (error) {
+          // If cache read fails (e.g., query hasn't been executed yet),
+          // fallback to refetchQueries approach
+          LOGGER.info(
+            'Cache read failed, will refetch queries instead:',
+            String(error),
+          );
         }
+      }
+    },
+    refetchQueries: [
+      {
+        query: GetUserLeagues,
       },
-      refetchQueries: [
-        {
-          query: GetUserLeagues,
-        },
-      ],
-    });
+    ],
+  });
 
   const trimmedLeagueName = formData.leagueName.trim();
   const isLeagueNameLengthValid = trimmedLeagueName.length >= 3;
@@ -287,6 +286,8 @@ export function LeagueCreatePage(): React.JSX.Element {
 
     try {
       const result = await createLeagueAndTeams({
+        errorPolicy: 'none',
+        context: { suppressGlobalError: true },
         variables: {
           input: {
             leagueName: trimmedLeagueName,
@@ -1495,18 +1496,6 @@ export function LeagueCreatePage(): React.JSX.Element {
                   the league.
                 </Text>
               </YStack>
-
-              {/* Error Display */}
-              {error && (
-                <Card backgroundColor="$red3" borderColor="$red7" padding="$3">
-                  <Text color="$red11" size="$3" fontWeight="600">
-                    Error: {error.message || 'Failed to create league'}
-                  </Text>
-                  <Text color="$red10" size="$2" marginTop="$1">
-                    Please check your inputs and try again.
-                  </Text>
-                </Card>
-              )}
 
               {/* League Visibility */}
               <YStack space="$2">

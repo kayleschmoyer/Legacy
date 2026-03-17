@@ -161,7 +161,13 @@ const errorLink = new ErrorLink(({ error, operation, forward }) => {
   // Check for 401 HTTP error
   const is401 = ServerError.is(error) && error.statusCode === 401;
 
-  if (!isUnauthenticated && !is401) {
+  // Allow callers to opt out of the global toast by passing
+  // `context: { suppressGlobalError: true }` in the mutation/query options.
+  const suppressGlobalError = Boolean(
+    operation.getContext()['suppressGlobalError'],
+  );
+
+  if (!isUnauthenticated && !is401 && !suppressGlobalError) {
     // Surface uncaught errors to the user via the global ApolloErrorToast.
     if (CombinedGraphQLErrors.is(error) && error.errors.length > 0) {
       // PREMIUM_REQUIRED is an expected user-facing condition (free-tier access
