@@ -58,9 +58,11 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
     );
 
   const handleJoin = async (): Promise<void> => {
+    // Guard against submission while validation is pending or incomplete.
     setError(null);
 
-    // Validate inputs
+    // Run synchronous input validations first so the user gets feedback
+    // even before the server-side validation completes (LS-1297).
     if (!inviteCode.trim()) {
       setError('Please enter an invite code');
       return;
@@ -74,6 +76,13 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
     // Validate invite code format (8 uppercase alphanumeric characters)
     if (!codePattern.test(inviteCode.trim().toUpperCase())) {
       setError('Invite code must be 8 characters (letters and numbers only)');
+      return;
+    }
+
+    // The Join button is disabled for these states, but pressing Enter on
+    // the form bypasses the button entirely (LS-1297). Block here only after
+    // input validation has run so errors are surfaced to the user.
+    if (loading || validating || !leagueInfo || isLeagueFull) {
       return;
     }
 

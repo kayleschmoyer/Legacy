@@ -233,6 +233,27 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   it('shows validation error when invite code is empty and form is submitted', () => {
+    // leagueInfo must be present for handleJoin to proceed past the guard.
+    // This simulates: user validated a code, then cleared the code field.
+    const { useValidateInviteCodeLazyQuery } =
+      require('../../api/db/graphql.generated') as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      {
+        data: {
+          validateInviteCode: {
+            isFull: false,
+            leagueName: 'Test League',
+            totalSpots: 10,
+            availableSpots: 5,
+          },
+        },
+        loading: false,
+      },
+    ]);
+
     renderPage();
 
     act(() => {
@@ -246,6 +267,25 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   it('shows validation error when team name is empty', () => {
+    const { useValidateInviteCodeLazyQuery } =
+      require('../../api/db/graphql.generated') as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      {
+        data: {
+          validateInviteCode: {
+            isFull: false,
+            leagueName: 'Test League',
+            totalSpots: 10,
+            availableSpots: 5,
+          },
+        },
+        loading: false,
+      },
+    ]);
+
     renderPage();
 
     const codeInput = screen.getByPlaceholderText(/Enter 8-character code/i);
@@ -260,6 +300,25 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   it('shows validation error for invalid invite code format', () => {
+    const { useValidateInviteCodeLazyQuery } =
+      require('../../api/db/graphql.generated') as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      {
+        data: {
+          validateInviteCode: {
+            isFull: false,
+            leagueName: 'Test League',
+            totalSpots: 10,
+            availableSpots: 5,
+          },
+        },
+        loading: false,
+      },
+    ]);
+
     renderPage();
 
     const codeInput = screen.getByPlaceholderText(/Enter 8-character code/i);
@@ -282,6 +341,25 @@ describe('JoinLeagueByCodePage', () => {
     mockJoinLeague.mockResolvedValueOnce({
       data: { joinLeagueByCode: { leagueId: 42 } },
     });
+
+    const { useValidateInviteCodeLazyQuery } =
+      require('../../api/db/graphql.generated') as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      {
+        data: {
+          validateInviteCode: {
+            isFull: false,
+            leagueName: 'Test League',
+            totalSpots: 10,
+            availableSpots: 5,
+          },
+        },
+        loading: false,
+      },
+    ]);
 
     renderPage();
 
@@ -377,13 +455,79 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   /**
+   * Regression: LS-1297 — Enter submits form while invite-code validation is
+   * still pending, bypassing the disabled Join League button.
+   */
+  it('does not submit the join mutation while invite-code validation is pending (LS-1297 regression)', () => {
+    const { useValidateInviteCodeLazyQuery } =
+      require('../../api/db/graphql.generated') as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+    // Simulate validating state: loading=true, no data yet
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      { data: undefined, loading: true },
+    ]);
+
+    renderPage();
+
+    fireEvent.change(screen.getByPlaceholderText(/Enter 8-character code/i), {
+      target: { value: 'ABC12345' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Enter your team name/i), {
+      target: { value: 'Test Team' },
+    });
+
+    act(() => {
+      fireEvent.submit(document.querySelector('form')!);
+    });
+
+    expect(mockJoinLeague).not.toHaveBeenCalled();
+  });
+
+  it('does not submit when league info has not been fetched yet (LS-1297 regression)', () => {
+    // Default mock: no leagueInfo, not loading
+    renderPage();
+
+    fireEvent.change(screen.getByPlaceholderText(/Enter 8-character code/i), {
+      target: { value: 'ABC12345' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Enter your team name/i), {
+      target: { value: 'Test Team' },
+    });
+
+    act(() => {
+      fireEvent.submit(document.querySelector('form')!);
+    });
+
+    expect(mockJoinLeague).not.toHaveBeenCalled();
+  });
+
+  /**
    * Regression: LS-1299 — invite-code field errors clear on edit, but other errors persist
    */
   it('clears invite-code error when user edits the code field (LS-1299 regression)', async () => {
-    const { useJoinLeagueByCodeMutation } =
+    const { useJoinLeagueByCodeMutation, useValidateInviteCodeLazyQuery } =
       require('../../api/db/graphql.generated') as {
         useJoinLeagueByCodeMutation: jest.Mock;
+        useValidateInviteCodeLazyQuery: jest.Mock;
       };
+
+    // Provide valid leagueInfo so the form submission guard passes
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      {
+        data: {
+          validateInviteCode: {
+            isFull: false,
+            leagueName: 'Test League',
+            totalSpots: 10,
+            availableSpots: 5,
+          },
+        },
+        loading: false,
+      },
+    ]);
 
     // Use a unique message so it won't be confused with the static
     // '!leagueInfo && code.length===8' display text in the component
@@ -426,10 +570,27 @@ describe('JoinLeagueByCodePage', () => {
   });
 
   it('does not clear unrelated errors when user edits the invite code field (LS-1299 regression)', async () => {
-    const { useJoinLeagueByCodeMutation } =
+    const { useJoinLeagueByCodeMutation, useValidateInviteCodeLazyQuery } =
       require('../../api/db/graphql.generated') as {
         useJoinLeagueByCodeMutation: jest.Mock;
+        useValidateInviteCodeLazyQuery: jest.Mock;
       };
+
+    // Provide valid leagueInfo so the form submission guard passes
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      {
+        data: {
+          validateInviteCode: {
+            isFull: false,
+            leagueName: 'Test League',
+            totalSpots: 10,
+            availableSpots: 5,
+          },
+        },
+        loading: false,
+      },
+    ]);
 
     // Simulate a league-full error (unrelated to invite-code field)
     mockJoinLeague.mockRejectedValueOnce(
