@@ -250,6 +250,13 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         }
       }
 
+      const resolvedNumberOfDivisions = numberOfDivisions ?? 2;
+      if (resolvedNumberOfDivisions > numberOfTeams) {
+        throw UserInputError(
+          'Number of divisions cannot exceed number of teams',
+        );
+      }
+
       try {
         const result = await leagueService.createLeague({
           name: leagueName,
@@ -257,7 +264,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           ownerUsername: username,
           maxRosterSize: maxRosterSize || 25,
           numberOfTeams,
-          numberOfDivisions: numberOfDivisions ?? 2,
+          numberOfDivisions: resolvedNumberOfDivisions,
           schedulingStrategy:
             (inputSchedulingStrategy as
               | 'round-robin'

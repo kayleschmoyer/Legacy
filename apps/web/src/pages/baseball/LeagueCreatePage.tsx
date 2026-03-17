@@ -227,6 +227,10 @@ export function LeagueCreatePage(): React.JSX.Element {
       return 'Number of teams must be between 4 and 16';
     }
 
+    if (formData.numberOfDivisions > formData.numberOfTeams) {
+      return 'Number of divisions cannot exceed number of teams';
+    }
+
     if (formData.maxRosterSize < 15 || formData.maxRosterSize > 50) {
       return 'Roster size must be between 15 and 50 players';
     }

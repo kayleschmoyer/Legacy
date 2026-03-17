@@ -239,17 +239,16 @@ export class LeagueService {
           isPublic: PublicSchema.leagues.isPublic,
         });
 
-      // 2. Create teams — assign each team to a division (block-assign evenly across divisions)
-      // e.g. 12 teams / 2 divisions → teams 0-5 to division 1, teams 6-11 to division 2
+      // 2. Create teams — assign each team to a division (round-robin across divisions)
+      // e.g. 4 teams / 3 divisions → div 1 gets 2, div 2 gets 1, div 3 gets 1
       const teamNames = [`${ownerUsername}'s Team`, ...DEFAULT_TEAM_NAMES];
       const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
-      const teamsPerDivision = Math.ceil(teamsToCreate / numberOfDivisions);
       const teamData = teamNames
         .slice(0, teamsToCreate)
         .map((teamName, index) => ({
           name: teamName,
           leagueId: league.id,
-          divisionId: Math.floor(index / teamsPerDivision) + 1,
+          divisionId: (index % numberOfDivisions) + 1,
           waiverOrder: index + 1,
           faabBudget: faabBudgetDefault,
         }));
