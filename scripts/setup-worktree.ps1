@@ -41,6 +41,29 @@ function Write-Ok    { param([string]$msg) Write-Host "  [ok] $msg" -ForegroundC
 function Write-Skip  { param([string]$msg) Write-Host "  [--] $msg" -ForegroundColor DarkGray }
 function Write-Warn  { param([string]$msg) Write-Host "  [!!] $msg" -ForegroundColor Yellow }
 
+function Confirm-IndependentInstall {
+    # Prompt the user to confirm a full pnpm install in the worktree when the
+    # main repo's node_modules is broken.  In non-interactive sessions (e.g.
+    # agents running via make wt-setup) default to 'yes' so work isn't blocked.
+    param([string]$Reason)
+    Write-Host ""
+    Write-Warn "Main repo node_modules is unhealthy: $Reason"
+    Write-Warn "Junctioning would propagate the broken state to this worktree."
+    Write-Host "  Options:" -ForegroundColor Yellow
+    Write-Host "    Y - Run pnpm install in this worktree only (independent node_modules)" -ForegroundColor Yellow
+    Write-Host "    N - Abort setup (fix main repo first: cd $MainRepoPath ; make install)" -ForegroundColor Yellow
+    $isInteractive = [Environment]::UserInteractive -and (-not [Console]::IsInputRedirected)
+    if (-not $isInteractive) {
+        Write-Warn "Non-interactive session detected -- defaulting to independent install"
+        return $true
+    }
+    $answer = Read-Host "  Install independently in this worktree? [Y/n]"
+    if ($answer -match '^[Nn]') {
+        return $false
+    }
+    return $true
+}
+
 function Get-FileHash256 {
     param([string]$Path)
     if (-not (Test-Path $Path)) { return $null }
@@ -76,12 +99,12 @@ function Assert-NodeModulesValid {
     $modulesYaml = Join-Path $NMPath ".modules.yaml"
     $binDir      = Join-Path $NMPath ".bin"
     if (-not (Test-Path $modulesYaml)) {
-        Write-Warn "node_modules/.modules.yaml missing -- install may have failed"
+        Write-Warn "$NMPath/.modules.yaml missing -- install may have failed"
         return $false
     }
     $binItems = @(Get-ChildItem $binDir -ErrorAction SilentlyContinue)
     if ($binItems.Count -eq 0) {
-        Write-Warn "node_modules/.bin is empty -- install may have failed"
+        Write-Warn "$NMPath/.bin is empty -- install may have failed"
         return $false
     }
     return $true
@@ -101,6 +124,23 @@ function Remove-JunctionSafe {
     if (Test-IsJunction $Path) {
         cmd /c "rmdir `"$Path`"" 2>$null
         Write-Ok "Removed stale junction at $Path"
+    }
+}
+
+function Invoke-PnpmInstallWithRetry {
+    # Run pnpm install in $InstallPath, validate, retry once if incomplete.
+    # Throws on failure.
+    param([string]$InstallPath)
+    Push-Location $InstallPath
+    try { pnpm install --frozen-lockfile } finally { Pop-Location }
+    $nm = Join-Path $InstallPath "node_modules"
+    if (-not (Assert-NodeModulesValid $nm)) {
+        Write-Warn "Retrying pnpm install (first attempt left node_modules incomplete)"
+        Push-Location $InstallPath
+        try { pnpm install --frozen-lockfile } finally { Pop-Location }
+        if (-not (Assert-NodeModulesValid $nm)) {
+            Write-Error "pnpm install failed to produce a valid node_modules. Run 'make wt-setup WT=`"$InstallPath`"' again."
+        }
     }
 }
 
@@ -217,80 +257,81 @@ else {
         # Force mode: always full install
         Write-Warn "Force mode -- running full pnpm install"
         Remove-JunctionSafe $wtNM
-        Push-Location $WorktreePath
-        try { pnpm install --frozen-lockfile } finally { Pop-Location }
-        if (-not (Assert-NodeModulesValid $wtNM)) {
-            Write-Warn "Retrying pnpm install (first attempt left node_modules incomplete)"
-            Push-Location $WorktreePath
-            try { pnpm install --frozen-lockfile } finally { Pop-Location }
-            if (-not (Assert-NodeModulesValid $wtNM)) {
-                Write-Error "pnpm install failed to produce a valid node_modules. Run 'make wt-setup WT=$WorktreePath' again."
-            }
-        }
+        Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
         Write-Ok "pnpm install completed (independent node_modules)"
     }
     elseif ($lockfilesMatch -and (Test-Path $mainNM) -and -not $currentIsJunction) {
         # Lockfiles match + main has node_modules + worktree has no junction yet
-        if (Test-Path $wtNM) {
-            Write-Warn "Removing existing node_modules to replace with junction (lockfiles match)"
-            # cmd rmdir /s /q is 5-10x faster than Remove-Item -Recurse on Windows
-            cmd /c "rmdir /s /q `"$wtNM`"" 2>$null
-            if (Test-Path $wtNM) {
-                # Fallback: if rmdir failed (file locks), try PowerShell
-                Remove-Item $wtNM -Recurse -Force -ErrorAction SilentlyContinue
+        # Validate main node_modules BEFORE junctioning to avoid propagating broken state
+        if (-not (Assert-NodeModulesValid $mainNM)) {
+            $reason = "main repo node_modules is missing .modules.yaml or .bin"
+            if (Confirm-IndependentInstall -Reason $reason) {
+                # If worktree already has a valid independent node_modules, skip reinstall
+                if ((Test-Path $wtNM) -and -not (Test-IsJunction $wtNM) -and (Assert-NodeModulesValid $wtNM)) {
+                    Write-Ok "Worktree already has valid independent node_modules -- skipping reinstall"
+                }
+                else {
+                    Write-Warn "Installing independently in worktree (not junctioning)"
+                    if (Test-Path $wtNM) {
+                        cmd /c "rmdir /s /q `"$wtNM`"" 2>$null
+                        if (Test-Path $wtNM) { Remove-Item $wtNM -Recurse -Force -ErrorAction SilentlyContinue }
+                    }
+                    Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
+                    Write-Ok "pnpm install completed (independent node_modules, main repo still needs repair)"
+                }
+            else {
+                Write-Error "Aborting: fix main repo node_modules first (cd $MainRepoPath ; make install), then re-run wt-setup."
             }
         }
-        cmd /c "mklink /J `"$wtNM`" `"$mainNM`"" | Out-Null
-        Write-Ok "Junctioned node_modules -> main repo (lockfiles match, saved ~1.8 GB)"
+        else {
+            if (Test-Path $wtNM) {
+                Write-Warn "Removing existing node_modules to replace with junction (lockfiles match)"
+                # cmd rmdir /s /q is 5-10x faster than Remove-Item -Recurse on Windows
+                cmd /c "rmdir /s /q `"$wtNM`"" 2>$null
+                if (Test-Path $wtNM) {
+                    # Fallback: if rmdir failed (file locks), try PowerShell
+                    Remove-Item $wtNM -Recurse -Force -ErrorAction SilentlyContinue
+                }
+            }
+            cmd /c "mklink /J `"$wtNM`" `"$mainNM`"" | Out-Null
+            Write-Ok "Junctioned node_modules -> main repo (lockfiles match, saved ~1.8 GB)"
+        }
     }
     elseif ($lockfilesMatch -and $currentIsJunction) {
-        # Already junctioned and still valid
-        Write-Ok "node_modules already junctioned to main repo (lockfiles still match)"
+        # Already junctioned -- verify the target is still healthy
+        if (-not (Assert-NodeModulesValid $wtNM)) {
+            $reason = "junctioned node_modules is missing .modules.yaml or .bin"
+            if (Confirm-IndependentInstall -Reason $reason) {
+                Write-Warn "Replacing broken junction with independent install"
+                Remove-JunctionSafe $wtNM
+                Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
+                Write-Ok "pnpm install completed (independent node_modules, main repo still needs repair)"
+            }
+            else {
+                Write-Error "Aborting: fix main repo node_modules first (cd $MainRepoPath ; make install), then re-run wt-setup."
+            }
+        }
+        else {
+            Write-Ok "node_modules already junctioned to main repo (lockfiles still match)"
+        }
     }
     elseif (-not $lockfilesMatch -and $currentIsJunction) {
         # Lockfiles diverged -- need independent install
         Write-Warn "Lockfiles diverged -- removing junction, running pnpm install"
         Remove-JunctionSafe $wtNM
-        Push-Location $WorktreePath
-        try { pnpm install --frozen-lockfile } finally { Pop-Location }
-        if (-not (Assert-NodeModulesValid $wtNM)) {
-            Write-Warn "Retrying pnpm install (first attempt left node_modules incomplete)"
-            Push-Location $WorktreePath
-            try { pnpm install --frozen-lockfile } finally { Pop-Location }
-            if (-not (Assert-NodeModulesValid $wtNM)) {
-                Write-Error "pnpm install failed to produce a valid node_modules. Run 'make wt-setup WT=$WorktreePath' again."
-            }
-        }
+        Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
         Write-Ok "pnpm install completed (independent node_modules)"
     }
     elseif (-not $lockfilesMatch) {
         # Lockfiles differ, no junction -- normal install
         Write-Warn "Lockfiles differ from main -- running pnpm install"
-        Push-Location $WorktreePath
-        try { pnpm install --frozen-lockfile } finally { Pop-Location }
-        if (-not (Assert-NodeModulesValid $wtNM)) {
-            Write-Warn "Retrying pnpm install (first attempt left node_modules incomplete)"
-            Push-Location $WorktreePath
-            try { pnpm install --frozen-lockfile } finally { Pop-Location }
-            if (-not (Assert-NodeModulesValid $wtNM)) {
-                Write-Error "pnpm install failed to produce a valid node_modules. Run 'make wt-setup WT=$WorktreePath' again."
-            }
-        }
+        Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
         Write-Ok "pnpm install completed (independent node_modules)"
     }
     else {
         # Lockfiles match but main has no node_modules
         Write-Warn "Main repo has no node_modules -- running pnpm install in worktree"
-        Push-Location $WorktreePath
-        try { pnpm install --frozen-lockfile } finally { Pop-Location }
-        if (-not (Assert-NodeModulesValid $wtNM)) {
-            Write-Warn "Retrying pnpm install (first attempt left node_modules incomplete)"
-            Push-Location $WorktreePath
-            try { pnpm install --frozen-lockfile } finally { Pop-Location }
-            if (-not (Assert-NodeModulesValid $wtNM)) {
-                Write-Error "pnpm install failed to produce a valid node_modules. Run 'make wt-setup WT=$WorktreePath' again."
-            }
-        }
+        Invoke-PnpmInstallWithRetry -InstallPath $WorktreePath
         Write-Ok "pnpm install completed"
     }
 }
