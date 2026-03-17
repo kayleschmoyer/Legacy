@@ -1684,7 +1684,10 @@ export function LeagueDetailPage(): React.JSX.Element {
             Teams
           </Text>
           <Text fontSize="$8" fontWeight="800" color={BRAND_GOLD_LIGHT}>
-            {teamCount}
+            {leagueTeamsLoading ||
+            (teamCount === 0 && leagueTeamsData?.leagueTeams === undefined)
+              ? '\u2014'
+              : teamCount}
           </Text>
         </SnapshotStat>
         <SnapshotDivider />
@@ -1714,7 +1717,11 @@ export function LeagueDetailPage(): React.JSX.Element {
             My Starters
           </Text>
           <Text fontSize="$8" fontWeight="800" color="$green11">
-            {assignedCount}
+            {teamMembersLoading ||
+            positionsLoading ||
+            (!userTeamId && assignedCount === 0)
+              ? '\u2014'
+              : assignedCount}
           </Text>
         </SnapshotStat>
         <SnapshotDivider />
@@ -1729,7 +1736,11 @@ export function LeagueDetailPage(): React.JSX.Element {
             On Bench
           </Text>
           <Text fontSize="$8" fontWeight="800" color="$amber11">
-            {benchCount}
+            {teamMembersLoading ||
+            positionsLoading ||
+            (!userTeamId && benchCount === 0)
+              ? '\u2014'
+              : benchCount}
           </Text>
         </SnapshotStat>
         <SnapshotDivider />
@@ -1759,7 +1770,9 @@ export function LeagueDetailPage(): React.JSX.Element {
             Positions
           </Text>
           <Text fontSize="$8" fontWeight="800" color="$color">
-            {positions.length}
+            {positionsLoading && positions.length === 0
+              ? '\u2014'
+              : positions.length}
           </Text>
         </SnapshotStat>
       </SnapshotBar>
