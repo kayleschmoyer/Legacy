@@ -24,6 +24,10 @@
     "legacy-sports-aws": {
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/aws-server/src/index.ts"]
+    },
+    "legacy-sports-github": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/github-server/src/index.ts"]
     }
   }
 }

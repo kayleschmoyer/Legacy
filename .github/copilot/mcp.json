@@ -28,6 +28,11 @@
       "type": "stdio",
       "command": "node",
       "args": ["--import", "tsx", "tools/mcp/aws-server/src/index.ts"]
+    },
+    "legacy-sports-github": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/github-server/src/index.ts"]
     }
   }
 }
