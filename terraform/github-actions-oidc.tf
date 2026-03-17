@@ -368,6 +368,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Effect = "Allow"
         Action = [
           # Write permissions for Terraform apply
+          "rds:ModifyDBInstance",
           "rds:ModifyDBProxy",
           "rds:ModifyDBProxyTargetGroup",
           "rds:AddTagsToResource",
@@ -451,6 +452,16 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:apigateway:${local.region}::/apis/*",
           "arn:aws:apigateway:${local.region}::/domainnames",
           "arn:aws:apigateway:${local.region}::/domainnames/*"
+        ]
+      },
+      # API Gateway tagging — scoped to PUT only (Terraform tag operations)
+      {
+        Effect = "Allow"
+        Action = [
+          "apigateway:PUT"
+        ]
+        Resource = [
+          "arn:aws:apigateway:${local.region}::/tags/*"
         ]
       },
       # Lambda read permissions
