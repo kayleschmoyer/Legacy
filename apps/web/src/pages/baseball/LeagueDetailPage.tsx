@@ -3471,7 +3471,10 @@ export function LeagueDetailPage(): React.JSX.Element {
                   <input
                     placeholder="Enter your team name"
                     value={spectatorTeamName}
-                    onChange={(e) => setSpectatorTeamName(e.target.value)}
+                    onChange={(e) => {
+                      setSpectatorTeamName(e.target.value);
+                      setSpectatorJoinError(null);
+                    }}
                     style={{
                       flex: 1,
                       minWidth: 200,
