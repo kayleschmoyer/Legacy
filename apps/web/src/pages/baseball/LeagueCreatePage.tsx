@@ -198,7 +198,7 @@ export function LeagueCreatePage(): React.JSX.Element {
 
   const handleInputChange = (
     field: keyof CreateLeagueFormData,
-    value: string | number | boolean | Date,
+    value: string | number | boolean | Date | undefined,
   ) => {
     setFormData((prev) => {
       const next = { ...prev, [field]: value };
@@ -827,7 +827,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                             const year = parseInt(text, 10);
                             handleInputChange(
                               'customEraStartYear',
-                              isNaN(year) ? '' : year,
+                              isNaN(year) ? undefined : year,
                             );
                           }}
                           keyboardType="numeric"
@@ -854,7 +854,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                             const year = parseInt(text, 10);
                             handleInputChange(
                               'customEraEndYear',
-                              isNaN(year) ? '' : year,
+                              isNaN(year) ? undefined : year,
                             );
                           }}
                           keyboardType="numeric"
