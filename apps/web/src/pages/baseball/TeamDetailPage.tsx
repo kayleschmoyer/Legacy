@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
@@ -15,6 +15,7 @@ import {
   TeamMemberFragment,
   useGetLeagueByIdQuery,
   useGetLeagueTeamsQuery,
+  useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdQuery,
   useUpdateTeamBrandingMutation,
@@ -81,6 +82,23 @@ export function TeamDetailPage() {
     skip: !leagueId,
   });
 
+  // Get league positions to map positionId → positionType (e.g. "SP", "C")
+  const { data: positionsData, loading: positionsLoading } =
+    useGetPositionsForLeagueQuery({
+      variables: { leagueId: leagueId || 0 },
+      skip: !leagueId,
+    });
+
+  const positionMap = useMemo(() => {
+    const map = new Map<number, string>();
+    positionsData?.leaguePositions?.forEach((pos) => {
+      if (pos.id != null && pos.positionType) {
+        map.set(pos.id, pos.positionType);
+      }
+    });
+    return map;
+  }, [positionsData]);
+
   const [updateTeamBranding, { loading: brandingLoading }] =
     useUpdateTeamBrandingMutation();
 
@@ -95,7 +113,11 @@ export function TeamDetailPage() {
       userPermissionLevel === 'general_manager');
 
   const loading =
-    membersLoading || teamsLoading || userTeamLoading || leagueLoading;
+    membersLoading ||
+    teamsLoading ||
+    userTeamLoading ||
+    leagueLoading ||
+    positionsLoading;
 
   if (loading) return <Spinner />;
   if (membersError)
@@ -323,7 +345,9 @@ export function TeamDetailPage() {
                   {member.player?.firstName} {member.player?.lastName}
                 </Text>
                 <Text fontSize="$2" color="$gray11">
-                  Position ID: {member.positionId || 'None'}
+                  {member.positionId != null
+                    ? (positionMap.get(member.positionId) ?? 'Unassigned')
+                    : 'Unassigned'}
                 </Text>
               </YStack>
             ),
