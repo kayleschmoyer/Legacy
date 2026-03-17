@@ -34,6 +34,11 @@
       "type": "stdio",
       "command": "node",
       "args": ["--import", "tsx", "tools/mcp/github-server/src/index.ts"]
+    },
+    "legacy-sports-nx": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/nx-server/src/index.ts"]
     }
   }
 }

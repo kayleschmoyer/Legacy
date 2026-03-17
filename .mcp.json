@@ -28,6 +28,10 @@
     "legacy-sports-github": {
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/github-server/src/index.ts"]
+    },
+    "legacy-sports-nx": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/nx-server/src/index.ts"]
     }
   }
 }

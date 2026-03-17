@@ -103,3 +103,16 @@ Pull request and review lifecycle management:
 - **github_get_repo_info** — Get repo owner, name, default branch, and URL
 
 See `.agents/skills/create-pr/SKILL.md` and `.agents/skills/fix-copilot-reviews/SKILL.md` for the workflows this server supports.
+
+### nx-server
+
+> **Server ID:** `legacy-sports-nx`
+
+Nx build system intelligence — project discovery, affected analysis, target execution, and dependency graph queries:
+
+- **nx_show_projects** — List Nx projects with optional filters (affected, target, tag)
+- **nx_show_project** — Inspect a single project's configuration (targets, tags, deps)
+- **nx_affected** — Show which projects are affected by current changes
+- **nx_run** — Run an Nx target on a specific project (allowlisted targets only)
+- **nx_run_affected** — Run a target on all affected projects (allowlisted targets only)
+- **nx_dep_graph** — Query project dependency relationships (dependencies or dependents)
