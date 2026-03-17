@@ -94,8 +94,8 @@ try {
 
     # Detect conflict state from output or git status
     $conflictFiles = @(git diff --name-only --diff-filter=U 2>$null)
-    $inRebase = Test-Path (Join-Path $wt ".git" "rebase-merge") -PathType Container
-    $inRebase = $inRebase -or (Test-Path (Join-Path $wt ".git" "rebase-apply") -PathType Container)
+    $inRebase = Test-Path (Join-Path (Join-Path $wt ".git") "rebase-merge") -PathType Container
+    $inRebase = $inRebase -or (Test-Path (Join-Path (Join-Path $wt ".git") "rebase-apply") -PathType Container)
 
     if ($conflictFiles.Count -gt 0 -or $inRebase -or $rebaseExit -ne 0) {
         Write-Warn ""

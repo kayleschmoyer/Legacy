@@ -3826,8 +3826,28 @@ export function LeagueDetailPage(): React.JSX.Element {
                     alignItems="center"
                   >
                     <YStack alignItems="center" gap="$3">
-                      <Swords size={32} color="var(--textMuted)" />
-                      {allLeagueMatchups.length > 0 ? (
+                      <Swords size={32} color="$textMuted" />
+                      {selectedMatchupId && !selectedMatchupLoading ? (
+                        <>
+                          <Text
+                            color="$textMuted"
+                            fontSize="$5"
+                            fontWeight="600"
+                          >
+                            Matchup Not Found
+                          </Text>
+                          <Text
+                            color="$textMuted"
+                            fontSize="$3"
+                            textAlign="center"
+                            maxWidth={400}
+                          >
+                            {allLeagueMatchups.length > 0
+                              ? 'The requested matchup doesn\u0027t exist. Use the navigation above to browse available matchups.'
+                              : 'The requested matchup doesn\u0027t exist or hasn\u0027t been created yet.'}
+                          </Text>
+                        </>
+                      ) : allLeagueMatchups.length > 0 ? (
                         <>
                           <Text
                             color="$textMuted"

@@ -430,8 +430,8 @@ else {
 
 Write-Step ".github/skills"
 
-$wtAgentsSkills = Join-Path $WorktreePath ".agents" "skills"
-$wtGithubSkills = Join-Path $WorktreePath ".github" "skills"
+$wtAgentsSkills = Join-Path (Join-Path $WorktreePath ".agents") "skills"
+$wtGithubSkills = Join-Path (Join-Path $WorktreePath ".github") "skills"
 
 if (-not (Test-Path $wtAgentsSkills)) {
     Write-Warn "No .agents/skills in worktree -- skipping"
