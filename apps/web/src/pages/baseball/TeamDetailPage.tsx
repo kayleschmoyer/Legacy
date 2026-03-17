@@ -38,7 +38,8 @@ import {
 export function TeamDetailPage() {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
-  const teamIdNum = parseInt(teamId || '0');
+  const isValidTeamId = /^\d+$/.test(teamId ?? '');
+  const teamIdNum = isValidTeamId ? parseInt(teamId!, 10) : 0;
 
   // Local state for branding form
   const [avatarInput, setAvatarInput] = useState('');
@@ -55,7 +56,7 @@ export function TeamDetailPage() {
     error: membersError,
   } = useGetTeamMembersQuery({
     variables: { teamId: teamIdNum },
-    skip: !teamId,
+    skip: !isValidTeamId,
   });
 
   // Get team details from leagueTeams query
@@ -120,10 +121,52 @@ export function TeamDetailPage() {
     leagueLoading ||
     positionsLoading;
 
+  if (!isValidTeamId) {
+    return (
+      <YStack padding="$6" gap="$3" alignItems="center">
+        <H3>Team not found</H3>
+        <Text color="$colorSubtle">
+          The team you&apos;re looking for doesn&apos;t exist or the link is
+          invalid.
+        </Text>
+      </YStack>
+    );
+  }
+
   if (loading) return <Spinner />;
-  if (membersError)
-    return <Text>Error loading team: {membersError.message}</Text>;
-  if (!membersData?.teamMembers) return <Text>Team not found</Text>;
+
+  if (membersError) {
+    const graphQLErrors =
+      'graphQLErrors' in membersError
+        ? (membersError.graphQLErrors as ReadonlyArray<{
+            extensions?: Record<string, unknown>;
+          }>)
+        : [];
+    const isNotFound = graphQLErrors.some(
+      (e) => e.extensions?.['code'] === 'NOT_FOUND',
+    );
+    return (
+      <YStack padding="$6" gap="$3" alignItems="center">
+        <H3>{isNotFound ? 'Team not found' : 'Error loading team'}</H3>
+        <Text color="$colorSubtle">
+          {isNotFound
+            ? "This team doesn't exist or you may not have access to it."
+            : 'Something went wrong. Please try refreshing the page.'}
+        </Text>
+      </YStack>
+    );
+  }
+
+  if (!membersData?.teamMembers) {
+    return (
+      <YStack padding="$6" gap="$3" alignItems="center">
+        <H3>Team not found</H3>
+        <Text color="$colorSubtle">
+          This team doesn&apos;t exist or you may not have access to it.
+        </Text>
+      </YStack>
+    );
+  }
 
   // Find the team from leagueTeams
   const team = teamsData?.leagueTeams?.find(
