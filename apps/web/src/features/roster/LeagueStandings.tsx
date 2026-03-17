@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { XStack, YStack } from '@legacy-sports/shared-components';
 import { Card, Separator, Spinner, styled, Text } from 'tamagui';
-import { Trophy } from '@tamagui/lucide-icons';
+import { AlertTriangle, Trophy } from '@tamagui/lucide-icons';
 import { useStandings } from '../../hooks/useStandings';
 import {
   AMBER,
@@ -30,6 +30,7 @@ export interface LeagueStandingsProps {
   leagueId: number;
   teams: readonly Team[];
   loading?: boolean;
+  teamsError?: Error | null;
   userTeamId?: number | null;
   waiverType?: string | null;
   /** When provided, called instead of navigating to the team detail page */
@@ -68,6 +69,7 @@ export function LeagueStandings({
   leagueId,
   teams,
   loading = false,
+  teamsError = null,
   userTeamId,
   waiverType,
   onTeamClick,
@@ -342,6 +344,32 @@ export function LeagueStandings({
     );
   }
 
+  if (teamsError && (!teams || teams.length === 0)) {
+    return (
+      <Card
+        backgroundColor="$surfacePanel"
+        borderColor="$red7"
+        borderWidth={1}
+        borderRadius="$6"
+        padding="$8"
+        alignItems="center"
+        role="alert"
+        aria-live="assertive"
+      >
+        <YStack alignItems="center" gap="$3">
+          <AlertTriangle size={32} color="$red10" />
+          <Text color="$red11" fontSize="$5" fontWeight="600">
+            Failed to load teams
+          </Text>
+          <Text color="$textMuted" fontSize="$3" textAlign="center">
+            Team data could not be retrieved. Please refresh the page to try
+            again.
+          </Text>
+        </YStack>
+      </Card>
+    );
+  }
+
   if (!teams || teams.length === 0) {
     return (
       <Card
@@ -353,7 +381,7 @@ export function LeagueStandings({
         alignItems="center"
       >
         <YStack alignItems="center" gap="$3">
-          <Trophy size={32} color="var(--textMuted)" />
+          <Trophy size={32} color="$textMuted" />
           <Text color="$textMuted" fontSize="$5" fontWeight="600">
             No teams yet
           </Text>

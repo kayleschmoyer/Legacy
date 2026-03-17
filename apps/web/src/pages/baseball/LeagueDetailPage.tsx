@@ -540,7 +540,11 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const [
     getLeagueTeams,
-    { data: leagueTeamsData, loading: leagueTeamsLoading },
+    {
+      data: leagueTeamsData,
+      loading: leagueTeamsLoading,
+      error: leagueTeamsError,
+    },
   ] = useGetLeagueTeamsLazyQuery();
 
   useEffect(() => {
@@ -3675,6 +3679,7 @@ export function LeagueDetailPage(): React.JSX.Element {
                 leagueId={leagueId}
                 teams={leagueTeams}
                 loading={leagueTeamsLoading}
+                teamsError={leagueTeamsError}
                 userTeamId={userTeamId}
                 waiverType={league?.waiverType}
                 onTeamClick={handleViewTeamRoster}
