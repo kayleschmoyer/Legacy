@@ -516,11 +516,14 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [data, dispatch, user?.id]);
 
-  const { data: positionsData, loading: positionsLoading } =
-    useGetPositionsForLeagueQuery({
-      skip: isNaN(leagueId) || reduxPositions.length > 0,
-      variables: { leagueId },
-    });
+  const {
+    data: positionsData,
+    loading: positionsLoading,
+    error: positionsError,
+  } = useGetPositionsForLeagueQuery({
+    skip: isNaN(leagueId) || reduxPositions.length > 0,
+    variables: { leagueId },
+  });
 
   useEffect(() => {
     if (positionsData?.leaguePositions) {
@@ -860,6 +863,7 @@ export function LeagueDetailPage(): React.JSX.Element {
   const {
     data: teamMembersData,
     loading: teamMembersLoading,
+    error: teamMembersError,
     refetch: refetchTeamMembers,
   } = useGetTeamMembersQuery({
     skip: !userTeamId || reduxTeamMembers.length > 0,
@@ -2594,6 +2598,11 @@ export function LeagueDetailPage(): React.JSX.Element {
                   // this guard the roster renders with 0 players before the
                   // real data arrives.
                   (!userTeamId && userTeamData === undefined && !!user?.id)
+          }
+          error={
+            !isViewingOther && !isViewingHistoricalRosterWeek
+              ? (positionsError ?? teamMembersError ?? null)
+              : null
           }
           playerMatchupData={
             isViewingHistoricalRosterWeek ? undefined : playerMatchupDataMap

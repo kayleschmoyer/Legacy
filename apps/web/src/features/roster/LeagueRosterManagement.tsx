@@ -1236,6 +1236,7 @@ export interface LeagueRosterManagementProps {
     displacedPlayer: TeamMemberFragment,
   ) => void;
   loading?: boolean;
+  error?: Error | null;
   playerMatchupData?: ReadonlyMap<number, PlayerMatchupData>;
   /** When true, the roster is displayed in read-only mode (viewing another team) */
   readOnly?: boolean;
@@ -1254,6 +1255,7 @@ export function LeagueRosterManagement({
   onPlayerRemove,
   onPlayerSwap,
   loading = false,
+  error = null,
   playerMatchupData,
   readOnly = false,
   teamName,
@@ -1423,6 +1425,31 @@ export function LeagueRosterManagement({
       >
         <Text fontSize="$5" fontWeight="600" color="$textMuted">
           Loading roster...
+        </Text>
+      </YStack>
+    );
+  }
+
+  if (error) {
+    return (
+      <YStack
+        padding="$6"
+        alignItems="center"
+        gap="$3"
+        role="alert"
+        aria-live="assertive"
+        backgroundColor="$red2"
+        borderColor="$red6"
+        borderWidth={1}
+        borderRadius="$4"
+      >
+        <AlertTriangle size={32} color="$red10" />
+        <Text fontSize="$5" fontWeight="600" color="$red11">
+          Failed to load roster
+        </Text>
+        <Text fontSize="$3" color="$textMuted" textAlign="center">
+          Roster data could not be retrieved. Please refresh the page to try
+          again.
         </Text>
       </YStack>
     );
