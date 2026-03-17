@@ -134,6 +134,7 @@ import { MatchupNavigationControls } from '../../features/matchup/MatchupNavigat
 import { announcePolite } from '../../utils/a11y';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
+  resetLeagueState,
   setIsCommissioner,
   setLeagueData,
   setLeagueId,
@@ -394,7 +395,7 @@ export function LeagueDetailPage(): React.JSX.Element {
     tab?: string;
     matchupId?: string;
   }>();
-  const leagueId = parseInt(id || '0', 10);
+  const leagueId = /^\d+$/.test(id ?? '') ? parseInt(id!, 10) : NaN;
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
@@ -473,6 +474,10 @@ export function LeagueDetailPage(): React.JSX.Element {
   useEffect(() => {
     if (!isNaN(leagueId)) {
       dispatch(setLeagueId(leagueId));
+    } else {
+      // LS-1302: invalid (non-numeric) league ID — clear any previously loaded
+      // league from Redux so we don't render a stale league under the invalid URL.
+      dispatch(resetLeagueState());
     }
   }, [leagueId, dispatch]);
 
