@@ -451,7 +451,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:apigateway:${local.region}::/restapis/*",
           "arn:aws:apigateway:${local.region}::/apis/*",
           "arn:aws:apigateway:${local.region}::/domainnames",
-          "arn:aws:apigateway:${local.region}::/domainnames/*"
+          "arn:aws:apigateway:${local.region}::/domainnames/*",
+          "arn:aws:apigateway:${local.region}::/tags/*"
         ]
       },
       # API Gateway tagging — scoped to PUT only (Terraform tag operations)
