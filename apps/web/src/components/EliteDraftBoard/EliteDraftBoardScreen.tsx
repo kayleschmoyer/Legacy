@@ -391,6 +391,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         firstName: string;
         lastName: string;
         brefId: string;
+        eligiblePositions?: string[] | null;
       } =>
         p.id != null &&
         p.firstName != null &&
@@ -402,6 +403,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       firstName: p.firstName,
       lastName: p.lastName,
       brefId: p.brefId,
+      eligiblePositions: p.eligiblePositions ?? undefined,
     }));
 
   // ---- Career Batting Stats (uses existing careerBattingStats connection) ----
@@ -561,7 +563,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         gamesStarted: ps?.gamesStarted,
       });
     }
-    // Override with available players (which have authoritative firstName/lastName)
+    // Override with available players (which have authoritative firstName/lastName and eligiblePositions)
     for (const ap of availablePlayers) {
       const s = playerStatsMap.get(ap.id);
       const pos = s?.position ?? 'UTIL';
@@ -571,6 +573,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
         position: pos,
+        eligiblePositions: ap.eligiblePositions ?? undefined,
         avg: s?.avg ?? 0,
         hr: s?.hr ?? 0,
         rbi: s?.rbi ?? 0,
@@ -642,6 +645,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         id: ap.id,
         name: `${ap.firstName} ${ap.lastName}`.trim(),
         position: pos,
+        eligiblePositions: ap.eligiblePositions ?? undefined,
         avg: s?.avg ?? 0,
         hr: s?.hr ?? 0,
         rbi: s?.rbi ?? 0,
