@@ -177,6 +177,20 @@ const heroGradientStyle: React.CSSProperties = {
   background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.18)} 0%, transparent 70%)`,
 };
 
+const heroHeadingStyle: React.CSSProperties = {
+  margin: 0,
+  fontWeight: 900,
+  textAlign: 'center',
+  letterSpacing: -1,
+  lineHeight: 1.1,
+  fontSize: 'clamp(2.5rem, 6vw, 4rem)',
+  background: `linear-gradient(135deg, #F5F7FA 0%, ${BRAND_GOLD_LIGHT} 60%, ${BRAND_GOLD} 100%)`,
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+  color: BRAND_GOLD_LIGHT,
+};
+
 const featureCardGlassStyle: React.CSSProperties = {
   background: `linear-gradient(135deg, ${withAlpha(BG_DARK, 0.72)} 0%, ${withAlpha(BRAND_NAVY, 0.35)} 100%)`,
   backdropFilter: 'blur(16px)',
@@ -375,26 +389,11 @@ export function PublicLandingPage(): React.JSX.Element {
 
             {/* Hero heading */}
             <YStack alignItems="center" gap="$3" maxWidth={680}>
-              <Text
-                fontSize="$12"
-                fontWeight="900"
-                color="$color"
-                textAlign="center"
-                letterSpacing={-1}
-                style={
-                  {
-                    lineHeight: 1.1,
-                    fontSize: 'clamp(2.5rem, 6vw, 4rem)',
-                    background: `linear-gradient(135deg, #F5F7FA 0%, ${BRAND_GOLD_LIGHT} 60%, ${BRAND_GOLD} 100%)`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  } as React.CSSProperties
-                }
-              >
+              <h1 style={heroHeadingStyle}>
                 Build Your Dynasty.
-                {'\n'}Dominate Your League.
-              </Text>
+                <br />
+                Dominate Your League.
+              </h1>
               <Text
                 fontSize="$5"
                 color="$color11"
