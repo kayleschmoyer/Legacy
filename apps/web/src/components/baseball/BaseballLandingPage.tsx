@@ -772,7 +772,6 @@ export function BaseballLandingPage() {
   if (auth.isLoading || (auth.user && isLoading && !data)) {
     return (
       <PageContainer
-        role="main"
         aria-label="Baseball fantasy landing page"
         style={pageBackgroundStyle}
       >
@@ -953,7 +952,6 @@ export function BaseballLandingPage() {
 
   return (
     <PageContainer
-      role="main"
       aria-label="Baseball fantasy landing page"
       style={pageBackgroundStyle}
     >
