@@ -715,7 +715,9 @@ export type ImpersonateUserResult = {
 export type InviteCodeInfo = {
   __typename?: 'InviteCodeInfo';
   availableSpots?: Maybe<Scalars['Int']['output']>;
+  isAlreadyMember?: Maybe<Scalars['Boolean']['output']>;
   isFull?: Maybe<Scalars['Boolean']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
   leagueName?: Maybe<Scalars['String']['output']>;
   totalSpots?: Maybe<Scalars['Int']['output']>;
 };

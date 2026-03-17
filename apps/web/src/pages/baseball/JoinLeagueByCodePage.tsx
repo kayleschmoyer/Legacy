@@ -58,6 +58,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
       (error.toLowerCase().includes('league is full') ||
         error.toLowerCase().includes('all teams have been claimed')),
     );
+  const isAlreadyMember = leagueInfo?.isAlreadyMember ?? false;
 
   const handleJoin = async (): Promise<void> => {
     // Guard against submission while validation is pending or incomplete.
@@ -253,7 +254,19 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
               )}
               {!validating &&
                 leagueInfo &&
-                (leagueInfo.isFull ? (
+                (leagueInfo.isAlreadyMember ? (
+                  <Text
+                    color="$blue10"
+                    fontSize="$2"
+                    fontWeight="600"
+                    data-testid="invite-status-already-member"
+                  >
+                    <span role="img" aria-label="check mark">
+                      ✅
+                    </span>{' '}
+                    You&apos;re already in {leagueInfo.leagueName}
+                  </Text>
+                ) : leagueInfo.isFull ? (
                   <Text
                     color="$orange10"
                     fontSize="$2"
@@ -348,6 +361,42 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
               </Text>
             </YStack>
 
+            {/* Already a Member Banner */}
+            {isAlreadyMember && leagueInfo && (
+              <Card
+                data-testid="alert-already-member"
+                backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+                padding="$4"
+                role="status"
+                aria-live="polite"
+              >
+                <YStack space="$2">
+                  <Text color={BRAND_GOLD_LIGHT} fontSize="$4" fontWeight="700">
+                    <span role="img" aria-label="check mark">
+                      ✅
+                    </span>{' '}
+                    You&apos;re already in {leagueInfo.leagueName}
+                  </Text>
+                  <Text color={BRAND_GOLD_LIGHT} fontSize="$3">
+                    You are already a member of this league. Head to your league
+                    to get started.
+                  </Text>
+                  <Button
+                    marginTop="$2"
+                    backgroundColor={BRAND_NAVY_LIGHT}
+                    color="white"
+                    borderRadius="$4"
+                    onPress={() =>
+                      navigate(`/baseball/league/${leagueInfo.leagueId}`)
+                    }
+                  >
+                    Go to League
+                  </Button>
+                </YStack>
+              </Card>
+            )}
+
             {/* League Full Banner */}
             {isLeagueFull && (
               <Card
@@ -425,7 +474,8 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                   !inviteCode.trim() ||
                   !teamName.trim() ||
                   !leagueInfo ||
-                  isLeagueFull
+                  isLeagueFull ||
+                  isAlreadyMember
                 }
                 minWidth={150}
                 aria-label="Join league"

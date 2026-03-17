@@ -709,7 +709,9 @@ export type ImpersonateUserResult = {
 export type InviteCodeInfo = {
   __typename?: 'InviteCodeInfo';
   availableSpots?: Maybe<Scalars['Int']['output']>;
+  isAlreadyMember?: Maybe<Scalars['Boolean']['output']>;
   isFull?: Maybe<Scalars['Boolean']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
   leagueName?: Maybe<Scalars['String']['output']>;
   totalSpots?: Maybe<Scalars['Int']['output']>;
 };
@@ -4212,10 +4214,12 @@ export type ValidateInviteCodeQuery = {
   __typename?: 'Query';
   validateInviteCode?: {
     __typename?: 'InviteCodeInfo';
+    leagueId?: number | null;
     leagueName?: string | null;
     totalSpots?: number | null;
     availableSpots?: number | null;
     isFull?: boolean | null;
+    isAlreadyMember?: boolean | null;
   } | null;
 };
 
@@ -10812,10 +10816,12 @@ export type JoinLeagueByCodeMutationOptions = BaseMutationOptions<
 export const ValidateInviteCode = gql`
   query ValidateInviteCode($code: String!) {
     validateInviteCode(code: $code) {
+      leagueId
       leagueName
       totalSpots
       availableSpots
       isFull
+      isAlreadyMember
     }
   }
 `;

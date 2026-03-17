@@ -49,7 +49,9 @@ jest.mock('@legacy-sports/shared-components', () => ({
       {children}
     </button>
   ),
-  Card: ({ children }: any) => <div>{children}</div>,
+  Card: ({ children, ...rest }: any) => (
+    <div data-testid={rest['data-testid']}>{children}</div>
+  ),
   XStack: ({ children }: any) => <div>{children}</div>,
   YStack: ({ children }: any) => <div>{children}</div>,
 }));
@@ -655,6 +657,50 @@ describe('JoinLeagueByCodePage', () => {
     });
 
     expect(screen.getByText(/This league is full/i)).toBeInTheDocument();
+  });
+
+  it('shows already-member banner and disables submit when user is already in the league (LS-1301)', () => {
+    const { useValidateInviteCodeLazyQuery } =
+      require('../../api/db/graphql.generated') as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      {
+        data: {
+          validateInviteCode: {
+            leagueId: 42,
+            leagueName: 'Test League',
+            totalSpots: 0,
+            availableSpots: 0,
+            isFull: false,
+            isAlreadyMember: true,
+          },
+        },
+        loading: false,
+      },
+    ]);
+
+    renderPage();
+
+    // Type a valid 8-char code so isCodeComplete triggers leagueInfo derivation
+    fireEvent.change(screen.getByPlaceholderText(/Enter 8-character code/i), {
+      target: { value: 'ABC12345' },
+    });
+
+    // Already-member banner is shown
+    expect(screen.getByTestId('alert-already-member')).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/already in Test League/i).length,
+    ).toBeGreaterThan(0);
+
+    // Submit button is disabled
+    const buttons = screen.getAllByText(/Join League/i);
+    const submitButton = buttons.find(
+      (el) => el.closest('button') || el.tagName === 'BUTTON',
+    );
+    expect(submitButton?.closest('button')).toBeDisabled();
   });
 
   /**

@@ -579,18 +579,22 @@ builder.queryField('leagueTeams', (t) =>
 
 // Object type returned by validateInviteCode query
 const InviteCodeInfo = builder.objectRef<{
+  leagueId: number;
   leagueName: string;
   totalSpots: number;
   availableSpots: number;
   isFull: boolean;
+  isAlreadyMember: boolean;
 }>('InviteCodeInfo');
 
 InviteCodeInfo.implement({
   fields: (t) => ({
+    leagueId: t.exposeInt('leagueId'),
     leagueName: t.exposeString('leagueName'),
     totalSpots: t.exposeInt('totalSpots'),
     availableSpots: t.exposeInt('availableSpots'),
     isFull: t.exposeBoolean('isFull'),
+    isAlreadyMember: t.exposeBoolean('isAlreadyMember'),
   }),
 });
 
@@ -623,6 +627,32 @@ builder.queryField('validateInviteCode', (t) =>
 
       const league = leagues[0];
 
+      // Check if the current user is already a member of this league
+      const existingMembership = await context.db
+        .select({ userId: PublicSchema.leagueMembers.userId })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, league.id),
+            eq(PublicSchema.leagueMembers.userId, context.user.id),
+          ),
+        )
+        .limit(1);
+
+      const isAlreadyMember = existingMembership.length > 0;
+
+      // Already a member — skip spot-counting queries
+      if (isAlreadyMember) {
+        return {
+          leagueId: league.id,
+          leagueName: league.name,
+          totalSpots: 0,
+          availableSpots: 0,
+          isFull: false,
+          isAlreadyMember,
+        };
+      }
+
       // Count total teams in the league
       const totalResult = await context.db
         .select({ total: count() })
@@ -645,10 +675,12 @@ builder.queryField('validateInviteCode', (t) =>
       const availableSpots = Math.max(0, totalSpots - assignedSpots);
 
       return {
+        leagueId: league.id,
         leagueName: league.name,
         totalSpots,
         availableSpots,
         isFull: availableSpots === 0,
+        isAlreadyMember,
       };
     },
   }),

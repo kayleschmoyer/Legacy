@@ -191,10 +191,12 @@ export function updateLeagueBrandingResponse(patch?: {
 
 export interface MockInviteCodeInfo {
   __typename: 'InviteCodeInfo';
+  leagueId: number;
   leagueName: string;
   totalSpots: number;
   availableSpots: number;
   isFull: boolean;
+  isAlreadyMember: boolean;
 }
 
 export function mockInviteCodeInfo(
@@ -202,10 +204,12 @@ export function mockInviteCodeInfo(
 ): MockInviteCodeInfo {
   return {
     __typename: 'InviteCodeInfo',
+    leagueId: 1,
     leagueName: 'Test League',
     totalSpots: 10,
     availableSpots: 4,
     isFull: false,
+    isAlreadyMember: false,
     ...overrides,
   };
 }

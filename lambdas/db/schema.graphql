@@ -772,7 +772,9 @@ type ImpersonateUserResult {
 
 type InviteCodeInfo {
   availableSpots: Int
+  isAlreadyMember: Boolean
   isFull: Boolean
+  leagueId: Int
   leagueName: String
   totalSpots: Int
 }
