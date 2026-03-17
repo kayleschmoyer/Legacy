@@ -107,6 +107,7 @@ export function TeamDetailPage() {
 
   // A user is the GM if their teamId matches AND they have owner/general_manager permission
   const isOwner = userTeamData?.userTeamId === teamIdNum;
+  const isCommissioner = userPermissionLevel === 'commissioner';
   const isGM =
     isOwner &&
     (userPermissionLevel === 'owner' ||
@@ -318,7 +319,7 @@ export function TeamDetailPage() {
               League ID: {leagueId}
             </Text>
           )}
-          {!isOwner && (
+          {!isOwner && !isCommissioner && (
             <Text fontSize="$3" color="$gray11" fontStyle="italic">
               You are viewing this team as a visitor. Only the General Manager
               can make changes.
@@ -354,8 +355,8 @@ export function TeamDetailPage() {
         )}
       </YStack>
 
-      {/* ── GM Settings ── */}
-      {isGM && leagueId && (
+      {/* ── GM / Commissioner Settings ── */}
+      {(isGM || isCommissioner) && leagueId && (
         <>
           <Separator />
           <YStack gap="$4">
