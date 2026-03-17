@@ -75,7 +75,7 @@ jobs:
       - name: Generate App Token
         if: github.event_name != 'pull_request'
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.PREVIEW_APP_ID }}
           private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
