@@ -712,12 +712,23 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const handleToggleQueue = useCallback(
     async (playerId: number) => {
       if (!draftId) return;
-      if (queuedPlayerIds.has(playerId)) {
-        await removeFromQueueMutation({ variables: { draftId, playerId } });
-      } else {
-        await addToQueueMutation({ variables: { draftId, playerId } });
+      const isQueued = queuedPlayerIds.has(playerId);
+      try {
+        if (isQueued) {
+          await removeFromQueueMutation({ variables: { draftId, playerId } });
+        } else {
+          await addToQueueMutation({ variables: { draftId, playerId } });
+        }
+        void refetchQueue().catch((e: unknown) =>
+          LOGGER.warn('Queue refetch failed:', String(e)),
+        );
+      } catch {
+        showToast(
+          isQueued
+            ? 'Failed to remove player from queue. Please try again.'
+            : 'Failed to add player to queue. Please try again.',
+        );
       }
-      void refetchQueue();
     },
     [
       draftId,
@@ -725,6 +736,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       addToQueueMutation,
       removeFromQueueMutation,
       refetchQueue,
+      showToast,
     ],
   );
 
@@ -811,7 +823,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
       void refetchCurrentPick({ draftId: notification.draftId });
       void refetchPickHistory();
       void refetchAvailablePlayers();
-      void refetchQueue();
+      void refetchQueue().catch((e: unknown) =>
+        LOGGER.warn('Queue refetch failed:', String(e)),
+      );
     },
     [
       myTeamId,
