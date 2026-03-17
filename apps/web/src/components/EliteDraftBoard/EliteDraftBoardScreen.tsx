@@ -293,6 +293,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
   // ---- Current Pick ----
   const [draftOrderMissing, setDraftOrderMissing] = useState(false);
+  const [currentPickLoadError, setCurrentPickLoadError] = useState<
+    string | null
+  >(null);
   const {
     data: currentPickData,
     error: currentPickError,
@@ -323,12 +326,16 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
   // Draft/pick diagnostics
   useEffect(() => {
-    if (!currentPickErrorMessage) return;
+    if (!currentPickErrorMessage) {
+      setCurrentPickLoadError(null);
+      return;
+    }
 
     if (
       currentPickErrorMessage.includes('No teams configured for this draft')
     ) {
       setDraftOrderMissing(true);
+      setCurrentPickLoadError(null);
       setInitError(
         'Draft order has not been generated yet. Re-start the live draft to assign teams to draft slots.',
       );
@@ -337,11 +344,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     }
 
     setDraftOrderMissing(false);
+    setCurrentPickLoadError(currentPickErrorMessage);
   }, [currentPickErrorMessage]);
 
   useEffect(() => {
     if (currentPickInfo) {
       setDraftOrderMissing(false);
+      setCurrentPickLoadError(null);
       setInitError(null);
     }
   }, [currentPickInfo]);
@@ -2049,6 +2058,48 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
                     {currentPickTeamId}
                   </div>
                 )}
+            </div>
+          ) : currentPickLoadError ? (
+            <div
+              className="d-panel"
+              role="alert"
+              aria-live="polite"
+              style={{ textAlign: 'center' }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: 1.5,
+                  textTransform: 'uppercase',
+                  marginBottom: 6,
+                  color: 'var(--d-error)',
+                }}
+              >
+                Pick Load Error
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>
+                Failed to load current pick
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: 'var(--d-text-muted)',
+                  marginTop: 6,
+                }}
+              >
+                There was a problem checking whose turn it is. The draft is
+                still running.
+              </div>
+              <button
+                className="d-state-btn"
+                style={{ marginTop: 12 }}
+                onClick={() => {
+                  if (draftId) void refetchCurrentPick({ draftId });
+                }}
+              >
+                Retry
+              </button>
             </div>
           ) : (
             <div className="d-panel" style={{ textAlign: 'center' }}>
