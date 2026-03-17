@@ -215,6 +215,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const {
     data: leagueData,
     loading: leagueLoading,
+    error: leagueError,
     refetch: refetchLeague,
   } = useQuery(GET_LEAGUE_BY_ID, {
     variables: { id: leagueId },
@@ -1486,6 +1487,44 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   // =========================================================================
   // Error
   // =========================================================================
+
+  if (!leagueLoading && !league && (leagueError || leagueData !== undefined)) {
+    const graphQLErrors =
+      leagueError && 'graphQLErrors' in leagueError
+        ? (leagueError.graphQLErrors as ReadonlyArray<{
+            extensions?: Record<string, unknown>;
+          }>)
+        : [];
+    const isUnauthorized = graphQLErrors.some(
+      (e) =>
+        e.extensions?.['code'] === 'UNAUTHENTICATED' ||
+        e.extensions?.['code'] === 'FORBIDDEN',
+    );
+    return (
+      <div className="d-root">
+        <style>{CSS}</style>
+        <div className="d-bg-fx" />
+        <div className="d-state-center">
+          <div className="d-state-icon">
+            <span role="img" aria-label={isUnauthorized ? 'lock' : 'warning'}>
+              {isUnauthorized ? '🔒' : '⚠️'}
+            </span>
+          </div>
+          <div className="d-state-title">
+            {isUnauthorized ? 'Access Denied' : 'League Not Found'}
+          </div>
+          <div className="d-state-desc">
+            {isUnauthorized
+              ? "You don't have access to this draft room."
+              : "This league doesn't exist or the draft room is unavailable."}
+          </div>
+          <button className="d-state-btn" onClick={() => navigate('/baseball')}>
+            Back to Leagues
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (availablePlayersError) {
     return (
