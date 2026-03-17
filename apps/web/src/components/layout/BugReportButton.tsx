@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
   Paragraph,
@@ -57,6 +57,17 @@ interface SubmitState {
   message?: string;
 }
 
+interface SimilarBug {
+  issueKey: string;
+  summary: string;
+  status: string;
+}
+
+/** Minimum characters before triggering a duplicate search. */
+const SEARCH_MIN_LENGTH = 10;
+/** Debounce delay in ms for the duplicate search. */
+const SEARCH_DEBOUNCE_MS = 600;
+
 /**
  * A minimal "Report a Bug" button that opens a small dialog.
  * Attaches auth info automatically so devs can reproduce the issue.
@@ -72,6 +83,9 @@ export const BugReportButton: React.FC = () => {
   const [attachments, setAttachments] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [similarBugs, setSimilarBugs] = useState<SimilarBug[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchAbortRef = useRef<AbortController | null>(null);
 
   const resetForm = useCallback(() => {
     setDescription('');
@@ -79,6 +93,10 @@ export const BugReportButton: React.FC = () => {
     setShowDetails(false);
     setAttachments([]);
     setAttachmentError('');
+    setSimilarBugs([]);
+    setSearchLoading(false);
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
   }, []);
 
   const handleOpenChange = useCallback(
@@ -88,6 +106,58 @@ export const BugReportButton: React.FC = () => {
     },
     [resetForm],
   );
+
+  // Debounced search for similar bugs as the user types
+  useEffect(() => {
+    const trimmed = description.trim();
+    if (trimmed.length < SEARCH_MIN_LENGTH || !env.jiraProxyUrl) {
+      searchAbortRef.current?.abort();
+      searchAbortRef.current = null;
+      setSimilarBugs([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    const timer = setTimeout(() => {
+      searchAbortRef.current?.abort();
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
+
+      const csrfToken = getCsrfToken();
+      fetch(`${env.jiraProxyUrl}/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
+        },
+        credentials: 'include',
+        signal: controller.signal,
+        body: JSON.stringify({ query: trimmed }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            setSimilarBugs([]);
+            return;
+          }
+          const data = (await res.json()) as {
+            issues: SimilarBug[];
+          };
+          setSimilarBugs(data.issues ?? []);
+        })
+        .catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          setSimilarBugs([]);
+        })
+        .finally(() => setSearchLoading(false));
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      clearTimeout(timer);
+      searchAbortRef.current?.abort();
+      searchAbortRef.current = null;
+    };
+  }, [description]);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -364,6 +434,55 @@ export const BugReportButton: React.FC = () => {
                     {description.length}/{MAX_DESCRIPTION_LENGTH}
                   </Paragraph>
                 </YStack>
+
+                {/* Similar existing bugs */}
+                {(similarBugs.length > 0 || searchLoading) && (
+                  <YStack
+                    gap="$2"
+                    backgroundColor="$yellow2"
+                    borderRadius="$4"
+                    padding="$3"
+                    borderWidth={1}
+                    borderColor="$yellow7"
+                  >
+                    <Paragraph size="$2" fontWeight="600" color="$yellow11">
+                      {searchLoading
+                        ? 'Searching for similar reports…'
+                        : `Similar bug${similarBugs.length === 1 ? '' : 's'} already reported:`}
+                    </Paragraph>
+                    {similarBugs.map((bug) => (
+                      <XStack
+                        key={bug.issueKey}
+                        gap="$2"
+                        alignItems="flex-start"
+                        paddingVertical="$1"
+                      >
+                        <Paragraph
+                          size="$2"
+                          fontWeight="600"
+                          color="$yellow11"
+                          flexShrink={0}
+                        >
+                          {bug.issueKey}
+                        </Paragraph>
+                        <YStack flex={1}>
+                          <Paragraph size="$2" color="$color" numberOfLines={2}>
+                            {bug.summary}
+                          </Paragraph>
+                          <Paragraph size="$1" color="$colorPress">
+                            Status: {bug.status}
+                          </Paragraph>
+                        </YStack>
+                      </XStack>
+                    ))}
+                    {similarBugs.length > 0 && (
+                      <Paragraph size="$1" color="$yellow11">
+                        You can still submit your report — it helps us know more
+                        people are affected.
+                      </Paragraph>
+                    )}
+                  </YStack>
+                )}
 
                 {/* Collapsible technical details */}
                 <YStack gap="$2">

@@ -1,4 +1,4 @@
-import { createJiraBug } from './JiraClient';
+import { createJiraBug, searchJiraBugs } from './JiraClient';
 
 jest.mock('@aws-sdk/client-secrets-manager', () => ({
   SecretsManagerClient: jest.fn().mockImplementation(() => ({
@@ -198,5 +198,88 @@ describe('createJiraBug — epic parent field', () => {
       fields: { parent?: { key: string } };
     };
     expect(body.fields.parent).toBeUndefined();
+  });
+});
+
+describe('searchJiraBugs', () => {
+  let fetchSpy: jest.MockedFunction<typeof fetch>;
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(global, 'fetch') as jest.MockedFunction<typeof fetch>;
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    jest.clearAllMocks();
+  });
+
+  function makeSearchResponse(
+    issues: Array<{
+      key: string;
+      fields: { summary: string; status: { name: string } };
+    }>,
+    total?: number,
+  ): Response {
+    return new Response(
+      JSON.stringify({ total: total ?? issues.length, issues }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
+  it('returns matching issues from Jira search', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      makeSearchResponse([
+        {
+          key: 'LS-50',
+          fields: { summary: 'Login page broken', status: { name: 'To Do' } },
+        },
+        {
+          key: 'LS-51',
+          fields: {
+            summary: 'Login button unresponsive',
+            status: { name: 'In Progress' },
+          },
+        },
+      ]),
+    );
+
+    const result = await searchJiraBugs('login broken', 'LS', 'jira-secret');
+
+    expect(result.issues).toHaveLength(2);
+    expect(result.issues[0].issueKey).toBe('LS-50');
+    expect(result.issues[0].summary).toBe('Login page broken');
+    expect(result.issues[0].status).toBe('To Do');
+    expect(result.issues[1].issueKey).toBe('LS-51');
+    expect(result.total).toBe(2);
+  });
+
+  it('returns empty result when Jira API errors', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response('Internal Server Error', { status: 500 }),
+    );
+
+    const result = await searchJiraBugs('crash', 'LS', 'jira-secret');
+    expect(result.issues).toHaveLength(0);
+    expect(result.total).toBe(0);
+  });
+
+  it('escapes double quotes in query to prevent JQL injection', async () => {
+    fetchSpy.mockResolvedValueOnce(makeSearchResponse([], 0));
+
+    await searchJiraBugs('test "injected" query', 'LS', 'jira-secret');
+
+    const calls = fetchSpy.mock.calls as unknown as FetchCall[];
+    const url = calls[0][0];
+    expect(url).toContain(encodeURIComponent('\\"injected\\"'));
+  });
+
+  it('caps maxResults to 10', async () => {
+    fetchSpy.mockResolvedValueOnce(makeSearchResponse([], 0));
+
+    await searchJiraBugs('test', 'LS', 'jira-secret', 50);
+
+    const calls = fetchSpy.mock.calls as unknown as FetchCall[];
+    const url = calls[0][0];
+    expect(url).toContain('maxResults=10');
   });
 });

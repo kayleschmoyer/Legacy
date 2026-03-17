@@ -61,6 +61,18 @@ export interface CreateIssueResult {
   issueUrl: string;
 }
 
+export interface SearchResult {
+  issueKey: string;
+  issueUrl: string;
+  summary: string;
+  status: string;
+}
+
+export interface SearchBugsResult {
+  issues: SearchResult[];
+  total: number;
+}
+
 let cachedCredentials: JiraCredentials | null = null;
 
 async function getJiraCredentials(
@@ -325,4 +337,66 @@ export async function createJiraBug(
   }
 
   return { issueKey, issueUrl };
+}
+
+/**
+ * Search for existing bug reports in Jira whose summary or description
+ * contains the given query text.  Returns up to `maxResults` issues
+ * (capped at 10) ordered by most-recently created.
+ */
+export async function searchJiraBugs(
+  query: string,
+  projectKey: string,
+  secretName: string,
+  maxResults = 5,
+): Promise<SearchBugsResult> {
+  const credentials = await getJiraCredentials(secretName);
+  const { api_token, email, base_url } = credentials;
+  const authHeader = Buffer.from(`${email}:${api_token}`).toString('base64');
+
+  const cap = Math.min(Math.max(maxResults, 1), 10);
+
+  // Escape double-quotes in the user query to prevent JQL injection
+  const sanitized = query.replace(/"/g, '\\"');
+  const jql = `project = "${projectKey}" AND type = Bug AND text ~ "${sanitized}" ORDER BY created DESC`;
+
+  const params = new URLSearchParams({
+    jql,
+    maxResults: String(cap),
+    fields: 'summary,status',
+  });
+
+  const response = await fetch(
+    `${base_url}/rest/api/3/search?${params.toString()}`,
+    {
+      headers: {
+        Authorization: `Basic ${authHeader}`,
+        Accept: 'application/json',
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    LOGGER.warn(`Jira search API error ${response.status}: ${errorBody}`);
+    return { issues: [], total: 0 };
+  }
+
+  const data = (await response.json()) as {
+    total: number;
+    issues: Array<{
+      key: string;
+      fields: { summary: string; status: { name: string } };
+    }>;
+  };
+
+  return {
+    total: data.total,
+    issues: data.issues.map((issue) => ({
+      issueKey: issue.key,
+      issueUrl: `${base_url}/browse/${issue.key}`,
+      summary: issue.fields.summary,
+      status: issue.fields.status.name,
+    })),
+  };
 }

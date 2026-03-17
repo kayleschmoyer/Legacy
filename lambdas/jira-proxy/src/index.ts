@@ -9,7 +9,7 @@ import {
   withRollbar,
 } from '@legacy-sports/rollbar';
 import type { AttachmentInput, CreateIssueInput } from './JiraClient';
-import { createJiraBug } from './JiraClient';
+import { createJiraBug, searchJiraBugs } from './JiraClient';
 
 /** Verified JWT payload fields used for attribution. */
 interface JwtUserPayload {
@@ -107,7 +107,7 @@ function getAllowedOrigins(): Set<string> {
 
 const BASE_CORS_HEADERS = {
   'Access-Control-Allow-Headers':
-    'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+    'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-CSRF-Token',
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
   // Security headers
   'X-Content-Type-Options': 'nosniff',
@@ -309,8 +309,9 @@ function parseBugReport(rawBody: string | null): CreateIssueInput {
  * Jira Proxy Lambda handler.
  *
  * Routes:
- *   POST /jira/bug   — Create a bug report in Jira
- *   OPTIONS  /jira/* — CORS preflight
+ *   POST /jira/bug    — Create a bug report in Jira
+ *   POST /jira/search — Search for existing bug reports
+ *   OPTIONS  /jira/*  — CORS preflight
  */
 export const baseHandler = async (
   event: APIGatewayEvent,
@@ -328,6 +329,13 @@ export const baseHandler = async (
     (path === '/jira/bug' || path === '/bug')
   ) {
     return handleCreateBug(event);
+  }
+
+  if (
+    event.httpMethod === 'POST' &&
+    (path === '/jira/search' || path === '/search')
+  ) {
+    return handleSearchBugs(event);
   }
 
   if (
@@ -364,6 +372,82 @@ export const baseHandler = async (
     event,
   );
 };
+
+/** Minimum query length to avoid overly broad Jira searches. */
+const MIN_SEARCH_QUERY_LENGTH = 3;
+/** Maximum allowed query length to prevent abuse. */
+const MAX_SEARCH_QUERY_LENGTH = 200;
+
+async function handleSearchBugs(
+  event: APIGatewayEvent,
+): Promise<APIGatewayProxyResult> {
+  const jiraSecretName = process.env['JIRA_SECRET_NAME'];
+  const jiraProjectKey = process.env['JIRA_PROJECT_KEY'];
+
+  if (!jiraSecretName || !jiraProjectKey) {
+    return jsonResponse(500, { error: 'Server configuration error' }, event);
+  }
+
+  const authUser = await verifyAuthToken(event.headers ?? {});
+  if (!authUser) {
+    return jsonResponse(
+      401,
+      { error: 'Unauthorized: valid authentication token required' },
+      event,
+    );
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(event.body ?? '');
+    if (typeof parsed !== 'object' || parsed === null) {
+      return jsonResponse(
+        400,
+        { error: 'Request body must be a JSON object' },
+        event,
+      );
+    }
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return jsonResponse(
+      400,
+      { error: 'Request body must be valid JSON' },
+      event,
+    );
+  }
+
+  const query = typeof body['query'] === 'string' ? body['query'].trim() : '';
+  if (query.length < MIN_SEARCH_QUERY_LENGTH) {
+    return jsonResponse(
+      400,
+      {
+        error: `Query must be at least ${String(MIN_SEARCH_QUERY_LENGTH)} characters`,
+      },
+      event,
+    );
+  }
+  if (query.length > MAX_SEARCH_QUERY_LENGTH) {
+    return jsonResponse(
+      400,
+      {
+        error: `Query must be at most ${String(MAX_SEARCH_QUERY_LENGTH)} characters`,
+      },
+      event,
+    );
+  }
+
+  try {
+    const result = await searchJiraBugs(query, jiraProjectKey, jiraSecretName);
+    return jsonResponse(200, result, event);
+  } catch (err) {
+    LOGGER.error(`Failed to search Jira bugs: ${String(err)}`);
+    return jsonResponse(
+      500,
+      { error: 'Failed to search for existing bugs' },
+      event,
+    );
+  }
+}
 
 async function handleCreateBug(
   event: APIGatewayEvent,

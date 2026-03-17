@@ -1,6 +1,6 @@
 import type { APIGatewayEvent } from 'aws-lambda';
 import { sign } from 'jsonwebtoken';
-import { createJiraBug } from './JiraClient';
+import { createJiraBug, searchJiraBugs } from './JiraClient';
 import { baseHandler } from './index';
 
 // jest.mock calls are hoisted before imports by babel-jest at runtime
@@ -14,10 +14,14 @@ jest.mock('@legacy-sports/rollbar', () => ({
 // Mock the Jira client
 jest.mock('./JiraClient', () => ({
   createJiraBug: jest.fn(),
+  searchJiraBugs: jest.fn(),
 }));
 
 const mockCreateJiraBug = createJiraBug as jest.MockedFunction<
   typeof createJiraBug
+>;
+const mockSearchJiraBugs = searchJiraBugs as jest.MockedFunction<
+  typeof searchJiraBugs
 >;
 
 const TEST_JWT_SECRET = 'test-secret';
@@ -464,6 +468,100 @@ describe('Jira Proxy Handler', () => {
         'test-secret',
         undefined,
       );
+    });
+  });
+
+  describe('POST /jira/search', () => {
+    it('returns 401 when not authenticated', async () => {
+      const event = makeEvent({
+        httpMethod: 'POST',
+        path: '/jira/search',
+        headers: {},
+        body: JSON.stringify({ query: 'login broken' }),
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(401);
+    });
+
+    it('returns 400 when query is too short', async () => {
+      const event = makeEvent({
+        httpMethod: 'POST',
+        path: '/jira/search',
+        body: JSON.stringify({ query: 'ab' }),
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body) as { error: string };
+      expect(body.error).toContain('at least');
+    });
+
+    it('returns 400 when query is too long', async () => {
+      const event = makeEvent({
+        httpMethod: 'POST',
+        path: '/jira/search',
+        body: JSON.stringify({ query: 'a'.repeat(201) }),
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body) as { error: string };
+      expect(body.error).toContain('at most');
+    });
+
+    it('returns 400 when body is not JSON', async () => {
+      const event = makeEvent({
+        httpMethod: 'POST',
+        path: '/jira/search',
+        body: 'not json',
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(400);
+    });
+
+    it('returns 200 with search results', async () => {
+      mockSearchJiraBugs.mockResolvedValueOnce({
+        total: 1,
+        issues: [
+          {
+            issueKey: 'LS-50',
+            issueUrl: 'https://test.atlassian.net/browse/LS-50',
+            summary: 'Login page broken',
+            status: 'To Do',
+          },
+        ],
+      });
+
+      const event = makeEvent({
+        httpMethod: 'POST',
+        path: '/jira/search',
+        body: JSON.stringify({ query: 'login broken' }),
+      });
+
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(200);
+      const body = JSON.parse(result.body) as {
+        total: number;
+        issues: Array<{ issueKey: string }>;
+      };
+      expect(body.total).toBe(1);
+      expect(body.issues[0].issueKey).toBe('LS-50');
+      expect(mockSearchJiraBugs).toHaveBeenCalledWith(
+        'login broken',
+        'LS',
+        'test-secret',
+      );
+    });
+
+    it('returns 500 when search fails', async () => {
+      mockSearchJiraBugs.mockRejectedValueOnce(new Error('Network error'));
+
+      const event = makeEvent({
+        httpMethod: 'POST',
+        path: '/jira/search',
+        body: JSON.stringify({ query: 'test query' }),
+      });
+
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(500);
     });
   });
 });
