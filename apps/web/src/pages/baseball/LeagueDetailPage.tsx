@@ -3880,12 +3880,40 @@ export function LeagueDetailPage(): React.JSX.Element {
               )}
             </YStack>
           )}
-          {activeTab === 'trades' && userTeamId && (
-            <TradingCenter
-              leagueId={leagueId}
-              userTeamId={userTeamId}
-              isCommissioner={isCommissioner}
-            />
+          {activeTab === 'trades' && (
+            <YStack
+              role="tabpanel"
+              id="panel-trades"
+              aria-labelledby="tab-trades"
+            >
+              {!userTeamId && (
+                <Card
+                  backgroundColor="$surfacePanel"
+                  borderColor="$surfacePanelBorder"
+                  borderWidth={1}
+                  borderRadius="$6"
+                  padding="$8"
+                  alignItems="center"
+                >
+                  <YStack alignItems="center" gap="$3">
+                    <ArrowLeftRight size={32} color="var(--textMuted)" />
+                    <Text color="$textMuted" fontSize="$5" fontWeight="600">
+                      Trades
+                    </Text>
+                    <Text color="$textMuted" fontSize="$3" textAlign="center">
+                      Join this league to view and submit trade offers.
+                    </Text>
+                  </YStack>
+                </Card>
+              )}
+              {userTeamId && (
+                <TradingCenter
+                  leagueId={leagueId}
+                  userTeamId={userTeamId}
+                  isCommissioner={isCommissioner}
+                />
+              )}
+            </YStack>
           )}
           {activeTab === 'team-settings' && renderTeamSettings()}
           {activeTab === 'commissioner' &&
