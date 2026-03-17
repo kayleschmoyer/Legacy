@@ -26,6 +26,7 @@ import type { League } from './LeagueCard';
 import {
   DEFAULT_NUM_DIVISIONS,
   DEFAULT_NUM_TEAMS,
+  MAX_LEAGUE_NAME_LENGTH,
 } from '../../constants/league';
 import {
   GetUserLeagues,
@@ -712,12 +713,18 @@ export function BaseballLandingPage() {
   };
 
   const handleSubmit = () => {
-    if (creating || leagueName.trim().length < 3) return;
+    const trimmed = leagueName.trim();
+    if (
+      creating ||
+      trimmed.length < 3 ||
+      trimmed.length > MAX_LEAGUE_NAME_LENGTH
+    )
+      return;
     setCreateError(null);
     void createLeague({
       variables: {
         input: {
-          leagueName: leagueName.trim(),
+          leagueName: trimmed,
           numberOfTeams: teamCount,
           numberOfDivisions,
           playerPool,
@@ -1244,6 +1251,7 @@ export function BaseballLandingPage() {
                       onChangeText={setLeagueName}
                       onSubmitEditing={handleSubmit}
                       autoFocus
+                      maxLength={MAX_LEAGUE_NAME_LENGTH}
                       size="$3"
                       aria-label="League name"
                     />
@@ -1627,7 +1635,11 @@ export function BaseballLandingPage() {
                   <SecondaryButton disabled={creating}>Cancel</SecondaryButton>
                 </Dialog.Close>
                 <PrimaryButton
-                  disabled={creating || leagueName.trim().length < 3}
+                  disabled={
+                    creating ||
+                    leagueName.trim().length < 3 ||
+                    leagueName.trim().length > MAX_LEAGUE_NAME_LENGTH
+                  }
                   onPress={handleSubmit}
                 >
                   {creating ? 'Creating…' : 'Create League'}
