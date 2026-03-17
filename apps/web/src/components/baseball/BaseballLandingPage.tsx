@@ -23,6 +23,7 @@ import {
   Paragraph as TParagraph,
 } from 'tamagui';
 import type { League } from './LeagueCard';
+import { PageMeta } from '../PageMeta';
 import {
   DEFAULT_NUM_DIVISIONS,
   DEFAULT_NUM_TEAMS,
@@ -956,6 +957,10 @@ export function BaseballLandingPage() {
       aria-label="Baseball fantasy landing page"
       style={pageBackgroundStyle}
     >
+      <PageMeta
+        title="Baseball"
+        description="Manage your fantasy baseball leagues, draft players, track live stats, and compete with friends on Legacy Sports."
+      />
       <ContentContainer>
         {/* Returning users: compact hero → leagues list (zero-scroll) */}
         {/* New users: full hero → empty state CTA */}
