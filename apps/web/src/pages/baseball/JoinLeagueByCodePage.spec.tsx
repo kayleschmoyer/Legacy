@@ -626,4 +626,60 @@ describe('JoinLeagueByCodePage', () => {
 
     expect(screen.getByText(/This league is full/i)).toBeInTheDocument();
   });
+
+  /**
+   * Regression: LS-1295 — deep-link banner must not show for an unvalidated URL param
+   *
+   * The banner ("Invite code loaded from link! Ready to join.") must only appear
+   * once the invite code has been validated by the server (leagueInfo is present)
+   * AND the current code input still matches the validated value.
+   *
+   * NOTE: This test MUST be last because jest.resetModules() clears the module
+   * registry, which would break subsequent tests that depend on the top-level
+   * jest.mock() setup.
+   */
+  it('does not show deep-link banner when invite code from URL is not yet validated (LS-1295 regression)', () => {
+    jest.doMock('../../api/db/graphql.generated', () => ({
+      useJoinLeagueByCodeMutation: jest.fn(() => [
+        mockJoinLeague,
+        { loading: false },
+      ]),
+      // Simulate no validation result yet
+      useValidateInviteCodeLazyQuery: jest.fn(() => [
+        mockValidateCode,
+        { data: undefined, loading: false },
+      ]),
+    }));
+    jest.doMock('react-router-dom', () => ({
+      ...jest.requireActual('react-router-dom'),
+      useNavigate: () => mockNavigate,
+      useParams: () => ({ inviteCode: 'ABC12345' }),
+    }));
+
+    const {
+      render: rtlRender,
+      screen: rtlScreen,
+    } = require('@testing-library/react');
+    const {
+      MemoryRouter: Router,
+      Route: RRoute,
+      Routes: RRoutes,
+    } = jest.requireActual('react-router-dom');
+    const { JoinLeagueByCodePage: Page } =
+      require('./JoinLeagueByCodePage') as typeof import('./JoinLeagueByCodePage');
+
+    rtlRender(
+      <Router initialEntries={['/baseball/join/ABC12345']}>
+        <RRoutes>
+          <RRoute path="/baseball/join/:inviteCode" element={<Page />} />
+        </RRoutes>
+      </Router>,
+    );
+
+    expect(
+      rtlScreen.queryByText(/Invite code loaded from link/i),
+    ).not.toBeInTheDocument();
+
+    jest.resetModules();
+  });
 });

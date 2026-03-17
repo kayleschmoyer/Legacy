@@ -33,19 +33,19 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
   const [validateCode, { data: validateData, loading: validating }] =
     useValidateInviteCodeLazyQuery();
 
-  // Validate the code against the server whenever it reaches 8 chars
   const codePattern = /^[A-Z0-9]{8}$/;
   const trimmedCode = inviteCode.trim().toUpperCase();
   const isCodeComplete = codePattern.test(trimmedCode);
 
+  // Validate the code against the server whenever it reaches 8 chars
   useEffect(() => {
     if (isCodeComplete) {
       void validateCode({ variables: { code: trimmedCode } });
     }
   }, [trimmedCode, isCodeComplete, validateCode]);
 
-  // Only expose league info when the code is still a valid 8-char input;
-  // this prevents stale preview data from lingering after the user edits the code.
+  // Only expose league info when the code is still valid; this prevents stale
+  // preview data from lingering after the user edits the code (LS-1295).
   const leagueInfo = isCodeComplete
     ? (validateData?.validateInviteCode ?? null)
     : null;
@@ -155,7 +155,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
         </Text>
       </YStack>
 
-      {urlInviteCode && (
+      {urlInviteCode && leagueInfo && !leagueInfo.isFull && isCodeComplete && (
         <Card
           backgroundColor="$green2"
           borderColor="$green6"

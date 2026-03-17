@@ -91,7 +91,19 @@ test.describe('Join League — page load @critical', () => {
 // ── critical: deep link ───────────────────────────────────────────
 
 test.describe('Join League — deep link @critical', () => {
-  test('pre-fills invite code from URL and shows banner', async ({ page }) => {
+  test('pre-fills invite code from URL and shows banner after validation', async ({
+    page,
+  }) => {
+    // The banner is gated on leagueInfo being returned from validateInviteCode,
+    // so we must mock the query before navigating (it fires on mount).
+    await routeGraphQL(page, {
+      validateinvitecode: validateInviteCodeResponse({
+        leagueName: 'Summer Sluggers',
+        totalSpots: 10,
+        availableSpots: 3,
+      }),
+    });
+
     const lp = new LeaguePage(page);
     await lp.gotoJoin('ABC12XYZ');
     await lp.expectJoinFormVisible();
@@ -99,7 +111,7 @@ test.describe('Join League — deep link @critical', () => {
     // Code is pre-filled from the URL
     await expect(lp.inviteCodeInput).toHaveValue('ABC12XYZ');
 
-    // Deep-link confirmation banner appears
+    // Deep-link confirmation banner appears after the code is validated
     await expect(lp.deepLinkBanner).toBeVisible();
 
     // Subtext changes to indicate code is pre-filled
