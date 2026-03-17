@@ -237,6 +237,9 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     permLevel === 'owner' ||
     permLevel === 'commissioner' ||
     permLevel === 'general_manager';
+  // Commissioner-only controls (Pause Draft, Commissioner Pick, Disable Auto-Pick)
+  // must not be shown to general managers who lack those server-side permissions.
+  const isCommissioner = permLevel === 'owner' || permLevel === 'commissioner';
   const myTeamId = normalizeTeamId(league?.userMembership?.teamId);
 
   // Helper: resolve team name from leagueTeams by numeric ID
@@ -1858,8 +1861,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             </div>
           )}
 
-          {/* Commissioner Controls */}
-          {isOwner && draftId && (
+          {/* Commissioner Controls — only visible to owner/commissioner, not general_manager */}
+          {isCommissioner && draftId && (
             <div className="d-comm-controls">
               <div className="d-comm-title">
                 <span role="img" aria-label="crown">
