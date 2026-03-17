@@ -131,6 +131,8 @@ export function LeagueCreatePage(): React.JSX.Element {
   const [formError, setFormError] = useState<string | null>(null);
   const [showWaiverUpgradeModal, setShowWaiverUpgradeModal] =
     useState<boolean>(false);
+  const [showEraUpgradeModal, setShowEraUpgradeModal] =
+    useState<boolean>(false);
   const [formData, setFormData] = useState<CreateLeagueFormData>({
     leagueName: '',
     numberOfTeams: DEFAULT_NUM_TEAMS,
@@ -246,10 +248,21 @@ export function LeagueCreatePage(): React.JSX.Element {
     e.preventDefault();
     setFormError(null);
 
-    if (!isPremium && formData.waiverType === 'faab') {
+    if ((!isPremium || premiumLoading) && formData.waiverType === 'faab') {
       trackPremiumFeatureClick('FAAB Waiver Settings');
       setShowWaiverUpgradeModal(true);
       setFormError('FAAB waiver settings require Premium.');
+      return;
+    }
+
+    if (
+      (!isPremium || premiumLoading) &&
+      formData.eraFilter !== 'all' &&
+      formData.eraFilter !== 'modern'
+    ) {
+      trackPremiumFeatureClick('Historical Era Selection');
+      setShowEraUpgradeModal(true);
+      setFormError('This historical era requires Premium.');
       return;
     }
 
@@ -751,33 +764,41 @@ export function LeagueCreatePage(): React.JSX.Element {
               </YStack>
 
               {/* Era Filter — Era-Based Leagues (LS-295) */}
-              <PremiumGate
-                isPremium={isPremium}
-                featureName="Historical Era Selection"
-                featureDescription="Restrict your league's player pool to a specific baseball era — a unique differentiator no live-stats platform can offer."
-              >
-                <YStack space="$2">
-                  <Text size="$4" fontWeight="600" color="$gray12">
-                    Historical Era Filter
-                  </Text>
-                  <Text size="$2" color="$gray10">
-                    Restrict your league's player pool to a specific baseball
-                    era — a unique differentiator no live-stats platform can
-                    offer.
-                  </Text>
-                  <XStack space="$2" flexWrap="wrap">
-                    {ERA_FILTER_OPTIONS.map((option) => (
+              <YStack space="$2">
+                <Text size="$4" fontWeight="600" color="$gray12">
+                  Historical Era Filter
+                </Text>
+                <Text size="$2" color="$gray10">
+                  Restrict your league's player pool to a specific baseball era
+                  — a unique differentiator no live-stats platform can offer.
+                </Text>
+                <XStack space="$2" flexWrap="wrap">
+                  {ERA_FILTER_OPTIONS.map((option) => {
+                    const isFreeOption =
+                      option.value === 'all' || option.value === 'modern';
+                    const isLocked =
+                      (!isPremium || premiumLoading) && !isFreeOption;
+                    return (
                       <Button
                         key={option.value}
                         size="$3"
                         onPress={() => {
+                          if (isLocked) {
+                            trackPremiumFeatureClick(
+                              'Historical Era Selection',
+                            );
+                            setShowEraUpgradeModal(true);
+                            return;
+                          }
                           handleInputChange('eraFilter', option.value);
                         }}
                         disabled={loading}
                         backgroundColor={
                           formData.eraFilter === option.value
                             ? '$orange8'
-                            : '$color2'
+                            : isLocked
+                              ? '$color1'
+                              : '$color2'
                         }
                         borderColor={
                           formData.eraFilter === option.value
@@ -787,6 +808,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                         borderWidth={
                           formData.eraFilter === option.value ? 2 : 1
                         }
+                        opacity={isLocked ? 0.55 : 1}
                         hoverStyle={{
                           backgroundColor:
                             formData.eraFilter === option.value
@@ -807,69 +829,76 @@ export function LeagueCreatePage(): React.JSX.Element {
                           fontSize="$2"
                         >
                           {option.label}
+                          {isLocked ? ' (Premium)' : ''}
                         </Text>
                       </Button>
-                    ))}
-                  </XStack>
+                    );
+                  })}
+                </XStack>
+                {!isPremium && (
+                  <Text size="$2" color="$brandGoldLight">
+                    Other historical eras are available on Premium. Modern
+                    (2006+) is included free.
+                  </Text>
+                )}
 
-                  {/* Custom era year range */}
-                  {formData.eraFilter === 'custom' && (
-                    <XStack space="$3" alignItems="center" flexWrap="wrap">
-                      <YStack flex={1} space="$1">
-                        <Text fontSize="$2" color="$gray10">
-                          Start Year
-                        </Text>
-                        <Input
-                          size="$3"
-                          placeholder="e.g. 1940"
-                          value={
-                            formData.customEraStartYear !== undefined
-                              ? String(formData.customEraStartYear)
-                              : ''
-                          }
-                          onChangeText={(text: string) => {
-                            const year = parseInt(text, 10);
-                            handleInputChange(
-                              'customEraStartYear',
-                              isNaN(year) ? undefined : year,
-                            );
-                          }}
-                          keyboardType="numeric"
-                          disabled={loading}
-                          borderColor="$orange8"
-                        />
-                      </YStack>
-                      <Text color="$gray10" marginTop="$4">
-                        –
+                {/* Custom era year range */}
+                {formData.eraFilter === 'custom' && (
+                  <XStack space="$3" alignItems="center" flexWrap="wrap">
+                    <YStack flex={1} space="$1">
+                      <Text fontSize="$2" color="$gray10">
+                        Start Year
                       </Text>
-                      <YStack flex={1} space="$1">
-                        <Text fontSize="$2" color="$gray10">
-                          End Year
-                        </Text>
-                        <Input
-                          size="$3"
-                          placeholder="e.g. 1960"
-                          value={
-                            formData.customEraEndYear !== undefined
-                              ? String(formData.customEraEndYear)
-                              : ''
-                          }
-                          onChangeText={(text: string) => {
-                            const year = parseInt(text, 10);
-                            handleInputChange(
-                              'customEraEndYear',
-                              isNaN(year) ? undefined : year,
-                            );
-                          }}
-                          keyboardType="numeric"
-                          disabled={loading}
-                          borderColor="$orange8"
-                        />
-                      </YStack>
-                    </XStack>
-                  )}
-                </YStack>
-              </PremiumGate>
+                      <Input
+                        size="$3"
+                        placeholder="e.g. 1940"
+                        value={
+                          formData.customEraStartYear !== undefined
+                            ? String(formData.customEraStartYear)
+                            : ''
+                        }
+                        onChangeText={(text: string) => {
+                          const year = parseInt(text, 10);
+                          handleInputChange(
+                            'customEraStartYear',
+                            isNaN(year) ? undefined : year,
+                          );
+                        }}
+                        keyboardType="numeric"
+                        disabled={loading}
+                        borderColor="$orange8"
+                      />
+                    </YStack>
+                    <Text color="$gray10" marginTop="$4">
+                      –
+                    </Text>
+                    <YStack flex={1} space="$1">
+                      <Text fontSize="$2" color="$gray10">
+                        End Year
+                      </Text>
+                      <Input
+                        size="$3"
+                        placeholder="e.g. 1960"
+                        value={
+                          formData.customEraEndYear !== undefined
+                            ? String(formData.customEraEndYear)
+                            : ''
+                        }
+                        onChangeText={(text: string) => {
+                          const year = parseInt(text, 10);
+                          handleInputChange(
+                            'customEraEndYear',
+                            isNaN(year) ? undefined : year,
+                          );
+                        }}
+                        keyboardType="numeric"
+                        disabled={loading}
+                        borderColor="$orange8"
+                      />
+                    </YStack>
+                  </XStack>
+                )}
+              </YStack>
 
               {/* Hall of Fame Only Toggle */}
               <YStack space="$2">
@@ -1621,6 +1650,12 @@ export function LeagueCreatePage(): React.JSX.Element {
         onOpenChange={setShowWaiverUpgradeModal}
         featureName="FAAB Waiver Settings"
         featureDescription="Use Free Agent Acquisition Budget (FAAB) bidding for waiver claims, where the highest bid wins."
+      />
+      <UpgradeModal
+        open={showEraUpgradeModal}
+        onOpenChange={setShowEraUpgradeModal}
+        featureName="Historical Era Selection"
+        featureDescription="Unlock all historical eras to restrict your league's player pool — Dead Ball, Golden Age, Expansion, and more."
       />
     </ScrollView>
   );
