@@ -2645,6 +2645,53 @@ export function LeagueDetailPage(): React.JSX.Element {
   };
 
   const renderTeamSettings = () => {
+    // Non-members (spectators) should not see editable controls.
+    // Wait for the userTeamId query to complete before deciding.
+    if (!userTeamId) {
+      if (userTeamLoading) {
+        return (
+          <YStack
+            gap="$4"
+            padding="$4"
+            alignItems="center"
+            role="tabpanel"
+            id="panel-team-settings"
+            aria-labelledby="tab-team-settings"
+          >
+            <Spinner size="large" color={BRAND_NAVY_LIGHT} />
+          </YStack>
+        );
+      }
+      return (
+        <YStack
+          gap="$4"
+          padding="$4"
+          role="tabpanel"
+          id="panel-team-settings"
+          aria-labelledby="tab-team-settings"
+        >
+          <Card
+            backgroundColor="$surfacePanel"
+            borderColor="$surfacePanelBorder"
+            borderWidth={1}
+            borderRadius="$6"
+            padding="$6"
+            alignItems="center"
+          >
+            <YStack gap="$3" alignItems="center" maxWidth={400}>
+              <Edit3 size={32} color="$textMuted" />
+              <Text fontSize="$5" fontWeight="600" color="$textMuted">
+                You&apos;re not a member
+              </Text>
+              <Text fontSize="$3" color="$textMuted" textAlign="center">
+                Join this league to manage your team name, logo, and colors.
+              </Text>
+            </YStack>
+          </Card>
+        </YStack>
+      );
+    }
+
     const userTeam = leagueTeams.find((t) => t.id === userTeamId);
     const currentName = String(userTeam?.name ?? '');
 
