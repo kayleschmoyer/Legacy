@@ -16,10 +16,15 @@ import {
 
 interface DraftQueuePanelProps {
   draftId: number;
+  autoPickDisabled?: boolean;
   onError?: (message: string) => void;
 }
 
-export function DraftQueuePanel({ draftId, onError }: DraftQueuePanelProps) {
+export function DraftQueuePanel({
+  draftId,
+  autoPickDisabled,
+  onError,
+}: DraftQueuePanelProps) {
   const {
     data,
     loading,
@@ -188,7 +193,7 @@ export function DraftQueuePanel({ draftId, onError }: DraftQueuePanelProps) {
         </div>
       )}
 
-      {entries.length > 0 && (
+      {entries.length > 0 && !autoPickDisabled && (
         <div className="d-queue-hint">
           Auto-pick will select from this queue first
         </div>

@@ -2185,6 +2185,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           {draftId && myTeamId !== null && (
             <DraftQueuePanel
               draftId={draftId}
+              autoPickDisabled={autoPickDisabled}
               onError={(msg) => {
                 showToast(msg);
               }}
