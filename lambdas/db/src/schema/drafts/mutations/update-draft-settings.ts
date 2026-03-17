@@ -121,15 +121,17 @@ builder.mutationField('updateDraftSettings', (t) =>
             `Invalid era filter: ${eraFilter}. Must be one of: ${validEraFilters.join(', ')}`,
           );
         }
-        if (
-          eraFilter === 'custom' &&
-          customEraStartYear != null &&
-          customEraEndYear != null &&
-          customEraStartYear > customEraEndYear
-        ) {
-          throw new Error(
-            'Custom era start year must be less than or equal to end year',
-          );
+        if (eraFilter === 'custom') {
+          if (customEraStartYear == null || customEraEndYear == null) {
+            throw new Error(
+              'Both start year and end year are required for a custom era.',
+            );
+          }
+          if (customEraStartYear > customEraEndYear) {
+            throw new Error(
+              'Custom era start year must be less than or equal to end year',
+            );
+          }
         }
 
         if (

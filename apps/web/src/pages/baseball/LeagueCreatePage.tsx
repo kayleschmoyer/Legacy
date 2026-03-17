@@ -241,6 +241,18 @@ export function LeagueCreatePage(): React.JSX.Element {
       return 'Draft date must be in the future';
     }
 
+    if (formData.eraFilter === 'custom') {
+      if (
+        formData.customEraStartYear == null ||
+        formData.customEraEndYear == null
+      ) {
+        return 'Please enter both a start year and an end year for your custom era';
+      }
+      if (formData.customEraStartYear > formData.customEraEndYear) {
+        return 'Start year must be earlier than or equal to end year';
+      }
+    }
+
     return null;
   };
 

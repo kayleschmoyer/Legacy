@@ -257,6 +257,20 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         );
       }
 
+      // ── Custom era year-range validation ────────────────────────────────
+      if (inputEraFilter === 'custom') {
+        if (inputCustomEraStartYear == null || inputCustomEraEndYear == null) {
+          throw new Error(
+            'Both start year and end year are required for a custom era.',
+          );
+        }
+        if (inputCustomEraStartYear > inputCustomEraEndYear) {
+          throw new Error(
+            'Start year must be earlier than or equal to end year.',
+          );
+        }
+      }
+
       try {
         const result = await leagueService.createLeague({
           name: leagueName,

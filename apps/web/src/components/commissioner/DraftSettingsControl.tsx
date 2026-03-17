@@ -389,6 +389,23 @@ export function DraftSettingsControl({
   };
 
   const handleSave = async () => {
+    if (eraFilterLocal === 'custom') {
+      if (customEraStartYearLocal == null || customEraEndYearLocal == null) {
+        onError?.(
+          new Error(
+            'Please enter both a start year and an end year for your custom era',
+          ),
+        );
+        return;
+      }
+      if (customEraStartYearLocal > customEraEndYearLocal) {
+        onError?.(
+          new Error('Start year must be earlier than or equal to end year'),
+        );
+        return;
+      }
+    }
+
     try {
       await updateDraftSettings({
         variables: {
