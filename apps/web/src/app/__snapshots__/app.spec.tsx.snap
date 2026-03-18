@@ -61,6 +61,9 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           <div>
             Players Dropdown
           </div>
+          <div>
+            My Leagues Dropdown
+          </div>
           <a
             href="/games/season-draft"
             style="text-decoration: none;"
@@ -181,6 +184,9 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           <div>
             Players Dropdown
           </div>
+          <div>
+            My Leagues Dropdown
+          </div>
           <a
             href="/games/season-draft"
             style="text-decoration: none;"
@@ -298,6 +304,9 @@ exports[`App Navigation should render navigation with correct links 1`] = `
           </div>
           <div>
             Players Dropdown
+          </div>
+          <div>
+            My Leagues Dropdown
           </div>
           <a
             href="/games/season-draft"

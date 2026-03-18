@@ -105,6 +105,10 @@ jest.mock('../components/layout/HelpDropdown', () => ({
   HelpDropdown: () => <div>Help Dropdown</div>,
 }));
 
+jest.mock('../components/layout/MyLeaguesDropdown', () => ({
+  MyLeaguesDropdown: () => <div>My Leagues Dropdown</div>,
+}));
+
 jest.mock('../components/a11y/GlobalAnnouncer', () => ({
   GlobalAnnouncer: () => <div>Global Announcer</div>,
 }));

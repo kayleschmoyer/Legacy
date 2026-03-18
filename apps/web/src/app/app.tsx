@@ -29,6 +29,7 @@ import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { SportsDropdown } from '../components/layout/SportsDropdown';
 import { PlayersDropdown } from '../components/layout/PlayersDropdown';
 import { HelpDropdown } from '../components/layout/HelpDropdown';
+import { MyLeaguesDropdown } from '../components/layout/MyLeaguesDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
 import { BaseballScreen } from '../components/baseball';
 
@@ -278,6 +279,7 @@ function Navigation() {
           >
             <SportsDropdown />
             <PlayersDropdown />
+            <MyLeaguesDropdown />
 
             <Link
               to="/games/season-draft"
