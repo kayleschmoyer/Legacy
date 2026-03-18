@@ -42,6 +42,7 @@ import { DraftGrid } from './DraftGrid';
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
 import { getDraftCommentary } from './draftUtils';
+import { AuctionDraftRoom } from './auction/AuctionDraftRoom';
 import { PremiumGate } from '../PremiumGate';
 import { DEFAULT_NUM_TEAMS } from '../../constants/league';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
@@ -271,6 +272,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const draftId: number | null = leagueDraft?.id
     ? Number(leagueDraft.id)
     : null;
+  const isAuctionDraft = leagueDraft?.selectionMethod === 'auction';
 
   // Log draft errors (debug logging removed for production)
   useEffect(() => {
@@ -306,8 +308,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     GET_CURRENT_DRAFT_PICK,
     {
       variables: { draftId: draftId ?? 0 },
-      skip: !draftId,
-      pollInterval: !draftId || draftOrderMissing ? 0 : 5000, // Poll every 5s as a fallback to WebSocket
+      skip: !draftId || isAuctionDraft,
+      pollInterval: !draftId || draftOrderMissing || isAuctionDraft ? 0 : 5000, // Poll every 5s as a fallback to WebSocket
       errorPolicy: 'all',
     },
   );
@@ -363,7 +365,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     GetDraftPicksQueryVariables
   >(GET_DRAFT_PICKS, {
     variables: { draftId: draftId ?? 0 },
-    skip: !draftId,
+    skip: !draftId || isAuctionDraft,
   });
 
   const pickHistory: DraftPickRecord[] = (picksData?.getDraftPicks ??
@@ -390,7 +392,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           : 'hitterAvgPointsPerGame',
       limit: 200,
     },
-    skip: !draftId,
+    skip: !draftId || isAuctionDraft,
     errorPolicy: 'all',
   });
 
@@ -423,6 +425,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   // ---- Career Batting Stats (uses existing careerBattingStats connection) ----
   const { data: statsData } = useQuery(GET_DRAFT_PLAYER_STATS, {
     variables: { first: 5000, minGames: 1 },
+    skip: isAuctionDraft,
     errorPolicy: 'all',
   });
 
@@ -465,6 +468,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   // ---- Career Pitching Stats ----
   const { data: pitchingStatsData } = useQuery(GET_DRAFT_PITCHING_STATS, {
     variables: { limit: 2000, minGames: 1 },
+    skip: isAuctionDraft,
     errorPolicy: 'all',
   });
 
@@ -516,8 +520,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     GetDraftTeamAutoPickStatusesQueryVariables
   >(GET_DRAFT_TEAM_AUTO_PICK_STATUSES, {
     variables: { draftId: draftId ?? 0 },
-    skip: !draftId,
-    pollInterval: 5000,
+    skip: !draftId || isAuctionDraft,
+    pollInterval: isAuctionDraft ? 0 : 5000,
   });
 
   const autoPickTeamIds = useMemo<ReadonlySet<string>>(() => {
@@ -710,7 +714,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     GetMyDraftQueueQueryVariables
   >(GET_MY_DRAFT_QUEUE, {
     variables: { draftId: draftId ?? 0 },
-    skip: !draftId,
+    skip: !draftId || isAuctionDraft,
     fetchPolicy: 'cache-and-network',
   });
   const queueEntries = queueData?.getMyDraftQueue ?? [];
@@ -949,7 +953,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     // won't be sent. Set `Domain=.legacy-fantasy.com` on the cookie or use a
     // query-string token fallback in that case.
     viewContext: 'league',
-    autoConnect: !!leagueId && isAuthenticated,
+    autoConnect: !!leagueId && isAuthenticated && !isAuctionDraft,
     onDraftStarted: handleDraftStarted,
     onDraftPickMade: handleDraftPickMade,
     onDraftPickUndone: handleDraftPickUndone,
@@ -1853,6 +1857,16 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
           )}
         </div>
       </div>
+    );
+  }
+
+  // =========================================================================
+  // Auction Draft UI
+  // =========================================================================
+
+  if (leagueDraft?.selectionMethod === 'auction' && draftId != null) {
+    return (
+      <AuctionDraftRoom draftId={draftId} myTeamId={myTeamId ?? undefined} />
     );
   }
 
