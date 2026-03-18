@@ -41,7 +41,7 @@ All skills live under `.agents/skills/<name>/SKILL.md`. Key skills:
 | New app/lambda/lib/MCP   | `create-app`, `create-lambda`, `create-lib`, `create-mcp-server` |
 | PR creation/operations   | `create-pr`, `pr-operations`                                     |
 | Rebase / merge conflicts | `rebase-conflicts`, `resolve-merge-conflicts`                    |
-| MCP (DB/Jira)            | `mcp-db`, `mcp-jira`                                             |
+| MCP (DB/Jira/worktree)   | `mcp-db`, `mcp-jira`, `mcp-worktree`                             |
 | All skills               | `.agents/skills/`                                                |
 
 Tech stack: React Native · Next.js · Lambda · GraphQL · PostgreSQL/Drizzle · Terraform

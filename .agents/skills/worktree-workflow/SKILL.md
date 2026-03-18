@@ -9,6 +9,8 @@ description: 'Implement Jira tickets using git worktrees for parallel developmen
 
 Git worktrees let you check out multiple branches simultaneously in separate directories — one directory per ticket. The main repo stays on `main` and is used only for creating new worktrees. Each ticket gets its own folder. All worktrees are available in the multi-root VS Code workspace.
 
+> **Co-load required:** When running shell commands (`make`, `nx`, `git`) inside a worktree, load and use the [mcp-worktree skill](../mcp-worktree/SKILL.md) (`worktree_set` / `worktree_run`) instead of the bash tool. This prevents the most common failure mode — running commands in the main repo instead of the active worktree.
+
 ## Worktree Directory Structure
 
 ```
@@ -83,12 +85,13 @@ Junctioned worktrees share the main repo's `node_modules`. Key rules:
 
 Before creating the worktree, **inspect the Jira ticket** for "blocked-by" linked issues. Query the status of each blocker to decide how to proceed:
 
-```powershell
-# List linked issues for the ticket
-acli jira workitem link list --key LS-####
-# Then check the status of any "blocked-by" ticket
-acli jira workitem view --key LS-XXXX --fields status
+Use the `jira_check_blockers` MCP tool (primary) or load the [mcp-jira skill](../mcp-jira/SKILL.md) for full details:
+
 ```
+jira_check_blockers(key: "LS-####")
+```
+
+This returns a `canProceed` flag, the blocker list, and a `recommendation` ("base off main", "base off LS-XXXX branch", or "STOP — blocker(s) not ready: …").
 
 | Blocker status               | Action                                                                                                                                   |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -101,10 +104,10 @@ acli jira workitem view --key LS-XXXX --fields status
 
 ### Step 0b: Transition Jira to In Progress (Only After Step 0 Passes)
 
-Once blockers are verified as In Review/Done (or absent), transition the ticket:
+Once blockers are verified as In Review/Done (or absent), transition the ticket using the `jira_transition` MCP tool (primary):
 
-```powershell
-acli jira workitem transition --key LS-#### --status "In Progress"
+```
+jira_transition(key: "LS-####", status: "In Progress")
 ```
 
 ### Step 1: Create the Branch + Worktree
@@ -159,10 +162,10 @@ twig worktree list
 
 ### Step 2: Confirm Jira is In Progress
 
-If you haven't already transitioned the ticket (see the note at the top of this section), do it now:
+If you haven't already transitioned the ticket (see the note at the top of this section), do it now using the `jira_transition` MCP tool:
 
-```powershell
-acli jira workitem transition --key LS-#### --status "In Progress"
+```
+jira_transition(key: "LS-####", status: "In Progress")
 ```
 
 ### Step 3: Install Dependencies, Copy .env, Link .twig
@@ -308,8 +311,10 @@ gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp
 
 ### Step 9: Update Jira to In Review
 
-```powershell
-acli jira workitem transition --key LS-#### --status "In Review"
+Use the `jira_transition` MCP tool (primary):
+
+```
+jira_transition(key: "LS-####", status: "In Review")
 ```
 
 ### Step 10: Cleanup After Merge
@@ -349,8 +354,8 @@ cd "D:\code\legacy-sports"
 make worktree TICKET=#### DESC=description                           # independent
 make worktree TICKET=#### DESC=description PARENT=LS-XXXX/branch     # dependent
 
-# 2. Jira → In Progress
-acli jira workitem transition --key LS-#### --status "In Progress"
+# 2. Jira → In Progress (MCP tool — primary)
+jira_transition(key: "LS-####", status: "In Progress")
 
 # 3. Setup (node_modules + .env + .twig)
 $wt = "<path-from-twig-worktree-list>"
@@ -367,7 +372,7 @@ make pc
 # 6. PR + Jira (DO NOT stop at make pc)
 gh pr create --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
 ./scripts/cleanup-pr-body.ps1
-acli jira workitem transition --key LS-#### --status "In Review"
+jira_transition(key: "LS-####", status: "In Review")  # MCP tool — primary
 
 # 7. Cleanup after merge
 cd "D:\code\legacy-sports"
