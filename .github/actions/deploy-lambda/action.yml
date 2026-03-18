@@ -70,8 +70,6 @@ runs:
         echo "🚀 Building $LAMBDA_NAME Lambda..."
         echo "::notice::Building $NX_PROJECT project for targeted deployment"
 
-        export NX_NO_CLOUD=true
-
         # Build the project
         if pnpm exec nx build "$NX_PROJECT" --verbose 2>&1 | tee build.log; then
           echo "✅ $LAMBDA_NAME Lambda built successfully"

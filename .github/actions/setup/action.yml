@@ -279,6 +279,11 @@ runs:
         # Set conservative defaults for Nx execution
         echo "NX_DAEMON=false" >> $GITHUB_ENV
         echo "NX_PARALLEL=2" >> $GITHUB_ENV
+        # Disable Nx Cloud — this repo uses local caching only; prevents
+        # "Ambiguous Distribution Configuration" warnings when cloud env vars
+        # are present but nx-cloud start-ci-run was not called.
+        echo "NX_NO_CLOUD=true" >> $GITHUB_ENV
+        export NX_NO_CLOUD=true
 
         # Ensure Nx cache directory exists and is properly configured
         if [ -n "${NX_CACHE_DIRECTORY:-}" ]; then

@@ -71,9 +71,6 @@ runs:
         NODE_ENV: production
         APP_VERSION: ${{ github.sha }}
       run: |
-        # Ensure Nx Cloud is not used for CI builds
-        export NX_NO_CLOUD=true
-
         # Inject version information into build
         export VITE_COMMIT_SHA="${GITHUB_SHA}"
         export VITE_BUILD_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"

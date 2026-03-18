@@ -65,8 +65,6 @@ runs:
       run: |
         echo "::group::📦 Web Application Build"
 
-        export NX_NO_CLOUD=true
-
         echo "::notice::To reproduce locally: pnpm exec nx build web --verbose"
 
         ERROR_CONTEXT="build-web-$(date +%s)"
@@ -133,8 +131,6 @@ runs:
       shell: bash
       run: |
         echo "::group::⚡ Lambda Functions Build"
-
-        export NX_NO_CLOUD=true
 
         echo "::notice::To reproduce locally: pnpm exec nx run-many -t build --projects=draft-processor,game-selection,oauth-proxy,stats-lambda"
 

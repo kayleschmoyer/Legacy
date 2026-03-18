@@ -209,7 +209,6 @@ runs:
 
         PARALLEL="${{ inputs.parallel }}"
         echo "ℹ️ Running locally with --parallel=$PARALLEL"
-        export NX_NO_CLOUD=true
         echo "strategy=local" >> $GITHUB_OUTPUT
 
         LINT_SUCCESS=true

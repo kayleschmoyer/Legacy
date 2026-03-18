@@ -66,6 +66,10 @@ env:
   NX_SKIP_NX_CACHE: false
   NX_CACHE_DIRECTORY: .nx-cache
   NODE_OPTIONS: "--max_old_space_size=4096"
+  # Disable Nx Cloud globally — this repo uses local caching only.
+  # Without this, Nx may emit "Ambiguous Distribution Configuration" warnings
+  # when cloud env vars are present but start-ci-run was not called.
+  NX_NO_CLOUD: true
 
 jobs:
   # ============================================================================

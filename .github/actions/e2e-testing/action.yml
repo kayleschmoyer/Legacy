@@ -87,7 +87,6 @@ runs:
         # Configure Playwright for CI
         export CI=true
         export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/playwright"
-        export NX_NO_CLOUD=true
 
         PLAYWRIGHT_BIN="pnpm exec playwright"
 
