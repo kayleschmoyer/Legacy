@@ -42,9 +42,9 @@ export interface UIIntegrationFixtures {
 
 const WEB_BASE =
   process.env.INTEGRATION_WEB_URL ?? 'https://legacy-fantasy.com';
-const GQL_BASE =
-  process.env.INTEGRATION_BASE_URL ??
-  'https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/';
+const GQL_BASE = (
+  process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
+).replace(/\/?$/, '/');
 
 /**
  * Build a Playwright storageState for cookie-based auth (integration tests).

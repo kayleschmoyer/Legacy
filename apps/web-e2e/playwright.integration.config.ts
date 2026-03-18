@@ -19,8 +19,7 @@ export default defineConfig({
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
     baseURL:
-      process.env.INTEGRATION_BASE_URL ??
-      'https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/',
+      process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/',
     trace: 'on-first-retry',
   },
 });

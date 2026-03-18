@@ -91,7 +91,7 @@ async function triggerGameSelection(
     // Get API Gateway endpoint from environment
     const apiUrl =
       process.env.GAME_SELECTION_ENDPOINT ||
-      'https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/games';
+      'https://api.legacy-fantasy.com/games';
     const endpoint = `${apiUrl}/create-matchup`;
 
     LOGGER.info(

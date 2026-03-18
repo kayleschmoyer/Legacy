@@ -77,8 +77,7 @@
     "test-endpoint": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "powershell -Command \"$headers = @{'Content-Type' = 'application/json'}; $body = '{\\\"query\\\": \\\"{ hello }\\\"}'; $response = Invoke-RestMethod -Uri 'https://u65oy98s9d.execute-api.us-east-1.amazonaws.com/dev/graphql' -Method POST -Headers $headers -Body $body; $response | ConvertTo-Json\"",
-        "cwd": "terraform"
+        "command": "curl -s -X POST https://api.legacy-fantasy.com/graphql -H 'Content-Type: application/json' -d '{\"query\": \"{ hello }\"}'"
       }
     },
     "serve": {

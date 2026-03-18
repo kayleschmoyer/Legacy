@@ -235,8 +235,7 @@ test.describe
     // no-op until the server-side deadline actually expires, so polling every
     // 5 seconds is safe.
     const gqlBase =
-      process.env.INTEGRATION_BASE_URL ??
-      'https://bd1opa1yv7.execute-api.us-east-1.amazonaws.com/dev/';
+      process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/';
     async function nudgeDraftPick(): Promise<void> {
       if (!state.leagueId) return;
       await fetch(`${gqlBase}graphql`, {
