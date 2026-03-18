@@ -1,6 +1,6 @@
 ---
 name: mcp-jira
-description: 'Use the Jira MCP server tools for ticket operations: create tickets (avoids --json duplication bug), transition status with validation, view structured ticket details (including priority, reporter, labels, timestamps), fetch ticket comments, check blocker dependencies (3-way check), and set parent epic via REST API. Load when performing any Jira operation through MCP tools.'
+description: 'Manage Jira tickets via MCP tools (primary) or acli CLI (fallback). Load when creating tickets, checking blocker status before starting work, transitioning status (In Progress → In Review), or managing sprints and dependencies.'
 ---
 
 # Skill: Jira MCP Server
@@ -149,3 +149,16 @@ Alternatively, create `~/.netrc` — the server falls back to it automatically w
 ### Tool returns error about status validation
 
 Only `In Progress`, `In Review`, and `Done` are supported transitions. For other Jira statuses, use the Jira web UI or a direct REST client.
+
+## CLI Fallback (acli)
+
+When MCP tools are unavailable, use the `acli` CLI. **Read [references/jira-cli-fallback.md](references/jira-cli-fallback.md)** for the full CLI command reference including: attachment downloads, REST API for parent epics, sprint management, JQL search, investigation ticket workflow, and de-scoping patterns.
+
+**Never use `fetch_webpage` or raw HTTP to access Jira.** If neither MCP tools nor `acli` are available, inform the user that Jira credentials need configuration.
+
+## Best Practices
+
+1. **Update status immediately** when state changes (start work, create PR, merge)
+2. **Add to current sprint** for new tickets before implementation
+3. **Link related tickets** when de-scoping or splitting work
+4. **Close investigation tickets** immediately once a follow-up backlog ticket is created

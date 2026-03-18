@@ -1,6 +1,6 @@
 ---
 name: dev-web
-description: 'Start the Next.js development server for the web application with hot-reloading and local development features.'
+description: 'Start the Next.js development server with hot-reloading. Use when developing web features, testing UI changes locally, or debugging web application issues.'
 ---
 
 # Skill: Running Dev Web Server

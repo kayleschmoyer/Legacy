@@ -1,6 +1,6 @@
 ---
 name: integration-testing
-description: 'Write, run, and debug Playwright integration tests that validate distributed flows end-to-end against deployed (or local) services; covers async polling with expect.poll(), WebSocket message verification, GraphQL API assertions, long-running Lambda chain waits, UI browser integration tests for comprehensive user stories, test tagging, and Playwright config for integration projects. Load this skill before creating or modifying any integration test that hits real services or waits for async backends.'
+description: 'Write and debug Playwright integration tests that validate distributed flows end-to-end against deployed or local services. Load before creating or modifying any integration test that hits real services or waits for async backends.'
 ---
 
 # Skill: Integration Testing (Playwright — Distributed Flows)

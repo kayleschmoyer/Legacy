@@ -1,6 +1,6 @@
 ---
 name: fix-types
-description: 'Diagnose and fix TypeScript type errors in the Nx monorepo; covers module-not-found, type mismatches, missing declarations, and generated type errors.'
+description: 'Diagnose and fix TypeScript type errors in the Nx monorepo. Use when make typecheck reports errors (module-not-found, type mismatches, missing declarations, generated type issues) or CI fails on the typecheck step.'
 ---
 
 # Skill: Fix TypeScript Errors

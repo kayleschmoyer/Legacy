@@ -1,6 +1,6 @@
 ---
 name: debug-ci-failure
-description: 'End-to-end workflow for debugging failed GitHub Actions CI runs: identify the failed stage, fetch logs, locate the root cause, reproduce locally, fix, and re-verify. Use when a CI run fails on a PR or branch.'
+description: 'Debug failed CI runs end-to-end: identify the failed stage, fetch logs, locate the root cause, reproduce locally, fix, and re-verify. Use when a GitHub Actions run fails on a PR or branch.'
 ---
 
 # Skill: Debug a Failed GitHub Actions Run
@@ -18,23 +18,16 @@ Step-by-step playbook for triaging and fixing a failed CI run in the Legacy Spor
 
 ## CRITICAL: Evidence-First Debugging
 
-**NEVER guess at the problem.** Before attempting any fix, you MUST extract the actual error text from CI logs — the specific file, line number, error code, or message that identifies what went wrong.
+**NEVER guess at the problem.** Extract the actual error text from CI logs before attempting any fix.
 
-**Insufficient evidence (DO NOT proceed with just this):**
+| ❌ Insufficient (don't proceed) | ✅ Sufficient (ready to fix)                                                 |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| "The lint step failed"          | `apps/web/src/App.tsx:17:3 error @typescript-eslint/no-floating-promises`    |
+| "There are TypeScript errors"   | `lib/scoring/src/utils.ts(42,5): error TS2345: Argument of type 'string'...` |
+| "Unit tests failed"             | `FAIL lib/utils/src/helpers.spec.ts — Expected: 42, Received: undefined`     |
+| "The build failed"              | `(node:3665) Warning: Failed to load the ES module: jest.config.web.ts`      |
 
-- "The lint step failed" — _which rule? which file?_
-- "There are TypeScript errors" — _which TS error code? which file/line?_
-- "Unit tests failed" — _which test? what assertion? was it a config error upstream?_
-- "The build failed" — _which project? what error message?_
-
-**Sufficient evidence (you need this before fixing):**
-
-- `lib/scoring/src/utils.ts(42,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'`
-- `apps/web/src/App.tsx:17:3 error @typescript-eslint/no-floating-promises: Promises must be awaited`
-- `FAIL lib/utils/src/helpers.spec.ts — Expected: 42, Received: undefined`
-- `(node:3665) Warning: Failed to load the ES module: jest.config.web.ts`
-
-If a search pattern returns no results, widen your search or save the full logs and read them. **Do not skip the evidence step.**
+If a search pattern returns no results, widen your search or save the full logs. **Do not skip the evidence step.**
 
 ## CI Pipeline Stages (in order)
 
@@ -469,48 +462,15 @@ foreach ($p in $patterns) {
 
 ## Troubleshooting
 
-### `gh run view` returns no output
+- **`gh run view` returns no output**: run may be in-progress or token lacks `actions:read`. Confirm with `gh run view RUN_ID`.
+- **Logs truncated**: save to file or open in browser (`gh run view RUN_ID --web`).
+- **detect-changes failure**: usually infrastructure — rerun with `gh run rerun RUN_ID --failed`.
+- **Merge-queue rejection**: find the merge-queue run: `gh run list --workflow ci-orchestrator.yml --limit 5`, then debug normally.
 
-The run may still be in progress or the token lacks `actions:read` scope. Confirm with:
+> 📎 **Advanced troubleshooting** (concurrency cancellations, skills lint, E2E failures, setup detection, Terraform locks, merge queue, build artifacts): see [references/ci-troubleshooting-advanced.md](references/ci-troubleshooting-advanced.md)
 
-```powershell
-gh run view RUN_ID
-```
-
-### Logs are truncated
-
-GitHub truncates very long log lines. Save to file and search locally, or open in the browser:
-
-```powershell
-gh run view RUN_ID --web
-```
-
-### Failure in detect-changes
-
-This early stage rarely fails. When it does, it is usually an infrastructure issue (runner allocation, checkout failure). Rerun the job:
-
-```powershell
-gh run rerun RUN_ID --failed
-```
-
-### Merge-queue rejection
-
-The merge queue runs `ci-pipeline.yml` via `ci-orchestrator.yml`. Debug the same way — find the merge-queue run ID and follow this workflow.
-
-```powershell
-gh run list --workflow ci-orchestrator.yml --limit 5
-```
-
-> 📎 **Advanced troubleshooting** (items 8-15: concurrency cancellations, skills lint, E2E failures, setup detection, Terraform locks, merge queue, build artifacts): see [references/ci-troubleshooting-advanced.md](references/ci-troubleshooting-advanced.md)
-
-> 📎 **Pipeline architecture** (two-layer design diagram, env vars, timeouts, deployment debugging, comprehensive diagnostic script): see [references/ci-pipeline-architecture.md](references/ci-pipeline-architecture.md)
+> 📎 **Pipeline architecture** (two-layer design diagram, env vars, timeouts, deployment debugging): see [references/ci-pipeline-architecture.md](references/ci-pipeline-architecture.md)
 
 ## Related Skills
 
-- `.agents/skills/github-actions-logs/SKILL.md` — Detailed log parsing patterns and PowerShell commands
-- `.agents/skills/fix-lint/SKILL.md` — Resolving specific ESLint rule violations
-- `.agents/skills/fix-types/SKILL.md` — Fixing TypeScript type errors
-- `.agents/skills/test/SKILL.md` — Running and debugging unit tests locally
-- `.agents/skills/build/SKILL.md` — Building affected projects
-- `.agents/skills/troubleshoot/SKILL.md` — General dev-environment troubleshooting
-- `.agents/skills/deploy-lambda/SKILL.md` — Lambda deployment workflow
+`github-actions-logs` · `fix-lint` · `fix-types` · `test` · `build` · `troubleshoot` · `deploy-lambda`

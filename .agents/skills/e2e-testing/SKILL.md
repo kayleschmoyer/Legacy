@@ -1,6 +1,6 @@
 ---
 name: e2e-testing
-description: 'Write, run, and debug Playwright E2E tests for the web app; covers file placement, auth fixtures with automatic API isolation (blocks live AWS services), GraphQL mocking with page.route(), snapshot conventions, test tagging (@critical/@smoke/@regression), static production build serving (port 4280), Nx targets, and CI pipeline integration. Load this skill before creating or modifying any E2E test.'
+description: 'Write, run, and debug Playwright E2E tests: auth fixtures, API isolation, GraphQL mocking, test tagging, static build serving (port 4280), and CI pipeline. Load before creating or modifying any E2E test.'
 ---
 
 # Skill: E2E Testing (Playwright — Web)
@@ -27,26 +27,9 @@ Playwright's `webServer` config in `apps/web-e2e/playwright.config.ts` is the **
 
 ## Shutdown Hygiene (Windows Lock Prevention)
 
-When running E2E locally, always stop any manually started Playwright/static servers once you are done debugging.
+Always stop Playwright/static servers when done. Stale processes hold native `.node` addons, blocking `make install` for all junctioned worktrees. Use `make kill-stale` to find and stop them.
 
-- Processes like `playwright test-server` can keep native `.node` addons loaded (`bufferutil.node`, `utf-8-validate.node`).
-- In this repo, many worktrees share `node_modules` via junctions, so one stale server process can block installs for everyone.
-- The symptom is usually: `ERR_PNPM_EPERM ... unlink ... node_modules\\bufferutil\\...\\bufferutil.node`.
-
-Use these commands before `make install`/`make install-force` if you suspect a stale server:
-
-```powershell
-# Show node processes holding native addons under shared node_modules
-$nmRoot='D:\code\legacy-sports\node_modules'; $nmEsc=[regex]::Escape($nmRoot)
-Get-Process node -ErrorAction SilentlyContinue | Where-Object {
-  try { ($_.Modules | Where-Object { $_.FileName -match ($nmEsc + '.*\.node$') }).Count -gt 0 } catch { $false }
-} | Select-Object Id, ProcessName
-
-# Stop only the lock-holding node processes
-Get-Process node -ErrorAction SilentlyContinue | Where-Object {
-  try { ($_.Modules | Where-Object { $_.FileName -match ($nmEsc + '.*\.node$') }).Count -gt 0 } catch { $false }
-} | ForEach-Object { Stop-Process -Id $_.Id -Force }
-```
+> 📎 **Detection scripts and full details**: see [references/shutdown-hygiene.md](references/shutdown-hygiene.md)
 
 ## When to Use
 
@@ -131,74 +114,17 @@ All fixtures extend from an `isolated` base that includes **automatic API isolat
 
 ### API Isolation (automatic — 3-layer mock architecture)
 
-The production build bakes in **real AWS URLs** (GraphQL, OAuth proxy, WebSocket) from `.env` at build time. Without isolation, E2E tests would hit live services — making them flaky, slow, and dependent on network/AWS state.
+The production build bakes in real AWS URLs from `.env`. The `_apiIsolation` auto-fixture in `auth-enhanced.ts` intercepts **all requests not targeting port 4280**, ensuring complete network isolation.
 
-`auth-enhanced.ts` includes an `{ auto: true }` fixture called `_apiIsolation` that intercepts **all requests not targeting the E2E static file server port (4280)**. This catches localhost service ports (`:5000` GraphQL, `:5001` OAuth proxy), external CDNs, AWS endpoints, and any other host — ensuring complete network isolation.
+Three layers execute in LIFO order: **test `page.route()` → auth.ts overrides → baseline mocks**. The baseline (`shared-mocks.ts`) covers ~30 common operations. Unknown operations return an error and throw after the test.
 
-#### Layer structure
+- **Add new baseline**: edit `shared-mocks.ts`, add lowercased key to `BASELINE_GRAPHQL_RESPONSES`
+- **Tests just add `page.route()`** — it overrides the baseline. Use `route.fallback()` for unhandled ops.
+- Tests that don't need data (about page, nav) work with zero mocking setup.
 
-Playwright routes match in **LIFO order** (last registered runs first). The three layers register in this order, so they execute in reverse:
+> 📎 **Full 3-layer architecture, baseline catalog, auth.ts overrides, URL pattern table**: see [references/api-isolation-architecture.md](references/api-isolation-architecture.md)
 
-| Layer | File                               | Registers            | Runs   | Purpose                                             |
-| ----- | ---------------------------------- | -------------------- | ------ | --------------------------------------------------- |
-| 1     | `auth-enhanced.ts` `_apiIsolation` | First (auto fixture) | Last   | Shared baseline mocks + unmocked-op detection       |
-| 2     | `auth.ts` page fixture             | Second               | Middle | Authenticated-user overrides (OAuth login, leagues) |
-| 3     | Test code (`page.route()`)         | Last (test body)     | First  | Scenario-specific operation mocks                   |
-
-Request flow: **test handler → auth.ts handler → \_apiIsolation baseline → throw if unknown**
-
-#### Baseline mocks (`fixtures/shared-mocks.ts`)
-
-The baseline mock map (`BASELINE_GRAPHQL_RESPONSES`) provides default responses for ~30 common GraphQL operations. These cover:
-
-- **App shell**: `GetUserById`, `GetUserLeagues` (empty)
-- **Home page**: `GetOnThisDay`, `GetOnThisDayEvents`
-- **League detail**: `GetLeagueById`, `GetLeagueTeams`, `GetPositionsForLeague`, `GetLeagueScoringProfile`, matchups, standings, activity, chat, etc.
-- **Draft**: `GetLeagueDraft`, `GetDraftTeamOrder`
-- **Subscription, trade block, playoff, player stats, admin, team members, invite code**
-
-All baseline responses use the factory functions from `mocks/graphql/` (e.g., `leagueByIdResponse()`, `leagueTeamsResponse()`).
-
-#### Unmocked operation detection
-
-If a GraphQL operation reaches layer 1 and is **not** in the baseline map:
-
-1. **During the test**: returns `{ errors: [{ message: "unmocked..." }] }` (so the UI shows an error state instead of hanging)
-2. **After the test body**: throws a descriptive error listing all unmocked operations
-
-This catches missing mocks early. Fix by adding the operation to `shared-mocks.ts` (if common) or mocking it in the test.
-
-#### How to add a new baseline operation
-
-1. Edit `apps/web-e2e/src/fixtures/shared-mocks.ts`
-2. Add a lowercased key to `BASELINE_GRAPHQL_RESPONSES`
-3. Use a factory from `mocks/graphql/` or return a minimal `{ data: { fieldName: null } }` response
-
-#### auth.ts overrides
-
-`auth.ts` extends `auth-enhanced.ts` and adds overrides for authenticated user context:
-
-- OAuth login endpoint mock
-- `GetUserLeagues` → returns one league (overrides baseline's empty array)
-- `StartDraft` and `UpdateLeagueBranding` mutation mocks
-- All other operations use `route.fallback()` → fall through to baseline
-
-Tests that import from `auth.ts` get both the auth overrides AND the baseline.
-
-| URL Pattern            | Layer 1 (baseline) Response                     | Why                                                 |
-| ---------------------- | ----------------------------------------------- | --------------------------------------------------- |
-| `*/graphql` (known op) | `200` with baseline mock data                   | Components render with reasonable defaults          |
-| `*/graphql` (unknown)  | `200 { errors: [...] }` + post-test throw       | Catches missing mocks — add to shared-mocks.ts      |
-| Everything else        | `401 { error: 'Blocked by E2E API isolation' }` | Prevents silent JWT refresh and other backend calls |
-
-This means:
-
-- Tests that need specific GraphQL responses just add `page.route()` as before — it overrides the baseline
-- Tests that don't need data (about page, navigation, etc.) work with zero mocking setup
-- The silent JWT refresh (`/refresh-jwt`) is blocked automatically — no need for manual intercepts
-- Unmocked operations are caught and reported instead of silently returning empty data
-
-> **Do NOT use MSW for E2E tests.** MSW requires a Service Worker in the browser — fragile, requires build changes, and handlers don't serialize across the Playwright/browser boundary. Playwright's `page.route()` intercepts at the network protocol layer and is the first-class solution.
+> **Do NOT use MSW for E2E tests.** Playwright's `page.route()` intercepts at the network protocol layer and is the first-class solution.
 
 ```typescript
 // Default authenticated test
@@ -277,74 +203,21 @@ test.beforeEach(async ({ page }) => {
 });
 ```
 
-> **🚫 NEVER use `route.continue()`** in E2E tests. E2E tests are hermetic —
-> they must never send requests to a real backend. In CI there _is_ no backend
-> (the app is served as static files), so `route.continue()` causes requests to
-> hang until timeout, silently breaking every test in the suite.
->
-> **Use `route.fallback()` for unhandled operations.** With the 3-layer
-> architecture, `route.fallback()` cascades through: test → auth.ts → baseline.
-> The baseline handles ~30 common operations. Only truly unknown operations
-> trigger the post-test error.
->
-> **Never return `{ errors: [...], data: null }` as a catch-all** —
-> Apollo treats that as a server error, triggering error boundaries that
-> unmount the page and break every downstream assertion.
+> **🚫 NEVER use `route.continue()`** — E2E tests are hermetic (no backend in CI).
+> Use `route.fallback()` for unhandled operations — they cascade through the 3-layer architecture.
 >
 > ```typescript
-> // ✅ Best: fall through to shared baseline mocks
-> await route.fallback();
->
-> // ✅ OK: explicit empty data for a specific operation
-> await route.fulfill({
->   status: 200,
->   contentType: 'application/json',
->   body: JSON.stringify({ data: {} }),
-> });
->
-> // ❌ WRONG: error response — Apollo error boundary crashes UI
-> await route.fulfill({
->   body: JSON.stringify({
->     errors: [{ message: `[E2E] No mock for operation: ${op}` }],
->     data: null,
->   }),
-> });
->
-> // ❌ WRONG: route.continue() — hangs in CI, hits real backend locally
-> await route.continue();
+> await route.fallback();        // ✅ cascades to baseline mocks
+> await route.fulfill({ ... });  // ✅ explicit response for specific operation
+> await route.continue();        // ❌ hangs in CI, hits backend locally
 > ```
 >
-> **`route.fallback()` is OK** when multiple route handlers are chained and you
-> want an earlier handler to defer to a later one — but the _final_ handler in
-> the chain must still end with `route.fulfill()`, never `route.continue()`.
->
-> **Only integration tests hit real services** (see `.agents/skills/integration-testing/SKILL.md`).
+> **Never return `{ errors: [...], data: null }` as a catch-all** — Apollo error boundaries crash the UI.
 
-> **Avoid broad `postData.includes()` matches:** A check like
-> `postData.includes('getleague')` will also match `getleagueteams`,
-> `getleaguemembers`, etc. Either:
->
-> - **Reorder** specific matches before general ones (`getleagueteams` before `getleague`)
-> - **Quote** the operation name: `postData.includes('"getleague"')` to match the exact JSON field
-> - **Best**: Use `extractOperationName()` from `apps/web-e2e/src/fixtures/shared-mocks.ts`
+> **Avoid broad `postData.includes()` matches** — `'getleague'` also matches `getleagueteams`. Use `extractOperationName()` from `shared-mocks.ts` instead.
 
-> **Mock response structure must match Apollo's expectations:**
-> Apollo client reads `response.data.<fieldName>`, NOT `response.<fieldName>`.
-> Always wrap mock responses in a `{ data: { ... } }` envelope, and use the
-> correct GraphQL field name (check the actual `.graphql` query file):
->
-> ```typescript
-> // ❌ WRONG — missing data wrapper
-> await route.fulfill({ json: { getLeagueById: null } });
->
-> // ❌ WRONG — wrong field name (operation name ≠ field name)
-> await route.fulfill({ json: { data: { GetLeagueById: null } } });
->
-> // ✅ CORRECT — data wrapper + correct field name from query
-> await route.fulfill({ json: { data: { league: null } } });
-> ```
->
-> Reference `apps/web-e2e/src/fixtures/shared-mocks.ts` for correct baseline patterns.
+> **Mock response structure:** Always wrap in `{ data: { ... } }` with the correct GraphQL **field name** (not operation name):
+> `{ data: { league: null } }` ✅ — `{ data: { GetLeagueById: null } }` ❌ — `{ getLeagueById: null }` ❌. See `shared-mocks.ts` for patterns.
 
 ### 5. Tag the test suite
 
@@ -374,440 +247,47 @@ test.describe('Basic Smoke @smoke', () => {
 
 CI defaults to `@critical` (excluding `@slow`). To run all:
 
-### Tagging Decision Guide
-
-Apply **one primary tag** to the `test.describe` block. Individual tests inherit the suite tag. Tests that genuinely belong to a different tier get their own inline tag appended to the test name (e.g., `'shows drag handles @regression'`).
-
-#### `@critical` — Use when a failure means the app is effectively down
-
-A flow is **critical** if a failure blocks users from completing the core game loop: authenticate → create/join a league → draft → play matchups → trade/waiver → manage subscription. Ask: _"If this breaks at 11 PM on a Friday, would we roll back immediately?"_ If yes → `@critical`.
-
-Examples:
-
-- User can log in / is redirected when unauthenticated
-- User can create or join a league
-- User can discover leagues and submit a join request
-- Draft board renders and draft status updates work
-- Commissioner can advance matchups, select games, process waivers
-- User can send/receive/cancel trades
-- Subscription paywall gates content correctly and upgrade flow works
-- WebSocket real-time updates arrive without page reload
-- Mobile navigation panel opens and links work
-
-Counter-examples (these are **not** `@critical`):
-
-- Player stats page loads (display-only, game still plays)
-- Standings table renders (informational, not blocking)
-- Playoff bracket shows round names (visual, results still process)
-- Commissioner league settings form (games play with existing settings)
-- Team detail page shows roster (read-only view)
-
-Rule of thumb: if the feature breaking means **users cannot play their leagues or pay**, it is `@critical`. If it means **users cannot see some data** but the game loop still works, it is `@regression`.
-
-#### `@smoke` — Use when the test is a basic page/navigation sanity check
-
-A smoke test answers: _"Does the page load and show its main heading?"_ It is not testing a user flow — just that the route renders at all. These are fast (< 2 s) and exist to catch routing and build regressions before anything else runs.
-
-Examples:
-
-- About page shows its H1
-- Help page sections are visible
-- Home page heading is present
-- Navigation links are visible
-- Profile settings page loads
-
-Rule of thumb: if the test only calls `page.goto()` + `expect(...).toBeVisible()` on a top-level heading or nav element, it is `@smoke`.
-
-**Do not** tag a test `@smoke` if it requires GraphQL mocking, authentication state beyond a basic JWT, or more than one interaction.
-
-#### `@regression` — Use for display features, edge cases, or error states
-
-Regression tests cover features where a failure is annoying but doesn't break the core game loop. This includes **display/browsing pages** (stats, standings, player profiles, team detail, pricing, playoff brackets), **edge cases** (error states, empty states, locked UI), **accessibility checks**, and **admin-only tools**.
-
-Examples:
-
-- Player stats page structure and tab switching
-- Standings table data rendering
-- Playoff bracket completed/in-progress display
-- Team detail page identity and roster
-- Roster management layout and player data
-- Commissioner league settings form
-- Admin console access control and user management
-- Error toast displays and can be dismissed
-- Form shows validation errors on invalid input
-- Accessibility: headings have correct hierarchy
-- Cross-browser rendering differences
-
-Rule of thumb: if the test was written _after_ a bug was found in production, tag it `@regression`. Also use `@regression` for anything that is too slow or too niche to run on every PR.
-
-#### `@visual` — Use for screenshot/snapshot tests
-
-Visual tests capture the pixel layout of a page or component. They are brittle across OS/DPI and are not run in normal CI. Always pair with a corresponding `@critical` or `@smoke` test that validates the same page functionally.
-
-#### `@slow` — Append to any test that takes > 10 seconds
-
-`@slow` can be combined with another tag (e.g., `@critical @slow`). The CI default run excludes `@slow` tests via `--grep-invert @slow`. Long-running integration flows (e.g., full season simulation) should carry this tag.
-
-### Common Mistakes
-
-| Mistake                                                    | Correct approach                                               |
-| ---------------------------------------------------------- | -------------------------------------------------------------- |
-| Tagging a heading-visibility check `@critical`             | Use `@smoke` instead                                           |
-| Tagging a display/browsing page `@critical`                | Use `@regression` — game loop still works without it           |
-| Tagging a broken-state / edge case `@critical`             | Use `@regression`                                              |
-| Tagging admin-only tools `@critical`                       | Use `@regression` — internal ops, not user-facing gameplay     |
-| Tagging a full season simulation without `@slow`           | Add `@slow` alongside the primary tag                          |
-| Putting `@critical` on a test that takes 15+ seconds       | Add `@slow` so it is excluded by default                       |
-| Tagging an entire file `@smoke` when some tests test flows | Split into multiple `test.describe` blocks with different tags |
-
 ```powershell
 # IMPORTANT: The pipe `|` in grep patterns is interpreted by Windows CMD
 # (which Nx spawns internally). Always use the $env: variable approach:
 $env:PLAYWRIGHT_GREP='@critical|@smoke|@regression' ; pnpm exec nx e2e web-e2e
 ```
 
-> **Never** pass `--grep='@critical|@smoke'` via `--` args on Windows.
-> CMD interprets `|` as a shell pipe, producing `'smoke' is not recognized`.
-> The `PLAYWRIGHT_GREP` env var is read by `apps/web-e2e/playwright.config.ts`
-> and converted to a `grep` regex — it is not a built-in Playwright env var.
+> **Unsure which tag?** Load `references/test-tagging-guide.md` for the full decision guide with examples and common mistakes.
 
 ## Playwright Best Practices (REQUIRED)
 
-Follow these Playwright-recommended patterns. Violations cause flaky, slow, and non-deterministic tests.
+> **Full details in `references/playwright-best-practices.md`** — load when writing or reviewing test code.
 
-### Never use `waitForTimeout()`
+Key rules (always apply):
 
-`page.waitForTimeout()` is an arbitrary sleep — tests that depend on it are slow (best case) and flaky (worst case). Replace with a condition-based wait:
+- **Never** use `waitForTimeout()` — use condition-based waits instead
+- **Never** use `waitForLoadState('networkidle')` — wait for specific elements
+- **Never** use `page.$()`, `page.$$()`, `page.waitForSelector()` — use Playwright locators
+- **Always** use web-first assertions (`await expect(locator).toBeVisible()`)
+- **Always** pass `--config=apps/web-e2e/playwright.config.ts`
+- Prefer role-based selectors > text > placeholder > testID > CSS
 
-```typescript
-// ❌ WRONG: arbitrary sleep
-await page.waitForTimeout(1000);
-await expect(page.getByText('Results')).toBeVisible();
+## Running Tests, CI Pipeline & Validation
 
-// ✅ CORRECT: wait for the condition directly
-await expect(page.getByText('Results')).toBeVisible();
+> **Full details in `references/e2e-ci-and-validation.md`** — load when running tests, understanding CI, or troubleshooting.
 
-// ✅ For debounced inputs: fill then assert on the result
-await page.fill('#search', 'query');
-await expect(page.getByTestId('search-results')).toBeVisible();
-
-// ✅ For polling (integration tests): use expect.poll()
-await expect
-  .poll(async () => {
-    const resp = await page.request.get('/api/status');
-    return resp.json();
-  })
-  .toEqual(expect.objectContaining({ ready: true }));
-```
-
-### Never use `waitForLoadState('networkidle')`
-
-`'networkidle'` waits until no network requests for 500ms — it's **deprecated**, unreliable with long-polling/WebSockets, and adds unnecessary delay. SPAs with polling or analytics never truly go idle.
-
-```typescript
-// ❌ WRONG: unreliable, deprecated
-await page.waitForLoadState('networkidle');
-
-// ✅ CORRECT: wait for a specific element
-await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-
-// ✅ OK when you just need DOM ready (e.g., before a snapshot)
-await page.waitForLoadState('domcontentloaded');
-```
-
-### Never use `page.$()`, `page.$$()`, `page.waitForSelector()`, or `elementHandle`
-
-These are legacy Puppeteer-style APIs. Playwright locators are auto-waiting, auto-retrying, and composable.
-
-```typescript
-// ❌ WRONG: Puppeteer-style
-const el = await page.$('.my-button');
-await el?.click();
-
-// ✅ CORRECT: Playwright locator
-await page.locator('.my-button').click();
-// Even better: use semantic selectors
-await page.getByRole('button', { name: /submit/i }).click();
-```
-
-### Prefer web-first assertions
-
-```typescript
-// ❌ WRONG: manual check
-const isVisible = await page.locator('.toast').isVisible();
-expect(isVisible).toBe(true);
-
-// ✅ CORRECT: auto-retrying web-first assertion
-await expect(page.locator('.toast')).toBeVisible();
-```
-
-### Always pass `--config`
-
-A legacy root `playwright.config.ts` exists. Without `--config`, Playwright picks it up and uses the wrong port/settings.
-
-```powershell
-# ❌ WRONG: picks up root config (port 4200, dev server)
-pnpm exec playwright test
-
-# ✅ CORRECT: uses E2E config (port 4280, static build)
-pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts
-```
-
-> **Known tech debt:** ~40 `waitForTimeout()` and ~20 `networkidle` calls exist in integration tests and page objects. These should be eliminated in future PRs but are not blocking `@critical` tests.
-
-## Locator Conventions
-
-Prefer Playwright's accessibility-first selectors in this order:
-
-1. **Role-based** (best): `page.getByRole('button', { name: /create league/i })`
-2. **Text**: `page.getByText('Fantasy League')`
-3. **Placeholder**: `page.getByPlaceholder('Enter your league name')`
-4. **Test ID** (when no semantic option): `page.getByTestId('leagues-grid')`
-5. **CSS selector** (last resort): `page.locator('a[href="/about"]')`
-
-> Avoid brittle CSS class selectors — they change with styling updates.
-
-## Page Objects
-
-Page objects live in `apps/web-e2e/src/pages/` and encapsulate locators for a route or component group.
-
-### Pattern
-
-```typescript
-import { type Locator, type Page, expect } from '@playwright/test';
-
-export class ExamplePage {
-  readonly page: Page;
-  readonly heading: Locator;
-  readonly submitButton: Locator;
-
-  constructor(page: Page) {
-    this.page = page;
-    this.heading = page.getByRole('heading', { level: 1 });
-    this.submitButton = page.getByRole('button', { name: /submit/i });
-  }
-
-  async goto() {
-    await this.page.goto('/example');
-    await this.page.waitForLoadState('domcontentloaded');
-  }
-
-  async expectLoaded() {
-    await expect(this.heading).toBeVisible({ timeout: 15000 });
-  }
-}
-```
-
-### Rules
-
-- One page object per route group (e.g., `league.page.ts` covers create + detail + list)
-- Expose `Locator` properties for assertions, helper methods for multi-step interactions
-- Use `expect` inside helper methods only for preconditions (e.g., `expectLoaded`)
-- Name the file `<domain>.page.ts`
-
-## Snapshot Testing
-
-### Visual snapshots
-
-```typescript
-import { SnapshotUtils } from '../support/snapshot-utils';
-
-test('page matches snapshot @visual', async ({ page }) => {
-  await page.goto('/about');
-  await SnapshotUtils.preparePage(page);
-  await expect(page).toHaveScreenshot('about-page.png', {
-    maxDiffPixelRatio: 0.01,
-  });
-});
-```
-
-### Responsive snapshots
-
-```typescript
-await SnapshotUtils.captureResponsiveSnapshots(page, 'feature-name');
-// Captures at mobile (375×667), tablet (768×1024), desktop (1920×1080)
-```
-
-### Update snapshots
-
-```powershell
-pnpm exec nx e2e:update-snapshots web-e2e
-```
-
-## Nx Targets
-
-| Target                 | Command                                           |
-| ---------------------- | ------------------------------------------------- |
-| `e2e`                  | Run all Playwright tests                          |
-| `e2e:ui`               | Interactive UI mode (pick & debug tests visually) |
-| `e2e:headed`           | Run with visible browser                          |
-| `e2e:debug`            | Run with Playwright Inspector                     |
-| `e2e:update-snapshots` | Refresh all snapshot baselines                    |
-| `e2e:snapshots`        | Run only snapshot/visual tests                    |
-| `typecheck`            | TypeScript check (no emit)                        |
-| `lint`                 | ESLint                                            |
-
-### Run commands
+Quick reference:
 
 ```powershell
 # All tests
 pnpm exec nx e2e web-e2e
 
-# Single test file (no pipe — safe to pass via --)
+# Single test (no pipe — safe)
 pnpm exec nx e2e web-e2e -- --grep='League Detail'
 
-# Specific tag (no pipe — safe to pass via --)
-pnpm exec nx e2e web-e2e -- --grep='@critical'
-
-# Multiple tags (pipe in pattern — MUST use env var on Windows)
+# Multiple tags (MUST use env var on Windows)
 $env:PLAYWRIGHT_GREP='@critical|@smoke' ; pnpm exec nx e2e web-e2e
-
-# Chromium only (useful for faster local runs)
-$env:PLAYWRIGHT_GREP='@critical|@smoke' ; pnpm exec nx e2e web-e2e -- --project chromium
 
 # Interactive UI mode
 pnpm exec nx e2e:ui web-e2e
-
-# Headed (see browser)
-pnpm exec nx e2e:headed web-e2e
-
-# Debug with inspector
-pnpm exec nx e2e:debug web-e2e
 ```
 
-> **Windows pipe escaping rule:** Any grep pattern containing `|` must be set
-> via `$env:PLAYWRIGHT_GREP` — never passed as a `--grep` CLI argument.
-> CMD (spawned by Node/Nx on Windows) treats `|` as a shell pipe operator.
-> `PLAYWRIGHT_GREP` is read by `apps/web-e2e/playwright.config.ts`, not by Playwright itself.
+**Pre-commit rule:** If you changed any file under `apps/web-e2e/src/`, you **must** run affected E2E tests locally and confirm they pass before committing.
 
-## CI Pipeline
-
-E2E tests run in **Stage 3** of the CI pipeline (after quality gates and build validation):
-
-1. Pre-built web artifact is downloaded (or falls back to Nx remote cache)
-2. Playwright browsers are installed (cached)
-3. Playwright's `webServer` config starts `pnpm dlx serve@14.2.4 -s dist/apps/web` on port **4280**
-4. Tests run with `--grep @critical` and `--grep-invert @slow` by default
-5. Results are parsed: passed/failed/success-rate/execution-time
-
-The CI action supports inputs: `test-patterns`, `browser`, `timeout-minutes`.
-
-> **Server lifecycle is managed by Playwright**, not by the CI action. The `webServer` block in `playwright.config.ts` starts the static file server, waits for it to be healthy (`http://127.0.0.1:4280`), and kills it after tests finish. No manual start/wait/kill logic is needed.
-
-**E2E failures block PR merging.** E2E is included in the CI `failure-threshold` alongside quality-gates and build-validation. A failing E2E shard will fail the overall CI pipeline and prevent the PR from landing.
-
-## Pre-Commit: Local E2E Validation (REQUIRED)
-
-When you add, modify, or delete any Playwright test file (`apps/web-e2e/src/**`), page object, fixture, mock, or utility, you **must** run the affected E2E tests locally and confirm they pass **before committing**. This is not optional — E2E failures now block PR merging in CI.
-
-### Steps
-
-1. **Build the web app** (if not already built or if you changed web app code):
-
-   ```powershell
-   pnpm exec nx build web
-   ```
-
-   The tests run against `dist/apps/web` — you **must** rebuild after web app changes.
-
-2. **Run the specific test file you changed** (fastest feedback):
-
-   ```powershell
-   $env:E2E_AUTH_MODE='ci' ; pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts --project=chromium --grep='Test Describe Name' apps/web-e2e/src/tests/my-feature.spec.ts
-   ```
-
-   Playwright's `webServer` config will automatically start `npx serve` on port 4280 and stop it when tests finish. No manual server management needed.
-
-3. **If you changed shared infrastructure** (fixtures, page objects, utils), run the full `@critical` suite:
-
-   ```powershell
-   $env:E2E_AUTH_MODE='ci' ; pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts --project=chromium --grep='@critical'
-   ```
-
-4. **All tests must pass** before you commit. If a test fails:
-   - Fix the test or the code under test — do not skip or disable the test.
-   - Re-run until green.
-
-> Running with `--project chromium` is sufficient for local validation. CI runs across all browser projects.
-> Set `$env:E2E_AUTH_MODE='ci'` to sign JWTs locally (skips OAuth device flow).
-
-### What counts as "changing Playwright tests"
-
-Any edit to files under `apps/web-e2e/src/` — including:
-
-- Test specs (`tests/*.spec.ts`)
-- Fixtures (`fixtures/*.ts`)
-- Page objects (`pages/*.page.ts`)
-- Mocks (`mocks/**/*.ts`)
-- Utilities and support files (`utils/*.ts`, `support/*.ts`)
-- Global setup/teardown (`global-setup.ts`, `global-teardown.ts`)
-
-Also run E2E tests when your changes affect pages tested by existing E2E specs (e.g., editing a web app page component that has a corresponding `*.spec.ts`).
-
-## Selector Sync Rule
-
-When a PR changes the **login page, landing page, or auth guard** (`PublicLandingPage`, `LoginPage`, `EnhancedAuthGuard`, etc.), the same PR **must** update all E2E selectors that reference those components. Common selectors to check:
-
-- Button names: `getByRole('button', { name: /get started.../i })`
-- Headline text: `getByText(/build your dynasty/i)`
-- Aria labels: `aria-label="Sign in"`, `aria-label="Get started with Google"`
-
-**How to check:** Search `apps/web-e2e/src/` for the old button text, heading text, or aria-label. If any E2E file references the value you're changing, update it in the same PR.
-
-```powershell
-# Verify no stale selectors remain after a landing page change
-Get-ChildItem -Recurse apps/web-e2e/src -Filter *.ts | Select-String -Pattern 'old button text' -SimpleMatch
-```
-
-> **Why:** E2E tests run against the _built_ app. If the app's UI changes but tests still look for old selectors, every test will fail — and if CI skips E2E (see below), the breakage goes undetected until it blocks all future PRs.
-
-## CI: When E2E Tests Run
-
-E2E tests only run when `detect-changes` flags `e2e: true` or `web: true`. The web app is built only when those flags (or `requires-full-build`) are set.
-
-**Implication:** A PR that changes _only_ `apps/web/` components (no E2E file changes) will run E2E. A PR that changes _only_ `apps/web-e2e/` files will also trigger a web build and run E2E. But a PR that changes neither will skip E2E entirely.
-
-**This means breaking changes to auth/landing pages that don't also touch E2E selectors will pass CI** — the tests that would catch the breakage simply don't run on unrelated PRs. This is why the Selector Sync Rule above is critical.
-
-## Troubleshooting
-
-| Problem                             | Fix                                                                                                                                                                                                               |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------- | ------------------ |
-| Tests timeout on `goto()`           | Ensure `dist/apps/web` exists (`pnpm exec nx build web`). Playwright's webServer serves it on port 4280.                                                                                                          |
-| Auth fails locally                  | Delete `.auth/token-cache.json` and re-run. Or use `$env:E2E_AUTH_MODE='ci'` to skip OAuth device flow.                                                                                                           |
-| Snapshots differ on CI vs local     | CI uses Linux Chromium — update snapshots via the GH Action                                                                                                                                                       |
-| GraphQL mock not intercepting       | Check the URL filter excludes `/@fs/` and `.ts`/`.js` paths                                                                                                                                                       |
-| Tests hang on unmocked operation    | Add the operation to `shared-mocks.ts` (if common) or mock it in your test. The `_apiIsolation` fixture throws after the test with a list of unmocked operations.                                                 |
-| Mock never intercepts query         | Check for broad `includes()` match — use quoted operation name                                                                                                                                                    |
-| Flaky: some tests pass vacuously    | Mock returns `data: null` — use `{ data: { queryName: [] } }`                                                                                                                                                     |
-| Expired JWT test shows auth content | The app's silent `/refresh-jwt` call is succeeding against real AWS. API isolation fixture handles this automatically — make sure your test extends from `auth-enhanced.ts` fixtures, not raw `@playwright/test`. |
-| `'smoke' is not recognized`         | **Windows pipe bug.** Use `$env:PLAYWRIGHT_GREP='@critical                                                                                                                                                        | @smoke'`instead of`--grep='@critical | @smoke'`. CMD interprets ` | ` as a shell pipe. |
-
-## Tamagui / Custom Component Pitfalls
-
-### Custom dialog backdrops intercept Playwright clicks
-
-Tamagui custom dialogs (not `<Dialog>`) that use a `position: fixed` backdrop `YStack` will intercept Playwright's hit test via `elementFromPoint()`. Even with proper `zIndex`, Playwright sees the backdrop, not the dialog content.
-
-**Fix for the component:** Add `onPress={(e) => e.stopPropagation()}` to the inner dialog panel, plus `role="dialog"`, `aria-modal`, and `aria-label` for testability.
-
-**Fix for the test:** Use `{ force: true }` on clicks inside the dialog, but **always scope locators to the dialog first**:
-
-```typescript
-const dialog = page.getByRole('dialog', { name: 'My Dialog' });
-await dialog.getByRole('button', { name: /confirm/i }).click({ force: true });
-```
-
-> **Warning:** Unscoped `page.getByRole('button')` with `force: true` can match navigation buttons outside the dialog, causing it to close or navigate away.
-
-### Adding testID for selection UIs
-
-When Tamagui components lack semantic roles (e.g., player selection rows), add `testID` which renders as `data-testid` on web:
-
-```tsx
-<XStack testID={`item-${id}`} role="option" aria-label={`Select ${name}`}>
-```
-
-### Collapsed accordion sections
-
-Accordion-style sections render children but keep them hidden. Always expand the accordion (click the header) before asserting on or clicking elements inside it.
+**Selector sync rule:** When a PR changes the login page, landing page, or auth guard, update all E2E selectors referencing those components in the same PR.

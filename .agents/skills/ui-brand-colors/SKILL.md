@@ -1,6 +1,6 @@
 ---
 name: ui-brand-colors
-description: 'Enforce Legacy Sports brand color palette whenever adding or editing UI components in apps/web or apps/app. NEVER use raw Tailwind $blue tokens, arbitrary hex values, or inline rgba(). Always import from apps/web/src/constants/colors.ts. Load this skill before any UI work involving colors, buttons, badges, or highlights.'
+description: 'Use brand colors from apps/web/src/constants/colors.ts (not raw Tailwind tokens or hex values) when adding or editing UI components. Load before any UI work involving colors, buttons, badges, or highlights.'
 ---
 
 # UI Brand Colors

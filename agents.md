@@ -2,91 +2,46 @@
 
 **Copilot users**: See `.github/copilot-instructions.md` (auto-loaded)
 
-**Other agents**: Load `.github/skills/workflow-ticket-to-pr/SKILL.md` to start
+**Other agents**: Load `.agents/skills/worktree-workflow/SKILL.md` to start
 
-## ≡ƒÜ¿ CRITICAL
+## CRITICAL
 
-**NEVER commit to main** ΓÇö create a worktree first: `twig worktree create LS-####/description`
+- **NEVER commit to main** — create a worktree first: `make worktree TICKET=#### DESC=description`
+- **ALWAYS drive to PR** — work is NOT complete until `gh pr create` runs and Jira moves to "In Review"
+- **One ticket = one worktree = one PR** — never mix unrelated changes
+- **Shared node_modules** — never `make clean`/`make install` in the main repo while worktrees exist
+- **No `console.*`** — use `LOGGER` from `@legacy-sports/logging`
+- **E2E tests are hermetic** — never `route.continue()`, use `route.fallback()`
+- **Kill background servers when done** — `make kill-stale`
 
-**ALWAYS drive to PR** ΓÇö your work is NOT complete until `gh pr create` is run and Jira is moved to "In Review". Passing `make pc` is a checkpoint, not the finish line. Stopping after code changes or after `make pc` without opening a PR is the single most common agent failure mode.
+## Workflow (summary)
 
-## Workflow
-
-1. Ticket: use `jira_create_ticket` MCP tool, or `acli jira workitem create --summary "..." --project LS --type Task --json | ConvertFrom-Json` and note `$key` (skip if ticket exists).
-2. Dependency check first: use `jira_check_blockers` MCP tool, or inspect "blocked-by" links before any status transition.
-   - If any blocker is **not** In Review or Done, **STOP** (do not proceed).
-   - If blocker is In Review, use its branch as parent.
-   - If blocker is Done (or no blockers), base off `origin/main`.
-3. Jira In Progress: after blocker check passes, transition with `jira_transition`, or `acli jira workitem transition --key LS-#### --status "In Progress"`.
-4. Worktree: `twig worktree create $key/description`, note path, then `make wt-setup WT=$wt` (or manually: `make install`, copy `.env`, junction `.twig`).
-5. Agent multi-root access (optional): `make sync-worktrees`; `code legacy-sports.code-workspace`.
-6. Code + commit.
-7. Rebase: `git fetch origin ; twig rebase`.
-8. Post-rebase stabilization (before push): `make install ; pnpm exec nx run db:print-schema ; pnpm exec nx affected -t codegen --base=origin/main`.
-9. Validate: `make pc` (must pass before pushing), then `git push --force-with-lease origin HEAD`.
-10. PR: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main`; run `.\scripts\cleanup-pr-body.ps1`; move Jira to "In Review".
-11. Cleanup: `twig worktree clean`.
-
-## Rules
-
-**One ticket = one worktree = one PR** — never add unrelated changes to an existing branch or worktree. If a new task arises mid-flight, create a separate Jira ticket and worktree. Do not stash changes into another worktree or tack extra commits onto an in-flight branch.
-**Drive to PR** ΓÇö code ΓåÆ rebase ΓåÆ stabilize (`make install` + codegen) ΓåÆ `make pc` ΓåÆ push ΓåÆ `gh pr create` ΓåÆ Jira "In Review". **Do NOT push until `make pc` passes** ΓÇö pushing before validating is the #1 cause of post-rebase CI failures.
-**Shared node_modules ΓÇö do not mutate** ΓÇö Worktrees share `node_modules` via junctions to the main repo. Never run `make clean`, `make install`, or `pnpm install` in `D:\code\legacy-sports` while worktrees are active. Only install/clean inside your own worktree with independent `node_modules`. Runtime guards in `make install` and `make clean` will block you from mutating a junctioned `node_modules` automatically.
-**If node_modules looks broken in a junctioned worktree** (missing `.bin/`, missing packages, module-not-found errors): **DO NOT run `make install` or `make clean`**. The junction means your worktree's `node_modules` IS the main repo's `node_modules`. Instead: (1) Verify the junction is intact: `(Get-Item node_modules -Force).Attributes -band [IO.FileAttributes]::ReparsePoint`. (2) If intact, the shared `node_modules` is genuinely broken ΓÇö **ask the user** to run `make install` in the main repo (`D:\code\legacy-sports`). An agent must never do this autonomously. (3) If the junction is missing, re-run `make wt-setup WT=<path>` to recreate it.
-**Never raw `pnpm install`** ΓÇö always use `make install` (or `make install-force`). The Makefile targets acquire a file lock (`.pnpm-install.lock`) that prevents concurrent installs from corrupting the shared `node_modules`. `make wt-setup` also shares this lock.
-Nx only (`pnpm exec nx affected -t <target>`) PowerShell (`;` chains) Fix root causes Update Jira No `console.*` ΓÇö use `LOGGER` from `@legacy-sports/logging` (exceptions: `lib/logging/`, `apps/cli/`, migrations, build scripts)
-**Kill background servers when done** — if you start **any** background process via `isBackground=true` (dev servers, Playwright `test-server`, file watchers, etc.), you **must** stop it before your workflow ends. Track the terminal ID and call `Stop-Process` or kill the terminal. On Windows, stale node processes hold native addon binaries and cause `ERR_PNPM_EPERM` during `make clean`/`make install`. Run `make kill-stale` to find and stop these. The VS Code Playwright extension also spawns `test-server` automatically via Test Explorer — equally dangerous.
-**E2E tests are hermetic** — never use `route.continue()` in E2E tests (no backend in CI). Use `route.fallback()` to cascade through the 3-layer mock architecture (test → auth → baseline); only the final baseline handler should `route.fulfill()`. When changing login/landing page UI, update E2E selectors in the same PR (see `.github/skills/e2e-testing/SKILL.md`).
-**Prefer MCP tools** ΓÇö for Jira and DB operations, prefer the MCP tools (`jira_*`, `db_*`) over CLI commands when available ΓÇö they return structured data and have built-in guardrails. See `.github/skills/mcp-jira/SKILL.md` and `.github/skills/mcp-db/SKILL.md`.
-**Resolve PR review threads** ΓÇö when addressing PR review comments (from Copilot or any reviewer), **always resolve each thread** after pushing the fix. Use the GraphQL `resolveReviewThread` mutation: `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=$threadId`. Fetch thread IDs via GraphQL `reviewThreads` query, filtering for `isResolved: false`. Leaving threads unresolved after fixing them is incomplete work.
+1. Jira: `jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress"
+2. Worktree: `make worktree TICKET=#### DESC=description` → `make wt-setup WT=$wt`
+3. Code + commit from `$wt`
+4. Rebase: `git fetch origin ; twig rebase` → stabilize → `make pc` → push
+5. PR: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main`
+6. Jira: "In Review" → Cleanup: `twig worktree clean`
 
 ## Environment
 
-Windows PowerShell Nx monorepo pnpm 9.12.1 Jira:LS twig
+Windows PowerShell · Nx monorepo · pnpm 9.12.1 · Jira:LS · twig
 
 ## Docs Index
 
-| Need                            | File                                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------- | --- | ------------------- | ----------------------------------------- | --- | ----------- | ------------------------------------ |
-| **Add secret / env var**        | `.github/skills/add-secret-or-env-var/SKILL.md`                                 |
-| Architecture                    | `.github/skills/architecture/SKILL.md`                                          |
-| **AWS orphan cleanup**          | `.github/skills/aws-orphan-cleanup/SKILL.md`                                    |
-| Branch creation (advanced)      | `.github/skills/branch-create/SKILL.md`                                         |
-| **Config reference**            | `.github/skills/config-standards/SKILL.md`                                      |
-| DB queries                      | `.github/skills/db-query/SKILL.md`                                              |
-| DB schema reference             | `.github/skills/db-schema/SKILL.md`                                             |
-| **Debug distributed processes** | `.github/skills/debug-distributed/SKILL.md`                                     |
-| **Docker local stack**          | `.github/skills/docker-local/SKILL.md`                                          |
-| **Dump RDS to S3**              | `.github/skills/db-dump/SKILL.md`                                               |
-| **E2E testing (Playwright)**    | `.github/skills/e2e-testing/SKILL.md`                                           |
-| **Integration testing**         | `.github/skills/integration-testing/SKILL.md`                                   |
-| Full workflow (start here)      | `.github/skills/workflow-ticket-to-pr/SKILL.md`                                 |
-| **Install packages**            | `.github/skills/install-packages/SKILL.md`                                      |
-| Lint errors                     | `.github/skills/fix-lint/SKILL.md`                                              |
-| **Never edit generated**        | `.github/skills/no-edit-generated/SKILL.md`                                     |
-| **Never edit schema.graphql**   | `.github/skills/no-edit-schema-graphql/SKILL.md`                                |     | **No lint disable** | `.github/skills/no-lint-disable/SKILL.md` |     | **New app** | `.github/skills/create-app/SKILL.md` |
-| **New lambda**                  | `.github/skills/create-lambda/SKILL.md`                                         |
-| **New library**                 | `.github/skills/create-lib/SKILL.md`                                            |
-| **New MCP server**              | `.github/skills/create-mcp-server/SKILL.md`                                     |
-| **New skill**                   | `.github/skills/create-skill/SKILL.md`                                          |
-| PR creation                     | `.github/skills/create-pr/SKILL.md`                                             |
-| **Refresh dev seed**            | `.github/skills/db-dump-dev/SKILL.md`                                           |
-| **Restore dev seed**            | `.github/skills/db-restore-dev/SKILL.md`                                        |
-| **Restore from S3 dump**        | `.github/skills/db-restore/SKILL.md`                                            |
-| **Scratch output files**        | `.github/skills/scratch-dir/SKILL.md`                                           |
-| Troubleshooting                 | `.github/skills/troubleshoot/SKILL.md`                                          |
-| Type errors                     | `.github/skills/fix-types/SKILL.md`                                             |
-| **Storybook**                   | `.github/skills/storybook/SKILL.md`                                             |
-| **UI Brand Colors**             | `.github/skills/ui-brand-colors/SKILL.md`                                       |
-| **UI Standards**                | `.github/skills/ui-standards/SKILL.md`                                          |
-| **User testing**                | `.github/skills/user-testing/SKILL.md`                                          |
-| **WebSocket refetch UX**        | `.github/skills/websocket-refetch-ux/SKILL.md`                                  |
-| **Rebase & conflicts**          | `.github/skills/rebase-conflicts/SKILL.md`                                      |
-| **Resolve merge conflicts**     | `.github/skills/resolve-merge-conflicts/SKILL.md`                               |
-| **MCP DB operations**           | `.github/skills/mcp-db/SKILL.md`                                                |
-| **MCP Jira server**             | `.github/skills/mcp-jira/SKILL.md`                                              |
-| **Makefile reference**          | `.github/skills/makefile/SKILL.md`                                              |
-| **Worktree workflow (default)** | `.github/skills/worktree-workflow/SKILL.md`                                     |
-| All skills (60 guides)          | `.github/skills/`                                                               |
-| CSV reference data              | `docs/agents/*.csv`                                                             |
-| Tech stack                      | React Native ┬╖ Next.js ┬╖ Lambda ┬╖ GraphQL ┬╖ PostgreSQL/Drizzle ┬╖ Terraform |
+All skills live under `.agents/skills/<name>/SKILL.md`. Key skills:
+
+| Need                     | Skill name(s)                                                    |
+| ------------------------ | ---------------------------------------------------------------- |
+| Full workflow            | `worktree-workflow`                                              |
+| Architecture             | `architecture`                                                   |
+| DB (query/schema/dump)   | `db-query`, `db-schema`, `db-dump`, `db-restore`                 |
+| E2E / Integration tests  | `e2e-testing`, `integration-testing`                             |
+| Bug fixes / lint / types | `fix-bugs`, `fix-lint`, `fix-types`                              |
+| New app/lambda/lib/MCP   | `create-app`, `create-lambda`, `create-lib`, `create-mcp-server` |
+| PR creation/operations   | `create-pr`, `pr-operations`                                     |
+| Rebase / merge conflicts | `rebase-conflicts`, `resolve-merge-conflicts`                    |
+| MCP (DB/Jira)            | `mcp-db`, `mcp-jira`                                             |
+| All skills               | `.agents/skills/`                                                |
+
+Tech stack: React Native · Next.js · Lambda · GraphQL · PostgreSQL/Drizzle · Terraform

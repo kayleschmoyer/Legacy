@@ -1,6 +1,6 @@
 ---
 name: config-standards
-description: 'Reference for all project configuration file conventions in the Legacy Sports Nx monorepo; use when reviewing configs, debugging build issues, or creating new projects.'
+description: 'Load when reviewing project configs, debugging build/test/lint setup, or creating new apps/lambdas/libs to understand Nx configuration conventions (tsconfig, project.json, eslint, jest).'
 ---
 
 # Skill: Configuration Standards

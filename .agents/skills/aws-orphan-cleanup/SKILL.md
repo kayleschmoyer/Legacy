@@ -1,6 +1,6 @@
 ---
 name: aws-orphan-cleanup
-description: 'Audit AWS for orphaned resources not tracked by Terraform and clean them up; covers all resource types (VPCs, NAT Gateways, EIPs, Lambdas, API Gateways, S3, SQS, Secrets Manager, SSM, IAM, CloudWatch, EC2, DynamoDB, EventBridge). Use when asked to audit AWS, find orphaned resources, reduce AWS costs, or clean up legacy infrastructure.'
+description: 'Find and clean up AWS resources not tracked by Terraform. Use when auditing AWS costs, investigating unexpected resources, or cleaning up legacy infrastructure after decommissioning services.'
 ---
 
 # Skill: AWS Orphaned Resource Cleanup

@@ -1,6 +1,6 @@
 ---
 name: create-mcp-server
-description: 'Create a new MCP (Model Context Protocol) server under tools/mcp/; covers directory structure, Nx project vs standalone setup, SDK patterns (McpServer class + StdioServerTransport), tool registration with Zod schemas, .vscode/mcp.json registration, build/typecheck configuration, and README conventions. Load this skill before adding any new MCP server to the repo.'
+description: 'Create a new MCP (Model Context Protocol) server under tools/mcp/ to expose domain-specific tools to AI agents. Load before adding any new MCP server; covers directory structure, SDK patterns, tool registration, and configuration.'
 ---
 
 # Skill: Create a New MCP Server
@@ -39,288 +39,24 @@ tools/mcp/
 
 ## Two Setup Patterns
 
-### Pattern A: Standalone npm Module (recommended for most servers)
+| Pattern                         | When                                       | Config                                                    |
+| ------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
+| **A: Standalone** (recommended) | Simple servers, no Nx targets              | `package.json` + `tsconfig.json` only                     |
+| **B: Nx Project**               | Needs typecheck/lint/test in `nx affected` | Add `project.json`, `tsconfig.lib.json`, `.eslintrc.json` |
 
-Simpler setup — no Nx project registration needed. The server runs via `tsx` directly.
-
-**`package.json`**:
-
-```json
-{
-  "name": "legacy-sports-mcp-<server-name>",
-  "private": true,
-  "type": "module"
-}
-```
-
-**`tsconfig.json`**:
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true
-  },
-  "include": ["src/**/*.ts"]
-}
-```
-
-### Pattern B: Nx Project (for servers needing typecheck/lint/test targets)
-
-Use this when the server should participate in `nx affected` workflows.
-
-**`project.json`**:
-
-```json
-{
-  "name": "mcp-<server-name>",
-  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "tools/mcp/<server-name>/src",
-  "projectType": "application",
-  "tags": ["scope:tool", "platform:node"],
-  "targets": {
-    "typecheck": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "tsc --noEmit -p tools/mcp/<server-name>/tsconfig.lib.json"
-      }
-    }
-  }
-}
-```
-
-**`tsconfig.json`** (Nx variant):
-
-```json
-{
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "types": ["node"]
-  },
-  "files": [],
-  "include": [],
-  "references": [{ "path": "./tsconfig.lib.json" }]
-}
-```
-
-**`tsconfig.lib.json`**:
-
-```json
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "outDir": "../../../dist/out-tsc",
-    "declaration": true,
-    "types": ["node"]
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts"]
-}
-```
-
-**`.eslintrc.json`**:
-
-```json
-{
-  "extends": ["../../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*", "dist", "node_modules"],
-  "overrides": [
-    {
-      "files": ["*.ts"],
-      "parserOptions": {
-        "project": ["tools/mcp/<server-name>/tsconfig.*?.json"]
-      }
-    }
-  ]
-}
-```
+> Full config templates for both patterns: [references/setup-patterns.md](references/setup-patterns.md)
 
 ## Steps
 
-### 1. Create the Directory
-
-```powershell
-New-Item -ItemType Directory -Path "tools/mcp/<server-name>/src/tools" -Force
-```
-
-### 2. Create package.json
-
-Use Pattern A (standalone) or Pattern B (Nx project) from above.
-
-### 3. Create the Entry Point (`src/index.ts`)
-
-```typescript
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { z } from 'zod';
-
-const server = new McpServer({
-  name: 'legacy-sports-<server-name>',
-  version: '1.0.0',
-});
-
-// --- tool_name ---
-server.tool(
-  'tool_name',
-  'Description of what the tool does. Be specific — agents read this to decide when to call it.',
-  {
-    // Zod schema for parameters
-    param1: z.string().describe('What this parameter is for'),
-    param2: z.boolean().default(false).describe('Optional flag with default'),
-  },
-  async (params) => {
-    // Tool implementation
-    return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify({ success: true, data: '...' }),
-        },
-      ],
-    };
-  },
-);
-
-// Start the server
-const transport = new StdioServerTransport();
-await server.connect(transport);
-```
-
-### 4. Implement Tool Handlers
-
-For servers with more than 2 tools, split handlers into `src/tools/<tool-name>.ts`:
-
-```typescript
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-
-interface MyToolParams {
-  param1: string;
-  param2?: boolean;
-}
-
-export async function myTool(params: MyToolParams): Promise<CallToolResult> {
-  // Implementation
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({ success: true }),
-      },
-    ],
-  };
-}
-```
-
-Then import and wire up in `src/index.ts`:
-
-```typescript
-import { myTool } from './tools/my-tool.js';
-
-server.tool(
-  'my_tool',
-  'Description...',
-  { param1: z.string().describe('...') },
-  async (params) => myTool(params),
-);
-```
-
-### 5. Register in `.vscode/mcp.json`
-
-Add the server to `.vscode/mcp.json` so VS Code discovers it:
-
-```json
-{
-  "inputs": [],
-  "servers": {
-    "<server-name>": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/<server-name>/src/index.ts"]
-    }
-  }
-}
-```
-
-**Command conventions**:
-
-- Use `node --import tsx` — `pnpm`/`npx` are `.CMD` files on Windows that fail when VS Code spawns them without a shell
-- Path is relative to the workspace root
-- Transport is always `stdio` for local MCP servers
-
-### 5b. Register for Cross-Client Discovery
-
-The repo maintains MCP configs for multiple AI clients. After adding to `.vscode/mcp.json`, also add the server to these files:
-
-**`.mcp.json`** (Claude Code CLI):
-
-```json
-{
-  "mcpServers": {
-    "<server-id>": {
-      "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/<directory-name>/src/index.ts"]
-    }
-  }
-}
-```
-
-> ⚠️ **Server ID ≠ directory name.** The config key (`<server-id>`) may differ from
-> the on-disk directory (`<directory-name>`). For example, `legacy-sports-jira`
-> points to `tools/mcp/jira-server/`. Check `.vscode/mcp.json` for the canonical mapping.
-
-**Key differences from `.vscode/mcp.json`**:
-
-| Feature         | VS Code           | Claude Code       |
-| --------------- | ----------------- | ----------------- |
-| Top-level key   | `servers`         | `mcpServers`      |
-| Transport field | `"type": "stdio"` | Omitted (default) |
-| Env var syntax  | `${env:VAR_NAME}` | `${VAR_NAME}`     |
-
-> ⚠️ **Keep all config files in sync.** When adding or removing a server, update `.vscode/mcp.json`, `.github/copilot/mcp.json`, and `.mcp.json` together. See `tools/mcp/README.md` for the mapping reference.
-
-### 6. Add a README
-
-Create `tools/mcp/<server-name>/README.md`:
-
-```markdown
-# MCP <Server Name>
-
-<One-line description of what the server provides.>
-
-## Tools
-
-- **tool_name** — description
-- **another_tool** — description
-
-## How It Works
-
-<Brief explanation of implementation approach.>
-```
-
-### 7. Update the MCP README Index
-
-Add the new server to `tools/mcp/README.md`.
-
-### 8. Test the Server
-
-Verify the server starts and responds to tool listing:
-
-```powershell
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0.1.0"}}}' | pnpm exec tsx tools/mcp/<server-name>/src/index.ts
-# Or without pnpm wrapper:
-node --import tsx tools/mcp/<server-name>/src/index.ts
-```
-
-Or restart VS Code and check that the server appears in the MCP panel.
+1. **Create directory**: `New-Item -ItemType Directory -Path "tools/mcp/<server-name>/src/tools" -Force`
+2. **Create package.json**: Use Pattern A or B from reference
+3. **Create entry point** (`src/index.ts`): McpServer + StdioServerTransport + tool registrations (see reference for template)
+4. **Split tool handlers** (>2 tools): One file per tool in `src/tools/`
+5. **Register in `.vscode/mcp.json`**: Use `node --import tsx` as command (`.CMD` wrappers fail on Windows)
+   - Also register in `.mcp.json` and `.github/copilot/mcp.json` — keep all in sync
+6. **Add README**: `tools/mcp/<server-name>/README.md` with tool list
+7. **Update MCP index**: Add to `tools/mcp/README.md`
+8. **Test**: Run manually or restart VS Code to verify MCP panel
 
 ## Tool Design Guidelines
 
@@ -347,27 +83,7 @@ Write tool descriptions as if an agent reads them to decide when to call the too
 
 ### Return Values
 
-Always return structured JSON in the `text` field:
-
-```typescript
-return {
-  content: [
-    {
-      type: 'text',
-      text: JSON.stringify({ success: true, key: 'LS-1234' }),
-    },
-  ],
-};
-```
-
-For errors, set `isError: true`:
-
-```typescript
-return {
-  content: [{ type: 'text', text: 'Error message here' }],
-  isError: true,
-};
-```
+Return structured JSON in `text` field. Set `isError: true` for errors. See [references/setup-patterns.md](references/setup-patterns.md) for examples.
 
 ### Safety
 

@@ -1,6 +1,6 @@
 ---
 name: db-restore
-description: 'Download the latest production database dump from S3 and restore it into the local Docker PostgreSQL container; use when initializing a fresh local environment with real data or refreshing stale local data. Requires AWS SSO access.'
+description: 'Restore database into local Docker: production dump from S3 (AWS required) or scrubbed dev seed from repo (no AWS). Use when setting up fresh environment or refreshing stale data.'
 ---
 
 # Skill: Restore Production Dump into Local Docker
@@ -88,8 +88,25 @@ This is normal. `pg_restore` exits 1 for non-fatal warnings (e.g. missing extens
 **Migrations fail after restore**
 The dump may be older than the latest migration files. Run `make db-migrate` — it will apply pending migrations on top of the restored data.
 
+## Restore Dev Seed (No AWS Required)
+
+For developers without AWS access, restore the scrubbed anonymized seed from the repo:
+
+```powershell
+make db-restore-dev
+```
+
+This restores `resources/dev-seed.dump` (committed via Git LFS) into `ls-postgres`. The seed contains real game/league/player/stats data with PII replaced (usernames → `user_N`, emails anonymized, passwords zeroed, device tokens redacted).
+
+The script auto-pulls from Git LFS if the file is a pointer stub. After restore, run:
+
+```powershell
+make db-migrate   # Apply any pending migrations on top of the seed
+```
+
+**If seed file not found**: Install Git LFS (`winget install GitHub.GitLFS ; git lfs install`), then retry.
+
 ## Related Skills
 
-- [db-dump](../db-dump/SKILL.md) — create a new dump from RDS
-- [db-dump-dev](../db-dump-dev/SKILL.md) — scrub and package as commitable seed
-- [db-restore-dev](../db-restore-dev/SKILL.md) — restore without AWS access
+- [db-dump](../db-dump/SKILL.md) — create dumps (production or dev seed)
+- [db-schema](../db-schema/SKILL.md) — table/column reference

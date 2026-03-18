@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: 'High-level architecture reference for the Legacy Sports monorepo: project structure, how apps/lambdas/libs connect, build system patterns, and cross-platform resolution.'
+description: 'Load when you need to understand where code lives, how apps/lambdas/libs connect, build system patterns, or cross-platform resolution. Use when planning features that span multiple projects or debugging import/dependency issues.'
 ---
 
 # Skill: System Architecture

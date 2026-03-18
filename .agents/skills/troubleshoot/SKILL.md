@@ -1,6 +1,6 @@
 ---
 name: troubleshoot
-description: 'Quick-reference fixes for common dev environment issues: module not found errors, database connectivity, port conflicts, Nx cache corruption, and AWS auth failures.'
+description: 'Fix common dev environment problems: module-not-found errors, DB connectivity, port conflicts, Nx cache corruption, EPERM file locks, AWS auth failures, and Terraform state locks. Use when the dev environment breaks or CI shows environment-related errors.'
 ---
 
 # Skill: Troubleshooting
@@ -170,8 +170,45 @@ make rebase-tree
 
 ## Related Skills
 
-- [fix-types.md](../fix-types/SKILL.md) — TypeScript error fixes
-- [fix-lint.md](../fix-lint/SKILL.md) — ESLint error fixes
-- [nx-reset.md](../nx-reset/SKILL.md) — Nx cache reset
-- [sync-env.md](../sync-env/SKILL.md) — Environment sync
-- [aws-sso-login.md](../aws-sso-login/SKILL.md) — AWS authentication
+- [fix-types](../fix-types/SKILL.md) — TypeScript error fixes
+- [fix-lint](../fix-lint/SKILL.md) — ESLint error fixes
+- [sync-env](../sync-env/SKILL.md) — Environment sync
+- [aws-sso-login](../aws-sso-login/SKILL.md) — AWS authentication
+
+## Nx Cache Reset (Detailed)
+
+When `make reset` isn't enough:
+
+### Level 1: Cache Only (Fastest)
+
+```powershell
+make reset                   # Clears .nx/cache/ and stops daemon
+# or: pnpm exec nx reset
+```
+
+### Level 2: Full Clean (Slower)
+
+```powershell
+make clean:all               # Cache + node_modules
+pnpm install
+pnpm run build:libs
+```
+
+### Level 3: Nuclear (Slowest)
+
+```powershell
+Remove-Item -Recurse -Force node_modules, .nx, dist, coverage
+pnpm install
+pnpm run build:libs
+pnpm run validate
+```
+
+### Daemon Won't Stop
+
+```powershell
+pnpm exec nx daemon --stop
+Start-Sleep -Seconds 2
+pnpm exec nx reset
+```
+
+⚠️ **Don't overuse cache clearing!** Nx cache makes builds much faster. Only reset when actually needed.

@@ -1,6 +1,6 @@
 ---
 name: create-app
-description: 'Create a new application under apps/ with standardized Nx configuration; covers Node/CLI apps, React Native mobile apps, and Next.js web apps.'
+description: 'Create a new application (CLI tool, web app, or mobile app) under apps/ with standardized Nx configuration. Load before creating any new app.'
 ---
 
 # Skill: Create a New App

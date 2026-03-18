@@ -1,6 +1,6 @@
 ---
 name: worktree-workflow
-description: 'Implement a Jira ticket using a git worktree so multiple tickets can be worked in parallel without switching branches; covers setup, directory structure, validation, PR creation, and cleanup. Use whenever starting work on any Jira ticket — worktrees are the default workflow, not an alternative.'
+description: 'Implement Jira tickets using git worktrees for parallel development: blocker check → branch → code → validate → PR → cleanup. Load when starting any ticket work; this is the default workflow. Covers in-place branching and dependent branch trees.'
 ---
 
 # Skill: Implementing Tickets via Git Worktrees
@@ -51,56 +51,23 @@ work and confuses traceability.
 
 ## ⚠️ Concurrent Agent Safety (Shared node_modules)
 
-When multiple agents work in parallel, **all junctioned worktrees share the same physical
-`node_modules` directory** in the main repo. This creates race conditions if any agent
-mutates that directory.
+Junctioned worktrees share the main repo's `node_modules`. Key rules:
 
-**Rules for concurrent agents:**
+- **Never `make clean`/`make install`/`pnpm install` in the main repo** while worktrees exist — it breaks all junctions.
+- **Never manually remove worktrees** — always use `twig worktree clean` (unlinks junctions safely).
+- **Broken node_modules?** Check if it's a junction first: `(Get-Item node_modules -Force).Attributes -band [IO.FileAttributes]::ReparsePoint`. If yes, **ask the user** to fix the main repo — never run `make install` autonomously.
+- All install ops are serialized via `.pnpm-install.lock`. **Never run raw `pnpm install`** — use Makefile targets.
 
-1. **Never run `make clean`, `make install`, `make install-force`, or `pnpm install` in the
-   main repo** (`D:\code\legacy-sports`) while worktrees are active. These mutate or destroy
-   the shared `node_modules`, breaking every junctioned worktree mid-build/test.
-2. **Only run install/clean inside your own worktree** — and only when it has independent
-   (non-junctioned) `node_modules` (i.e., lockfiles diverged from main).
-3. **All install operations are serialized** — `make install`, `make install-force`, `make install-node`,
-   and `make wt-setup` all share a file lock (`.pnpm-install.lock`) in the main repo so concurrent
-   agents don't race on `node_modules`. If another install is in progress, yours will wait (up to 5 min).
-   **Never run raw `pnpm install`** — always use the Makefile targets.
-4. **`make clean` and `make force-clean` are junction-safe** — they detect junctions and
-   only unlink them (`cmd rmdir`) instead of recursively deleting the target contents.
-5. **Runtime guards enforce these rules** — `make install` (via `pnpm-install-lock.ps1`) will
-   **refuse to run** if `node_modules` is a junction, and `make clean` will **refuse to run** if
-   other worktrees have junctions pointing to the shared `node_modules`. These guards exist
-   because agents ignoring the instructions above caused cascading failures across all worktrees.
+> 📎 **Full concurrent safety rules, recovery steps, and what's safe in parallel**: see [references/concurrent-agent-safety.md](references/concurrent-agent-safety.md)
 
-**What is safe in parallel:**
+## Key Rules
 
-- Reading `node_modules` via junctions (builds, tests, lint) — multiple readers are fine.
-- Running `make wt-setup` concurrently (serialized by lock).
-- Running `pnpm install` in a worktree with independent `node_modules`.
-
-**Never manually remove worktrees:**
-
-> Running `git worktree remove` or deleting a worktree directory (e.g., `Remove-Item -Recurse`)
-> **destroys the `node_modules` junction target** — the main repo's `node_modules`. This breaks
-> every other junctioned worktree and requires a full `make install` to recover. Always use
-> `twig worktree clean`, which safely unlinks junctions before removing the directory.
-
-**When node_modules appears broken in a junctioned worktree:**
-
-> This is the #1 agent failure mode. An agent sees "missing `.bin/`" or "module not found"
-> and reflexively runs `make install` — which mutates the shared `node_modules` and breaks
-> every other agent's worktree simultaneously, triggering a cascade of install attempts.
-
-1. **Check if `node_modules` is a junction** (it almost always is):
-   ```powershell
-   (Get-Item node_modules -Force).Attributes -band [IO.FileAttributes]::ReparsePoint
-   ```
-2. **If it IS a junction** → the problem is in the main repo's `node_modules`, not yours.
-   **Ask the user** to fix it. An agent must never autonomously run `make install` in the
-   main repo while other worktrees are active.
-3. **If the junction is missing** → re-run `make wt-setup WT=<this-worktree-path>` to
-   recreate it. This is safe — it only creates a symlink, it doesn't mutate `node_modules`.
+| Rule                    | Detail                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Main stays on main**  | Never check out a feature branch in the main repo — it's the base for new worktrees                     |
+| **No edits in main**    | All file edits must happen inside `$wt`. Staging changes in main creates phantom diffs.                 |
+| **Never manual remove** | **Always** `twig worktree clean` — never `git worktree remove` or manual deletion (destroys junctions). |
+| **Run make install**    | `node_modules` is absent in a fresh worktree — always run `make wt-setup` or `make install` inside it   |
 
 ## Prerequisites
 
@@ -210,46 +177,15 @@ $wt = "<path-from-twig-worktree-list>"
 make wt-setup WT=$wt
 ```
 
-The script (`scripts/setup-worktree.ps1`):
-
-- **Compares lockfile hashes** between the worktree and main repo
-- **If they match**: creates a Windows **junction** from the worktree's `node_modules` → main repo's `node_modules` (instant, zero extra disk)
-- **If they differ**: runs `pnpm install --frozen-lockfile` (creates independent `node_modules`)
-- **Copies `.env`** from the main repo (or updates it if stale)
-- **Junctions `.twig`** so twig shares branch-dependency state
-- **Installs git hooks** from `.github/hooks/` into the shared hooks directory (pre-push auto-format + amend)
-
-> **Why junctions save disk**: With 20+ worktrees and ~1.8 GB per `node_modules`, full copies consume **36+ GB**. Junction-based sharing reduces this to near zero for worktrees whose lockfile matches main.
+`make wt-setup` compares lockfile hashes — if they match main, it creates a junction (instant, zero disk); if they differ, it runs `pnpm install`. Also copies `.env` and junctions `.twig`.
 
 Pass `-Force` to skip the lockfile check and always run a full `pnpm install`:
 
 ```powershell
 make wt-setup WT=$wt FORCE=-Force
-# Or directly:
-.\scripts\setup-worktree.ps1 -WorktreePath $wt -Force
 ```
 
-**Manual alternative** (if the script isn't available):
-
-```powershell
-$wt = (twig worktree list --porcelain 2>$null | Select-String "path:" | Where-Object { $_ -match "LS-####" } | ForEach-Object { ($_ -split "path: ")[1].Trim() })
-# OR just set it manually:
-$wt = "<path-from-twig-worktree-list>"
-
-cd $wt
-
-# Install all dependencies (pnpm + poetry) using the standard Makefile target
-make install
-
-# Copy .env from main repo
-Copy-Item "D:\code\legacy-sports\.env" "$wt\.env"
-
-# Junction .twig so twig shares branch dependency state with the main repo
-# (junction = no admin required; symlink would require admin on Windows)
-cmd /c mklink /J "$wt\.twig" "D:\code\legacy-sports\.twig"
-```
-
-> **Why junction not copy?** `.twig/state.json` tracks branch dependencies. Both the main repo and worktree must read/write the same file or twig commands (`twig tree`, `twig branch depend`, etc.) will diverge.
+> 📎 **Manual alternative** (without `make wt-setup`): see [references/manual-worktree-setup.md](references/manual-worktree-setup.md)
 
 ### Step 4: Add to Multi-Root Workspace
 
@@ -324,28 +260,9 @@ Run the full validation suite before opening the PR. Fix any failures and push a
 make pc
 ```
 
-> **Docs-only or non-code changes?** `make pc` requires `node_modules` (via `make wt-setup`).
-> If the worktree was created without `make wt-setup` for a docs-only change, you **still
-> must format** before pushing. Use the main repo's Prettier as a minimal check:
->
-> ```powershell
-> # From the worktree — uses main repo's Prettier install
-> node D:\code\legacy-sports\node_modules\prettier\bin\prettier.cjs --check .
-> # Fix formatting issues:
-> node D:\code\legacy-sports\node_modules\prettier\bin\prettier.cjs --write <files>
-> ```
->
-> This is the **minimum bar** — even markdown files are checked by CI's formatting gate.
+> **Docs-only changes?** Use main repo's Prettier: `node D:\code\legacy-sports\node_modules\prettier\bin\prettier.cjs --check .`
 
-> **Formatting failures?** If `make pc` exits with `ERROR: Formatting rewrote the following files:`, run:
->
-> ```powershell
-> make format-commit
-> ```
->
-> This runs `nx format:write`, stages all changes, and commits them as `style: apply formatting` in one step. Then re-run `make pc`.
->
-> ⚠️ **Before running `make format-commit`, make sure the working tree is otherwise clean** (no uncommitted feature or WIP changes). `make format-commit` will fail fast if the tree is dirty, preventing accidental inclusion of non-formatting changes.
+> **Formatting failures?** Run `make format-commit` (formats + stages + commits). The working tree must be otherwise clean. Then re-run `make pc`.
 
 > 🚨 **DO NOT STOP HERE.** Passing `make pc` is a checkpoint, not the finish line. You **must**
 > continue to Step 8 (create PR) and Step 9 (Jira "In Review"). Stopping after validation
@@ -399,30 +316,12 @@ acli jira workitem transition --key LS-#### --status "In Review"
 
 ```powershell
 cd "D:\code\legacy-sports"
-
-# Remove from the multi-root workspace (if it exists)
 make sync-worktrees-remove TICKET=####
-
-# Remove worktrees whose branches have been merged or deleted
 twig worktree clean
-
-# Delete the branch locally
 git branch -d "LS-####/short-description"
-
-# Verify
-twig worktree list
 ```
 
-`twig worktree clean` detects worktrees with merged/deleted branches and prompts to remove them. It is safer than `git worktree remove` because it will not remove a worktree that still has an active branch.
-
-> **🚨 NEVER use `git worktree remove` or manually delete a worktree directory.**
-> Worktrees contain `node_modules` **junctions** (Windows symlinks) pointing to the main
-> repo's shared `node_modules`. Running `git worktree remove --force` or deleting the
-> directory recursively **destroys the junction target** — wiping out the main repo's
-> `node_modules` and breaking every other junctioned worktree simultaneously. This is
-> catastrophic and requires a full `make install` in the main repo to recover.
->
-> `twig worktree clean` safely unlinks junctions before removing the directory. Always use it.
+> **🚨 NEVER use `git worktree remove` or manually delete a worktree directory** — it destroys `node_modules` junctions. Always use `twig worktree clean`. See [references/concurrent-agent-safety.md](references/concurrent-agent-safety.md).
 
 ## Moving an Existing Worktree
 
@@ -434,70 +333,44 @@ git worktree move "D:\code\old-path" "D:\code\new-path"
 twig worktree list  # verify
 ```
 
-## Key Rules
-
-| Rule                        | Detail                                                                                                                                                                                                                                |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Main stays on main**      | Never check out a feature branch in the main repo — it's the base for new worktrees                                                                                                                                                   |
-| **No edits in main**        | Never edit, stage, or commit files in `D:\code\legacy-sports` for ticket work. All file edits must happen inside `$wt`. Staging changes there and "forgetting" them is a common source of phantom diffs that linger until discovered. |
-| **One worktree per branch** | Git prevents two worktrees sharing the same branch                                                                                                                                                                                    |
-| **Don't run from inside**   | `git worktree move/remove` must be run from outside the target worktree                                                                                                                                                               |
-| **Never manual remove**     | **Always** use `twig worktree clean` — never `git worktree remove` or manual directory deletion. Manual removal destroys `node_modules` junctions, breaking every other worktree that shares them.                                    |
-| **Run make install**        | `node_modules` and Python deps are absent in a fresh worktree — always run `make install` inside it                                                                                                                                   |
-| **Separate VS Code window** | Open each worktree in its own VS Code window for clean file watching                                                                                                                                                                  |
-| **Multi-root for agents**   | Run `make sync-worktrees TICKETS=501,493` then open `legacy-sports.code-workspace` — limit to 3-4 worktrees for TS performance                                                                                                        |
-
 > 📎 **Troubleshooting** (twig commands, permissions, stale entries, node_modules, cleanup cadence): see [references/worktree-troubleshooting.md](references/worktree-troubleshooting.md)
+
+> 📎 **In-place branching** (without worktrees): for users who explicitly ask to skip worktrees, see [references/in-place-branching.md](references/in-place-branching.md)
+
+> 📎 **Dependent branch trees** (stacked branches, cascade rebase, skip-commits): see [references/branch-tree-management.md](references/branch-tree-management.md)
+
+> 📎 **Common workflow mistakes & recovery** (wrong parent, duplicate branches, partial implementation): see [references/workflow-common-mistakes.md](references/workflow-common-mistakes.md)
 
 ## Quick Reference
 
 ```powershell
-# 0. Check Jira ticket for dependencies on unmerged branches
-#    If dependent: pass PARENT=LS-XXXX/branch-name in step 1
-
-# 1. Create branch + worktree + register parent (one command)
+# 1. Create branch + worktree
 cd "D:\code\legacy-sports"
-make worktree TICKET=#### DESC=description                           # independent (parent=main)
+make worktree TICKET=#### DESC=description                           # independent
 make worktree TICKET=#### DESC=description PARENT=LS-XXXX/branch     # dependent
 
-# 2. Jira
+# 2. Jira → In Progress
 acli jira workitem transition --key LS-#### --status "In Progress"
 
-# 3. Smart setup (node_modules + .env + .twig in one command)
+# 3. Setup (node_modules + .env + .twig)
 $wt = "<path-from-twig-worktree-list>"
 make wt-setup WT=$wt
-# Or manually:
-#   cd $wt ; make install ; Copy-Item "D:\code\legacy-sports\.env" .env ; cmd /c mklink /J ".twig" "D:\code\legacy-sports\.twig"
 
-# 4. Open VS Code
-code $wt
-
-# 4b. Workspace is auto-added by make worktree — no extra step needed
-
-# 5. Work, commit (from inside the worktree)
-git add . ; git commit -m "feat(scope): description (LS-####)" ; git push -u origin HEAD
-
-# 6. Pre-PR validation
-make pc
-# If formatting rewrote files, run:
-#   make format-commit   # formats, stages, and commits ALL current changes; only run when the worktree is otherwise clean, then re-run make pc
-
-# 🚨 DO NOT STOP HERE — make pc passing is a checkpoint, not the finish line.
-# You MUST continue to step 7 (PR + Jira). Stopping here is the #1 agent failure mode.
-
-# 6b. Apply pending migrations (if any migration files were added)
-cd lib/db-client ; pnpm run db:up   # confirm "Applied N new migrations"
+# 4. Work + commit + push (from inside worktree)
 cd $wt
+git add . ; git commit -m "feat(scope): msg (LS-####)" ; git push -u origin HEAD
 
-# 7. PR + Jira (see create-pr skill for full template)
-gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+# 5. Migrations + validate
+cd lib/db-client ; pnpm run db:up ; cd $wt
+make pc
+
+# 6. PR + Jira (DO NOT stop at make pc)
+gh pr create --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
 ./scripts/cleanup-pr-body.ps1
 acli jira workitem transition --key LS-#### --status "In Review"
 
 # 7. Cleanup after merge
 cd "D:\code\legacy-sports"
-make sync-worktrees-remove TICKET=####   # remove from workspace (if exists)
-twig worktree clean
-git branch -d "LS-####/description"
-twig worktree list
+make sync-worktrees-remove TICKET=####
+twig worktree clean ; git branch -d "LS-####/description"
 ```

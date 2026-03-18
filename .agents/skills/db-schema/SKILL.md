@@ -1,6 +1,6 @@
 ---
 name: db-schema
-description: 'Database schema reference for the Legacy Sports PostgreSQL database (public + app_internal schemas); load before writing SQL queries to avoid table/column mistakes.'
+description: 'Load before writing or reviewing SQL queries to understand the public and app_internal PostgreSQL schemas and avoid table/column mistakes.'
 ---
 
 # Skill: Database Schema Reference

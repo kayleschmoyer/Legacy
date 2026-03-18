@@ -1,6 +1,6 @@
 ---
 name: fix-lint
-description: 'Diagnose and fix ESLint errors that remain after auto-fix, including floating promises, unsafe any types, console statements, and import order issues.'
+description: 'Diagnose and fix ESLint errors that remain after auto-fix. Use when make lint still reports errors (floating promises, unsafe any, console statements, import order) or when CI fails on the lint step.'
 ---
 
 # Skill: Fix Linting Errors

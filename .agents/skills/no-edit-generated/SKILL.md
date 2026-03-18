@@ -1,6 +1,6 @@
 ---
 name: no-edit-generated
-description: 'Never manually edit *.generated.ts or schema.graphql files; always regenerate them via the codegen process. Use when you are about to edit a generated file, see generated file conflicts, or need to update GraphQL types after a schema change.'
+description: 'Regenerate *.generated.ts and schema.graphql via codegen instead of editing them manually. Load when you encounter generated files in a diff, see generated-file merge conflicts, or need to update GraphQL types after a schema change.'
 ---
 
 # Skill: Never Edit Generated Files Directly

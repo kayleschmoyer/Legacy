@@ -1,6 +1,6 @@
 ---
 name: install-packages
-description: 'Install, remove, or update npm packages in the pnpm monorepo; covers workspace-root vs project-level dependencies, dev dependencies, peer dependencies, post-install validation, and preventing version duplication across workspace packages (pnpm.overrides, pinned specifiers, nested node_modules detection).'
+description: 'Install, remove, or update npm packages in the pnpm monorepo. Use when adding dependencies, removing unused packages, resolving version conflicts, or fixing pnpm-lock.yaml merge conflicts.'
 ---
 
 # Skill: Installing Packages
@@ -227,3 +227,34 @@ Get-ChildItem lib/*/node_modules -ErrorAction SilentlyContinue
 pnpm exec nx affected -t typecheck
 pnpm exec nx affected -t build
 ```
+
+## Lockfile Management
+
+### Sync Lockfile After package.json Changes
+
+```powershell
+pnpm install   # Updates pnpm-lock.yaml to match package.json
+```
+
+### Resolve Lockfile Merge Conflicts
+
+```powershell
+git checkout --theirs pnpm-lock.yaml   # Accept one side
+pnpm install                            # Regenerate from merged package.json
+git add pnpm-lock.yaml
+```
+
+### Recreate Lockfile from Scratch
+
+```powershell
+Remove-Item pnpm-lock.yaml
+pnpm install
+```
+
+### Check for Outdated Packages
+
+```powershell
+pnpm outdated
+```
+
+**Always commit `pnpm-lock.yaml` changes alongside `package.json` changes.** Use `--frozen-lockfile` in CI to prevent unexpected updates.

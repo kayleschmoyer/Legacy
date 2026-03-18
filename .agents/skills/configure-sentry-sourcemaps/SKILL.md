@@ -1,6 +1,6 @@
 ---
 name: configure-sentry-sourcemaps
-description: 'Add Sentry sourcemap upload to a new Lambda, web app, or deployed resource that needs Sentry error tracking with sourcemaps enabled.'
+description: 'Add Sentry sourcemap upload to a new Lambda, web app, or deployed resource. Load before configuring error tracking with sourcemaps on any new deployable.'
 ---
 
 # Configure Sentry Sourcemap Upload

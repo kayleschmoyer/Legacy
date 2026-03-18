@@ -1,6 +1,6 @@
 ---
 name: ui-standards
-description: Guidelines for building modern, responsive UI components using Tamagui, including glassmorphism, gradients, and interactive states.
+description: 'Load when creating or styling UI components to follow Tamagui patterns for glassmorphism, gradients, interactive states, and responsive layouts.'
 ---
 
 # UI Standards & Styling Guide

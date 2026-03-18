@@ -1,6 +1,6 @@
 ---
 name: db-dump
-description: 'Dump the live AWS RDS PostgreSQL database to a compressed binary file and upload it to S3; use when refreshing the production snapshot stored in S3 or creating a local cache of the live database. Requires AWS SSO access.'
+description: 'Back up the production database to S3 or create a scrubbed dev seed with PII anonymization. Use when refreshing the production snapshot or creating a new dev seed for the repo. Requires AWS SSO.'
 ---
 
 # Skill: Dump RDS Database to S3
@@ -83,7 +83,40 @@ Start Docker Desktop, then retry.
 **`pg_dump` connection error**
 Verify the RDS instance is running and your IP is in the security group. The RDS host must be reachable from your machine (not inside Docker container networking).
 
+## Create Scrubbed Dev Seed
+
+After restoring production data, create an anonymized seed for devs without AWS access:
+
+```powershell
+make db-restore    # Pull production data first (AWS needed)
+make db-dump-dev   # Scrub PII and create seed
+```
+
+`make db-dump-dev` calls `scripts/db-dump-dev.ps1` which:
+
+1. Runs `scripts/db-scrub.ps1` — anonymizes PII (usernames, emails, passwords, device tokens)
+2. Runs `pg_dump` → `resources/dev-seed.dump`
+3. Prints commit instructions
+
+### What Gets Scrubbed
+
+| Table                               | Columns                        | Replacement                            |
+| ----------------------------------- | ------------------------------ | -------------------------------------- |
+| `app_internal.users`                | username, email, password_hash | `user_N`, `user_N@example.com`, zeroed |
+| `app_internal.device_tokens`        | token                          | `REDACTED_N`                           |
+| `app_internal.notification_history` | entire table                   | `TRUNCATE`                             |
+
+### Commit the Seed
+
+```powershell
+git add resources/dev-seed.dump
+git commit -m "chore(db): refresh scrubbed dev seed dump"
+git push
+```
+
+Git LFS handles the binary automatically. To add new PII fields, edit `scripts/db-scrub.ps1` first.
+
 ## Related Skills
 
-- [db-restore](../db-restore/SKILL.md) — restore the S3 dump into local Docker
-- [db-dump-dev](../db-dump-dev/SKILL.md) — scrub PII and create the repo seed dump
+- [db-restore](../db-restore/SKILL.md) — restore dumps into local Docker
+- [db-schema](../db-schema/SKILL.md) — table/column reference for scrub rules

@@ -1,6 +1,6 @@
 ---
 name: no-lint-disable
-description: 'Never add eslint-disable or @ts-ignore comments without exhausting all alternatives first. This skill covers the policy, enforcement rules, approved exceptions, and the required justification format. Load before adding any lint suppression comment.'
+description: 'Resolve lint errors by fixing the root cause instead of adding eslint-disable or @ts-ignore suppressions. Load before adding any lint suppression comment; covers the policy, approved exceptions, and required justification format.'
 ---
 
 # Skill: No Lint Disable

@@ -1,6 +1,6 @@
 ---
 name: access-version-information
-description: 'Access and use build version information for debugging production issues, verifying deployments, monitoring health checks, and adding version metadata to new services.'
+description: 'Access build version information for debugging production issues and verifying deployments. Use when checking health endpoints, diagnosing deployed versions, or adding version metadata to a new service.'
 ---
 
 # Skill: Access and Use Version Information

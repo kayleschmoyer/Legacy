@@ -1,6 +1,6 @@
 ---
 name: create-lambda
-description: 'Create a new AWS Lambda function under lambdas/ with standardized Nx configuration including build, deploy, serve, typecheck, lint, and test targets.'
+description: 'Create a new AWS Lambda function under lambdas/ with standardized Nx configuration. Load before creating any new serverless function, API endpoint, or event handler.'
 ---
 
 # Skill: Create a New Lambda

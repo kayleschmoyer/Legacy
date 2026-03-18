@@ -1,6 +1,6 @@
 ---
 name: create-lib
-description: 'Create a new shared TypeScript library under lib/ with standardized Nx configuration; libraries are source-only packages consumed by apps and lambdas at build time.'
+description: 'Create a new shared TypeScript library under lib/ for code reuse across apps and lambdas. Load before creating any new library.'
 ---
 
 # Skill: Create a New Library

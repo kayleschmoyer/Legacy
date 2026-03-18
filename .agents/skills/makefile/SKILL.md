@@ -1,6 +1,6 @@
 ---
 name: makefile
-description: 'Reference for all Makefile targets in the Legacy Sports monorepo; wraps Nx commands with cross-platform support, colored output, and pre-commit validation.'
+description: 'Load when running build, test, lint, typecheck, or pre-commit tasks to see all available Make targets; provides a consistent cross-platform entry point wrapping Nx commands.'
 ---
 
 # Skill: Makefile

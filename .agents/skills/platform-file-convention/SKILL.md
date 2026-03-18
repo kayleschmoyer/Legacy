@@ -1,6 +1,6 @@
 ---
 name: platform-file-convention
-description: 'React Native platform file convention for Nx source-only libraries: index.ts is universal (browser-safe), index.native.ts is for Metro/mobile, server.ts is the explicit server subpath (Node.js/Lambda). Never create .web.ts entry files — bare .ts IS the web entry. Load this skill before creating or modifying platform-variant files in any shared library, adding a new library with platform splits, or debugging bundler resolution errors (Vite, Metro, esbuild).'
+description: 'Use the correct platform file variants in shared libraries: index.ts (universal), index.native.ts (mobile), server.ts (Node.js). Load before creating platform-variant files, adding libraries with platform splits, or debugging bundler resolution errors.'
 ---
 
 # Skill: Platform File Convention

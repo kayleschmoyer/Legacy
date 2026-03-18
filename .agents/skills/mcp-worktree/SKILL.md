@@ -1,6 +1,6 @@
 ---
 name: mcp-worktree
-description: 'Use the MCP worktree server to run commands in the correct git worktree directory; covers worktree_list, worktree_set, worktree_run, worktree_guard, worktree_rebase, worktree_stabilize, and worktree_push tools. Load when working with multiple worktrees, running make/nx/git commands, rebasing branches, or when you need to ensure commands target the right worktree instead of the main repo.'
+description: 'Run commands in the correct git worktree directory via MCP tools. Load when working with multiple worktrees, running make/nx/git commands, or ensuring commands target the right worktree instead of the main repo.'
 ---
 
 # Skill: MCP Worktree Server

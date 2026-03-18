@@ -106,6 +106,8 @@ const MAX_TEAMS = 16;
 
 **Resolution strategies** (pick ONE per conflict):
 
+> **Priority order**: (1) Regenerate if generated file or lock file, (2) Manual merge for source files, (3) Accept yours/theirs only if one side is obviously wrong. See the full [Decision Framework](#copilot-decision-framework) below for the 9-tier priority.
+
 1. **Keep yours** — your branch's version is correct:
 
    ```powershell

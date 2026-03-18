@@ -1,6 +1,6 @@
 ---
 name: create-skill
-description: 'Create a new agent skill in the correct agentskills.io format under .agents/skills/; covers directory structure, frontmatter requirements, content guidelines, description writing strategy, gitignore pitfalls, updating both skills indexes (copilot-instructions.md and agents.md), and validation. Load this skill before creating or modifying any agent skill file.'
+description: 'Create or update an agent skill following the agentskills.io format. Load before creating, modifying, or auditing any agent skill file; covers frontmatter, content guidelines, token budget, description strategy, and validation.'
 ---
 
 # Skill: Create a New Agent Skill
@@ -22,12 +22,15 @@ This repo currently has 60+ skills covering everything from workflow automation 
 ```
 .agents/skills/
 └── <skill-name>/
-    └── SKILL.md
+    ├── SKILL.md
+    └── references/          ← optional load-on-demand files
+        └── <topic>.md
 ```
 
 - One directory per skill, named in **lowercase-hyphen** (kebab-case)
 - The directory name **must exactly match** the `name` frontmatter field
-- `SKILL.md` is the only required file (additional resource files can be added alongside it)
+- `SKILL.md` is the only required file
+- Use `references/` for overflow content that exceeds the token budget (see Token Budget section)
 
 ## Required Frontmatter
 
@@ -57,44 +60,83 @@ disable-model-invocation: true # prevent Copilot from auto-loading (manual only)
 
 ## Writing a Good Description
 
-The `description` is the **most important field** — it determines whether Copilot auto-loads your skill. Copilot matches user intent against this text, so include:
+The `description` is the **most important field** — it determines whether Copilot auto-loads your skill. Copilot matches user intent against this text.
 
-- **What** the skill does (capabilities)
-- **When** to use it (trigger phrases / use cases)
-- **Keywords** an agent would look for (action verbs, domain terms)
+### Description Principles ([agentskills.io best practices](https://agentskills.io/skill-creation/optimizing-descriptions))
 
-### Examples from this Repo
+1. **Use imperative phrasing** — "Use this skill when..." or "Load before..." not "This skill does..."
+2. **Focus on user intent** — describe what the user is trying to achieve, not the skill's internal mechanics
+3. **Be pushy** — explicitly list contexts where the skill applies, even implicit ones: "even if they don't mention CSV"
+4. **Provide defaults not menus** — pick a default path and mention alternatives briefly
+5. **Start with an action verb** — "Create", "Deploy", "Fix", "Load when", "Use when"
+6. **End with a trigger** — "Load this skill before..." or "Use when..."
+7. **Under 1024 characters** — long enough to cover scope, short enough to avoid context bloat
 
-**Bad** (too vague):
+### Examples
 
-```yaml
-description: 'Helper for deployments'
+| Quality | Description                                                                               | Why                          |
+| ------- | ----------------------------------------------------------------------------------------- | ---------------------------- |
+| ❌ Bad  | `'Helper for deployments'`                                                                | Vague, no triggers           |
+| ❌ Bad  | `'Reference for all project configuration file conventions...'`                           | Declarative, not imperative  |
+| ✅ Good | `'Deploy Lambda functions to the cloud. Use when pushing new code or infra changes...'`   | Imperative + trigger         |
+| ✅ Good | `'Load before writing SQL queries to understand the public and app_internal schemas...'`  | User intent + trigger        |
+| ✅ Good | `'Fix common dev environment problems: module-not-found, DB connectivity... Use when...'` | Action verb + explicit scope |
+
+## Token Budget & Progressive Disclosure
+
+Every SKILL.md must stay under **500 lines** and **5,000 tokens** (the [agentskills.io](https://agentskills.io) spec). SKILL.md files are loaded in full when Copilot matches a user request — oversized skills waste context window on every invocation.
+
+### How to measure
+
+```powershell
+$c = Get-Content ".agents\skills\<name>\SKILL.md" -Raw
+"Lines: $(($c -split \"`n\").Count)  Tokens: $([math]::Ceiling($c.Length / 4))"
 ```
 
-**Good** (specific capabilities + triggers):
+### Progressive disclosure with `references/`
 
-```yaml
-description: 'Deploy AWS Lambda functions to the cloud environment; the required sequence is: unlock Terraform lock, apply infrastructure, then deploy Lambda code.'
+When a skill exceeds the limits (or approaches them), extract verbose content into `references/<topic>.md` files. These are **never auto-loaded** — agents fetch them only when explicitly instructed via a `📎 see references/...` link.
+
+```
+.agents/skills/<name>/
+├── SKILL.md              ← always loaded when matched (<500L, <5000T)
+└── references/
+    ├── architecture.md   ← loaded on demand (no size limit)
+    └── troubleshooting.md
 ```
 
-**Good** (multi-trigger with explicit anti-patterns):
+**What to keep in SKILL.md** (always loaded):
 
-```yaml
-description: 'Never manually edit *.generated.ts files; always regenerate them via the codegen process. Use when you are about to edit a generated file, see generated file conflicts, or need to update GraphQL types after a schema change.'
+- Decision logic, critical rules, essential commands
+- "When to use" triggers, prerequisites, step summaries
+- Short code examples (1 per concept)
+
+**What to extract to `references/`** (load on demand):
+
+- Detailed architecture diagrams and multi-table catalogs
+- Long PowerShell scripts and verbose code examples
+- Exhaustive troubleshooting guides
+- Historical rationale and design decisions
+- Recovery procedures and edge-case handling
+
+**Link pattern** (use consistently):
+
+```markdown
+> 📎 **Full recovery procedures**: see [references/recovery.md](references/recovery.md)
 ```
 
-**Good** (comprehensive with USE FOR / DO NOT USE FOR):
+### Always-loaded overhead
 
-```yaml
-description: 'Write, run, and debug Playwright E2E tests for the web app; covers file placement, auth fixtures, GraphQL mocking with page objects, snapshot conventions, test tagging (@critical/@smoke/@regression), Nx targets, and CI pipeline integration. Load this skill before creating or modifying any E2E test.'
-```
+Skill **descriptions** (~50 tokens each × 59 skills ≈ 3,300T) load on **every request** for Copilot to decide which skills to invoke. The SKILL.md body only loads for matched skills (typically 1–3 per request). Keep descriptions impactful but concise — they're the most expensive text per character in the system.
 
-### Description Strategy
+### Budget guidelines
 
-1. Start with the primary action verb: "Create", "Deploy", "Write", "Debug", "Fix"
-2. List the specific artifacts or systems involved
-3. End with a "Load this skill before..." or "Use when..." trigger sentence
-4. Keep under 1024 characters but use as much as needed — more specific is better
+| Zone      | Tokens  | Action                                        |
+| --------- | ------- | --------------------------------------------- |
+| Green     | < 3,000 | No action needed                              |
+| Yellow    | 3K–5K   | Review for extraction opportunities           |
+| Over spec | > 5,000 | **Must** extract to references before merging |
+| Lines     | > 500   | **Must** condense or extract before merging   |
 
 ## Skill Content Guidelines
 
@@ -111,27 +153,37 @@ Brief explanation of what this skill covers.
 
 - Bullet list of specific triggers
 
-## Prerequisites
+## Gotchas
 
-- Any required setup or context
+- Non-obvious environment-specific facts that defy assumptions
+- Corrections to mistakes the agent will make without being told
 
 ## Steps
 
-Numbered or headed steps with commands and code blocks.
+Numbered steps with commands and code blocks.
 
 ## Troubleshooting
 
 Common failures and fixes (use tables for quick scanning).
 ```
 
+> Keep gotchas in the main SKILL.md (not in references) — the agent needs them **before** encountering the situation, not after.
+
 ### Content Principles
 
+Based on [agentskills.io best practices](https://agentskills.io/skill-creation/best-practices):
+
+- **Add what the agent lacks, omit what it knows** — don't explain what a migration or PR is; focus on project-specific conventions, non-obvious edge cases, and which specific tools to use
 - **Be prescriptive, not descriptive** — say "Run `make install`" not "You might want to install dependencies"
+- **Provide defaults, not menus** — pick one approach and mention alternatives as escape hatches: "Use pdfplumber. For scanned PDFs, use pdf2image instead."
+- **Favor procedures over declarations** — teach the agent how to approach a class of problems, not what to produce for one specific case
+- **Include gotchas** — list environment-specific facts that defy reasonable assumptions (e.g., "The `users` table uses soft deletes — queries MUST include `WHERE deleted_at IS NULL`")
+- **Add validation loops** — for multi-step workflows, instruct: do the work → run validator → fix → repeat until clean
+- **Match specificity to fragility** — prescribe exactly for fragile operations; explain rationale for flexible ones so the agent can adapt
 - **Include full commands** — agents copy-paste literally; use fenced code blocks with language tags
-- **Show file contents** — when the skill creates files, show the complete template content
 - **Use tables for references** — agents parse tables faster than prose
-- **Link related skills** — reference other skills by path when there's overlap (e.g., "See `.agents/skills/codegen/SKILL.md` for regeneration steps")
-- **PowerShell syntax** — all terminal commands should use PowerShell conventions (`;` to chain, `$env:` for vars)
+- **Respect the token budget** — extract verbose examples, scripts, and catalogs to `references/`
+- **PowerShell syntax** — terminal commands use PowerShell conventions (`;` to chain, `$env:` for vars)
 
 ## Steps
 
@@ -171,6 +223,15 @@ Or validate all skills at once:
 ```powershell
 make lint-skills
 ```
+
+Check the token budget:
+
+```powershell
+$c = Get-Content ".agents\skills\<name>\SKILL.md" -Raw
+"Lines: $(($c -split "`n").Count)  Tokens: $([math]::Ceiling($c.Length / 4))"
+```
+
+If over 500 lines or 5,000 tokens, extract content to `references/` (see Token Budget section).
 
 ### 4. Update BOTH skills indexes
 
@@ -226,4 +287,5 @@ uvx --from skills-ref agentskills validate .agents/skills/<name>
 | `git add` doesn't pick up skill file          | Check gitignore conflict (Step 1) — skill name may match an ignore pattern               |
 | Validator fails on frontmatter                | Ensure line 1 is `---` (no BOM, no leading whitespace) and `name` matches directory name |
 | Skill loads but agent ignores instructions    | Move critical rules to the top of the file — agents sometimes truncate long skills       |
+| SKILL.md exceeds 500 lines or 5,000 tokens    | Extract verbose sections to `references/` — see Token Budget section above               |
 | Skill table in copilot-instructions.md broken | Ensure table rows use `                                                                  | ` delimiters and match the existing column count |

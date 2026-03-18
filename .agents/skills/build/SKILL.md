@@ -1,6 +1,6 @@
 ---
 name: build
-description: 'Build affected projects in the Nx monorepo, compiling TypeScript and bundling assets; use before deploying or verifying build output.'
+description: 'Build affected projects in the Nx monorepo. Use before deploying, after structural changes, or to validate build output as part of pre-commit checks.'
 ---
 
 # Skill: Building
@@ -202,3 +202,42 @@ pnpm exec nx affected -t build --dry-run
 - [Type Checking](../typecheck/SKILL.md)
 - [Linting](../lint/SKILL.md)
 - [Testing](../test/SKILL.md)
+
+## Affected Projects Analysis
+
+```powershell
+# Show which projects are affected by current changes
+pnpm exec nx show projects --affected
+
+# Visual dependency graph in browser
+pnpm exec nx graph
+
+# Only affected projects in graph
+pnpm exec nx affected:graph
+
+# Show projects with specific target
+pnpm exec nx show projects --affected --with-target=build
+
+# Show a specific project's details
+pnpm exec nx show project <project-name>
+```
+
+Use `affected` before running expensive operations (tests, builds) to scope work correctly.
+
+## Workspace Validation
+
+```powershell
+# Run all workspace validations
+pnpm run validate
+
+# Individual validations
+pnpm run validate:package-json        # Package.json standards
+pnpm run validate:workspace-deps       # Dependency alignment
+pnpm run validate:auth-security        # Authentication security
+pnpm run validate:security             # Security configuration
+
+# Fix workspace dependency issues
+node scripts/fix-workspace-deps.js
+```
+
+Run validation after installing new dependencies, after major refactoring, or when seeing dependency version mismatches.

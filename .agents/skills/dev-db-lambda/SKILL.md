@@ -1,6 +1,6 @@
 ---
 name: dev-db-lambda
-description: 'Start the local GraphQL database Lambda for development, providing a local backend for testing without deploying to AWS.'
+description: 'Start the local GraphQL database Lambda for development. Use when developing GraphQL features, testing queries locally, or debugging Lambda behavior without deploying to AWS.'
 ---
 
 # Skill: Running Dev DB Lambda

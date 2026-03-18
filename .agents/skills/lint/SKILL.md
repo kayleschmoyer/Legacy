@@ -1,6 +1,6 @@
 ---
 name: lint
-description: 'Run ESLint across affected Nx projects with automatic fixing; use before committing, after code changes, or as part of pre-commit validation.'
+description: 'Run ESLint and Prettier across affected projects with auto-fixing. Use before committing, when resolving code quality issues, or when CI fails on the lint or format step.'
 ---
 
 # Skill: Linting
@@ -116,4 +116,40 @@ Linting is Step 2 of the pre-commit sequence (typecheck → lint → test → bu
 
 - [Type Checking](../typecheck/SKILL.md)
 - [Testing](../test/SKILL.md)
-- [Formatting](../format/SKILL.md)
+
+## Formatting (Prettier)
+
+### Format All Files
+
+```powershell
+pnpm exec nx format:write
+```
+
+This is the same command `make pc` runs internally.
+
+### Check Formatting (Dry Run)
+
+```powershell
+pnpm exec nx format:check
+```
+
+### Format Specific Files
+
+```powershell
+pnpm exec prettier --write "apps/web/**/*.{ts,tsx}"
+pnpm exec prettier --write path/to/file.ts
+```
+
+### Pre-push Hook
+
+A pre-push Git hook runs `nx format:write` automatically before every push. If the working tree is clean, it auto-amends the last commit with formatting fixes and aborts the push — run `git push` again. If uncommitted changes exist, it blocks the push. To bypass in an emergency: `git push --no-verify`.
+
+### Recommended Order
+
+```powershell
+pnpm exec nx format:write           # Format
+pnpm exec nx affected -t typecheck   # Typecheck
+pnpm exec nx affected -t lint --fix  # Lint
+pnpm exec nx affected -t test        # Test
+pnpm exec nx affected -t build       # Build
+```

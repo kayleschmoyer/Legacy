@@ -1,6 +1,6 @@
 ---
 name: mcp-db
-description: 'MCP server exposing database operations (migration status, query execution, schema regeneration, health checks) as tools for AI agents. Use when agents need to run database queries, check migration status, apply migrations, regenerate schema.graphql, or verify database health.'
+description: 'Run database operations via MCP tools (primary) or CLI fallback. Load when checking migration status, running ad-hoc SQL, regenerating schema.graphql, restoring the dev seed, or verifying database health.'
 ---
 
 # Skill: MCP Database Operations Server
@@ -36,66 +36,46 @@ tools/mcp/db-server/
         └── restore-dev-seed.ts
 ```
 
-## Tools
+## Workflows
 
-### db_check_health
+### Pre-flight: Verify Environment
 
-Pre-flight check before starting work.
+Run `db_check_health` before starting any DB work. It returns `{ dockerRunning, postgresReachable, migrationsUpToDate, issues[] }`. If any issue is reported, fix it before proceeding.
 
-- **Parameters**: none
-- **Returns**: `{ dockerRunning, postgresReachable, migrationsUpToDate, issues[] }`
-- **Use first** to verify the dev environment is ready.
+### Check and Apply Migrations (Before `make pc`)
 
-### db_migration_status
+1. Call `db_migration_status` → returns `{ applied, pending, pendingNames[], needsMigration }`
+2. If `needsMigration` is true, call `db_migrate` → returns `{ applied, appliedNames[], success }`
+3. Confirm `success` is true before continuing
 
-Check pending migration status.
+### Regenerate Schema After Pothos Changes
 
-- **Parameters**: `worktreePath?` (optional, defaults to repo root)
-- **Returns**: `{ applied, pending, pendingNames[], needsMigration }`
-- Equivalent to running `pnpm run db:status` from `lib/db-client`.
+1. Call `db_print_schema` → returns `{ success, schemaChanged, output }`
+2. If `schemaChanged`, call `db_codegen` with `printSchemaFirst: false` → returns `{ success, output }`
+3. Verify no type errors: run `make typecheck`
 
-### db_migrate
+### Ad-hoc Query for Debugging
 
-Apply pending migrations.
+Call `db_query` with `query` (string) and optionally `format` (`'table'` or `'json'`).
 
-- **Parameters**: `worktreePath?` (optional)
-- **Returns**: `{ applied, appliedNames[], success }`
-- Checks for pending migrations first. Returns a warning if none to apply.
-- Equivalent to running `pnpm run db:up` from `lib/db-client`.
+- **READ-ONLY by default** — refuses writes unless `allowWrite: true`
+- Uses a Postgres `READ ONLY` transaction as a safety net
 
-### db_query
+### Restore Dev Seed (Destructive)
 
-Execute an ad-hoc SQL query.
+Call `db_restore_dev_seed` with `confirmDestructive: true`. Drops and recreates `legacy_sports_dev`, then runs migrations if `runMigrationsAfter: true` (default).
 
-- **Parameters**: `query` (string, required), `format` (`'table'` | `'json'`, default `'json'`), `allowWrite` (boolean, default `false`)
-- **Returns**: `{ rows[], rowCount, columns[] }`
-- **READ-ONLY by default** — refuses INSERT/UPDATE/DELETE/DROP/TRUNCATE/ALTER unless `allowWrite=true`.
-- Uses a Postgres `READ ONLY` transaction as a safety net.
+## Tool Reference
 
-### db_print_schema
-
-Regenerate `schema.graphql` from the Pothos schema.
-
-- **Parameters**: `worktreePath?` (optional)
-- **Returns**: `{ success, schemaChanged, output }`
-- Equivalent to `pnpm exec nx run db:print-schema`.
-
-### db_codegen
-
-Run GraphQL codegen using Nx affected.
-
-- **Parameters**: `worktreePath?`, `printSchemaFirst?` (default `false`), `base?`, `skipNxCache?` (default `false`)
-- **Returns**: `{ success, ranPrintSchema, output }`
-- Equivalent to `pnpm exec nx affected -t codegen` (optionally runs `pnpm exec nx run db:print-schema` first).
-
-### db_restore_dev_seed
-
-Restore the scrubbed dev seed into the local Docker Postgres database.
-
-- **Parameters**: `worktreePath?`, `confirmDestructive` (required `true`), `runMigrationsAfter?` (default `true`)
-- **Returns**: `{ success, migrationsRun, output }`
-- Equivalent to running `scripts/db-restore-dev.ps1` (with required confirmation) and optionally `make db-migrate`.
-- **Destructive**: drops and recreates local `legacy_sports_dev`.
+| Tool                  | Key Parameters                                                |
+| --------------------- | ------------------------------------------------------------- |
+| `db_check_health`     | none                                                          |
+| `db_migration_status` | `worktreePath?`                                               |
+| `db_migrate`          | `worktreePath?`                                               |
+| `db_query`            | `query` (required), `format?`, `allowWrite?`                  |
+| `db_print_schema`     | `worktreePath?`                                               |
+| `db_codegen`          | `worktreePath?`, `printSchemaFirst?`, `base?`, `skipNxCache?` |
+| `db_restore_dev_seed` | `confirmDestructive` (required `true`), `runMigrationsAfter?` |
 
 ## Configuration
 
@@ -127,3 +107,36 @@ Registered in `.vscode/mcp.json`:
 | Postgres connection refused | Start Docker: `docker compose up -d postgres`          |
 | Migration status fails      | Ensure `lib/db-client` exists and `.env` is loaded     |
 | Schema print fails          | Check that `db` Nx project has a `print-schema` target |
+
+## CLI Fallback (Direct Database Access)
+
+When MCP tools are unavailable, use these CLI commands:
+
+```powershell
+# Test database connection
+pnpm run db:test
+
+# Interactive PostgreSQL shell
+pnpm run db:psql
+
+# Run SQL queries via script (recommended over psql for one-off queries)
+.\scripts\db-query.ps1 -Query "SELECT * FROM players LIMIT 10"
+.\scripts\db-query.ps1 -Query "SELECT * FROM leagues" -Format json
+
+# View connection details
+pnpm run db:url            # masked password
+pnpm run db:credentials    # full credentials (careful!)
+
+# Resync credentials from AWS
+pnpm run sync-env
+```
+
+### Common psql Commands
+
+```sql
+\dt                    -- List all tables
+\d table_name          -- Describe table structure
+\dn                    -- List all schemas
+SELECT COUNT(*) FROM players;
+\q                     -- Exit psql
+```

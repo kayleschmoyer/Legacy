@@ -1,6 +1,6 @@
 ---
 name: storybook
-description: 'Add or run Storybook stories for shared-components; covers story file conventions, naming, Meta/StoryObj patterns, TamaguiProvider decorator, interaction tests, accessibility, Nx targets, and how to run/build storybook locally. Load this skill before adding new stories or running storybook.'
+description: 'Add or run Storybook stories for shared-components with proper conventions. Load before adding new stories, writing interaction tests, or running storybook locally.'
 ---
 
 # Skill: Storybook for Shared Components

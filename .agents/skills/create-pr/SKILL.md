@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: 'Create pull requests using twig GitHub integration with automatic PR template population; use after completing work on a feature branch.'
+description: 'Create a pull request with automatic Jira linkage and PR template population. Use after completing work on a feature branch and passing make pc validation.'
 ---
 
 # Skill: Pull Request Creation

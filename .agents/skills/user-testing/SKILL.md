@@ -1,6 +1,6 @@
 ---
 name: user-testing
-description: 'Optionally check out a feature branch in the main repo to test UI changes live against running dev servers before opening a PR; covers checkout, testing, and returning to main. Use when the user wants to verify UI/UX changes visually before review.'
+description: 'Check out a feature branch to test UI changes live against dev servers before opening a PR. Use when the user wants to verify UI/UX changes visually before review.'
 ---
 
 # Skill: Optional User Testing Before PR
