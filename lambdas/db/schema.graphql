@@ -2369,6 +2369,7 @@ type Query {
   Return earned badges for a team in a league
   """
   teamBadges(leagueId: Int!, teamId: Int!): [UserBadge!]
+  teamById(teamId: Int!): Team
   teamLeagueMembers(teamId: Int!): [LeagueMember!]
   teamMembers(teamId: Int!): [TeamMember!]
   teamTradeOffers(status: String, teamId: Int!): [TradeOffer!]

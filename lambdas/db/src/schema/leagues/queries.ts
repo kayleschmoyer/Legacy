@@ -497,6 +497,94 @@ builder.queryField('userTeamId', (t) =>
   }),
 );
 
+// Query field to get a single team by its ID (supports empty-roster teams, LS-1330)
+builder.queryField('teamById', (t) =>
+  t.field({
+    type: Team,
+    nullable: true,
+    args: {
+      teamId: t.arg.int({ required: true }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError('Authentication required to fetch team');
+      }
+
+      const { teamId } = args;
+      const userId = context.user.id;
+
+      // Fetch the team row (includes leagueId, branding, manager join)
+      const rows = await context.db
+        .select({
+          id: PublicSchema.teams.id,
+          name: PublicSchema.teams.name,
+          leagueId: PublicSchema.teams.leagueId,
+          divisionId: PublicSchema.teams.divisionId,
+          createdAt: PublicSchema.teams.createdAt,
+          updatedAt: PublicSchema.teams.updatedAt,
+          waiverOrder: PublicSchema.teams.waiverOrder,
+          faabBudget: PublicSchema.teams.faabBudget,
+          logoUrl: PublicSchema.teams.logoUrl,
+          primaryColor: PublicSchema.teams.primaryColor,
+          secondaryColor: PublicSchema.teams.secondaryColor,
+          isLocked: PublicSchema.teams.isLocked,
+          avatarUrl: PublicSchema.teams.avatarUrl,
+          bannerUrl: PublicSchema.teams.bannerUrl,
+          managerId: PublicSchema.leagueMembers.userId,
+        })
+        .from(PublicSchema.teams)
+        .leftJoin(
+          PublicSchema.leagueMembers,
+          and(
+            eq(PublicSchema.leagueMembers.teamId, PublicSchema.teams.id),
+            eq(
+              PublicSchema.leagueMembers.leagueId,
+              PublicSchema.teams.leagueId,
+            ),
+          ),
+        )
+        .where(eq(PublicSchema.teams.id, teamId))
+        .orderBy(
+          sql`CASE ${PublicSchema.leagueMembers.permissionLevel}
+            WHEN 'commissioner' THEN 1
+            WHEN 'general_manager' THEN 2
+            WHEN 'team_manager' THEN 3
+            ELSE 4
+          END`,
+        )
+        .limit(1);
+
+      if (rows.length === 0) {
+        return null;
+      }
+
+      const team = rows[0];
+
+      // Verify viewer is a member of this league (or is an admin)
+      if (!context.user.isAdmin) {
+        const leagueMember = await context.db
+          .select()
+          .from(PublicSchema.leagueMembers)
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.leagueId, team.leagueId),
+              eq(PublicSchema.leagueMembers.userId, userId),
+            ),
+          )
+          .limit(1);
+
+        if (leagueMember.length === 0) {
+          throw ForbiddenError(
+            'Access denied: You are not a member of this league',
+          );
+        }
+      }
+
+      return team;
+    },
+  }),
+);
+
 // Query field to get all teams in a league for standings
 builder.queryField('leagueTeams', (t) =>
   t.field({

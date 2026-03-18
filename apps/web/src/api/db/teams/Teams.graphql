@@ -43,6 +43,13 @@ query GetTeamMembers($teamId: Int!) {
   }
 }
 
+query GetTeamById($teamId: Int!) {
+  teamById(teamId: $teamId) {
+    ...Team
+    managerId
+  }
+}
+
 mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
   updateTeamMemberPosition(
     teamMemberId: $teamMemberId

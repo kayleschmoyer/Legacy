@@ -16,6 +16,7 @@ import {
   useGetLeagueByIdQuery,
   useGetLeagueTeamsQuery,
   useGetPositionsForLeagueQuery,
+  useGetTeamByIdQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdQuery,
   useUpdateTeamBrandingMutation,
@@ -59,8 +60,15 @@ export function TeamDetailPage() {
     skip: !isValidTeamId,
   });
 
-  // Get team details from leagueTeams query
-  const leagueId = membersData?.teamMembers?.[0]?.leagueId;
+  // Fetch team row directly — provides leagueId for empty-roster teams (LS-1330)
+  const { data: teamByIdData, loading: teamByIdLoading } = useGetTeamByIdQuery({
+    variables: { teamId: teamIdNum },
+    skip: !isValidTeamId,
+  });
+
+  // leagueId: prefer from members (populated after draft), fall back to teamById
+  const leagueId =
+    membersData?.teamMembers?.[0]?.leagueId ?? teamByIdData?.teamById?.leagueId;
   const {
     data: teamsData,
     loading: teamsLoading,
@@ -116,6 +124,7 @@ export function TeamDetailPage() {
 
   const loading =
     membersLoading ||
+    teamByIdLoading ||
     teamsLoading ||
     userTeamLoading ||
     leagueLoading ||
@@ -168,10 +177,11 @@ export function TeamDetailPage() {
     );
   }
 
-  // Find the team from leagueTeams
-  const team = teamsData?.leagueTeams?.find(
-    (t: { id?: number | null }) => t?.id === teamIdNum,
-  );
+  // Find the team from leagueTeams, falling back to teamById for empty-roster teams
+  const team =
+    teamsData?.leagueTeams?.find(
+      (t: { id?: number | null }) => t?.id === teamIdNum,
+    ) ?? teamByIdData?.teamById;
   const teamMembers = membersData.teamMembers;
 
   const currentAvatarUrl = team?.avatarUrl ?? null;

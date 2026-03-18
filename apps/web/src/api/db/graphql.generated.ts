@@ -2127,6 +2127,7 @@ export type Query = {
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
   /** Return earned badges for a team in a league */
   teamBadges?: Maybe<Array<UserBadge>>;
+  teamById?: Maybe<Team>;
   teamLeagueMembers?: Maybe<Array<LeagueMember>>;
   teamMembers?: Maybe<Array<TeamMember>>;
   teamTradeOffers?: Maybe<Array<TradeOffer>>;
@@ -2571,6 +2572,10 @@ export type QuerySeasonPitchingStatsArgs = {
 
 export type QueryTeamBadgesArgs = {
   leagueId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
+};
+
+export type QueryTeamByIdArgs = {
   teamId: Scalars['Int']['input'];
 };
 
@@ -7084,6 +7089,31 @@ export type GetTeamMembersQuery = {
       } | null;
     } | null;
   }> | null;
+};
+
+export type GetTeamByIdQueryVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+}>;
+
+export type GetTeamByIdQuery = {
+  __typename?: 'Query';
+  teamById?: {
+    __typename?: 'Team';
+    managerId?: number | null;
+    id?: number | null;
+    leagueId?: number | null;
+    name?: string | null;
+    waiverOrder?: number | null;
+    faabBudget?: number | null;
+    isLocked?: boolean | null;
+    logoUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    avatarUrl?: string | null;
+    bannerUrl?: string | null;
+    totalPayroll?: number | null;
+    capSpace?: number | null;
+  } | null;
 };
 
 export type UpdateTeamMemberPositionMutationVariables = Exact<{
@@ -17027,6 +17057,93 @@ export type GetTeamMembersSuspenseQueryHookResult = ReturnType<
 export type GetTeamMembersQueryResult = Apollo.QueryResult<
   GetTeamMembersQuery,
   GetTeamMembersQueryVariables
+>;
+export const GetTeamById = gql`
+  query GetTeamById($teamId: Int!) {
+    teamById(teamId: $teamId) {
+      ...Team
+      managerId
+    }
+  }
+  ${TeamFragmentDoc}
+`;
+
+/**
+ * __useGetTeamByIdQuery__
+ *
+ * To run a query within a React component, call `useGetTeamByIdQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTeamByIdQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTeamByIdQuery({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *   },
+ * });
+ */
+export function useGetTeamByIdQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTeamByIdQuery,
+    GetTeamByIdQueryVariables
+  > &
+    (
+      | { variables: GetTeamByIdQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetTeamByIdQuery, GetTeamByIdQueryVariables>(
+    GetTeamById,
+    options,
+  );
+}
+export function useGetTeamByIdLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTeamByIdQuery,
+    GetTeamByIdQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetTeamByIdQuery, GetTeamByIdQueryVariables>(
+    GetTeamById,
+    options,
+  );
+}
+export function useGetTeamByIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamByIdQuery,
+        GetTeamByIdQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<GetTeamByIdQuery, GetTeamByIdQueryVariables>(
+    GetTeamById,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTeamByIdQuery,
+          GetTeamByIdQueryVariables
+        >,
+  );
+}
+export type GetTeamByIdQueryHookResult = ReturnType<typeof useGetTeamByIdQuery>;
+export type GetTeamByIdLazyQueryHookResult = ReturnType<
+  typeof useGetTeamByIdLazyQuery
+>;
+export type GetTeamByIdSuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamByIdSuspenseQuery
+>;
+export type GetTeamByIdQueryResult = Apollo.QueryResult<
+  GetTeamByIdQuery,
+  GetTeamByIdQueryVariables
 >;
 export const UpdateTeamMemberPosition = gql`
   mutation UpdateTeamMemberPosition($teamMemberId: Int!, $positionId: Int) {
