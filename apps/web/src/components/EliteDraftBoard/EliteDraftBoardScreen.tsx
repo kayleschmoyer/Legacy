@@ -6,7 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
-import { useMutation, useQuery } from '@apollo/client/react';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   type DraftCompletedNotification,
@@ -376,6 +376,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     []) as unknown as DraftPickRecord[];
 
   // ---- Available Players (server-side search) ----
+  const client = useApolloClient();
+  const PLAYER_PAGE_SIZE = 200;
   const [playerSearch, setPlayerSearch] = useState('');
   const {
     data: availablePlayersData,
@@ -394,15 +396,26 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         selectedPosition === 'P'
           ? 'pitchingAvgPointsPerGame'
           : 'hitterAvgPointsPerGame',
-      limit: 200,
+      limit: PLAYER_PAGE_SIZE,
     },
     skip: !draftId || isAuctionDraft,
     errorPolicy: 'all',
   });
 
-  const availablePlayers: AvailableDraftPlayer[] = (
-    availablePlayersData?.getAvailableDraftPlayers ?? []
-  )
+  // Accumulated raw player list across all loaded pages
+  const [allRawPlayers, setAllRawPlayers] = useState<
+    NonNullable<GetAvailableDraftPlayersQuery['getAvailableDraftPlayers']>
+  >([]);
+  const [hasMorePlayers, setHasMorePlayers] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    const items = availablePlayersData?.getAvailableDraftPlayers ?? [];
+    setAllRawPlayers(items);
+    setHasMorePlayers(items.length === PLAYER_PAGE_SIZE);
+  }, [availablePlayersData, PLAYER_PAGE_SIZE]);
+
+  const availablePlayers: AvailableDraftPlayer[] = allRawPlayers
     .filter(
       (
         p,
@@ -720,6 +733,56 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   // Position filtering is handled server-side via the position query variable.
   // enrichedPlayers already contains only the players matching the selected position.
   const filteredPlayers = enrichedPlayers;
+
+  const loadMoreRequestKeyRef = useRef(0);
+
+  const handleLoadMorePlayers = useCallback(async () => {
+    if (loadingMore || !draftId) return;
+    setLoadingMore(true);
+    const requestKey = ++loadMoreRequestKeyRef.current;
+    try {
+      const result = await client.query<
+        GetAvailableDraftPlayersQuery,
+        GetAvailableDraftPlayersQueryVariables
+      >({
+        query: GET_AVAILABLE_DRAFT_PLAYERS,
+        variables: {
+          draftId: draftId ?? 0,
+          search: playerSearch || null,
+          position: selectedPosition !== 'ALL' ? selectedPosition : null,
+          orderBy:
+            selectedPosition === 'P'
+              ? 'pitchingAvgPointsPerGame'
+              : 'hitterAvgPointsPerGame',
+          limit: PLAYER_PAGE_SIZE,
+          offset: allRawPlayers.length,
+        },
+        fetchPolicy: 'network-only',
+      });
+      if (requestKey !== loadMoreRequestKeyRef.current) return;
+      const newItems = result.data?.getAvailableDraftPlayers ?? [];
+      setAllRawPlayers((prev) => [...prev, ...newItems]);
+      setHasMorePlayers(newItems.length === PLAYER_PAGE_SIZE);
+    } catch (err) {
+      if (requestKey !== loadMoreRequestKeyRef.current) return;
+      LOGGER.error(
+        '[Draft] Load more players failed',
+        err instanceof Error ? err : new Error(String(err)),
+      );
+    } finally {
+      if (requestKey === loadMoreRequestKeyRef.current) {
+        setLoadingMore(false);
+      }
+    }
+  }, [
+    loadingMore,
+    draftId,
+    client,
+    playerSearch,
+    selectedPosition,
+    allRawPlayers.length,
+    PLAYER_PAGE_SIZE,
+  ]);
 
   // ---- Mutations ----
   const [initializeLiveDraft, { loading: initDraftLoading }] = useMutation(
@@ -2727,66 +2790,81 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
 
           {/* Player Grid */}
           {viewMode !== 'board' && (
-            <div
-              className="d-player-grid"
-              data-testid="player-pool"
-              style={{ gridTemplateColumns: gridCols }}
-            >
-              {filteredPlayers.map((player, idx) => (
-                <PlayerCard
-                  key={player.id}
-                  player={player}
-                  index={idx}
-                  isMyPick={commPickMode ? isOwner : isMyPick}
-                  isWatched={watchlist.includes(player.id)}
-                  isQueued={queuedPlayerIds.has(player.id)}
-                  onDraft={() => {
-                    if (commPickMode && isOwner) {
-                      void handleCommissionerPick(player.id);
-                    } else {
-                      void handleMakePick(player.id);
+            <>
+              <div
+                className="d-player-grid"
+                data-testid="player-pool"
+                style={{ gridTemplateColumns: gridCols }}
+              >
+                {filteredPlayers.map((player, idx) => (
+                  <PlayerCard
+                    key={player.id}
+                    player={player}
+                    index={idx}
+                    isMyPick={commPickMode ? isOwner : isMyPick}
+                    isWatched={watchlist.includes(player.id)}
+                    isQueued={queuedPlayerIds.has(player.id)}
+                    onDraft={() => {
+                      if (commPickMode && isOwner) {
+                        void handleCommissionerPick(player.id);
+                      } else {
+                        void handleMakePick(player.id);
+                      }
+                    }}
+                    onToggleWatch={() =>
+                      setWatchlist((prev) =>
+                        prev.includes(player.id)
+                          ? prev.filter((id) => id !== player.id)
+                          : [...prev, player.id],
+                      )
                     }
-                  }}
-                  onToggleWatch={() =>
-                    setWatchlist((prev) =>
-                      prev.includes(player.id)
-                        ? prev.filter((id) => id !== player.id)
-                        : [...prev, player.id],
-                    )
-                  }
-                  onToggleQueue={
-                    myTeamId !== null && draftId
-                      ? () => void handleToggleQueue(player.id)
-                      : undefined
-                  }
-                />
-              ))}
+                    onToggleQueue={
+                      myTeamId !== null && draftId
+                        ? () => void handleToggleQueue(player.id)
+                        : undefined
+                    }
+                  />
+                ))}
 
-              {filteredPlayers.length === 0 && !availablePlayersLoading && (
-                <div
-                  style={{
-                    gridColumn: '1 / -1',
-                    textAlign: 'center',
-                    padding: '60px 20px',
-                    color: 'var(--d-text-muted)',
-                  }}
-                >
-                  <div style={{ fontSize: 48, marginBottom: 12 }}>
-                    <span role="img" aria-label="search">
-                      🔍
-                    </span>
+                {filteredPlayers.length === 0 && !availablePlayersLoading && (
+                  <div
+                    style={{
+                      gridColumn: '1 / -1',
+                      textAlign: 'center',
+                      padding: '60px 20px',
+                      color: 'var(--d-text-muted)',
+                    }}
+                  >
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>
+                      <span role="img" aria-label="search">
+                        🔍
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 600 }}>
+                      No players found
+                    </div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>
+                      {searchTerm
+                        ? 'Try a different search term'
+                        : 'All available players have been drafted'}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 600 }}>
-                    No players found
+                )}
+              </div>
+              {hasMorePlayers &&
+                !availablePlayersLoading &&
+                filteredPlayers.length > 0 && (
+                  <div style={{ textAlign: 'center', padding: '16px 20px' }}>
+                    <button
+                      className="d-state-btn"
+                      onClick={() => void handleLoadMorePlayers()}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore ? 'Loading…' : 'Load More Players'}
+                    </button>
                   </div>
-                  <div style={{ fontSize: 13, marginTop: 4 }}>
-                    {searchTerm
-                      ? 'Try a different search term'
-                      : 'All available players have been drafted'}
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+            </>
           )}
         </div>
       </div>

@@ -101,6 +101,9 @@ jest.mock('@apollo/client/react', () => ({
     error: undefined,
     refetch: jest.fn(),
   })),
+  useApolloClient: jest.fn(() => ({
+    query: jest.fn().mockResolvedValue({ data: MOCK_QUERY_DATA }),
+  })),
   // Return a mock mutate function that resolves to {} so callers can safely
   // chain .catch() on the result.  The draft component calls
   // nudgeExpiredDraftPick(...).catch(...) and CI runners are slow enough that
