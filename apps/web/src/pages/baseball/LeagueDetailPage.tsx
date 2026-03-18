@@ -527,9 +527,13 @@ export function LeagueDetailPage(): React.JSX.Element {
   useEffect(() => {
     if (data?.league) {
       dispatch(setLeagueData(data.league));
-      dispatch(setIsCommissioner(data.league.owner === user?.id));
+      dispatch(
+        setIsCommissioner(
+          data.league.owner === user?.id || user?.accessLevel === 'admin',
+        ),
+      );
     }
-  }, [data, dispatch, user?.id]);
+  }, [data, dispatch, user?.id, user?.accessLevel]);
 
   const {
     data: positionsData,
@@ -825,7 +829,10 @@ export function LeagueDetailPage(): React.JSX.Element {
           secondaryColor: t.secondaryColor ?? null,
         }));
 
-  const isCommissioner = reduxIsCommissioner || league?.owner === user?.id;
+  const isCommissioner =
+    reduxIsCommissioner ||
+    league?.owner === user?.id ||
+    user?.accessLevel === 'admin';
 
   // Spectator mode: authenticated user viewing a public league they are not a member of.
   // Check both data.league.userMembership (Apollo cache) AND userTeamId (from the separate

@@ -123,7 +123,8 @@ builder.queryField('league', (t) =>
           membershipResults.length > 0 ? membershipResults[0] : null;
 
         // Access control: members always have access; non-members can only view public leagues (spectator mode)
-        if (!userMembership && !league.isPublic) {
+        // Admins can access any league regardless of membership or visibility
+        if (!userMembership && !league.isPublic && !context.user?.isAdmin) {
           throw ForbiddenError(
             'Access denied: You are not a member of this league',
           );
@@ -325,7 +326,7 @@ builder.queryField('leaguePositions', (t) =>
           )
           .limit(1);
 
-        if (leagueAccess.length === 0) {
+        if (leagueAccess.length === 0 && !context.user?.isAdmin) {
           throw ForbiddenError('User does not have access to this league');
         }
 
@@ -616,8 +617,8 @@ builder.queryField('leagueTeams', (t) =>
           )
           .limit(1);
 
-        if (leagueAccess.length === 0) {
-          throw new Error('User does not have access to this league');
+        if (leagueAccess.length === 0 && !context.user?.isAdmin) {
+          throw ForbiddenError('User does not have access to this league');
         }
 
         // Fetch all teams in the league with their primary manager userId
@@ -652,6 +653,7 @@ builder.queryField('leagueTeams', (t) =>
 
         return teams;
       } catch (error) {
+        if (error instanceof GraphQLError) throw error;
         LOGGER.error(
           'Error fetching league teams',
           error instanceof Error ? error : new Error(String(error)),
