@@ -317,3 +317,6 @@ scratch/*
 # Backward-compat junction: .github/skills/ → .agents/skills/
 # Created by setup scripts; not tracked by git (core.symlinks=false on Windows)
 .github/skills
+
+# Claude Code local settings (machine-specific paths and overrides)
+.claude/settings.local.json

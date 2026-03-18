@@ -14,6 +14,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Kill background servers when done** — `make kill-stale`
 - **Prefer `.graphql` + codegen over inline `gql`** — for new code in `apps/web` and `lib/shared-components`, define queries in `.graphql` files and import generated hooks from `graphql.generated.ts`. Legacy inline `gql` usage exists in the codebase and generated files necessarily contain `gql` strings.
 
+## Post-Session Reflection (AI Workspace Improvements)
+
+After completing any task, reflect on the session and identify gaps in MCP tooling or agent skills:
+
+1. **Check** [LS-1455](https://bkrupa.atlassian.net/browse/LS-1455) for existing child tickets (`parent = LS-1455` JQL)
+2. **File a child Task/Story** under LS-1455 if the gap is not already tracked
+
+**What qualifies as a gap:**
+
+- A needed MCP tool doesn't exist or returns incomplete data
+- A skill doc (`.agents/skills/<name>/SKILL.md`) is missing, outdated, or misleading for a workflow agents perform
+- CLAUDE.md instructions were ambiguous or missing coverage for a real scenario
+
 ## Workflow
 
 Full details in `.github/copilot-instructions.md`. Summary:
