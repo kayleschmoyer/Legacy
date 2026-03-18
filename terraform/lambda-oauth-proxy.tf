@@ -208,6 +208,11 @@ resource "aws_lambda_function" "oauth_proxy" {
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
 
+      # CORS — comma-separated origins allowed to make credentialed requests.
+      # The Lambda code defaults to https://legacy-fantasy.com when not set,
+      # but we make it explicit here so staging/PR environments can override it.
+      CORS_ALLOWED_ORIGINS = "https://${var.domain_name},https://www.${var.domain_name}"
+
       # Device-flow DynamoDB table
       DEVICE_FLOW_TABLE_NAME = aws_dynamodb_table.oauth_device_flows.name
     }

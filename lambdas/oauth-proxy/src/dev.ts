@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import type {
   APIGatewayEvent,
   APIGatewayProxyResult,
@@ -13,7 +12,6 @@ const PORT = 5001;
 
 const app = express();
 
-app.use(cors());
 app.use(express.json());
 
 // Simulate API Gateway: forward all requests to the real Lambda handler so that
