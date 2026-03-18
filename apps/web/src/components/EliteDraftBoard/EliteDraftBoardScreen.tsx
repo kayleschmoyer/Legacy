@@ -76,6 +76,7 @@ import {
   PauseDraft as PAUSE_DRAFT,
   RemoveFromDraftQueue as REMOVE_FROM_DRAFT_QUEUE,
   ResumeDraft as RESUME_DRAFT,
+  SetDraftOrder as SET_DRAFT_ORDER,
 } from '../../api/db/graphql.generated';
 import { env } from '../../config/environment';
 
@@ -707,6 +708,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     { loading: autoPickDisabledLoading },
   ] = useMutation(COMMISSIONER_SET_AUTOPICK_DISABLED);
   const [nudgeExpiredDraftPick] = useMutation(NUDGE_EXPIRED_DRAFT_PICK);
+  const [setDraftOrderMutation] = useMutation(SET_DRAFT_ORDER);
 
   // ---- Draft Queue ----
   const { data: queueData, refetch: refetchQueue } = useQuery<
@@ -1004,8 +1006,49 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         const draft = (result.data as any)?.initializeDraft;
         if (draft?.id) {
           const newDraftId = Number(draft.id);
+          // LS-1317: if the commissioner manually reordered teams before starting,
+          // apply that custom order now (setDraftOrder requires currentPick === 0,
+          // which is guaranteed immediately after initializeDraft).
+          let customOrderFailed = false;
+          if (customDraftOrder && customDraftOrder.length > 0) {
+            // Normalize against current leagueTeams: keep only valid IDs
+            // in the custom order, then append any missing teams.
+            const validTeamIds = new Set(leagueTeams.map((t) => String(t.id)));
+            const seen = new Set<string>();
+            const normalized: string[] = [];
+            for (const id of customDraftOrder) {
+              if (validTeamIds.has(id) && !seen.has(id)) {
+                seen.add(id);
+                normalized.push(id);
+              }
+            }
+            for (const t of leagueTeams) {
+              const id = String(t.id);
+              if (!seen.has(id)) {
+                normalized.push(id);
+              }
+            }
+            try {
+              await setDraftOrderMutation({
+                variables: {
+                  draftId: newDraftId,
+                  teamIds: normalized.map(Number),
+                },
+              });
+            } catch (orderErr) {
+              LOGGER.warn('[Draft] Failed to apply custom draft order', {
+                error: orderErr,
+              });
+              customOrderFailed = true;
+              setInitError(
+                'Draft started but custom team order could not be applied.',
+              );
+            }
+          }
           setDraftOrderMissing(false);
-          setInitError(null);
+          if (!customOrderFailed) {
+            setInitError(null);
+          }
           void refetchDraft();
           void refetchLeague();
           void refetchCurrentPick({ draftId: newDraftId });
@@ -1018,7 +1061,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     },
     [
       leagueId,
+      leagueTeams,
+      customDraftOrder,
       initializeLiveDraft,
+      setDraftOrderMutation,
       refetchDraft,
       refetchLeague,
       refetchCurrentPick,
