@@ -125,7 +125,12 @@
     "git restore": true,
     "git mv": true,
     "mkdir": true,
-    "git rm": true
+    "git rm": true,
+    ".\\scripts\\scan-prs.ps1": true,
+    ".\\scripts\\rebase-pr.ps1": true,
+    ".\\scripts\\pr-enter-worktree.ps1": true,
+    ".\\scripts\\resolve-review-threads.ps1": true,
+    ".\\scripts\\ci-failure-log.ps1": true
   },
   "chat.editing.autoAcceptDelay": 10,
   "C_Cpp.files.exclude": {

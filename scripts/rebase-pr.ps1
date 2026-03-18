@@ -99,7 +99,7 @@ try {
 
     if ($conflictFiles.Count -gt 0 -or $inRebase -or $rebaseExit -ne 0) {
         Write-Warn ""
-        Write-Warn "CONFLICTS DETECTED — rebase requires manual resolution."
+        Write-Warn "CONFLICTS DETECTED - rebase requires manual resolution."
         Write-Warn ""
         if ($conflictFiles.Count -gt 0) {
             Write-Warn "Conflicting files:"
@@ -108,13 +108,13 @@ try {
         Write-Warn ""
         Write-Warn "Resolve the conflicts, then run:"
         Write-Warn "  cd $wt"
-        Write-Warn "  git add <resolved-files>"
+        Write-Warn ('  git add <resolved-files>')
         Write-Warn "  git rebase --continue"
         Write-Warn "Then re-run this script with -SkipStabilize if rebase was completed."
         exit 1
     }
 
-    Write-Ok "Rebase complete — no conflicts."
+    Write-Ok "Rebase complete - no conflicts."
 
     # ---------------------------------------------------------------------------
     # Step 3: Post-rebase stabilization

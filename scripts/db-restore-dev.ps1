@@ -43,7 +43,7 @@ if (-not (Test-Path $seedPath)) {
 }
 
 if ($needsPull) {
-    Write-Step "Seed file missing or is an LFS pointer — running git lfs pull"
+    Write-Step "Seed file missing or is an LFS pointer - running git lfs pull"
     git lfs pull
     if ($LASTEXITCODE -ne 0) {
         Write-Err "git lfs pull failed (exit code $LASTEXITCODE)"

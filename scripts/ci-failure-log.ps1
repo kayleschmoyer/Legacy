@@ -128,11 +128,11 @@ $errorPatterns = @(
     'Expected:',          # Jest assertion failures
     '##\[error\]',        # GitHub Actions error annotations
     'ESLint',             # ESLint errors
-    ' problems (',        # ESLint summary (N problems (M errors...))
+    ' problems \(',        # ESLint summary (N problems (M errors...))
     'timed.out',          # Timeout
     'FAILED',             # Test/build failures
     'Cannot find module', # Module resolution
-    'error: ',            # Generic error prefix
+    'error: '             # Generic error prefix
 )
 
 $errorLines = @($rawLines | Where-Object {
@@ -173,7 +173,7 @@ if ($errorLines.Count -gt 0) {
     }
 } else {
     Write-Host ""
-    Write-Warn "No error lines matched known patterns — read $logFile directly."
+    Write-Warn "No error lines matched known patterns - read $logFile directly."
 }
 
 Write-Host ""

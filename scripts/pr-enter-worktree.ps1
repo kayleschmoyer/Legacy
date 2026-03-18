@@ -112,7 +112,7 @@ if ($wtPath) {
     # Verify the node_modules junction is intact
     $nmPath = Join-Path $wtPath "node_modules"
     if (-not (Test-Path $nmPath)) {
-        Write-Step "node_modules missing — running wt-setup..."
+        Write-Step "node_modules missing - running wt-setup..."
         Push-Location $mainRepo
         make wt-setup WT=$wtPath *>&1 | ForEach-Object { Write-Host $_ }
         if ($LASTEXITCODE -ne 0) {
@@ -132,7 +132,7 @@ if ($wtPath) {
 # Step 2: Create worktree
 # ---------------------------------------------------------------------------
 
-Write-Step "Worktree not found — creating via twig..."
+Write-Step "Worktree not found - creating via twig..."
 
 Push-Location $mainRepo
 

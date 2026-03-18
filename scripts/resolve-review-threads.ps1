@@ -138,7 +138,7 @@ foreach ($thread in $unresolved) {
             $failed++
         }
     } catch {
-        Write-Warning "Failed to resolve thread at $location: $_"
+        Write-Warning "Failed to resolve thread at ${location}: $_"
         $failed++
     }
 }
