@@ -139,12 +139,41 @@ builder.mutationField('claimFreeAgent', (t) =>
       }
       const teamId = membership[0].teamId;
 
-      // 2. Check the player is not already on a team in this league
+      // 2. Load league settings and check draft/waiver prerequisites
+      const leagueRow = await db
+        .select({
+          draftStatus: PublicSchema.leagues.draftStatus,
+          maxRosterSize: PublicSchema.leagues.maxRosterSize,
+          waiverType: PublicSchema.leagues.waiverType,
+          waiverEnabled: PublicSchema.leagues.waiverEnabled,
+          salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+          minSalary: PublicSchema.leagues.minSalary,
+          salaryCap: PublicSchema.leagues.salaryCap,
+        })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+
+      if (leagueRow.length === 0) {
+        throw new Error('League not found');
+      }
+
+      if (leagueRow[0].draftStatus !== 'completed') {
+        throw new Error(
+          'Free agent claims are not available until the draft has been completed',
+        );
+      }
+
+      if (!leagueRow[0].waiverEnabled) {
+        throw new Error('Waivers are not enabled for this league');
+      }
+
+      // 3. Check the player is not already on a team in this league
       if (await isPlayerOnRoster(db, leagueId, playerId)) {
         throw new Error('This player is already on a roster in this league');
       }
 
-      // 3. Check for existing pending claim for this player in this league
+      // 4. Check for existing pending claim for this player in this league
       const existingClaim = await db
         .select({ id: PublicSchema.waiverClaims.id })
         .from(PublicSchema.waiverClaims)
@@ -162,28 +191,7 @@ builder.mutationField('claimFreeAgent', (t) =>
         throw new Error('You already have a pending claim for this player');
       }
 
-      // 4. If roster is full, verify a drop player was provided
-      const leagueRow = await db
-        .select({
-          maxRosterSize: PublicSchema.leagues.maxRosterSize,
-          waiverType: PublicSchema.leagues.waiverType,
-          waiverEnabled: PublicSchema.leagues.waiverEnabled,
-          salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
-          minSalary: PublicSchema.leagues.minSalary,
-          salaryCap: PublicSchema.leagues.salaryCap,
-        })
-        .from(PublicSchema.leagues)
-        .where(eq(PublicSchema.leagues.id, leagueId))
-        .limit(1);
-
-      if (leagueRow.length === 0) {
-        throw new Error('League not found');
-      }
-
-      if (!leagueRow[0].waiverEnabled) {
-        throw new Error('Waivers are not enabled for this league');
-      }
-
+      // 5. Validate roster capacity, salary cap, and FAAB requirements
       // FAAB validation
       const leagueWaiverType = leagueRow[0].waiverType;
       let resolvedFaabBid: number | null = null;

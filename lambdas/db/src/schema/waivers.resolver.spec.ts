@@ -88,6 +88,7 @@ describe('Waivers Resolver', () => {
           maxRosterSize: 'maxRosterSize',
           waiverType: 'waiverType',
           waiverEnabled: 'waiverEnabled',
+          draftStatus: 'draftStatus',
           salaryCapEnabled: 'salaryCapEnabled',
           minSalary: 'minSalary',
           salaryCap: 'salaryCap',
@@ -429,6 +430,64 @@ describe('Waivers Resolver', () => {
           undefined as never,
         ),
       ).rejects.toThrow('League not found');
+    });
+
+    it('throws when draft is not completed (new league)', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ teamId: 2 }]) // membership
+        .mockResolvedValueOnce([]) // existingClaim
+        .mockResolvedValueOnce([
+          {
+            draftStatus: 'not-started',
+            waiverEnabled: true,
+            waiverType: 'standard',
+            maxRosterSize: 25,
+            salaryCapEnabled: false,
+            minSalary: 1,
+            salaryCap: null,
+          },
+        ]); // leagueRow
+
+      const resolver = getMutation('claimFreeAgent');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, playerId: 10 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(
+        'Free agent claims are not available until the draft has been completed',
+      );
+    });
+
+    it('throws when draft is in-progress (not yet completed)', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ teamId: 2 }]) // membership
+        .mockResolvedValueOnce([]) // existingClaim
+        .mockResolvedValueOnce([
+          {
+            draftStatus: 'in-progress',
+            waiverEnabled: true,
+            waiverType: 'standard',
+            maxRosterSize: 25,
+            salaryCapEnabled: false,
+            minSalary: 1,
+            salaryCap: null,
+          },
+        ]); // leagueRow
+
+      const resolver = getMutation('claimFreeAgent');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, playerId: 10 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(
+        'Free agent claims are not available until the draft has been completed',
+      );
     });
   });
 
