@@ -54,17 +54,25 @@ function makeEvent(overrides: Partial<APIGatewayEvent> = {}): APIGatewayEvent {
 }
 
 describe('Jira Proxy Handler', () => {
+  let originalCorsOrigins: string | undefined;
+
   beforeEach(() => {
     jest.clearAllMocks();
     process.env['JIRA_SECRET_NAME'] = 'test-secret';
     process.env['JIRA_PROJECT_KEY'] = 'LS';
     process.env['JWT_SECRET'] = TEST_JWT_SECRET;
+    originalCorsOrigins = process.env['CORS_ALLOWED_ORIGINS'];
   });
 
   afterEach(() => {
     delete process.env['JIRA_SECRET_NAME'];
     delete process.env['JIRA_PROJECT_KEY'];
     delete process.env['JWT_SECRET'];
+    if (originalCorsOrigins !== undefined) {
+      process.env['CORS_ALLOWED_ORIGINS'] = originalCorsOrigins;
+    } else {
+      delete process.env['CORS_ALLOWED_ORIGINS'];
+    }
   });
 
   it('returns 200 for OPTIONS (CORS preflight)', async () => {
@@ -89,7 +97,6 @@ describe('Jira Proxy Handler', () => {
       'https://legacy-fantasy.com',
     );
     expect(result.headers?.['Vary']).toBe('Origin');
-    delete process.env['CORS_ALLOWED_ORIGINS'];
   });
 
   it('omits ACAO when origin is not in allowlist', async () => {
@@ -101,7 +108,6 @@ describe('Jira Proxy Handler', () => {
     const result = await baseHandler(event);
     expect(result.statusCode).toBe(200);
     expect(result.headers?.['Access-Control-Allow-Origin']).toBeUndefined();
-    delete process.env['CORS_ALLOWED_ORIGINS'];
   });
 
   it('includes security headers in responses', async () => {
@@ -125,6 +131,24 @@ describe('Jira Proxy Handler', () => {
     const event = makeEvent({ httpMethod: 'OPTIONS' });
     const result = await baseHandler(event);
     expect(result.headers?.['Access-Control-Allow-Methods']).toContain('GET');
+  });
+
+  it('returns Access-Control-Allow-Credentials: true for credentialed requests', async () => {
+    const event = makeEvent({
+      httpMethod: 'OPTIONS',
+      headers: { Origin: 'https://legacy-fantasy.com' },
+    });
+    process.env['CORS_ALLOWED_ORIGINS'] = 'https://legacy-fantasy.com';
+    const result = await baseHandler(event);
+    expect(result.headers?.['Access-Control-Allow-Credentials']).toBe('true');
+  });
+
+  it('includes X-CSRF-Token in Access-Control-Allow-Headers', async () => {
+    const event = makeEvent({ httpMethod: 'OPTIONS' });
+    const result = await baseHandler(event);
+    expect(result.headers?.['Access-Control-Allow-Headers']).toContain(
+      'X-CSRF-Token',
+    );
   });
 
   it('returns 200 for health check', async () => {
