@@ -12,7 +12,7 @@
 	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy \
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
-	fix-windows-locks diagnose \
+	fix-windows-locks diagnose kill-stale \
 	branch-tree cleanup-merged-branches squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
 	pre-commit pc quick-check format-commit \
 	wt-setup
@@ -165,6 +165,7 @@ clean-safe: clean-cache ## Safely clean build artifacts and cache (alias for cle
 
 clean: ## Clean all build artifacts and dependencies
 ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -Command "$$nmPath = Join-Path '$(WORKSPACE_PATH_WIN)' 'node_modules'; $$nmEsc = [regex]::Escape($$nmPath); $$procs = Get-Process node -EA SilentlyContinue | Where-Object { try { ($$_.Modules | Where-Object { $$_.FileName -match ($$nmEsc + '.*\.node$$') }).Count -gt 0 } catch { $$false } }; if ($$procs) { Write-Host ''; Write-Host '  BLOCKED: node processes are holding native addon file locks' -ForegroundColor Red; $$procs | ForEach-Object { $$cmd = (Get-CimInstance Win32_Process -Filter ('ProcessId=' + $$_.Id)).CommandLine; Write-Host ('    PID {0}: {1}' -f $$_.Id, $$cmd) -ForegroundColor Yellow }; Write-Host ''; Write-Host '  Run  make kill-stale  to stop them, then retry  make clean' -ForegroundColor Cyan; Write-Host ''; exit 1 }"
 	@powershell -NoProfile -Command "$$nmPath = Join-Path '$(WORKSPACE_PATH_WIN)' 'node_modules'; $$nmItem = Get-Item $$nmPath -Force -EA SilentlyContinue; if ($$nmItem -and (($$nmItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { Write-Host ''; Write-Host '  BLOCKED: node_modules is a junction' -ForegroundColor Red; Write-Host '  Running make clean here would unlink the junction and break this worktree.' -ForegroundColor Yellow; Write-Host '  Run make clean in the main repo instead.' -ForegroundColor Cyan; Write-Host ''; exit 1 }; if (-not (Test-Path $$nmPath)) { exit 0 }; $$wtDirs = @(); try { $$wtDirs = @(git worktree list --porcelain 2>$$null | Select-String '^worktree ' | ForEach-Object { ($$_ -replace '^worktree ','').Trim() } | Where-Object { $$_ -ne '$(WORKSPACE_PATH_WIN)' }) } catch {}; $$junctions = @(); foreach ($$wt in $$wtDirs) { $$wtNM = Join-Path $$wt 'node_modules'; $$wi = Get-Item $$wtNM -Force -EA SilentlyContinue; if ($$wi -and (($$wi.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { $$junctions += $$wt } }; if ($$junctions.Count -gt 0) { Write-Host ''; Write-Host '  WARNING: These worktrees junction to this node_modules:' -ForegroundColor Yellow; $$junctions | ForEach-Object { Write-Host ('    - ' + $$_) -ForegroundColor Yellow }; Write-Host '  make clean will break them. Run twig worktree clean first, or pass FORCE=1.' -ForegroundColor Yellow; Write-Host ''; if ('$(FORCE)' -ne '1') { exit 1 } }"
 endif
 	@$(call echo_blue,Cleaning workspace...)
@@ -180,10 +181,6 @@ endif
 	@$(call echo_blue,Stopping workspace-affiliated processes...)
 	@$(KILL_WORKSPACE_PROCS)
 ifeq ($(DETECTED_OS),Windows)
-	@$(call echo_blue,Releasing native addon file locks...)
-	@powershell -NoProfile -Command "$$nmPath = Join-Path '$(WORKSPACE_PATH_WIN)' 'node_modules'; $$nmEsc = [regex]::Escape($$nmPath); $$procs = Get-Process node -EA SilentlyContinue | Where-Object { try { ($$_.Modules | Where-Object { $$_.FileName -match ($$nmEsc + '.*\.node$$') }).Count -gt 0 } catch { $$false } }; if ($$procs) { $$procs | ForEach-Object { Write-Host ('Stopping {0} (PID {1}) - holds native addon lock' -f $$_.ProcessName, $$_.Id); Stop-Process -Id $$_.Id -Force } } else { Write-Host 'No processes holding native addon locks' }"
-	@$(call echo_blue,Waiting for file handles to release...)
-	@powershell -Command "Start-Sleep -Seconds 3"
 	@$(call echo_blue,Removing node_modules (junction-safe)...)
 	@powershell -NoProfile -ExecutionPolicy Bypass -Command "$$nmPath = 'node_modules'; if (-not (Test-Path $$nmPath)) { Write-Host 'No node_modules to remove'; return } $$item = Get-Item $$nmPath -Force; if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { cmd /c 'rmdir node_modules'; Write-Host 'node_modules junction removed (target preserved)' } else { try { Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction Stop; Write-Host 'node_modules removed' } catch { $$emptyDir = Join-Path $$env:TEMP ('empty_' + (Get-Random)); New-Item -ItemType Directory -Path $$emptyDir -Force | Out-Null; robocopy $$emptyDir $$nmPath /MIR /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null; Remove-Item -Path $$emptyDir -Force -ErrorAction SilentlyContinue; Remove-Item -Path $$nmPath -Recurse -Force -ErrorAction SilentlyContinue; Write-Host 'node_modules removed using robocopy' } }"
 else
@@ -603,6 +600,13 @@ dev-setup: install db-migrate ## Setup development environment
 	@$(call echo_green,Development environment setup completed!)
 
 # Troubleshooting
+kill-stale: ## Find and stop node processes holding native addon locks under node_modules
+ifeq ($(DETECTED_OS),Windows)
+	@powershell -NoProfile -Command "$$nmPath = Join-Path '$(WORKSPACE_PATH_WIN)' 'node_modules'; $$nmEsc = [regex]::Escape($$nmPath); $$procs = Get-Process node -EA SilentlyContinue | Where-Object { try { ($$_.Modules | Where-Object { $$_.FileName -match ($$nmEsc + '.*\.node$$') }).Count -gt 0 } catch { $$false } }; if (-not $$procs) { Write-Host 'No processes holding native addon locks' -ForegroundColor Green; return }; $$procs | ForEach-Object { $$cmd = (Get-CimInstance Win32_Process -Filter ('ProcessId=' + $$_.Id)).CommandLine; Write-Host ('  PID {0}: {1}' -f $$_.Id, $$cmd) -ForegroundColor Yellow }; if ('$(DRYRUN)' -eq '1') { Write-Host 'Dry run — pass DRYRUN=0 or omit DRYRUN to kill these processes' -ForegroundColor Cyan; return }; $$procs | ForEach-Object { Write-Host ('Stopping node (PID {0})' -f $$_.Id) -ForegroundColor Red; Stop-Process -Id $$_.Id -Force }"
+else
+	@echo "kill-stale is Windows-only (native addon file locks are a Windows issue)"
+endif
+
 fix-windows-locks: ## Fix Windows file permission issues
 	@$(call echo_blue,Fixing Windows file locks...)
 	@$(call echo_yellow,Closing editors and stopping processes...)

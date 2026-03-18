@@ -51,6 +51,25 @@ $env:AWS_PAGER = ""
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 ```
 
+### EPERM / Native Addon File Lock (`bufferutil.node`)
+
+Symptom: `ERR_PNPM_EPERM ... unlink ... node_modules\bufferutil\...\bufferutil.node` during `make install` or `make clean`.
+
+A background node process (usually the VS Code Playwright extension's `test-server` or a manually started dev server) is holding a native `.node` addon open.
+
+```powershell
+# Identify the lock-holding process (preview without killing)
+make kill-stale DRYRUN=1
+
+# Kill stale node processes holding native addon locks
+make kill-stale
+
+# Then retry
+make clean install
+```
+
+If `make kill-stale` reports no processes but the error persists, a non-node process may hold the lock. Use Process Explorer or `handle.exe` from Sysinternals to find it.
+
 ### Terraform State Locked
 
 ```powershell

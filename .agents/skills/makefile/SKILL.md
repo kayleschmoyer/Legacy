@@ -124,6 +124,7 @@ make sync-worktrees-add TICKET=507    # Add a worktree to existing workspace
 make sync-worktrees-remove TICKET=493 # Remove a worktree from workspace
 make worktree TICKET=507 DESC=desc    # Create worktree + auto-add to workspace
 make diagnose        # Show platform, versions, diagnostics
+make kill-stale      # Find/stop node processes holding native addon locks (DRYRUN=1 to preview)
 make codegen         # Run GraphQL code generation
 ```
 
@@ -164,7 +165,7 @@ Five echo macros are available: `echo_blue`, `echo_green`, `echo_yellow`, `echo_
 
 ### Issue: File lock errors on Windows
 
-**Solution**: `make install-force` or `make fix-windows-locks` then retry.
+**Solution**: `make kill-stale` first (stops node processes holding `.node` file locks), then `make install-force` or `make fix-windows-locks` then retry.
 
 ### Issue: Stale build/test results
 
