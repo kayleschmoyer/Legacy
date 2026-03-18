@@ -50,3 +50,17 @@ every other junctioned worktree and requires a full `make install` to recover. A
    main repo while other worktrees are active.
 3. **If the junction is missing** → re-run `make wt-setup WT=<this-worktree-path>` to
    recreate it. This is safe — it only creates a symlink, it doesn't mutate `node_modules`.
+
+## Runtime Guards
+
+Multiple layers prevent agents from accidentally mutating shared `node_modules`:
+
+| Guard                             | File                      | Trigger                                 | What it blocks                                                         |
+| --------------------------------- | ------------------------- | --------------------------------------- | ---------------------------------------------------------------------- |
+| **Package manager enforcement**   | `preinstall-guard.js`     | Any `npm install` / `yarn install`      | Non-pnpm package managers (checks `npm_config_user_agent`)             |
+| **Junction mutation (worktree)**  | `preinstall-guard.js`     | `pnpm install` in a junctioned worktree | Detects junction via `fs.readlinkSync()`, exits 1                      |
+| **Junction mutation (main repo)** | `preinstall-guard.js`     | `pnpm install` in main repo             | Detects worktrees with junctions pointing here via `git worktree list` |
+| **PowerShell junction guard**     | `pnpm-install-lock.ps1`   | `make install`, `make install-force`    | Same as above two, with richer error messages and recovery steps       |
+| **Main-repo worktree guard**      | `pnpm-install-lock.ps1`   | `make install` in main repo             | Scans all worktrees for junctions targeting this `node_modules`        |
+| **File lock serialization**       | `pnpm-install-lock.ps1`   | All install ops                         | `.pnpm-install.lock` exclusive file handle (5-min timeout)             |
+| **Clean guard**                   | `Makefile` (`make clean`) | `make clean` in worktree or main repo   | Blocks if junctions exist (self or siblings)                           |

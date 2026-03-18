@@ -131,6 +131,56 @@ if (Test-Path $nmPath) {
     }
 }
 
+# ---------------------------------------------------------------------------
+# Main-repo guard — refuse if worktrees have junctions to this node_modules
+# ---------------------------------------------------------------------------
+# When running from the main repo (not a worktree), check if any worktrees
+# have junctions pointing to THIS node_modules. Installing here would
+# silently mutate the shared directory and break those worktrees.
+
+if (Test-Path $nmPath) {
+    $wtDirs = @()
+    try {
+        $wtDirs = @(git worktree list --porcelain 2>$null |
+            Select-String '^worktree ' |
+            ForEach-Object { ($_ -replace '^worktree ','').Trim() } |
+            Where-Object { $_ -ne (Get-Location).Path })
+    } catch {}
+
+    $junctions = @()
+    $thisNmResolved = (Resolve-Path $nmPath -ErrorAction SilentlyContinue).Path
+    foreach ($wt in $wtDirs) {
+        $wtNM = Join-Path $wt 'node_modules'
+        $wi = Get-Item $wtNM -Force -ErrorAction SilentlyContinue
+        if ($wi -and (($wi.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+            $wtTarget = $null
+            try { $wtTarget = (Resolve-Path $wi.Target -ErrorAction SilentlyContinue).Path } catch {}
+            if ($wtTarget -eq $thisNmResolved) {
+                $junctions += $wt
+            }
+        }
+    }
+
+    if ($junctions.Count -gt 0) {
+        Write-Host ""
+        Write-Host "  ============================================================" -ForegroundColor Red
+        Write-Host "  BLOCKED: worktrees have junctions to this node_modules" -ForegroundColor Red
+        Write-Host "  ============================================================" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  Running pnpm install here would silently mutate the shared" -ForegroundColor Yellow
+        Write-Host "  node_modules and break these junctioned worktrees:" -ForegroundColor Yellow
+        foreach ($j in $junctions) {
+            Write-Host "    - $j" -ForegroundColor Yellow
+        }
+        Write-Host ""
+        Write-Host "  What to do instead:" -ForegroundColor Cyan
+        Write-Host "    - Clean up idle worktrees first:  twig worktree clean" -ForegroundColor White
+        Write-Host "    - Or remove their junctions:  cd <worktree> && cmd /c `"rmdir node_modules`"" -ForegroundColor White
+        Write-Host ""
+        exit 1
+    }
+}
+
 Enter-InstallLock
 try {
     if ($ForceClean) {
