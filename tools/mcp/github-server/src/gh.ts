@@ -44,6 +44,19 @@ export async function runGhJson<T>(args: string[]): Promise<T> {
   return JSON.parse(raw) as T;
 }
 
+/** Fetch the current repo's owner login and name. */
+export async function getRepoOwnerName(): Promise<{
+  owner: string;
+  name: string;
+}> {
+  return runGhJson<{ owner: { login: string }; name: string }>([
+    'repo',
+    'view',
+    '--json',
+    'owner,name',
+  ]).then((r) => ({ owner: r.owner.login, name: r.name }));
+}
+
 /** Run a GraphQL query/mutation via `gh api graphql`. */
 export async function runGraphQL<T>(
   query: string,

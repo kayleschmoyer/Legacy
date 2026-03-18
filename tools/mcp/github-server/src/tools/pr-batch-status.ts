@@ -1,4 +1,4 @@
-import { runGhJson, runGraphQL } from '../gh.js';
+import { runGhJson, runGraphQL, getRepoOwnerName } from '../gh.js';
 import type { ToolResult } from '../types.js';
 
 interface PRBatchStatusParams {
@@ -79,18 +79,6 @@ query($owner: String!, $repo: String!) {
     ${fragments.join('\n')}
   }
 }`;
-}
-
-async function getRepoOwnerName(): Promise<{
-  owner: string;
-  name: string;
-}> {
-  return runGhJson<{ owner: { login: string }; name: string }>([
-    'repo',
-    'view',
-    '--json',
-    'owner,name',
-  ]).then((r) => ({ owner: r.owner.login, name: r.name }));
 }
 
 export async function prBatchStatus(

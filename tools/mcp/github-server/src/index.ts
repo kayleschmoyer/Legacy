@@ -11,6 +11,7 @@ import { manageLabels } from './tools/manage-labels.js';
 import { getRepoInfo } from './tools/get-repo-info.js';
 import { prDashboard } from './tools/pr-dashboard.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
+import { prScan } from './tools/pr-scan.js';
 
 const server = new McpServer({
   name: 'legacy-sports-github',
@@ -200,6 +201,22 @@ server.tool(
       .describe('Array of PR numbers to fetch detailed status for'),
   },
   async (params) => prBatchStatus(params),
+);
+
+// --- github_pr_scan ---
+server.tool(
+  'github_pr_scan',
+  'Scan all open PRs and return pre-bucketed arrays for the pr-operations sweep workflow. Returns: conflicting (merge conflicts), reviews (unresolved threads with body/path/line details), ciFailing (with failedChecks names), ciPending, and clean. Equivalent to running scripts/scan-prs.ps1 but works in any environment without PowerShell.',
+  {
+    limit: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(200)
+      .default(200)
+      .describe('Maximum number of open PRs to scan (default: 200)'),
+  },
+  async (params) => prScan(params),
 );
 
 // Start the server
