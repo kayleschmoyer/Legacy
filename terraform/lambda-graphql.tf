@@ -221,10 +221,17 @@ resource "aws_lambda_function" "graphql" {
       SYSTEM_API_KEY = random_password.system_api_key.result
 
       # Stripe payment integration
-      STRIPE_SECRET_KEY_SECRET_NAME      = aws_secretsmanager_secret.stripe_secret_key.name
-      STRIPE_WEBHOOK_SECRET_SECRET_NAME  = aws_secretsmanager_secret.stripe_webhook_secret.name
-      STRIPE_PUBLISHABLE_KEY             = var.stripe_publishable_key
-      STRIPE_TRIAL_PERIOD_DAYS           = tostring(var.stripe_trial_period_days)
+      STRIPE_SECRET_KEY_SECRET_NAME     = aws_secretsmanager_secret.stripe_secret_key.name
+      STRIPE_WEBHOOK_SECRET_SECRET_NAME = aws_secretsmanager_secret.stripe_webhook_secret.name
+      STRIPE_PUBLISHABLE_KEY            = var.stripe_publishable_key
+      STRIPE_TRIAL_PERIOD_DAYS          = tostring(var.stripe_trial_period_days)
+
+      # CORS — comma-separated list of origins permitted to make cross-origin
+      # requests.  Must include the production web domain so draft-pick (and all
+      # other GraphQL) requests from the browser are not blocked by the Lambda's
+      # origin-reflection guard in handler.ts.
+      # Falls back to the handler's built-in default when domain_name is empty.
+      CORS_ALLOWED_ORIGINS = var.domain_name != "" ? "https://${var.domain_name}" : "https://legacy-fantasy.com"
     }
   }
 

@@ -231,6 +231,66 @@ resource "aws_api_gateway_method_response" "graphql_options" {
 # (including CORS). Integration response blocks are not needed — the Lambda in
 # lambdas/db/src/server/handler.ts reflects the validated origin via getCorsHeaders().
 
+# ─── Gateway-level CORS error responses ────────────────────────────────────────
+#
+# When API Gateway itself rejects a request before reaching the Lambda (e.g. 429
+# throttle, 502 bad gateway, 503 unavailable, 504 timeout) the Lambda never runs
+# and therefore cannot set CORS headers. Without these gateway_response resources
+# the browser receives a no-CORS response and shows:
+#   "No 'Access-Control-Allow-Origin' header is present on the requested resource."
+#
+# We reflect the origin wildcard here because we cannot validate the origin at the
+# gateway level (no Lambda context). The Lambda still validates origins for all
+# requests it handles; these responses only fire for gateway-level errors.
+#
+# Referenced by deploy.ps1 and deploy.sh as aws_api_gateway_gateway_response.cors
+# (used when targeting the api-gateway group specifically).
+
+locals {
+  # HTTP status codes for which API Gateway may return its own error response
+  # before the Lambda is invoked — each needs CORS headers so the browser can
+  # read the error body.
+  gateway_error_types = toset([
+    "DEFAULT_4XX",
+    "DEFAULT_5XX",
+    "THROTTLED",
+    "QUOTA_EXCEEDED",
+    "ACCESS_DENIED",
+    "AUTHORIZER_FAILURE",
+    "AUTHORIZER_CONFIGURATION_ERROR",
+    "BAD_REQUEST_PARAMETERS",
+    "BAD_REQUEST_BODY",
+    "INVALID_API_KEY",
+    "INVALID_SIGNATURE",
+    "MISSING_AUTHENTICATION_TOKEN",
+    "REQUEST_TOO_LARGE",
+    "RESOURCE_NOT_FOUND",
+    "INTEGRATION_FAILURE",
+    "INTEGRATION_TIMEOUT",
+    "UNSUPPORTED_MEDIA_TYPE",
+    "WAF_FILTERED",
+  ])
+}
+
+resource "aws_api_gateway_gateway_response" "cors" {
+  for_each = local.gateway_error_types
+
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  response_type = each.key
+
+  response_parameters = {
+    # Use the configured domain name as the allowed origin. When the Lambda is
+    # not invoked (gateway-level errors), we cannot reflect the validated origin,
+    # so we use the production domain directly. Falls back to the default domain
+    # when domain_name is empty. Note: Allow-Credentials=true requires a specific
+    # origin (not '*').
+    "gatewayresponse.header.Access-Control-Allow-Origin"      = "'https://${var.domain_name != "" ? var.domain_name : "legacy-fantasy.com"}'"
+    "gatewayresponse.header.Access-Control-Allow-Headers"     = "'Content-Type,Authorization,X-Requested-With,apollo-require-preflight,X-CSRF-Token'"
+    "gatewayresponse.header.Access-Control-Allow-Methods"     = "'GET,POST,OPTIONS'"
+    "gatewayresponse.header.Access-Control-Allow-Credentials" = "'true'"
+  }
+}
+
 # ─── Custom domain: api.<domain> ───────────────────────────────────────────────
 
 # ACM certificate for api.<domain>
