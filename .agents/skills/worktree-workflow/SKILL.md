@@ -15,14 +15,15 @@ Git worktrees let you check out multiple branches simultaneously in separate dir
 
 ```
 D:\code\
-├── legacy-sports\                  ← main repo, always on main
-└── LS-####\                        ← worktree created by twig (sibling of repo)
-    └── short-description\          ← or flat LS-####, depending on branch name
+├── legacy-sports\                         ← main repo, always on main
+└── legacy-sports-worktrees\
+    ├── LS-1234-my-feature\                ← worktree for LS-1234/my-feature branch
+    └── LS-1235-another-ticket\            ← worktree for LS-1235/another-ticket branch
 ```
 
-`twig worktree create <branch>` places the worktree in the **repository's parent directory** (`D:\code\`), in a folder derived from the branch name. Run `twig worktree list` after creation to confirm the exact path — use that path for all subsequent steps.
+`twig worktree create <branch>` places worktrees under `D:\code\legacy-sports-worktrees\` in a folder derived from the branch name (slashes replaced with hyphens). Run `twig worktree list` after creation to confirm the exact path — use that path for all subsequent steps.
 
-> Worktrees created manually (or before twig worktree commands were available) may live at `D:\code\legacy-sports-worktrees\LS-####\`. That path is still valid; twig tracks worktrees by path, not by convention.
+Scripts like `scripts/pr-enter-worktree.ps1` and `.vscode/settings.json` assume this `legacy-sports-worktrees` base directory.
 
 ## When to Use
 
