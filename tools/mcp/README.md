@@ -75,6 +75,9 @@ Git worktree management for parallel ticket work:
 - **worktree_set** — Set the active worktree for subsequent commands
 - **worktree_run** — Run a shell command in the active worktree
 - **worktree_guard** — Check whether a path is inside the main repo (warns if worktrees are active)
+- **worktree_rebase** — Fetch origin and rebase the active worktree branch onto its parent (via `twig rebase`)
+- **worktree_stabilize** — Run post-rebase stabilization: `make install`, regenerate schema, and run codegen on affected projects
+- **worktree_push** — Push the current branch with `--force-with-lease` (refuses to push `main`)
 
 ### aws-server
 
@@ -116,3 +119,17 @@ Nx build system intelligence — project discovery, affected analysis, target ex
 - **nx_run** — Run an Nx target on a specific project (allowlisted targets only)
 - **nx_run_affected** — Run a target on all affected projects (allowlisted targets only)
 - **nx_dep_graph** — Query project dependency relationships (dependencies or dependents)
+
+## Cloud vs Local Availability
+
+Some servers depend on infrastructure that is unavailable in the GitHub Copilot cloud agent environment. Use this table when deciding which servers you can call:
+
+| Server ID              | Local (Windows dev) | Cloud agent (Copilot) | Notes                                                                                                                                  |
+| ---------------------- | :-----------------: | :-------------------: | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-ci`     |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                 |
+| `legacy-sports-db`     |         ✅          |          ✅           | Cloud uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`                                                               |
+| `legacy-sports-jira`   |         ✅          |  ✅ (needs secrets)   | Requires `JIRA_EMAIL` + `JIRA_API_TOKEN` env vars / GitHub secrets                                                                     |
+| `legacy-sports-github` |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                 |
+| `legacy-sports-nx`     |         ✅          |          ✅           | Uses `pnpm exec nx`; available after `pnpm install`                                                                                    |
+| `worktree`             |         ✅          |          ❌           | Cloud agents work directly in a branch checkout — no worktrees needed                                                                  |
+| `legacy-sports-aws`    |         ✅          |          ❌           | No AWS SSO or OIDC credentials in cloud; no CloudWatch access — use `legacy-sports-ci` (`ci_get_logs`) for GitHub Actions logs instead |

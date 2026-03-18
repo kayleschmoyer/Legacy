@@ -50,7 +50,18 @@ When running as a **cloud coding agent** (Codespace-like environment, set up by 
 
 **Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make <target>` → `cd lib/db-client && pnpm run db:status && pnpm run db:migrate` → `make pc` → commit + push → `gh pr create` → Jira "In Review"
 
-**MCP servers:** `legacy-sports-ci` (CI logs/reruns), `legacy-sports-db` (Docker Postgres), `legacy-sports-jira` (ticket CRUD). No `worktree` or `legacy-sports-aws`.
+**Available MCP servers in cloud:**
+
+- `legacy-sports-ci` — CI log queries, workflow reruns
+- `legacy-sports-db` — local Docker Postgres queries, migrations, schema generation
+- `legacy-sports-jira` — ticket CRUD, transitions, blocker checks (requires `JIRA_EMAIL` and `JIRA_API_TOKEN` secrets)
+- `legacy-sports-github` — PR and review lifecycle management (uses `gh` CLI, authenticated via GitHub token)
+- `legacy-sports-nx` — Nx project discovery, affected analysis, and target execution
+
+**Unavailable in cloud (by design):**
+
+- `worktree` — no worktree management needed
+- `legacy-sports-aws` — no AWS credentials
 
 ## Environment
 
