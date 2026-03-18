@@ -9,6 +9,8 @@ import { getReviewThreads } from './tools/get-review-threads.js';
 import { resolveThread } from './tools/resolve-thread.js';
 import { manageLabels } from './tools/manage-labels.js';
 import { getRepoInfo } from './tools/get-repo-info.js';
+import { prDashboard } from './tools/pr-dashboard.js';
+import { prBatchStatus } from './tools/pr-batch-status.js';
 
 const server = new McpServer({
   name: 'legacy-sports-github',
@@ -159,6 +161,45 @@ server.tool(
   'Get repository information (owner, name, default branch, URL). Useful for constructing GraphQL queries or API calls.',
   {},
   async () => getRepoInfo(),
+);
+
+// --- github_pr_dashboard ---
+server.tool(
+  'github_pr_dashboard',
+  'Cross-PR triage dashboard. Returns all open PRs with mergeable status, CI pass/fail/pending, unresolved review thread count, labels, and a summary with counts of conflicting/failing/pending/approved PRs. Replaces multiple gh CLI calls + JSON parsing for PR triage.',
+  {
+    state: z
+      .enum(['open', 'closed', 'merged', 'all'])
+      .default('open')
+      .describe('PR state filter (default: open)'),
+    author: z.string().optional().describe('Filter by PR author username'),
+    label: z
+      .string()
+      .optional()
+      .describe('Filter by label, e.g. merge-when-ready'),
+    limit: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .default(30)
+      .describe('Maximum number of PRs to return (default: 30)'),
+  },
+  async (params) => prDashboard(params),
+);
+
+// --- github_pr_batch_status ---
+server.tool(
+  'github_pr_batch_status',
+  'Detailed status for specific PRs by number. Returns mergeable status, CI job results by name, review approval state, individual reviews, and unresolved thread count for each PR. Uses batched GraphQL for efficiency.',
+  {
+    prNumbers: z
+      .array(z.coerce.number().int().positive())
+      .min(1)
+      .max(50)
+      .describe('Array of PR numbers to fetch detailed status for'),
+  },
+  async (params) => prBatchStatus(params),
 );
 
 // Start the server
