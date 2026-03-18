@@ -7,6 +7,8 @@ import { affected } from './tools/affected.js';
 import { runTarget } from './tools/run-target.js';
 import { runAffected } from './tools/run-affected.js';
 import { depGraph } from './tools/dep-graph.js';
+import { installPackage } from './tools/install-package.js';
+import { checkPackageHealth } from './tools/check-package-health.js';
 
 const server = new McpServer({
   name: 'legacy-sports-nx',
@@ -170,6 +172,65 @@ server.tool(
       ),
   },
   async (params) => depGraph(params),
+);
+
+// --- Input validation patterns ---
+// npm package names: optional @scope/ prefix, then alphanumeric/hyphens/dots/underscores
+const NPM_NAME_REGEX = /^(@[a-z0-9\-._]+\/)?[a-z0-9\-._]+$/;
+// Semver-ish: digits.digits.digits with optional pre-release/build, or dist-tags like "latest", "next"
+const VERSION_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9.\-+_^~>=<!* ]*$/;
+// Absolute path: Windows (C:\...) or Unix (/...)
+const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:\\|\/)/;
+
+// --- nx_install_package ---
+server.tool(
+  'nx_install_package',
+  'Install an npm package safely in the pnpm monorepo. Enforces junction-aware safety: refuses to install if node_modules is a junction, scans for nested node_modules duplicates in lib/*, checks if @types/ companion is needed. All packages are installed at the workspace root (-w flag).',
+  {
+    name: z
+      .string()
+      .regex(NPM_NAME_REGEX, 'Invalid npm package name')
+      .describe(
+        'Package name to install (e.g., "lodash", "@tanstack/react-query").',
+      ),
+    version: z
+      .string()
+      .regex(VERSION_REGEX, 'Invalid version or dist-tag')
+      .optional()
+      .describe(
+        'Specific version to install (e.g., "4.17.21"). Omit for latest.',
+      ),
+    dev: z
+      .boolean()
+      .default(false)
+      .describe(
+        'If true, install as a devDependency (-D flag). Use for build/test tools, @types/ packages, etc.',
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe(
+        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
+      ),
+  },
+  async (params) => installPackage(params),
+);
+
+// --- nx_check_package_health ---
+server.tool(
+  'nx_check_package_health',
+  'Scan the workspace for package health issues: nested node_modules in lib/* (version duplication), wildcard dependency ranges in workspace packages, missing pnpm.overrides entries, and missing @types/ companions. Use after installing packages or to diagnose runtime crashes caused by duplicate package versions.',
+  {
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe(
+        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
+      ),
+  },
+  async (params) => checkPackageHealth(params),
 );
 
 // Start the server
