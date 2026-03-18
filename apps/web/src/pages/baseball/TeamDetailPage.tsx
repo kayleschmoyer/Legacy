@@ -72,6 +72,7 @@ export function TeamDetailPage() {
   const {
     data: teamsData,
     loading: teamsLoading,
+    error: teamsError,
     refetch: refetchTeams,
   } = useGetLeagueTeamsQuery({
     variables: { leagueId: leagueId || 0 },
@@ -79,14 +80,21 @@ export function TeamDetailPage() {
   });
 
   // Get user's team in this league to check ownership
-  const { data: userTeamData, loading: userTeamLoading } =
-    useGetUserTeamIdQuery({
-      variables: { leagueId: leagueId || 0 },
-      skip: !leagueId,
-    });
+  const {
+    data: userTeamData,
+    loading: userTeamLoading,
+    error: userTeamError,
+  } = useGetUserTeamIdQuery({
+    variables: { leagueId: leagueId || 0 },
+    skip: !leagueId,
+  });
 
   // Get league details including the user's permission level
-  const { data: leagueData, loading: leagueLoading } = useGetLeagueByIdQuery({
+  const {
+    data: leagueData,
+    loading: leagueLoading,
+    error: leagueError,
+  } = useGetLeagueByIdQuery({
     variables: { id: leagueId || 0 },
     skip: !leagueId,
   });
@@ -176,6 +184,12 @@ export function TeamDetailPage() {
       </YStack>
     );
   }
+  if (teamsError)
+    return <Text>Error loading league teams: {teamsError.message}</Text>;
+  if (userTeamError)
+    return <Text>Error loading team ownership: {userTeamError.message}</Text>;
+  if (leagueError)
+    return <Text>Error loading league details: {leagueError.message}</Text>;
 
   // Find the team from leagueTeams, falling back to teamById for empty-roster teams
   const team =
