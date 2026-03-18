@@ -56,6 +56,7 @@ import {
   GetDraftPitchingStats as GET_DRAFT_PITCHING_STATS,
   GetDraftPlayerStats as GET_DRAFT_PLAYER_STATS,
   GetDraftTeamAutoPickStatuses as GET_DRAFT_TEAM_AUTO_PICK_STATUSES,
+  GetDraftTeamOrder as GET_DRAFT_TEAM_ORDER,
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
@@ -68,6 +69,8 @@ import {
   type GetDraftPicksQueryVariables,
   type GetDraftTeamAutoPickStatusesQuery,
   type GetDraftTeamAutoPickStatusesQueryVariables,
+  type GetDraftTeamOrderQuery,
+  type GetDraftTeamOrderQueryVariables,
   type GetMyDraftQueueQuery,
   type GetMyDraftQueueQueryVariables,
   InitializeLiveDraft as INITIALIZE_LIVE_DRAFT,
@@ -524,6 +527,33 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     skip: !draftId || isAuctionDraft,
     pollInterval: isAuctionDraft ? 0 : 5000,
   });
+
+  // ---- Draft team order (LS-1318: used to sort board-view columns) ----
+  const { data: draftTeamOrderData } = useQuery<
+    GetDraftTeamOrderQuery,
+    GetDraftTeamOrderQueryVariables
+  >(GET_DRAFT_TEAM_ORDER, {
+    variables: { draftId: draftId ?? 0 },
+    skip: !draftId || viewMode !== 'board',
+  });
+
+  // Sort leagueTeams by their assigned draft slot when board view is active.
+  // Falls back to the original leagueTeams order if no slot data is available.
+  const boardOrderedTeams = useMemo<LeagueTeam[]>(() => {
+    const slotOrder = draftTeamOrderData?.getDraftTeamOrder;
+    if (!slotOrder || slotOrder.length === 0) return leagueTeams;
+    const slotMap = new Map<string, number>();
+    for (const entry of slotOrder) {
+      if (entry.teamId != null && entry.draftOrder != null) {
+        slotMap.set(String(entry.teamId), entry.draftOrder);
+      }
+    }
+    return [...leagueTeams].sort((a, b) => {
+      const slotA = slotMap.get(String(a.id)) ?? Infinity;
+      const slotB = slotMap.get(String(b.id)) ?? Infinity;
+      return slotA - slotB;
+    });
+  }, [leagueTeams, draftTeamOrderData]);
 
   const autoPickTeamIds = useMemo<ReadonlySet<string>>(() => {
     const ids = new Set<string>();
@@ -2669,10 +2699,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             </div>
           </div>
 
-          {/* Board View (Team Columns) */}
+          {/* Board View (Team Columns) — columns are sorted by draft slot (LS-1318) */}
           {viewMode === 'board' && (
             <DraftGrid
-              teams={leagueTeams}
+              teams={boardOrderedTeams}
               picks={pickHistory}
               currentPickInfo={currentPickInfo}
               myTeamId={myTeamId}
