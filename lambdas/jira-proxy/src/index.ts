@@ -4,6 +4,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
 import {
   captureError,
+  captureWarning,
   getRollbarConfigFromEnv,
   initRollbar,
   withRollbar,
@@ -125,6 +126,15 @@ function getCorsHeaders(event: APIGatewayEvent): Record<string, string> {
   if (origin && allowed.has(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Vary'] = 'Origin';
+  } else if (origin) {
+    LOGGER.warn(
+      'CORS: rejected unrecognized origin — check CORS_ALLOWED_ORIGINS env var',
+      { origin },
+    );
+    captureWarning(new Error('CORS: rejected unrecognized origin'), {
+      origin,
+      allowedOrigins: [...allowed],
+    });
   }
   return headers;
 }

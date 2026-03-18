@@ -4,7 +4,11 @@ import {
   Context,
 } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { addBreadcrumb, captureError } from '@legacy-sports/rollbar';
+import {
+  addBreadcrumb,
+  captureError,
+  captureWarning,
+} from '@legacy-sports/rollbar';
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 
 /**
@@ -48,6 +52,15 @@ export function getCorsHeaders(
   if (origin && allowed.has(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Vary'] = 'Origin';
+  } else if (origin) {
+    LOGGER.warn(
+      'CORS: rejected unrecognized origin — check CORS_ALLOWED_ORIGINS env var',
+      { origin },
+    );
+    captureWarning(new Error('CORS: rejected unrecognized origin'), {
+      origin,
+      allowedOrigins: [...allowed],
+    });
   }
   return headers;
 }

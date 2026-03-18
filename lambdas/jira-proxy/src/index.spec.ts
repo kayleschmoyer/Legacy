@@ -9,6 +9,7 @@ jest.mock('@legacy-sports/rollbar', () => ({
   initRollbar: jest.fn(),
   withRollbar: (fn: unknown) => fn,
   captureError: jest.fn(),
+  captureWarning: jest.fn(),
 }));
 
 // Mock the Jira client

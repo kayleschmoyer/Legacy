@@ -21,6 +21,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
   captureError,
+  captureWarning,
   getRollbarConfigFromEnv,
   initRollbar,
   withRollbar,
@@ -292,6 +293,10 @@ async function handleConnect(
         LOGGER.warn('WebSocket connection rejected: invalid Origin', {
           origin,
         });
+        captureWarning(
+          new Error('CORS: rejected unrecognized WebSocket origin'),
+          { origin, allowedOrigins: allowed },
+        );
         return { statusCode: 403, body: 'Forbidden: Invalid origin' };
       }
     }
