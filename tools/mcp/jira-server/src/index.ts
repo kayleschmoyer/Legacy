@@ -7,6 +7,18 @@ import { view } from './tools/view.js';
 import { checkBlockers } from './tools/check-blockers.js';
 import { setParent } from './tools/set-parent.js';
 import { getComments } from './tools/get-comments.js';
+import { getAtlassianCredentials } from './netrc.js';
+
+// Validate credentials at startup so the server fails fast with a clear
+// error instead of silently starting with every tool call failing.
+try {
+  await getAtlassianCredentials();
+} catch (error) {
+  const msg =
+    error instanceof Error ? error.message : 'Unknown credential error';
+  process.stderr.write(`[legacy-sports-jira] ${msg}\n`);
+  process.exit(1);
+}
 
 const server = new McpServer({
   name: 'legacy-sports-jira',

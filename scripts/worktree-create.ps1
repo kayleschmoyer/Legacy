@@ -101,7 +101,13 @@ if ($currentBranch -and $currentBranch -ne 'main') {
 # worktree starts from an outdated base -- requiring a post-create rebase.
 # ---------------------------------------------------------------------------
 Write-Host "[PRE] Fetching origin..." -ForegroundColor DarkGray
-git fetch origin 2>$null
+# Git sends progress to stderr. Under $ErrorActionPreference=Stop, PS 5.1
+# promotes native-command stderr to a terminating error even with 2>$null.
+# Isolate with a local scope to prevent the script from aborting.
+& {
+    $ErrorActionPreference = 'SilentlyContinue'
+    git fetch origin 2>$null
+}
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[WARN] git fetch origin failed -- continuing with local refs" -ForegroundColor Yellow
 }
@@ -157,10 +163,11 @@ if (-not $NoWorkspace -and $ticketNumber -and (Test-Path "legacy-sports.code-wor
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-$wtPath = twig worktree list --porcelain 2>$null |
-    Select-String "path:" |
+# Use git (not twig) porcelain format: lines start with "worktree <path>"
+$wtPath = git worktree list --porcelain 2>$null |
+    Select-String "^worktree " |
     Where-Object { $_ -match [regex]::Escape($TicketKey) } |
-    ForEach-Object { ($_ -split "path:\s*")[1].Trim() } |
+    ForEach-Object { ($_ -replace '^worktree\s+', '').Trim() } |
     Select-Object -First 1
 
 Write-Host ""
@@ -177,7 +184,7 @@ Write-Host "Next steps:" -ForegroundColor Yellow
 if ($wtPath) {
     Write-Host "  cd $wtPath"
 } else {
-    Write-Host "  cd (path from twig worktree list)"
+    Write-Host "  cd (path from git worktree list)"
 }
 Write-Host "  make install"
 Write-Host "  Copy-Item D:\code\legacy-sports\.env .env"
