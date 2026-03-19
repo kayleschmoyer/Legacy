@@ -1,6 +1,7 @@
 import { LOGGER } from '@legacy-sports/logging';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView } from 'react-native';
+import { secureStorage } from '@legacy-sports/shared-components';
 import {
   H1,
   Paragraph,
@@ -38,14 +39,13 @@ const DEFAULT_PREFS: UserPreferences = {
   enableAnimations: true,
 };
 
-/* ─── Storage helpers (in-memory with simple key-value fallback) ─── */
+/* ─── Storage helpers (Expo SecureStore on native / sessionStorage on web) ─── */
 
-// Simple in-module store for mobile preferences
-const memoryStore: Record<string, string> = {};
-
-function loadPrefs(): UserPreferences {
+async function loadPrefsAsync(): Promise<UserPreferences> {
   try {
-    const raw = memoryStore[STORAGE_KEY];
+    // hasItem() triggers lazy initialization of SecureStore on native
+    await secureStorage.hasItem(STORAGE_KEY);
+    const raw = await secureStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PREFS;
     return {
       ...DEFAULT_PREFS,
@@ -58,8 +58,11 @@ function loadPrefs(): UserPreferences {
   }
 }
 
-function savePrefs(prefs: UserPreferences): void {
-  memoryStore[STORAGE_KEY] = JSON.stringify(prefs);
+function savePrefsAsync(prefs: UserPreferences): void {
+  secureStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)).catch((error) => {
+    const err = error instanceof Error ? error : new Error(String(error));
+    LOGGER.error('Failed to save user preferences', err);
+  });
 }
 
 /* ─── Toggle component ─── */
@@ -198,11 +201,23 @@ function SectionCard({ icon, title, subtitle, children }: SectionProps) {
 
 export default function PreferencesScreen(): React.JSX.Element {
   const { themePreference, setThemePreference } = useThemeContext();
-  const [prefs, setPrefs] = useState<UserPreferences>(() => ({
-    ...loadPrefs(),
+  const [prefs, setPrefs] = useState<UserPreferences>({
+    ...DEFAULT_PREFS,
     theme: themePreference,
-  }));
+  });
   const [saved, setSaved] = useState(false);
+  const initialLoadDone = useRef(false);
+
+  // Load persisted preferences on mount
+  useEffect(() => {
+    void loadPrefsAsync().then((loaded) => {
+      setPrefs((prev) => ({ ...loaded, theme: prev.theme }));
+      // Delay flag so the save effect skips the initial render cycle
+      requestAnimationFrame(() => {
+        initialLoadDone.current = true;
+      });
+    });
+  }, []);
 
   // Keep local mirror in sync when context changes (e.g. system preference flip)
   useEffect(() => {
@@ -222,7 +237,8 @@ export default function PreferencesScreen(): React.JSX.Element {
   );
 
   useEffect(() => {
-    savePrefs(prefs);
+    if (!initialLoadDone.current) return;
+    savePrefsAsync(prefs);
     setSaved(true);
     const timer = setTimeout(() => setSaved(false), 2000);
     return () => clearTimeout(timer);

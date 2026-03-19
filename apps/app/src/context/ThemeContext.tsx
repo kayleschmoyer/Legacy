@@ -10,10 +10,12 @@
  *   reactively when the OS theme changes while in "system" mode.
  */
 import { LOGGER } from '@legacy-sports/logging';
+import { secureStorage } from '@legacy-sports/shared-components';
 import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -22,33 +24,13 @@ import { Appearance, useColorScheme } from 'react-native';
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 
-const PREFS_KEY = 'ls_user_preferences';
-
-/* ── Simple session store (replace with AsyncStorage for persistence) ── */
-const sessionStore: Record<string, string> = {};
-
-function readStoredPreference(): ThemePreference {
-  try {
-    const raw = sessionStore[PREFS_KEY];
-    if (!raw) return 'system';
-    const parsed = JSON.parse(raw) as { theme?: ThemePreference };
-    return parsed.theme ?? 'system';
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    LOGGER.error('Failed to read stored theme preference', err);
-    return 'system';
-  }
-}
+const THEME_KEY = 'ls_theme_preference';
 
 function persistPreference(pref: ThemePreference): void {
-  try {
-    const raw = sessionStore[PREFS_KEY];
-    const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-    sessionStore[PREFS_KEY] = JSON.stringify({ ...existing, theme: pref });
-  } catch (error) {
+  secureStorage.setItem(THEME_KEY, pref).catch((error) => {
     const err = error instanceof Error ? error : new Error(String(error));
     LOGGER.error('Failed to persist theme preference', err);
-  }
+  });
 }
 
 /* ── Context ─────────────────────────────────────────── */
@@ -68,8 +50,28 @@ const ThemeContext = createContext<ThemeContextValue>({
 /* ── Provider ─────────────────────────────────────────── */
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [preference, setPreference] =
-    useState<ThemePreference>(readStoredPreference);
+  const [preference, setPreference] = useState<ThemePreference>('system');
+
+  // Load persisted theme preference on mount
+  useEffect(() => {
+    void (async () => {
+      try {
+        // hasItem() triggers lazy initialization of SecureStore on native
+        await secureStorage.hasItem(THEME_KEY);
+        const stored = await secureStorage.getItem(THEME_KEY);
+        if (stored === 'light' || stored === 'dark' || stored === 'system') {
+          setPreference(stored);
+          if (stored !== 'system') {
+            Appearance.setColorScheme(stored);
+          }
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Failed to load theme preference', err);
+        setPreference('system');
+      }
+    })();
+  }, []);
 
   // useColorScheme() is reactive: picks up both manual Appearance.setColorScheme()
   // and OS-level theme changes in real-time.
