@@ -11,6 +11,9 @@ const config: StorybookConfig = {
   stories: [
     '../src/Welcome.stories.@(js|jsx|ts|tsx|mdx)',
     '../src/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+    // Web-app bespoke components surfaced in shared-components Storybook.
+    // Scoped to the icons directory to avoid pulling in Next.js/web-only deps.
+    '../../apps/web/src/components/icons/**/*.stories.@(js|jsx|ts|tsx|mdx)',
   ],
   addons: [
     '@storybook/addon-links',
