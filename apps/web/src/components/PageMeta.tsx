@@ -1,5 +1,13 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+
+/**
+ * Safe alternative to useLocation().pathname that works outside a Router context.
+ * PublicLandingPage renders as the loginComponent of EnhancedAuthGuard, which sits
+ * above BrowserRouter in the component tree, so useLocation() would throw.
+ */
+function usePathname(): string {
+  return typeof window !== 'undefined' ? window.location.pathname : '/';
+}
 
 interface PageMetaProps {
   /** Page-specific title. " | Legacy Sports" is appended automatically. */
@@ -11,6 +19,15 @@ interface PageMetaProps {
    * Defaults to the site logo at /logo-512.png.
    */
   imageUrl?: string;
+  /**
+   * Width of the preview image in pixels.  Only emitted when provided.
+   * Required if imageUrl points to a non-square image (e.g. 1200 for a 1200×630 image).
+   */
+  imageWidth?: number;
+  /**
+   * Height of the preview image in pixels.  Only emitted when provided.
+   */
+  imageHeight?: number;
   /**
    * Explicit canonical URL.  Defaults to the current page's full URL.
    */
@@ -40,15 +57,17 @@ export function PageMeta({
   title,
   description,
   imageUrl,
+  imageWidth,
+  imageHeight,
   canonicalUrl,
   ogType = 'website',
 }: PageMetaProps) {
-  const location = useLocation();
+  const pathname = usePathname();
   const origin =
     typeof window !== 'undefined'
       ? window.location.origin
       : 'https://legacy.sports';
-  const pageUrl = canonicalUrl ?? `${origin}${location.pathname}`;
+  const pageUrl = canonicalUrl ?? `${origin}${pathname}`;
   const image = imageUrl ?? `${origin}${DEFAULT_IMAGE_PATH}`;
   const fullTitle = `${title} | ${SITE_NAME}`;
 
@@ -57,6 +76,7 @@ export function PageMeta({
       {/* Standard */}
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
+      <link rel="canonical" href={pageUrl} />
 
       {/* Open Graph (Facebook, LinkedIn, Discord, Slack, iMessage…) */}
       <meta property="og:site_name" content={SITE_NAME} />
@@ -64,7 +84,20 @@ export function PageMeta({
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={image} />
+      {imageWidth != null && (
+        <meta property="og:image:width" content={String(imageWidth)} />
+      )}
+      {imageHeight != null && (
+        <meta property="og:image:height" content={String(imageHeight)} />
+      )}
+      {imageWidth == null && imageHeight == null && !imageUrl && (
+        <>
+          <meta property="og:image:width" content="512" />
+          <meta property="og:image:height" content="512" />
+        </>
+      )}
       <meta property="og:url" content={pageUrl} />
+      <meta property="og:locale" content="en_US" />
 
       {/* Twitter / X Card */}
       <meta name="twitter:card" content="summary_large_image" />

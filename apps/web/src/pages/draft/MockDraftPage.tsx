@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useInitializeMockDraftMutation } from '../../api/db/graphql.generated';
 import { PremiumGate } from '../../components/PremiumGate';
 import { useIsPremium } from '../../hooks/useIsPremium';
+import { PageMeta } from '../../components/PageMeta';
 import {
   BLACK,
   BRAND_GOLD,
@@ -399,6 +400,10 @@ export function MockDraftPage(): React.JSX.Element {
       featureName="Mock Draft Simulator"
       featureDescription="Practice your draft strategy with the full Mock Draft simulator before the real draft."
     >
+      <PageMeta
+        title="Mock Draft Simulator"
+        description="Practice your fantasy baseball draft strategy risk-free with the full Mock Draft simulator."
+      />
       <SetupScreen
         onStart={(s) => {
           void handleStart(s);

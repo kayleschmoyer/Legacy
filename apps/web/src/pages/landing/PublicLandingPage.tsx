@@ -12,6 +12,7 @@ import {
   BrandIconBadge,
   type BrandIconName,
 } from '../../components/icons';
+import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -319,6 +320,10 @@ export function PublicLandingPage(): React.JSX.Element {
 
   return (
     <PageContainer style={pageBackgroundStyle}>
+      <PageMeta
+        title="Fantasy Baseball League Manager"
+        description="Legacy Sports — the fantasy baseball league manager built for serious fans. Create leagues, draft players, track stats, and compete with friends."
+      />
       {/* ─── Navigation Bar ─── */}
       <XStack
         position="sticky"

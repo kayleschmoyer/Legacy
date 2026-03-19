@@ -19,6 +19,7 @@ import {
 } from '../../api/db/graphql.generated';
 import { PremiumGate } from '../../components/PremiumGate';
 import { useIsPremium } from '../../hooks/useIsPremium';
+import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -832,6 +833,10 @@ export function PlayerComparisonPage() {
       featureDescription="Compare up to 4 players side-by-side with career stats, scoring projections, and season breakdowns."
     >
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
+        <PageMeta
+          title="Player Comparison"
+          description="Compare up to 4 players side-by-side with career stats, scoring projections, and season breakdowns."
+        />
         <YStack minHeight="100vh" backgroundColor={BG_DARK as never}>
           <YStack
             maxWidth={1280}

@@ -421,7 +421,7 @@ export function HomePage(): React.JSX.Element {
     return (
       <ScrollView>
         <PageMeta
-          title="Legacy Sports"
+          title="Dashboard"
           description="Your personalized fantasy sports dashboard."
         />
         <PageContainer style={pageBackgroundStyle}>
