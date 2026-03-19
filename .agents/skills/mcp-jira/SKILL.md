@@ -39,12 +39,13 @@ Credentials are resolved in this priority order by the server:
 
 Create a Jira ticket with proper defaults.
 
-| Parameter     | Type   | Required | Default | Description              |
-| ------------- | ------ | -------- | ------- | ------------------------ |
-| `summary`     | string | yes      |         | Ticket summary / title   |
-| `type`        | enum   | no       | Task    | Task, Bug, or Story      |
-| `description` | string | no       |         | Ticket description       |
-| `parent`      | string | no       |         | Parent epic key (LS-640) |
+| Parameter     | Type   | Required | Default | Description                                                               |
+| ------------- | ------ | -------- | ------- | ------------------------------------------------------------------------- |
+| `summary`     | string | yes      |         | Ticket summary / title                                                    |
+| `type`        | enum   | no       | Task    | Task, Bug, or Story                                                       |
+| `description` | string | no       |         | Ticket description                                                        |
+| `parent`      | string | no       |         | Parent epic key (LS-640)                                                  |
+| `sprint`      | string | no       |         | `"current"` for active sprint, or numeric sprint ID. Omit to leave unset. |
 
 **Guardrail:** Uses Jira REST API directly (no external CLI dependencies).
 

@@ -43,6 +43,13 @@ server.tool(
       .string()
       .optional()
       .describe('Parent epic key, e.g. LS-640 (optional)'),
+    sprint: z
+      .string()
+      .regex(/^(?:current|\d+)$/, 'Must be "current" or a numeric sprint ID')
+      .optional()
+      .describe(
+        'Sprint to add the ticket to. Use "current" to auto-detect the active sprint, or pass a numeric sprint ID. Omit to leave unassigned.',
+      ),
   },
   async (params) => createTicket(params),
 );
