@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import React from 'react';
+import { BrandIcon, BrandIconBadge, type BrandIconName } from './BrandIcon';
 import {
   BG_DARK,
   BRAND_GOLD_LIGHT,
@@ -8,7 +9,6 @@ import {
   BRAND_SEAM_RED,
   withAlpha,
 } from '../../constants/colors';
-import { BrandIcon, BrandIconBadge, type BrandIconName } from './BrandIcon';
 
 const WHITE = '#FFFFFF';
 
