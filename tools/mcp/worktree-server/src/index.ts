@@ -324,6 +324,27 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_rebase_continue',
+      description:
+        'Continue an in-progress rebase after conflicts have been resolved. ' +
+        'Stages resolved files, runs git rebase --continue, returns structured JSON.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          files: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description:
+              'Files to stage before continuing. If omitted, stages all (git add -A).',
+          },
+          worktree: {
+            type: 'string',
+            description: "Optional ticket key (e.g. 'LS-1134').",
+          },
+        },
+      },
+    },
+    {
       name: 'worktree_push',
       description:
         'Push the current branch with --force-with-lease. Refuses to push ' +
@@ -1068,6 +1089,167 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
             {
               type: 'text',
               text: `Commit failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_rebase_continue
+    // -----------------------------------------------------------------------
+    case 'worktree_rebase_continue': {
+      const { files, worktree: wtKey } = args as {
+        files?: string[];
+        worktree?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+
+      // Verify rebase is in progress
+      try {
+        const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
+        const inRebase =
+          existsSync(join(gitDir, 'rebase-merge')) ||
+          existsSync(join(gitDir, 'rebase-apply'));
+        if (!inRebase) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'No rebase in progress. Use worktree_rebase to start one.',
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch {
+        return {
+          content: [{ type: 'text', text: 'Could not determine git state.' }],
+          isError: true,
+        };
+      }
+
+      const agentEnv = {
+        GIT_EDITOR: 'true',
+        GIT_SEQUENCE_EDITOR: 'true',
+      };
+
+      // Helper: get conflicted files reliably via git diff
+      const getConflictedFiles = (): string[] => {
+        try {
+          return run('git diff --name-only --diff-filter=U', cwd)
+            .trim()
+            .split('\n')
+            .filter(Boolean);
+        } catch {
+          return [];
+        }
+      };
+
+      try {
+        // Stage resolved files using execFileSync (safe argument passing)
+        if (files && files.length > 0) {
+          runGit(['add', '--', ...files], cwd);
+        } else {
+          runGit(['add', '-A'], cwd);
+        }
+
+        // Continue rebase
+        run('git rebase --continue', cwd, {
+          timeout: 120_000,
+          env: agentEnv,
+        });
+
+        // Check if rebase is still in progress
+        const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
+        const stillRebasing =
+          existsSync(join(gitDir, 'rebase-merge')) ||
+          existsSync(join(gitDir, 'rebase-apply'));
+
+        if (stillRebasing) {
+          const conflictedFiles = getConflictedFiles();
+          const message =
+            conflictedFiles.length > 0
+              ? 'Rebase paused — more conflicts to resolve.'
+              : 'Rebase paused — awaiting action (e.g., edit/reword step).';
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    completed: false,
+                    remainingConflicts: conflictedFiles,
+                    message,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  completed: true,
+                  remainingConflicts: [],
+                  message:
+                    'Rebase complete. Next: worktree_stabilize, then make pc, then worktree_push.',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; status?: number };
+        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+        const hasConflicts =
+          output.includes('CONFLICT') || output.includes('could not apply');
+
+        if (hasConflicts) {
+          const conflictedFiles = getConflictedFiles();
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    completed: false,
+                    remainingConflicts: conflictedFiles,
+                    message:
+                      'New conflicts encountered. Resolve them and call worktree_rebase_continue again.',
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Rebase continue failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
             },
           ],
           isError: true,
