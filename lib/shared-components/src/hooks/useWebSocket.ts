@@ -206,10 +206,17 @@ export function useWebSocket({
       return;
     }
 
+    if (!token) {
+      LOGGER.warn(
+        '[useWebSocket] connect deferred: no auth token available yet',
+      );
+      return;
+    }
+
     if (clientRef.current) {
       clientRef.current.connect();
     }
-  }, [wsUrl]);
+  }, [wsUrl, token]);
 
   const disconnect = useCallback(() => {
     if (clientRef.current) {
@@ -243,6 +250,13 @@ export function useWebSocket({
         '[useWebSocket] useEffect: no wsUrl, skipping client creation',
       );
       setError('WebSocket URL not configured');
+      return;
+    }
+
+    if (!token) {
+      LOGGER.warn(
+        '[useWebSocket] useEffect: no auth token, deferring client creation',
+      );
       return;
     }
 

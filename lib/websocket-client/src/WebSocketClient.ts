@@ -97,6 +97,13 @@ export class WebSocketClient {
       return;
     }
 
+    if (!this.options.token) {
+      LOGGER.warn(
+        'Cannot connect - no auth token provided. Connection deferred until token is available.',
+      );
+      return;
+    }
+
     if (this.ws?.readyState === WebSocket.OPEN) {
       LOGGER.debug('Already connected');
       return;

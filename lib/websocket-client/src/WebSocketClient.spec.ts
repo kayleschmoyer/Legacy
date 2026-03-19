@@ -133,6 +133,44 @@ describe('WebSocketClient', () => {
       jest.advanceTimersByTime(100);
     });
 
+    it('should be a no-op when token is missing', () => {
+      const logging = jest.requireMock<{
+        LOGGER: { warn: jest.Mock };
+      }>('@legacy-sports/logging');
+
+      mockServer = new Server(mockUrl);
+
+      const client = new WebSocketClient({
+        url: mockUrl,
+        leagueId: 123,
+        autoConnect: false,
+      });
+
+      client.connect();
+      jest.advanceTimersByTime(100);
+
+      expect(client.getState()).toBe('disconnected');
+      expect(logging.LOGGER.warn).toHaveBeenCalledWith(
+        expect.stringContaining('no auth token'),
+      );
+      client.dispose();
+    });
+
+    it('should not auto-connect when token is missing', () => {
+      mockServer = new Server(mockUrl);
+
+      const client = new WebSocketClient({
+        url: mockUrl,
+        leagueId: 123,
+        autoConnect: true,
+      });
+
+      jest.advanceTimersByTime(100);
+
+      expect(client.getState()).toBe('disconnected');
+      client.dispose();
+    });
+
     it('should not reconnect if already connected', () => {
       mockServer = new Server(mockUrl);
 
