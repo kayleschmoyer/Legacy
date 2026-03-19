@@ -34,6 +34,8 @@ make lint
 
 ### Lint specific project
 
+Prefer the `nx_run` MCP tool (`nx_run(project: "<project-name>", target: "lint")`) over shell commands. Fall back to shell only when MCP is unavailable:
+
 ```powershell
 pnpm exec nx run <project-name>:lint --fix
 ```

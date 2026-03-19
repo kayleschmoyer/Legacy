@@ -153,15 +153,34 @@ Detailed how-to docs under `.agents/skills/<name>/SKILL.md`. Skills are auto-mat
 
 ## MCP Servers
 
-| Server                 | Purpose                                                   |
-| ---------------------- | --------------------------------------------------------- |
-| `legacy-sports-db`     | Database queries, migrations, schema generation           |
-| `legacy-sports-jira`   | Ticket CRUD, transitions, blocker checks                  |
-| `legacy-sports-ci`     | CI log queries, workflow reruns                           |
-| `legacy-sports-github` | PR and review lifecycle (uses `gh` CLI)                   |
-| `legacy-sports-nx`     | Nx project discovery, affected analysis, target execution |
+| Server                 | Purpose                                                                   |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `legacy-sports-db`     | Database queries, migrations, schema generation                           |
+| `legacy-sports-jira`   | Ticket CRUD, transitions, blocker checks                                  |
+| `legacy-sports-ci`     | CI log queries, workflow reruns                                           |
+| `legacy-sports-github` | PR and review lifecycle (uses `gh` CLI)                                   |
+| `legacy-sports-nx`     | Nx project discovery, affected analysis, target execution                 |
+| `legacy-sports-make`   | Makefile targets: validation, build, install, worktree setup              |
+| `worktree`             | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push |
+| `legacy-sports-aws`    | CloudWatch log tailing, AWS SSO status checks                             |
 
 Use MCP tools first for Jira operations (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). Fall back to `acli` CLI — never direct HTTP.
+
+> **MCP-first principle**: the shell commands shown elsewhere in this document (Workflow, Commands sections) are **fallbacks** for when MCP servers are unavailable. When MCP tools are available, always prefer them over the equivalent shell commands listed below.
+
+**Nx targets — MCP first**: for project-specific targets (build, test, lint, typecheck, codegen, etc.), prefer the `nx_run` MCP tool over `pnpm exec nx run <project>:<target>`. For affected targets, prefer `nx_run_affected` over `pnpm exec nx affected -t <target>`. Fall back to shell commands only when the MCP server is unavailable.
+
+**Make targets — MCP first**: prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool enforces a target whitelist, sets appropriate timeouts, and provides structured output. For worktree creation use `make_worktree_create`; for worktree setup use `make_wt_setup` (supports junction removal + independent `make install`).
+
+**Git operations in worktrees — MCP first**: use `worktree_push` (supports `setUpstream`) instead of `git push` via Bash, `worktree_rebase` instead of `git fetch && twig rebase`, and `worktree_run` for other git commands. These tools auto-resolve the worktree directory, refuse dangerous operations (pushing `main`, pushing during rebase), and require no manual `cd` or `-C` flags.
+
+**GitHub PR operations — MCP first**: use `github_create_pr` instead of `gh pr create` via Bash, `github_resolve_thread` instead of `gh api graphql` mutations, `github_get_review_threads` instead of raw GraphQL queries, and `github_manage_labels` instead of `gh pr edit --add-label`. These tools handle temp file body encoding, GraphQL thread IDs, and structured output.
+
+**CI operations — MCP first**: use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_rerun` instead of `gh run` commands via Bash. These tools parse and structure log output for agent consumption.
+
+**Database operations — MCP first**: use `db_migration_status` and `db_migrate` instead of `pnpm --prefix lib/db-client run db:status/db:up` via Bash, `db_query` for ad-hoc SQL, `db_codegen` for GraphQL codegen, and `db_print_schema` for schema regeneration.
+
+**AWS operations — MCP first**: use `aws_logs_tail` instead of `aws logs tail` via Bash, and `aws_sso_status` to check credentials before any AWS operation.
 
 ## Cloud Agent Mode (Copilot Coding Agent)
 

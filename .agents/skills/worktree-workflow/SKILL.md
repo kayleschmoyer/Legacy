@@ -280,8 +280,9 @@ main repo where dev servers run, lets you verify visually, then returns main to 
 
 Before opening the PR, run all E2E tests affected by your changes. This catches UI regressions that `make pc` does not cover.
 
+Use the `nx_run_affected` MCP tool (`nx_run_affected(target: "e2e")`) when available. Fall back to shell only when MCP is unavailable (run from the worktree root):
+
 ```powershell
-cd $wt
 pnpm exec nx affected -t e2e --base=origin/main
 ```
 

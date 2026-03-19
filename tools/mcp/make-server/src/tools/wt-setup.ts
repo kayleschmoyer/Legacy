@@ -1,0 +1,146 @@
+import { existsSync, lstatSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { runMake, getRepoRoot } from '../run-command.js';
+import type { ToolResult } from '../types.js';
+
+function isJunction(p: string): boolean {
+  try {
+    return lstatSync(p).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+interface WtSetupParams {
+  worktreePath: string;
+  removeJunction?: boolean;
+}
+
+/**
+ * Set up a worktree for development. This runs `make wt-setup WT=<path>` which:
+ *   1. Creates a node_modules junction to the main repo (if not already present)
+ *   2. Copies .env from the main repo
+ *   3. Creates .twig config
+ *   4. Installs git hooks
+ *
+ * If removeJunction is true, it will:
+ *   1. Remove the node_modules junction
+ *   2. Run `make install` to create independent node_modules
+ *
+ * This is needed when the worktree requires different dependencies (e.g.,
+ * after adding/removing packages on the branch).
+ *
+ * NOTE: `make wt-setup` is Windows-only. On other platforms this tool returns an error.
+ */
+export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
+  const { worktreePath, removeJunction = false } = params;
+
+  if (process.platform !== 'win32') {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'make_wt_setup is Windows-only. On Linux/macOS, run: make install && cp .env from main repo.',
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  if (!existsSync(worktreePath)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Worktree path does not exist: ${worktreePath}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const repoRoot = getRepoRoot();
+  const log: string[] = [`[worktree: ${worktreePath}]`];
+  let junctionActuallyRemoved = false;
+
+  try {
+    // Step 1: Run make wt-setup from the main repo
+    log.push('', '$ make wt-setup WT=...');
+    const setupOutput = await runMake(
+      ['wt-setup', `WT=${worktreePath}`],
+      repoRoot,
+      300_000,
+    );
+    log.push(setupOutput);
+    log.push('Worktree setup complete.');
+
+    // Step 2: Optionally remove junction and install independent deps
+    if (removeJunction) {
+      const nmPath = join(worktreePath, 'node_modules');
+
+      if (isJunction(nmPath)) {
+        log.push('', 'Removing node_modules junction...');
+
+        // rmSync with recursive: false removes the junction/symlink itself
+        // without following it or deleting the target directory contents.
+        rmSync(nmPath, { recursive: false });
+        junctionActuallyRemoved = true;
+        log.push('Junction removed.');
+
+        log.push('', '$ make install (independent node_modules)');
+        const installOutput = await runMake(['install'], worktreePath, 300_000);
+        log.push(installOutput);
+        log.push('Independent node_modules installed.');
+      } else if (existsSync(nmPath)) {
+        log.push(
+          '',
+          'node_modules exists but is not a junction — skipping junction removal.',
+        );
+      } else {
+        log.push('', 'No node_modules found — running make install...');
+        const installOutput = await runMake(['install'], worktreePath, 300_000);
+        log.push(installOutput);
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              success: true,
+              worktreePath,
+              junctionRemoved: junctionActuallyRemoved,
+              log: log.join('\n'),
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  } catch (error) {
+    log.push(
+      '',
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              success: false,
+              worktreePath,
+              log: log.join('\n'),
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+      isError: true,
+    };
+  }
+}

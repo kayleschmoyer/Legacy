@@ -32,6 +32,10 @@
     "legacy-sports-nx": {
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/nx-server/src/index.ts"]
+    },
+    "legacy-sports-make": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/make-server/src/index.ts"]
     }
   }
 }

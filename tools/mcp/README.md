@@ -120,6 +120,16 @@ Nx build system intelligence — project discovery, affected analysis, target ex
 - **nx_run_affected** — Run a target on all affected projects (allowlisted targets only)
 - **nx_dep_graph** — Query project dependency relationships (dependencies or dependents)
 
+### make-server
+
+> **Server ID:** `legacy-sports-make`
+
+Makefile target execution with whitelisted targets, appropriate timeouts, and worktree-aware operations:
+
+- **make_run** — Run a whitelisted make target (pc, install, build, test, lint-fix, typecheck, codegen, kill-stale, etc.)
+- **make_wt_setup** — Set up a worktree (node_modules junction, .env, hooks) with optional junction removal and independent install
+- **make_worktree_create** — Create a new git worktree for a Jira ticket (branch + worktree directory + parent registration)
+
 ## Cloud vs Local Availability
 
 Some servers depend on infrastructure that is unavailable in the GitHub Copilot cloud agent environment. Use this table when deciding which servers you can call:
@@ -132,4 +142,5 @@ Some servers depend on infrastructure that is unavailable in the GitHub Copilot 
 | `legacy-sports-github` |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                    |
 | `legacy-sports-nx`     |         ✅          |          ✅           | Uses `pnpm exec nx`; available after `pnpm install`                                                                                       |
 | `worktree`             |         ✅          |          ❌           | Cloud agents work directly in a branch checkout — no worktrees needed                                                                     |
+| `legacy-sports-make`   |         ✅          |          ✅           | Uses `make` CLI; worktree-create/wt-setup are Windows-only                                                                                |
 | `legacy-sports-aws`    |         ✅          |          ❌           | No AWS SSO or OIDC credentials in cloud; no CloudWatch access — use GitHub Actions/CI logs via `legacy-sports-ci` (`ci_get_logs`) instead |
