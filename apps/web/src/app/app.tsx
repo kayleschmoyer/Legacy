@@ -253,6 +253,7 @@ function Navigation() {
               <img
                 src="/logo.png"
                 alt="Legacy Sports"
+                data-testid="header-logo"
                 style={{ height: 38, width: 'auto', display: 'block' }}
               />
               <Paragraph

@@ -9,6 +9,7 @@ export class NavigationPage {
 
   // Brand
   readonly logoLink: Locator;
+  readonly logoImg: Locator;
   readonly brandText: Locator;
 
   // Desktop navigation
@@ -26,6 +27,7 @@ export class NavigationPage {
     this.page = page;
 
     this.logoLink = page.getByRole('link', { name: /legacy sports home/i });
+    this.logoImg = page.getByTestId('header-logo');
     this.brandText = page.getByTestId('brand-text');
 
     this.primaryNav = page.getByRole('navigation', { name: 'Primary' });
@@ -44,10 +46,11 @@ export class NavigationPage {
     this.mobileNav = page.getByRole('navigation', { name: /mobile/i });
   }
 
-  /** Assert the header and logo are visible. */
+  /** Assert the header, logo link, and logo image are visible. */
   async expectHeaderVisible() {
     await expect(this.header).toBeVisible({ timeout: 30000 });
     await expect(this.logoLink).toBeVisible({ timeout: 30000 });
+    await expect(this.logoImg).toBeVisible({ timeout: 30000 });
   }
 
   /** Navigate home via the logo link. */

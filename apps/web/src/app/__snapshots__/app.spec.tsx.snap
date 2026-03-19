@@ -33,6 +33,7 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           >
             <img
               alt="Legacy Sports"
+              data-testid="header-logo"
               src="/logo.png"
               style="height: 38px; width: auto; display: block;"
             />
@@ -156,6 +157,7 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           >
             <img
               alt="Legacy Sports"
+              data-testid="header-logo"
               src="/logo.png"
               style="height: 38px; width: auto; display: block;"
             />
@@ -277,6 +279,7 @@ exports[`App Navigation should render navigation with correct links 1`] = `
           >
             <img
               alt="Legacy Sports"
+              data-testid="header-logo"
               src="/logo.png"
               style="height: 38px; width: auto; display: block;"
             />

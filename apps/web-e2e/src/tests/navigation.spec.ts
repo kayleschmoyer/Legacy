@@ -20,6 +20,12 @@ test.describe('Navigation Header @smoke', () => {
     // The header contains a link back to the homepage
     const homeLink = page.locator('a[href="/"]').first();
     await expect(homeLink).toBeVisible();
+
+    // The logo image must be present in the header branding
+    const logoImg = page.getByTestId('header-logo');
+    await expect(logoImg).toBeVisible();
+    await expect(logoImg).toHaveAttribute('src', '/logo.png');
+    await expect(logoImg).toHaveAttribute('alt', 'Legacy Sports');
   });
 
   test('logo link navigates to the homepage', async ({ page }) => {
