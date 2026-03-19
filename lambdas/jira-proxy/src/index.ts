@@ -125,6 +125,7 @@ function getCorsHeaders(event: APIGatewayEvent): Record<string, string> {
   const headers: Record<string, string> = { ...BASE_CORS_HEADERS };
   if (origin && allowed.has(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
+    headers['Access-Control-Allow-Credentials'] = 'true';
     headers['Vary'] = 'Origin';
   } else if (origin) {
     LOGGER.warn(

@@ -52,6 +52,17 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_resource.badge.id,
       aws_api_gateway_method.badge_get.id,
       aws_api_gateway_integration.badge_get.id,
+      # Jira Proxy resources
+      aws_api_gateway_resource.jira_proxy.id,
+      aws_api_gateway_resource.jira_proxy_paths.id,
+      aws_api_gateway_method.jira_proxy_root_options.id,
+      aws_api_gateway_method.jira_proxy_root_any.id,
+      aws_api_gateway_method.jira_proxy_options.id,
+      aws_api_gateway_method.jira_proxy_any.id,
+      aws_api_gateway_integration.jira_proxy_root_options.id,
+      aws_api_gateway_integration.jira_proxy_root_any.id,
+      aws_api_gateway_integration.jira_proxy_options.id,
+      aws_api_gateway_integration.jira_proxy_any.id,
     ]))
   }
 
@@ -66,6 +77,14 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_integration.graphql_get,
     aws_api_gateway_integration.graphql_post,
     aws_api_gateway_integration.graphql_options,
+    aws_api_gateway_method.jira_proxy_root_options,
+    aws_api_gateway_method.jira_proxy_root_any,
+    aws_api_gateway_method.jira_proxy_options,
+    aws_api_gateway_method.jira_proxy_any,
+    aws_api_gateway_integration.jira_proxy_root_options,
+    aws_api_gateway_integration.jira_proxy_root_any,
+    aws_api_gateway_integration.jira_proxy_options,
+    aws_api_gateway_integration.jira_proxy_any,
   ]
 }
 

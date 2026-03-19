@@ -97,10 +97,11 @@ describe('Jira Proxy Handler', () => {
     expect(result.headers?.['Access-Control-Allow-Origin']).toBe(
       'https://legacy-fantasy.com',
     );
+    expect(result.headers?.['Access-Control-Allow-Credentials']).toBe('true');
     expect(result.headers?.['Vary']).toBe('Origin');
   });
 
-  it('omits ACAO when origin is not in allowlist', async () => {
+  it('omits ACAO and credentials header when origin is not in allowlist', async () => {
     process.env['CORS_ALLOWED_ORIGINS'] = 'https://legacy-fantasy.com';
     const event = makeEvent({
       httpMethod: 'OPTIONS',
@@ -109,6 +110,9 @@ describe('Jira Proxy Handler', () => {
     const result = await baseHandler(event);
     expect(result.statusCode).toBe(200);
     expect(result.headers?.['Access-Control-Allow-Origin']).toBeUndefined();
+    expect(
+      result.headers?.['Access-Control-Allow-Credentials'],
+    ).toBeUndefined();
   });
 
   it('includes security headers in responses', async () => {

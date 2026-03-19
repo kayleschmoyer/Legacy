@@ -123,6 +123,8 @@ resource "aws_api_gateway_resource" "jira_proxy_paths" {
 }
 
 # OPTIONS method for CORS on root /jira resource
+# Uses Lambda proxy so the function can return the correct per-origin
+# Access-Control-Allow-Origin (required when credentials: 'include' is used).
 resource "aws_api_gateway_method" "jira_proxy_root_options" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.jira_proxy.id
@@ -137,20 +139,6 @@ resource "aws_api_gateway_integration" "jira_proxy_root_options" {
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.jira_proxy.invoke_arn
-}
-
-resource "aws_api_gateway_method_response" "jira_proxy_root_options" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.jira_proxy.id
-  http_method = aws_api_gateway_method.jira_proxy_root_options.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers"     = true
-    "method.response.header.Access-Control-Allow-Methods"     = true
-    "method.response.header.Access-Control-Allow-Origin"      = true
-    "method.response.header.Access-Control-Allow-Credentials" = true
-  }
 }
 
 # ANY method on root /jira resource
@@ -171,6 +159,8 @@ resource "aws_api_gateway_integration" "jira_proxy_root_any" {
 }
 
 # OPTIONS method for CORS on /jira/{proxy+}
+# Uses Lambda proxy so the function can return the correct per-origin
+# Access-Control-Allow-Origin (required when credentials: 'include' is used).
 resource "aws_api_gateway_method" "jira_proxy_options" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.jira_proxy_paths.id
@@ -185,20 +175,6 @@ resource "aws_api_gateway_integration" "jira_proxy_options" {
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.jira_proxy.invoke_arn
-}
-
-resource "aws_api_gateway_method_response" "jira_proxy_options" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.jira_proxy_paths.id
-  http_method = aws_api_gateway_method.jira_proxy_options.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers"     = true
-    "method.response.header.Access-Control-Allow-Methods"     = true
-    "method.response.header.Access-Control-Allow-Origin"      = true
-    "method.response.header.Access-Control-Allow-Credentials" = true
-  }
 }
 
 # ANY method for /jira/{proxy+}
