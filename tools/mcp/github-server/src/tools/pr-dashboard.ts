@@ -1,4 +1,5 @@
 import { runGhJson, runGraphQL, getRepoOwnerName } from '../gh.js';
+import { summarizeCIStatus } from '../types.js';
 import type { ToolResult } from '../types.js';
 
 interface PRDashboardParams {
@@ -133,21 +134,6 @@ async function fetchReviewThreadCounts(
   }
 
   return counts;
-}
-
-function summarizeCIStatus(checks: PRListItem['statusCheckRollup']): string {
-  if (!checks || checks.length === 0) return 'none';
-
-  const conclusions = checks.map((c) => c.conclusion ?? c.status);
-  if (conclusions.every((c) => c === 'SUCCESS')) return 'pass';
-  if (conclusions.some((c) => c === 'FAILURE')) return 'fail';
-  if (
-    conclusions.some(
-      (c) => c === 'PENDING' || c === 'IN_PROGRESS' || c === 'QUEUED',
-    )
-  )
-    return 'pending';
-  return 'mixed';
 }
 
 export async function prDashboard(

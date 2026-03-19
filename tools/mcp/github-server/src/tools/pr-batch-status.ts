@@ -1,4 +1,5 @@
 import { runGhJson, runGraphQL, getRepoOwnerName } from '../gh.js';
+import { summarizeCIStatus } from '../types.js';
 import type { ToolResult } from '../types.js';
 
 interface PRBatchStatusParams {
@@ -133,19 +134,7 @@ export async function prBatchStatus(
         conclusion: c.conclusion,
       }));
 
-      const ciSummary = (() => {
-        if (ciJobs.length === 0) return 'none';
-        const conclusions = ciJobs.map((c) => c.conclusion ?? c.status);
-        if (conclusions.every((c) => c === 'SUCCESS')) return 'pass';
-        if (conclusions.some((c) => c === 'FAILURE')) return 'fail';
-        if (
-          conclusions.some(
-            (c) => c === 'PENDING' || c === 'IN_PROGRESS' || c === 'QUEUED',
-          )
-        )
-          return 'pending';
-        return 'mixed';
-      })();
+      const ciSummary = summarizeCIStatus(ciJobs);
 
       const reviews = (pr.reviews ?? []).map((r) => ({
         author: r.author.login,
