@@ -11,5 +11,18 @@
       "Skill(update-config)",
       "mcp__claude_ai_Atlassian__searchJiraIssuesUsingJql"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-main-repo.sh"
+          }
+        ]
+      }
+    ]
   }
 }
