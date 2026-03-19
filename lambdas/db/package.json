@@ -24,11 +24,11 @@
     "graphql": "*"
   },
   "devDependencies": {
-    "@testcontainers/postgresql": "^11.11.0",
+    "@testcontainers/postgresql": "^11.13.0",
     "@types/better-sqlite3": "^7.6.13",
-    "better-sqlite3": "^12.6.2",
+    "better-sqlite3": "^12.8.0",
     "drizzle-orm": "*",
-    "testcontainers": "^11.11.0",
+    "testcontainers": "^11.13.0",
     "tsx": "*"
   }
 }
