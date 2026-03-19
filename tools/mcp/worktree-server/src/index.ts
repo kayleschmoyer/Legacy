@@ -4,9 +4,16 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { execSync } from 'node:child_process';
-import { existsSync, lstatSync, readlinkSync } from 'node:fs';
+import { execFileSync, execSync } from 'node:child_process';
+import {
+  existsSync,
+  lstatSync,
+  readlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 
 // ---------------------------------------------------------------------------
 // Constants & state
@@ -131,6 +138,21 @@ function resolveTargetDir(
     error:
       'No active worktree set. Use worktree_set first or pass the worktree parameter.',
   };
+}
+
+/** Run git with arguments array (no shell interpolation). Safe for user-provided values. */
+function runGit(
+  args: string[],
+  cwd: string,
+  opts?: { timeout?: number; env?: Record<string, string> },
+): string {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf-8',
+    timeout: opts?.timeout ?? 120_000,
+    maxBuffer: 10 * 1024 * 1024,
+    env: { ...process.env, ...opts?.env },
+  });
 }
 
 /** Run a command in a directory and return stdout. Throws on non-zero exit. */
@@ -268,6 +290,37 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
           },
         },
+      },
+    },
+    {
+      name: 'worktree_commit',
+      description:
+        'Stage files and create a conventional commit in the active (or specified) worktree. ' +
+        'Refuses to commit on main. Refuses to stage .env or credential files. ' +
+        'Auto-appends Co-Authored-By line. Validates conventional commit message format.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          message: {
+            type: 'string',
+            description:
+              'Commit message in conventional format: type(scope): description. ' +
+              'Example: "feat(auth): add oauth flow"',
+          },
+          files: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description:
+              'Files to stage. If omitted, stages all modified/untracked files (like git add -A). ' +
+              'Prefer specifying files explicitly over staging all.',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+        },
+        required: ['message'],
       },
     },
     {
@@ -785,6 +838,236 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
             {
               type: 'text',
               text: `Failed to get status for ${cwd}:\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_commit
+    // -----------------------------------------------------------------------
+    case 'worktree_commit': {
+      const {
+        message,
+        files,
+        worktree: wtKey,
+      } = args as {
+        message: string;
+        files?: string[];
+        worktree?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+
+      // Safety: refuse main, detached HEAD, and in-progress rebase/merge
+      try {
+        const branch = run('git branch --show-current', cwd).trim();
+        if (!branch) {
+          const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
+          const inRebase =
+            existsSync(join(gitDir, 'rebase-merge')) ||
+            existsSync(join(gitDir, 'rebase-apply'));
+          return {
+            content: [
+              {
+                type: 'text',
+                text: inRebase
+                  ? 'Refused: rebase is in progress. Finish the rebase before committing.'
+                  : 'Refused: HEAD is detached (no branch checked out). Aborting commit.',
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (branch === 'main') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Refused: cannot commit on main. Create a worktree first.',
+              },
+            ],
+            isError: true,
+          };
+        }
+        // Check for in-progress merge
+        const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
+        if (existsSync(join(gitDir, 'MERGE_HEAD'))) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Refused: merge is in progress. Complete or abort the merge first.',
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Could not determine current branch. Aborting commit.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Validate conventional commit format (scope is optional)
+      const conventionalPattern =
+        /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?:\s.+/;
+      if (!conventionalPattern.test(message)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Invalid commit message format: "${message}"\n\n` +
+                'Expected conventional commit: type[(scope)]: description\n' +
+                'Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert\n' +
+                'Scope is optional. Examples: "feat(auth): add oauth", "fix: typo"',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Refuse to stage dangerous files
+      const dangerousPatterns = [
+        /\.env$/,
+        /\.env\./,
+        /credentials/i,
+        /secrets?\./i,
+        /\.pem$/,
+        /\.key$/,
+      ];
+
+      // Distinguish files=undefined (stage all) from files=[] (error: nothing specified)
+      const stageAll = files === undefined;
+      if (!stageAll && files.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'No files specified. Either omit the files parameter to stage all, or provide file paths.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (!stageAll) {
+        for (const f of files) {
+          if (dangerousPatterns.some((p) => p.test(f))) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Refused: "${f}" looks like a credential/secret file. Remove it from the file list.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+      }
+
+      try {
+        // Stage files using execFileSync to avoid shell injection
+        if (!stageAll) {
+          runGit(['add', '--', ...files], cwd);
+        } else {
+          // Stage all modified files, but check for dangerous files first
+          const status = run('git status --porcelain', cwd).trim();
+          if (!status) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: 'Nothing to commit — working tree is clean.',
+                },
+              ],
+            };
+          }
+
+          // Check for dangerous files in the changeset
+          const changedFiles = status
+            .split('\n')
+            .map((l) => l.slice(3).trim())
+            .filter(Boolean);
+          for (const f of changedFiles) {
+            if (dangerousPatterns.some((p) => p.test(f))) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text:
+                      `Refused: "${f}" looks like a credential/secret file and would be staged by git add -A.\n` +
+                      'Specify files explicitly to exclude it.',
+                  },
+                ],
+                isError: true,
+              };
+            }
+          }
+
+          runGit(['add', '-A'], cwd);
+        }
+
+        // Commit using -F (file) to avoid shell interpolation of message
+        const fullMessage =
+          message + '\n\nCo-Authored-By: Claude <noreply@anthropic.com>';
+        const msgPath = join(tmpdir(), `worktree-commit-msg-${Date.now()}.txt`);
+        writeFileSync(msgPath, fullMessage, 'utf-8');
+
+        try {
+          runGit(['commit', '-F', msgPath], cwd, {
+            env: { GIT_EDITOR: 'true' },
+          });
+
+          // Get commit info (works on orphan/first commits too)
+          const sha = run('git rev-parse --short HEAD', cwd).trim();
+          const filesChanged = run(
+            'git diff-tree --no-commit-id --name-only -r HEAD',
+            cwd,
+          ).trim();
+
+          const result = {
+            sha,
+            message,
+            filesChanged: filesChanged.split('\n').filter(Boolean),
+          };
+
+          return {
+            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          };
+        } finally {
+          try {
+            unlinkSync(msgPath);
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; status?: number };
+        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Commit failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
             },
           ],
           isError: true,
