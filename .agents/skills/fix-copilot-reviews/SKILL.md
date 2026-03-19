@@ -177,8 +177,12 @@ When fixing >10 PRs in a single session:
   (e.g., Prettier), but does **not** replace `make pc`. At batch scale,
   skip `make pc` on each individual PR and rely on CI to catch issues.
   Optionally run `make pc` once at the end on a spot-check PR.
-- **Use subagents** — delegate each PR fix to a subagent for parallel
-  execution. Each subagent: checkout → read → fix → commit → push.
+- **Loop sequentially in the main conversation** — process each PR one at a
+  time in the main conversation context (which has the required tool
+  permissions). Do **not** use sub-agents for parallel execution — sub-agents
+  do not inherit the parent conversation's tool permissions (command
+  execution, file read/write, etc.) and will fail with permission-denied
+  errors.
 - **Re-resolve after all pushes** — Copilot re-reviews trigger new threads.
   Do a final sweep of all PR numbers after all fixes are pushed.
 
