@@ -20,8 +20,14 @@ import { graphqlOk } from '../helpers/graphql';
 interface SeasonState {
   leagueId: number;
   inviteCode: string;
+  /** teams[0] = api's team, teams[1] = api2's team */
   teams: Array<{ id: number; name: string }>;
   draftId: number;
+  /**
+   * Ordered team IDs from the randomized draft order.  Used to determine
+   * the number of teams per round (all picks use `commissionerPick`).
+   */
+  draftTeamOrder: number[];
   /** Player IDs on team-1's roster (built during draft). */
   team1Roster: number[];
   /** Player IDs on team-2's roster. */
@@ -60,6 +66,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
       inviteCode: '',
       teams: [],
       draftId: 0,
+      draftTeamOrder: [],
       team1Roster: [],
       team2Roster: [],
       availablePlayers: [],
@@ -79,16 +86,28 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
     state.teams = [];
     await test.step('1.1 Commissioner creates league', async () => {
       const data = await graphqlOk<{
-        createLeague: { id: number; name: string; inviteCode: string };
+        createLeagueAndTeams: {
+          league: { id: number; name: string; inviteCode: string };
+          teams: Array<{ id: number; name: string }>;
+        };
       }>(
         apiCommissioner,
-        `mutation CreateLeague($name: String!) {
-           createLeague(name: $name) { ${LEAGUE_FIELDS} }
+        `mutation CreateLeague($input: CreateLeagueAndTeamsInput!) {
+           createLeagueAndTeams(input: $input) {
+             league { ${LEAGUE_FIELDS} }
+             teams { id name }
+           }
          }`,
-        { name: 'Integration Season Test League' },
+        {
+          input: {
+            leagueName: 'Integration Season Test League',
+            numberOfTeams: 3,
+            playerPool: 'all',
+          },
+        },
       );
-      state.leagueId = data.createLeague.id;
-      state.inviteCode = data.createLeague.inviteCode;
+      state.leagueId = Number(data.createLeagueAndTeams.league.id);
+      state.inviteCode = data.createLeagueAndTeams.league.inviteCode;
       expect(state.leagueId).toBeGreaterThan(0);
       expect(state.inviteCode).toBeTruthy();
     });
@@ -106,7 +125,10 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
         { inviteCode: state.inviteCode, teamName: 'The Sluggers' },
       );
       expect(data.joinLeague.teamId).toBeGreaterThan(0);
-      state.teams.push({ id: data.joinLeague.teamId, name: 'The Sluggers' });
+      state.teams.push({
+        id: Number(data.joinLeague.teamId),
+        name: 'The Sluggers',
+      });
     });
 
     await test.step('1.3 Team manager 2 joins league', async () => {
@@ -122,7 +144,10 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
         { inviteCode: state.inviteCode, teamName: 'The Aces' },
       );
       expect(data.joinLeague.teamId).toBeGreaterThan(0);
-      state.teams.push({ id: data.joinLeague.teamId, name: 'The Aces' });
+      state.teams.push({
+        id: Number(data.joinLeague.teamId),
+        name: 'The Aces',
+      });
     });
 
     await test.step('1.4 Rename team', async () => {
@@ -210,7 +235,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
           draftOrder: 'snake',
         },
       );
-      state.draftId = data.initializeDraft.id;
+      state.draftId = Number(data.initializeDraft.id);
       expect(state.draftId).toBeGreaterThan(0);
     });
 
@@ -225,6 +250,19 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
         { draftId: state.draftId },
       );
       expect(data.randomizeDraftOrder.id).toBe(state.draftId);
+
+      // Store the draft order so subsequent steps pick with the correct
+      // API context.
+      const orderData = await graphqlOk<{
+        getDraftTeamOrder: Array<{ teamId: number; draftOrder: number }>;
+      }>(
+        api,
+        `query DraftOrder($draftId: Int!) {
+           getDraftTeamOrder(draftId: $draftId) { teamId draftOrder }
+         }`,
+        { draftId: state.draftId },
+      );
+      state.draftTeamOrder = orderData.getDraftTeamOrder.map((e) => e.teamId);
     });
 
     await test.step('2.3 Fetch available draft players', async () => {
@@ -336,101 +374,96 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
     });
 
     await test.step('2.10 Make draft picks (round 1)', async () => {
-      const pick1Player = state.availablePlayers[5];
-      const data1 = await graphqlOk<{
-        makeDraftPick: { id: number; playerId: number; teamId: number };
-      }>(
-        api,
-        `mutation Pick($draftId: Int!, $playerId: Int!) {
-           makeDraftPick(draftId: $draftId, playerId: $playerId) {
-             id playerId teamId round overallPick
-           }
-         }`,
-        { draftId: state.draftId, playerId: pick1Player.id },
-      );
-      state.team1Roster.push(data1.makeDraftPick.playerId);
-      expect(data1.makeDraftPick.playerId).toBe(pick1Player.id);
-
-      const pick2Player = state.availablePlayers[6];
-      const data2 = await graphqlOk<{
-        makeDraftPick: { id: number; playerId: number; teamId: number };
-      }>(
-        api2,
-        `mutation Pick($draftId: Int!, $playerId: Int!) {
-           makeDraftPick(draftId: $draftId, playerId: $playerId) {
-             id playerId teamId round overallPick
-           }
-         }`,
-        { draftId: state.draftId, playerId: pick2Player.id },
-      );
-      state.team2Roster.push(data2.makeDraftPick.playerId);
+      // Use commissionerPick for all picks — the commissioner can pick on
+      // behalf of any team regardless of turn order, avoiding flaky
+      // draft-order mismatches.
+      const numTeams = state.draftTeamOrder.length;
+      for (let i = 0; i < numTeams; i++) {
+        const player = state.availablePlayers[5 + i];
+        const data = await graphqlOk<{
+          commissionerPick: { id: number; playerId: number; teamId: number };
+        }>(
+          apiCommissioner,
+          `mutation Pick($draftId: Int!, $playerId: Int!) {
+             commissionerPick(draftId: $draftId, playerId: $playerId) {
+               id playerId teamId round overallPick
+             }
+           }`,
+          { draftId: state.draftId, playerId: player.id },
+        );
+        // Track which roster the player landed on
+        if (data.commissionerPick.teamId === state.teams[0].id) {
+          state.team1Roster.push(Number(data.commissionerPick.playerId));
+        } else if (data.commissionerPick.teamId === state.teams[1].id) {
+          state.team2Roster.push(Number(data.commissionerPick.playerId));
+        }
+      }
     });
 
     await test.step('2.11 Undo last pick and re-pick', async () => {
       const undoData = await graphqlOk<{
         undoLastDraftPick: { id: number; playerId: number };
       }>(
-        api2,
+        apiCommissioner,
         `mutation Undo($draftId: Int!) {
            undoLastDraftPick(draftId: $draftId) { id playerId }
          }`,
         { draftId: state.draftId },
       );
-      expect(undoData.undoLastDraftPick.playerId).toBe(
-        state.team2Roster[state.team2Roster.length - 1],
-      );
-      state.team2Roster.pop();
+      // Remove the undone player from whichever roster it was on
+      for (const roster of [state.team1Roster, state.team2Roster]) {
+        const idx = roster.indexOf(undoData.undoLastDraftPick.playerId);
+        if (idx >= 0) {
+          roster.splice(idx, 1);
+          break;
+        }
+      }
 
-      const rePick = state.availablePlayers[7];
+      const rePick = state.availablePlayers[5 + state.draftTeamOrder.length];
       const reData = await graphqlOk<{
-        makeDraftPick: { playerId: number };
+        commissionerPick: { playerId: number; teamId: number };
       }>(
-        api2,
+        apiCommissioner,
         `mutation Pick($draftId: Int!, $playerId: Int!) {
-           makeDraftPick(draftId: $draftId, playerId: $playerId) {
+           commissionerPick(draftId: $draftId, playerId: $playerId) {
              id playerId teamId
            }
          }`,
         { draftId: state.draftId, playerId: rePick.id },
       );
-      state.team2Roster.push(reData.makeDraftPick.playerId);
+      if (reData.commissionerPick.teamId === state.teams[0].id) {
+        state.team1Roster.push(Number(reData.commissionerPick.playerId));
+      } else if (reData.commissionerPick.teamId === state.teams[1].id) {
+        state.team2Roster.push(Number(reData.commissionerPick.playerId));
+      }
     });
 
     await test.step('2.12 Continue draft — additional rounds', async () => {
-      let playerIdx = 8;
+      const numTeams = state.draftTeamOrder.length;
+      let playerIdx = 5 + numTeams + 1; // after round 1 + re-pick
       const additionalRounds = 3;
-      for (let round = 0; round < additionalRounds; round++) {
-        if (state.availablePlayers[playerIdx]) {
-          const d1 = await graphqlOk<{
-            makeDraftPick: { playerId: number };
-          }>(
-            api,
-            `mutation Pick($draftId: Int!, $playerId: Int!) {
-               makeDraftPick(draftId: $draftId, playerId: $playerId) { playerId }
-             }`,
-            {
-              draftId: state.draftId,
-              playerId: state.availablePlayers[playerIdx].id,
-            },
-          );
-          state.team1Roster.push(d1.makeDraftPick.playerId);
-          playerIdx++;
-        }
 
-        if (state.availablePlayers[playerIdx]) {
-          const d2 = await graphqlOk<{
-            makeDraftPick: { playerId: number };
+      for (let round = 0; round < additionalRounds; round++) {
+        for (let t = 0; t < numTeams; t++) {
+          if (!state.availablePlayers[playerIdx]) break;
+
+          const d = await graphqlOk<{
+            commissionerPick: { playerId: number; teamId: number };
           }>(
-            api2,
+            apiCommissioner,
             `mutation Pick($draftId: Int!, $playerId: Int!) {
-               makeDraftPick(draftId: $draftId, playerId: $playerId) { playerId }
+               commissionerPick(draftId: $draftId, playerId: $playerId) { playerId teamId }
              }`,
             {
               draftId: state.draftId,
               playerId: state.availablePlayers[playerIdx].id,
             },
           );
-          state.team2Roster.push(d2.makeDraftPick.playerId);
+          if (d.commissionerPick.teamId === state.teams[0].id) {
+            state.team1Roster.push(Number(d.commissionerPick.playerId));
+          } else if (d.commissionerPick.teamId === state.teams[1].id) {
+            state.team2Roster.push(Number(d.commissionerPick.playerId));
+          }
           playerIdx++;
         }
       }
@@ -445,68 +478,75 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
   // -------------------------------------------------------------------------
 
   test('Phase 3: Post-draft roster setup', async ({ api }) => {
-    await test.step('3.1 Set player positions on roster', async () => {
+    // Helper: fetch team members for api's team (teams[0]).
+    const fetchMyTeamMembers = async <T extends string>(fields: T) => {
       const data = await graphqlOk<{
-        getLeagueTeams: Array<{
-          id: number;
-          teamMembers: Array<{
-            id: number;
-            playerId: number;
-            positionId: number | null;
-          }>;
-        }>;
+        teamMembers: Array<Record<string, unknown>>;
       }>(
         api,
-        `query Teams($leagueId: Int!) {
-           getLeagueTeams(leagueId: $leagueId) {
-             id teamMembers { id playerId positionId }
-           }
+        `query Members($teamId: Int!) {
+           teamMembers(teamId: $teamId) { ${fields} }
+         }`,
+        { teamId: state.teams[0].id },
+      );
+      return data.teamMembers;
+    };
+
+    await test.step('3.1 Set player positions on roster', async () => {
+      // Fetch actual league position IDs (they're auto-generated, not 1,2,3).
+      const posData = await graphqlOk<{
+        leaguePositions: Array<{ id: number; positionType: string }>;
+      }>(
+        api,
+        `query Positions($leagueId: Int!) {
+           leaguePositions(leagueId: $leagueId) { id positionType }
          }`,
         { leagueId: state.leagueId },
       );
+      expect(posData.leaguePositions.length).toBeGreaterThan(0);
+      const firstPositionId = posData.leaguePositions[0].id;
 
-      const myTeam = data.getLeagueTeams.find(
-        (t) => t.id === state.teams[0].id,
+      const members = await fetchMyTeamMembers('id playerId positionId');
+      expect(members.length).toBeGreaterThan(0);
+
+      const member = members[0] as {
+        id: number;
+        playerId: number;
+        positionId: number | null;
+      };
+      const setData = await graphqlOk<{
+        updateTeamMemberPosition: { id: number; positionId: number };
+      }>(
+        api,
+        `mutation SetPos($teamMemberId: Int!, $positionId: Int) {
+           updateTeamMemberPosition(teamMemberId: $teamMemberId, positionId: $positionId) {
+             id positionId
+           }
+         }`,
+        { teamMemberId: member.id, positionId: firstPositionId },
       );
-      expect(myTeam).toBeTruthy();
-
-      if (myTeam && myTeam.teamMembers.length > 0) {
-        const member = myTeam.teamMembers[0];
-        const posData = await graphqlOk<{
-          updateTeamMemberPosition: { id: number; positionId: number };
-        }>(
-          api,
-          `mutation SetPos($teamMemberId: Int!, $positionId: Int) {
-             updateTeamMemberPosition(teamMemberId: $teamMemberId, positionId: $positionId) {
-               id positionId
-             }
-           }`,
-          { teamMemberId: member.id, positionId: 1 },
-        );
-        expect(posData.updateTeamMemberPosition.positionId).toBe(1);
-      }
+      expect(setData.updateTeamMemberPosition.positionId).toBe(firstPositionId);
     });
 
     await test.step('3.2 Swap player positions', async () => {
-      const data = await graphqlOk<{
-        getLeagueTeams: Array<{
-          id: number;
-          teamMembers: Array<{ id: number; positionId: number | null }>;
-        }>;
+      // Get actual league position IDs for the swap fallback
+      const posData = await graphqlOk<{
+        leaguePositions: Array<{ id: number }>;
       }>(
         api,
-        `query Teams($leagueId: Int!) {
-           getLeagueTeams(leagueId: $leagueId) {
-             id teamMembers { id positionId }
-           }
+        `query Positions($leagueId: Int!) {
+           leaguePositions(leagueId: $leagueId) { id }
          }`,
         { leagueId: state.leagueId },
       );
-      const myTeam = data.getLeagueTeams.find(
-        (t) => t.id === state.teams[0].id,
-      );
-      if (myTeam && myTeam.teamMembers.length >= 2) {
-        const [a, b] = myTeam.teamMembers;
+      const posIds = posData.leaguePositions.map((p) => p.id);
+
+      const members = (await fetchMyTeamMembers('id positionId')) as Array<{
+        id: number;
+        positionId: number | null;
+      }>;
+      if (members.length >= 2 && posIds.length >= 2) {
+        const [a, b] = members;
         const swapData = await graphqlOk<{
           swapTeamMemberPositions: Array<{ id: number; positionId: number }>;
         }>(
@@ -523,8 +563,8 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
           {
             teamMemberIdA: a.id,
             teamMemberIdB: b.id,
-            positionIdA: b.positionId ?? 2,
-            positionIdB: a.positionId ?? 1,
+            positionIdA: b.positionId ?? posIds[1],
+            positionIdB: a.positionId ?? posIds[0],
           },
         );
         expect(swapData.swapTeamMemberPositions).toHaveLength(2);
@@ -532,24 +572,10 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
     });
 
     await test.step('3.3 Mark player for trade block', async () => {
-      const data = await graphqlOk<{
-        getLeagueTeams: Array<{
-          id: number;
-          teamMembers: Array<{ id: number }>;
-        }>;
-      }>(
-        api,
-        `query Teams($leagueId: Int!) {
-           getLeagueTeams(leagueId: $leagueId) {
-             id teamMembers { id }
-           }
-         }`,
-        { leagueId: state.leagueId },
-      );
-      const myTeam = data.getLeagueTeams.find(
-        (t) => t.id === state.teams[0].id,
-      );
-      if (myTeam && myTeam.teamMembers.length > 0) {
+      const members = (await fetchMyTeamMembers('id')) as Array<{
+        id: number;
+      }>;
+      if (members.length > 0) {
         const tbData = await graphqlOk<{
           setTradeBlock: { id: number; onTradeBlock: boolean };
         }>(
@@ -559,7 +585,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
                id onTradeBlock
              }
            }`,
-          { teamMemberId: myTeam.teamMembers[0].id, onTradeBlock: true },
+          { teamMemberId: members[0].id, onTradeBlock: true },
         );
         expect(tbData.setTradeBlock.onTradeBlock).toBe(true);
       }
@@ -573,15 +599,21 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
   test('Phase 4: Matchups & lineups', async ({ api, apiCommissioner }) => {
     await test.step('4.1 Commissioner creates all matchups', async () => {
       const data = await graphqlOk<{
-        createAllMatchups: { success: boolean };
+        createAllMatchups: {
+          matchups: Array<{ id: number }>;
+          currentMatchupId: number | null;
+        };
       }>(
         apiCommissioner,
         `mutation CreateMatchups($leagueId: Int!) {
-           createAllMatchups(leagueId: $leagueId) { success }
+           createAllMatchups(leagueId: $leagueId) {
+             matchups { id }
+             currentMatchupId
+           }
          }`,
         { leagueId: state.leagueId },
       );
-      expect(data.createAllMatchups.success).toBeTruthy();
+      expect(data.createAllMatchups.matchups.length).toBeGreaterThan(0);
     });
 
     await test.step('4.2 Query week 1 matchups', async () => {
@@ -603,7 +635,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
         { leagueId: state.leagueId, weekNumber: 1 },
       );
       expect(data.getMatchupsByWeek.length).toBeGreaterThan(0);
-      state.matchupId = data.getMatchupsByWeek[0].id;
+      state.matchupId = Number(data.getMatchupsByWeek[0].id);
     });
 
     await test.step('4.3 Query matchup players for lineup', async () => {
@@ -700,7 +732,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
           dropPlayerId: dropPlayer,
         },
       );
-      state.waiverClaimId = data.claimFreeAgent.id;
+      state.waiverClaimId = Number(data.claimFreeAgent.id);
       expect(state.waiverClaimId).toBeGreaterThan(0);
     });
 
@@ -737,7 +769,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
           dropPlayerId: dropPlayer,
         },
       );
-      state.waiverClaimId = data.claimFreeAgent.id;
+      state.waiverClaimId = Number(data.claimFreeAgent.id);
     });
 
     await test.step('5.4 Process waivers', async () => {
@@ -787,7 +819,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
           message: 'Fair trade?',
         },
       );
-      state.tradeOfferId = data.proposeTrade.id;
+      state.tradeOfferId = Number(data.proposeTrade.id);
       expect(data.proposeTrade.status).toBe('pending');
     });
 

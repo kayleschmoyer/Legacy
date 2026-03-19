@@ -1,0 +1,167 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { getTestUserJwt, TEST_USERS } from '../utils/test-user-auth';
+
+/**
+ * Playwright global teardown for integration tests.
+ *
+ * Deletes all leagues owned by the authenticated test user so that successive
+ * runs never hit the free-tier league limit.  Uses the same auth-resolution
+ * logic as the test fixtures (env var → CLI auth store → local register).
+ *
+ * Only runs when the `INTEGRATION_TEARDOWN` env var is set to `"true"`,
+ * preventing accidental deletion outside of integration test runs.
+ */
+
+interface CliAuthData {
+  tokens: Record<string, { jwt: string; expiresAt: number; email: string }>;
+  defaultUser: string;
+}
+
+interface GqlResponse<T> {
+  data?: T;
+  errors?: Array<{ message: string }>;
+}
+
+const GQL_BASE = (
+  process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
+).replace(/\/?$/, '/');
+
+async function getAuthJwt(): Promise<string | undefined> {
+  if (process.env.INTEGRATION_JWT_COMMISSIONER) {
+    return process.env.INTEGRATION_JWT_COMMISSIONER;
+  }
+  if (process.env.INTEGRATION_JWT) {
+    return process.env.INTEGRATION_JWT;
+  }
+
+  const authPath = path.join(os.homedir(), '.legacy-sports', 'auth.json');
+  if (fs.existsSync(authPath)) {
+    try {
+      const data = JSON.parse(
+        fs.readFileSync(authPath, 'utf-8'),
+      ) as CliAuthData;
+      const user = data.defaultUser;
+      const entry = user ? data.tokens[user] : undefined;
+      if (entry?.jwt && (!entry.expiresAt || entry.expiresAt >= Date.now())) {
+        return entry.jwt;
+      }
+    } catch {
+      // Ignore parse errors — fall through to test user auth
+    }
+  }
+
+  // No CLI auth or env var — register/login a test commissioner via local auth
+  try {
+    return await getTestUserJwt(TEST_USERS.COMMISSIONER);
+  } catch {
+    return undefined;
+  }
+}
+
+async function gqlFetch<T>(
+  jwt: string,
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T | undefined> {
+  try {
+    const res = await fetch(GQL_BASE + 'graphql', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+    const json = (await res.json()) as GqlResponse<T>;
+    if (json.errors?.length) {
+      console.error(
+        `[integration teardown] GraphQL error: ${json.errors[0].message}`,
+      );
+      return undefined;
+    }
+    return json.data;
+  } catch (err) {
+    console.error(
+      `[integration teardown] Network error: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return undefined;
+  }
+}
+
+/**
+ * Well-known name patterns produced by integration tests.  Any league whose
+ * name matches one of these is eligible for cleanup.
+ */
+const TEST_LEAGUE_PATTERNS = [
+  'Test League',
+  'Integration Season Test League',
+  // All UI integration tests use "<Label> E2E <timestamp>" naming
+  /\bE2E\b/,
+];
+
+function isTestLeague(name: string): boolean {
+  return TEST_LEAGUE_PATTERNS.some((pattern) =>
+    typeof pattern === 'string' ? name.startsWith(pattern) : pattern.test(name),
+  );
+}
+
+export default async function globalTeardown(): Promise<void> {
+  if (process.env.INTEGRATION_TEARDOWN !== 'true') {
+    console.log(
+      '[integration teardown] INTEGRATION_TEARDOWN is not set to "true" — skipping league cleanup.',
+    );
+    return;
+  }
+
+  const jwt = await getAuthJwt();
+  if (!jwt) {
+    console.log(
+      '[integration teardown] No auth token available — skipping league cleanup.',
+    );
+    return;
+  }
+
+  const data = await gqlFetch<{
+    userLeagues: Array<{ id: number; name: string }>;
+  }>(jwt, 'query { userLeagues { id name } }');
+
+  const leagues = data?.userLeagues;
+  if (!leagues?.length) {
+    console.log('[integration teardown] No leagues to clean up.');
+    return;
+  }
+
+  const targets = leagues.filter((l) => isTestLeague(l.name));
+  if (targets.length === 0) {
+    console.log(
+      `[integration teardown] ${leagues.length} league(s) found but none matched test patterns — skipping.`,
+    );
+    return;
+  }
+
+  console.log(
+    `[integration teardown] Deleting ${targets.length} test league(s)...`,
+  );
+
+  let deleted = 0;
+  for (const league of targets) {
+    const result = await gqlFetch<{ deleteLeague: string }>(
+      jwt,
+      'mutation($leagueId: Int!) { deleteLeague(leagueId: $leagueId) }',
+      { leagueId: league.id },
+    );
+    if (result?.deleteLeague) {
+      deleted++;
+    } else {
+      console.error(
+        `[integration teardown] Failed to delete league ${league.id} (${league.name})`,
+      );
+    }
+  }
+
+  console.log(
+    `[integration teardown] Deleted ${deleted}/${targets.length} test league(s).`,
+  );
+}

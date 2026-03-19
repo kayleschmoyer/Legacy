@@ -72,12 +72,22 @@ function buildIntegrationStorageState(jwt: string) {
   const expiry = payload.exp ?? Math.floor(Date.now() / 1000) + 3600;
   const url = new URL(WEB_BASE);
 
+  // Use the parent domain (with leading dot) so the cookies are sent to
+  // both the web app (legacy-fantasy.com) and the API subdomain
+  // (api.legacy-fantasy.com), matching how the OAuth proxy sets them in
+  // production with Domain=.legacy-fantasy.com.
+  // For localhost or other non-FQDN hosts, use the hostname directly
+  // because `.localhost` is not a valid cookie domain in most browsers.
+  const isLocalhost =
+    url.hostname === 'localhost' || !url.hostname.includes('.');
+  const cookieDomain = isLocalhost ? url.hostname : `.${url.hostname}`;
+
   return {
     cookies: [
       {
         name: 'ls_jwt',
         value: jwt,
-        domain: url.hostname,
+        domain: cookieDomain,
         path: '/',
         httpOnly: true,
         secure: url.protocol === 'https:',
@@ -87,7 +97,7 @@ function buildIntegrationStorageState(jwt: string) {
       {
         name: 'ls_csrf',
         value: 'integration-csrf-token',
-        domain: url.hostname,
+        domain: cookieDomain,
         path: '/',
         httpOnly: false,
         secure: url.protocol === 'https:',
@@ -101,6 +111,7 @@ function buildIntegrationStorageState(jwt: string) {
         localStorage: [
           { name: 'ls_user_profile', value: JSON.stringify(userProfile) },
           { name: 'ls_token_expiry', value: String(expiry) },
+          { name: 'ls_csrf_token', value: 'integration-csrf-token' },
         ],
       },
     ],

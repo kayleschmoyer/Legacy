@@ -18,7 +18,6 @@
  *     src/integration/tests/commissioner-announcements-ui.integration.spec.ts
  */
 
-import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { test } from '../fixtures/ui';
@@ -39,31 +38,6 @@ let state: AnnouncementsState;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Switch the logged-in user by writing a new JWT into localStorage. */
-async function switchUser(
-  page: Page,
-  jwt: string,
-  url?: string,
-): Promise<void> {
-  if (url) {
-    await page.goto(url);
-    await page.waitForLoadState('domcontentloaded');
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  } else {
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  }
-}
 
 const GQL_URL =
   (
@@ -132,29 +106,26 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 2: Manager joins the league via invite code', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1,
   }) => {
     const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-    await switchUser(page, managerJwt1, joinUrl);
-    await page.waitForLoadState('load');
+    await managerPage1.goto(joinUrl);
+    await managerPage1.waitForLoadState('load');
 
-    await expect(page.getByText(/spot(s)?\s+available/i).first()).toBeVisible({
-      timeout: 15_000,
+    await expect(
+      managerPage1.getByText(/spot(s)?\s+available/i).first(),
+    ).toBeVisible({ timeout: 15_000 });
+
+    await managerPage1.getByTestId('team-name').fill('Announcement Readers');
+    const joinBtn = managerPage1.getByRole('button', {
+      name: /Join League/i,
     });
-
-    await page.getByTestId('team-name').fill('Announcement Readers');
-    const joinBtn = page.getByRole('button', { name: /Join League/i });
     await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
     await joinBtn.click();
 
-    await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
+    await expect(managerPage1).toHaveURL(/\/baseball\/league\/\d+/, {
       timeout: 15_000,
     });
-
-    // Restore commissioner identity for subsequent phases.
-    await switchUser(page, commissionerJwt);
   });
 
   // -----------------------------------------------------------------------
@@ -247,26 +218,21 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 5: Member sees the announcement on league overview', async ({
-    commissionerPage: page,
-    managerJwt1,
+    managerPage1,
   }) => {
-    await switchUser(
-      page,
-      managerJwt1,
-      `/baseball/league/${state.leagueId}/overview`,
-    );
-    await page.waitForLoadState('load');
+    await managerPage1.goto(`/baseball/league/${state.leagueId}/overview`);
+    await managerPage1.waitForLoadState('load');
 
     await test.step('Commissioner Announcements panel is visible (there are announcements)', async () => {
-      await expect(page.getByText('Commissioner Announcements')).toBeVisible({
-        timeout: 15_000,
-      });
+      await expect(
+        managerPage1.getByText('Commissioner Announcements'),
+      ).toBeVisible({ timeout: 15_000 });
     });
 
     await test.step('Announcement text is displayed to the member', async () => {
-      await expect(page.getByText(state.announcementText).first()).toBeVisible({
-        timeout: 15_000,
-      });
+      await expect(
+        managerPage1.getByText(state.announcementText).first(),
+      ).toBeVisible({ timeout: 15_000 });
     });
   });
 
@@ -275,28 +241,19 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 6: Member does not see the "New Announcement" compose button', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1,
   }) => {
-    await switchUser(
-      page,
-      managerJwt1,
-      `/baseball/league/${state.leagueId}/overview`,
-    );
-    await page.waitForLoadState('load');
+    await managerPage1.goto(`/baseball/league/${state.leagueId}/overview`);
+    await managerPage1.waitForLoadState('load');
 
     // The panel should still be shown because there are announcements.
-    await expect(page.getByText('Commissioner Announcements')).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(
+      managerPage1.getByText('Commissioner Announcements'),
+    ).toBeVisible({ timeout: 15_000 });
 
     // But the compose button must NOT appear for a regular member.
     await expect(
-      page.getByRole('button', { name: /new announcement/i }),
+      managerPage1.getByRole('button', { name: /new announcement/i }),
     ).not.toBeVisible();
-
-    // Restore commissioner identity.
-    await switchUser(page, commissionerJwt);
   });
 });

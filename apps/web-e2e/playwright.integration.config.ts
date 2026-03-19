@@ -7,6 +7,8 @@ config({ path: resolve(__dirname, '../../.env') });
 
 export default defineConfig({
   testDir: './src/integration/tests',
+  globalSetup: './src/integration/global-teardown.ts',
+  globalTeardown: './src/integration/global-teardown.ts',
   timeout: 120_000,
   retries: 2,
   // Serialize test execution to avoid API Gateway / Lambda throttling under
