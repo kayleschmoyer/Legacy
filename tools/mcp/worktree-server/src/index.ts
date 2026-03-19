@@ -379,6 +379,41 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_log',
+      description:
+        'Show structured commit log for the active (or specified) worktree. ' +
+        'Returns a JSON object with a commits array containing sha, shortSha, message, author, date, and refs.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: { type: 'string', description: 'Optional ticket key.' },
+          maxCount: { type: 'number', description: 'Max commits. Default 20.' },
+          path: { type: 'string', description: 'File path filter.' },
+          range: {
+            type: 'string',
+            description: 'Commit range (e.g. "origin/main..HEAD").',
+          },
+        },
+      },
+    },
+    {
+      name: 'worktree_show',
+      description:
+        'Show a specific commit metadata, stat summary, and optional file-filtered diff.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          sha: {
+            type: 'string',
+            description: 'Commit SHA (hex only, e.g. "abc1234" or "HEAD").',
+          },
+          worktree: { type: 'string', description: 'Optional ticket key.' },
+          path: { type: 'string', description: 'File path for filtered diff.' },
+        },
+        required: ['sha'],
+      },
+    },
+    {
       name: 'worktree_push',
       description:
         'Push the current branch with --force-with-lease. Refuses to push ' +
@@ -1466,6 +1501,186 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
               text: `Failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
             },
           ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_log
+    // -----------------------------------------------------------------------
+    case 'worktree_log': {
+      const {
+        worktree: wtKey,
+        maxCount = 20,
+        path: filterPath,
+        range,
+      } = args as {
+        worktree?: string;
+        maxCount?: number;
+        path?: string;
+        range?: string;
+      };
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+      const limit = Math.min(Math.max(maxCount, 1), 100);
+
+      // Validate range if provided (only safe rev chars)
+      if (range && !/^[a-zA-Z0-9_./~^{}-]+$/.test(range)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid range: "${range}". Only rev characters allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        // Use record/field separators to avoid delimiter collisions with commit text
+        const RS = '\x1e'; // record separator
+        const FS = '\x1f'; // field separator
+        const gitArgs = [
+          'log',
+          `--format=${RS}%H${FS}%h${FS}%s${FS}%an${FS}%aI${FS}%D`,
+          `-n`,
+          `${limit}`,
+        ];
+        if (range) gitArgs.push(range);
+        if (filterPath) gitArgs.push('--', filterPath);
+
+        const output = runGit(gitArgs, cwd, { timeout: 30_000 });
+        const commits = output
+          .split(RS)
+          .filter((b) => b.trim())
+          .map((record) => {
+            const fields = record.trim().split(FS);
+            return {
+              sha: fields[0] ?? '',
+              shortSha: fields[1] ?? '',
+              message: fields[2] ?? '',
+              author: fields[3] ?? '',
+              date: fields[4] ?? '',
+              refs: fields[5] ?? '',
+            };
+          });
+        return {
+          content: [
+            { type: 'text', text: JSON.stringify({ commits }, null, 2) },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [{ type: 'text', text: `Failed to get log: ${output}` }],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_show
+    // -----------------------------------------------------------------------
+    case 'worktree_show': {
+      const {
+        sha,
+        worktree: wtKey,
+        path: filterPath,
+      } = args as {
+        sha: string;
+        worktree?: string;
+        path?: string;
+      };
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      // Validate SHA — allow hex, HEAD, HEAD~N, branch names
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(sha)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid SHA: "${sha}". Only rev characters allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        // Use execFileSync via runGit for safe argument passing
+        const meta = runGit(
+          ['show', sha, '--no-patch', '--format=%H%n%s%n%an%n%aI'],
+          cwd,
+          { timeout: 10_000 },
+        ).trim();
+        const metaLines = meta.split('\n');
+
+        const stat = runGit(['show', sha, '--stat', '--format='], cwd, {
+          timeout: 10_000,
+        }).trim();
+        const statEntries = stat
+          .split('\n')
+          .filter((l) => l.includes('|'))
+          .map((l) => {
+            const match = l.match(/^\s*(.+?)\s*\|\s*(\d+)\s*([+-]*)/);
+            return match
+              ? { file: match[1].trim(), changes: parseInt(match[2], 10) }
+              : { file: l.trim(), changes: 0 };
+          });
+
+        const result: Record<string, unknown> = {
+          sha: metaLines[0] ?? sha,
+          message: metaLines[1] ?? '',
+          author: metaLines[2] ?? '',
+          date: metaLines[3] ?? '',
+          stat: statEntries,
+        };
+
+        if (filterPath) {
+          try {
+            const diff = runGit(['show', sha, '--', filterPath], cwd, {
+              timeout: 30_000,
+            }).trim();
+            result.diff =
+              diff.length > 50_000
+                ? diff.slice(0, 50_000) + '\n... [truncated]'
+                : diff;
+          } catch {
+            result.diff =
+              '(diff unavailable — file may not exist in this commit)';
+          }
+        }
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [{ type: 'text', text: `Failed to show commit: ${output}` }],
           isError: true,
         };
       }
