@@ -47,6 +47,12 @@ class WebRollbarImplementation implements RollbarInterface {
         //   the WebSocket connection (LS-978 / LS-993). Browsers do not expose
         //   error details for WebSocket onerror events. The WebSocketClient
         //   auto-reconnects; logging these is noise.
+        // - "Cross-Origin-Opener-Policy": Google Identity Services popup flow
+        //   generates repeated COOP warnings when polling window.closed on the
+        //   Google accounts popup (LS-1480). These are browser-level warnings
+        //   from Google's own script, not actionable from our side. Auth still
+        //   completes via postMessage fallback. Without this filter, the COOP
+        //   spam exhausts maxItems/itemsPerMinute and silently drops real errors.
         checkIgnore: (_isUncaught: boolean, args: unknown[]) => {
           const err = args[0];
           if (err instanceof Error && err.name === 'AbortError') {
@@ -64,7 +70,16 @@ class WebRollbarImplementation implements RollbarInterface {
           if (typeof err === 'string' && err.includes('ResizeObserver loop')) {
             return true;
           }
-          if (err instanceof Error && err.message === 'WebSocket error') {
+          if (
+            typeof err === 'string' &&
+            err.includes('Cross-Origin-Opener-Policy')
+          ) {
+            return true;
+          }
+          if (
+            err instanceof Error &&
+            err.message.includes('Cross-Origin-Opener-Policy')
+          ) {
             return true;
           }
           return false;
