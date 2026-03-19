@@ -166,6 +166,9 @@ export * from './utils/mapGraphQLToScoringFormat';
 // Preset image data (avatars, team logos, banners)
 export * from './constants/presets';
 
+// League feature components
+export * from './features/leagues/LeagueActivityFeed';
+
 // Matchup feature components
 export * from './features/matchup';
 

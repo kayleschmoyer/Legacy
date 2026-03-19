@@ -8,10 +8,17 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { HeaderTitleProps } from '@react-navigation/elements';
 import { Button, Card, H3, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Tabs } from '@tamagui/tabs';
-import { Alert } from 'react-native';
+import { Alert, ScrollView, Share } from 'react-native';
 import { gql } from '@apollo/client';
+
 import { useLazyQuery } from '@apollo/client/react';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  LeagueActivityFeed,
+  LeagueTradeBlock,
+  PendingTradeOffers,
+  useWebSocket,
+} from '@legacy-sports/shared-components';
 import {
   LeaguePositionFragment,
   StartDraftMutation,
@@ -35,6 +42,7 @@ import { useMatchupsForLeague } from '../../../../features/matchup/hooks/useMatc
 import { useLeagueScoringSettings } from '../../../../common/scoring';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
+import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
 // Manual GraphQL query for getting user's team ID in a league
 const GET_USER_TEAM_ID = gql`
   query GetUserTeamId($leagueId: Int!) {
@@ -59,8 +67,19 @@ export default function LeagueId(): React.JSX.Element {
   const params = useLocalSearchParams();
   const leagueId = params.leagueId;
   const router = useRouter();
-  const [selectedTab, setSelectedTab] = useState('roster');
+  const [selectedTab, setSelectedTab] = useState('overview');
   const userInfo = useAuthorizedUserInfo();
+  const [wsToken, setWsToken] = useState<string | undefined>();
+
+  useEffect(() => {
+    let active = true;
+    void readKeychainValue(Secret.INTERNAL_JWT).then((token: string | null) => {
+      if (active && token) setWsToken(token);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const leagueIdStr =
     typeof leagueId === 'string'
@@ -188,6 +207,47 @@ export default function LeagueId(): React.JSX.Element {
     refetch: refetchScoringProfile,
   } = useLeagueScoringSettings(numLeagueId);
 
+  const league = leagueData?.league;
+
+  // WebSocket for live league updates
+  const wsUrl = process.env.EXPO_PUBLIC_WEBSOCKET_URL;
+  const { connected: _wsConnected } = useWebSocket({
+    url: wsUrl ?? undefined,
+    token: wsToken,
+    leagueId: isNaN(numLeagueId) ? undefined : numLeagueId,
+    viewContext: 'league',
+    autoConnect: !isNaN(numLeagueId) && !!wsUrl && !!wsToken,
+    onRosterUpdate: () => {
+      // Trigger refetches on roster updates
+    },
+    onDraftCompleted: () => {
+      Alert.alert('Draft Complete', 'The draft has finished!');
+    },
+  });
+
+  // Invite/share handler
+  const handleInviteShare = useCallback(async () => {
+    const leagueName = league?.name ?? 'Legacy Sports League';
+    const inviteCode = league?.inviteCode ?? '';
+    const message = inviteCode
+      ? `Join my league "${leagueName}" on Legacy Sports! Use invite code: ${inviteCode}`
+      : `Join my league "${leagueName}" on Legacy Sports!`;
+    try {
+      const result = await Share.share({
+        message,
+        title: `Join ${leagueName}`,
+      });
+      if (result.action === Share.dismissedAction) {
+        LOGGER.debug('Share dismissed by user');
+      }
+    } catch (error: unknown) {
+      LOGGER.error(
+        'Error while sharing league invite',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+  }, [league?.name, league?.inviteCode]);
+
   const handleStartDraft = useCallback(() => {
     if (!isCommissioner) {
       Alert.alert(
@@ -266,7 +326,6 @@ export default function LeagueId(): React.JSX.Element {
     return <Spinner />;
   }
 
-  const league = leagueData?.league;
   if (!league) {
     return <Text>Could not find league with id {leagueId}</Text>;
   }
@@ -279,25 +338,72 @@ export default function LeagueId(): React.JSX.Element {
         flexDirection="column"
         flex={1}
       >
-        <Tabs.List backgroundColor="$background" paddingHorizontal="$4">
+        <Tabs.List
+          backgroundColor="$background"
+          paddingHorizontal="$2"
+          flexWrap="wrap"
+        >
+          <Tabs.Tab value="overview" flex={1}>
+            <Text fontSize="$2">Overview</Text>
+          </Tabs.Tab>
           <Tabs.Tab value="roster" flex={1}>
-            <Text>Roster</Text>
+            <Text fontSize="$2">Roster</Text>
           </Tabs.Tab>
           <Tabs.Tab value="matchups" flex={1}>
-            <Text>Matchups</Text>
+            <Text fontSize="$2">Matchups</Text>
+          </Tabs.Tab>
+          <Tabs.Tab value="trades" flex={1}>
+            <Text fontSize="$2">Trades</Text>
           </Tabs.Tab>
           <Tabs.Tab value="standings" flex={1}>
-            <Text>Standings</Text>
+            <Text fontSize="$2">Standings</Text>
           </Tabs.Tab>
           <Tabs.Tab value="chat" flex={1}>
-            <Text>Chat</Text>
+            <Text fontSize="$2">Chat</Text>
           </Tabs.Tab>
           {isCommissioner && (
             <Tabs.Tab value="commissioner" flex={1}>
-              <Text>Settings</Text>
+              <Text fontSize="$2">Settings</Text>
             </Tabs.Tab>
           )}
         </Tabs.List>
+
+        {/* Overview Tab — Activity Feed, Invite, Quick Links */}
+        <Tabs.Content value="overview" flex={1}>
+          <ScrollView>
+            <YStack padding="$3" space="$3">
+              {/* Invite/Share */}
+              <Card backgroundColor="$blue2" borderColor="$blue6" padding="$3">
+                <XStack justifyContent="space-between" alignItems="center">
+                  <YStack flex={1}>
+                    <Text fontSize="$4" fontWeight="600">
+                      Invite Friends
+                    </Text>
+                    <Text fontSize="$2" color="$gray11">
+                      Share your league with friends
+                    </Text>
+                  </YStack>
+                  <Button
+                    size="$3"
+                    backgroundColor="$blue9"
+                    color="white"
+                    onPress={() => void handleInviteShare()}
+                  >
+                    Share
+                  </Button>
+                </XStack>
+              </Card>
+
+              {/* Activity Feed */}
+              <YStack>
+                <Text fontSize="$5" fontWeight="600" marginBottom="$2">
+                  Recent Activity
+                </Text>
+                <LeagueActivityFeed leagueId={numLeagueId} limit={15} />
+              </YStack>
+            </YStack>
+          </ScrollView>
+        </Tabs.Content>
 
         <Tabs.Content value="roster" flex={1}>
           <LeagueRosterManagement
@@ -330,6 +436,32 @@ export default function LeagueId(): React.JSX.Element {
               }
             }}
           />
+        </Tabs.Content>
+
+        {/* Trades Tab — Trade Block + Pending Offers */}
+        <Tabs.Content value="trades" flex={1}>
+          <ScrollView>
+            <YStack padding="$3" space="$4">
+              <YStack>
+                <Text fontSize="$5" fontWeight="600" marginBottom="$2">
+                  Trade Block
+                </Text>
+                <LeagueTradeBlock
+                  leagueId={numLeagueId}
+                  userTeamId={userTeamId}
+                />
+              </YStack>
+
+              {userTeamId && (
+                <YStack>
+                  <Text fontSize="$5" fontWeight="600" marginBottom="$2">
+                    Pending Trade Offers
+                  </Text>
+                  <PendingTradeOffers teamId={userTeamId} />
+                </YStack>
+              )}
+            </YStack>
+          </ScrollView>
         </Tabs.Content>
 
         <Tabs.Content value="standings" flex={1}>
