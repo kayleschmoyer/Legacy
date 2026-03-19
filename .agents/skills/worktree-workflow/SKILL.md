@@ -220,6 +220,20 @@ code legacy-sports.code-workspace
 
 All commands run from within the worktree directory (`cd $wt`). Write code, add tests, update docs.
 
+### Step 5b: Self-Review Changes
+
+Before committing, run a self-review of all changes on the branch. This catches project-rule violations and code-quality issues that `make pc` does not cover.
+
+See the [review skill](../review/SKILL.md) for the full checklist. Key checks:
+
+- No `console.*` (use `LOGGER`)
+- No `@ts-ignore` / `eslint-disable`
+- Prefer `.graphql` + codegen over inline `gql`
+- No dead code, duplication, or loose `any` types
+- Leverage existing shared utilities
+
+Fix any issues found before proceeding to commit.
+
 ### Step 6: Commit and Push
 
 ```powershell
@@ -361,7 +375,8 @@ jira_transition(key: "LS-####", status: "In Progress")
 $wt = "<path-from-twig-worktree-list>"
 make wt-setup WT=$wt
 
-# 4. Work + commit + push (from inside worktree)
+# 4. Work + self-review + commit + push (from inside worktree)
+# Run /review (see review skill) to catch rule violations and quality issues
 git -C $wt add . ; git -C $wt commit -m "feat(scope): msg (LS-####)" ; git -C $wt push -u origin HEAD
 
 # 5. Migrations + validate

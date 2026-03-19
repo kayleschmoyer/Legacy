@@ -163,7 +163,7 @@ Brief overview of what this PR does.
 
 ## Jira Ticket
 
-[LS-1234](https://legacysports.atlassian.net/browse/LS-1234)
+[LS-1234](https://bkrupa.atlassian.net/browse/LS-1234)
 
 ## Problem
 
