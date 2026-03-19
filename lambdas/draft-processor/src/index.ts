@@ -381,8 +381,12 @@ async function buildPlayerPool(
 
   // Negro-league filter pushed to SQL: rows with NULL lg_id are non-NL and
   // must be kept, so we use (lg_id IS NULL OR lg_id NOT IN (...)).
-  const notNegroLeague = (lgIdCol: typeof PublicSchema.seasonBatting.lgId) =>
-    or(isNull(lgIdCol), notInArray(lgIdCol, negroLeagueList));
+  const notNegroLeague = (
+    lgIdCol:
+      | typeof PublicSchema.seasonBatting.lgId
+      | typeof PublicSchema.seasonPitching.lgId
+      | typeof PublicSchema.seasonFielding.lgId,
+  ) => or(isNull(lgIdCol), notInArray(lgIdCol, negroLeagueList));
 
   const [battingStats, pitchingStats, fieldingStats] = await Promise.all([
     db
@@ -1347,7 +1351,7 @@ async function updateDraftStatus(
   } catch (error) {
     LOGGER.error(
       `Failed to update draft status to '${status}' for league ${leagueId}:`,
-      error,
+      error instanceof Error ? error.message : String(error),
     );
 
     captureError(error instanceof Error ? error : new Error(String(error)), {
@@ -1552,7 +1556,7 @@ async function processDraftMessage(
 
     LOGGER.error(
       `Error processing draft message for league ${leagueId}:`,
-      error,
+      errorMessage,
     );
 
     // Capture detailed error context with Sentry
@@ -1596,7 +1600,7 @@ async function processDraftMessage(
 
       LOGGER.error(
         `CRITICAL: Failed to reset draft status for league ${leagueId} after processing error:`,
-        statusError,
+        statusErrorMessage,
       );
 
       // This is a critical error - we failed to reset the status AND the original processing failed
@@ -1693,7 +1697,10 @@ const baseDraftProcessorHandler = async (
         LOGGER.info(`Draft processing succeeded for league ${result.leagueId}`);
       }
     } catch (error) {
-      LOGGER.error('Error processing SQS record:', error);
+      LOGGER.error(
+        'Error processing SQS record:',
+        error instanceof Error ? error.message : String(error),
+      );
 
       captureError(error instanceof Error ? error : new Error(String(error)), {
         tags: {
