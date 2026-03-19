@@ -44,6 +44,7 @@ import { DraftQueuePanel } from './DraftQueuePanel';
 import { getDraftCommentary } from './draftUtils';
 import { AuctionDraftRoom } from './auction/AuctionDraftRoom';
 import { PremiumGate } from '../PremiumGate';
+import { EMERALD, EMERALD_LIGHT, withAlpha } from '../../constants/colors';
 import { DEFAULT_NUM_TEAMS } from '../../constants/league';
 import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
 import {
@@ -80,6 +81,7 @@ import {
   RemoveFromDraftQueue as REMOVE_FROM_DRAFT_QUEUE,
   ResumeDraft as RESUME_DRAFT,
   SetDraftOrder as SET_DRAFT_ORDER,
+  ToggleDraftAutoPick as TOGGLE_DRAFT_AUTO_PICK,
 } from '../../api/db/graphql.generated';
 import { env } from '../../config/environment';
 
@@ -532,7 +534,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   }, [pitchingStatsData]);
 
   // ---- Auto-pick statuses (server-side, polled every 5s) ----
-  const { data: allAutoPickData } = useQuery<
+  const { data: allAutoPickData, refetch: refetchAutoPickStatuses } = useQuery<
     GetDraftTeamAutoPickStatusesQuery,
     GetDraftTeamAutoPickStatusesQueryVariables
   >(GET_DRAFT_TEAM_AUTO_PICK_STATUSES, {
@@ -802,6 +804,8 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   ] = useMutation(COMMISSIONER_SET_AUTOPICK_DISABLED);
   const [nudgeExpiredDraftPick] = useMutation(NUDGE_EXPIRED_DRAFT_PICK);
   const [setDraftOrderMutation] = useMutation(SET_DRAFT_ORDER);
+  const [toggleAutoPickMutation, { loading: toggleAutoPickLoading }] =
+    useMutation(TOGGLE_DRAFT_AUTO_PICK);
 
   // ---- Draft Queue ----
   const { data: queueData, refetch: refetchQueue } = useQuery<
@@ -1289,6 +1293,36 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     setDraftAutoPickDisabledMutation,
     showToast,
     refetchDraft,
+  ]);
+
+  // LS-1339: Toggle the current user's own auto-pick for their team
+  const isMyTeamAutoPick =
+    myTeamId !== null && autoPickTeamIds.has(String(myTeamId));
+
+  const handleToggleUserAutoPick = useCallback(async () => {
+    if (!draftId || toggleAutoPickLoading) return;
+    const enable = !isMyTeamAutoPick;
+    try {
+      await toggleAutoPickMutation({ variables: { draftId, enable } });
+      void refetchAutoPickStatuses();
+      showToast(
+        enable
+          ? '🤖 Auto-pick enabled — the system will pick for you when your turn arrives'
+          : '✅ Auto-pick disabled — you will make your own picks',
+        'info',
+      );
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Failed to update auto-pick';
+      showToast(msg, 'error');
+    }
+  }, [
+    draftId,
+    toggleAutoPickLoading,
+    isMyTeamAutoPick,
+    toggleAutoPickMutation,
+    refetchAutoPickStatuses,
+    showToast,
   ]);
 
   // ---- Commissioner Pick ----
@@ -2473,6 +2507,42 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
             />
           )}
 
+          {/* LS-1339: User auto-pick toggle — only shown when user has a team */}
+          {draftId && myTeamId !== null && (
+            <button
+              className={`d-btn-glass${isMyTeamAutoPick ? ' active' : ''}`}
+              onClick={() => void handleToggleUserAutoPick()}
+              disabled={toggleAutoPickLoading || autoPickDisabled}
+              aria-pressed={isMyTeamAutoPick}
+              title={
+                autoPickDisabled
+                  ? 'Auto-pick has been disabled by the commissioner'
+                  : isMyTeamAutoPick
+                    ? 'Auto-pick is ON — the system picks for you. Click to disable.'
+                    : 'Enable auto-pick — the system will pick from your queue when your turn arrives.'
+              }
+              style={{
+                background: isMyTeamAutoPick
+                  ? `linear-gradient(135deg, ${withAlpha(EMERALD_LIGHT, 0.25)} 0%, ${withAlpha(EMERALD, 0.15)} 100%)`
+                  : undefined,
+                borderColor: isMyTeamAutoPick
+                  ? withAlpha(EMERALD_LIGHT, 0.5)
+                  : undefined,
+                opacity: autoPickDisabled ? 0.5 : 1,
+              }}
+            >
+              <span role="img" aria-label="robot">
+                🤖
+              </span>
+              &ensp;
+              {toggleAutoPickLoading
+                ? 'Updating...'
+                : isMyTeamAutoPick
+                  ? 'Auto-Pick ON'
+                  : 'Enable Auto-Pick'}
+            </button>
+          )}
+
           {/* Pick History */}
           {pickHistory.length > 0 && (
             <div className="d-panel">
@@ -2712,10 +2782,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
               }}
             >
               {viewModes.map((mode) => {
-                const isUserAutoPick =
-                  mode === 'board' &&
-                  myTeamId !== null &&
-                  autoPickTeamIds.has(String(myTeamId));
+                const isUserAutoPick = mode === 'board' && isMyTeamAutoPick;
                 return (
                   <button
                     key={mode}
