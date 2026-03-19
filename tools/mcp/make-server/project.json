@@ -1,0 +1,15 @@
+{
+  "name": "mcp-make-server",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "tools/mcp/make-server/src",
+  "projectType": "application",
+  "tags": ["scope:tool", "platform:node"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p tools/mcp/make-server/tsconfig.json"
+      }
+    }
+  }
+}
