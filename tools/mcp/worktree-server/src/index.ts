@@ -8,6 +8,7 @@ import { execFileSync, execSync } from 'node:child_process';
 import {
   existsSync,
   lstatSync,
+  readFileSync,
   readlinkSync,
   unlinkSync,
   writeFileSync,
@@ -342,6 +343,39 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description: "Optional ticket key (e.g. 'LS-1134').",
           },
         },
+      },
+    },
+    {
+      name: 'worktree_conflict_info',
+      description:
+        'List all conflicted files with line ranges and short previews of each side.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: { type: 'string', description: 'Optional ticket key.' },
+        },
+      },
+    },
+    {
+      name: 'worktree_checkout_file',
+      description:
+        'Resolve conflicted files by checking out theirs or ours version and staging them.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          files: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'File paths to resolve.',
+          },
+          strategy: {
+            type: 'string',
+            enum: ['theirs', 'ours'],
+            description: '"theirs" or "ours".',
+          },
+          worktree: { type: 'string', description: 'Optional ticket key.' },
+        },
+        required: ['files', 'strategy'],
       },
     },
     {
@@ -1250,6 +1284,186 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
             {
               type: 'text',
               text: `Rebase continue failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_conflict_info
+    // -----------------------------------------------------------------------
+    case 'worktree_conflict_info': {
+      const { worktree: wtKey } = args as { worktree?: string };
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+      try {
+        // Use NUL-delimited output for safe path handling
+        const rawConflicts = run(
+          'git diff --name-only --diff-filter=U -z',
+          cwd,
+        );
+        const conflictedPaths = rawConflicts.split('\0').filter(Boolean);
+        if (conflictedPaths.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  { files: [], message: 'No conflicts found.' },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+        const files: Array<{
+          path: string;
+          conflicts: Array<{
+            startLine: number;
+            separatorLine: number;
+            endLine: number;
+            oursPreview: string;
+            theirsPreview: string;
+          }>;
+        }> = [];
+        for (const filePath of conflictedPaths) {
+          const fullPath = join(cwd, filePath);
+          if (!existsSync(fullPath)) {
+            files.push({ path: filePath, conflicts: [] });
+            continue;
+          }
+          const content = readFileSync(fullPath, 'utf-8');
+          const lines = content.split('\n');
+          const conflicts: Array<{
+            startLine: number;
+            separatorLine: number;
+            endLine: number;
+            oursPreview: string;
+            theirsPreview: string;
+          }> = [];
+          let i = 0;
+          while (i < lines.length) {
+            if (lines[i].startsWith('<<<<<<<')) {
+              const startLine = i + 1;
+              const oursLines: string[] = [];
+              i++;
+              while (i < lines.length && !lines[i].startsWith('=======')) {
+                oursLines.push(lines[i]);
+                i++;
+              }
+              const separatorLine = i + 1;
+              i++;
+              const theirsLines: string[] = [];
+              while (i < lines.length && !lines[i].startsWith('>>>>>>>')) {
+                theirsLines.push(lines[i]);
+                i++;
+              }
+              const endLine = i + 1;
+              const preview = (arr: string[]) => {
+                const suffix =
+                  arr.length > 3 ? `\n... (${arr.length} lines total)` : '';
+                const maxContent = 200 - suffix.length;
+                return arr.slice(0, 3).join('\n').slice(0, maxContent) + suffix;
+              };
+              conflicts.push({
+                startLine,
+                separatorLine,
+                endLine,
+                oursPreview: preview(oursLines),
+                theirsPreview: preview(theirsLines),
+              });
+            }
+            i++;
+          }
+          files.push({ path: filePath, conflicts });
+        }
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ files }, null, 2) }],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            { type: 'text', text: `Failed to inspect conflicts: ${output}` },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_checkout_file
+    // -----------------------------------------------------------------------
+    case 'worktree_checkout_file': {
+      const {
+        files,
+        strategy,
+        worktree: wtKey,
+      } = args as {
+        files: string[];
+        strategy: 'theirs' | 'ours';
+        worktree?: string;
+      };
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+      try {
+        const resolvedFiles: string[] = [];
+        for (const file of files) {
+          runGit(['checkout', `--${strategy}`, '--', file], cwd);
+          runGit(['add', '--', file], cwd);
+          resolvedFiles.push(file);
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  strategy,
+                  resolved: resolvedFiles,
+                  message: `Resolved ${resolvedFiles.length} file(s) using --${strategy} and staged them.`,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
             },
           ],
           isError: true,
