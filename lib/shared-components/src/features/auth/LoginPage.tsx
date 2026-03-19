@@ -12,6 +12,7 @@ import {
 } from 'tamagui';
 import { AuthService } from './services/AuthService';
 import { OAuthProvider } from '../../platform-components';
+import { OAuthErrorCode } from '../../platform-components/types';
 import type { OAuthConfig } from '../../platform-components/types';
 
 // Type definitions for OAuth responses
@@ -208,11 +209,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         onSuccess(user);
       }
     } catch (error) {
-      LOGGER.error('Google login failed:', String(error));
-      const errorMsg =
-        error instanceof Error ? error.message : 'Google login failed';
-      setErrorMessage(errorMsg);
-      onError?.(error instanceof Error ? error : new Error(errorMsg));
+      // When the user closes the Google sign-in popup (or COOP policy causes
+      // the popup to report as closed), the OAuth provider rejects with
+      // SIGN_IN_CANCELLED. This is not an error worth surfacing — the user
+      // can simply click "Sign in with Google" again.
+      const isCancelled =
+        error instanceof Error &&
+        'code' in error &&
+        (error as { code: OAuthErrorCode }).code ===
+          OAuthErrorCode.SIGN_IN_CANCELLED;
+      if (isCancelled) {
+        LOGGER.debug('Google sign-in popup closed by user');
+      } else {
+        LOGGER.error('Google login failed:', String(error));
+        const errorMsg =
+          error instanceof Error ? error.message : 'Google login failed';
+        setErrorMessage(errorMsg);
+        onError?.(error instanceof Error ? error : new Error(errorMsg));
+      }
     } finally {
       setIsLoading(false);
     }

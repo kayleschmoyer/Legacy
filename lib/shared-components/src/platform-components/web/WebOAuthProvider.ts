@@ -302,7 +302,16 @@ export class WebOAuthProvider implements OAuthProvider {
       }
 
       try {
-        // Initialize the code client for authorization code flow
+        // Initialize the code client for authorization code flow.
+        //
+        // COOP Warning Note: When using ux_mode 'popup', Google's accounts pages
+        // (accounts.google.com) set Cross-Origin-Opener-Policy headers that cause
+        // repeated "Cross-Origin-Opener-Policy policy would block the window.closed
+        // call" console warnings in the browser. This is a known Google Identity
+        // Services issue — the warnings are not actionable from our side. The auth
+        // flow still completes successfully because GSI falls back to postMessage
+        // for cross-origin communication when window.closed polling is blocked by
+        // COOP. See: https://developers.google.com/identity/gsi/web/guides/overview
         this.codeClient = window.google.accounts.oauth2.initCodeClient({
           client_id: this.config.googleClientId,
           scope: [
@@ -337,6 +346,36 @@ export class WebOAuthProvider implements OAuthProvider {
             }
           },
           error_callback: (error: CodeError) => {
+            // GSI may fire error_callback with 'popup_closed' (user dismissed
+            // the consent window, or COOP policy closed it) or
+            // 'popup_failed_to_open' (blocked by a popup blocker or browser
+            // policy). Both are non-fatal — the user can retry — so we log at
+            // debug level rather than surfacing them as login failures.
+            const errorType = error.error || '';
+            if (errorType === 'popup_closed') {
+              LOGGER.debug('GSI popup closed by user or COOP policy');
+              reject(
+                this.createOAuthError(
+                  OAuthErrorCode.SIGN_IN_CANCELLED,
+                  'Sign-in popup was closed',
+                ),
+              );
+              return;
+            }
+
+            if (errorType === 'popup_failed_to_open') {
+              LOGGER.debug(
+                'GSI popup failed to open (popup blocker or browser policy)',
+              );
+              reject(
+                this.createOAuthError(
+                  OAuthErrorCode.SIGN_IN_CANCELLED,
+                  'Sign-in popup was blocked from opening',
+                ),
+              );
+              return;
+            }
+
             reject(
               this.createOAuthError(
                 OAuthErrorCode.UNKNOWN_ERROR,
