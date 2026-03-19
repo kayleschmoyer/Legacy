@@ -36,9 +36,10 @@ function isLocalDev(): boolean {
 }
 
 /** Cookie attributes that vary between local dev and deployed environments. */
-function cookieAttrs(): string {
+function cookieAttrs(domain?: string): string {
   if (isLocalDev()) return 'SameSite=Lax; Path=/';
-  return 'Secure; SameSite=None; Path=/';
+  const domainAttr = domain ? `; Domain=.${domain}` : '';
+  return `Secure; SameSite=None; Path=/${domainAttr}`;
 }
 
 /**
@@ -58,10 +59,15 @@ function cookieAttrs(): string {
  *
  * In local development (HTTP), `Secure` is omitted and `SameSite=Lax` is used
  * because browsers reject `SameSite=None` without the `Secure` flag.
+ *
+ * When `COOKIE_DOMAIN` env var is set (e.g. `legacy-fantasy.com`), the cookies
+ * are scoped to `.legacy-fantasy.com` so all subdomains (api., ws.) can send
+ * them — required for the WebSocket Lambda to receive the ls_jwt cookie.
  */
 export function buildAuthCookies(jwt: string, csrfToken: string): string[] {
   const maxAge = 24 * 60 * 60; // 24 hours — matches JWT expiry
-  const attrs = cookieAttrs();
+  const domain = process.env['COOKIE_DOMAIN'] || undefined;
+  const attrs = cookieAttrs(domain);
 
   return [
     `${JWT_COOKIE}=${jwt}; HttpOnly; ${attrs}; Max-Age=${maxAge}`,
@@ -73,7 +79,8 @@ export function buildAuthCookies(jwt: string, csrfToken: string): string[] {
  * Build Set-Cookie headers that clear the JWT and CSRF cookies (on logout).
  */
 export function buildClearAuthCookies(): string[] {
-  const attrs = cookieAttrs();
+  const domain = process.env['COOKIE_DOMAIN'] || undefined;
+  const attrs = cookieAttrs(domain);
   return [
     `${JWT_COOKIE}=; HttpOnly; ${attrs}; Max-Age=0`,
     `${CSRF_COOKIE}=; ${attrs}; Max-Age=0`,

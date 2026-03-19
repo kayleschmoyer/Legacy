@@ -234,6 +234,11 @@ resource "aws_lambda_function" "websocket" {
 
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN                = var.rollbar_access_token
+
+      # Allowed origins for WebSocket CSRF protection (comma-separated).
+      # Defaults to https://legacy-fantasy.com when not set, but must be
+      # explicitly wired so staging/preview domains can also be added.
+      CORS_ALLOWED_ORIGINS = var.domain_name != "" ? "https://${var.domain_name},https://www.${var.domain_name}" : "https://legacy-fantasy.com,https://www.legacy-fantasy.com"
     }
   }
 

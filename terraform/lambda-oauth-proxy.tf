@@ -213,6 +213,10 @@ resource "aws_lambda_function" "oauth_proxy" {
       # but we make it explicit here so staging/PR environments can override it.
       CORS_ALLOWED_ORIGINS = "https://${var.domain_name},https://www.${var.domain_name}"
 
+      # Cookie domain — scopes ls_jwt and ls_csrf to all subdomains so that
+      # the WebSocket Lambda (ws.<domain>) receives the auth cookie.
+      COOKIE_DOMAIN = var.domain_name != "" ? var.domain_name : ""
+
       # Device-flow DynamoDB table
       DEVICE_FLOW_TABLE_NAME = aws_dynamodb_table.oauth_device_flows.name
     }
