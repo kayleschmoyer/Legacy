@@ -16,12 +16,18 @@ export function runCommand(
   args: string[],
   cwd: string,
   timeoutMs = COMMAND_TIMEOUT,
+  opts?: { shell?: boolean },
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       command,
       args,
-      { cwd, timeout: timeoutMs },
+      {
+        cwd,
+        timeout: timeoutMs,
+        maxBuffer: 10 * 1024 * 1024,
+        shell: opts?.shell ?? false,
+      },
       (err, stdout, stderr) => {
         if (err) {
           const msg = stderr?.trim() || stdout?.trim() || err.message;
@@ -34,11 +40,15 @@ export function runCommand(
   });
 }
 
-/** Run a pnpm script in a given directory. */
+/**
+ * Run a pnpm script in a given directory.
+ * Uses shell: true because corepack-shimmed pnpm is not found by execFile
+ * on Windows without a shell.
+ */
 export function runPnpm(
   args: string[],
   cwd: string,
   timeoutMs?: number,
 ): Promise<string> {
-  return runCommand('pnpm', args, cwd, timeoutMs);
+  return runCommand('pnpm', args, cwd, timeoutMs, { shell: true });
 }
