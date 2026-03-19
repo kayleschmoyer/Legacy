@@ -1,0 +1,55 @@
+query GetTeamTradeOffers($teamId: Int!, $status: String) {
+  teamTradeOffers(teamId: $teamId, status: $status) {
+    ...TradeOffer
+  }
+}
+
+query GetLeagueTradeOffers($leagueId: Int!, $status: String) {
+  leagueTradeOffers(leagueId: $leagueId, status: $status) {
+    ...TradeOffer
+  }
+}
+
+mutation ProposeTrade(
+  $leagueId: Int!
+  $receivingTeamId: Int!
+  $offeringPlayerIds: [Int!]!
+  $requestingPlayerIds: [Int!]!
+  $message: String
+  $expiresInDays: Int
+) {
+  proposeTrade(
+    leagueId: $leagueId
+    receivingTeamId: $receivingTeamId
+    offeringPlayerIds: $offeringPlayerIds
+    requestingPlayerIds: $requestingPlayerIds
+    message: $message
+    expiresInDays: $expiresInDays
+  ) {
+    ...TradeOffer
+  }
+}
+
+mutation AcceptTrade($tradeId: Int!) {
+  acceptTrade(tradeId: $tradeId) {
+    ...TradeOffer
+  }
+}
+
+mutation RejectTrade($tradeId: Int!) {
+  rejectTrade(tradeId: $tradeId) {
+    ...TradeOffer
+  }
+}
+
+mutation CancelTrade($tradeId: Int!) {
+  cancelTrade(tradeId: $tradeId) {
+    ...TradeOffer
+  }
+}
+
+mutation VetoTrade($tradeId: Int!) {
+  vetoTrade(tradeId: $tradeId) {
+    ...TradeOffer
+  }
+}

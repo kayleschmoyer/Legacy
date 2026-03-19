@@ -1,0 +1,5 @@
+mutation SetTradeBlock($teamMemberId: Int!, $onTradeBlock: Boolean!) {
+  setTradeBlock(teamMemberId: $teamMemberId, onTradeBlock: $onTradeBlock) {
+    ...TeamMember
+  }
+}

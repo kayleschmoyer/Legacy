@@ -1,0 +1,63 @@
+fragment CommissionerActionResult on CommissionerActionResult {
+  success
+  message
+}
+
+fragment CommissionerAuditLog on CommissionerAuditLog {
+  id
+  leagueId
+  userId
+  action
+  targetType
+  targetId
+  reason
+  createdAt
+}
+
+query GetCommissionerAuditLogs($leagueId: Int!, $limit: Int) {
+  commissionerAuditLogs(leagueId: $leagueId, limit: $limit) {
+    ...CommissionerAuditLog
+  }
+}
+
+mutation ForceAddPlayer($input: ForceAddPlayerInput!) {
+  forceAddPlayer(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation ForceDropPlayer($input: ForceDropPlayerInput!) {
+  forceDropPlayer(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation EditMatchupScore($input: EditMatchupScoreInput!) {
+  editMatchupScore(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation SwapMatchupTeams($input: SwapMatchupTeamsInput!) {
+  swapMatchupTeams(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation UpdateCommissionerNote($input: UpdateCommissionerNoteInput!) {
+  updateCommissionerNote(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation SetTeamLock($input: SetTeamLockInput!) {
+  setTeamLock(input: $input) {
+    ...CommissionerActionResult
+  }
+}
+
+mutation BulkDropTeamPlayers($input: BulkDropPlayersInput!) {
+  bulkDropTeamPlayers(input: $input) {
+    ...CommissionerActionResult
+  }
+}

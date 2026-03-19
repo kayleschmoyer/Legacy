@@ -1,0 +1,16 @@
+query GetLeagueTeams($leagueId: Int!) {
+  leagueTeams(leagueId: $leagueId) {
+    id
+    name
+    leagueId
+    waiverOrder
+    faabBudget
+    isLocked
+    logoUrl
+    primaryColor
+    secondaryColor
+    avatarUrl
+    bannerUrl
+    managerId
+  }
+}

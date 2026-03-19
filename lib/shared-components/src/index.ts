@@ -156,3 +156,19 @@ export * from './components/UnifiedLoadingPanel';
 export * from './utils/scoreFormatting';
 export * from './utils/playerFormatting';
 export * from './utils/draftStatus';
+
+// Color constants and utilities
+export * from './utils/colors';
+
+// GraphQL-to-scoring stat mappers
+export * from './utils/mapGraphQLToScoringFormat';
+
+// Preset image data (avatars, team logos, banners)
+export * from './constants/presets';
+
+// Matchup feature components
+export * from './features/matchup';
+
+// Picker components (avatar, banner)
+export * from './components/AvatarPicker';
+export * from './components/BannerPicker';

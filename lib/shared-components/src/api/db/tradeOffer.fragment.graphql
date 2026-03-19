@@ -1,0 +1,27 @@
+fragment TradeOfferPlayer on TradeOfferPlayer {
+  id
+  tradeOfferId
+  playerId
+  fromTeamId
+  playerName
+  playerPosition
+}
+
+fragment TradeOffer on TradeOffer {
+  id
+  leagueId
+  proposingTeamId
+  receivingTeamId
+  status
+  message
+  expiresAt
+  respondedAt
+  vetoedAt
+  createdAt
+  updatedAt
+  proposingTeamName
+  receivingTeamName
+  players {
+    ...TradeOfferPlayer
+  }
+}

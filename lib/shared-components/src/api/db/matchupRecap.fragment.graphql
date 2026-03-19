@@ -1,0 +1,7 @@
+fragment MatchupRecapFragment on MatchupRecap {
+  headline
+  narrative
+  highlights
+  matchupType
+  winnerId
+}

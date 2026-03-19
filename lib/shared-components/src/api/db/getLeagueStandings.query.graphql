@@ -1,0 +1,16 @@
+query GetLeagueStandings($leagueId: Int!) {
+  getLeagueStandings(leagueId: $leagueId) {
+    teamId
+    teamName
+    wins
+    losses
+    ties
+    winPercentage
+    pointsFor
+    pointsAgainst
+    avatarUrl
+    primaryColor
+    secondaryColor
+    divisionId
+  }
+}

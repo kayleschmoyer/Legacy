@@ -1,0 +1,16 @@
+query GetLeagueActivity(
+  $leagueId: Int!
+  $limit: Int
+  $eventTypes: [LeagueActivityEventType!]
+) {
+  leagueActivity(leagueId: $leagueId, limit: $limit, eventTypes: $eventTypes) {
+    id
+    leagueId
+    teamId
+    actorUserId
+    actorUsername
+    eventType
+    payload
+    occurredAt
+  }
+}

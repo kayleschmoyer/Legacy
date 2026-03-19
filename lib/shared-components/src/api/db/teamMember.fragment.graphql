@@ -1,0 +1,20 @@
+fragment TeamMember on TeamMember {
+  id
+  playerId
+  positionId
+  teamId
+  leagueId
+  onTradeBlock
+  salary
+  player {
+    id
+    firstName
+    lastName
+    brefId
+    eligiblePositions
+    careerBatting {
+      games
+    }
+    seasonsPlayed
+  }
+}
