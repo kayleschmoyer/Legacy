@@ -68,6 +68,14 @@ if (!JWT_SECRET_NAME) {
 // Cache JWT secret to avoid repeated Secrets Manager calls
 let cachedJwtSecret: string | null = null;
 
+/**
+ * Reset the cached JWT secret. Exposed for testing only.
+ * @internal
+ */
+export function __resetCachedJwtSecret(): void {
+  cachedJwtSecret = null;
+}
+
 interface JwtPayload {
   id: number;
   username: string;
