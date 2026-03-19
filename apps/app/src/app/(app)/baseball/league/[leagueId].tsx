@@ -14,6 +14,9 @@ import { gql } from '@apollo/client';
 import { useLazyQuery } from '@apollo/client/react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  CommissionerAuditLog,
+  CommissionerNoteControl,
+  DeleteLeagueControl,
   LeagueActivityFeed,
   LeagueTradeBlock,
   PendingTradeOffers,
@@ -478,51 +481,84 @@ export default function LeagueId(): React.JSX.Element {
 
         {isCommissioner && (
           <Tabs.Content value="commissioner" flex={1}>
-            <YStack padding="$4" space="$4">
-              <H3 marginBottom="$3">Commissioner Settings</H3>
+            <ScrollView>
+              <YStack padding="$4" space="$4">
+                <H3 marginBottom="$3">Commissioner Settings</H3>
 
-              <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
-                <YStack space="$3">
-                  <Text fontSize="$5" fontWeight="600" color="$blue11">
-                    Draft Management
-                  </Text>
-                  <Text color="$gray11" fontSize="$3">
-                    Start a random draft to automatically assign players to all
-                    teams in the league.
-                  </Text>
-                  <XStack justifyContent="space-between" alignItems="center">
-                    <YStack flex={1}>
-                      <Text fontSize="$4" fontWeight="500">
-                        Random Draft
-                      </Text>
-                      <Text fontSize="$2" color="$gray10">
-                        Randomly assigns players to roster positions
-                      </Text>
-                    </YStack>
-                    <Button
-                      backgroundColor="$blue9"
-                      color="white"
-                      onPress={handleStartDraft}
-                      disabled={startDraftLoading}
-                      opacity={startDraftLoading ? 0.6 : 1}
-                      minWidth={120}
-                    >
-                      {startDraftLoading ? 'Starting...' : 'Start Draft'}
-                    </Button>
-                  </XStack>
-                </YStack>
-              </Card>
+                {/* Commissioner Note */}
+                <CommissionerNoteControl
+                  leagueId={numLeagueId}
+                  currentNote={league?.lmNotes ?? ''}
+                  onSuccess={(msg) => Alert.alert('Success', msg)}
+                  onError={(err) => Alert.alert('Error', err.message)}
+                />
 
-              <LeagueScoringEditor
-                leagueId={numLeagueId}
-                profile={scoringProfile}
-                loading={scoringLoading}
-                error={scoringError}
-                onRefetch={async () => {
-                  await refetchScoringProfile();
-                }}
-              />
-            </YStack>
+                {/* Draft Management */}
+                <Card
+                  backgroundColor="$blue2"
+                  borderColor="$blue6"
+                  padding="$4"
+                >
+                  <YStack space="$3">
+                    <Text fontSize="$5" fontWeight="600" color="$blue11">
+                      Draft Management
+                    </Text>
+                    <Text color="$gray11" fontSize="$3">
+                      Start a random draft to automatically assign players to
+                      all teams in the league.
+                    </Text>
+                    <XStack justifyContent="space-between" alignItems="center">
+                      <YStack flex={1}>
+                        <Text fontSize="$4" fontWeight="500">
+                          Random Draft
+                        </Text>
+                        <Text fontSize="$2" color="$gray10">
+                          Randomly assigns players to roster positions
+                        </Text>
+                      </YStack>
+                      <Button
+                        backgroundColor="$blue9"
+                        color="white"
+                        onPress={handleStartDraft}
+                        disabled={startDraftLoading}
+                        opacity={startDraftLoading ? 0.6 : 1}
+                        minWidth={120}
+                      >
+                        {startDraftLoading ? 'Starting...' : 'Start Draft'}
+                      </Button>
+                    </XStack>
+                  </YStack>
+                </Card>
+
+                {/* Scoring Settings */}
+                <LeagueScoringEditor
+                  leagueId={numLeagueId}
+                  profile={scoringProfile}
+                  loading={scoringLoading}
+                  error={scoringError}
+                  onRefetch={async () => {
+                    await refetchScoringProfile();
+                  }}
+                />
+
+                {/* Audit Log */}
+                <CommissionerAuditLog leagueId={numLeagueId} />
+
+                {/* Danger Zone */}
+                <DeleteLeagueControl
+                  leagueId={numLeagueId}
+                  leagueName={league?.name ?? ''}
+                  onDeleted={() => {
+                    Alert.alert(
+                      'Deleted',
+                      'League has been permanently deleted.',
+                    );
+                    router.navigate('/');
+                  }}
+                  onError={(err) => Alert.alert('Error', err.message)}
+                />
+              </YStack>
+            </ScrollView>
           </Tabs.Content>
         )}
       </Tabs>

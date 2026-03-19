@@ -3490,6 +3490,15 @@ export type BulkDropTeamPlayersMutation = {
   } | null;
 };
 
+export type DeleteLeagueMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type DeleteLeagueMutation = {
+  __typename?: 'Mutation';
+  deleteLeague?: string | null;
+};
+
 export type CreateSeasonDraftGameMutationVariables = Exact<{
   name: Scalars['String']['input'];
   playerNames: Array<Scalars['String']['input']> | Scalars['String']['input'];
@@ -5928,6 +5937,54 @@ export type BulkDropTeamPlayersMutationResult =
 export type BulkDropTeamPlayersMutationOptions = BaseMutationOptions<
   BulkDropTeamPlayersMutation,
   BulkDropTeamPlayersMutationVariables
+>;
+export const DeleteLeague = gql`
+  mutation DeleteLeague($leagueId: Int!) {
+    deleteLeague(leagueId: $leagueId)
+  }
+`;
+export type DeleteLeagueMutationFn = MutationFunction<
+  DeleteLeagueMutation,
+  DeleteLeagueMutationVariables
+>;
+
+/**
+ * __useDeleteLeagueMutation__
+ *
+ * To run a mutation, you first call `useDeleteLeagueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteLeagueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteLeagueMutation, { data, loading, error }] = useDeleteLeagueMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useDeleteLeagueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    DeleteLeagueMutation,
+    DeleteLeagueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    DeleteLeagueMutation,
+    DeleteLeagueMutationVariables
+  >(DeleteLeague, options);
+}
+export type DeleteLeagueMutationHookResult = ReturnType<
+  typeof useDeleteLeagueMutation
+>;
+export type DeleteLeagueMutationResult =
+  Apollo.MutationResult<DeleteLeagueMutation>;
+export type DeleteLeagueMutationOptions = BaseMutationOptions<
+  DeleteLeagueMutation,
+  DeleteLeagueMutationVariables
 >;
 export const CreateSeasonDraftGame = gql`
   mutation CreateSeasonDraftGame(

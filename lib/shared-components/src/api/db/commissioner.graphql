@@ -61,3 +61,7 @@ mutation BulkDropTeamPlayers($input: BulkDropPlayersInput!) {
     ...CommissionerActionResult
   }
 }
+
+mutation DeleteLeague($leagueId: Int!) {
+  deleteLeague(leagueId: $leagueId)
+}

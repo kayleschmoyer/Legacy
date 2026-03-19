@@ -3480,14 +3480,6 @@ export type MatchupFragment = {
   selectedGamesCount?: number | null;
   startTime?: string | null;
   endTime?: string | null;
-  recap?: {
-    __typename?: 'MatchupRecap';
-    headline?: string | null;
-    narrative?: string | null;
-    highlights?: Array<string> | null;
-    matchupType?: string | null;
-    winnerId?: number | null;
-  } | null;
 };
 
 export type GetMatchupByIdQueryVariables = Exact<{
@@ -3512,14 +3504,6 @@ export type GetMatchupByIdQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
-    recap?: {
-      __typename?: 'MatchupRecap';
-      headline?: string | null;
-      narrative?: string | null;
-      highlights?: Array<string> | null;
-      matchupType?: string | null;
-      winnerId?: number | null;
-    } | null;
   } | null;
 };
 
@@ -3546,14 +3530,6 @@ export type GetMatchupsForLeagueQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
-    recap?: {
-      __typename?: 'MatchupRecap';
-      headline?: string | null;
-      narrative?: string | null;
-      highlights?: Array<string> | null;
-      matchupType?: string | null;
-      winnerId?: number | null;
-    } | null;
   }> | null;
 };
 
@@ -3589,14 +3565,6 @@ export type GetMatchupsByWeekQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
-    recap?: {
-      __typename?: 'MatchupRecap';
-      headline?: string | null;
-      narrative?: string | null;
-      highlights?: Array<string> | null;
-      matchupType?: string | null;
-      winnerId?: number | null;
-    } | null;
   }> | null;
 };
 
@@ -3649,14 +3617,6 @@ export type GetMatchupHistoryQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
-    recap?: {
-      __typename?: 'MatchupRecap';
-      headline?: string | null;
-      narrative?: string | null;
-      highlights?: Array<string> | null;
-      matchupType?: string | null;
-      winnerId?: number | null;
-    } | null;
   }> | null;
 };
 
@@ -4769,13 +4729,6 @@ export const MatchupFragmentDoc = gql`
     selectedGamesCount
     startTime
     endTime
-    recap {
-      headline
-      narrative
-      highlights
-      matchupType
-      winnerId
-    }
   }
 `;
 export const LeagueChatMessageFieldsFragmentDoc = gql`
