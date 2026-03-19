@@ -147,6 +147,16 @@ jobs:
           echo "::endgroup::"
 
       # -----------------------------------------------------------------------
+      # Trust the AWS RDS certificate chain so Node.js can validate SSL certs
+      # -----------------------------------------------------------------------
+      - name: "Install AWS RDS CA bundle"
+        id: rds-ca
+        run: |
+          curl -sSf https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem \
+            -o "$RUNNER_TEMP/rds-global-bundle.pem"
+          echo "ca_bundle=$RUNNER_TEMP/rds-global-bundle.pem" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
       # Run the check
       # -----------------------------------------------------------------------
       - name: "Check all migrations are applied"
@@ -158,6 +168,7 @@ jobs:
           CI_READONLY_DB_PASSWORD: ${{ steps.db-creds.outputs.db_pass }}
           CI_READONLY_DB_NAME: ${{ steps.db-creds.outputs.db_name }}
           CI_READONLY_DB_SSL: "true"
+          NODE_EXTRA_CA_CERTS: ${{ steps.rds-ca.outputs.ca_bundle }}
         run: node scripts/check-migrations-applied.js
 
       # -----------------------------------------------------------------------
