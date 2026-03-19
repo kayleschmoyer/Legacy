@@ -1,0 +1,15 @@
+{
+  "name": "mcp-jira-server",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "tools/mcp/jira-server/src",
+  "projectType": "application",
+  "tags": ["scope:tool", "platform:node"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p tools/mcp/jira-server/tsconfig.json"
+      }
+    }
+  }
+}
