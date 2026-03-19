@@ -241,13 +241,11 @@ Run `db:status` to check, then apply any pending migrations before running `make
 Tests may depend on the updated schema, so migrations must be applied first.
 
 ```powershell
-cd $wt/lib/db-client
-
 # Check for pending migrations
-pnpm run db:status
+pnpm --prefix $wt/lib/db-client run db:status
 
 # Apply any that are pending
-pnpm run db:up
+pnpm --prefix $wt/lib/db-client run db:up
 ```
 
 Confirm `db:up` output shows `Applied N new migrations` or `No new migrations to apply`.
@@ -363,12 +361,11 @@ $wt = "<path-from-twig-worktree-list>"
 make wt-setup WT=$wt
 
 # 4. Work + commit + push (from inside worktree)
-cd $wt
-git add . ; git commit -m "feat(scope): msg (LS-####)" ; git push -u origin HEAD
+git -C $wt add . ; git -C $wt commit -m "feat(scope): msg (LS-####)" ; git -C $wt push -u origin HEAD
 
 # 5. Migrations + validate
-cd lib/db-client ; pnpm run db:up ; cd $wt
-make pc
+pnpm --prefix $wt/lib/db-client run db:up
+make -C $wt pc
 
 # 6. PR + Jira (DO NOT stop at make pc)
 gh pr create --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main

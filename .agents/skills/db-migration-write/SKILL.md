@@ -103,17 +103,14 @@ See **[Migration Patterns & Operations](references/migration-patterns-and-operat
 A migration that fails to apply is a broken commit — catch it here first.
 
 ```powershell
-# From the repo root or lib/db-client directory
-cd lib/db-client
-
 # Check current status (confirms new migration is pending)
-pnpm run db:status
+pnpm --prefix lib/db-client run db:status
 
 # Apply pending migrations
-pnpm run db:up
+pnpm --prefix lib/db-client run db:up
 
 # Verify the schema changes landed correctly
-pnpm run db:psql
+pnpm --prefix lib/db-client run db:psql
 # Inside psql: \d table_name
 # Or for enum: SELECT enumlabel FROM pg_enum WHERE enumtypid = 'enum_name'::regtype;
 ```

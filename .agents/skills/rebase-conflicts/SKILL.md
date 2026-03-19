@@ -241,26 +241,23 @@ Write-Host "Total conflicting: $($conflicting.Count) of $(($raw | ConvertFrom-Js
 When working in a worktree (see [worktree-workflow skill](../worktree-workflow/SKILL.md)):
 
 ```powershell
-# Navigate to worktree
-cd $wt
-
-# Fetch and rebase
-git fetch origin
-git rebase origin/main
+# Fetch and rebase (use -C to target the worktree without cd)
+git -C $wt fetch origin
+git -C $wt rebase origin/main
 
 # Resolve conflicts (same process as above)
 
 # Stabilize before pushing (CRITICAL — prevents CI failures)
-make install
-pnpm exec nx run db:print-schema
-pnpm exec nx affected -t codegen --base=origin/main
-make pc
+make -C $wt install
+pnpm --prefix $wt exec nx run db:print-schema
+pnpm --prefix $wt exec nx affected -t codegen --base=origin/main
+make -C $wt pc
 
 # Only push AFTER make pc passes
-git push --force-with-lease origin HEAD
+git -C $wt push --force-with-lease origin HEAD
 ```
 
-> **Important**: Never rebase from the main repo directory if the branch is checked out in a worktree. Always `cd` into the worktree first.
+> **Important**: Never rebase from the main repo directory if the branch is checked out in a worktree. Use `git -C $wt` to target the worktree directly.
 
 ---
 

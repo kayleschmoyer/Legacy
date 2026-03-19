@@ -233,35 +233,23 @@ $c = Get-Content ".agents\skills\<name>\SKILL.md" -Raw
 
 If over 500 lines or 5,000 tokens, extract content to `references/` (see Token Budget section).
 
-### 4. Update BOTH skills indexes
+### 4. Register the skill in `AGENTS.md`
 
-Skills are registered in **two** places. You must update both.
-
-#### a) `.github/copilot-instructions.md`
-
-Add the new skill to the "Load When Needed" table (alphabetical order):
+Add the new skill to the "Skills Reference" table in `AGENTS.md` (repo root, alphabetical order):
 
 ```markdown
-| **New skill** | `.agents/skills/<name>/SKILL.md` |
+| **New skill** | `<skill-name>` |
 ```
 
-#### b) `agents.md` (repo root)
-
-Add to the "Docs Index" table in the same format:
-
-```markdown
-| **New skill** | `.agents/skills/<name>/SKILL.md` |
-```
-
-> **Why both?** `copilot-instructions.md` is auto-loaded by GitHub Copilot. `agents.md` is the entry point for non-Copilot agents (Cursor, Windsurf, etc.).
+> `AGENTS.md` is the single canonical agent instructions file. `CLAUDE.md` is a copy of it (symlink where supported; on Windows with `core.symlinks=false` it is a plain copy). Claude Code auto-reads `CLAUDE.md`; GitHub Copilot reads `AGENTS.md` directly.
 
 ### 5. Verify the skill loads
 
-After committing, test that Copilot can discover the skill:
+After committing, test that the agent can discover the skill:
 
-1. Open a new chat
+1. Open a new chat (Copilot) or conversation (Claude Code)
 2. Describe the scenario your skill covers (use the trigger phrases from your description)
-3. Confirm Copilot auto-loads your skill (it appears under "Used skills" in the chat)
+3. Confirm the agent auto-loads your skill (it appears under "Used skills" in the chat)
 
 ## Audit All Skills
 
@@ -281,11 +269,11 @@ uvx --from skills-ref agentskills validate .agents/skills/<name>
 
 ## Troubleshooting
 
-| Problem                                       | Fix                                                                                      |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Skill not auto-loading                        | Improve the `description` field — add more trigger keywords and action verbs             |
-| `git add` doesn't pick up skill file          | Check gitignore conflict (Step 1) — skill name may match an ignore pattern               |
-| Validator fails on frontmatter                | Ensure line 1 is `---` (no BOM, no leading whitespace) and `name` matches directory name |
-| Skill loads but agent ignores instructions    | Move critical rules to the top of the file — agents sometimes truncate long skills       |
-| SKILL.md exceeds 500 lines or 5,000 tokens    | Extract verbose sections to `references/` — see Token Budget section above               |
-| Skill table in copilot-instructions.md broken | Ensure table rows use `                                                                  | ` delimiters and match the existing column count |
+| Problem                                    | Fix                                                                                      |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Skill not auto-loading                     | Improve the `description` field — add more trigger keywords and action verbs             |
+| `git add` doesn't pick up skill file       | Check gitignore conflict (Step 1) — skill name may match an ignore pattern               |
+| Validator fails on frontmatter             | Ensure line 1 is `---` (no BOM, no leading whitespace) and `name` matches directory name |
+| Skill loads but agent ignores instructions | Move critical rules to the top of the file — agents sometimes truncate long skills       |
+| SKILL.md exceeds 500 lines or 5,000 tokens | Extract verbose sections to `references/` — see Token Budget section above               |
+| Skill table in AGENTS.md broken            | Ensure table rows use `\|` delimiters and match the existing column count                |

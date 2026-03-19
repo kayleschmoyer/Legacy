@@ -133,7 +133,7 @@ make pc
 
 ```powershell
 # 1. Push from worktree
-cd $wt ; git push -u origin HEAD
+git -C $wt push -u origin HEAD
 
 # 2. Check out in main repo for testing
 cd "D:\code\legacy-sports"

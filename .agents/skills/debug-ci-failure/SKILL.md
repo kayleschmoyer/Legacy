@@ -307,7 +307,7 @@ twig worktree create "$key/short-description"
 $wt = "<path from twig worktree list>"
 
 # 3. Set up the worktree
-make wt-setup WT=$wt   # or: cd $wt; make install; Copy-Item ...\.env .env
+make wt-setup WT=$wt   # or: make -C $wt install; Copy-Item ...\.env $wt\.env
 
 # 4. All subsequent file edits and commands happen inside $wt
 ```

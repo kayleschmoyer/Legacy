@@ -80,5 +80,5 @@ foreach ($job in $jobs) {
 ### Why NOT Sub-Agents for Rebases
 
 - **Cascade invalidation**: Merging PR A changes `main`, invalidating PR B's rebase
-- **Context accumulation**: A single agent learns patterns across PRs (e.g., "agents.md is always `--theirs`")
+- **Context accumulation**: A single agent learns patterns across PRs (e.g., "AGENTS.md is always `--theirs`")
 - **Rate limits**: Parallel sub-agents multiply costs and hit API throttling
