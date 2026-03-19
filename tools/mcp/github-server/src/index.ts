@@ -77,6 +77,15 @@ server.tool(
       .boolean()
       .default(false)
       .describe('Create as draft PR (default: false)'),
+    worktreePath: z
+      .string()
+      .refine((p) => !p || /^([A-Za-z]:\\|\/)/.test(p), {
+        message: 'worktreePath must be an absolute path',
+      })
+      .optional()
+      .describe(
+        'Absolute path to a worktree directory. If provided, runs gh from this directory instead of the repo root. Fixes "uncommitted changes" errors when the main repo has workspace file changes.',
+      ),
   },
   async (params) => createPR(params),
 );

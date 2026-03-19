@@ -14,14 +14,15 @@ export function getRepoRoot(): string {
 /** Resolve the gh executable name — on Windows, shimmed exes need `.exe`. */
 const GH_CMD = process.platform === 'win32' ? 'gh.exe' : 'gh';
 
-/** Run a GitHub CLI command from the repo root and return stdout. */
-export function runGh(args: string[]): Promise<string> {
+/** Run a GitHub CLI command from the repo root (or specified cwd) and return stdout. */
+export function runGh(args: string[], cwd?: string): Promise<string> {
+  const resolvedCwd = cwd ? resolve(cwd) : getRepoRoot();
   return new Promise((resolvePromise, reject) => {
     execFile(
       GH_CMD,
       args,
       {
-        cwd: getRepoRoot(),
+        cwd: resolvedCwd,
         timeout: COMMAND_TIMEOUT_MS,
         maxBuffer: MAX_BUFFER_BYTES,
         shell: false,
@@ -39,8 +40,8 @@ export function runGh(args: string[]): Promise<string> {
 }
 
 /** Run `gh` and parse the JSON output. */
-export async function runGhJson<T>(args: string[]): Promise<T> {
-  const raw = await runGh(args);
+export async function runGhJson<T>(args: string[], cwd?: string): Promise<T> {
+  const raw = await runGh(args, cwd);
   return JSON.parse(raw) as T;
 }
 
