@@ -7,8 +7,10 @@ fragment Matchup on Matchup {
   team1Score
   team2Score
   status
+  statsLoadingStatus
   gamesPerMatchup
   spStartsPerMatchup
+  selectedGamesCount
   startTime
   endTime
 }

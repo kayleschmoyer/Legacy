@@ -2,9 +2,13 @@ import React, { useState } from 'react';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Spinner, Tabs, Text, YStack } from 'tamagui';
+import {
+  GamesRemaining,
+  MatchupRecapPanel,
+} from '@legacy-sports/shared-components';
+import { MatchupStatus } from '../../../api/db/graphql.generated';
 import { MatchupScoreboard } from '../components/MatchupScoreboard';
 import { StandingsTable } from '../components/StandingsTable';
-import { GamesRemaining } from '../components/GamesRemaining';
 import { useMatchupById } from '../hooks/useMatchup';
 import { useStandings } from '../hooks/useStandings';
 
@@ -13,8 +17,6 @@ import { useStandings } from '../hooks/useStandings';
  * Shows scoreboard, standings, and detailed matchup information
  */
 export default function MatchupDetailScreen() {
-  // expo-router types cannot be resolved in this project's TS config
-
   const params = useLocalSearchParams();
 
   const rawMatchupId = params.matchupId;
@@ -63,10 +65,11 @@ export default function MatchupDetailScreen() {
   }
 
   const gamesTotal = matchup.gamesPerMatchup ?? 0;
-  // Hardcoded to 0 until the API exposes a gamesCompleted or gamesPlayed
-  // field on the Matchup type — tracked for future GraphQL schema work.
-  const gamesRemaining = 0;
-  const gamesCompleted = gamesTotal - gamesRemaining;
+  const selectedGamesCount = matchup.selectedGamesCount ?? 0;
+  const gamesRemaining = Math.min(
+    Math.max(gamesTotal - selectedGamesCount, 0),
+    gamesTotal,
+  );
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -103,10 +106,14 @@ export default function MatchupDetailScreen() {
 
               {gamesTotal > 0 && (
                 <GamesRemaining
-                  gamesTotal={gamesTotal}
-                  gamesCompleted={gamesCompleted}
                   gamesRemaining={gamesRemaining}
+                  totalGames={gamesTotal}
                 />
+              )}
+
+              {/* Narrative Recap — shown only for completed matchups */}
+              {matchup.status === MatchupStatus.Completed && matchupId && (
+                <MatchupRecapPanel matchupId={matchupId} />
               )}
             </YStack>
           </ScrollView>
@@ -132,12 +139,6 @@ export default function MatchupDetailScreen() {
                 <Text color="$gray11">
                   <Text fontWeight="bold">Status:</Text> {matchup.status}
                 </Text>
-                {matchup.selectedSeason && (
-                  <Text color="$gray11">
-                    <Text fontWeight="bold">Season:</Text>{' '}
-                    {matchup.selectedSeason}
-                  </Text>
-                )}
                 {matchup.startTime && (
                   <Text color="$gray11">
                     <Text fontWeight="bold">Start:</Text>{' '}

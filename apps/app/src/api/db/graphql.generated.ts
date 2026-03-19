@@ -3474,10 +3474,20 @@ export type MatchupFragment = {
   team1Score?: number | null;
   team2Score?: number | null;
   status?: MatchupStatus | null;
+  statsLoadingStatus?: StatsLoadingStatus | null;
   gamesPerMatchup?: number | null;
   spStartsPerMatchup?: number | null;
+  selectedGamesCount?: number | null;
   startTime?: string | null;
   endTime?: string | null;
+  recap?: {
+    __typename?: 'MatchupRecap';
+    headline?: string | null;
+    narrative?: string | null;
+    highlights?: Array<string> | null;
+    matchupType?: string | null;
+    winnerId?: number | null;
+  } | null;
 };
 
 export type GetMatchupByIdQueryVariables = Exact<{
@@ -3496,10 +3506,20 @@ export type GetMatchupByIdQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
+    statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
     spStartsPerMatchup?: number | null;
+    selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    recap?: {
+      __typename?: 'MatchupRecap';
+      headline?: string | null;
+      narrative?: string | null;
+      highlights?: Array<string> | null;
+      matchupType?: string | null;
+      winnerId?: number | null;
+    } | null;
   } | null;
 };
 
@@ -3520,10 +3540,20 @@ export type GetMatchupsForLeagueQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
+    statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
     spStartsPerMatchup?: number | null;
+    selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    recap?: {
+      __typename?: 'MatchupRecap';
+      headline?: string | null;
+      narrative?: string | null;
+      highlights?: Array<string> | null;
+      matchupType?: string | null;
+      winnerId?: number | null;
+    } | null;
   }> | null;
 };
 
@@ -3553,10 +3583,20 @@ export type GetMatchupsByWeekQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
+    statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
     spStartsPerMatchup?: number | null;
+    selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    recap?: {
+      __typename?: 'MatchupRecap';
+      headline?: string | null;
+      narrative?: string | null;
+      highlights?: Array<string> | null;
+      matchupType?: string | null;
+      winnerId?: number | null;
+    } | null;
   }> | null;
 };
 
@@ -3603,10 +3643,20 @@ export type GetMatchupHistoryQuery = {
     team1Score?: number | null;
     team2Score?: number | null;
     status?: MatchupStatus | null;
+    statsLoadingStatus?: StatsLoadingStatus | null;
     gamesPerMatchup?: number | null;
     spStartsPerMatchup?: number | null;
+    selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    recap?: {
+      __typename?: 'MatchupRecap';
+      headline?: string | null;
+      narrative?: string | null;
+      highlights?: Array<string> | null;
+      matchupType?: string | null;
+      winnerId?: number | null;
+    } | null;
   }> | null;
 };
 
@@ -4713,10 +4763,19 @@ export const MatchupFragmentDoc = gql`
     team1Score
     team2Score
     status
+    statsLoadingStatus
     gamesPerMatchup
     spStartsPerMatchup
+    selectedGamesCount
     startTime
     endTime
+    recap {
+      headline
+      narrative
+      highlights
+      matchupType
+      winnerId
+    }
   }
 `;
 export const LeagueChatMessageFieldsFragmentDoc = gql`
