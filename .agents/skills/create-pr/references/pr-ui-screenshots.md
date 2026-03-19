@@ -63,14 +63,22 @@ GitHub renders images pasted directly into the markdown editor, or referenced vi
 
 When writing the PR body via an **agent** (using `create_file`):
 
-1. Take screenshots locally and upload them to the PR draft (via browser) to get GitHub asset URLs, **or**
-2. Use the Playwright MCP browser tools (`mcp_microsoft_pla_browser_navigate`, `mcp_microsoft_pla_browser_take_screenshot`) to navigate to the running dev server and capture a screenshot, then embed it:
+> **Current limitation:** The Playwright MCP browser tools (`mcp_microsoft_pla_browser_navigate`, `mcp_microsoft_pla_browser_take_screenshot`) are **not currently configured** in this project. Automated screenshot capture is not available to agents.
+
+**Agent workflow — leave a placeholder and prompt the human:**
+
+1. Write the PR body with a placeholder `## Screenshots` section:
 
 ```markdown
-<!-- Agent workflow: use mcp_microsoft_pla_browser_navigate to open the dev server,
-     navigate to the changed page, and call mcp_microsoft_pla_browser_take_screenshot
-     to capture the current state. Then embed the resulting file path or GitHub URL here. -->
+## Screenshots
+
+<!-- Screenshots required — UI changes detected in this PR.
+     Please run `make dev-web`, navigate to the affected screens,
+     capture Before/After screenshots, and paste them here before merging. -->
 ```
+
+2. After creating the PR, note that screenshots still need to be added (e.g., in your summary to the user).
+3. Do **not** skip or delete the `## Screenshots` section — leave the placeholder so reviewers know they are expected.
 
 ### Screenshot Checklist
 

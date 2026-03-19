@@ -234,6 +234,27 @@ Technical explanation of why the issue occurred.
 
 > 📎 **UI screenshot guidelines** (what to capture, how to take/embed screenshots, checklist, when to skip): see [references/pr-ui-screenshots.md](references/pr-ui-screenshots.md)
 
+## UI Screenshots
+
+Any PR that changes a visible UI element must include **Before** and **After** screenshots in the PR description. This applies to new pages, layout or spacing changes, color/font/style updates, loading/empty/error states, and conditional UI.
+
+**When screenshots are required:** any `.tsx`, `.jsx`, `.css`, `.module.css`, Tamagui, or style-related file is changed, or a new route/page/component is added.
+
+**Steps:**
+
+1. Run the dev server: `make dev-web` (web) or `make dev` (full stack)
+2. Navigate to the affected screen before applying your changes — capture **Before**
+3. Apply changes, navigate back — capture **After**
+4. Embed both in the `## Screenshots` section of the PR body using GitHub image markdown
+
+**Agents:** Automated screenshot capture requires the Playwright MCP browser tools, which are not currently configured. When working on a UI PR:
+
+- Leave the `## Screenshots` section in the PR body with placeholder comments
+- Note in the PR description that screenshots need to be added manually
+- Ask the user to run the dev server, capture screenshots, and paste them into the PR
+
+> 📎 **Full details** (what to capture, mobile/desktop breakpoints, Playwright automation, embed syntax, checklist): see [references/pr-ui-screenshots.md](references/pr-ui-screenshots.md)
+
 ## PR Title Format
 
 ```
