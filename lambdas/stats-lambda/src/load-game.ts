@@ -1,5 +1,5 @@
 import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
-import { and, count, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import {
@@ -10,18 +10,20 @@ import {
   withRollbar,
 } from '@legacy-sports/rollbar';
 import { createNotificationService } from '@legacy-sports/aws-utils';
+import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
+import { cleanupCache, getCacheStats } from '@legacy-sports/bref-client';
+
+import type { LoadMatchupStatsMessage } from './load-game-types';
+import { PLAYER_PROCESSING_BUDGET_MS } from './load-game-types';
+
+/** Must match SQS maxReceiveCount in terraform/sqs.tf redrive_policy */
+const MAX_RETRIES = 3;
+import { isRetryableError } from './retry-strategy';
 import {
-  PublicDb,
-  PublicSchema,
-  runWithPublicClient,
-} from '@legacy-sports/db-client';
-import {
-  cleanupCache,
-  getAllGameBattingStats,
-  getAllGameFieldingStats,
-  getAllGamePitchingStats,
-  getCacheStats,
-} from '@legacy-sports/bref-client';
+  checkMatchupCompletion,
+  updateMatchupStatus,
+} from './game-state-manager';
+import { loadPlayerGameStats } from './player-stats-loader';
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -31,519 +33,6 @@ if (rollbarConfig) {
 
 // Initialize WebSocket notification service
 const notificationService = createNotificationService();
-
-/**
- * Maximum milliseconds to spend processing players within a single Lambda invocation.
- * Sized to leave ~60s headroom against the tightest Lambda timeout (prod = 300s).
- * With batch_size=1, the baseline load is ~96s (8 players × 3 BBRef requests × 4s spacing)
- * so this budget comfortably covers several 429 retries before ejecting gracefully.
- * When the budget is exceeded the message is returned as a batchItemFailure so SQS
- * re-delivers it cleanly; already-completed players are DB cache hits on re-delivery.
- */
-const PLAYER_PROCESSING_BUDGET_MS = 240_000; // 4 minutes
-
-/**
- * Message format for matchup stats loading
- * Contains a batch of players for a matchup to process sequentially
- * Supports batching to avoid Lambda timeouts
- *
- */
-interface LoadMatchupStatsMessage {
-  matchupId: number;
-  batchIndex?: number; // Optional: which batch this is (0-indexed)
-  totalBatches?: number; // Optional: total number of batches for this matchup
-  players: Array<{
-    matchupPlayerId: number;
-    playerId: number;
-    brefId: string;
-    season: number;
-    fieldingGamePos: string;
-  }>;
-}
-
-/**
- * Select random unique game identifiers and update matchup_player_games
- * Called after all game stats are loaded for a player.
- * Only updates records that don't already have a game_identifier assigned
- * (i.e., records from the uncached path where game selection couldn't pick a game).
- */
-async function selectAndAssignGameIdentifiers(
-  db: PublicDb,
-  matchupPlayerId: number,
-  playerId: number,
-  season: number,
-): Promise<void> {
-  LOGGER.info(
-    `Selecting game identifiers for matchup player ${matchupPlayerId}`,
-  );
-
-  // Get all unique game identifiers for this player/season from batting stats.
-  // Falls back to pitching stats for DH-era pitchers who have no batting rows.
-  const allUniqueBattingGames = await db
-    .selectDistinct({ gameIdentifier: PublicSchema.gameBatting.gameIdentifier })
-    .from(PublicSchema.gameBatting)
-    .where(
-      and(
-        eq(PublicSchema.gameBatting.playerId, playerId),
-        eq(PublicSchema.gameBatting.season, season),
-      ),
-    );
-
-  // Filter out empty string game_identifiers (stale data from pre-refactor scrapes)
-  let uniqueGames = allUniqueBattingGames.filter(
-    (g) => g.gameIdentifier !== '' && g.gameIdentifier !== null,
-  );
-
-  if (uniqueGames.length === 0) {
-    // Batting stats are absent (DH-era pitcher) or all stale — try pitching stats
-    LOGGER.info(
-      `No valid batting game identifiers for player ${playerId} season ${season}, falling back to pitching stats`,
-    );
-    const allUniquePitchingGames = await db
-      .selectDistinct({
-        gameIdentifier: PublicSchema.gamePitching.gameIdentifier,
-      })
-      .from(PublicSchema.gamePitching)
-      .where(
-        and(
-          eq(PublicSchema.gamePitching.playerId, playerId),
-          eq(PublicSchema.gamePitching.season, season),
-        ),
-      );
-
-    uniqueGames = allUniquePitchingGames.filter(
-      (g) => g.gameIdentifier !== '' && g.gameIdentifier !== null,
-    );
-  }
-
-  if (uniqueGames.length === 0) {
-    LOGGER.warn(
-      `No valid game identifiers found for player ${playerId} season ${season} (checked batting and pitching), cannot select games`,
-    );
-    return;
-  }
-
-  LOGGER.info(
-    `Found ${uniqueGames.length} unique games for player ${playerId} season ${season}`,
-  );
-
-  // Get records that need game_identifier assignment (null gameIdentifier)
-  const unassignedGames = await db
-    .select()
-    .from(PublicSchema.matchupPlayerGames)
-    .where(
-      and(
-        eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
-        isNull(PublicSchema.matchupPlayerGames.gameIdentifier),
-      ),
-    );
-
-  if (unassignedGames.length === 0) {
-    LOGGER.info(
-      `All game slots already have game_identifiers for matchup player ${matchupPlayerId}`,
-    );
-    return;
-  }
-
-  // Get already-used game identifiers to avoid duplicates
-  const usedGames = await db
-    .select({ gameIdentifier: PublicSchema.matchupPlayerGames.gameIdentifier })
-    .from(PublicSchema.matchupPlayerGames)
-    .where(
-      and(
-        eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayerId),
-        isNotNull(PublicSchema.matchupPlayerGames.gameIdentifier),
-      ),
-    );
-
-  const usedIds = new Set(
-    usedGames
-      .map((g) => g.gameIdentifier)
-      .filter((id): id is string => id !== null),
-  );
-
-  // Filter to available (not already used) games
-  const availableGames = uniqueGames.filter(
-    (g) => !usedIds.has(g.gameIdentifier),
-  );
-
-  // Randomly select N unique games for unassigned slots
-  const shuffled = availableGames
-    .map((g) => ({ gameIdentifier: g.gameIdentifier, sort: Math.random() }))
-    .sort((a, b) => a.sort - b.sort)
-    .slice(0, unassignedGames.length);
-
-  LOGGER.info(
-    `Selected ${shuffled.length} random games from ${availableGames.length} available (${usedIds.size} already used)`,
-  );
-
-  // Update each unassigned matchup_player_games record with a game_identifier
-  for (let i = 0; i < shuffled.length && i < unassignedGames.length; i++) {
-    await db
-      .update(PublicSchema.matchupPlayerGames)
-      .set({
-        gameIdentifier: shuffled[i].gameIdentifier,
-      })
-      .where(eq(PublicSchema.matchupPlayerGames.id, unassignedGames[i].id));
-  }
-
-  LOGGER.info(
-    `Successfully assigned game identifiers for matchup player ${matchupPlayerId}`,
-  );
-}
-
-/**
- * Check if an error is a retryable Baseball-Reference error (timeout, rate limit, or overload).
- * Rate limit (429) and overload (529) errors should be retried after SQS visibility timeout delay.
- */
-function isRetryableError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-
-  const errorMessage = error.message.toLowerCase();
-
-  // Check for HTTP 429 (Too Many Requests) or 529 (Site Overloaded)
-  const isRateLimited =
-    errorMessage.includes('status code 429') ||
-    errorMessage.includes('status code 529');
-
-  // Check for HTTP 504 (Gateway Timeout) or 524 (Cloudflare timeout)
-  const isTimeoutStatus =
-    errorMessage.includes('status code 504') ||
-    errorMessage.includes('status code 524');
-
-  // Also check for generic timeout messages
-  const isTimeoutMessage =
-    errorMessage.includes('timeout') || errorMessage.includes('timed out');
-
-  return isRateLimited || isTimeoutStatus || isTimeoutMessage;
-}
-
-/**
- * Check if an error is specifically a rate limit or overload error (429/529).
- * Used to abort remaining players in a batch early (no point hitting an overloaded service).
- */
-function isRateLimitError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const msg = error.message.toLowerCase();
-  return msg.includes('status code 429') || msg.includes('status code 529');
-}
-
-/**
- * Purge stale game stats that have empty game_identifier values.
- * These were scraped by pre-refactor code that didn't populate game_identifier.
- * Deleting them allows a fresh re-scrape that produces proper identifiers.
- */
-async function purgeStaleStats(
-  db: PublicDb,
-  playerId: number,
-  season: number,
-): Promise<void> {
-  const staleBatting = await db
-    .select({ cnt: count() })
-    .from(PublicSchema.gameBatting)
-    .where(
-      and(
-        eq(PublicSchema.gameBatting.playerId, playerId),
-        eq(PublicSchema.gameBatting.season, season),
-        eq(PublicSchema.gameBatting.gameIdentifier, ''),
-      ),
-    );
-
-  const staleCount = staleBatting[0]?.cnt ?? 0;
-  if (staleCount === 0) return;
-
-  LOGGER.warn(
-    `Found ${staleCount} stale batting records with empty game_identifier for player ${playerId} season ${season} — purging all stale stats to force re-scrape`,
-  );
-
-  // Delete stale batting
-  await db
-    .delete(PublicSchema.gameBatting)
-    .where(
-      and(
-        eq(PublicSchema.gameBatting.playerId, playerId),
-        eq(PublicSchema.gameBatting.season, season),
-        eq(PublicSchema.gameBatting.gameIdentifier, ''),
-      ),
-    );
-
-  // Delete stale pitching
-  await db
-    .delete(PublicSchema.gamePitching)
-    .where(
-      and(
-        eq(PublicSchema.gamePitching.playerId, playerId),
-        eq(PublicSchema.gamePitching.season, season),
-        eq(PublicSchema.gamePitching.gameIdentifier, ''),
-      ),
-    );
-
-  // Delete stale fielding
-  await db
-    .delete(PublicSchema.gameFielding)
-    .where(
-      and(
-        eq(PublicSchema.gameFielding.playerId, playerId),
-        eq(PublicSchema.gameFielding.season, season),
-        eq(PublicSchema.gameFielding.gameIdentifier, ''),
-      ),
-    );
-
-  LOGGER.info(`Purged stale stats for player ${playerId} season ${season}`);
-}
-
-async function loadPlayerGameStats(
-  db: PublicDb,
-  player: LoadMatchupStatsMessage['players'][0],
-  matchupId: number,
-  leagueId: number | null,
-): Promise<void> {
-  const { playerId, brefId, season, fieldingGamePos } = player;
-
-  LOGGER.info(
-    `Loading stats for player ${playerId} (${brefId}), season ${season}`,
-  );
-
-  const playerObj: {
-    id: number;
-    firstName: string;
-    lastName: string;
-    brefId: string;
-    statsLastFetchedAt: Date;
-    allStarSelections: number;
-    goldGloves: number;
-    silverSluggers: number;
-    mvpAwards: number;
-    cyYoungAwards: number;
-    worldSeriesRings: number;
-    hallOfFame: boolean;
-    rookieOfTheYear: boolean;
-    totalGames: number;
-  } = {
-    id: playerId,
-    firstName: '',
-    lastName: '',
-    brefId,
-    statsLastFetchedAt: new Date(),
-    allStarSelections: 0,
-    goldGloves: 0,
-    silverSluggers: 0,
-    mvpAwards: 0,
-    cyYoungAwards: 0,
-    worldSeriesRings: 0,
-    hallOfFame: false,
-    rookieOfTheYear: false,
-    totalGames: 0,
-  };
-
-  try {
-    // Purge stale stats with empty game_identifier (from pre-refactor scrapes)
-    await purgeStaleStats(db, playerId, season);
-
-    // Load batting stats - check if ANY game exists for this player/season, if not load ALL games
-    LOGGER.debug(
-      `Checking if batting stats exist for player ${playerId}, season ${season}`,
-    );
-    const existingBatting = await db
-      .select()
-      .from(PublicSchema.gameBatting)
-      .where(
-        and(
-          eq(PublicSchema.gameBatting.playerId, playerId),
-          eq(PublicSchema.gameBatting.season, season),
-        ),
-      )
-      .limit(1);
-
-    if (existingBatting.length === 0) {
-      LOGGER.info(
-        `No batting stats cached for player ${playerId} season ${season}, loading ALL games from Baseball Reference`,
-      );
-      const allBattingStats = await getAllGameBattingStats(playerObj, season);
-      if (allBattingStats && allBattingStats.length > 0) {
-        await db
-          .insert(PublicSchema.gameBatting)
-          .values(allBattingStats)
-          .onConflictDoNothing();
-        LOGGER.info(
-          `Loaded ${allBattingStats.length} batting game records for player ${playerId}`,
-        );
-      }
-    } else {
-      LOGGER.debug(
-        `Batting stats already cached for player ${playerId}, season ${season} (${existingBatting.length} games found)`,
-      );
-    }
-
-    // Load pitching stats - same pattern
-    LOGGER.debug(
-      `Checking if pitching stats exist for player ${playerId}, season ${season}`,
-    );
-    const existingPitching = await db
-      .select()
-      .from(PublicSchema.gamePitching)
-      .where(
-        and(
-          eq(PublicSchema.gamePitching.playerId, playerId),
-          eq(PublicSchema.gamePitching.season, season),
-        ),
-      )
-      .limit(1);
-
-    if (existingPitching.length === 0) {
-      LOGGER.info(
-        `No pitching stats cached for player ${playerId} season ${season}, loading ALL games from Baseball Reference`,
-      );
-      const allPitchingStats = await getAllGamePitchingStats(playerObj, season);
-      if (allPitchingStats && allPitchingStats.length > 0) {
-        await db
-          .insert(PublicSchema.gamePitching)
-          .values(allPitchingStats)
-          .onConflictDoNothing();
-        LOGGER.info(
-          `Loaded ${allPitchingStats.length} pitching game records for player ${playerId}`,
-        );
-      }
-    } else {
-      LOGGER.debug(
-        `Pitching stats already cached for player ${playerId}, season ${season}`,
-      );
-    }
-
-    // Load fielding stats - same pattern
-    LOGGER.debug(
-      `Checking if fielding stats exist for player ${playerId}, season ${season}`,
-    );
-    const existingFielding = await db
-      .select()
-      .from(PublicSchema.gameFielding)
-      .where(
-        and(
-          eq(PublicSchema.gameFielding.playerId, playerId),
-          eq(PublicSchema.gameFielding.season, season),
-        ),
-      )
-      .limit(1);
-
-    if (existingFielding.length === 0) {
-      LOGGER.info(
-        `No fielding stats cached for player ${playerId} season ${season}, loading ALL games from Baseball Reference`,
-      );
-      const allFieldingStats = await getAllGameFieldingStats(
-        playerObj,
-        season,
-        fieldingGamePos,
-      );
-      if (allFieldingStats && allFieldingStats.length > 0) {
-        await db
-          .insert(PublicSchema.gameFielding)
-          .values(allFieldingStats)
-          .onConflictDoNothing();
-        LOGGER.info(
-          `Loaded ${allFieldingStats.length} fielding game records for player ${playerId}`,
-        );
-      }
-    } else {
-      LOGGER.debug(
-        `Fielding stats already cached for player ${playerId}, season ${season}`,
-      );
-    }
-
-    LOGGER.info(`Successfully loaded all stats for player ${playerId}`);
-
-    // After loading all games, select N random unique game identifiers
-    // and update matchup_player_games
-    if (player.matchupPlayerId) {
-      await selectAndAssignGameIdentifiers(
-        db,
-        player.matchupPlayerId,
-        playerId,
-        season,
-      );
-
-      // Mark this player's game as completed
-      await db
-        .update(PublicSchema.matchupPlayerGames)
-        .set({ statsLoadingStatus: 'completed' })
-        .where(
-          eq(
-            PublicSchema.matchupPlayerGames.matchupPlayerId,
-            player.matchupPlayerId,
-          ),
-        );
-
-      LOGGER.info(`Updated player ${playerId} status to 'completed'`);
-
-      // Send notification that player stats are updated (using cached leagueId)
-      try {
-        if (notificationService && leagueId !== null) {
-          await notificationService.notifyPlayerStatsUpdated(
-            playerId,
-            matchupId,
-            leagueId,
-            { playerId, status: 'completed' },
-          );
-          LOGGER.debug(
-            `Sent player stats updated notification for player ${playerId}`,
-          );
-        }
-      } catch (notifyError) {
-        LOGGER.warn('Failed to send player stats updated notification', {
-          error:
-            notifyError instanceof Error
-              ? notifyError.message
-              : String(notifyError),
-          playerId,
-        });
-      }
-    }
-  } catch (error) {
-    const retryable = isRetryableError(error);
-
-    LOGGER.error(`Failed to load stats for player ${playerId}:`, {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      playerId,
-      brefId,
-      season,
-      isRetryable: retryable,
-    });
-
-    // For retryable errors (429, timeout), leave status as 'loading' so
-    // the SQS retry can process the player again without false 'failed' state
-    if (retryable) {
-      interface RetryableError extends Error {
-        originalError: unknown;
-        isRetryableTimeout: boolean;
-        isRateLimit: boolean;
-      }
-      const retryableError = new Error(
-        `RETRYABLE: ${error instanceof Error ? error.message : String(error)}`,
-      ) as RetryableError;
-      retryableError.originalError = error;
-      retryableError.isRetryableTimeout = true;
-      retryableError.isRateLimit = isRateLimitError(error);
-      throw retryableError;
-    }
-
-    // Non-retryable error — mark this player's game as failed
-    if (player.matchupPlayerId) {
-      await db
-        .update(PublicSchema.matchupPlayerGames)
-        .set({ statsLoadingStatus: 'failed' })
-        .where(
-          eq(
-            PublicSchema.matchupPlayerGames.matchupPlayerId,
-            player.matchupPlayerId,
-          ),
-        );
-
-      LOGGER.info(`Updated player ${playerId} game status to 'failed'`);
-    }
-
-    throw error;
-  }
-}
 
 const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   // Security: Log only safe metadata (not full event payload which can be large and contain sensitive data)
@@ -669,8 +158,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         const retryCount = record.attributes?.ApproximateReceiveCount
           ? parseInt(record.attributes.ApproximateReceiveCount, 10)
           : 1;
-        // Must match SQS maxReceiveCount in terraform/sqs.tf redrive_policy
-        const maxRetries = 3;
+        const maxRetries = MAX_RETRIES;
 
         LOGGER.info(
           `Processing message with retry count: ${retryCount}/${maxRetries}`,
@@ -708,7 +196,13 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
 
           try {
             addBreadcrumb(`Loading stats for player ${player.playerId}`);
-            await loadPlayerGameStats(db, player, message.matchupId, leagueId);
+            await loadPlayerGameStats(
+              db,
+              player,
+              message.matchupId,
+              leagueId,
+              notificationService,
+            );
           } catch (error) {
             failedPlayerCount++;
 
@@ -769,10 +263,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         // Already-completed players are DB cache hits on re-delivery — no BBRef requests needed.
         if (hitTimeBudget) {
           batchItemFailures.push({ itemIdentifier: record.messageId });
-          await db
-            .update(PublicSchema.matchups)
-            .set({ statsLoadingStatus: 'retry' })
-            .where(eq(PublicSchema.matchups.id, message.matchupId));
+          await updateMatchupStatus(db, message.matchupId, 'retry');
           LOGGER.info(
             `Set matchup ${message.matchupId} stats_loading_status to 'retry' (time budget)`,
           );
@@ -798,10 +289,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           batchItemFailures.push({ itemIdentifier: record.messageId });
 
           // Update matchup status to 'retry' so consumers know it's being retried
-          await db
-            .update(PublicSchema.matchups)
-            .set({ statsLoadingStatus: 'retry' })
-            .where(eq(PublicSchema.matchups.id, message.matchupId));
+          await updateMatchupStatus(db, message.matchupId, 'retry');
 
           LOGGER.info(
             `Set matchup ${message.matchupId} stats_loading_status to 'retry' (attempt ${retryCount}/${maxRetries})`,
@@ -839,63 +327,15 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           let matchupMainStatus: 'in_progress' | 'completed' | undefined;
 
           if (finalStatus === 'completed') {
-            // Query matchup to get gamesPerMatchup and count selected games
-            const matchupResult = await db
-              .select({
-                gamesPerMatchup: PublicSchema.matchups.gamesPerMatchup,
-              })
-              .from(PublicSchema.matchups)
-              .where(eq(PublicSchema.matchups.id, message.matchupId))
-              .limit(1);
-
-            const gamesPerMatchup = matchupResult[0]?.gamesPerMatchup ?? 0;
-
-            // Count distinct game_num values for this matchup
-            const selectedGamesResult = await db
-              .select({
-                count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
-              })
-              .from(PublicSchema.matchupPlayerGames)
-              .innerJoin(
-                PublicSchema.matchupPlayers,
-                eq(
-                  PublicSchema.matchupPlayerGames.matchupPlayerId,
-                  PublicSchema.matchupPlayers.id,
-                ),
-              )
-              .where(
-                eq(PublicSchema.matchupPlayers.matchupId, message.matchupId),
-              );
-
-            const selectedGamesCount = selectedGamesResult[0]?.count ?? 0;
-
-            // If all games are selected and stats loaded, mark matchup as completed
-            if (selectedGamesCount >= gamesPerMatchup && gamesPerMatchup > 0) {
-              matchupMainStatus = 'completed';
-              LOGGER.info(
-                `All games complete for matchup ${message.matchupId} (${selectedGamesCount}/${gamesPerMatchup})`,
-              );
-            } else {
-              matchupMainStatus = 'in_progress';
-              LOGGER.info(
-                `Matchup ${message.matchupId} still in progress (${selectedGamesCount}/${gamesPerMatchup} games)`,
-              );
-            }
+            matchupMainStatus = await checkMatchupCompletion(
+              db,
+              message.matchupId,
+            );
           }
 
-          const updateData: {
-            statsLoadingStatus: 'completed' | 'failed';
-            status?: 'in_progress' | 'completed';
-          } = { statsLoadingStatus: finalStatus };
-
-          if (matchupMainStatus) {
-            updateData.status = matchupMainStatus;
-          }
-
-          await db
-            .update(PublicSchema.matchups)
-            .set(updateData)
-            .where(eq(PublicSchema.matchups.id, message.matchupId));
+          await updateMatchupStatus(db, message.matchupId, finalStatus, {
+            status: matchupMainStatus,
+          });
 
           LOGGER.info(
             `Set matchup ${message.matchupId} stats_loading_status to '${finalStatus}'${matchupMainStatus ? ` and status to '${matchupMainStatus}'` : ''}`,
@@ -1000,12 +440,12 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         const retryCount = record.attributes?.ApproximateReceiveCount
           ? parseInt(record.attributes.ApproximateReceiveCount, 10)
           : 1;
-        const maxRetries = 5;
+        const maxRetries = MAX_RETRIES;
         const isRetryable = isRetryableError(error);
 
         if (isRetryable && retryCount < maxRetries) {
           LOGGER.warn(
-            `Returning message to queue for retry due to timeout error (attempt ${retryCount}/${maxRetries})`,
+            `Returning message to queue for retry due to retryable error (attempt ${retryCount}/${maxRetries})`,
             {
               messageId: record.messageId,
               matchupId: parsedMessage?.matchupId,
@@ -1017,10 +457,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           // Update matchup status to 'retry' before returning to queue
           if (parsedMessage?.matchupId) {
             try {
-              await db
-                .update(PublicSchema.matchups)
-                .set({ statsLoadingStatus: 'retry' })
-                .where(eq(PublicSchema.matchups.id, parsedMessage.matchupId));
+              await updateMatchupStatus(db, parsedMessage.matchupId, 'retry');
 
               LOGGER.info(
                 `Set matchup ${parsedMessage.matchupId} stats_loading_status to 'retry' (attempt ${retryCount}/${maxRetries})`,
@@ -1044,10 +481,7 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         // Update matchup status to failed (retries exhausted or non-retryable error)
         if (parsedMessage?.matchupId) {
           try {
-            await db
-              .update(PublicSchema.matchups)
-              .set({ statsLoadingStatus: 'failed' })
-              .where(eq(PublicSchema.matchups.id, parsedMessage.matchupId));
+            await updateMatchupStatus(db, parsedMessage.matchupId, 'failed');
 
             LOGGER.info(
               `Set matchup ${parsedMessage.matchupId} stats_loading_status to 'failed'`,
