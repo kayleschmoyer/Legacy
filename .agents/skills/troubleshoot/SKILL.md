@@ -1,6 +1,6 @@
 ---
 name: troubleshoot
-description: 'Fix common dev environment problems: module-not-found errors, DB connectivity, port conflicts, Nx cache corruption, EPERM file locks, AWS auth failures, and Terraform state locks. Use when the dev environment breaks or CI shows environment-related errors.'
+description: 'Fix common dev environment and production problems: module-not-found errors, DB connectivity, port conflicts, Nx cache corruption, EPERM file locks, AWS auth failures, Terraform state locks, and Rollbar noise. Use when the dev environment breaks, CI shows environment-related errors, or production error reporting is degraded.'
 ---
 
 # Skill: Troubleshooting
@@ -139,6 +139,15 @@ gh run view <run-id> --log-failed
 gh run rerun <run-id> --failed
 ```
 
+### Production Client Errors (Rollbar)
+
+When investigating browser console errors from production:
+
+1. **Check Rollbar rate limits first** — `maxItems` (50/session) and `itemsPerMinute` (25) in `lib/rollbar/src/lib/rollbar.web.ts`. Noisy browser warnings from third-party scripts (e.g. Google Identity Services COOP warnings) can exhaust these limits and **silently drop real errors**.
+2. **Check `checkIgnore` filter** — if a new class of browser noise appears, add it to the `checkIgnore` callback in `rollbar.web.ts`. Existing filters: AbortError, Failed to fetch, WebSocket error/closed, ResizeObserver loop. (COOP/COEP warnings are **not** filtered today — if they become noisy, add a filter.)
+3. **Rollbar 429 = symptom, not cause** — a `POST api.rollbar.com 429` means the Rollbar API is rejecting requests due to server-side rate limiting (account plan limits). This is distinct from the client-side `maxItems`/`itemsPerMinute` caps. Find what's flooding Rollbar before assuming a transient service issue.
+4. **Third-party script errors are not actionable** — errors from Google's GIS `client` script, browser extensions, or ad blockers should be filtered, not fixed. Verify the error originates from our code before investigating.
+
 ### Git / Branch Issues
 
 ```powershell
@@ -167,6 +176,7 @@ make rebase-tree
 | Nx cache issues        | `pnpm exec nx reset`                      |
 | AWS CLI encoding error | `$env:PYTHONIOENCODING = "utf-8"`         |
 | Terraform state locked | `node scripts/terraform-unlock.js`        |
+| Rollbar 429 / errors   | Check `checkIgnore` in `rollbar.web.ts`   |
 
 ## Related Skills
 
