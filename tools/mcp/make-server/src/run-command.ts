@@ -24,7 +24,10 @@ export function runCommand(
       { cwd, timeout: timeoutMs, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
-          const msg = stderr?.trim() || stdout?.trim() || err.message;
+          // Include both stdout and stderr so callers get full context
+          // (step output in stdout, error details in stderr)
+          const parts = [stdout?.trim(), stderr?.trim()].filter(Boolean);
+          const msg = parts.join('\n') || err.message;
           reject(new Error(msg));
           return;
         }
