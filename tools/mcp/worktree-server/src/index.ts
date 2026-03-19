@@ -254,6 +254,23 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_status',
+      description:
+        'Get structured git status for the active (or specified) worktree. ' +
+        'Returns modified, staged, untracked files, branch info, ahead/behind counts, ' +
+        'and rebase/merge/conflict state as structured JSON.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+        },
+      },
+    },
+    {
       name: 'worktree_push',
       description:
         'Push the current branch with --force-with-lease. Refuses to push ' +
@@ -654,6 +671,125 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         'Stabilization complete. Next: worktree_run(command: "make pc") to validate.',
       );
       return { content: [{ type: 'text', text: log.join('\n') }] };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_status
+    // -----------------------------------------------------------------------
+    case 'worktree_status': {
+      const { worktree: wtKey } = args as { worktree?: string };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+
+      try {
+        // Branch name
+        const branch = run('git branch --show-current', cwd).trim();
+
+        // Porcelain v2 status for structured parsing
+        const porcelain = run('git status --porcelain=v2 --branch', cwd);
+        const lines = porcelain.split('\n').filter(Boolean);
+
+        const modified: string[] = [];
+        const staged: string[] = [];
+        const untracked: string[] = [];
+        const conflicted: string[] = [];
+        let ahead = 0;
+        let behind = 0;
+
+        for (const line of lines) {
+          if (line.startsWith('# branch.ab ')) {
+            // "# branch.ab +3 -1" → ahead=3, behind=1
+            const match = line.match(/\+(\d+)\s+-(\d+)/);
+            if (match) {
+              ahead = parseInt(match[1], 10);
+              behind = parseInt(match[2], 10);
+            }
+          } else if (line.startsWith('1 ') || line.startsWith('2 ')) {
+            // Ordinary (1) or rename/copy (2) entry
+            // Format: "1 XY sub mH mI mW hH hI path"
+            // Rename: "2 XY sub mH mI mW hH hI Xscore\tpath\torigPath"
+            const xy = line.slice(2, 4);
+            const tabParts = line.split('\t');
+            // For type 2, the new path is the second tab-separated field
+            const path = line.startsWith('2 ')
+              ? (tabParts[1] ?? '')
+              : (tabParts[1] ?? line.slice(line.indexOf('\t') + 1));
+            // X = index status, Y = worktree status
+            const indexStatus = xy[0];
+            const worktreeStatus = xy[1];
+
+            if (
+              indexStatus === 'U' ||
+              worktreeStatus === 'U' ||
+              xy === 'AA' ||
+              xy === 'DD'
+            ) {
+              conflicted.push(path);
+            } else {
+              if (indexStatus !== '.' && indexStatus !== '?') {
+                staged.push(path);
+              }
+              if (worktreeStatus !== '.' && worktreeStatus !== '?') {
+                modified.push(path);
+              }
+            }
+          } else if (line.startsWith('u ')) {
+            // Unmerged entry — conflict
+            const path = line.slice(line.indexOf('\t') + 1);
+            conflicted.push(path);
+          } else if (line.startsWith('? ')) {
+            untracked.push(line.slice(2));
+          }
+        }
+
+        // Detect rebase/merge state — use absolute path to handle worktrees correctly
+        const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
+        const rebaseInProgress =
+          existsSync(join(gitDir, 'rebase-merge')) ||
+          existsSync(join(gitDir, 'rebase-apply'));
+        const mergeInProgress = existsSync(join(gitDir, 'MERGE_HEAD'));
+
+        const result = {
+          branch: branch || '(detached)',
+          modified,
+          staged,
+          untracked,
+          conflicted,
+          ahead,
+          behind,
+          rebaseInProgress,
+          mergeInProgress,
+          clean:
+            modified.length === 0 &&
+            staged.length === 0 &&
+            untracked.length === 0 &&
+            conflicted.length === 0,
+        };
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string };
+        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to get status for ${cwd}:\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
 
     // -----------------------------------------------------------------------
