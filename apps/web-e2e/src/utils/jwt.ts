@@ -95,6 +95,81 @@ export class E2EJwtUtil {
 }
 
 /**
+ * Decode a JWT and throw immediately if it is expired (or will expire within
+ * the given buffer).  Integration-test fixtures call this so that developers
+ * get a clear "refresh your token" message instead of cryptic 401 failures.
+ *
+ * @param jwt     The raw JWT string.
+ * @param source  Human-readable label for the error message (e.g.
+ *                "INTEGRATION_JWT env var", "~/.legacy-sports/auth.json").
+ * @param bufferSeconds  Fail early if the token expires within this many
+ *                       seconds (default 60).
+ */
+/**
+ * Error thrown when an auth token is expired or about to expire.
+ * Use `err instanceof JwtExpiredError` to distinguish from other errors.
+ */
+export class JwtExpiredError extends Error {
+  override readonly name = 'JwtExpiredError';
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export function assertJwtNotExpired(
+  jwt: string,
+  source: string,
+  bufferSeconds = 60,
+): void {
+  if (!E2EJwtUtil.isValidJwtFormat(jwt)) {
+    throw new JwtExpiredError(
+      `Auth token from ${source} is not a valid JWT (expected 3 base64url segments). ` +
+        'Refresh your token before running integration tests:\n' +
+        '  • Local: run  ./ls-cli.ps1 auth login\n' +
+        '  • CI:    set  INTEGRATION_JWT_COMMISSIONER / INTEGRATION_JWT  env var to a fresh token',
+    );
+  }
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = E2EJwtUtil.decodeJwtPayload(jwt);
+  } catch {
+    throw new JwtExpiredError(
+      `Auth token from ${source} has a malformed payload (base64/JSON decode failed). ` +
+        'Refresh your token before running integration tests:\n' +
+        '  • Local: run  ./ls-cli.ps1 auth login\n' +
+        '  • CI:    set  INTEGRATION_JWT_COMMISSIONER / INTEGRATION_JWT  env var to a fresh token',
+    );
+  }
+
+  const exp = payload.exp;
+  if (exp === undefined) return; // no expiry claim — nothing to check
+
+  if (typeof exp !== 'number' || !Number.isFinite(exp)) {
+    throw new JwtExpiredError(
+      `Auth token from ${source} has a malformed 'exp' claim (expected number, got ${typeof exp}). ` +
+        'Refresh your token before running integration tests.',
+    );
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (exp <= now + bufferSeconds) {
+    const expiredAgo = now - exp;
+    const detail =
+      expiredAgo > 0
+        ? `expired ${expiredAgo}s ago`
+        : `expires in ${exp - now}s (within ${bufferSeconds}s buffer)`;
+
+    throw new JwtExpiredError(
+      `Auth token from ${source} is expired or about to expire (${detail}). ` +
+        'Refresh your token before running integration tests:\n' +
+        '  • Local: run  ./ls-cli.ps1 auth login\n' +
+        '  • CI:    set  INTEGRATION_JWT_COMMISSIONER / INTEGRATION_JWT  env var to a fresh token',
+    );
+  }
+}
+
+/**
  * Convenience functions for common use cases
  */
 export const E2EAuth = {

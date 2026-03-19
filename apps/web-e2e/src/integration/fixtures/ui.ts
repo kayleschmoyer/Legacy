@@ -2,6 +2,7 @@ import { test as base, type Page } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { assertJwtNotExpired, JwtExpiredError } from '../../utils/jwt';
 import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
 
 /**
@@ -117,7 +118,9 @@ interface CliAuthData {
  */
 async function getAuthJwt(): Promise<string> {
   if (process.env.INTEGRATION_JWT) {
-    return process.env.INTEGRATION_JWT;
+    const jwt = process.env.INTEGRATION_JWT;
+    assertJwtNotExpired(jwt, 'INTEGRATION_JWT env var');
+    return jwt;
   }
 
   const authPath = path.join(os.homedir(), '.legacy-sports', 'auth.json');
@@ -132,9 +135,11 @@ async function getAuthJwt(): Promise<string> {
       const entry = user ? data.tokens[user] : undefined;
 
       if (entry?.jwt && (!entry.expiresAt || entry.expiresAt >= Date.now())) {
+        assertJwtNotExpired(entry.jwt, '~/.legacy-sports/auth.json');
         return entry.jwt;
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof JwtExpiredError) throw err;
       // Fall through to local register
     }
   }

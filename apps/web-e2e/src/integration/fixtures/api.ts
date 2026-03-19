@@ -2,6 +2,7 @@ import { type APIRequestContext, test as base } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { assertJwtNotExpired, JwtExpiredError } from '../../utils/jwt';
 import { getTestUserJwt, TEST_USERS } from '../../utils/test-user-auth';
 
 export interface IntegrationFixtures {
@@ -28,7 +29,9 @@ interface GqlResponse<T> {
 
 async function getAuthJwt(): Promise<string> {
   if (process.env.INTEGRATION_JWT_COMMISSIONER) {
-    return process.env.INTEGRATION_JWT_COMMISSIONER;
+    const jwt = process.env.INTEGRATION_JWT_COMMISSIONER;
+    assertJwtNotExpired(jwt, 'INTEGRATION_JWT_COMMISSIONER env var');
+    return jwt;
   }
 
   const authPath = path.join(os.homedir(), '.legacy-sports', 'auth.json');
@@ -43,9 +46,11 @@ async function getAuthJwt(): Promise<string> {
       const entry = user ? data.tokens[user] : undefined;
 
       if (entry?.jwt && (!entry.expiresAt || entry.expiresAt >= Date.now())) {
+        assertJwtNotExpired(entry.jwt, '~/.legacy-sports/auth.json');
         return entry.jwt;
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof JwtExpiredError) throw err;
       // Fall through to local register
     }
   }
