@@ -275,6 +275,33 @@ export class NotificationService {
   }
 
   /**
+   * Insert a notification_history record.
+   * Returns the new row's id, or null if the insert fails non-fatally.
+   */
+  async logNotificationHistory(
+    userId: number,
+    notificationType: string,
+    title: string,
+    body: string,
+    data?: Record<string, unknown>,
+  ): Promise<number | null> {
+    return runWithPublicClient(this.options, async (db) => {
+      const [result] = await db
+        .insert(PublicSchema.notificationHistory)
+        .values({
+          userId,
+          notificationType,
+          title,
+          body,
+          data: data ?? null,
+        })
+        .returning({ id: PublicSchema.notificationHistory.id });
+
+      return result ? Number(result.id) : null;
+    });
+  }
+
+  /**
    * Disable a device token
    */
   async disableDeviceToken(userId: number, deviceToken: string): Promise<void> {

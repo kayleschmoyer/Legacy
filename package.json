@@ -159,6 +159,7 @@
     "expo-modules-core": "~3.0.29",
     "expo-router": "~6.0.23",
     "expo-secure-store": "~15.0.8",
+    "expo-server-sdk": "^3.10.0",
     "express": "4.21.2",
     "google-auth-library": "^9.14.0",
     "grafast": "1.0.0-rc.7",

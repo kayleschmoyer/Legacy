@@ -2127,6 +2127,7 @@ export type Query = {
   seasonPitchingStats?: Maybe<Array<SeasonPitching>>;
   /** Return earned badges for a team in a league */
   teamBadges?: Maybe<Array<UserBadge>>;
+  teamById?: Maybe<Team>;
   teamLeagueMembers?: Maybe<Array<LeagueMember>>;
   teamMembers?: Maybe<Array<TeamMember>>;
   teamTradeOffers?: Maybe<Array<TradeOffer>>;
@@ -2571,6 +2572,10 @@ export type QuerySeasonPitchingStatsArgs = {
 
 export type QueryTeamBadgesArgs = {
   leagueId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
+};
+
+export type QueryTeamByIdArgs = {
   teamId: Scalars['Int']['input'];
 };
 
