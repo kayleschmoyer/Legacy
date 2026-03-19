@@ -1,7 +1,7 @@
 // Players feature exports
 export { FreeAgents } from './FreeAgents';
 export { PlayerCard } from './PlayerCard';
-export { PlayerDetail } from './PlayerDetail';
+export { PlayerDetail, PlayerDetailById } from './PlayerDetail';
 export { PlayerRow } from './PlayerRow';
 export { PlayersGrid } from './PlayersGrid';
 export { PlayersScreen } from './PlayersScreen';
