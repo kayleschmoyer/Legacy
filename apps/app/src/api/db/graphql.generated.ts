@@ -4582,6 +4582,8 @@ export type UserFragment = {
   id?: number | null;
   email?: string | null;
   username?: string | null;
+  avatarUrl?: string | null;
+  accessLevel?: string | null;
   subscriptionTier?: string | null;
 };
 
@@ -4596,6 +4598,8 @@ export type GetUserByEmailQuery = {
     id?: number | null;
     email?: string | null;
     username?: string | null;
+    avatarUrl?: string | null;
+    accessLevel?: string | null;
     subscriptionTier?: string | null;
   } | null;
 };
@@ -4614,6 +4618,8 @@ export type GetLeaguesForUserQuery = {
     id?: number | null;
     email?: string | null;
     username?: string | null;
+    avatarUrl?: string | null;
+    accessLevel?: string | null;
     subscriptionTier?: string | null;
   } | null;
 };
@@ -4629,7 +4635,40 @@ export type GetUserByIdQuery = {
     id?: number | null;
     email?: string | null;
     username?: string | null;
+    avatarUrl?: string | null;
+    accessLevel?: string | null;
     subscriptionTier?: string | null;
+  } | null;
+};
+
+export type UpdateUsernameMutationVariables = Exact<{
+  username: Scalars['String']['input'];
+}>;
+
+export type UpdateUsernameMutation = {
+  __typename?: 'Mutation';
+  updateUsername?: {
+    __typename?: 'User';
+    id?: number | null;
+    email?: string | null;
+    username?: string | null;
+    avatarUrl?: string | null;
+    accessLevel?: string | null;
+    subscriptionTier?: string | null;
+  } | null;
+};
+
+export type UpdateUserAvatarMutationVariables = Exact<{
+  avatarUrl?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type UpdateUserAvatarMutation = {
+  __typename?: 'Mutation';
+  updateUserAvatar?: {
+    __typename?: 'User';
+    id?: number | null;
+    username?: string | null;
+    avatarUrl?: string | null;
   } | null;
 };
 
@@ -4885,6 +4924,8 @@ export const UserFragmentDoc = gql`
     id
     email
     username
+    avatarUrl
+    accessLevel
     subscriptionTier
   }
 `;
@@ -8613,4 +8654,107 @@ export type GetUserByIdSuspenseQueryHookResult = ReturnType<
 export type GetUserByIdQueryResult = Apollo.QueryResult<
   GetUserByIdQuery,
   GetUserByIdQueryVariables
+>;
+export const UpdateUsername = gql`
+  mutation UpdateUsername($username: String!) {
+    updateUsername(username: $username) {
+      ...User
+    }
+  }
+  ${UserFragmentDoc}
+`;
+export type UpdateUsernameMutationFn = MutationFunction<
+  UpdateUsernameMutation,
+  UpdateUsernameMutationVariables
+>;
+
+/**
+ * __useUpdateUsernameMutation__
+ *
+ * To run a mutation, you first call `useUpdateUsernameMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateUsernameMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateUsernameMutation, { data, loading, error }] = useUpdateUsernameMutation({
+ *   variables: {
+ *      username: // value for 'username'
+ *   },
+ * });
+ */
+export function useUpdateUsernameMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateUsernameMutation,
+    UpdateUsernameMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateUsernameMutation,
+    UpdateUsernameMutationVariables
+  >(UpdateUsername, options);
+}
+export type UpdateUsernameMutationHookResult = ReturnType<
+  typeof useUpdateUsernameMutation
+>;
+export type UpdateUsernameMutationResult =
+  Apollo.MutationResult<UpdateUsernameMutation>;
+export type UpdateUsernameMutationOptions = BaseMutationOptions<
+  UpdateUsernameMutation,
+  UpdateUsernameMutationVariables
+>;
+export const UpdateUserAvatar = gql`
+  mutation UpdateUserAvatar($avatarUrl: String) {
+    updateUserAvatar(avatarUrl: $avatarUrl) {
+      id
+      username
+      avatarUrl
+    }
+  }
+`;
+export type UpdateUserAvatarMutationFn = MutationFunction<
+  UpdateUserAvatarMutation,
+  UpdateUserAvatarMutationVariables
+>;
+
+/**
+ * __useUpdateUserAvatarMutation__
+ *
+ * To run a mutation, you first call `useUpdateUserAvatarMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateUserAvatarMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateUserAvatarMutation, { data, loading, error }] = useUpdateUserAvatarMutation({
+ *   variables: {
+ *      avatarUrl: // value for 'avatarUrl'
+ *   },
+ * });
+ */
+export function useUpdateUserAvatarMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateUserAvatarMutation,
+    UpdateUserAvatarMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateUserAvatarMutation,
+    UpdateUserAvatarMutationVariables
+  >(UpdateUserAvatar, options);
+}
+export type UpdateUserAvatarMutationHookResult = ReturnType<
+  typeof useUpdateUserAvatarMutation
+>;
+export type UpdateUserAvatarMutationResult =
+  Apollo.MutationResult<UpdateUserAvatarMutation>;
+export type UpdateUserAvatarMutationOptions = BaseMutationOptions<
+  UpdateUserAvatarMutation,
+  UpdateUserAvatarMutationVariables
 >;

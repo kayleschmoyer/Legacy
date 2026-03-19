@@ -2,6 +2,8 @@ fragment User on User {
   id
   email
   username
+  avatarUrl
+  accessLevel
   subscriptionTier
 }
 
@@ -35,11 +37,16 @@ query GetUserById($id: Int!) {
     ...User
   }
 }
-# CreateUser mutation not available in current schema
-# mutation CreateUser($input: CreateUserInput!) {
-#   createUser(input: $input) {
-#     user {
-#       ...User
-#     }
-#   }
-# }
+mutation UpdateUsername($username: String!) {
+  updateUsername(username: $username) {
+    ...User
+  }
+}
+
+mutation UpdateUserAvatar($avatarUrl: String) {
+  updateUserAvatar(avatarUrl: $avatarUrl) {
+    id
+    username
+    avatarUrl
+  }
+}

@@ -1,24 +1,35 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ScrollView } from 'react-native';
 import {
   Button,
   H1,
+  Input,
   Paragraph,
   Separator,
+  Spinner,
   Text,
   XStack,
   YStack,
 } from 'tamagui';
 import { useRouter } from 'expo-router';
+import { AvatarImage, AvatarPicker } from '@legacy-sports/shared-components';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   useAuthHandlers,
   useCurrentUserInfo,
 } from '../../common/auth/AuthHooks';
 import { useSubscription } from '../../features/subscription';
+import {
+  useGetUserByIdQuery,
+  useUpdateUserAvatarMutation,
+  useUpdateUsernameMutation,
+} from '../../api/db/graphql.generated';
 
 const BRAND_GOLD_LIGHT = '#C5A55A';
 const BRAND_NAVY_LIGHT = '#2C4A7C';
 const BRAND_SEAM_RED = '#C41E3A';
+
+const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{3,50}$/;
 
 function getAccessLevelLabel(level: string): string {
   switch (level) {
@@ -38,6 +49,26 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
+  // Fetch full user data (including avatarUrl)
+  const userId = currentUser?.id;
+  const { data: userData, refetch: refetchUser } = useGetUserByIdQuery({
+    variables: { id: userId ?? 0 },
+    skip: !userId,
+  });
+  const user = userData?.user;
+
+  // Username editing state
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [updateUsername, { loading: updatingUsername }] =
+    useUpdateUsernameMutation();
+
+  // Avatar editing state
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [updateAvatar, { loading: updatingAvatar }] =
+    useUpdateUserAvatarMutation();
+
   const handleLogout = () => {
     setLoggingOut(true);
     try {
@@ -47,10 +78,49 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
     }
   };
 
-  const userName = currentUser?.username ?? '';
-  const userEmail = currentUser?.email ?? '';
-  const isAdmin = currentUser?.isAdmin ?? false;
-  const userId = currentUser?.id;
+  const handleStartEditUsername = useCallback(() => {
+    setUsernameInput(user?.username ?? currentUser?.username ?? '');
+    setUsernameError(null);
+    setEditingUsername(true);
+  }, [user?.username, currentUser?.username]);
+
+  const handleSaveUsername = useCallback(async () => {
+    const trimmed = usernameInput.trim();
+    if (!USERNAME_REGEX.test(trimmed)) {
+      setUsernameError(
+        'Username must be 3-50 characters: letters, numbers, _, -, or .',
+      );
+      return;
+    }
+    try {
+      await updateUsername({ variables: { username: trimmed } });
+      await refetchUser();
+      setEditingUsername(false);
+      setUsernameError(null);
+    } catch (err) {
+      LOGGER.error('Failed to update username:', String(err));
+      setUsernameError('Failed to update username. It may already be taken.');
+    }
+  }, [usernameInput, updateUsername, refetchUser]);
+
+  const handleAvatarSelect = useCallback(
+    async (url: string | null) => {
+      try {
+        await updateAvatar({ variables: { avatarUrl: url } });
+        await refetchUser();
+        setShowAvatarPicker(false);
+      } catch (err) {
+        LOGGER.error('Failed to update avatar:', String(err));
+      }
+    },
+    [updateAvatar, refetchUser],
+  );
+
+  const userName = user?.username ?? currentUser?.username ?? '';
+  const userEmail = user?.email ?? currentUser?.email ?? '';
+  const isAdmin =
+    user?.accessLevel === 'admin' || (currentUser?.isAdmin ?? false);
+  const avatarUrl = user?.avatarUrl ?? null;
 
   return (
     <ScrollView>
@@ -99,7 +169,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               justifyContent="center"
               backgroundColor="$color2"
             >
-              <Text fontSize={16}>👤</Text>
+              <Text fontSize={16}>{'\u{1F464}'}</Text>
             </YStack>
             <YStack flex={1}>
               <Paragraph size="$4" color="$color" fontWeight="600">
@@ -114,27 +184,28 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
           <YStack padding="$5" gap="$4">
             {/* Avatar + Name Summary */}
             <XStack gap="$4" alignItems="center">
-              <YStack
-                width={72}
-                height={72}
-                borderRadius="$12"
-                alignItems="center"
-                justifyContent="center"
-                borderWidth={3}
-                borderColor={BRAND_NAVY_LIGHT}
-                backgroundColor={BRAND_NAVY_LIGHT}
-                flexShrink={0}
-              >
-                <Text
-                  style={{
-                    fontSize: 28,
-                    fontWeight: '700',
-                    color: 'white',
-                    lineHeight: 32,
-                  }}
+              <YStack onPress={() => setShowAvatarPicker(!showAvatarPicker)}>
+                <AvatarImage
+                  url={avatarUrl}
+                  username={userName}
+                  size={72}
+                  borderRadius={36}
+                />
+                <YStack
+                  position="absolute"
+                  bottom={0}
+                  right={0}
+                  width={24}
+                  height={24}
+                  borderRadius={12}
+                  backgroundColor={BRAND_NAVY_LIGHT}
+                  alignItems="center"
+                  justifyContent="center"
+                  borderWidth={2}
+                  borderColor="$background"
                 >
-                  {userName.charAt(0).toUpperCase() || '?'}
-                </Text>
+                  <Text fontSize={12}>{'\u270F\uFE0F'}</Text>
+                </YStack>
               </YStack>
               <YStack gap="$2" flex={1}>
                 <Text
@@ -174,11 +245,31 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               </YStack>
             </XStack>
 
+            {/* Avatar Picker (expandable) */}
+            {showAvatarPicker && (
+              <YStack
+                borderRadius="$5"
+                borderWidth={1}
+                borderColor="$borderColor"
+                overflow="hidden"
+              >
+                <AvatarPicker
+                  currentUrl={avatarUrl}
+                  variant="user"
+                  onSelect={(url: string | null) =>
+                    void handleAvatarSelect(url)
+                  }
+                  loading={updatingAvatar}
+                  username={userName}
+                />
+              </YStack>
+            )}
+
             <Separator />
 
-            {/* Fields */}
-            <YStack gap="$3">
-              <XStack alignItems="center" gap="$4">
+            {/* Username field */}
+            <YStack gap="$2">
+              <XStack alignItems="center" justifyContent="space-between">
                 <Paragraph
                   size="$3"
                   color="$colorPress"
@@ -187,61 +278,90 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                 >
                   Username
                 </Paragraph>
-                <Paragraph size="$4" color="$color" flex={1}>
-                  {userName}
-                </Paragraph>
+                {editingUsername ? (
+                  <XStack gap="$2" flex={1} alignItems="center">
+                    <Input
+                      flex={1}
+                      size="$3"
+                      value={usernameInput}
+                      onChangeText={setUsernameInput}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      placeholder="username"
+                    />
+                    <Button
+                      size="$2"
+                      theme="blue"
+                      onPress={() => void handleSaveUsername()}
+                      disabled={updatingUsername}
+                      icon={
+                        updatingUsername ? <Spinner size="small" /> : undefined
+                      }
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="$2"
+                      chromeless
+                      onPress={() => setEditingUsername(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </XStack>
+                ) : (
+                  <XStack flex={1} alignItems="center" gap="$2">
+                    <Paragraph size="$4" color="$color" flex={1}>
+                      {userName}
+                    </Paragraph>
+                    <Button
+                      size="$2"
+                      chromeless
+                      color={BRAND_NAVY_LIGHT}
+                      onPress={handleStartEditUsername}
+                    >
+                      Edit
+                    </Button>
+                  </XStack>
+                )}
               </XStack>
-              {userEmail ? (
-                <XStack alignItems="center" gap="$4">
-                  <Paragraph
-                    size="$3"
-                    color="$colorPress"
-                    fontWeight="500"
-                    width={120}
-                  >
-                    Email
-                  </Paragraph>
-                  <Paragraph size="$4" color="$color" flex={1}>
-                    {userEmail}
-                  </Paragraph>
-                </XStack>
-              ) : null}
-              {userId != null ? (
-                <XStack alignItems="center" gap="$4">
-                  <Paragraph
-                    size="$3"
-                    color="$colorPress"
-                    fontWeight="500"
-                    width={120}
-                  >
-                    User ID
-                  </Paragraph>
-                  <Paragraph size="$4" color="$colorPress" flex={1}>
-                    #{userId}
-                  </Paragraph>
-                </XStack>
-              ) : null}
+              {usernameError && (
+                <Text fontSize="$2" color="$red10" paddingLeft={120}>
+                  {usernameError}
+                </Text>
+              )}
             </YStack>
 
-            {/* Read-only notice */}
-            <XStack
-              alignItems="flex-start"
-              gap="$3"
-              padding="$4"
-              borderRadius="$5"
-              borderWidth={1}
-              borderColor={`${BRAND_NAVY_LIGHT}55`}
-              backgroundColor={`${BRAND_NAVY_LIGHT}1A`}
-            >
-              <Text fontSize={16} style={{ flexShrink: 0 }}>
-                ℹ️
-              </Text>
-              <Paragraph size="$3" color="$colorPress" flex={1}>
-                Profile details are managed through your Google account. To
-                update your name or profile photo, visit your Google Account
-                settings.
-              </Paragraph>
-            </XStack>
+            {/* Email field (read-only) */}
+            {userEmail ? (
+              <XStack alignItems="center" gap="$4">
+                <Paragraph
+                  size="$3"
+                  color="$colorPress"
+                  fontWeight="500"
+                  width={120}
+                >
+                  Email
+                </Paragraph>
+                <Paragraph size="$4" color="$color" flex={1}>
+                  {userEmail}
+                </Paragraph>
+              </XStack>
+            ) : null}
+            {userId != null ? (
+              <XStack alignItems="center" gap="$4">
+                <Paragraph
+                  size="$3"
+                  color="$colorPress"
+                  fontWeight="500"
+                  width={120}
+                >
+                  User ID
+                </Paragraph>
+                <Paragraph size="$4" color="$colorPress" flex={1}>
+                  #{userId}
+                </Paragraph>
+              </XStack>
+            ) : null}
           </YStack>
         </YStack>
 
@@ -268,7 +388,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               justifyContent="center"
               backgroundColor="$color2"
             >
-              <Text fontSize={16}>🔒</Text>
+              <Text fontSize={16}>{'\u{1F512}'}</Text>
             </YStack>
             <YStack flex={1}>
               <Paragraph size="$4" color="$color" fontWeight="600">
@@ -291,7 +411,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                 Sign-in Method
               </Paragraph>
               <XStack alignItems="center" gap="$2">
-                <Text fontSize={16}>🌐</Text>
+                <Text fontSize={16}>{'\u{1F310}'}</Text>
                 <Paragraph size="$4" color="$color">
                   Google OAuth
                 </Paragraph>
@@ -346,7 +466,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               justifyContent="center"
               backgroundColor={isPremium ? `${BRAND_GOLD_LIGHT}33` : '$color2'}
             >
-              <Text fontSize={16}>{isPremium ? '⭐' : '💎'}</Text>
+              <Text fontSize={16}>{isPremium ? '\u2B50' : '\u{1F48E}'}</Text>
             </YStack>
             <YStack flex={1}>
               <Paragraph size="$4" color="$color" fontWeight="600">
@@ -355,11 +475,11 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               <Paragraph size="$2" color="$colorPress">
                 {isPremium
                   ? `Premium (${tier === 'annual' ? 'Annual' : 'Monthly'})`
-                  : 'Free plan — tap to upgrade'}
+                  : 'Free plan \u2014 tap to upgrade'}
               </Paragraph>
             </YStack>
             <Text fontSize="$4" color="$colorSubtle">
-              ›
+              {'\u203A'}
             </Text>
           </XStack>
         </YStack>
@@ -387,7 +507,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               justifyContent="center"
               backgroundColor={`${BRAND_SEAM_RED}1A`}
             >
-              <Text fontSize={16}>🚪</Text>
+              <Text fontSize={16}>{'\u{1F6AA}'}</Text>
             </YStack>
             <YStack flex={1}>
               <Paragraph size="$4" fontWeight="600" color={BRAND_SEAM_RED}>
