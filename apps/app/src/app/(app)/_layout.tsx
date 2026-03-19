@@ -10,6 +10,9 @@ import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import BaseballHome from './baseball';
 import DraftBoardPage from './DraftBoardPage';
 import FootballHome from './football';
+import SeasonDraftGamesScreen from './season-draft';
+import SeasonDraftGameScreen from './season-draft/[gameId]';
+import SeasonDraftGameCreateScreen from './season-draft/create';
 import PlayerDetail from './PlayerDetail';
 import PlayerStats from './PlayerStats';
 import ViewCareerStats from './view_career_stats';
@@ -44,6 +47,9 @@ export type AppDrawerParamList = {
   'baseball/matchup': { matchupId: string; leagueId: string };
   'football/index': undefined;
   DraftBoardPage: undefined;
+  'season-draft/index': undefined;
+  'season-draft/[gameId]': { gameId: string };
+  'season-draft/create': undefined;
   FreeAgents: undefined;
   PlayerStats: undefined;
   PlayerDetail: { playerId: string; playerName: string };
@@ -97,6 +103,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'DraftBoardPage',
     title: 'Draft Board',
+  },
+  {
+    route: 'season-draft/index',
+    title: 'Season Draft Games',
   },
   {
     route: 'FreeAgents',
@@ -247,6 +257,27 @@ export default function Layout() {
             name="DraftBoardPage"
             options={{ title: 'Draft Board' }}
             component={DraftBoardPage}
+          />
+          <Screen
+            name="season-draft/index"
+            options={{ title: 'Season Draft Games' }}
+            component={SeasonDraftGamesScreen}
+          />
+          <Screen
+            name="season-draft/[gameId]"
+            options={{
+              drawerLabel: () => null,
+              title: 'Season Draft Game',
+            }}
+            component={SeasonDraftGameScreen}
+          />
+          <Screen
+            name="season-draft/create"
+            options={{
+              drawerLabel: () => null,
+              title: 'Create Season Draft Game',
+            }}
+            component={SeasonDraftGameCreateScreen}
           />
           <Screen
             name="FreeAgents"
