@@ -16,30 +16,20 @@
  *   - Commissioner / General Manager → allowed for their league only
  */
 
-import {
-  createBadgeService,
-  filterPlayerIdsByLeagueEligibility,
-  PublicSchema,
-} from '@legacy-sports/db-client';
+import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { shuffleArray } from '@legacy-sports/utils';
-import { getDbOptions } from '@legacy-sports/utils/node';
-import { and, count, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, count, eq, sql } from 'drizzle-orm';
 
 import {
-  ALLOWED_POSITIONS_FOR_AUTO_PICK,
   commitDraftPick,
-  enableAutoPickForUnmanagedTeams,
   getCurrentDraftPickInfo,
-  getFirstQueuedPlayerForTeam,
   getUnfilledPositionTypes,
 } from './helpers';
+import { fetchCandidatePool } from './candidate-pool';
+import { selectAutoPickPlayer } from './auto-pick-scorer';
+import { executePickEffects } from './draft-pick-effects';
 import { builder, type Context } from '../builder';
-import { createAllMatchupsForLeague } from '../matchups/mutations';
-import { insertActivityLog } from '../../services/activity-log';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
-
-const badgeService = createBadgeService(getDbOptions());
 
 /**
  * Lighter auth check for the draft auto-pick nudge.
@@ -182,17 +172,9 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
             result.draftsProcessed++;
 
             // Inner loop: chain through consecutive expired deadlines.
-            // When pickTimeLimitSeconds < the EventBridge interval, multiple
-            // deadlines may have expired. Process them all in one invocation,
-            // capped to stay within Lambda timeout limits.
-            //
             // Time-budget guard: each auto-pick spans a DB transaction that
-            // can take several seconds (eligibility + stats queries across
-            // 23 k players). The Lambda timeout is 30 s, so we stop chaining
-            // at 20 s to avoid timing out mid-transaction, which would abort
-            // the transaction and leave the connection in a bad state for the
-            // next invocation. EventBridge (every 60 s) or the next client
-            // nudge will resume where we left off.
+            // can take several seconds. The Lambda timeout is 30 s, so we
+            // stop chaining at 20 s to avoid timing out mid-transaction.
             const PICK_LOOP_BUDGET_MS = 20_000;
             const loopStartTime = Date.now();
             const MAX_AUTO_PICKS_PER_DRAFT = 100;
@@ -208,297 +190,22 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 break;
               }
 
-              // ─── Phase 1: Non-locking pre-computation ─────────────────────────────────
-              // Check deadline and fetch candidate pool BEFORE acquiring the row lock.
-              // This moves the expensive read queries (23 k-row player join, eligibility
-              // filters, stats for ~1000 candidates) off the critical path, dramatically
-              // reducing lock hold time and contention during live drafts.
-
-              // Fast bail-out: check deadline without acquiring any lock
-              const preCheckRows = await context.db.execute(
-                sql`SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId}`,
+              // ─── Phase 1: Non-locking pre-computation ─────────────────────
+              const candidatePool = await fetchCandidatePool(
+                context.db,
+                draftId,
+                draftLeagueId,
               );
-              const preCheckDraft = preCheckRows.rows[0] as
-                | {
-                    id: number;
-                    league_id: number;
-                    current_pick: number;
-                    current_pick_deadline: Date | null;
-                  }
-                | undefined;
+              if (!candidatePool) break;
 
-              if (!preCheckDraft) {
-                LOGGER.warn(
-                  `[autoProcessDraftPicks] Draft ${draftId} not found in pre-check`,
-                );
-                break;
-              }
+              const { league } = candidatePool;
 
-              const preCheckNow = new Date();
-              if (
-                !preCheckDraft.current_pick_deadline ||
-                new Date(preCheckDraft.current_pick_deadline) > preCheckNow
-              ) {
-                LOGGER.info(
-                  `[autoProcessDraftPicks] Draft ${draftId} deadline not expired in pre-check — stopping loop`,
-                );
-                break;
-              }
-
-              // League status check outside transaction — fail fast without holding the row lock
-              const [leaguePre] = await context.db
-                .select()
-                .from(PublicSchema.leagues)
-                .where(eq(PublicSchema.leagues.id, draftLeagueId))
-                .limit(1);
-
-              if (!leaguePre || leaguePre.draftStatus !== 'in-progress') {
-                LOGGER.info(
-                  `[autoProcessDraftPicks] League ${draftLeagueId} is not in-progress, skipping draft ${draftId}`,
-                );
-                break;
-              }
-
-              // Matchup settings used by both candidate selection and detailed scoring
-              const gamesPerMatchup = leaguePre.gamesPerMatchup ?? 5;
-              const spStartsPerMatchup = leaguePre.spStartsPerMatchup ?? 1;
-
-              // 1. Fetch the top 1000 undrafted candidates pre-sorted by projected
-              //    fantasy points per matchup. Batting/fielding are scaled by
-              //    gamesPerMatchup; pitching by spStartsPerMatchup so that
-              //    position players and pitchers are ranked by their actual
-              //    expected matchup contribution.
-              //    Limiting the candidate pool here avoids passing 23 k+ player
-              //    IDs as array parameters to the eligibility filters and the
-              //    scoring query, which previously caused ~10 s per pick and
-              //    Lambda timeouts. 1000 candidates gives ample coverage for all
-              //    roster positions while reducing downstream query cost by ~23×.
-              //
-              //    NOT EXISTS is used instead of NOT IN to avoid the null-safety
-              //    footgun (NOT IN returns no rows if the subquery contains a
-              //    NULL) and to allow the planner to use the unique index on
-              //    draft_picks(draft_id, player_id) for the anti-join.
-              const undraftedRows = await context.db.execute(
-                sql`SELECT p.id,
-                    (
-                      CASE WHEN COALESCE(cb.g, 0) > 0 THEN
-                        (COALESCE(cb.h,0)*1.0 + COALESCE(cb.doubles,0)*2.0 +
-                         COALESCE(cb.triples,0)*3.0 + COALESCE(cb.hr,0)*4.0 +
-                         COALESCE(cb.r,0)*1.0 + COALESCE(cb.rbi,0)*1.0 +
-                         COALESCE(cb.sb,0)*2.0 + COALESCE(cb.cs,0)*-1.0 +
-                         COALESCE(cb.hbp,0)*1.0 + COALESCE(cb.so,0)*-0.5
-                        ) / cb.g * ${gamesPerMatchup}
-                      ELSE 0 END
-                      +
-                      CASE WHEN COALESCE(cp.g, 0) > 0 THEN
-                        (COALESCE(cp.w,0)*5.0 + COALESCE(cp.l,0)*-2.0 +
-                         COALESCE(cp.sv,0)*5.0 + COALESCE(cp.so,0)*1.0 +
-                         COALESCE(cp.outs_recorded,0)*1.0 + COALESCE(cp.h,0)*-1.0 +
-                         COALESCE(cp.er,0)*-2.0 + COALESCE(cp.bb,0)*-1.0
-                        ) / cp.g * ${spStartsPerMatchup}
-                      ELSE 0 END
-                      +
-                      CASE WHEN COALESCE(cf.g, 0) > 0 THEN
-                        COALESCE(cf.e_def,0) * -1.0 / cf.g * ${gamesPerMatchup}
-                      ELSE 0 END
-                    ) AS fpg
-                  FROM players p
-                  LEFT JOIN career_batting cb ON cb.player_id = p.id
-                  LEFT JOIN career_pitching cp ON cp.player_id = p.id
-                  LEFT JOIN career_fielding cf ON cf.player_id = p.id
-                  WHERE NOT EXISTS (
-                    SELECT 1 FROM draft_picks dp
-                    WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
-                  )
-                  ORDER BY fpg DESC
-                  LIMIT 1000`,
-              );
-              const undraftedIds = undraftedRows.rows.map(
-                (r) => r.id as number,
-              );
-
-              // 2. Apply all eligibility filters via the shared DraftUtils function
-              //    (playerPool, minCareerGames, minCareerSeasons, hofOnly, eraFilter)
-              const eligibilityResult =
-                await filterPlayerIdsByLeagueEligibility(
-                  context.db,
-                  undraftedIds,
-                  {
-                    playerPool: leaguePre.playerPool,
-                    minCareerGames: leaguePre.minCareerGames ?? 0,
-                    minCareerSeasons: leaguePre.minCareerSeasons ?? 0,
-                    hofOnly: leaguePre.hofOnly ?? false,
-                    eraFilter: leaguePre.eraFilter ?? 'all',
-                    customEraStartYear: leaguePre.customEraStartYear ?? null,
-                    customEraEndYear: leaguePre.customEraEndYear ?? null,
-                  },
-                );
-              // Filter preserves FPG-descending order from undraftedIds
-              const eligibleIds = undraftedIds.filter((id) =>
-                eligibilityResult.eligibleIds.has(id),
-              );
-
-              if (eligibleIds.length === 0) {
-                throw new Error(`No available players for draft ${draftId}`);
-              }
-
-              // 3. Pre-compute per-player stats and positions for the candidate pool.
-              //    Done outside the lock so this expensive join doesn't hold the row lock.
-              //
-              // Use pre-computed per-category PPG from player_scoring_cache (LS-902)
-              // instead of 3 LEFT JOINs to career stat materialized views.
-              // Projected matchup pts = batting_ppg × games per matchup
-              //                       + pitching_ppg × SP starts per matchup
-              //                       + fielding_ppg × games per matchup
-              const statsRows = await context.db.execute(
-                sql`SELECT
-                  p.id AS player_id,
-                  (
-                    COALESCE(cs.batting_ppg, 0)  * ${gamesPerMatchup} +
-                    COALESCE(cs.pitching_ppg, 0) * ${spStartsPerMatchup} +
-                    COALESCE(cs.fielding_ppg, 0) * ${gamesPerMatchup}
-                  ) AS projected_fpg
-                FROM players p
-                LEFT JOIN public.player_scoring_cache cs
-                  ON cs.player_id = p.id AND cs.league_id IS NULL
-                WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
-                ORDER BY projected_fpg DESC`,
-              );
-
-              // Fetch position eligibility from the mat view (same source of truth as the UI)
-              const positionRows = await context.db
-                .select({
-                  playerId: PublicSchema.playerEligiblePositions.playerId,
-                  position: PublicSchema.playerEligiblePositions.position,
-                })
-                .from(PublicSchema.playerEligiblePositions)
-                .where(
-                  inArray(
-                    PublicSchema.playerEligiblePositions.playerId,
-                    eligibleIds,
-                  ),
-                );
-
-              const eligiblePositionsByPlayer = new Map<number, string[]>();
-              for (const row of positionRows) {
-                const positions =
-                  eligiblePositionsByPlayer.get(row.playerId) ?? [];
-                positions.push(row.position);
-                eligiblePositionsByPlayer.set(row.playerId, positions);
-              }
-
-              // Build player info map: id → { fpg, positions } (passed into tx via closure)
-              const playerDraftInfo = new Map<
-                number,
-                { fpg: number; positions: string[] }
-              >();
-              // Ranked IDs in descending FPG order (statsRows already sorted)
-              const rankedEligibleIds: number[] = [];
-              for (const row of statsRows.rows) {
-                const playerId = row.player_id as number;
-                playerDraftInfo.set(playerId, {
-                  fpg: Number(row.projected_fpg) || 0,
-                  positions: eligiblePositionsByPlayer.get(playerId) ?? [],
-                });
-                rankedEligibleIds.push(playerId);
-              }
-              // Append any eligibleIds not in statsRows (no career stats — final fallback)
-              for (const id of eligibleIds) {
-                if (!playerDraftInfo.has(id)) {
-                  rankedEligibleIds.push(id);
-                  playerDraftInfo.set(id, { fpg: 0, positions: [] });
-                }
-              }
-
-              // ─── Pre-compute bench versatility (Phase 1) ────────────────────────────
-              // Two focused queries replace the previous single query that contained a
-              // correlated subquery (total_slots) executing once per result row:
-              //   1. total_slots: simple COUNT(*) scalar, runs once.
-              //   2. slots_coverable: uses an eligible_players CTE to pre-filter
-              //      player_eligible_positions before the 3-way join, shrinking the
-              //      dataset the planner joins across league_positions + position_mapping.
-              // Combined with the pre-computed per-matchup FPG to rank bench candidates.
-
-              // Step 1: total roster slots for this league (scalar, no correlated subquery)
-              const totalSlotsResult = await context.db.execute(
-                sql`SELECT COUNT(*)::int AS total_slots
-                    FROM league_positions
-                    WHERE league_id = ${draftLeagueId}`,
-              );
-              const benchTotalSlots = Number(
-                totalSlotsResult.rows[0]?.total_slots ?? 0,
-              );
-
-              // Step 2: slots_coverable per eligible player (no correlated subquery)
-              const benchVersatilityRows = await context.db.execute(
-                sql`WITH position_mapping(slot_type, stat_pos) AS (
-                  VALUES
-                    ('1B'::text, '1B'::text),
-                    ('2B', '2B'), ('3B', '3B'), ('C', 'C'),
-                    ('CF', 'CF'), ('LF', 'LF'), ('RF', 'RF'), ('SS', 'SS'),
-                    ('SP', 'SP'), ('SP', 'P'), ('RP', 'RP'), ('RP', 'P'),
-                    ('OF', 'LF'), ('OF', 'RF'), ('OF', 'CF'),
-                    ('IF', '1B'), ('IF', '2B'), ('IF', '3B'), ('IF', 'SS'),
-                    ('DH', '1B'), ('DH', '2B'), ('DH', '3B'), ('DH', 'SS'),
-                    ('DH', 'LF'), ('DH', 'RF'), ('DH', 'CF'), ('DH', 'C'), ('DH', 'DH'),
-                    ('XDH', 'DH')
-                ),
-                eligible_players AS (
-                  SELECT player_id, position
-                  FROM player_eligible_positions
-                  WHERE player_id = ANY(${sql.param(eligibleIds)}::integer[])
-                )
-                SELECT
-                  ep.player_id,
-                  COUNT(DISTINCT lp.id)::int AS slots_coverable
-                FROM league_positions lp
-                JOIN position_mapping pm ON pm.slot_type = lp.position_type::text
-                JOIN eligible_players ep ON ep.position = pm.stat_pos
-                WHERE lp.league_id = ${draftLeagueId}
-                GROUP BY ep.player_id`,
-              );
-
-              // Combine DB-computed slot counts with in-memory FPG to rank bench picks
-              const slotsCoverableMap = new Map<number, number>();
-              for (const row of benchVersatilityRows.rows) {
-                slotsCoverableMap.set(
-                  row.player_id as number,
-                  Number(row.slots_coverable),
-                );
-              }
-
-              let bestBenchPick:
-                | {
-                    playerId: number;
-                    fpg: number;
-                    slotsCoverable: number;
-                    totalSlots: number;
-                  }
-                | undefined;
-              let bestBenchScore = -Infinity;
-              for (const [id, info] of playerDraftInfo) {
-                const slotsCoverable = slotsCoverableMap.get(id) ?? 0;
-                const benchScore = info.fpg * (1 + 0.15 * slotsCoverable);
-                if (benchScore > bestBenchScore) {
-                  bestBenchScore = benchScore;
-                  bestBenchPick = {
-                    playerId: id,
-                    fpg: info.fpg,
-                    slotsCoverable,
-                    totalSlots: benchTotalSlots,
-                  };
-                }
-              }
-
-              // ─── Phase 2: Short locked write transaction ─────────────────────────────
-              // By this point the expensive read work is done. The transaction only needs
-              // to: acquire the row lock, re-validate the deadline (TOCTOU guard), score
-              // players from the pre-computed map (pure in-memory), and write the pick.
+              // ─── Phase 2: Short locked write transaction ──────────────────
               const pickResult = await context.db.transaction(async (tx) => {
                 // Surface lock waits as errors rather than silent hangs
                 await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
-                // Acquire row-level lock — narrow SELECT avoids transferring unused columns
+                // Acquire row-level lock
                 const draftRows = await tx.execute(
                   sql`SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId} FOR UPDATE`,
                 );
@@ -515,8 +222,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   throw new Error(`Draft ${draftId} not found`);
                 }
 
-                // Re-check deadline inside transaction — may have been picked
-                // by a user, or the chained deadline may still be in the future.
+                // Re-check deadline inside transaction (TOCTOU guard)
                 const checkNow = new Date();
                 if (
                   !draft.current_pick_deadline ||
@@ -528,20 +234,17 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   return null;
                 }
 
-                // Capture the expired deadline for chaining — the NEXT deadline
-                // is computed from this value (not from wall-clock now) so the
-                // intended cadence is preserved when EventBridge fires late.
+                // Capture the expired deadline for chaining
                 const expiredDeadline = new Date(draft.current_pick_deadline);
 
-                // Re-validate league status inside the transaction (guards against race
-                // between the pre-check outside and this lock acquisition).
-                const [league] = await tx
+                // Re-validate league status inside the transaction
+                const [txLeague] = await tx
                   .select()
                   .from(PublicSchema.leagues)
                   .where(eq(PublicSchema.leagues.id, draftLeagueId))
                   .limit(1);
 
-                if (!league || league.draftStatus !== 'in-progress') {
+                if (!txLeague || txLeague.draftStatus !== 'in-progress') {
                   LOGGER.info(
                     `[autoProcessDraftPicks] League ${draftLeagueId} is not in-progress, skipping draft ${draftId}`,
                   );
@@ -561,7 +264,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   return null;
                 }
 
-                // Determine unfilled roster positions for the current team (lightweight reads)
+                // Determine unfilled roster positions for the current team
                 const unfilledPositionTypes = await getUnfilledPositionTypes(
                   tx,
                   draftId,
@@ -575,7 +278,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     draftId,
                     teamId: currentPickInfo.teamId,
                     unfilledPositionTypes,
-                    eligibleCount: rankedEligibleIds.length,
+                    eligibleCount: candidatePool.rankedEligibleIds.length,
                     eligibilityFilters: {
                       playerPool: league.playerPool,
                       minCareerGames: league.minCareerGames,
@@ -586,185 +289,18 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   },
                 );
 
-                let autoPlayerId: number | undefined;
-                let autoPickReason = '';
-
-                // ── Draft queue check (LS-473) ──────────────────────────────
-                // Prefer the user's queued player over the FPG algorithm.
-                // getFirstQueuedPlayerForTeam returns the first undrafted entry.
-                const eligibleIdSet = new Set(eligibleIds);
-                const queuedPlayerId = await getFirstQueuedPlayerForTeam(
-                  tx,
-                  draftId,
-                  currentPickInfo.teamId,
-                );
-                if (
-                  queuedPlayerId !== null &&
-                  eligibleIdSet.has(queuedPlayerId)
-                ) {
-                  autoPlayerId = queuedPlayerId;
-                  autoPickReason = `Draft queue pick — player ${queuedPlayerId} (user's next queued selection)`;
-                  LOGGER.info(
-                    '[LS-473] autoProcessDraftPicks: using draft queue selection',
-                    {
-                      draftId,
-                      teamId: currentPickInfo.teamId,
-                      playerId: autoPlayerId,
-                    },
-                  );
-                }
-
-                // ── Smart auto-pick: projected fantasy points + positional scarcity ──
-                // Score the pre-computed candidate pool entirely in-memory — no DB queries.
-                // Only runs if the draft queue yielded no eligible player.
-                if (
-                  autoPlayerId === undefined &&
-                  unfilledPositionTypes.length > 0
-                ) {
-                  // Compute positional scarcity: scarcer positions → higher boost
-                  const totalEligible = Math.max(playerDraftInfo.size, 1);
-                  const positionCandidateCounts = new Map<string, number>();
-                  for (const posType of unfilledPositionTypes) {
-                    const allowedStatPositions =
-                      ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [posType];
-                    let posCount = 0;
-                    for (const [, info] of playerDraftInfo) {
-                      if (
-                        allowedStatPositions.some((sp) =>
-                          info.positions.includes(sp),
-                        )
-                      ) {
-                        posCount++;
-                      }
-                    }
-                    positionCandidateCounts.set(posType, Math.max(posCount, 1));
-                  }
-
-                  // Score each player: projected matchup pts × scarcity multiplier
-                  // Players matching scarcer unfilled positions get a boost;
-                  // players not matching any unfilled position get a penalty.
-                  let bestScore = -Infinity;
-
-                  for (const [id, info] of playerDraftInfo) {
-                    let scarcityMultiplier = 0.25; // Penalty for not filling any need
-                    let matchesUnfilled = false;
-                    let bestPosition = '';
-
-                    for (const posType of unfilledPositionTypes) {
-                      const allowedStatPositions =
-                        ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [posType];
-                      if (
-                        allowedStatPositions.some((sp) =>
-                          info.positions.includes(sp),
-                        )
-                      ) {
-                        matchesUnfilled = true;
-                        const posCount =
-                          positionCandidateCounts.get(posType) ?? totalEligible;
-                        // sqrt-based scarcity: moderate boost, capped at 5×
-                        const posScarcity = Math.min(
-                          Math.sqrt(totalEligible / posCount),
-                          5.0,
-                        );
-                        if (posScarcity > scarcityMultiplier) {
-                          scarcityMultiplier = posScarcity;
-                          bestPosition = posType;
-                        }
-                      }
-                    }
-
-                    const draftScore = info.fpg * scarcityMultiplier;
-                    if (draftScore > bestScore) {
-                      bestScore = draftScore;
-                      autoPlayerId = id;
-                      autoPickReason = matchesUnfilled
-                        ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected matchup pts (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
-                        : `Best available (bench) — ${info.fpg.toFixed(1)} projected matchup pts`;
-                    }
-                  }
-
-                  LOGGER.info(
-                    '[autoProcessDraftPicks] Smart auto-pick selected',
-                    {
-                      draftId,
-                      playerId: autoPlayerId,
-                      reason: autoPickReason,
-                      unfilledPositionTypes,
-                      positionScarcity: Object.fromEntries(
-                        positionCandidateCounts,
-                      ),
-                    },
-                  );
-                } else if (autoPlayerId === undefined) {
-                  // No unfilled starting positions — use the pre-computed bench
-                  // pick (slot-coverage scored at the DB level in Phase 1).
-                  if (bestBenchPick) {
-                    autoPlayerId = bestBenchPick.playerId;
-                    autoPickReason = `Best available (bench) — ${bestBenchPick.fpg.toFixed(1)} projected matchup pts, starts in ${bestBenchPick.slotsCoverable}/${bestBenchPick.totalSlots} slots`;
-                    LOGGER.info(
-                      '[autoProcessDraftPicks] Auto-pick for bench (versatility + matchup pts)',
-                      {
-                        draftId,
-                        playerId: autoPlayerId,
-                        reason: autoPickReason,
-                        totalSlots: bestBenchPick.totalSlots,
-                      },
-                    );
-                  }
-                }
-
-                // Final fallback (should rarely happen — only if no stats exist)
-                if (autoPlayerId === undefined) {
-                  autoPlayerId = eligibleIds[0];
-                  autoPickReason =
-                    'Fallback selection (no career stats available)';
-                  LOGGER.info(
-                    '[autoProcessDraftPicks] Using final fallback auto-pick',
-                    { draftId, playerId: autoPlayerId },
-                  );
-                }
-
-                // Guard: the pre-computed top player could have been drafted by a
-                // concurrent pick between Phase 1 and this transaction. Walk the
-                // ranked list to find the first player still available.
-                if (autoPlayerId !== undefined) {
-                  const preferredId = autoPlayerId;
-                  const [alreadyDrafted] = await tx
-                    .select({ playerId: PublicSchema.draftPicks.playerId })
-                    .from(PublicSchema.draftPicks)
-                    .where(
-                      and(
-                        eq(PublicSchema.draftPicks.draftId, draftId),
-                        eq(PublicSchema.draftPicks.playerId, preferredId),
-                      ),
-                    )
-                    .limit(1);
-                  if (alreadyDrafted) {
-                    autoPlayerId = undefined;
-                    for (const candidateId of rankedEligibleIds) {
-                      if (candidateId === preferredId) continue;
-                      const [taken] = await tx
-                        .select({ playerId: PublicSchema.draftPicks.playerId })
-                        .from(PublicSchema.draftPicks)
-                        .where(
-                          and(
-                            eq(PublicSchema.draftPicks.draftId, draftId),
-                            eq(PublicSchema.draftPicks.playerId, candidateId),
-                          ),
-                        )
-                        .limit(1);
-                      if (!taken) {
-                        autoPlayerId = candidateId;
-                        autoPickReason = `${autoPickReason} (fallback: preferred player drafted concurrently)`;
-                        break;
-                      }
-                    }
-                  }
-                }
-
-                if (autoPlayerId === undefined) {
-                  throw new Error(`No available players for draft ${draftId}`);
-                }
+                // Select the best player via the scoring module
+                const { playerId: autoPlayerId, reason: autoPickReason } =
+                  await selectAutoPickPlayer({
+                    tx,
+                    draftId,
+                    eligibleIds: candidatePool.eligibleIds,
+                    playerDraftInfo: candidatePool.playerDraftInfo,
+                    rankedEligibleIds: candidatePool.rankedEligibleIds,
+                    bestBenchPick: candidatePool.bestBenchPick,
+                    currentPickInfo,
+                    unfilledPositionTypes,
+                  });
 
                 // Validate roster limit
                 const [rosterCount] = await tx
@@ -789,10 +325,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   );
                 }
 
-                // Commit the pick: insert pick row, advance draft state, and add player to roster.
-                // commitDraftPick is the single source of truth for all draft-pick DB writes.
-                // Pass deadlineBaseTime = expiredDeadline so the next team gets their full
-                // timer window regardless of when EventBridge actually fired.
+                // Commit the pick: insert pick row, advance draft state, add player to roster.
                 const {
                   draftPick,
                   isDraftComplete,
@@ -810,9 +343,7 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                   deadlineBaseTime: expiredDeadline,
                 });
 
-                // Mark this team as auto-pick going forward since they missed a
-                // pick — subsequent picks will be made instantly on their behalf
-                // without waiting for the deadline to expire (LS-427).
+                // Mark this team as auto-pick going forward (LS-427)
                 await tx
                   .update(PublicSchema.draftTeams)
                   .set({ autoPick: true })
@@ -826,8 +357,8 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                     ),
                   );
 
-                // If the next team has auto-pick enabled, immediately expire their
-                // deadline so the inner loop chains to them right away (LS-427).
+                // If the next team has auto-pick enabled, immediately expire
+                // their deadline so the inner loop chains right away (LS-427).
                 let effectiveNextDeadline = nextDeadline;
                 if (nextPickInfo && !isDraftComplete) {
                   const [nextTeamEntry] = await tx
@@ -880,95 +411,18 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 isDraftComplete: pickResult.isDraftComplete,
               });
 
-              // Send WebSocket notifications (outside transaction)
-              if (notificationService) {
-                await notificationService.notifyDraftPickMade(
-                  draftLeagueId,
-                  draftId,
-                  pickResult.draftPick.id,
-                  pickResult.currentPickInfo.teamId,
-                  pickResult.autoPlayerId,
-                  pickResult.currentPickInfo.round,
-                  pickResult.currentPickInfo.pickNumber,
-                  pickResult.currentPickInfo.overallPick,
-                  pickResult.nextPickInfo
-                    ? {
-                        teamId: pickResult.nextPickInfo.teamId,
-                        round: pickResult.nextPickInfo.round,
-                        pickNumber: pickResult.nextPickInfo.pickNumber,
-                        overallPick: pickResult.nextPickInfo.overallPick,
-                      }
-                    : undefined,
-                  {
-                    wasAutoPick: true,
-                    autoPickReason: pickResult.autoPickReason,
-                    currentPickDeadline:
-                      pickResult.nextDeadline?.toISOString() ?? null,
-                  },
-                );
-
-                if (pickResult.isDraftComplete) {
-                  result.draftsCompleted++;
-                  await notificationService.notifyDraftCompleted(
-                    draftLeagueId,
-                    (row.selection_method as string) ?? 'standard',
-                  );
-                }
-              }
-
-              // Auto-create matchups when draft completes
-              if (pickResult.isDraftComplete) {
-                try {
-                  const matchupResult = await createAllMatchupsForLeague(
-                    context.db,
-                    draftLeagueId,
-                  );
-                  LOGGER.info(
-                    '[autoProcessDraftPicks] Auto-created matchups after draft completion',
-                    {
-                      leagueId: draftLeagueId,
-                      matchupCount: matchupResult.matchupCount,
-                    },
-                  );
-                } catch (matchupError) {
-                  LOGGER.error(
-                    '[autoProcessDraftPicks] Failed to auto-create matchups',
-                    matchupError instanceof Error
-                      ? matchupError
-                      : new Error(String(matchupError)),
-                    { leagueId: draftLeagueId },
-                  );
-                }
-
-                // Evaluate draft badges for all participants (fire-and-forget, non-fatal)
-                badgeService
-                  .evaluateDraftBadges(draftLeagueId)
-                  .catch((err: unknown) => {
-                    LOGGER.warn(
-                      '[autoProcessDraftPicks] Badge evaluation after draft failed (non-fatal)',
-                      { leagueId: draftLeagueId, err },
-                    );
-                  });
-              }
-
-              // Record auto-pick in the activity log (fire-and-forget, non-fatal)
-              void insertActivityLog(
-                { db: context.db },
-                {
-                  leagueId: draftLeagueId,
-                  teamId: pickResult.currentPickInfo.teamId,
-                  actorUserId: null,
-                  eventType: 'draft_pick_made',
-                  payload: {
-                    playerId: pickResult.autoPlayerId,
-                    round: pickResult.currentPickInfo.round,
-                    pickNumber: pickResult.currentPickInfo.pickNumber,
-                    overallPick: pickResult.currentPickInfo.overallPick,
-                    wasAutoPick: true,
-                    autoPickReason: pickResult.autoPickReason,
-                  },
-                },
-              );
+              // Execute post-pick side effects (notifications, matchups, badges, activity log).
+              // Note: draftsCompleted is tracked regardless of notificationService
+              // availability — draft completion is a data event, not a notification event.
+              const effects = await executePickEffects({
+                db: context.db,
+                notificationService: notificationService ?? null,
+                draftLeagueId,
+                draftId,
+                selectionMethod: (row.selection_method as string) ?? 'standard',
+                pickResult,
+              });
+              result.draftsCompleted += effects.draftsCompleted;
 
               // ── Inner-loop control ──────────────────────────────────
               if (pickResult.isDraftComplete) {
@@ -976,7 +430,6 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               }
 
               // If the chained deadline is already expired, pick again now
-              // instead of waiting for the next EventBridge invocation.
               if (
                 pickResult.nextDeadline &&
                 pickResult.nextDeadline <= new Date()
@@ -1020,285 +473,6 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
         const errMsg = error instanceof Error ? error.message : String(error);
         LOGGER.error(
           '[autoProcessDraftPicks] Fatal error',
-          error instanceof Error ? error : new Error(errMsg),
-        );
-        result.errors.push(errMsg);
-        return result;
-      }
-    },
-  }),
-);
-
-// ── Mutation: autoStartScheduledDrafts ───────────────────────────────────────
-// Triggered every minute by EventBridge. Finds all live drafts with
-// `scheduled_at <= now` and `draft_status = 'not-started'`, then initializes
-// them exactly as `initializeDraft` would for live mode:
-//  1. Shuffle & insert draft_teams rows
-//  2. Set draftStartedAt, initial pick deadline
-//  3. Update league draft_status → 'in-progress'
-//  4. Send DRAFT_STARTED WebSocket notification
-//
-// Authorization: system-only (EventBridge API key required).
-
-interface AutoStartScheduledDraftsResultShape {
-  draftsStarted: number;
-  errors: string[];
-}
-
-const AutoStartScheduledDraftsResult =
-  builder.objectRef<AutoStartScheduledDraftsResultShape>(
-    'AutoStartScheduledDraftsResult',
-  );
-
-builder.objectType(AutoStartScheduledDraftsResult, {
-  description: 'Result of the scheduled draft auto-start job',
-  fields: (t) => ({
-    draftsStarted: t.exposeInt('draftsStarted'),
-    errors: t.exposeStringList('errors'),
-  }),
-});
-
-/**
- * Mutation: autoStartScheduledDrafts
- *
- * Finds all drafts whose `scheduled_at` is at or before the current time and
- * whose associated league has `draft_status = 'not-started'`, then starts each
- * one as a live draft.
- *
- * Called by EventBridge every minute alongside `autoProcessDraftPicks`.
- */
-builder.mutationField('autoStartScheduledDrafts', (t) =>
-  t.field({
-    type: AutoStartScheduledDraftsResult,
-    args: {},
-    description:
-      'System-only: start all live drafts whose scheduled_at has arrived. Triggered by EventBridge every minute.',
-    resolve: async (_parent, _args, context) => {
-      // Only EventBridge system requests or admins may invoke this
-      if (!context.isSystemRequest && !context.user?.isAdmin) {
-        throw new Error(
-          'Unauthorized: autoStartScheduledDrafts is a system-only operation.',
-        );
-      }
-
-      LOGGER.info(
-        '[autoStartScheduledDrafts] Scanning for scheduled drafts to start',
-      );
-
-      const result: AutoStartScheduledDraftsResultShape = {
-        draftsStarted: 0,
-        errors: [],
-      };
-
-      try {
-        const now = new Date();
-
-        // Find all drafts with scheduled_at <= now that belong to a not-started league
-        const scheduledDrafts = await context.db
-          .select({
-            draftId: PublicSchema.drafts.id,
-            leagueId: PublicSchema.drafts.leagueId,
-            draftMode: PublicSchema.drafts.draftMode,
-            selectionMethod: PublicSchema.drafts.selectionMethod,
-            draftOrder: PublicSchema.drafts.draftOrder,
-            pickTimeLimitSeconds: PublicSchema.drafts.pickTimeLimitSeconds,
-            scheduledAt: PublicSchema.drafts.scheduledAt,
-          })
-          .from(PublicSchema.drafts)
-          .innerJoin(
-            PublicSchema.leagues,
-            eq(PublicSchema.drafts.leagueId, PublicSchema.leagues.id),
-          )
-          .where(
-            and(
-              lte(PublicSchema.drafts.scheduledAt, now),
-              eq(PublicSchema.leagues.draftStatus, 'not-started'),
-            ),
-          );
-
-        if (scheduledDrafts.length === 0) {
-          LOGGER.info(
-            '[autoStartScheduledDrafts] No scheduled drafts due to start',
-          );
-          return result;
-        }
-
-        LOGGER.info(
-          `[autoStartScheduledDrafts] Found ${scheduledDrafts.length} draft(s) to start`,
-        );
-
-        const notificationService = context.notificationService;
-
-        for (const draft of scheduledDrafts) {
-          const { draftId, leagueId } = draft;
-          try {
-            // Get all teams in the league
-            const teams = await context.db
-              .select({ id: PublicSchema.teams.id })
-              .from(PublicSchema.teams)
-              .where(eq(PublicSchema.teams.leagueId, leagueId));
-
-            if (teams.length < 2) {
-              LOGGER.warn(
-                `[autoStartScheduledDrafts] League ${leagueId} has fewer than 2 teams — skipping`,
-                { leagueId, teamCount: teams.length },
-              );
-              result.errors.push(
-                `League ${leagueId}: fewer than 2 teams, cannot auto-start`,
-              );
-              continue;
-            }
-
-            // Randomize draft order
-            const shuffled = shuffleArray(teams);
-
-            // LS-545 / LS-480: Enable auto-pick for teams without a general manager
-            const autoPickTeamIds = await enableAutoPickForUnmanagedTeams(
-              context.db,
-              leagueId,
-              draftId,
-              shuffled.map((t) => t.id),
-            );
-
-            if (autoPickTeamIds.length > 0) {
-              LOGGER.info(
-                '[autoStartScheduledDrafts] Auto-pick enabled for unmanaged teams',
-                { leagueId, draftId, teamIds: autoPickTeamIds },
-              );
-            }
-
-            const startedAt = new Date();
-            const pickTimeLimit = Number(draft.pickTimeLimitSeconds) || 120;
-            const initialDeadline = new Date(
-              startedAt.getTime() + pickTimeLimit * 1000,
-            );
-
-            // Wrap the multi-step write sequence in a transaction so a
-            // mid-flight failure cannot leave draft state inconsistent.
-            await context.db.transaction(async (tx) => {
-              // Clear any stale draft_teams and draft_picks from previous runs
-              await tx
-                .delete(PublicSchema.draftTeams)
-                .where(eq(PublicSchema.draftTeams.draftId, draftId));
-              await tx
-                .delete(PublicSchema.draftPicks)
-                .where(eq(PublicSchema.draftPicks.draftId, draftId));
-
-              // Insert draft teams in randomized order
-              await tx.insert(PublicSchema.draftTeams).values(
-                shuffled.map((team, index) => ({
-                  draftId,
-                  teamId: team.id,
-                  leagueId,
-                  draftOrder: index + 1,
-                })),
-              );
-
-              // Update the draft record with started timestamps + first pick deadline
-              await tx
-                .update(PublicSchema.drafts)
-                .set({
-                  draftStartedAt: startedAt,
-                  currentPick: 0,
-                  currentPickDeadline: initialDeadline,
-                  updatedAt: startedAt,
-                })
-                .where(eq(PublicSchema.drafts.id, draftId));
-
-              // Update league status
-              await tx
-                .update(PublicSchema.leagues)
-                .set({ draftStatus: 'in-progress' })
-                .where(eq(PublicSchema.leagues.id, leagueId));
-            });
-
-            // Send WebSocket notification
-            if (notificationService) {
-              await notificationService.notifyDraftStarted(
-                leagueId,
-                draftId,
-                draft.draftOrder,
-                teams.length,
-                pickTimeLimit,
-                initialDeadline.toISOString(),
-              );
-            }
-
-            // Post system league message
-            try {
-              const [chatMsg] = await context.db
-                .insert(PublicSchema.leagueMessages)
-                .values({
-                  leagueId,
-                  userId: null,
-                  messageText:
-                    '🏈 The scheduled draft has automatically started! Get ready to pick.',
-                  messageType: 'draft_settings',
-                  metadata: {
-                    autoStarted: true,
-                    scheduledAt: draft.scheduledAt?.toISOString(),
-                  },
-                })
-                .returning();
-
-              if (notificationService) {
-                notificationService
-                  .notifyLeagueChatMessage(leagueId, {
-                    leagueId,
-                    messageId: chatMsg.id,
-                    senderId: null,
-                    senderUsername: 'System',
-                    messageText:
-                      '🏈 The scheduled draft has automatically started! Get ready to pick.',
-                    timestamp: chatMsg.timestamp ?? startedAt.toISOString(),
-                    messageType: 'draft_settings',
-                    metadata: { autoStarted: true },
-                  })
-                  .catch((notifyErr: unknown) => {
-                    LOGGER.warn(
-                      '[autoStartScheduledDrafts] Failed to send chat WS notification',
-                      { leagueId, notifyErr },
-                    );
-                  });
-              }
-            } catch (chatErr) {
-              LOGGER.warn(
-                '[autoStartScheduledDrafts] Failed to insert system chat message (non-fatal)',
-                { leagueId, chatErr },
-              );
-            }
-
-            result.draftsStarted++;
-            LOGGER.info('[autoStartScheduledDrafts] Draft auto-started', {
-              draftId,
-              leagueId,
-              teamCount: teams.length,
-              scheduledAt: draft.scheduledAt,
-            });
-          } catch (draftError) {
-            const errMsg =
-              draftError instanceof Error
-                ? draftError.message
-                : String(draftError);
-            LOGGER.error(
-              `[autoStartScheduledDrafts] Error starting draft ${draftId}`,
-              draftError instanceof Error ? draftError : new Error(errMsg),
-              { draftId, leagueId },
-            );
-            result.errors.push(`Draft ${draftId}: ${errMsg}`);
-          }
-        }
-
-        LOGGER.info('[autoStartScheduledDrafts] Completed', {
-          draftsStarted: result.draftsStarted,
-          errorCount: result.errors.length,
-        });
-
-        return result;
-      } catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        LOGGER.error(
-          '[autoStartScheduledDrafts] Fatal error',
           error instanceof Error ? error : new Error(errMsg),
         );
         result.errors.push(errMsg);
