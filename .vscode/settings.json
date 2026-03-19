@@ -1,6 +1,5 @@
 {
   "typescript.tsdk": "node_modules\\typescript\\lib",
-  "python.defaultInterpreterPath": ".venv/Scripts/python.exe",
   "python.terminal.activateEnvironment": false,
   "python.locator": "native",
   "nxConsole.generateAiAgentRules": true,
