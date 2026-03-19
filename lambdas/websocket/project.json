@@ -34,9 +34,10 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "outputs": ["{workspaceRoot}/coverage/lambdas/websocket"],
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "lambdas/websocket/jest.config.ts"
+        "jestConfig": "lambdas/websocket/jest.config.ts",
+        "passWithNoTests": false
       }
     },
     "lint": {

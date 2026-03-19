@@ -1,20 +1,20 @@
-export default {
+const { createNodeJestConfig } = require('../../jest.helpers.ts');
+
+module.exports = createNodeJestConfig({
   displayName: 'websocket',
-  preset: '../../jest.preset.js',
-  testEnvironment: 'node',
-  collectCoverageFrom: ['**/*.(t|j)s'],
-  coverageDirectory: '../../coverage/lambdas/websocket',
-  coverageReporters: ['text', 'lcov'],
-  setupFilesAfterEnv: [],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
-  transform: {
-    '^.+\\.(ts|tsx)$': [
-      'ts-jest',
-      {
-        tsconfig: '<rootDir>/tsconfig.spec.json',
-        diagnostics: { warnOnly: true },
-      },
-    ],
+  projectPath: 'lambdas/websocket',
+  overrides: {
+    transform: {
+      '^.+\\.[tj]s$': [
+        'ts-jest',
+        {
+          tsconfig: '<rootDir>/tsconfig.spec.json',
+          // Source file has pre-existing TS issues (aws-lambda V2 type gaps,
+          // DynamoDB index-signature access style) that don't affect runtime.
+          // Type checking is handled by the separate typecheck target.
+          diagnostics: false,
+        },
+      ],
+    },
   },
-  testMatch: ['**/*.(test|spec).(ts|tsx|js|jsx)'],
-};
+});
