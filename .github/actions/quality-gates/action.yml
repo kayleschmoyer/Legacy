@@ -161,8 +161,15 @@ runs:
 
         # Get changed files between base and head
         CHANGED=$(git diff --name-only --diff-filter=ACMR \
-          "${{ inputs.base-ref }}" "${{ inputs.head-ref }}" \
-          | sort)
+          "${{ inputs.base-ref }}" "${{ inputs.head-ref }}" | sort)
+
+        # Filter out symlinks — prettier errors on explicitly-passed symlinks.
+        # Uses if/then (not &&) so the loop always exits 0 under pipefail.
+        if [ -n "$CHANGED" ]; then
+          CHANGED=$(echo "$CHANGED" | while IFS= read -r f; do
+            if [ -f "$f" ] && [ ! -L "$f" ]; then printf '%s\n' "$f"; fi
+          done) || true
+        fi
 
         if [ -z "$CHANGED" ]; then
           echo "✅ No files changed — nothing to check"
