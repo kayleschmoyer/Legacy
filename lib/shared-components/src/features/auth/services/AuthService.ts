@@ -229,16 +229,16 @@ export class AuthService {
 
     if (!response.ok) {
       const errorText = await response.text();
+      let message = `Secure OAuth failed: ${response.status}`;
       try {
         const errorData = JSON.parse(errorText) as { message?: string };
-        throw new Error(
-          errorData.message || `Secure OAuth failed: ${response.status}`,
-        );
+        if (errorData.message) {
+          message = errorData.message;
+        }
       } catch {
-        throw new Error(
-          `Secure OAuth failed: ${response.status} - ${errorText}`,
-        );
+        message = `Secure OAuth failed: ${response.status} - ${errorText}`;
       }
+      throw new Error(message);
     }
 
     const responseText = await response.text();

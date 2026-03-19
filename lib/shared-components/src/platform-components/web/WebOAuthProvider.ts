@@ -114,6 +114,7 @@ export class WebOAuthProvider implements OAuthProvider {
   private gsiLoaded = false;
   private codeClient?: CodeClient;
   private oneTapInitialized = false;
+  private fedcmFailed = false;
 
   async configure(config: OAuthConfig): Promise<void> {
     this.config = config;
@@ -126,6 +127,7 @@ export class WebOAuthProvider implements OAuthProvider {
     this.isConfigured = true;
 
     // Initialize One Tap immediately if enabled (for page load experience)
+    // Also re-initialize if a previous FedCM attempt failed and we need to retry
     if (this.shouldEnableOneTap() && !this.oneTapInitialized) {
       // Add small delay to ensure DOM is ready and GSI is fully loaded
       setTimeout(() => {
@@ -190,12 +192,8 @@ export class WebOAuthProvider implements OAuthProvider {
     return this.config?.gsi?.oneTap !== false;
   }
 
-  private initializeOneTap(): void {
-    if (
-      !window.google?.accounts?.id ||
-      !this.config ||
-      this.oneTapInitialized
-    ) {
+  private initializeOneTap(useFedCm?: boolean): void {
+    if (!window.google?.accounts?.id || !this.config) {
       return;
     }
 
@@ -203,11 +201,17 @@ export class WebOAuthProvider implements OAuthProvider {
       return;
     }
 
+    // Determine whether to use FedCM: explicit parameter > previous failure > default
+    const isLocalhost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+    const enableFedCm =
+      useFedCm !== undefined ? useFedCm : !isLocalhost && !this.fedcmFailed;
+
     try {
-      // Create GSI configuration with FedCM handling
       const gsiConfig: ExtendedGoogleIdConfiguration = {
         client_id: this.config.googleClientId,
-        use_fedcm_for_prompt: true, // Opt-in to FedCM to avoid deprecation warning
+        use_fedcm_for_prompt: enableFedCm,
         callback: (response: CredentialResponse) => {
           // One Tap provides ID token - send it directly to OAuth proxy
           void this.handleOneTapResponse(response)
@@ -232,29 +236,48 @@ export class WebOAuthProvider implements OAuthProvider {
         cancel_on_tap_outside: this.config.gsi?.cancelOnTapOutside ?? true,
       };
 
-      // Disable FedCM for localhost/127.0.0.1 development to avoid token retrieval errors
-      // (FedCM requires HTTPS and does not work on localhost)
-      if (
-        window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1'
-      ) {
-        gsiConfig.use_fedcm_for_prompt = false;
-      }
-
       window.google.accounts.id.initialize(gsiConfig);
 
       // Show One Tap prompt
       window.google.accounts.id.prompt(
         (notification: PromptMomentNotification) => {
           const momentType = notification.getMomentType();
+          const dismissedReason = notification.getDismissedReason?.();
+          const skippedReason = notification.getSkippedReason?.();
+          const notDisplayedReason = notification.getNotDisplayedReason?.();
 
-          // Log important failures but not routine user actions
-          if (
-            momentType === 'dismissed_moment_credential_selector_limit' ||
-            momentType === 'dismissed_moment_fedcm_continue_on' ||
-            momentType === 'dismissed_moment_fedcm_disabled'
-          ) {
-            LOGGER.warn('One Tap dismissed:', momentType);
+          if (momentType === 'dismissed' && dismissedReason) {
+            LOGGER.warn('One Tap dismissed:', dismissedReason);
+
+            // Retry without FedCM when dismissed due to FedCM-specific failures.
+            // Exclude 'credential_returned' — it means the credential callback
+            // already fired (successful selection), so retrying would cause a
+            // redundant second prompt / duplicate login flow.
+            if (
+              enableFedCm &&
+              !this.fedcmFailed &&
+              dismissedReason !== 'credential_returned' &&
+              (dismissedReason === 'cancel_called' ||
+                // Any other unexpected dismiss during FedCM warrants a retry
+                dismissedReason !== 'user_cancel')
+            ) {
+              LOGGER.warn(
+                'FedCM dismissed One Tap, retrying without FedCM:',
+                dismissedReason,
+              );
+              this.fedcmFailed = true;
+              this.oneTapInitialized = false;
+              this.initializeOneTap(false);
+              return;
+            }
+          }
+
+          if (momentType === 'skipped' && skippedReason) {
+            LOGGER.warn('One Tap skipped:', skippedReason);
+          }
+
+          if (notDisplayedReason) {
+            LOGGER.warn('One Tap not displayed:', notDisplayedReason);
           }
         },
       );

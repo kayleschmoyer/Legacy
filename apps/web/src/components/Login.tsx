@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   LoginPage,
@@ -21,6 +21,10 @@ export function Login() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Track whether we've shown the login form at least once, so we don't
+  // unmount LoginPage (and lose its error state) during OAuth authentication.
+  const hasShownLoginRef = useRef(false);
+
   LOGGER.info('Login component - Auth state:', { isAuthenticated, isLoading });
   LOGGER.info('Login component - Location:', location.pathname);
   LOGGER.info('Login component - OAuth config:', config);
@@ -42,8 +46,9 @@ export function Login() {
     return <Navigate to={from} replace />;
   }
 
-  // Don't show login form while checking auth status
-  if (isLoading) {
+  // Show loading spinner only for the initial auth check, not during
+  // OAuth authentication (which would unmount LoginPage and lose error state).
+  if (isLoading && !hasShownLoginRef.current) {
     return (
       <YStack
         minHeight="100vh"
@@ -56,6 +61,9 @@ export function Login() {
       </YStack>
     );
   }
+
+  // Once we render LoginPage, remember it so we don't unmount it mid-auth
+  hasShownLoginRef.current = true;
 
   return (
     <YStack
