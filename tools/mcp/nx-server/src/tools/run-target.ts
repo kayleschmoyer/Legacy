@@ -12,6 +12,7 @@ const ALLOWED_TARGETS = new Set([
   'print-schema',
   'deploy:plan',
   'e2e',
+  'integration',
   'storybook',
 ]);
 

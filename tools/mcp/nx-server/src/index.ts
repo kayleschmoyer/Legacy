@@ -92,9 +92,11 @@ server.tool(
 );
 
 // --- nx_run ---
+// NOTE: The allowed-targets list in this description must stay in sync with
+// ALLOWED_TARGETS in tools/run-target.ts (the canonical enforcement source).
 server.tool(
   'nx_run',
-  'Run an Nx target on a specific project. Allowed targets: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, storybook. Use for single-project operations.',
+  'Run an Nx target on a specific project. Allowed targets: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook. Use for single-project operations.',
   {
     project: z
       .string()
@@ -127,6 +129,8 @@ server.tool(
 );
 
 // --- nx_run_affected ---
+// NOTE: The allowed-targets list in this description must stay in sync with
+// ALLOWED_TARGETS in tools/run-affected.ts (the canonical enforcement source).
 server.tool(
   'nx_run_affected',
   'Run an Nx target on all affected projects. Allowed targets: build, test, lint, typecheck, codegen. This is the equivalent of `pnpm exec nx affected -t <target> --base=origin/main`.',
