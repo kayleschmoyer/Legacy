@@ -49,7 +49,8 @@ export async function listChildren(
       jql = `parent = ${quotedKey} AND status = ${quotedStatus} ORDER BY created DESC`;
     }
 
-    // Paginate through all results
+    // Paginate through all results using the v3 search/jql endpoint (POST).
+    // The old GET /rest/api/3/search was removed by Atlassian (410 Gone).
     const PAGE_SIZE = 100;
     let startAt = 0;
     const allIssues: JiraSearchResponse['issues'] = [];
@@ -57,13 +58,13 @@ export async function listChildren(
     let hasMore = true;
     while (hasMore) {
       const result = await jiraRequest<JiraSearchResponse>({
-        method: 'GET',
-        path: '/rest/api/3/search',
-        query: {
+        method: 'POST',
+        path: '/rest/api/3/search/jql',
+        body: {
           jql,
-          fields: 'summary,status,issuetype,priority,created',
-          maxResults: String(PAGE_SIZE),
-          startAt: String(startAt),
+          fields: ['summary', 'status', 'issuetype', 'priority', 'created'],
+          maxResults: PAGE_SIZE,
+          startAt,
         },
       });
 
