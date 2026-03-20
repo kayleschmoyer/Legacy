@@ -65,8 +65,6 @@ interface SimilarBug {
 
 /** Minimum characters before triggering a duplicate search. */
 const SEARCH_MIN_LENGTH = 10;
-/** Debounce delay in ms for the duplicate search. */
-const SEARCH_DEBOUNCE_MS = 600;
 
 /**
  * A minimal "Report a Bug" button that opens a small dialog.
@@ -107,56 +105,48 @@ export const BugReportButton: React.FC = () => {
     [resetForm],
   );
 
-  // Debounced search for similar bugs as the user types
-  useEffect(() => {
+  const handleSearchSimilar = useCallback(() => {
     const trimmed = description.trim();
     if (trimmed.length < SEARCH_MIN_LENGTH || !env.jiraProxyUrl) {
-      searchAbortRef.current?.abort();
-      searchAbortRef.current = null;
-      setSimilarBugs([]);
-      setSearchLoading(false);
       return;
     }
 
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
     setSearchLoading(true);
-    const timer = setTimeout(() => {
-      searchAbortRef.current?.abort();
-      const controller = new AbortController();
-      searchAbortRef.current = controller;
 
-      const csrfToken = getCsrfToken();
-      fetch(`${env.jiraProxyUrl}/search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
-        },
-        credentials: 'include',
-        signal: controller.signal,
-        body: JSON.stringify({ query: trimmed }),
-      })
-        .then(async (res) => {
-          if (!res.ok) {
-            setSimilarBugs([]);
-            return;
-          }
-          const data = (await res.json()) as {
-            issues: SimilarBug[];
-          };
-          setSimilarBugs(data.issues ?? []);
-        })
-        .catch((err: unknown) => {
-          if (err instanceof DOMException && err.name === 'AbortError') return;
+    const csrfToken = getCsrfToken();
+    fetch(`${env.jiraProxyUrl}/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
+      },
+      credentials: 'include',
+      signal: controller.signal,
+      body: JSON.stringify({ query: trimmed }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
           setSimilarBugs([]);
-        })
-        .finally(() => setSearchLoading(false));
-    }, SEARCH_DEBOUNCE_MS);
+          return;
+        }
+        const data = (await res.json()) as {
+          issues: SimilarBug[];
+        };
+        setSimilarBugs(data.issues ?? []);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setSimilarBugs([]);
+      })
+      .finally(() => setSearchLoading(false));
+  }, [description]);
 
-    return () => {
-      clearTimeout(timer);
-      searchAbortRef.current?.abort();
-      searchAbortRef.current = null;
-    };
+  // Clear stale similar-bug results whenever the description changes
+  useEffect(() => {
+    setSimilarBugs([]);
   }, [description]);
 
   const handleFileChange = useCallback(
@@ -435,54 +425,71 @@ export const BugReportButton: React.FC = () => {
                   </Paragraph>
                 </YStack>
 
-                {/* Similar existing bugs */}
-                {(similarBugs.length > 0 || searchLoading) && (
-                  <YStack
-                    gap="$2"
-                    backgroundColor="$yellow2"
-                    borderRadius="$4"
-                    padding="$3"
-                    borderWidth={1}
-                    borderColor="$yellow7"
+                {/* Search for similar bugs */}
+                {description.trim().length >= SEARCH_MIN_LENGTH && (
+                  <Button
+                    size="$2"
+                    onPress={handleSearchSimilar}
+                    disabled={searchLoading}
+                    alignSelf="flex-start"
                   >
-                    <Paragraph size="$2" fontWeight="600" color="$yellow11">
-                      {searchLoading
-                        ? 'Searching for similar reports…'
-                        : `Similar bug${similarBugs.length === 1 ? '' : 's'} already reported:`}
-                    </Paragraph>
-                    {similarBugs.map((bug) => (
-                      <XStack
-                        key={bug.issueKey}
-                        gap="$2"
-                        alignItems="flex-start"
-                        paddingVertical="$1"
-                      >
-                        <Paragraph
-                          size="$2"
-                          fontWeight="600"
-                          color="$yellow11"
-                          flexShrink={0}
-                        >
-                          {bug.issueKey}
-                        </Paragraph>
-                        <YStack flex={1}>
-                          <Paragraph size="$2" color="$color" numberOfLines={2}>
-                            {bug.summary}
-                          </Paragraph>
-                          <Paragraph size="$1" color="$colorPress">
-                            Status: {bug.status}
-                          </Paragraph>
-                        </YStack>
-                      </XStack>
-                    ))}
-                    {similarBugs.length > 0 && (
-                      <Paragraph size="$1" color="$yellow11">
-                        You can still submit your report — it helps us know more
-                        people are affected.
-                      </Paragraph>
-                    )}
-                  </YStack>
+                    {searchLoading
+                      ? 'Searching…'
+                      : 'Search for similar reports'}
+                  </Button>
                 )}
+
+                {/* Similar existing bugs */}
+                {similarBugs.length > 0 &&
+                  description.trim().length >= SEARCH_MIN_LENGTH && (
+                    <YStack
+                      gap="$2"
+                      backgroundColor="$yellow2"
+                      borderRadius="$4"
+                      padding="$3"
+                      borderWidth={1}
+                      borderColor="$yellow7"
+                    >
+                      <Paragraph size="$2" fontWeight="600" color="$yellow11">
+                        {`Similar bug${similarBugs.length === 1 ? '' : 's'} already reported:`}
+                      </Paragraph>
+                      {similarBugs.map((bug) => (
+                        <XStack
+                          key={bug.issueKey}
+                          gap="$2"
+                          alignItems="flex-start"
+                          paddingVertical="$1"
+                        >
+                          <Paragraph
+                            size="$2"
+                            fontWeight="600"
+                            color="$yellow11"
+                            flexShrink={0}
+                          >
+                            {bug.issueKey}
+                          </Paragraph>
+                          <YStack flex={1}>
+                            <Paragraph
+                              size="$2"
+                              color="$color"
+                              numberOfLines={2}
+                            >
+                              {bug.summary}
+                            </Paragraph>
+                            <Paragraph size="$1" color="$colorPress">
+                              Status: {bug.status}
+                            </Paragraph>
+                          </YStack>
+                        </XStack>
+                      ))}
+                      {similarBugs.length > 0 && (
+                        <Paragraph size="$1" color="$yellow11">
+                          You can still submit your report — it helps us know
+                          more people are affected.
+                        </Paragraph>
+                      )}
+                    </YStack>
+                  )}
 
                 {/* Collapsible technical details */}
                 <YStack gap="$2">
