@@ -143,6 +143,7 @@ builder.mutationField('claimFreeAgent', (t) =>
       const leagueRow = await db
         .select({
           draftStatus: PublicSchema.leagues.draftStatus,
+          leaguePhase: PublicSchema.leagues.leaguePhase,
           maxRosterSize: PublicSchema.leagues.maxRosterSize,
           waiverType: PublicSchema.leagues.waiverType,
           waiverEnabled: PublicSchema.leagues.waiverEnabled,
@@ -161,6 +162,12 @@ builder.mutationField('claimFreeAgent', (t) =>
       if (leagueRow[0].draftStatus !== 'completed') {
         throw new Error(
           'Free agent claims are not available until the draft has been completed',
+        );
+      }
+
+      if (leagueRow[0].leaguePhase !== 'active') {
+        throw new Error(
+          'Free agent claims are only available during the active season',
         );
       }
 

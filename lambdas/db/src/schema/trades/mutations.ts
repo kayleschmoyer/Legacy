@@ -281,6 +281,21 @@ builder.mutationField('proposeTrade', (t) =>
         );
       }
 
+      // 0. Check league phase — trades are only allowed during the active season
+      const [leagueCheck] = await db
+        .select({ leaguePhase: PublicSchema.leagues.leaguePhase })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+      if (!leagueCheck) {
+        throw new Error('League not found');
+      }
+      if (leagueCheck.leaguePhase !== 'active') {
+        throw new Error(
+          'Trade offers are only available during the active season',
+        );
+      }
+
       // 1. Resolve the proposing team
       const proposingTeamId = await resolveUserTeam(userId, leagueId, db);
 

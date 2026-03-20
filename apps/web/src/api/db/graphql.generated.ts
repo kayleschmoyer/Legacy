@@ -746,6 +746,8 @@ export type League = {
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMockDraft?: Maybe<Scalars['Boolean']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
+  /** Lifecycle phase of the league: pre-draft (awaiting draft), active (season in play), offseason (post-renewal, before commissioner starts new season) */
+  leaguePhase?: Maybe<Scalars['String']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
   logoUrl?: Maybe<Scalars['String']['output']>;
   luxuryTaxThreshold?: Maybe<Scalars['Int']['output']>;
@@ -1196,6 +1198,7 @@ export type Mutation = {
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
   setTradeBlock?: Maybe<TeamMember>;
   startDraft?: Maybe<League>;
+  startSeason?: Maybe<League>;
   /** Start a Season Draft Game (move from setup to drafting) */
   startSeasonDraftGame?: Maybe<Scalars['Boolean']['output']>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
@@ -1605,6 +1608,10 @@ export type MutationStartDraftArgs = {
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type MutationStartSeasonArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationStartSeasonDraftGameArgs = {
@@ -3828,6 +3835,7 @@ export type LeagueFragment = {
   currentMatchup?: number | null;
   currentWeekNumber?: number | null;
   draftStatus?: string | null;
+  leaguePhase?: string | null;
   inviteCode?: string | null;
   playerPool?: string | null;
   weekAdvanceStatus?: string | null;
@@ -3906,6 +3914,7 @@ export type GetLeagueByIdQuery = {
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
     draftStatus?: string | null;
+    leaguePhase?: string | null;
     inviteCode?: string | null;
     playerPool?: string | null;
     weekAdvanceStatus?: string | null;
@@ -3971,6 +3980,7 @@ export type CreateLeagueAndTeamsMutation = {
       currentMatchup?: number | null;
       currentWeekNumber?: number | null;
       draftStatus?: string | null;
+      leaguePhase?: string | null;
       inviteCode?: string | null;
       playerPool?: string | null;
       weekAdvanceStatus?: string | null;
@@ -4033,6 +4043,7 @@ export type GetUserLeaguesQuery = {
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
     draftStatus?: string | null;
+    leaguePhase?: string | null;
     inviteCode?: string | null;
     playerPool?: string | null;
     weekAdvanceStatus?: string | null;
@@ -4127,6 +4138,7 @@ export type StartDraftMutation = {
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
     draftStatus?: string | null;
+    leaguePhase?: string | null;
     inviteCode?: string | null;
     playerPool?: string | null;
     weekAdvanceStatus?: string | null;
@@ -4328,6 +4340,7 @@ export type UpdateLeagueSettingsMutation = {
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
     draftStatus?: string | null;
+    leaguePhase?: string | null;
     inviteCode?: string | null;
     playerPool?: string | null;
     weekAdvanceStatus?: string | null;
@@ -4434,6 +4447,71 @@ export type RenewLeagueMutation = {
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
     draftStatus?: string | null;
+    leaguePhase?: string | null;
+    inviteCode?: string | null;
+    playerPool?: string | null;
+    weekAdvanceStatus?: string | null;
+    waiverType?: string | null;
+    waiverEnabled?: boolean | null;
+    faabBudgetDefault?: number | null;
+    spStartsPerMatchup?: number | null;
+    gamesPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
+    totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
+    lmNotes?: string | null;
+    isMockDraft?: boolean | null;
+    isPublic?: boolean | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    previousLeagueId?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
+    salaryFloor?: number | null;
+    luxuryTaxThreshold?: number | null;
+    minSalary?: number | null;
+    salaryEscalationPct?: number | null;
+    salaryDecayPct?: number | null;
+    auctionBudget?: number | null;
+    auctionMinBid?: number | null;
+    eraFilter?: string | null;
+    hofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    userMembership?: {
+      __typename?: 'LeagueMember';
+      leagueId?: number | null;
+      userId?: number | null;
+      teamId?: number | null;
+      permissionLevel?: string | null;
+      username?: string | null;
+    } | null;
+  } | null;
+};
+
+export type StartSeasonMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type StartSeasonMutation = {
+  __typename?: 'Mutation';
+  startSeason?: {
+    __typename?: 'League';
+    id?: number | null;
+    name?: string | null;
+    owner?: number | null;
+    maxRosterSize?: number | null;
+    currentMatchup?: number | null;
+    currentWeekNumber?: number | null;
+    draftStatus?: string | null;
+    leaguePhase?: string | null;
     inviteCode?: string | null;
     playerPool?: string | null;
     weekAdvanceStatus?: string | null;
@@ -7886,6 +7964,7 @@ export const LeagueFragmentDoc = gql`
     currentMatchup
     currentWeekNumber
     draftStatus
+    leaguePhase
     inviteCode
     playerPool
     weekAdvanceStatus
@@ -11579,6 +11658,57 @@ export type RenewLeagueMutationResult =
 export type RenewLeagueMutationOptions = BaseMutationOptions<
   RenewLeagueMutation,
   RenewLeagueMutationVariables
+>;
+export const StartSeason = gql`
+  mutation StartSeason($leagueId: Int!) {
+    startSeason(leagueId: $leagueId) {
+      ...League
+    }
+  }
+  ${LeagueFragmentDoc}
+`;
+export type StartSeasonMutationFn = MutationFunction<
+  StartSeasonMutation,
+  StartSeasonMutationVariables
+>;
+
+/**
+ * __useStartSeasonMutation__
+ *
+ * To run a mutation, you first call `useStartSeasonMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useStartSeasonMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [startSeasonMutation, { data, loading, error }] = useStartSeasonMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useStartSeasonMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    StartSeasonMutation,
+    StartSeasonMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<StartSeasonMutation, StartSeasonMutationVariables>(
+    StartSeason,
+    options,
+  );
+}
+export type StartSeasonMutationHookResult = ReturnType<
+  typeof useStartSeasonMutation
+>;
+export type StartSeasonMutationResult =
+  Apollo.MutationResult<StartSeasonMutation>;
+export type StartSeasonMutationOptions = BaseMutationOptions<
+  StartSeasonMutation,
+  StartSeasonMutationVariables
 >;
 export const GetAuctionState = gql`
   query GetAuctionState($draftId: Int!) {

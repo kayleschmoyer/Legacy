@@ -320,7 +320,7 @@ export async function commitDraftPick(
   if (isDraftComplete) {
     await tx
       .update(PublicSchema.leagues)
-      .set({ draftStatus: 'completed' })
+      .set({ draftStatus: 'completed', leaguePhase: 'active' })
       .where(eq(PublicSchema.leagues.id, leagueId));
   }
 

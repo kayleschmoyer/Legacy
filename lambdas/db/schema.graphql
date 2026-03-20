@@ -812,6 +812,11 @@ type League {
   inviteCode: String
   isMockDraft: Boolean
   isPublic: Boolean
+
+  """
+  Lifecycle phase of the league: pre-draft (awaiting draft), active (season in play), offseason (post-renewal, before commissioner starts new season)
+  """
+  leaguePhase: String
   lmNotes: String
   logoUrl: String
   luxuryTaxThreshold: Int
@@ -1566,6 +1571,7 @@ type Mutation {
     leagueId: Int!
     selectionMethod: String
   ): League
+  startSeason(leagueId: Int!): League
 
   """
   Start a Season Draft Game (move from setup to drafting)

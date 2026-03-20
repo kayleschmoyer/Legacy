@@ -116,6 +116,12 @@ export const rosterLockTiming = pgEnum('roster_lock_timing', [
   'custom',
 ]);
 
+export const leaguePhase = pgEnum('league_phase', [
+  'pre-draft',
+  'active',
+  'offseason',
+]);
+
 export const weekAdvanceStatus = pgEnum('week_advance_status', [
   'idle',
   'queued',

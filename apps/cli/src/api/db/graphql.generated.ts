@@ -746,6 +746,8 @@ export type League = {
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMockDraft?: Maybe<Scalars['Boolean']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
+  /** Lifecycle phase of the league: pre-draft (awaiting draft), active (season in play), offseason (post-renewal, before commissioner starts new season) */
+  leaguePhase?: Maybe<Scalars['String']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
   logoUrl?: Maybe<Scalars['String']['output']>;
   luxuryTaxThreshold?: Maybe<Scalars['Int']['output']>;
@@ -1196,6 +1198,7 @@ export type Mutation = {
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
   setTradeBlock?: Maybe<TeamMember>;
   startDraft?: Maybe<League>;
+  startSeason?: Maybe<League>;
   /** Start a Season Draft Game (move from setup to drafting) */
   startSeasonDraftGame?: Maybe<Scalars['Boolean']['output']>;
   swapMatchupPlayerPositions?: Maybe<Array<MatchupPlayer>>;
@@ -1605,6 +1608,10 @@ export type MutationStartDraftArgs = {
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   leagueId: Scalars['Int']['input'];
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type MutationStartSeasonArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationStartSeasonDraftGameArgs = {

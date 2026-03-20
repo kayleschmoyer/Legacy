@@ -158,6 +158,7 @@ export async function fetchLeagueDetails(leagueId: number) {
         currentMatchup: PublicSchema.leagues.currentMatchup,
         currentWeek: PublicSchema.leagues.currentWeek,
         draftStatus: PublicSchema.leagues.draftStatus,
+        leaguePhase: PublicSchema.leagues.leaguePhase,
         inviteCode: PublicSchema.leagues.inviteCode,
         playerPool: PublicSchema.leagues.playerPool,
       })

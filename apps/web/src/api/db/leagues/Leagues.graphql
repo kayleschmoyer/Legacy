@@ -6,6 +6,7 @@ fragment League on League {
   currentMatchup
   currentWeekNumber
   draftStatus
+  leaguePhase
   inviteCode
   playerPool
   weekAdvanceStatus
@@ -257,6 +258,12 @@ mutation JoinPublicLeague($leagueId: Int!, $teamName: String!) {
 
 mutation RenewLeague($leagueId: Int!, $keepRosters: Boolean!) {
   renewLeague(leagueId: $leagueId, keepRosters: $keepRosters) {
+    ...League
+  }
+}
+
+mutation StartSeason($leagueId: Int!) {
+  startSeason(leagueId: $leagueId) {
     ...League
   }
 }

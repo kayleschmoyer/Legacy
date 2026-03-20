@@ -53,6 +53,8 @@ export const League = builder.objectRef<{
     | 'in-progress'
     | 'paused'
     | 'completed';
+  /** Lifecycle phase: pre-draft, active, or offseason */
+  leaguePhase: 'pre-draft' | 'active' | 'offseason';
   inviteCode: string;
   playerPool: 'all' | 'nl' | 'al';
   weekAdvanceStatus?: 'idle' | 'queued' | 'processing' | 'success' | 'failed';
@@ -117,6 +119,11 @@ League.implement({
     currentMatchup: t.exposeInt('currentMatchup', { nullable: true }),
     currentWeek: t.exposeInt('currentWeek', { nullable: true }),
     draftStatus: t.exposeString('draftStatus'),
+    leaguePhase: t.exposeString('leaguePhase', {
+      description:
+        'Lifecycle phase of the league: pre-draft (awaiting draft), ' +
+        'active (season in play), offseason (post-renewal, before commissioner starts new season)',
+    }),
     inviteCode: t.exposeString('inviteCode'),
     playerPool: t.exposeString('playerPool'),
     weekAdvanceStatus: t.exposeString('weekAdvanceStatus', { nullable: true }),

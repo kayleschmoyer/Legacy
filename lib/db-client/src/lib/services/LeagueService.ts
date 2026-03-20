@@ -110,6 +110,7 @@ export interface CreateLeagueResult {
       | 'in-progress'
       | 'paused'
       | 'completed';
+    leaguePhase: 'pre-draft' | 'active' | 'offseason';
     inviteCode: string;
     playerPool: 'all' | 'nl' | 'al';
     eraFilter?: EraFilterValue;
@@ -227,6 +228,7 @@ export class LeagueService {
           currentMatchup: PublicSchema.leagues.currentMatchup,
           currentWeek: PublicSchema.leagues.currentWeek,
           draftStatus: PublicSchema.leagues.draftStatus,
+          leaguePhase: PublicSchema.leagues.leaguePhase,
           inviteCode: PublicSchema.leagues.inviteCode,
           playerPool: PublicSchema.leagues.playerPool,
           eraFilter: PublicSchema.leagues.eraFilter,

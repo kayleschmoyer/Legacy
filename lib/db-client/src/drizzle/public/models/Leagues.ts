@@ -22,6 +22,7 @@ import {
   playerPool,
   eraFilter,
   draftStatus,
+  leaguePhase,
   leaguePermissionLevel,
   positionSlot,
   rosterLockTiming,
@@ -47,6 +48,8 @@ export const leagues = pgTable(
      * matchups.week_number on migration 20260305_120000. */
     currentWeek: integer('current_week'),
     draftStatus: draftStatus('draft_status').notNull().default('not-started'),
+    /** Lifecycle phase: pre-draft (awaiting draft), active (season in play), offseason (post-renewal, pre-start) */
+    leaguePhase: leaguePhase('league_phase').notNull().default('pre-draft'),
     inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
     minGamesPerSeason: integer('min_games_per_season').default(10),
     gamesPerMatchup: integer('games_per_matchup').default(5),

@@ -21,6 +21,7 @@ export interface DraftTriggerResult {
       | 'in-progress'
       | 'paused'
       | 'completed';
+    leaguePhase: 'pre-draft' | 'active' | 'offseason';
     inviteCode: string;
     playerPool: 'all' | 'nl' | 'al';
   };
@@ -200,6 +201,7 @@ export class DraftService {
           currentMatchup: null,
           currentWeek: null,
           draftStatus: 'not-started' as const,
+          leaguePhase: 'pre-draft' as const,
           inviteCode: 'UNKNOWN',
           playerPool: 'all' as const,
         };

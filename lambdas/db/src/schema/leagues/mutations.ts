@@ -23,7 +23,10 @@ import {
   Team,
 } from './types';
 import { builder } from '../builder';
-import { adjustMatchupsForNewTotal } from '../matchups/mutations';
+import {
+  adjustMatchupsForNewTotal,
+  createAllMatchupsForLeague,
+} from '../matchups/mutations';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -1910,6 +1913,7 @@ builder.mutationField('renewLeague', (t) =>
           currentMatchup: null,
           currentWeek: null,
           draftStatus: keepRosters ? 'completed' : 'not-started',
+          leaguePhase: keepRosters ? 'offseason' : 'pre-draft',
           inviteCode: newInviteCode,
           minGamesPerSeason: oldLeague.minGamesPerSeason,
           gamesPerMatchup: oldLeague.gamesPerMatchup,
@@ -2177,6 +2181,117 @@ builder.mutationField('renewLeague', (t) =>
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Pothos resolver return type mismatch
       return newLeague as any;
+    },
+  }),
+);
+
+// -- Start Season (offseason → active) ---------------------------------------
+
+/**
+ * Mutation: startSeason
+ *
+ * Commissioner action that advances a league from the 'offseason' phase to
+ * 'active'. This is used after renewLeague with keepRosters=true — the
+ * commissioner can configure settings during the offseason window, then
+ * explicitly start the new season which triggers matchup generation.
+ */
+builder.mutationField('startSeason', (t) =>
+  t.field({
+    type: League,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const { leagueId } = args;
+      const userId = context.user.id;
+
+      // 1. Verify caller is commissioner
+      const [membership] = await context.db
+        .select({ permissionLevel: PublicSchema.leagueMembers.permissionLevel })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (!membership) {
+        throw ForbiddenError('You are not a member of this league');
+      }
+      if (membership.permissionLevel !== 'commissioner') {
+        throw ForbiddenError('Only the commissioner can start the season');
+      }
+
+      // 2. Atomically claim the offseason → active transition to prevent races.
+      //    If another request already transitioned this league, the WHERE clause
+      //    won't match any rows and we'll throw below.
+      const [claimed] = await context.db
+        .update(PublicSchema.leagues)
+        .set({ leaguePhase: 'active' })
+        .where(
+          and(
+            eq(PublicSchema.leagues.id, leagueId),
+            eq(PublicSchema.leagues.leaguePhase, 'offseason'),
+          ),
+        )
+        .returning();
+
+      if (!claimed) {
+        // Either league doesn't exist or it wasn't in offseason
+        const [league] = await context.db
+          .select({ leaguePhase: PublicSchema.leagues.leaguePhase })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        if (!league) {
+          throw new Error('League not found');
+        }
+        throw new Error(
+          `Cannot start season: league is in '${league.leaguePhase}' phase, expected 'offseason'`,
+        );
+      }
+
+      // 3. Generate matchups for the new season
+      const matchupResult = await createAllMatchupsForLeague(
+        context.db,
+        leagueId,
+      );
+
+      if (matchupResult.matchupCount === 0) {
+        // Roll back to offseason — can't be active with no matchups
+        await context.db
+          .update(PublicSchema.leagues)
+          .set({ leaguePhase: 'offseason' })
+          .where(eq(PublicSchema.leagues.id, leagueId));
+
+        throw new Error(
+          'Cannot start season: matchup generation produced 0 matchups. League remains in offseason.',
+        );
+      }
+
+      LOGGER.info('Season started via startSeason', {
+        leagueId,
+        matchupCount: matchupResult.matchupCount,
+        currentMatchupId: matchupResult.currentMatchupId,
+        userId,
+      });
+
+      // 4. Re-fetch the league to return the updated state
+      const [updatedLeague] = await context.db
+        .select()
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Pothos resolver return type mismatch
+      return updatedLeague as any;
     },
   }),
 );
