@@ -14,6 +14,7 @@ const ALLOWED_TARGETS = new Set([
   'e2e',
   'integration',
   'storybook',
+  'format',
 ]);
 
 /** Shell metacharacters that must not appear in passthrough args (prevents injection via shell: true). */
