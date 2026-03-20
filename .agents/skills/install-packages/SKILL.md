@@ -17,6 +17,31 @@ How to correctly install npm packages in the Legacy Sports pnpm monorepo. All de
 - Updating a package to a specific version
 - Troubleshooting "module not found" errors after install
 
+## Installing in a Worktree
+
+Worktrees share `node_modules` with the main repo via a Windows junction. To install a new package in a worktree, you must break the junction first and install independently:
+
+1. **Remove the junction** (does NOT delete the main repo's `node_modules`):
+
+   ```powershell
+   cmd /c "rmdir node_modules"
+   ```
+
+2. **Add the package** to the root `package.json` (still use `-w`):
+
+   ```powershell
+   pnpm add -w <package-name>
+   ```
+
+3. **Run `make install`** in the worktree to get independent `node_modules`:
+   ```powershell
+   make install
+   ```
+
+> **Do NOT install in the main repo** while junctioned worktrees exist — this is unsafe and can corrupt shared junctions. The `preinstall-guard` script only blocks installs when lockfiles are already dirty, and `pnpm add` can sometimes slip through before it dirties the lockfile. Always install in the worktree after removing its junction. Note that `make install` is blocked by `pnpm-install-lock.ps1` when junctioned worktrees are present.
+
+> **After the worktree is cleaned up**, the main repo's junction remains as it was. The next time you create a worktree, `make wt-setup` will re-create a fresh junction.
+
 ## Prerequisites
 
 - pnpm 9.12.1+ (`corepack enable && corepack prepare pnpm@9.12.1 --activate`)
