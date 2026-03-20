@@ -7,6 +7,7 @@ import { view } from './tools/view.js';
 import { checkBlockers } from './tools/check-blockers.js';
 import { setParent } from './tools/set-parent.js';
 import { getComments } from './tools/get-comments.js';
+import { listChildren } from './tools/list-children.js';
 import { getAtlassianCredentials } from './netrc.js';
 
 // Validate credentials at startup so the server fails fast with a clear
@@ -106,6 +107,28 @@ server.tool(
     key: z.string().describe('Jira ticket key, e.g. LS-1137'),
   },
   async (params) => getComments(params),
+);
+
+// --- jira_list_children ---
+server.tool(
+  'jira_list_children',
+  'List child tickets of an epic or story. Returns key, summary, status, type, priority, and created date for each child. Optionally filter by status.',
+  {
+    key: z
+      .string()
+      .regex(
+        /^[A-Z][A-Z0-9_]+-\d+$/,
+        'Must be a valid Jira issue key (e.g., LS-123)',
+      )
+      .describe('Parent ticket key, e.g. LS-1455 (epic or story)'),
+    status: z
+      .string()
+      .optional()
+      .describe(
+        'Filter children by status (e.g. "To Do", "In Progress", "In Review", "Done"). Omit to return all.',
+      ),
+  },
+  async (params) => listChildren(params),
 );
 
 // Start the server
