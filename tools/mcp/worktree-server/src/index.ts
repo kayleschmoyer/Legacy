@@ -577,6 +577,39 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_ls_tree',
+      description:
+        'List files in a directory at a specific git ref (branch, tag, or SHA) ' +
+        'without checking it out. Useful for checking file existence on remote branches ' +
+        'during CI triage. Runs `git ls-tree`.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          ref: {
+            type: 'string',
+            description:
+              'Git ref to list from (e.g. "origin/main", "origin/LS-1234/branch", a SHA).',
+          },
+          path: {
+            type: 'string',
+            description:
+              'Optional directory path relative to repo root (e.g. "lib/db-client/src/"). ' +
+              'Omit to list the entire tree.',
+          },
+          recursive: {
+            type: 'boolean',
+            description: 'If true, list files recursively (default: true).',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Optional ticket key. Uses active worktree if omitted.',
+          },
+        },
+        required: ['ref'],
+      },
+    },
+    {
       name: 'worktree_unjunction',
       description:
         'Remove the node_modules junction/symlink in a worktree so it can get independent ' +
@@ -2421,6 +2454,110 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
             {
               type: 'text',
               text: `Failed to remove node_modules junction/symlink: ${e.message ?? String(err)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_ls_tree
+    // -----------------------------------------------------------------------
+    case 'worktree_ls_tree': {
+      const {
+        ref,
+        path: dirPath,
+        recursive = true,
+        worktree,
+      } = args as {
+        ref: string;
+        path?: string;
+        recursive?: boolean;
+        worktree?: string;
+      };
+
+      let cwd: string;
+      if (worktree) {
+        const target = resolveTargetDir(worktree);
+        if ('error' in target) {
+          return {
+            content: [{ type: 'text', text: target.error }],
+            isError: true,
+          };
+        }
+        cwd = target.path;
+      } else if (activeWorktree) {
+        cwd = activeWorktree;
+      } else {
+        cwd = MAIN_REPO;
+      }
+
+      // Validate ref (only safe rev chars; reject option-like values)
+      if (ref.startsWith('-')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Ref must not start with '-'.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(ref)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Only alphanumeric, '.', '/', '~', '^', '-' allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const MAX_FILES = 500;
+        const gitArgs = ['ls-tree', '--name-only'];
+        if (recursive) gitArgs.push('-r');
+
+        // For non-recursive mode with a directory path, use <ref>:<dirPath>
+        // so git returns the directory's children instead of just the directory entry.
+        if (dirPath && !recursive) {
+          gitArgs.push(`${ref}:${dirPath}`);
+        } else {
+          gitArgs.push(ref);
+          if (dirPath) gitArgs.push('--', dirPath);
+        }
+
+        const output = runGit(gitArgs, cwd);
+        const allFiles = output.trim().split('\n').filter(Boolean);
+        const truncated = allFiles.length > MAX_FILES;
+        const files = truncated ? allFiles.slice(0, MAX_FILES) : allFiles;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                ref,
+                path: dirPath ?? '/',
+                fileCount: allFiles.length,
+                truncated,
+                files,
+              }),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { message?: string; stderr?: string };
+        const msg = e.stderr || e.message || String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to list files at ${ref}${dirPath ? `:${dirPath}` : ''}: ${msg.trim()}`,
             },
           ],
           isError: true,
