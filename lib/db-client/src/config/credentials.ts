@@ -88,13 +88,36 @@ export async function resolveDatabaseCredentials(
     try {
       return await resolveAwsSecretCredentials(secretName, config);
     } catch (error) {
+      // In Lambda (production), fail fast — never silently fall back to local credentials
+      if (
+        process.env.LAMBDA_TASK_ROOT ||
+        process.env.AWS_LAMBDA_FUNCTION_NAME
+      ) {
+        const wrapped = new Error(
+          `Failed to resolve AWS credentials for secret "${secretName}" in production: ${String(error)}`,
+        );
+        if (error instanceof Error) {
+          wrapped.stack = `${wrapped.stack}\nCaused by: ${error.stack}`;
+        }
+        throw wrapped;
+      }
       LOGGER.warn(
-        `Failed to resolve AWS credentials, falling back to environment: ${String(error)}`,
+        `Failed to resolve AWS credentials, falling back to environment (non-Lambda): ${String(error)}`,
       );
     }
   }
 
-  // 3. Fallback to environment variables
+  // In Lambda (production), fail fast if no secret name is configured at all
+  if (
+    !secretName &&
+    (process.env.LAMBDA_TASK_ROOT || process.env.AWS_LAMBDA_FUNCTION_NAME)
+  ) {
+    throw new Error(
+      'Database credentials misconfigured: no AWS secret name configured in Lambda environment. Set CredentialConfig.secretName or DB_SECRET_NAME/DB_CREDS_PATH.',
+    );
+  }
+
+  // 3. Fallback to environment variables (local development only)
   return resolveLocalCredentials(config);
 }
 
