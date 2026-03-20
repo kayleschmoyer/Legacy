@@ -7,6 +7,7 @@ import { createPR } from './tools/create-pr.js';
 import { requestReview } from './tools/request-review.js';
 import { getReviewThreads } from './tools/get-review-threads.js';
 import { resolveThread } from './tools/resolve-thread.js';
+import { resolveThreads } from './tools/resolve-threads.js';
 import { manageLabels } from './tools/manage-labels.js';
 import { manageLabelsBatch } from './tools/manage-labels-batch.js';
 import { getRepoInfo } from './tools/get-repo-info.js';
@@ -145,6 +146,22 @@ server.tool(
       ),
   },
   async (params) => resolveThread(params),
+);
+
+// --- github_resolve_threads ---
+server.tool(
+  'github_resolve_threads',
+  'Batch-resolve multiple review threads in batched GraphQL calls (groups of 50). Much faster than calling github_resolve_thread individually during PR sweeps. Get thread IDs from github_get_review_threads.',
+  {
+    threadIds: z
+      .array(z.string())
+      .min(1)
+      .max(100)
+      .describe(
+        'Array of GraphQL node IDs of review threads to resolve (from github_get_review_threads)',
+      ),
+  },
+  async (params) => resolveThreads(params),
 );
 
 // --- github_manage_labels ---
