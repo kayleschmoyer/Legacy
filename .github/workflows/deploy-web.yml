@@ -85,7 +85,6 @@ jobs:
           VITE_WEBSOCKET_URL: ${{ secrets.VITE_WEBSOCKET_URL }}
           VITE_GA_MEASUREMENT_ID: ${{ secrets.VITE_GA_MEASUREMENT_ID }}
           VITE_GIPHY_API_KEY: ${{ secrets.VITE_GIPHY_API_KEY }}
-          VITE_JIRA_PROXY_URL: ${{ secrets.VITE_JIRA_PROXY_URL }}
           VITE_ROLLBAR_ACCESS_TOKEN: ${{ secrets.VITE_ROLLBAR_ACCESS_TOKEN }}
           VITE_VERSION: ${{ needs.setup.outputs.version }}
           VITE_APP_VERSION: ${{ needs.setup.outputs.version }}
@@ -96,11 +95,16 @@ jobs:
           ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           NODE_ENV: production
         run: |
+          # Derive jira proxy URL from the same API base as GraphQL
+          # (same API Gateway custom domain, different path)
+          export VITE_JIRA_PROXY_URL="${VITE_GRAPHQL_HOST%/graphql}/jira"
+
           # Display version information
           echo "📋 Version Information:"
           echo "  Version: ${{ needs.setup.outputs.version }}"
           echo "  Commit: ${{ needs.setup.outputs.commit_sha }}"
           echo "  Build Number: ${{ needs.setup.outputs.build_number }}"
+          echo "  Jira Proxy URL: $VITE_JIRA_PROXY_URL"
 
           NX_CMD="${NX_COMMAND:-}"
           if [ -z "$NX_CMD" ]; then

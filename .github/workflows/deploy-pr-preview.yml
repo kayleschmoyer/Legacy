@@ -172,7 +172,6 @@ jobs:
           VITE_WEBSOCKET_URL: ${{ secrets.VITE_WEBSOCKET_URL }}
           VITE_GA_MEASUREMENT_ID: ""
           VITE_GIPHY_API_KEY: ${{ secrets.VITE_GIPHY_API_KEY }}
-          VITE_JIRA_PROXY_URL: ${{ secrets.VITE_JIRA_PROXY_URL }}
           VITE_ROLLBAR_ACCESS_TOKEN: ""
           VITE_VERSION: "0.0.0-pr.${{ steps.pr.outputs.number }}"
           VITE_APP_VERSION: "0.0.0-pr.${{ steps.pr.outputs.number }}"
@@ -180,7 +179,10 @@ jobs:
           VITE_BUILD_DATE: ${{ github.event.workflow_run.updated_at }}
           VITE_BRANCH: ${{ steps.pr.outputs.head_branch }}
           NODE_ENV: production
-        run: pnpm exec nx build web --configuration=production
+        run: |
+          # Derive jira proxy URL from the same API base as GraphQL
+          export VITE_JIRA_PROXY_URL="${VITE_GRAPHQL_HOST%/graphql}/jira"
+          pnpm exec nx build web --configuration=production
 
       - name: Add SPA Fallback (Fallback Build)
         if: steps.pr.outputs.skip != 'true' && steps.download.outcome != 'success'

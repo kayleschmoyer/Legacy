@@ -65,7 +65,10 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
   googleAnalyticsMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID as
     | string
     | undefined,
-  jiraProxyUrl: (import.meta.env.VITE_JIRA_PROXY_URL as string) || '',
+  jiraProxyUrl:
+    import.meta.env.DEV && import.meta.env.VITE_JIRA_PROXY_URL
+      ? '/__jira-proxy'
+      : (import.meta.env.VITE_JIRA_PROXY_URL as string) || '',
   stripeMonthlyPriceId:
     (import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID as string) || '',
   stripeAnnualPriceId:

@@ -65,6 +65,19 @@ export default defineConfig(({ mode }) => {
       port: 4200,
       host: 'localhost',
       strictPort: true,
+      proxy: env.VITE_JIRA_PROXY_URL
+        ? {
+            // Proxy jira-proxy requests through the dev server so the HttpOnly
+            // ls_jwt cookie (set on localhost) is forwarded to the API Gateway.
+            // Without this, cross-origin requests to the raw API Gateway URL
+            // never include the cookie and the lambda returns 401.
+            '/__jira-proxy': {
+              target: env.VITE_JIRA_PROXY_URL,
+              changeOrigin: true,
+              rewrite: (path) => path.replace(/^\/__jira-proxy(\/|$)/, ''),
+            },
+          }
+        : undefined,
     },
     preview: {
       port: 4200,
