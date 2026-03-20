@@ -21,7 +21,7 @@ export function runCommand(
     execFile(
       command,
       args,
-      { cwd, timeout: timeoutMs, maxBuffer: 10 * 1024 * 1024 },
+      { cwd, timeout: timeoutMs, shell: true, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
           // Include both stdout and stderr so callers get full context
