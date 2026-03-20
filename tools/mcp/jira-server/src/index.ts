@@ -8,6 +8,7 @@ import { checkBlockers } from './tools/check-blockers.js';
 import { setParent } from './tools/set-parent.js';
 import { getComments } from './tools/get-comments.js';
 import { listChildren } from './tools/list-children.js';
+import { editTicket } from './tools/edit-ticket.js';
 import { getAtlassianCredentials } from './netrc.js';
 
 // Validate credentials at startup so the server fails fast with a clear
@@ -129,6 +130,22 @@ server.tool(
       ),
   },
   async (params) => listChildren(params),
+);
+
+// --- jira_edit_ticket ---
+server.tool(
+  'jira_edit_ticket',
+  'Update fields on an existing Jira ticket. Provide at least one field to update.',
+  {
+    key: z.string().describe('Jira ticket key, e.g. LS-1578'),
+    summary: z.string().optional().describe('New summary/title'),
+    description: z.string().optional().describe('New description'),
+    type: z
+      .enum(['Task', 'Bug', 'Story'])
+      .optional()
+      .describe('Change issue type'),
+  },
+  async (params) => editTicket(params),
 );
 
 // Start the server
