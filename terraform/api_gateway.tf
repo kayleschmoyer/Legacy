@@ -63,6 +63,13 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_integration.jira_proxy_root_any.id,
       aws_api_gateway_integration.jira_proxy_options.id,
       aws_api_gateway_integration.jira_proxy_any.id,
+      # Rollbar Discord resources
+      aws_api_gateway_resource.rollbar_discord.id,
+      aws_api_gateway_resource.rollbar_discord_paths.id,
+      aws_api_gateway_method.rollbar_discord_root_any.id,
+      aws_api_gateway_method.rollbar_discord_any.id,
+      aws_api_gateway_integration.rollbar_discord_root_any.id,
+      aws_api_gateway_integration.rollbar_discord_any.id,
     ]))
   }
 
@@ -85,6 +92,10 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_integration.jira_proxy_root_any,
     aws_api_gateway_integration.jira_proxy_options,
     aws_api_gateway_integration.jira_proxy_any,
+    aws_api_gateway_method.rollbar_discord_root_any,
+    aws_api_gateway_method.rollbar_discord_any,
+    aws_api_gateway_integration.rollbar_discord_root_any,
+    aws_api_gateway_integration.rollbar_discord_any,
   ]
 }
 

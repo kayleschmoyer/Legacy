@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 Write-Host "🚀 Deploying all Lambda functions to environment: $Environment" -ForegroundColor Green
 
 # Array of Lambda functions to deploy
-$Functions = @("graphql", "stats", "oauth-proxy", "game-selection", "draft-processor")
+$Functions = @("graphql", "stats", "oauth-proxy", "game-selection", "draft-processor", "rollbar-discord")
 
 # Get script directory
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition

@@ -46,6 +46,18 @@ variable "stripe_webhook_secret" {
   sensitive   = true
 }
 
+variable "rollbar_webhook_secret" {
+  description = "Rollbar webhook signing secret for HMAC-SHA256 signature verification"
+  type        = string
+  sensitive   = true
+}
+
+variable "discord_webhook_url" {
+  description = "Discord webhook URL for posting Rollbar and CloudWatch alarm notifications"
+  type        = string
+  sensitive   = true
+}
+
 # =============================================================================
 # GENERATED SECRETS
 # =============================================================================
@@ -183,6 +195,32 @@ resource "aws_secretsmanager_secret" "jira_credentials" {
 resource "aws_secretsmanager_secret_version" "jira_credentials" {
   secret_id     = aws_secretsmanager_secret.jira_credentials.id
   secret_string = var.jira_credentials
+}
+
+# Rollbar webhook signing secret for the Rollbar Discord notification Lambda
+resource "aws_secretsmanager_secret" "rollbar_webhook_secret" {
+  name        = "${var.environment}/rollbar-webhook-secret"
+  description = "Rollbar webhook signing secret for HMAC-SHA256 signature verification"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "rollbar_webhook_secret" {
+  secret_id     = aws_secretsmanager_secret.rollbar_webhook_secret.id
+  secret_string = var.rollbar_webhook_secret
+}
+
+# Discord webhook URL for the Rollbar Discord notification Lambda
+resource "aws_secretsmanager_secret" "discord_webhook_url" {
+  name        = "${var.environment}/discord-webhook-url"
+  description = "Discord webhook URL for posting Rollbar and CloudWatch alarm notifications"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "discord_webhook_url" {
+  secret_id     = aws_secretsmanager_secret.discord_webhook_url.id
+  secret_string = var.discord_webhook_url
 }
 
 # =============================================================================

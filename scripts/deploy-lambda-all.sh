@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "🚀 Deploying all Lambda functions to environment: $ENVIRONMENT"
 
 # Array of Lambda functions to deploy
-FUNCTIONS=("graphql" "stats" "oauth-proxy")
+FUNCTIONS=("graphql" "stats" "oauth-proxy" "rollbar-discord")
 
 # Deploy each function
 for func in "${FUNCTIONS[@]}"; do

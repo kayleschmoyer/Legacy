@@ -56,8 +56,13 @@ switch ($FunctionName) {
         $ProjectName = 'stripe-webhook'
         $SsmParam = "/legacy-sports/${Environment}/lambda/stripe-webhook/version"
     }
+    'rollbar-discord' {
+        $LambdaDir = 'lambdas/rollbar-discord'
+        $ProjectName = 'rollbar-discord'
+        $SsmParam = "/legacy-sports/${Environment}/lambda/rollbar-discord/version"
+    }
     default {
-        Write-Error "Unknown function name '$FunctionName'. Available: graphql, stats, oauth-proxy, game-selection, draft-processor, websocket, stripe-webhook"
+        Write-Error "Unknown function name '$FunctionName'. Available: graphql, stats, oauth-proxy, game-selection, draft-processor, websocket, stripe-webhook, rollbar-discord"
     }
 }
 
