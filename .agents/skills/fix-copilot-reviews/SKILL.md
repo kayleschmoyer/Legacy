@@ -9,7 +9,7 @@ description: 'Batch-process all open PRs that have been reviewed by Copilot: for
 
 Iterate over every open PR that has been reviewed by GitHub Copilot and **fix all review comments**.
 
-> **Clean PRs are handled automatically.** The `copilot-auto-approve` GitHub Action approves PRs and adds the `merge-when-ready` label when Copilot's review has no comments. This skill only handles PRs that have unresolved comments requiring code changes.
+> **Copilot reviews are automatic.** The `copilot-auto-approve` workflow requests Copilot reviews on PR open/update, and auto-approves + labels `merge-when-ready` when the review has no comments. This skill only handles PRs that have unresolved comments requiring code changes.
 
 ## When to Use
 

@@ -97,7 +97,7 @@ server.tool(
 // --- github_request_review ---
 server.tool(
   'github_request_review',
-  'Request reviewers on a PR. Always requests Copilot bot review by default (uses the special copilot-pull-request-reviewer[bot] account). Optionally add human reviewers.',
+  'Request reviewers on a PR. Copilot reviews are now auto-requested by the copilot-auto-approve workflow on PR open/update — use this tool as a fallback or to add human reviewers. Requests Copilot bot review by default (uses copilot-pull-request-reviewer[bot]).',
   {
     number: z.coerce
       .number()

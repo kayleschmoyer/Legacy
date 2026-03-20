@@ -119,35 +119,25 @@ If no e2e project is affected (pure back-end / library change), the command exit
 ```powershell
 # Create PR using GitHub CLI with --body-file (preferred — works for both humans and agents)
 gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
-
-# Request Copilot review via the GitHub API
-# IMPORTANT: --reviewer copilot and -f 'reviewers[]=copilot' do NOT work.
-# You must pipe a JSON body with the full bot login:
-$prNumber = gh pr view --json number --jq .number
-'{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
 ```
 
-> **Copilot review triggers auto-approval.** When Copilot finishes its review with no comments, the `copilot-auto-approve` GitHub Action automatically approves the PR and adds the `merge-when-ready` label. No manual labeling is needed — just request the review and the bot handles the rest.
->
-> **Note**: Neither `--reviewer copilot` on `gh pr create` nor `-f 'reviewers[]=copilot'` works — Copilot is a bot account (`copilot-pull-request-reviewer[bot]`), not a regular GitHub user. Always pipe JSON with the full bot login as shown above.
+> **Copilot review is automatic.** The `copilot-auto-approve` workflow automatically requests a Copilot review when a PR is opened or updated. When Copilot finishes its review with no comments, the workflow approves the PR and adds the `merge-when-ready` label. No manual review request or labeling is needed.
 
 > **Alternative (human-only, opens browser):** `twig github pr create-pr`
 > Twig auto-fills the PR from Jira — convenient for humans but not usable by agents.
 
-## Requesting Copilot Review
+## Copilot Review (Automatic)
 
-Every PR must have a Copilot code review requested. Use the `github_request_review` MCP tool (preferred) or the GitHub API **after** creating the PR:
+Copilot reviews are **automatically requested** by the `copilot-auto-approve` workflow when a PR is opened, updated (new commits pushed), or reopened. No manual action is needed.
 
-```
-github_request_review(number: <PR#>, copilot: true)
-```
-
-When Copilot finishes its review with no comments, the `copilot-auto-approve` workflow automatically:
+When Copilot finishes its review with no comments, the workflow automatically:
 
 1. **Approves** the PR (using a GitHub App bot)
 2. **Labels** it `merge-when-ready` (triggering the merge queue)
 
 If Copilot leaves comments, fix them using the `fix-copilot-reviews` skill, push, and Copilot will re-review — the bot approves once the review is clean.
+
+> **Manual fallback**: If the automatic request didn't fire (e.g., PR was created as draft then un-drafted), use `github_request_review(number: <PR#>, copilot: true)` to trigger it manually.
 
 > 📎 **PowerShell --body-file pitfalls** (why --body-file is required, encoding issues, heredoc traps, fixing garbled descriptions, backtick escaping): see [references/pr-body-powershell-pitfalls.md](references/pr-body-powershell-pitfalls.md)
 
@@ -217,7 +207,7 @@ Technical explanation of why the issue occurred.
 ## Best Practices
 
 1. **Always use `--body-file`** for PR descriptions — never inline `--body` in PowerShell
-2. **Always request Copilot review** via `github_request_review` MCP tool after `gh pr create` — the `copilot-auto-approve` workflow handles approval and `merge-when-ready` labeling automatically
+2. **Copilot review is automatic** — the `copilot-auto-approve` workflow requests Copilot review on PR open/update and handles approval and `merge-when-ready` labeling automatically
 3. **Use `create_file` tool** to write the temp .md file — it preserves backticks and special chars
 4. **Never use PowerShell heredoc** (`@" "@`) for markdown with backticks — it strips them
 5. **Never escape backticks** in the PR body content — write `` `code` `` not `\`code\`` (escaped backticks render as backslashes)
@@ -291,11 +281,8 @@ git push origin HEAD
 # 5. Create PR
 gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
-# 6. Request Copilot review (auto-approve bot handles approval + merge-when-ready label)
-#    MCP: github_request_review(number: <PR#>, copilot: true)
-#    API fallback:
-$prNumber = gh pr view --json number --jq .number
-'{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
+# 6. Copilot review is automatic — the copilot-auto-approve workflow requests
+#    review on PR open/update and auto-approves + labels merge-when-ready when clean
 
 # 7. Clean up temp file
 .\scripts\cleanup-pr-body.ps1
@@ -323,7 +310,7 @@ acli jira workitem transition --key LS-1234 --status "In Review"
 - [ ] PR title includes Jira ticket key prefix (e.g. `LS-1234 feat(scope): description`)
 - [ ] PR description renders correctly (check in browser)
 - [ ] Jira ticket updated to "In Review"
-- [ ] Copilot review requested (via `github_request_review` MCP tool) — bot auto-approves and labels `merge-when-ready` when clean
+- [ ] Copilot review automatically requested by workflow — bot auto-approves and labels `merge-when-ready` when clean
 - [ ] Human reviewers assigned (if required)
 - [ ] `make pc` passes locally (do not wait on GitHub CI — verify locally)
 

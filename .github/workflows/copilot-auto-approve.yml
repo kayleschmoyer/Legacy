@@ -1,18 +1,51 @@
 name: Copilot Auto-Approve
 
-# Auto-approve PRs when Copilot completes its review with no comments.
-# Uses a GitHub App (ID: 3142924) for approval identity.
+# Two jobs:
+# 1. request-review: automatically requests a Copilot review when a PR is opened or updated
+# 2. auto-approve: approves the PR when Copilot's review has no unresolved comments
+#
+# Uses a GitHub App (ID: 3142924) for bot identity.
 # Requires BOT_APP_PRIVATE_KEY secret containing the app's PEM private key.
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   pull_request_review:
     types: [submitted]
 
 jobs:
-  auto-approve:
+  request-review:
     if: >-
-      github.event.review.user.login == 'copilot-pull-request-reviewer[bot]' &&
-      github.event.review.state != 'changes_requested'
+      github.event_name == 'pull_request' &&
+      !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request Copilot review
+        uses: actions/github-script@v8
+        with:
+          script: |
+            try {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                reviewers: ['copilot-pull-request-reviewer[bot]'],
+              });
+              core.info(`Requested Copilot review on PR #${context.payload.pull_request.number}`);
+            } catch (error) {
+              // Don't fail the workflow if the request fails (e.g., bot not installed)
+              core.warning(`Failed to request Copilot review: ${error.message}`);
+            }
+
+  auto-approve:
+    # Only run on pull_request_review events from Copilot
+    # The webhook event uses login 'Copilot' (not 'copilot-pull-request-reviewer[bot]')
+    if: >-
+      github.event_name == 'pull_request_review' &&
+      (github.event.review.user.login == 'Copilot' ||
+       github.event.review.user.login == 'copilot-pull-request-reviewer[bot]') &&
+      github.event.review.state != 'changes_requested' &&
+      secrets.BOT_APP_PRIVATE_KEY != ''
     runs-on: ubuntu-latest
     steps:
       - name: Generate bot token
@@ -68,10 +101,14 @@ jobs:
               cursor = threads.pageInfo.endCursor;
             }
 
+            // GraphQL uses 'copilot-pull-request-reviewer' (no [bot] suffix)
+            // REST API uses 'copilot-pull-request-reviewer[bot]'
+            // Webhook event uses 'Copilot'
+            const copilotLogins = ['copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]', 'Copilot'];
             const copilotThreads = allThreads.filter(t =>
               !t.isOutdated &&
               !t.isResolved &&
-              t.comments.nodes.some(c => c.author.login === 'copilot-pull-request-reviewer[bot]')
+              t.comments.nodes.some(c => copilotLogins.includes(c.author.login))
             );
 
             const hasComments = copilotThreads.length > 0;

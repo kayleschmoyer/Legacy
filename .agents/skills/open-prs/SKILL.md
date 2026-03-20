@@ -17,19 +17,19 @@ Supports three modes:
 
 ## Environment Compatibility
 
-| Operation                          | Local Agent | Cloud Agent | Cloud Tool                                 |
-| ---------------------------------- | :---------: | :---------: | ------------------------------------------ |
-| Scan & classify all PRs            |     ✅      |     ✅      | `github_pr_dashboard`                      |
-| Detailed PR inspection             |     ✅      |     ✅      | `github_view_pr`, `github_pr_batch_status` |
-| Request Copilot reviews            |     ✅      |     ✅      | `github_request_review`                    |
-| Re-run flaky / failed CI           |     ✅      |     ✅      | `ci_rerun`                                 |
-| Diagnose CI failures (read logs)   |     ✅      |     ✅      | `ci_get_logs`, `ci_search_logs`            |
-| Resolve process/meta threads       |     ✅      |     ✅      | `github_resolve_thread`                    |
-| Fetch review thread details        |     ✅      |     ✅      | `github_get_review_threads`                |
-| Rebase conflicting PRs             |     ✅      |     ❌      | — (requires git checkout + push)           |
-| Fix review comments (code changes) |     ✅      |     ❌      | — (requires file edits + commit)           |
-| Fix CI failures (code changes)     |     ✅      |     ❌      | — (requires file edits + commit)           |
-| Post-rebase stabilization          |     ✅      |     ❌      | — (requires make pc + push)                |
+| Operation                          | Local Agent | Cloud Agent | Cloud Tool                                  |
+| ---------------------------------- | :---------: | :---------: | ------------------------------------------- |
+| Scan & classify all PRs            |     ✅      |     ✅      | `github_pr_dashboard`                       |
+| Detailed PR inspection             |     ✅      |     ✅      | `github_view_pr`, `github_pr_batch_status`  |
+| Request Copilot reviews (fallback) |     ✅      |     ✅      | `github_request_review` (auto via workflow) |
+| Re-run flaky / failed CI           |     ✅      |     ✅      | `ci_rerun`                                  |
+| Diagnose CI failures (read logs)   |     ✅      |     ✅      | `ci_get_logs`, `ci_search_logs`             |
+| Resolve process/meta threads       |     ✅      |     ✅      | `github_resolve_thread`                     |
+| Fetch review thread details        |     ✅      |     ✅      | `github_get_review_threads`                 |
+| Rebase conflicting PRs             |     ✅      |     ❌      | — (requires git checkout + push)            |
+| Fix review comments (code changes) |     ✅      |     ❌      | — (requires file edits + commit)            |
+| Fix CI failures (code changes)     |     ✅      |     ❌      | — (requires file edits + commit)            |
+| Post-rebase stabilization          |     ✅      |     ❌      | — (requires make pc + push)                 |
 
 > **Cloud agents cannot commit or push code.** Any operation that requires file edits, git commits, or git push must be deferred to a local agent or human developer. The cloud workflow focuses on API-only actions and producing an actionable report.
 
@@ -54,7 +54,7 @@ Supports three modes:
 | "Fix review comments" / "address Copilot feedback" | Pass 2 only (delegates to `fix-copilot-reviews`) |   ❌   |
 | "Fix CI failures"                                  | Pass 3 only (delegates to `debug-ci-failure`)    |   ❌   |
 | "Re-run failed CI" / "retry flaky CI"              | CI rerun only                                    |   ✅   |
-| "Request Copilot reviews"                          | Request reviews on unreviewed PRs                |   ✅   |
+| "Request Copilot reviews"                          | Fallback — reviews are auto-requested on PR open |   ✅   |
 | "Check PR status" / "scan PRs"                     | Scan + report only (no fixes)                    |   ✅   |
 
 ## Sub-Skills (Load on Demand)
@@ -332,7 +332,7 @@ For detailed inspection of specific PRs, use `github_pr_batch_status` with an ar
 
 ## Cloud Step 2: Verify Clean PRs Are Labeled
 
-The `copilot-auto-approve` bot automatically adds `merge-when-ready` when Copilot's review has no comments. Verify that clean PRs have the label. If any are missing it (e.g., Copilot review wasn't requested), request a review to trigger the auto-approve flow:
+The `copilot-auto-approve` workflow automatically requests Copilot reviews on PR open/update and adds `merge-when-ready` when the review has no comments. Verify that clean PRs have the label. If any are missing it (e.g., the workflow didn't fire for older PRs), request a review manually to trigger the auto-approve flow:
 
 ```
 github_request_review(number: <PR#>, copilot: true)
