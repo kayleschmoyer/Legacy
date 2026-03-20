@@ -355,8 +355,10 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       name: 'worktree_commit',
       description:
         'Stage files and create a conventional commit in the active (or specified) worktree. ' +
+        'Supports --amend to amend the previous commit. ' +
         'Refuses to commit on main. Refuses to stage .env or credential files. ' +
-        'Auto-appends Co-Authored-By line. Validates conventional commit message format.',
+        'For new commits, auto-appends a Co-Authored-By line and validates conventional commit message format; ' +
+        'when amending, it skips these steps and keeps the existing commit message.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -378,8 +380,14 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
           },
+          amend: {
+            type: 'boolean',
+            description:
+              'If true, amends the previous commit instead of creating a new one. ' +
+              'Uses --amend --no-edit (keeps the original message). The message parameter is ignored when amending.',
+          },
         },
-        required: ['message'],
+        required: [],
       },
     },
     {
@@ -1225,11 +1233,26 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         message,
         files,
         worktree: wtKey,
+        amend,
       } = args as {
-        message: string;
+        message?: string;
         files?: string[];
         worktree?: string;
+        amend?: boolean;
       };
+
+      // message is required for new commits, optional for amend
+      if (!amend && !message) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: message is required when not amending.',
+            },
+          ],
+          isError: true,
+        };
+      }
 
       const target = resolveTargetDir(wtKey);
       if ('error' in target) {
@@ -1297,10 +1320,10 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         };
       }
 
-      // Validate conventional commit format (scope is optional)
+      // Validate conventional commit format (scope is optional) — skip for amend
       const conventionalPattern =
         /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?:\s.+/;
-      if (!conventionalPattern.test(message)) {
+      if (!amend && !conventionalPattern.test(message as string)) {
         return {
           content: [
             {
@@ -1363,7 +1386,7 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         } else {
           // Stage all modified files, but check for dangerous files first
           const status = run('git status --porcelain', cwd).trim();
-          if (!status) {
+          if (!status && !amend) {
             return {
               content: [
                 {
@@ -1398,40 +1421,53 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
           runGit(['add', '-A'], cwd);
         }
 
-        // Commit using -F (file) to avoid shell interpolation of message
-        const fullMessage =
-          message + '\n\nCo-Authored-By: Claude <noreply@anthropic.com>';
-        const msgPath = join(tmpdir(), `worktree-commit-msg-${Date.now()}.txt`);
-        writeFileSync(msgPath, fullMessage, 'utf-8');
-
-        try {
-          runGit(['commit', '-F', msgPath], cwd, {
+        // Commit
+        if (amend) {
+          runGit(['commit', '--amend', '--no-edit'], cwd, {
             env: { GIT_EDITOR: 'true' },
           });
-
-          // Get commit info (works on orphan/first commits too)
-          const sha = run('git rev-parse --short HEAD', cwd).trim();
-          const filesChanged = run(
-            'git diff-tree --no-commit-id --name-only -r HEAD',
-            cwd,
-          ).trim();
-
-          const result = {
-            sha,
-            message,
-            filesChanged: filesChanged.split('\n').filter(Boolean),
-          };
-
-          return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          };
-        } finally {
+        } else {
+          const fullMessage =
+            message + '\n\nCo-Authored-By: Claude <noreply@anthropic.com>';
+          const msgPath = join(
+            tmpdir(),
+            `worktree-commit-msg-${Date.now()}.txt`,
+          );
+          writeFileSync(msgPath, fullMessage, 'utf-8');
           try {
-            unlinkSync(msgPath);
-          } catch {
-            // Ignore cleanup errors
+            runGit(['commit', '-F', msgPath], cwd, {
+              env: { GIT_EDITOR: 'true' },
+            });
+          } finally {
+            try {
+              unlinkSync(msgPath);
+            } catch {
+              // Ignore cleanup errors
+            }
           }
         }
+
+        // Get commit info (works on orphan/first commits too)
+        const sha = run('git rev-parse --short HEAD', cwd).trim();
+        const filesChanged = run(
+          'git diff-tree --no-commit-id --name-only -r HEAD',
+          cwd,
+        ).trim();
+
+        const commitMessage = amend
+          ? run('git log -1 --pretty=%B', cwd).trim()
+          : message;
+
+        const result = {
+          sha,
+          message: commitMessage,
+          filesChanged: filesChanged.split('\n').filter(Boolean),
+          ...(amend ? { amended: true } : {}),
+        };
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       } catch (err: unknown) {
         const e = err as { stdout?: string; stderr?: string; status?: number };
         const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
