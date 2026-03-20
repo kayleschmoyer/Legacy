@@ -6,11 +6,43 @@ resource "aws_security_group" "lambda" {
   vpc_id      = aws_vpc.main.id
   description = "Security group for Lambda functions"
 
+  # HTTPS egress — covers VPC endpoints (Secrets Manager, CloudWatch) and
+  # external APIs via NAT (Google, Rollbar, Sentry, Stripe, Apple IAP)
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS to VPC endpoints and external APIs via NAT"
+  }
+
+  # DNS egress — required for VPC DNS resolution (e.g. RDS endpoints, Secrets Manager)
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = [var.vpc_cidr]
+    description = "DNS (UDP) to VPC DNS resolver"
+  }
+
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+    description = "DNS (TCP) to VPC DNS resolver"
+  }
+
+  # PostgreSQL egress — RDS and RDS Proxy within the VPC
+  egress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = compact([
+      aws_security_group.rds.id,
+      try(aws_security_group.rds_proxy[0].id, ""),
+    ])
+    description = "PostgreSQL to RDS and RDS Proxy security groups"
   }
 
   tags = merge(local.common_tags, {

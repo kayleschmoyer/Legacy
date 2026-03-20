@@ -23,15 +23,7 @@ resource "aws_security_group" "nat_instance" {
   vpc_id      = aws_vpc.main.id
   description = "Security group for NAT instance"
 
-  # Allow HTTP/HTTPS from private subnets
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = [for subnet in aws_subnet.private_lambda : subnet.cidr_block]
-    description = "HTTP from private Lambda subnets"
-  }
-
+  # HTTPS-only — all external API traffic uses TLS; no HTTP ingress needed
   ingress {
     from_port   = 443
     to_port     = 443
@@ -40,13 +32,13 @@ resource "aws_security_group" "nat_instance" {
     description = "HTTPS from private Lambda subnets"
   }
 
-  # Allow all outbound traffic to internet
+  # HTTPS-only outbound — all external API traffic uses HTTPS
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "All outbound traffic to internet"
+    description = "HTTPS to external APIs (Google, Rollbar, Sentry, Stripe)"
   }
 
   tags = merge(local.common_tags, {
