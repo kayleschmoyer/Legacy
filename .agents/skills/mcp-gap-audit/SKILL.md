@@ -24,7 +24,7 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 Review the conversation history for all `Bash` tool invocations. Ignore:
 
 - **Git commands** already covered by `worktree_*` MCP tools (e.g., `git -C $wt status` → `worktree_status`)
-- **One-off investigative commands** (e.g., `ls`, `cat` for quick file inspection) — these are not worth tooling
+- **One-off investigative commands** (e.g., `ls`, `cat` for quick orientation) — these are not worth tooling. **Exception**: commands used during CI failure triage that have **no MCP equivalent** (e.g., `git show origin/branch:path` for remote ref:path reads, `git ls-tree`) are almost always recurring patterns, not one-offs — do NOT dismiss them. Commands that _do_ have MCP equivalents (e.g., `git diff` → `worktree_diff`, `git log` → `worktree_log`, `git show` for local commits → `worktree_show`) should be classified as `missing-awareness` rather than ignored
 - **Commands with no realistic MCP equivalent** (e.g., interactive editors, ad-hoc `python -c` scripts)
 
 Focus on commands that:
@@ -32,6 +32,15 @@ Focus on commands that:
 - Were used to accomplish a **repeatable workflow step** (build, test, deploy, query, migrate)
 - Have an existing MCP server that _should_ cover them but doesn't
 - Were run because the agent didn't know an MCP tool existed, or the MCP tool was missing a feature
+
+#### Commonly dismissed but recurring patterns
+
+These commands look "investigative" but represent repeatable workflows every agent will need:
+
+- **Reading files on remote branches**: `git show origin/branch:path/to/file` — needed for CI triage, PR review, conflict investigation. `worktree_show` covers local commit objects; **remote ref:path reads are a gap** (ticket-worthy)
+- **Listing files on remote branches**: `git ls-tree -r --name-only origin/branch -- path/` — needed for checking file existence, finding related files. **No MCP equivalent exists** (ticket-worthy)
+- **Searching logs for error patterns**: `git log --grep="pattern"`, `git log --diff-filter=D -- path` — needed for investigating regressions. `worktree_log` covers standard log queries; **`--grep` and `--diff-filter` options may be a `missing-feature` gap** — check before filing
+- **Comparing branches**: `git diff origin/main...origin/branch -- path` — needed for understanding PR scope. `worktree_diff` covers this — if the agent used raw `git diff` instead, classify as `missing-awareness`
 
 ### 2. Classify each command
 
@@ -114,6 +123,6 @@ Summarize the audit results to the user:
 ## Gotchas
 
 - **Don't create duplicate tickets** — always search LS-1455 children first. Summaries may vary; match on the _underlying capability_, not exact wording.
-- **Don't ticket one-off commands** — only commands that represent a repeatable pattern across sessions.
+- **Don't ticket one-off commands** — only commands that represent a repeatable pattern across sessions. **Heuristic**: ask "Would another agent triaging a different CI failure (or reviewing a different PR) need this same capability?" If yes, it's a repeatable pattern regardless of how simple or investigative it appears.
 - **`missing-feature` vs `missing-tool`** — if a tool exists but needs a new parameter (e.g., `nx_run` lacking `--updateSnapshot`), that's `missing-feature`, not `missing-tool`. The ticket should reference the existing tool.
 - **MCP server scope** — each server has a defined domain (see AGENTS.md MCP Servers table). Don't propose adding a git tool to the DB server.
