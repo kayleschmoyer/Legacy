@@ -1340,14 +1340,21 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
       }
 
       // Refuse to stage dangerous files
-      const dangerousPatterns = [
+      // "Always block" patterns — no safe-extension exemption applies
+      const alwaysBlockPatterns = [
         /\.env$/,
         /\.env\./,
         /credentials/i,
-        /secrets?\.(?!tf$)/i,
         /\.pem$/,
         /\.key$/,
       ];
+      // "Name-based" patterns that cause false positives on IaC/source files
+      // (e.g. secrets.tf, secrets.ts) — safe extensions are exempted
+      const nameBasedPatterns = [/secrets?\./i];
+
+      // IaC and source code files that reference secrets but don't contain them
+      const safeExtensions =
+        /\.(tf|ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|sh)$/i;
 
       // Distinguish files=undefined (stage all) from files=[] (error: nothing specified)
       const stageAll = files === undefined;
@@ -1363,9 +1370,13 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         };
       }
 
+      const isDangerous = (f: string) =>
+        alwaysBlockPatterns.some((p) => p.test(f)) ||
+        (nameBasedPatterns.some((p) => p.test(f)) && !safeExtensions.test(f));
+
       if (!stageAll) {
         for (const f of files) {
-          if (dangerousPatterns.some((p) => p.test(f))) {
+          if (isDangerous(f)) {
             return {
               content: [
                 {
@@ -1403,7 +1414,7 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
             .map((l) => l.slice(3).trim())
             .filter(Boolean);
           for (const f of changedFiles) {
-            if (dangerousPatterns.some((p) => p.test(f))) {
+            if (isDangerous(f)) {
               return {
                 content: [
                   {
