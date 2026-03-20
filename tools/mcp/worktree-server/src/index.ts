@@ -281,7 +281,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       description:
         'Get structured git status for the active (or specified) worktree. ' +
         'Returns modified, staged, untracked files, branch info, ahead/behind counts, ' +
-        'and rebase/merge/conflict state as structured JSON.',
+        'rebase/merge/conflict state, and merge-base info relative to origin/main as structured JSON.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -900,6 +900,34 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
           existsSync(join(gitDir, 'rebase-apply'));
         const mergeInProgress = existsSync(join(gitDir, 'MERGE_HEAD'));
 
+        // Compute merge-base with origin/main for rebase verification
+        let mergeBase: {
+          ref: string;
+          sha: string;
+          behindMain: number;
+        } | null = null;
+
+        try {
+          const mbSha = runGit(
+            ['merge-base', 'HEAD', 'origin/main'],
+            cwd,
+            { timeout: 10_000 },
+          ).trim();
+          // Count commits on origin/main not reachable from HEAD
+          const behindOutput = runGit(
+            ['rev-list', '--count', 'HEAD..origin/main'],
+            cwd,
+            { timeout: 10_000 },
+          ).trim();
+          mergeBase = {
+            ref: 'origin/main',
+            sha: mbSha,
+            behindMain: parseInt(behindOutput, 10) || 0,
+          };
+        } catch {
+          // merge-base can fail on orphan branches or if origin/main doesn't exist
+        }
+
         const result = {
           branch: branch || '(detached)',
           modified,
@@ -910,6 +938,7 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
           behind,
           rebaseInProgress,
           mergeInProgress,
+          mergeBase,
           clean:
             modified.length === 0 &&
             staged.length === 0 &&
