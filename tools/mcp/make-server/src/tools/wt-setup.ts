@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { runMake, getRepoRoot } from '../run-command.js';
+import { runCommand, runMake, getRepoRoot } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
 function isJunction(p: string): boolean {
@@ -14,6 +14,7 @@ function isJunction(p: string): boolean {
 interface WtSetupParams {
   worktreePath: string;
   removeJunction?: boolean;
+  noFrozenLockfile?: boolean;
 }
 
 /**
@@ -33,7 +34,11 @@ interface WtSetupParams {
  * NOTE: `make wt-setup` is Windows-only. On other platforms this tool returns an error.
  */
 export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
-  const { worktreePath, removeJunction = false } = params;
+  const {
+    worktreePath,
+    removeJunction = false,
+    noFrozenLockfile = false,
+  } = params;
 
   if (process.platform !== 'win32') {
     return {
@@ -87,9 +92,34 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
         junctionActuallyRemoved = true;
         log.push('Junction removed.');
 
-        log.push('', '$ make install (independent node_modules)');
-        const installOutput = await runMake(['install'], worktreePath, 300_000);
-        log.push(installOutput);
+        if (noFrozenLockfile) {
+          log.push(
+            '',
+            '$ pnpm install --no-frozen-lockfile (no frozen lockfile requested)',
+          );
+          const installOut = await runCommand(
+            'pnpm',
+            ['install', '--no-frozen-lockfile'],
+            worktreePath,
+            300_000,
+          );
+          log.push(installOut);
+          log.push('', '$ make install (Poetry sync + hooks)');
+          const makeInstallOut = await runMake(
+            ['install'],
+            worktreePath,
+            300_000,
+          );
+          log.push(makeInstallOut);
+        } else {
+          log.push('', '$ make install (independent node_modules)');
+          const installOutput = await runMake(
+            ['install'],
+            worktreePath,
+            300_000,
+          );
+          log.push(installOutput);
+        }
         log.push('Independent node_modules installed.');
       } else if (existsSync(nmPath)) {
         log.push(
@@ -97,9 +127,34 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
           'node_modules exists but is not a junction — skipping junction removal.',
         );
       } else {
-        log.push('', 'No node_modules found — running make install...');
-        const installOutput = await runMake(['install'], worktreePath, 300_000);
-        log.push(installOutput);
+        log.push('', 'No node_modules found — running install...');
+        if (noFrozenLockfile) {
+          log.push(
+            '',
+            '$ pnpm install --no-frozen-lockfile (no frozen lockfile requested)',
+          );
+          const installOut = await runCommand(
+            'pnpm',
+            ['install', '--no-frozen-lockfile'],
+            worktreePath,
+            300_000,
+          );
+          log.push(installOut);
+          log.push('', '$ make install (Poetry sync + hooks)');
+          const makeInstallOut = await runMake(
+            ['install'],
+            worktreePath,
+            300_000,
+          );
+          log.push(makeInstallOut);
+        } else {
+          const installOutput = await runMake(
+            ['install'],
+            worktreePath,
+            300_000,
+          );
+          log.push(installOutput);
+        }
       }
     }
 

@@ -70,6 +70,15 @@ server.tool(
           'independent node_modules in the worktree. Use when the branch has added/removed ' +
           'packages or when you need isolated dependencies.',
       ),
+    noFrozenLockfile: z
+      .boolean()
+      .default(false)
+      .describe(
+        'If true, runs `pnpm install --no-frozen-lockfile` first, then `make install` for ' +
+          'Poetry sync and git hooks (the frozen-lockfile pnpm step inside make install is a ' +
+          'fast no-op since deps are already resolved). ' +
+          'Use when the branch has added new workspace packages that changed the lockfile.',
+      ),
   },
   async (params) => wtSetup(params),
 );
