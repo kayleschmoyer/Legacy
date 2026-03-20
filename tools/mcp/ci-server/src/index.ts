@@ -6,6 +6,7 @@ import { listRuns } from './tools/list-runs.js';
 import { rerun } from './tools/rerun.js';
 import { searchLogs } from './tools/search-logs.js';
 import { viewRun } from './tools/view-run.js';
+import { autoFix } from './tools/auto-fix.js';
 
 const server = new McpServer({
   name: 'legacy-sports-ci',
@@ -206,6 +207,34 @@ server.tool(
       .describe('Enable debug logging for the rerun request'),
   },
   async (params) => rerun(params),
+);
+
+server.tool(
+  'ci_auto_fix',
+  'Analyze CI failure logs and classify the failure type. Returns the failure category ' +
+    '(formatting, stale_branch, codegen, type_error, test_failure, lint, flaky, infrastructure, unknown), ' +
+    'confidence level, evidence lines, and a structured recommendation for how to fix it. ' +
+    'Use this before manual debugging to attempt automated triage.',
+  {
+    runId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .describe('GitHub Actions run database ID to analyze'),
+    jobId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Optional job database ID to analyze instead of the whole run'),
+    attempt: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Specific attempt number for the run'),
+  },
+  async (params) => autoFix(params),
 );
 
 const transport = new StdioServerTransport();
