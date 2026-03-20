@@ -62,6 +62,11 @@ resource "aws_secretsmanager_secret" "database_credentials" {
   name_prefix = "${local.name_prefix}-db-creds-"
   description = "Database credentials for Legacy Sports"
 
+  # TODO: Automatic rotation requires a rotation Lambda (e.g.
+  # SecretsManagerRDSPostgreSQLRotationSingleUser) and migrating away from
+  # random_password so the Lambda — not Terraform — owns credential lifecycle.
+  # See LS-784.
+
   tags = local.common_tags
 }
 
@@ -72,6 +77,14 @@ resource "aws_secretsmanager_secret_version" "database_credentials" {
     password = random_password.database_password.result
   })
 }
+
+# =============================================================================
+# EXTERNALLY-MANAGED SECRETS (no rotation_rules)
+# These secrets are provided by third-party services (Google, Stripe, Jira) or
+# require application-level coordination (JWT — needs grace period for existing
+# tokens). Rotation must be performed manually via the provider's dashboard and
+# updated in secrets.auto.tfvars / GitHub Actions secrets.
+# =============================================================================
 
 resource "aws_secretsmanager_secret" "jwt_secret" {
   name        = "${var.environment}/jwt-secret-key"
@@ -118,6 +131,10 @@ resource "random_password" "system_api_key" {
 resource "aws_secretsmanager_secret" "system_api_key" {
   name_prefix = "${local.name_prefix}-system-api-key-"
   description = "System API key for EventBridge and admin CLI to call system mutations"
+
+  # TODO: Automatic rotation requires a rotation Lambda and updating consumers
+  # (EventBridge rules, admin CLI) to resolve credentials from Secrets Manager
+  # at runtime instead of random_password. See LS-784.
 
   tags = local.common_tags
 }
@@ -183,6 +200,9 @@ resource "random_password" "ci_readonly_db_password" {
 resource "aws_secretsmanager_secret" "ci_readonly_db_credentials" {
   name_prefix = "${local.name_prefix}-ci-readonly-db-creds-"
   description = "Read-only DB credentials for CI migration state checks (ci_readonly Postgres role)"
+
+  # TODO: Automatic rotation requires a rotation Lambda and a mechanism to
+  # ALTER the ci_readonly Postgres role password in sync. See LS-784.
 
   tags = merge(local.common_tags, {
     Component = "ci"
