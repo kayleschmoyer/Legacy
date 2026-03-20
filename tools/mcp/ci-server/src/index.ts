@@ -106,6 +106,14 @@ server.tool(
       .positive()
       .optional()
       .describe('If provided, returns only the last N lines of log output'),
+    errorSummary: z
+      .boolean()
+      .default(false)
+      .describe(
+        'When true, returns only error/failure lines with surrounding context instead of full logs. ' +
+          'Extracts TS errors, FAIL lines, Nx "Failed tasks" sections, and other error indicators. ' +
+          'Keeps output under ~200 lines for agent consumption.',
+      ),
   },
   async (params) => getLogs(params),
 );
