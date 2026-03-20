@@ -1,5 +1,5 @@
 import { runGhJson, runGraphQL, getRepoOwnerName } from '../gh.js';
-import { summarizeCIStatus } from '../types.js';
+import { summarizeCIStatus, deduplicateChecks } from '../types.js';
 import type { ToolResult } from '../types.js';
 
 interface PRDashboardParams {
@@ -201,7 +201,14 @@ export async function prDashboard(
 
     // 3. Build dashboard rows
     const rows = prs.map((pr) => {
-      const ci = summarizeCIStatus(pr.statusCheckRollup);
+      const dedupedChecks = pr.statusCheckRollup
+        ? deduplicateChecks(pr.statusCheckRollup)
+        : null;
+      const ci = summarizeCIStatus(dedupedChecks);
+      const hadStaleChecks =
+        pr.statusCheckRollup != null &&
+        dedupedChecks != null &&
+        pr.statusCheckRollup.length > dedupedChecks.length;
       const threads = threadCounts[pr.number] ?? {
         total: -1,
         unresolved: -1,
@@ -217,6 +224,7 @@ export async function prDashboard(
         isDraft: pr.isDraft,
         mergeable: pr.mergeable,
         ciStatus: ci,
+        hadStaleChecks,
         reviewDecision: pr.reviewDecision,
         unresolvedThreads: threads.unresolved,
         totalThreads: threads.total,

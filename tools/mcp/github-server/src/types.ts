@@ -10,6 +10,7 @@ export interface CICheck {
   name: string;
   status: string;
   conclusion: string | null;
+  startedAt?: string | null;
 }
 
 const FAILING_CONCLUSIONS = new Set([
@@ -22,10 +23,35 @@ const FAILING_CONCLUSIONS = new Set([
 const PENDING_STATUSES = new Set(['IN_PROGRESS', 'QUEUED', 'PENDING']);
 
 /**
+ * Deduplicate checks by name, keeping only the most recent run of each.
+ * When statusCheckRollup includes checks from old SHAs alongside current
+ * ones, stale failures can pollute the CI summary.
+ */
+export function deduplicateChecks(checks: CICheck[]): CICheck[] {
+  const byName = new Map<string, CICheck>();
+  for (const check of checks) {
+    const existing = byName.get(check.name);
+    if (!existing) {
+      byName.set(check.name, check);
+    } else if (
+      check.startedAt &&
+      (!existing.startedAt || check.startedAt > existing.startedAt)
+    ) {
+      byName.set(check.name, check);
+    } else if (!check.startedAt && !existing.startedAt) {
+      // Neither has a timestamp — prefer the later occurrence in the list
+      // since GitHub returns checks in reverse-chronological order by default.
+      byName.set(check.name, check);
+    }
+  }
+  return [...byName.values()];
+}
+
+/**
  * Summarize CI status from a list of checks.
  * Aligned with pr-scan's FAILING_CONCLUSIONS / PENDING_STATUSES sets.
  *
- * Returns: 'none' | 'pass' | 'fail' | 'pending' | 'mixed'
+ * Returns: 'none' | 'pass' | 'fail' | 'pending'
  */
 export function summarizeCIStatus(checks: CICheck[] | null): string {
   if (!checks || checks.length === 0) return 'none';
