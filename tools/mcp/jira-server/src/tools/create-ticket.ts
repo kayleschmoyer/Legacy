@@ -15,6 +15,17 @@ interface CreateIssueResponse {
   self: string;
 }
 
+interface CreateTicketResponse {
+  success: boolean;
+  key: string;
+  url: string;
+  id?: string;
+  type?: string;
+  summary?: string;
+  sprintId?: number;
+  warning?: string;
+}
+
 /** Create a Jira ticket via REST API. */
 export async function createTicket(
   params: CreateTicketParams,
@@ -81,24 +92,44 @@ export async function createTicket(
 
     // Assign to sprint post-creation via the Agile API — the Create Issue
     // REST endpoint does not support the sprint field directly.
+    let sprintWarning: string | undefined;
     if (sprintId) {
-      await jiraRequest({
-        method: 'POST',
-        path: `/rest/agile/1.0/sprint/${sprintId}/issue`,
-        body: { issues: [result.key] },
-      });
+      try {
+        await jiraRequest({
+          method: 'POST',
+          path: `/rest/agile/1.0/sprint/${sprintId}/issue`,
+          body: { issues: [result.key] },
+        });
+      } catch (sprintError) {
+        const sprintMessage =
+          sprintError instanceof Error
+            ? sprintError.message
+            : String(sprintError);
+        sprintWarning = `Ticket created but sprint assignment failed: ${sprintMessage}`;
+        sprintId = null;
+      }
+    }
+
+    const response: CreateTicketResponse = {
+      success: true,
+      key: result.key,
+      url: `https://bkrupa.atlassian.net/browse/${result.key}`,
+    };
+    if (sprintId) {
+      response.sprintId = sprintId;
+    }
+    if (sprintWarning) {
+      response.warning = sprintWarning;
+    } else if (sprint && !sprintId) {
+      response.warning =
+        'Sprint was requested but no active sprint was found. Ticket created without sprint assignment.';
     }
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
-            success: true,
-            key: result.key,
-            url: `https://bkrupa.atlassian.net/browse/${result.key}`,
-            ...(sprintId ? { sprintId } : {}),
-          }),
+          text: JSON.stringify(response),
         },
       ],
     };

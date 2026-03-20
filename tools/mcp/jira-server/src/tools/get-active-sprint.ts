@@ -18,18 +18,19 @@ interface BoardSearchResponse {
  * Find the active sprint for the LS project board.
  *
  * Discovery order:
- * 1. Search for scrum boards belonging to the LS project
+ * 1. Search for boards belonging to the LS project (any type)
  * 2. Query the first board's sprints filtered to state=active
  * 3. Return the first (and typically only) active sprint ID
  *
  * Returns `null` if no active sprint is found.
  */
 export async function getActiveSprintId(): Promise<number | null> {
-  // Find the LS project board
+  // Find the LS project board — omit type filter so team-managed ("simple")
+  // boards are included alongside scrum boards.
   const boards = await jiraRequest<BoardSearchResponse>({
     method: 'GET',
     path: '/rest/agile/1.0/board',
-    query: { projectKeyOrId: 'LS', type: 'scrum' },
+    query: { projectKeyOrId: 'LS' },
   });
 
   if (!boards.values.length) {
