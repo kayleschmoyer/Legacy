@@ -108,13 +108,9 @@ function isTestLeague(name: string): boolean {
 }
 
 export default async function globalTeardown(): Promise<void> {
-  if (process.env.INTEGRATION_TEARDOWN !== 'true') {
-    console.log(
-      '[integration teardown] INTEGRATION_TEARDOWN is not set to "true" — skipping league cleanup.',
-    );
-    return;
-  }
-
+  // Always run cleanup after integration tests to prevent league accumulation
+  // across runs. Previously gated by INTEGRATION_TEARDOWN=true, but skipping
+  // cleanup was the root cause of free-tier league limit failures (LS-1502).
   const jwt = await getAuthJwt();
   if (!jwt) {
     console.log(
