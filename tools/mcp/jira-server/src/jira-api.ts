@@ -38,9 +38,19 @@ export async function jiraRequest<T = unknown>(
     );
   }
 
+  // Some Jira endpoints (e.g. PUT) return 204 No Content with an empty body
+  // but may still include a content-type header. Guard against JSON parse errors.
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   const contentType = response.headers.get('content-type');
   if (contentType?.includes('application/json')) {
-    return (await response.json()) as T;
+    const text = await response.text();
+    if (!text) {
+      return undefined as T;
+    }
+    return JSON.parse(text) as T;
   }
   return undefined as T;
 }
