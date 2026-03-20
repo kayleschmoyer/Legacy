@@ -47,3 +47,12 @@ export function shuffleArray<T>(array: T[]): T[] {
   }
   return shuffled;
 }
+
+/**
+ * Strip trailing junk from MLB API descriptions.
+ * The API sometimes returns descriptions ending with ",  and." or ", , , ,  and."
+ * when optional fields are empty.
+ */
+export function cleanDescription(desc: string): string {
+  return desc.replace(/(?:,\s*)+and\.\s*$/, '.');
+}

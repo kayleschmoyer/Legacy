@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Zap,
 } from '@tamagui/lucide-icons';
+import { cleanDescription } from '@legacy-sports/utils';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -441,7 +442,7 @@ export function OnThisDayFeed(): React.JSX.Element {
                       </StatBadge>
                     </XStack>
                     <Text fontSize="$3" color="$textMuted" numberOfLines={2}>
-                      {event.description}
+                      {cleanDescription(event.description ?? '')}
                     </Text>
                   </YStack>
                 </XStack>

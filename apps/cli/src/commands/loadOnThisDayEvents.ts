@@ -23,6 +23,7 @@
  */
 
 import { LOGGER } from '@legacy-sports/logging';
+import { cleanDescription } from '@legacy-sports/utils';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '@legacy-sports/db-client';
 import { sql } from 'drizzle-orm';
@@ -157,7 +158,7 @@ export async function handleLoadOnThisDayEvents(
             const fromTeam = tx.fromTeam?.name ?? null;
             const toTeam = tx.toTeam?.name ?? null;
             const eventType = tx.typeCode ?? '';
-            const description = tx.description ?? '';
+            const description = cleanDescription(tx.description ?? '');
 
             if (upsert && mlbTransactionId !== null) {
               await db.execute(sql`
