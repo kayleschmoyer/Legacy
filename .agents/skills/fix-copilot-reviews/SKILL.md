@@ -1,21 +1,20 @@
 ---
 name: fix-copilot-reviews
-description: 'Batch-process all open PRs that have been reviewed by Copilot: for each PR with review comments, check out the branch in a worktree and fix every comment; for PRs with no review comments, add the merge-when-ready label. Use when asked to address Copilot review feedback across all PRs, batch-fix PR reviews, or auto-label clean PRs.'
+description: 'Batch-process all open PRs that have been reviewed by Copilot: for each PR with review comments, check out the branch in a worktree and fix every comment. Clean PRs are auto-approved and labeled by the copilot-auto-approve GitHub Action. Use when asked to address Copilot review feedback across all PRs or batch-fix PR reviews.'
 ---
 
 # Skill: Fix Copilot Reviews (Batch)
 
 ## Overview
 
-Iterate over every open PR that has been reviewed by GitHub Copilot.
-For each PR, either **fix all review comments** or **label it for merge**.
+Iterate over every open PR that has been reviewed by GitHub Copilot and **fix all review comments**.
+
+> **Clean PRs are handled automatically.** The `copilot-auto-approve` GitHub Action approves PRs and adds the `merge-when-ready` label when Copilot's review has no comments. This skill only handles PRs that have unresolved comments requiring code changes.
 
 ## When to Use
 
 - "Fix all Copilot review comments"
 - "Address Copilot feedback on open PRs"
-- "Label clean PRs as merge-when-ready"
-- "Request Copilot reviews on PRs that don't have them"
 - Periodic review-sweep before a release
 
 ## Workflow
@@ -40,21 +39,22 @@ foreach ($pr in $prs) {
 Write-Host "Found $($reviewed.Count) PRs reviewed by Copilot"
 ```
 
-### Step 1 — Classify: Comments vs Clean
+### Step 1 — Find PRs With Unresolved Comments
 
-For each Copilot-reviewed PR, fetch the review threads to determine if there
-are **unresolved, non-outdated** review comments.
+For each Copilot-reviewed PR, fetch the review threads and collect those with
+unresolved, non-outdated comments. PRs with no comments are skipped — the
+`copilot-auto-approve` workflow handles approval and labeling automatically.
 
 ```powershell
-# Resolve owner/repo once from the current repo
-$repoInfo = gh repo view --json owner,name | ConvertFrom-Json
-$owner = $repoInfo.owner.login
-$repo = $repoInfo.name
-
 $toFix = @()   # collect { pr, threads } objects for Step 2
 
 foreach ($pr in $reviewed) {
-  # Use GraphQL to get review threads (same query the merge-queue uses)
+  # Use MCP tool (preferred): github_get_review_threads(number: $pr.number, unresolvedOnly: true)
+  # Or GraphQL fallback:
+  $repoInfo = gh repo view --json owner,name | ConvertFrom-Json
+  $owner = $repoInfo.owner.login
+  $repo = $repoInfo.name
+
   $query = @'
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
@@ -84,20 +84,16 @@ query($owner: String!, $repo: String!, $number: Int!) {
     ConvertFrom-Json
 
   $threads = $result.data.repository.pullRequest.reviewThreads.nodes
-  # Filter to unresolved, non-outdated threads authored by Copilot
   $unresolved = $threads | Where-Object {
     -not $_.isResolved -and -not $_.isOutdated -and
     ($_.comments.nodes | Where-Object { $_.author.login -match 'copilot' })
   }
 
-  if ($unresolved.Count -eq 0) {
-    # --- CLEAN PR → label for merge ---
-    Write-Host "PR #$($pr.number) ($($pr.title)) — no comments, adding merge-when-ready"
-    gh pr edit $pr.number --add-label "merge-when-ready"
-  } else {
-    # --- HAS COMMENTS → collect them for fixing ---
+  if ($unresolved.Count -gt 0) {
     Write-Host "PR #$($pr.number) ($($pr.title)) — $($unresolved.Count) unresolved comment(s)"
     $toFix += @{ pr = $pr; threads = $unresolved }
+  } else {
+    Write-Host "PR #$($pr.number) ($($pr.title)) — clean (bot handles approval)"
   }
 }
 ```
@@ -190,41 +186,10 @@ When fixing >10 PRs in a single session:
 
 After processing every PR, print a summary table:
 
-| PR   | Title              | Action           | Result                   |
-| ---- | ------------------ | ---------------- | ------------------------ |
-| #123 | feat(scoring): ... | Fixed 3 comments | pushed                   |
-| #124 | fix(ui): ...       | No comments      | labeled merge-when-ready |
-
-## Requesting Copilot Reviews on PRs That Don't Have Them
-
-If the user asks to "add Copilot reviews" to PRs, find PRs **without** a
-Copilot review and request one via the GitHub API.
-
-> **IMPORTANT:** `gh pr edit --add-reviewer copilot` and `-f 'reviewers[]=copilot'`
-> do **NOT** work. Copilot's actual bot login is `copilot-pull-request-reviewer[bot]`.
-> You must pipe a JSON body with the full bot login.
-
-```powershell
-# Find PRs without a Copilot review
-$prs = gh pr list --state open --json number,title,headRefName --limit 100 | ConvertFrom-Json
-$noReview = @()
-foreach ($pr in $prs) {
-  $reviews = gh api --paginate "repos/{owner}/{repo}/pulls/$($pr.number)/reviews?per_page=100" 2>$null | ConvertFrom-Json
-  $copilotReview = $reviews | Where-Object { $_.user.login -eq 'copilot-pull-request-reviewer[bot]' }
-  if (-not $copilotReview) { $noReview += $pr }
-}
-
-# Request Copilot review on each
-$body = '{"reviewers":["copilot-pull-request-reviewer[bot]"]}'
-foreach ($pr in $noReview) {
-  $response = echo $body | gh api "repos/{owner}/{repo}/pulls/$($pr.number)/requested_reviewers" --method POST --input - 2>&1
-  if ($LASTEXITCODE -eq 0) {
-    Write-Host "Requested Copilot review on PR #$($pr.number)"
-  } else {
-    Write-Warning "Failed to request Copilot review on PR #$($pr.number) (exit code $LASTEXITCODE). Response:`n$response"
-  }
-}
-```
+| PR   | Title              | Action           | Result                      |
+| ---- | ------------------ | ---------------- | --------------------------- |
+| #123 | feat(scoring): ... | Fixed 3 comments | pushed (bot will re-review) |
+| #124 | fix(ui): ...       | No comments      | skipped (bot handles it)    |
 
 ## Common Copilot Review Patterns (Top 10)
 
@@ -255,8 +220,8 @@ The most frequent Copilot review issues — knowing these speeds up fixes signif
   it does not replace `make pc` or any CI checks.
 - If a review comment is unclear or requires a design decision, **skip it**
   and leave a reply on the thread explaining why: `gh api ... --method POST`.
-- Only add `merge-when-ready`. Do **not** add or remove `merge-to-parent` —
-  that label is managed by users, and we prefer to only auto-merge into main.
+- **Do not manually add `merge-when-ready`** — the `copilot-auto-approve` bot adds it
+  automatically when Copilot's review is clean after your fixes are pushed.
 
 ## Related Skills
 

@@ -21,7 +21,6 @@ Supports three modes:
 | ---------------------------------- | :---------: | :---------: | ------------------------------------------ |
 | Scan & classify all PRs            |     ✅      |     ✅      | `github_pr_dashboard`                      |
 | Detailed PR inspection             |     ✅      |     ✅      | `github_view_pr`, `github_pr_batch_status` |
-| Label clean PRs `merge-when-ready` |     ✅      |     ✅      | `github_manage_labels`                     |
 | Request Copilot reviews            |     ✅      |     ✅      | `github_request_review`                    |
 | Re-run flaky / failed CI           |     ✅      |     ✅      | `ci_rerun`                                 |
 | Diagnose CI failures (read logs)   |     ✅      |     ✅      | `ci_get_logs`, `ci_search_logs`            |
@@ -40,7 +39,6 @@ Supports three modes:
 - "Sweep open PRs and get them ready to merge"
 - "Rebase all conflicting PRs" _(local only)_
 - "Fix all review comments across PRs" _(local only)_
-- "Label clean PRs as merge-when-ready"
 - "Check PR status across the board"
 - "Re-run failed CI on all PRs"
 - "Request Copilot reviews on all PRs"
@@ -56,7 +54,6 @@ Supports three modes:
 | "Fix review comments" / "address Copilot feedback" | Pass 2 only (delegates to `fix-copilot-reviews`) |   ❌   |
 | "Fix CI failures"                                  | Pass 3 only (delegates to `debug-ci-failure`)    |   ❌   |
 | "Re-run failed CI" / "retry flaky CI"              | CI rerun only                                    |   ✅   |
-| "Label clean PRs" / "merge-when-ready"             | Label step only                                  |   ✅   |
 | "Request Copilot reviews"                          | Request reviews on unreviewed PRs                |   ✅   |
 | "Check PR status" / "scan PRs"                     | Scan + report only (no fixes)                    |   ✅   |
 
@@ -94,8 +91,7 @@ This skill delegates to specialized sub-skills for each operation category. Load
 
 - **Remove `@me` filter** — use `--limit 200` to catch all open PRs, not just yours
 - **Resolve review threads after fixing** — leaving threads unresolved is incomplete work
-- **Label step is REQUIRED** — the sweep is NOT complete until clean PRs are labeled `merge-when-ready`. Stopping after fixes without labeling is the most common sweep failure mode.
-- **Wait for CI before labeling** — if all fixes are pushed but CI is still `mixed`/pending, poll every 3 minutes (max 5 polls) until runs complete. Only then scan and label. Do not skip labeling because CI hasn't finished yet.
+- **Labeling is automated** — the `copilot-auto-approve` GitHub Action adds `merge-when-ready` when Copilot's review has no comments. Do not manually label PRs — fix comments, push, and let the bot handle approval + labeling after Copilot re-reviews.
 - **Dashboard CI summary can be stale** — the dashboard reports `ciStatus` as `none`, `pass`, `fail`, or `pending`. Stale checks (e.g., Enhanced Merge Queue on an old SHA) can cause a PR to show `fail` or `pending` even when current-SHA checks all pass. Use `github_pr_batch_status` to inspect actual job-level results: if all CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, the PR is clean regardless of dashboard `ciStatus`.
 
 ### Local Agent Only
@@ -196,7 +192,7 @@ For each PR in `$scan.reviews`:
 2. **Load `skills/fix-copilot-reviews/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
 3. After pushing, re-check for new threads (Copilot re-reviews on push)
 
-> **Label reminder**: After the outer loop completes, the Label step adds `merge-when-ready` to all clean PRs. Do NOT label PRs during this pass.
+> **No manual labeling needed.** The `copilot-auto-approve` bot labels clean PRs automatically after Copilot re-reviews the pushed fixes.
 
 ---
 
@@ -257,32 +253,17 @@ PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle
 
 ---
 
-## Label Clean PRs for Merge (REQUIRED)
+## Verify Clean PRs Are Labeled
 
-> **Do NOT stop before this step.** Fixing code without labeling clean PRs defeats the purpose of the sweep. If CI is still running, wait and re-scan — do not skip.
+> **Labeling is automated.** The `copilot-auto-approve` GitHub Action adds `merge-when-ready` when Copilot's review has no comments. After fixing review comments and pushing, Copilot re-reviews and the bot labels clean PRs automatically.
 
-After all fixes (or as a standalone operation), add `merge-when-ready` to every clean PR. If most PRs show stale `ciStatus` (`fail` or `pending` due to old-SHA checks), use `github_pr_batch_status` to inspect job-level results — a PR is clean if all CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, even when the dashboard disagrees:
+After all fixes, verify that clean PRs have been labeled. If any PRs are missing the label (e.g., the bot hasn't triggered yet), request a Copilot review to trigger the auto-approve flow:
 
-```powershell
-# Re-scan to get final state
-Set-Location D:\code\legacy-sports
-.\scripts\scan-prs.ps1
-$scan = Get-Content scratch/pr-scan.json | ConvertFrom-Json
-
-foreach ($pr in $scan.clean) {
-  $labels = (gh pr view $pr.number --json labels | ConvertFrom-Json).labels.name
-  if ($labels -notcontains 'merge-when-ready') {
-    Write-Host "PR #$($pr.number) ($($pr.title)) — adding merge-when-ready"
-    gh pr edit $pr.number --add-label "merge-when-ready"
-  } else {
-    Write-Host "PR #$($pr.number) ($($pr.title)) — already labeled"
-  }
-}
+```
+github_request_review(number: <PR#>, copilot: true)
 ```
 
-> **Stale-check gap**: The loop above only iterates `$scan.clean`, which won't include PRs misclassified by stale checks. When the dashboard marks PRs as `fail` or `pending` due to old-SHA checks, use `github_pr_batch_status` to identify PRs where all current-SHA CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, then label them directly via `github_manage_labels(number: <PR#>, add: ["merge-when-ready"])`.
-
-> **Only add `merge-when-ready`**. Do **not** add or remove `merge-to-parent` — that label is managed manually for stacked PRs targeting non-main branches.
+> **Only the bot should add `merge-when-ready`**. Do **not** manually add or remove `merge-to-parent` — that label is managed manually for stacked PRs targeting non-main branches.
 
 ---
 
@@ -298,7 +279,7 @@ For full sweeps, run passes 1–3 in a loop (max 5 iterations) until all PRs are
 4. Pass 3: Fix all CI failures
 5. Validate all changed PRs: `make pc` in each worktree
 6. Repeat passes 1–3 until no new changes are made (or max 5 iterations)
-7. Label all clean PRs `merge-when-ready`
+7. Verify clean PRs are labeled (bot handles labeling automatically after Copilot re-review)
 
 > 📎 **Parallelization details**: see [references/sweep-and-parallelization.md](references/sweep-and-parallelization.md)
 
@@ -349,22 +330,13 @@ For detailed inspection of specific PRs, use `github_pr_batch_status` with an ar
 
 > For a **scan-only** request, stop here and report the results.
 
-## Cloud Step 2: Label Clean PRs
+## Cloud Step 2: Verify Clean PRs Are Labeled
 
-A PR is **clean** when all of these are true:
-
-- `mergeable` is `MERGEABLE` (not `CONFLICTING` or `UNKNOWN`)
-- `ciStatus` is `pass`
-- `unresolvedThreads` is `0`
-- Not a draft (`isDraft` is `false`)
-
-For each clean PR that does not already have the `merge-when-ready` label:
+The `copilot-auto-approve` bot automatically adds `merge-when-ready` when Copilot's review has no comments. Verify that clean PRs have the label. If any are missing it (e.g., Copilot review wasn't requested), request a review to trigger the auto-approve flow:
 
 ```
-github_manage_labels(number: <PR#>, add: ["merge-when-ready"])
+github_request_review(number: <PR#>, copilot: true)
 ```
-
-> **Only add `merge-when-ready`**. Do **not** add or remove `merge-to-parent` — that label is managed manually for stacked PRs targeting non-main branches.
 
 ## Cloud Step 3: Re-run Flaky / Failed CI
 
@@ -461,10 +433,10 @@ For a full cloud sweep, run steps 1–7 in order. Unlike the local sweep, there 
 
 1. Scan all open PRs (Cloud Step 1)
 2. Re-run flaky CI (Cloud Step 3) — do this early so CI has time to complete
-3. Request Copilot reviews on unreviewed PRs (Cloud Step 4)
+3. Request Copilot reviews on unreviewed PRs (Cloud Step 4) — triggers auto-approve for clean PRs
 4. Resolve process/meta review threads (Cloud Step 5)
 5. Wait ~3 minutes if any CI re-runs were triggered, then re-scan
-6. Label all clean PRs (Cloud Step 2)
+6. Verify clean PRs are labeled (Cloud Step 2)
 7. Produce final report (Cloud Step 6)
 
 ---

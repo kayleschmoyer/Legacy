@@ -127,7 +127,7 @@ $prNumber = gh pr view --json number --jq .number
 '{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
 ```
 
-> **Why request Copilot review?** Copilot reviews run instantly, surface issues before human reviewers look at the PR, and are required by team convention.
+> **Copilot review triggers auto-approval.** When Copilot finishes its review with no comments, the `copilot-auto-approve` GitHub Action automatically approves the PR and adds the `merge-when-ready` label. No manual labeling is needed — just request the review and the bot handles the rest.
 >
 > **Note**: Neither `--reviewer copilot` on `gh pr create` nor `-f 'reviewers[]=copilot'` works — Copilot is a bot account (`copilot-pull-request-reviewer[bot]`), not a regular GitHub user. Always pipe JSON with the full bot login as shown above.
 
@@ -136,19 +136,18 @@ $prNumber = gh pr view --json number --jq .number
 
 ## Requesting Copilot Review
 
-Every PR must have a Copilot code review requested. Use the GitHub API **after** creating the PR:
+Every PR must have a Copilot code review requested. Use the `github_request_review` MCP tool (preferred) or the GitHub API **after** creating the PR:
 
-```powershell
-# Request Copilot review (run immediately after gh pr create)
-$prNumber = gh pr view --json number --jq .number
-'{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
+```
+github_request_review(number: <PR#>, copilot: true)
 ```
 
-> **Do NOT use `--reviewer copilot`** on `gh pr create` or `-f 'reviewers[]=copilot'` — neither works because Copilot is a bot account (`copilot-pull-request-reviewer[bot]`), not a regular GitHub user. You must pipe a JSON body with the full bot login as shown above.
+When Copilot finishes its review with no comments, the `copilot-auto-approve` workflow automatically:
 
-**Manual fallback (web UI):** Open the PR in the browser → Reviewers sidebar → gear icon → select "Copilot".
+1. **Approves** the PR (using a GitHub App bot)
+2. **Labels** it `merge-when-ready` (triggering the merge queue)
 
-Copilot reviews are non-blocking — they run asynchronously and do not gate the PR merge. However they must be **requested** on every PR so the feedback is available to human reviewers.
+If Copilot leaves comments, fix them using the `fix-copilot-reviews` skill, push, and Copilot will re-review — the bot approves once the review is clean.
 
 > 📎 **PowerShell --body-file pitfalls** (why --body-file is required, encoding issues, heredoc traps, fixing garbled descriptions, backtick escaping): see [references/pr-body-powershell-pitfalls.md](references/pr-body-powershell-pitfalls.md)
 
@@ -218,7 +217,7 @@ Technical explanation of why the issue occurred.
 ## Best Practices
 
 1. **Always use `--body-file`** for PR descriptions — never inline `--body` in PowerShell
-2. **Always request Copilot review** via `gh api` with piped JSON body after `gh pr create` — neither `--reviewer copilot` nor `-f 'reviewers[]=copilot'` works (see [Requesting Copilot Review](#requesting-copilot-review))
+2. **Always request Copilot review** via `github_request_review` MCP tool after `gh pr create` — the `copilot-auto-approve` workflow handles approval and `merge-when-ready` labeling automatically
 3. **Use `create_file` tool** to write the temp .md file — it preserves backticks and special chars
 4. **Never use PowerShell heredoc** (`@" "@`) for markdown with backticks — it strips them
 5. **Never escape backticks** in the PR body content — write `` `code` `` not `\`code\`` (escaped backticks render as backslashes)
@@ -292,7 +291,9 @@ git push origin HEAD
 # 5. Create PR
 gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
-# 6. Request Copilot review via API
+# 6. Request Copilot review (auto-approve bot handles approval + merge-when-ready label)
+#    MCP: github_request_review(number: <PR#>, copilot: true)
+#    API fallback:
 $prNumber = gh pr view --json number --jq .number
 '{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
 
@@ -322,9 +323,8 @@ acli jira workitem transition --key LS-1234 --status "In Review"
 - [ ] PR title includes Jira ticket key prefix (e.g. `LS-1234 feat(scope): description`)
 - [ ] PR description renders correctly (check in browser)
 - [ ] Jira ticket updated to "In Review"
-- [ ] Copilot review requested (via `gh api` call after PR creation)
+- [ ] Copilot review requested (via `github_request_review` MCP tool) — bot auto-approves and labels `merge-when-ready` when clean
 - [ ] Human reviewers assigned (if required)
-- [ ] Labels added (if needed)
 - [ ] `make pc` passes locally (do not wait on GitHub CI — verify locally)
 
 ## De-scoping Work

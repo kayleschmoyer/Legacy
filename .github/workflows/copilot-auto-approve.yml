@@ -1,0 +1,92 @@
+name: Copilot Auto-Approve
+
+# Auto-approve PRs when Copilot completes its review with no comments.
+# Uses a GitHub App (ID: 3142924) for approval identity.
+# Requires BOT_APP_PRIVATE_KEY secret containing the app's PEM private key.
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  auto-approve:
+    if: >-
+      github.event.review.user.login == 'copilot-pull-request-reviewer[bot]' &&
+      github.event.review.state != 'changes_requested'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate bot token
+        id: bot-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: 3142924
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Check for review comments
+        id: check
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ steps.bot-token.outputs.token }}
+          script: |
+            let allThreads = [];
+            let hasNextPage = true;
+            let cursor = null;
+
+            while (hasNextPage) {
+              const result = await github.graphql(`
+                query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      reviewThreads(first: 100, after: $cursor) {
+                        pageInfo {
+                          hasNextPage
+                          endCursor
+                        }
+                        nodes {
+                          isResolved
+                          isOutdated
+                          comments(first: 1) {
+                            nodes {
+                              author { login }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                number: context.payload.pull_request.number,
+                cursor,
+              });
+
+              const threads = result.repository.pullRequest.reviewThreads;
+              allThreads.push(...threads.nodes);
+              hasNextPage = threads.pageInfo.hasNextPage;
+              cursor = threads.pageInfo.endCursor;
+            }
+
+            const copilotThreads = allThreads.filter(t =>
+              !t.isOutdated &&
+              !t.isResolved &&
+              t.comments.nodes.some(c => c.author.login === 'copilot-pull-request-reviewer[bot]')
+            );
+
+            const hasComments = copilotThreads.length > 0;
+            core.setOutput('has_comments', hasComments.toString());
+            core.info(`Copilot unresolved threads: ${copilotThreads.length}`);
+
+      - name: Approve PR and label for merge
+        if: steps.check.outputs.has_comments == 'false'
+        env:
+          GH_TOKEN: ${{ steps.bot-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" \
+            --method POST \
+            -f event="APPROVE" \
+            -f body="Auto-approved: Copilot review completed with no comments."
+          gh pr edit "$PR_NUMBER" --repo "$REPO" --add-label "merge-when-ready"
