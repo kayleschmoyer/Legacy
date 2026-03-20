@@ -7,7 +7,7 @@ config({ path: resolve(__dirname, '../../.env') });
 
 export default defineConfig({
   testDir: './src/integration/tests',
-  globalSetup: './src/integration/global-teardown.ts',
+  globalSetup: './src/integration/global-setup.ts',
   globalTeardown: './src/integration/global-teardown.ts',
   timeout: 120_000,
   retries: 2,

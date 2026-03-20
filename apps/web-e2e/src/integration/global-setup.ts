@@ -1,0 +1,235 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { getTestUserJwt, TEST_USERS } from '../utils/test-user-auth';
+
+/**
+ * Playwright global setup for integration tests.
+ *
+ * Always deletes test leagues owned by the authenticated test user before tests
+ * run, so that successive runs never hit the free-tier league limit (max 3).
+ *
+ * Safety: before performing any deletions the resolved JWT is decoded and the
+ * email claim is verified against known integration-test user patterns.  If
+ * the token belongs to an unrecognised user (e.g. a developer's personal CLI
+ * session) or is expired, cleanup is skipped to prevent accidental data loss.
+ */
+
+interface CliAuthData {
+  tokens: Record<string, { jwt: string; expiresAt: number; email: string }>;
+  defaultUser: string;
+}
+
+interface GqlResponse<T> {
+  data?: T;
+  errors?: Array<{ message: string }>;
+}
+
+const GQL_BASE = (
+  process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
+).replace(/\/?$/, '/');
+
+async function getAuthJwt(): Promise<string | undefined> {
+  if (process.env.INTEGRATION_JWT_COMMISSIONER) {
+    return process.env.INTEGRATION_JWT_COMMISSIONER;
+  }
+  if (process.env.INTEGRATION_JWT) {
+    return process.env.INTEGRATION_JWT;
+  }
+
+  const authPath = path.join(os.homedir(), '.legacy-sports', 'auth.json');
+  if (fs.existsSync(authPath)) {
+    try {
+      const data = JSON.parse(
+        fs.readFileSync(authPath, 'utf-8'),
+      ) as CliAuthData;
+      const user = data.defaultUser;
+      const entry = user ? data.tokens[user] : undefined;
+      if (entry?.jwt && (!entry.expiresAt || entry.expiresAt >= Date.now())) {
+        return entry.jwt;
+      }
+    } catch {
+      // Ignore parse errors — fall through to test user auth
+    }
+  }
+
+  try {
+    return await getTestUserJwt(TEST_USERS.COMMISSIONER);
+  } catch {
+    return undefined;
+  }
+}
+
+async function gqlFetch<T>(
+  jwt: string,
+  query: string,
+  variables?: Record<string, unknown>,
+  retries = 2,
+): Promise<T | undefined> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(GQL_BASE + 'graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        console.error(
+          `[integration setup] HTTP ${res.status}: ${body.slice(0, 200)}`,
+        );
+        if (attempt < retries) continue;
+        return undefined;
+      }
+      const json = (await res.json()) as GqlResponse<T>;
+      if (json.errors?.length) {
+        console.error(
+          `[integration setup] GraphQL error: ${json.errors[0].message}`,
+        );
+        return undefined;
+      }
+      return json.data;
+    } catch (err) {
+      console.error(
+        `[integration setup] Network error (attempt ${attempt + 1}/${retries + 1}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Well-known name patterns produced by integration tests.  Any league whose
+ * name matches one of these is eligible for cleanup.
+ */
+const TEST_LEAGUE_PATTERNS = [
+  'Test League',
+  'Integration Season Test League',
+  // All UI integration tests use "<Label> E2E <timestamp>" naming
+  /\bE2E\b/,
+];
+
+function isTestLeague(name: string): boolean {
+  return TEST_LEAGUE_PATTERNS.some((pattern) =>
+    typeof pattern === 'string' ? name.startsWith(pattern) : pattern.test(name),
+  );
+}
+
+/**
+ * Decode a JWT payload without verification (we only need the email claim for
+ * the safety guard — the GraphQL server validates the signature).
+ */
+function decodeJwtEmail(jwt: string): string | undefined {
+  try {
+    const payload = jwt.split('.')[1];
+    if (!payload) return undefined;
+    const decoded = JSON.parse(
+      Buffer.from(payload, 'base64url').toString('utf-8'),
+    ) as { email?: string; exp?: number };
+    return decoded.email;
+  } catch {
+    return undefined;
+  }
+}
+
+function isJwtExpired(jwt: string): boolean {
+  try {
+    const payload = jwt.split('.')[1];
+    if (!payload) return true;
+    const decoded = JSON.parse(
+      Buffer.from(payload, 'base64url').toString('utf-8'),
+    ) as { exp?: number };
+    if (!decoded.exp) return false;
+    return decoded.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Email patterns that identify known integration-test users.  Any JWT whose
+ * email does not match is treated as a personal developer token.
+ */
+const ALLOWED_TEST_EMAIL_PATTERNS = [/@test\.legacysports\.dev$/];
+
+function isAllowedTestUser(email: string): boolean {
+  return ALLOWED_TEST_EMAIL_PATTERNS.some((re) => re.test(email));
+}
+
+export default async function globalSetup(): Promise<void> {
+  const jwt = await getAuthJwt();
+  if (!jwt) {
+    console.log(
+      '[integration setup] No auth token available — skipping pre-run league cleanup.',
+    );
+    return;
+  }
+
+  // Fail early if the token is expired
+  if (isJwtExpired(jwt)) {
+    console.warn(
+      '[integration setup] Auth token is expired — skipping cleanup. Refresh your token.',
+    );
+    return;
+  }
+
+  // Safety guard: verify the token belongs to a known test user
+  const email = decodeJwtEmail(jwt);
+  if (!email || !isAllowedTestUser(email)) {
+    console.warn(
+      `[integration setup] Auth token belongs to "${email ?? 'unknown'}" which is not a recognised ` +
+        'integration test user — skipping cleanup to prevent accidental data loss.',
+    );
+    return;
+  }
+
+  const data = await gqlFetch<{
+    userLeagues: Array<{ id: number; name: string }>;
+  }>(jwt, 'query { userLeagues { id name } }');
+
+  const leagues = data?.userLeagues;
+  if (!leagues?.length) {
+    console.log('[integration setup] No existing leagues — ready to run.');
+    return;
+  }
+
+  const targets = leagues.filter((l) => isTestLeague(l.name));
+  if (targets.length === 0) {
+    console.log(
+      `[integration setup] ${leagues.length} league(s) found but none matched test patterns — skipping cleanup.`,
+    );
+    return;
+  }
+
+  console.log(
+    `[integration setup] Cleaning up ${targets.length} stale test league(s) before run...`,
+  );
+
+  let deleted = 0;
+  for (const league of targets) {
+    const result = await gqlFetch<{ deleteLeague: string }>(
+      jwt,
+      'mutation($leagueId: Int!) { deleteLeague(leagueId: $leagueId) }',
+      { leagueId: league.id },
+    );
+    if (result?.deleteLeague) {
+      deleted++;
+    } else {
+      console.error(
+        `[integration setup] Failed to delete league ${league.id} (${league.name})`,
+      );
+    }
+  }
+
+  console.log(
+    `[integration setup] Cleaned up ${deleted}/${targets.length} test league(s).`,
+  );
+}
