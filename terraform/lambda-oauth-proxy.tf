@@ -158,7 +158,7 @@ resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_dynamodb" {
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "oauth_proxy_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-oauth-proxy"
-  retention_in_days = var.environment == "dev" ? 7 : 14
+  retention_in_days = local.log_retention_days[var.environment]
 
   tags = local.common_tags
 }

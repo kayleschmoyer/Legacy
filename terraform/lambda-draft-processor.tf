@@ -231,7 +231,7 @@ resource "aws_lambda_function" "draft_processor" {
 # CloudWatch Log Group for Lambda
 resource "aws_cloudwatch_log_group" "draft_processor_lambda" {
   name              = "/aws/lambda/${aws_lambda_function.draft_processor.function_name}"
-  retention_in_days = var.environment == "dev" ? 7 : 14
+  retention_in_days = local.log_retention_days[var.environment]
 
   tags = local.common_tags
 }

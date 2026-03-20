@@ -233,7 +233,7 @@ resource "aws_lambda_function" "websocket" {
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
       # Rollbar error tracking
-      ROLLBAR_ACCESS_TOKEN                = var.rollbar_access_token
+      ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
 
       # Allowed origins for WebSocket CSRF protection (comma-separated).
       # Defaults to https://legacy-fantasy.com when not set, but must be
@@ -256,7 +256,7 @@ resource "aws_lambda_function" "websocket" {
 # CloudWatch Log Group for WebSocket Lambda
 resource "aws_cloudwatch_log_group" "websocket_lambda" {
   name              = "/aws/lambda/${aws_lambda_function.websocket.function_name}"
-  retention_in_days = var.environment == "dev" ? 7 : 14
+  retention_in_days = local.log_retention_days[var.environment]
 
   tags = local.common_tags
 }

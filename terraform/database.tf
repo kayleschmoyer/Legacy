@@ -42,7 +42,7 @@ resource "aws_db_instance" "postgres" {
   publicly_accessible    = var.environment == "dev"
 
   # Backup & Maintenance - Optimized for dev
-  backup_retention_period    = 1 # Reduced from 7 days for dev
+  backup_retention_period    = local.backup_retention_days[var.environment]
   backup_window              = "03:00-04:00"
   maintenance_window         = "sun:04:00-sun:05:00"
   auto_minor_version_upgrade = true

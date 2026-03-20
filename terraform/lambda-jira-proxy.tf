@@ -61,7 +61,7 @@ resource "aws_iam_role_policy_attachment" "jira_proxy_lambda_secrets" {
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "jira_proxy_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-jira-proxy"
-  retention_in_days = var.environment == "dev" ? 7 : 14
+  retention_in_days = local.log_retention_days[var.environment]
 
   tags = local.common_tags
 }
@@ -86,12 +86,12 @@ resource "aws_lambda_function" "jira_proxy" {
 
   environment {
     variables = {
-      JIRA_SECRET_NAME              = aws_secretsmanager_secret.jira_credentials.name
-      JIRA_PROJECT_KEY               = "LS"
-      BUG_EPIC_KEY                   = "LS-1322"
-      JWT_SECRET_NAME                = aws_secretsmanager_secret.jwt_secret.name
-      NODE_ENV                       = var.environment
-      LOG_LEVEL                      = "info"
+      JIRA_SECRET_NAME                    = aws_secretsmanager_secret.jira_credentials.name
+      JIRA_PROJECT_KEY                    = "LS"
+      BUG_EPIC_KEY                        = "LS-1322"
+      JWT_SECRET_NAME                     = aws_secretsmanager_secret.jwt_secret.name
+      NODE_ENV                            = var.environment
+      LOG_LEVEL                           = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
       # Rollbar error tracking

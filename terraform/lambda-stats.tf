@@ -141,7 +141,7 @@ resource "aws_iam_role_policy_attachment" "stats_lambda_rds" {
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "stats_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-stats"
-  retention_in_days = var.environment == "dev" ? 7 : 14
+  retention_in_days = local.log_retention_days[var.environment]
 
   tags = local.common_tags
 }

@@ -101,8 +101,8 @@ resource "aws_iam_policy" "stripe_webhook_lambda_websocket" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = ["execute-api:ManageConnections"]
+        Effect   = "Allow"
+        Action   = ["execute-api:ManageConnections"]
         Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/*/*/@connections/*"
       },
       {
@@ -131,7 +131,7 @@ resource "aws_iam_role_policy_attachment" "stripe_webhook_lambda_websocket" {
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "stripe_webhook_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-stripe-webhook"
-  retention_in_days = var.environment == "dev" ? 7 : 14
+  retention_in_days = local.log_retention_days[var.environment]
 
   tags = local.common_tags
 }
@@ -156,17 +156,17 @@ resource "aws_lambda_function" "stripe_webhook" {
 
   environment {
     variables = {
-      NODE_ENV                               = var.environment
-      LOG_LEVEL                              = "info"
-      AWS_NODEJS_CONNECTION_REUSE_ENABLED    = "1"
-      STRIPE_SECRET_KEY_SECRET_NAME          = aws_secretsmanager_secret.stripe_secret_key.name
-      STRIPE_WEBHOOK_SECRET_SECRET_NAME      = aws_secretsmanager_secret.stripe_webhook_secret.name
-      CONNECTIONS_TABLE_NAME                 = aws_dynamodb_table.websocket_connections.name
-      WEBSOCKET_ENDPOINT                     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
-      STRIPE_GRACE_PERIOD_DAYS               = tostring(var.stripe_grace_period_days)
-      DB_HOST                                = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
-      DB_PORT                                = "5432"
-      DB_NAME                                = "legacy_sports"
+      NODE_ENV                            = var.environment
+      LOG_LEVEL                           = "info"
+      AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
+      STRIPE_SECRET_KEY_SECRET_NAME       = aws_secretsmanager_secret.stripe_secret_key.name
+      STRIPE_WEBHOOK_SECRET_SECRET_NAME   = aws_secretsmanager_secret.stripe_webhook_secret.name
+      CONNECTIONS_TABLE_NAME              = aws_dynamodb_table.websocket_connections.name
+      WEBSOCKET_ENDPOINT                  = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
+      STRIPE_GRACE_PERIOD_DAYS            = tostring(var.stripe_grace_period_days)
+      DB_HOST                             = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
+      DB_PORT                             = "5432"
+      DB_NAME                             = "legacy_sports"
 
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token

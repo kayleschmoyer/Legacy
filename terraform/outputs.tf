@@ -180,23 +180,23 @@ output "game_selection_lambda_function_arn" {
 output "environment_variables_summary" {
   description = "Summary of key environment variables for application configuration"
   value = {
-    aws_region                         = var.aws_region
-    environment                        = var.environment
-    db_host                            = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
-    db_creds_secret_name               = aws_secretsmanager_secret.database_credentials.name
-    jwt_secret_name                    = aws_secretsmanager_secret.jwt_secret.name
-    google_oauth_client_secret_name    = aws_secretsmanager_secret.google_oauth_client_secret.name
-    oauth_proxy_cookie_secret_name     = aws_secretsmanager_secret.oauth_proxy_cookie_secret.name
-    sqs_load_season_stats_url          = aws_sqs_queue.load_season_stats.url
-    sqs_automatic_drafts_url           = aws_sqs_queue.automatic_drafts.url
-    sqs_select_game_url                = aws_sqs_queue.select_game.url
-    sqs_load_game_stats_url            = aws_sqs_queue.load_game_stats.url
-    google_oauth_client_id             = var.google_oauth_client_id
-    jira_proxy_url                     = "${local.api_base_url}/jira"
-    ci_readonly_db_creds_secret_name   = aws_secretsmanager_secret.ci_readonly_db_credentials.name
-    stripe_secret_key_secret_name      = aws_secretsmanager_secret.stripe_secret_key.name
-    stripe_webhook_secret_secret_name  = aws_secretsmanager_secret.stripe_webhook_secret.name
-    stripe_publishable_key             = var.stripe_publishable_key
+    aws_region                        = var.aws_region
+    environment                       = var.environment
+    db_host                           = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
+    db_creds_secret_name              = aws_secretsmanager_secret.database_credentials.name
+    jwt_secret_name                   = aws_secretsmanager_secret.jwt_secret.name
+    google_oauth_client_secret_name   = aws_secretsmanager_secret.google_oauth_client_secret.name
+    oauth_proxy_cookie_secret_name    = aws_secretsmanager_secret.oauth_proxy_cookie_secret.name
+    sqs_load_season_stats_url         = aws_sqs_queue.load_season_stats.url
+    sqs_automatic_drafts_url          = aws_sqs_queue.automatic_drafts.url
+    sqs_select_game_url               = aws_sqs_queue.select_game.url
+    sqs_load_game_stats_url           = aws_sqs_queue.load_game_stats.url
+    google_oauth_client_id            = var.google_oauth_client_id
+    jira_proxy_url                    = "${local.api_base_url}/jira"
+    ci_readonly_db_creds_secret_name  = aws_secretsmanager_secret.ci_readonly_db_credentials.name
+    stripe_secret_key_secret_name     = aws_secretsmanager_secret.stripe_secret_key.name
+    stripe_webhook_secret_secret_name = aws_secretsmanager_secret.stripe_webhook_secret.name
+    stripe_publishable_key            = var.stripe_publishable_key
   }
 }
 

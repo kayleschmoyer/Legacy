@@ -146,3 +146,19 @@ variable "api_gateway_throttle_burst_limit" {
   type        = number
   default     = 200
 }
+
+# ── Per-environment retention maps ──────────────────────────────────────────────
+# Explicit maps so staging gets its own values instead of falling through to the
+# prod branch of a ternary.
+locals {
+  log_retention_days = {
+    dev     = 30
+    staging = 30
+    prod    = 90
+  }
+  backup_retention_days = {
+    dev     = 7
+    staging = 7
+    prod    = 30
+  }
+}

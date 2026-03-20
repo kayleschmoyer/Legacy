@@ -28,8 +28,8 @@ resource "aws_cloudwatch_event_target" "process_waiver_claims" {
       query = "mutation { processWaiverClaims { processed succeeded failed } }"
     })
     headers = {
-      "content-type"       = "application/json"
-      "x-system-api-key"   = random_password.system_api_key.result
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
     }
     requestContext = {
       http = {
@@ -71,8 +71,8 @@ resource "aws_cloudwatch_event_target" "auto_select_games" {
       query = "mutation { autoSelectGames { leaguesProcessed gamesTriggered errors } }"
     })
     headers = {
-      "content-type"       = "application/json"
-      "x-system-api-key"   = random_password.system_api_key.result
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
     }
     requestContext = {
       http = {
@@ -114,8 +114,8 @@ resource "aws_cloudwatch_event_target" "auto_advance_matchups" {
       query = "mutation { autoAdvanceMatchups { leaguesProcessed leaguesAdvanced leaguesSkipped errors } }"
     })
     headers = {
-      "content-type"       = "application/json"
-      "x-system-api-key"   = random_password.system_api_key.result
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
     }
     requestContext = {
       http = {
@@ -161,8 +161,8 @@ resource "aws_cloudwatch_event_target" "auto_process_draft_picks" {
       query = "mutation { autoProcessDraftPicks { draftsProcessed picksAutoMade draftsCompleted errors } }"
     })
     headers = {
-      "content-type"       = "application/json"
-      "x-system-api-key"   = random_password.system_api_key.result
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
     }
     requestContext = {
       http = {
