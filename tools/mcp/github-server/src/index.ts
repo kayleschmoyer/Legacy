@@ -8,6 +8,7 @@ import { requestReview } from './tools/request-review.js';
 import { getReviewThreads } from './tools/get-review-threads.js';
 import { resolveThread } from './tools/resolve-thread.js';
 import { manageLabels } from './tools/manage-labels.js';
+import { manageLabelsBatch } from './tools/manage-labels-batch.js';
 import { getRepoInfo } from './tools/get-repo-info.js';
 import { prDashboard } from './tools/pr-dashboard.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
@@ -163,6 +164,25 @@ server.tool(
       .describe('Labels to remove from the PR'),
   },
   async (params) => manageLabels(params),
+);
+
+// --- github_manage_labels_batch ---
+server.tool(
+  'github_manage_labels_batch',
+  'Add or remove labels on multiple PRs in one call. During sweeps, this is much faster than calling github_manage_labels individually for 30+ PRs.',
+  {
+    prs: z
+      .array(z.coerce.number().int().positive())
+      .min(1)
+      .max(100)
+      .describe('Array of PR numbers to update labels on'),
+    add: z.array(z.string()).optional().describe('Labels to add to each PR'),
+    remove: z
+      .array(z.string())
+      .optional()
+      .describe('Labels to remove from each PR'),
+  },
+  async (params) => manageLabelsBatch(params),
 );
 
 // --- github_get_repo_info ---
