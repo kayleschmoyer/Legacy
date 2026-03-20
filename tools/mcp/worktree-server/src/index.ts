@@ -356,7 +356,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       description:
         'Stage files and create a conventional commit in the active (or specified) worktree. ' +
         'Supports --amend to amend the previous commit. ' +
-        'Refuses to commit on main. Refuses to stage .env or credential files. ' +
+        'Refuses to commit on main. Refuses to stage .env or credential files (Terraform .tf files are allowed). ' +
         'For new commits, auto-appends a Co-Authored-By line and validates conventional commit message format; ' +
         'when amending, it skips these steps and keeps the existing commit message.',
       inputSchema: {
@@ -1344,7 +1344,7 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         /\.env$/,
         /\.env\./,
         /credentials/i,
-        /secrets?\./i,
+        /secrets?\.(?!tf$)/i,
         /\.pem$/,
         /\.key$/,
       ];
