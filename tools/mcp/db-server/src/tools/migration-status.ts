@@ -13,28 +13,43 @@ interface MigrationInfo {
   needsMigration: boolean;
 }
 
-/** Parse the output of `pnpm run db:status` into structured data. */
+/**
+ * Parse the output of `pnpm run db:status` into structured data.
+ *
+ * The rollback-migrations.ts script outputs (via LOGGER with timestamp prefix):
+ *   [...] INFO: 📁 Total migrations available: 138
+ *   [...] INFO: 📊 Applied migrations: 137
+ *   [...] INFO:   ✅ Applied: 20240101_000000_initial.ts
+ *   [...] INFO:   ⏸️  Pending: 20260319_120000_add_league_phase.ts
+ */
 function parseStatusOutput(output: string): MigrationInfo {
-  const appliedMatch = /(\d+)\s+applied/i.exec(output);
-  const pendingMatch = /(\d+)\s+pending/i.exec(output);
+  // Match "Applied migrations: N" or "N applied" (fallback for format changes)
+  const appliedMatch =
+    /applied migrations:\s*(\d+)/i.exec(output) ||
+    /(\d+)\s+(?:migrations?\s+)?applied/i.exec(output);
+  // Match "Total migrations available: N"
+  const totalMatch =
+    /total migrations available:\s*(\d+)/i.exec(output) ||
+    /(\d+)\s+migration files/i.exec(output);
 
   const applied = appliedMatch ? parseInt(appliedMatch[1], 10) : 0;
-  const pending = pendingMatch ? parseInt(pendingMatch[1], 10) : 0;
+  const total = totalMatch ? parseInt(totalMatch[1], 10) : 0;
 
-  // Extract pending migration names (lines that look like migration filenames)
+  // Extract pending migration names from lines with "Pending:" prefix
   const pendingNames: string[] = [];
   const lines = output.split('\n');
-  let inPending = false;
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (/pending/i.test(trimmed)) {
-      inPending = true;
-      continue;
-    }
-    if (inPending && /^\d{8}_\d{6}_/.test(trimmed)) {
-      pendingNames.push(trimmed);
+    const pendingFileMatch = /Pending:\s*(\d{8}_\d{6}_\S+)/i.exec(line);
+    if (pendingFileMatch) {
+      pendingNames.push(pendingFileMatch[1]);
     }
   }
+
+  // Pending count: use extracted names count, or fall back to total - applied
+  const pending =
+    pendingNames.length > 0
+      ? pendingNames.length
+      : Math.max(0, total - applied);
 
   return {
     applied,

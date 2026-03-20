@@ -10,7 +10,7 @@ export function getRepoRoot(): string {
   return resolve(thisDir, '..', '..', '..', '..');
 }
 
-/** Run a command in a given directory and return stdout. Throws on non-zero exit. */
+/** Run a command in a given directory and return stdout (falling back to stderr when stdout is empty). Throws on non-zero exit. */
 export function runCommand(
   command: string,
   args: string[],
@@ -34,7 +34,10 @@ export function runCommand(
           reject(new Error(msg));
           return;
         }
-        resolve(stdout.trim());
+        // Prefer stdout; fall back to stderr when stdout is empty (some
+        // tools like pnpm write diagnostics only to stderr).
+        const output = stdout?.trim() || stderr?.trim() || '';
+        resolve(output);
       },
     );
   });

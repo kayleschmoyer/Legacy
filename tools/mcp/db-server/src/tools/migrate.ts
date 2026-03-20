@@ -12,24 +12,33 @@ interface MigrateResult {
   success: boolean;
 }
 
-/** Parse the output of `pnpm run db:up` into structured data. */
+/**
+ * Parse the output of `pnpm run db:up` into structured data.
+ *
+ * The rollback-migrations.ts script outputs (via LOGGER with timestamp prefix):
+ *   [...] INFO: ⬆️ Applying migration: 20260319_120000_add_league_phase.ts
+ *   [...] INFO: ✅ Applied: 20260319_120000_add_league_phase.ts
+ *   [...] INFO: 📋 No new migrations to apply
+ *   [...] INFO: ✅ Applied N new migrations
+ */
 function parseUpOutput(output: string): MigrateResult {
   const appliedNames: string[] = [];
   const lines = output.split('\n');
 
   for (const line of lines) {
-    const trimmed = line.trim();
-    // Match lines that reference migration filenames being applied
+    // Match "Applied: <migration>" or "Applying migration: <migration>"
+    // Also keep legacy format "applied/applying <migration>" as fallback
     const migrationMatch =
-      /(?:applying|applied|running)\s+(\d{8}_\d{6}_\S+)/i.exec(trimmed);
+      /(?:Applied|Applying migration):\s*(\d{8}_\d{6}_\S+)/i.exec(line) ||
+      /(?:applying|applied|running)\s+(\d{8}_\d{6}_\S+)/i.exec(line);
     if (migrationMatch) {
-      appliedNames.push(migrationMatch[1]);
+      const name = migrationMatch[1];
+      // Deduplicate: "Applying migration:" and "Applied:" fire for the same file
+      if (!appliedNames.includes(name)) {
+        appliedNames.push(name);
+      }
     }
   }
-
-  // Check for "no new migrations" or "up to date" messages
-  const noMigrations =
-    /no (?:new )?migrations|up.to.date|nothing to apply/i.test(output);
 
   return {
     applied: appliedNames.length,
@@ -45,9 +54,15 @@ export async function migrate(params: MigrateParams): Promise<ToolResult> {
   // First check if there are pending migrations
   try {
     const statusOutput = await runPnpm(['run', 'db:status'], dbClientDir);
-    const noPending = /0\s+pending|no (?:new )?migrations|up.to.date/i.test(
-      statusOutput,
-    );
+    // Check if there are no pending migrations:
+    // - No "Pending:" lines with migration filenames
+    // - Or explicit "No new migrations" / "up to date" messages
+    const hasPendingFiles = /Pending:\s*\d{8}_\d{6}_/i.test(statusOutput);
+    // Use a single broad regex instead of re-implementing count parsing
+    // from migration-status.ts (which is the canonical parser).
+    const noPending =
+      !hasPendingFiles &&
+      /no (?:new )?migrations|up.to.date|nothing to apply/i.test(statusOutput);
 
     if (noPending) {
       return {
