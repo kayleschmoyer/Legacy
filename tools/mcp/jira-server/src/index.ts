@@ -34,9 +34,11 @@ server.tool(
   {
     summary: z.string().describe('Ticket summary / title'),
     type: z
-      .enum(['Task', 'Bug', 'Story'])
+      .enum(['Task', 'Bug', 'Story', 'Epic'])
       .default('Task')
-      .describe('Issue type (default: Task)'),
+      .describe(
+        'Issue type: one of "Task", "Bug", "Story", or "Epic" (default: Task)',
+      ),
     description: z
       .string()
       .optional()
