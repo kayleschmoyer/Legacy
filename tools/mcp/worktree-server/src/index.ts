@@ -890,6 +890,43 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         });
         log.push(rebaseOut.trim());
 
+        // Check if twig reported "up to date" but branch is actually behind origin/main.
+        // This can happen when twig compares against a stale local main ref.
+        const upToDate = /already up[ -]to[ -]date|is up[ -]to[ -]date/i.test(
+          rebaseOut,
+        );
+        if (upToDate) {
+          try {
+            // Verify: is origin/main actually an ancestor of HEAD?
+            runGit(['merge-base', '--is-ancestor', 'origin/main', 'HEAD'], cwd);
+            // Exit code 0 means origin/main IS an ancestor — truly up to date
+            log.push('(verified: branch is current with origin/main)');
+          } catch (ancestorErr: unknown) {
+            const exitStatus = (ancestorErr as { status?: number }).status;
+            if (exitStatus === 1) {
+              // Exit code 1 means origin/main is NOT an ancestor — branch is stale
+              log.push(
+                '(twig reported up-to-date but branch is behind origin/main — rebasing directly)',
+              );
+              log.push('$ git rebase origin/main');
+              const directRebase = run('git rebase origin/main', cwd, {
+                timeout: 120_000,
+                env: agentEnv,
+              });
+              log.push(directRebase.trim());
+            } else {
+              // Unexpected error (e.g. exit 128 for invalid ref) — warn and skip fallback
+              const msg =
+                ancestorErr instanceof Error
+                  ? ancestorErr.message
+                  : String(ancestorErr);
+              log.push(
+                `(warning: merge-base --is-ancestor failed with exit ${exitStatus ?? 'unknown'} — skipping staleness check: ${msg})`,
+              );
+            }
+          }
+        }
+
         log.push(
           '',
           'Rebase complete. Next steps:',
