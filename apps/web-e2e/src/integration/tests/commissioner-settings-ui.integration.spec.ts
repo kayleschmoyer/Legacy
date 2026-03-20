@@ -48,31 +48,6 @@ let state: SettingsState;
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Switch the logged-in user by writing a new JWT into localStorage. */
-async function switchUser(
-  page: Page,
-  jwt: string,
-  url?: string,
-): Promise<void> {
-  if (url) {
-    await page.goto(url);
-    await page.waitForLoadState('domcontentloaded');
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  } else {
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  }
-}
-
 const GQL_URL =
   (
     process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
@@ -270,15 +245,16 @@ test.describe
 
     await test.step('All three stat groups are visible', async () => {
       // Groups only render when scoring data finishes loading; allow up to 20s each.
-      // Target the region landmarks rendered by LeagueScoringSummary for deterministic matching.
+      // The Commissioner tab renders LeagueScoringEditor (not LeagueScoringSummary),
+      // which displays group titles as plain text headings, not ARIA region landmarks.
       await expect(
-        page.getByRole('region', { name: 'Batting multipliers' }),
+        page.getByText('Batting', { exact: true }).first(),
       ).toBeVisible({ timeout: 20_000 });
       await expect(
-        page.getByRole('region', { name: 'Pitching multipliers' }),
+        page.getByText('Pitching', { exact: true }).first(),
       ).toBeVisible({ timeout: 20_000 });
       await expect(
-        page.getByRole('region', { name: 'Fielding multipliers' }),
+        page.getByText('Fielding', { exact: true }).first(),
       ).toBeVisible({ timeout: 20_000 });
     });
 
@@ -296,49 +272,51 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 4: Manager joins league and sees no Commissioner tab', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1,
   }) => {
     await test.step('Manager joins the league', async () => {
       const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-      await switchUser(page, managerJwt1, joinUrl);
-      await page.waitForLoadState('load');
-      await expect(page.getByText(/spot(s)?\s+available/i).first()).toBeVisible(
-        { timeout: 15_000 },
-      );
-      await page.locator('#team-name').fill('Settings Tester');
-      const joinBtn = page.getByRole('button', { name: /Join League/i });
+      await managerPage1.goto(joinUrl);
+      await managerPage1.waitForLoadState('load');
+      await expect(
+        managerPage1.getByText(/spot(s)?\s+available/i).first(),
+      ).toBeVisible({ timeout: 15_000 });
+      await managerPage1.locator('#team-name').fill('Settings Tester');
+      const joinBtn = managerPage1.getByRole('button', {
+        name: /Join League/i,
+      });
       await expect(joinBtn).toBeEnabled({ timeout: 5_000 });
       await joinBtn.click();
-      await expect(page).toHaveURL(/\/baseball\/league\/\d+/, {
+      await expect(managerPage1).toHaveURL(/\/baseball\/league\/\d+/, {
         timeout: 15_000,
       });
     });
 
     await test.step('Manager cannot see the Commissioner navigation tab', async () => {
-      await page.goto(`/baseball/league/${state.leagueId}`);
-      await page.waitForLoadState('load');
+      await managerPage1.goto(`/baseball/league/${state.leagueId}`);
+      await managerPage1.waitForLoadState('load');
       // Wait for league overview to render
-      await expect(page.getByText(state.leagueName)).toBeVisible({
+      await expect(managerPage1.getByText(state.leagueName)).toBeVisible({
         timeout: 15_000,
       });
       // Commissioner tab should not exist for a non-commissioner
       await expect(
-        page.getByRole('button', { name: /Commissioner/i }),
+        managerPage1.getByRole('button', { name: /Commissioner/i }),
       ).not.toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('Navigating directly to commissioner URL shows no commissioner content', async () => {
-      await page.goto(`/baseball/league/${state.leagueId}/commissioner`);
-      await page.waitForLoadState('load');
+      await managerPage1.goto(
+        `/baseball/league/${state.leagueId}/commissioner`,
+      );
+      await managerPage1.waitForLoadState('load');
       // Should be redirected or show an access-denied message, not show commissioner tabs
       await expect(
-        page.getByRole('button', { name: 'League Settings', exact: true }),
+        managerPage1.getByRole('button', {
+          name: 'League Settings',
+          exact: true,
+        }),
       ).not.toBeVisible({ timeout: 5_000 });
     });
-
-    // Restore commissioner identity
-    await switchUser(page, commissionerJwt);
   });
 });
