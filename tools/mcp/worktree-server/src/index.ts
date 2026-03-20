@@ -10,6 +10,7 @@ import {
   lstatSync,
   readFileSync,
   readlinkSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -528,6 +529,23 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'boolean',
             description:
               'If true, adds -u to set the upstream tracking branch. Default false.',
+          },
+        },
+      },
+    },
+    {
+      name: 'worktree_unjunction',
+      description:
+        'Remove the node_modules junction/symlink in a worktree so it can get independent ' +
+        'node_modules via make install. Detects whether node_modules is a junction, symlink, ' +
+        'real directory, or missing, and handles platform differences (Windows NTFS junctions vs Unix symlinks).',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
           },
         },
       },
@@ -2168,6 +2186,122 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
             {
               type: 'text',
               text: `[cwd: ${cwd}]\n$ ${cmd}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_unjunction
+    // -----------------------------------------------------------------------
+    case 'worktree_unjunction': {
+      const { worktree: wtKey } = args as { worktree?: string };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+      const nmPath = join(cwd, 'node_modules');
+
+      try {
+        // Check what node_modules is
+        if (!existsSync(nmPath)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    removed: false,
+                    was: 'missing',
+                    message: 'node_modules does not exist — nothing to remove.',
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        const stat = lstatSync(nmPath);
+
+        if (stat.isSymbolicLink()) {
+          // Junction or symlink — remove it
+          // On Windows, junctions appear as symlinks to lstatSync
+          // rmSync with recursive:false safely removes both junctions and symlinks
+          const linkType =
+            process.platform === 'win32' ? 'junction' : 'symlink';
+          rmSync(nmPath, { recursive: false });
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    removed: true,
+                    was: linkType,
+                    message: `Removed node_modules ${linkType}. Run make install in the worktree to create independent node_modules.`,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        if (stat.isDirectory()) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    removed: false,
+                    was: 'directory',
+                    message:
+                      'node_modules is already a real directory (not a junction). No action needed.',
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  removed: false,
+                  was: 'unknown',
+                  message:
+                    'node_modules exists but is neither a symlink/junction nor a directory.',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to remove node_modules junction/symlink: ${e.message ?? String(err)}`,
             },
           ],
           isError: true,
