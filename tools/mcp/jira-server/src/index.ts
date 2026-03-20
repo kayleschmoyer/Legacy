@@ -61,12 +61,26 @@ server.tool(
 // --- jira_transition ---
 server.tool(
   'jira_transition',
-  'Transition a Jira ticket to a new status. Validates the status string.',
+  'Transition a Jira ticket to a new status. Validates the status string. ' +
+    'When transitioning to Done, warns about open subtasks. Use cascade: true to auto-transition them.',
   {
-    key: z.string().describe('Jira ticket key, e.g. LS-1137'),
+    key: z
+      .string()
+      .regex(
+        /^[A-Z][A-Z0-9_]+-\d+$/,
+        'Must be a valid Jira issue key (e.g., LS-1137)',
+      )
+      .describe('Jira ticket key, e.g. LS-1137'),
     status: z
       .enum(['In Progress', 'In Review', 'Done'])
       .describe('Target status'),
+    cascade: z
+      .boolean()
+      .default(false)
+      .describe(
+        'When transitioning to Done, auto-transition open subtasks to Done as well. ' +
+          'Without this flag, the tool warns about orphaned subtasks but does not cascade.',
+      ),
   },
   async (params) => transition(params),
 );
