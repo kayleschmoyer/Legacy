@@ -31,10 +31,6 @@ import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { test } from '../fixtures/ui';
 
-// ---------------------------------------------------------------------------
-// Shared state accumulated across serial phases
-// ---------------------------------------------------------------------------
-
 interface A11yState {
   leagueId: number;
   inviteCode: string;
@@ -44,7 +40,7 @@ interface A11yState {
 let state: A11yState;
 
 // ---------------------------------------------------------------------------
-// Helpers (same pattern as live-draft-ui.integration.spec.ts)
+// Helpers
 // ---------------------------------------------------------------------------
 
 /**
@@ -56,30 +52,6 @@ async function dismissPickAnnouncementOverlay(page: Page): Promise<void> {
   if (await overlay.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await overlay.click({ force: true });
     await overlay.waitFor({ state: 'hidden', timeout: 5_000 });
-  }
-}
-
-async function switchUser(
-  page: Page,
-  jwt: string,
-  url?: string,
-): Promise<void> {
-  if (url) {
-    await page.goto(url);
-    await page.waitForLoadState('domcontentloaded');
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  } else {
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
   }
 }
 
@@ -131,21 +103,19 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 2: Managers join the league', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
-    managerJwt2,
-    managerJwt3,
+    managerPage1,
+    managerPage2,
+    managerPage3,
   }) => {
     const managers = [
-      { jwt: managerJwt1, teamName: 'Keyboard Kings' },
-      { jwt: managerJwt2, teamName: 'Aria Aces' },
-      { jwt: managerJwt3, teamName: 'Focus Squad' },
+      { page: managerPage1, teamName: 'Keyboard Kings' },
+      { page: managerPage2, teamName: 'Aria Aces' },
+      { page: managerPage3, teamName: 'Focus Squad' },
     ];
 
-    for (const { jwt, teamName } of managers) {
+    for (const { page, teamName } of managers) {
       const joinUrl = `/baseball/league/join/${state.inviteCode}`;
-      await switchUser(page, jwt, joinUrl);
+      await page.goto(joinUrl);
       await page.waitForLoadState('load');
       await expect(page.getByText(/spot(s)?\s+available/i).first()).toBeVisible(
         { timeout: 15_000 },
@@ -159,9 +129,6 @@ test.describe
         timeout: 15_000,
       });
     }
-
-    // Restore commissioner identity
-    await switchUser(page, commissionerJwt);
   });
 
   // -----------------------------------------------------------------------
