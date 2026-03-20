@@ -10,8 +10,9 @@ name: "🎯 Jira Branch Sync"
 #   PR closed + merged                   → Done
 #   PR closed without merging            → In Progress
 #
-# After transitioning the child ticket, the workflow also syncs the parent
-# epic status (if any) based on the aggregate state of all its children:
+# Independently of whether the child ticket transition succeeded or was
+# skipped, the workflow also syncs the parent epic status (if any) based
+# on the aggregate state of all its children:
 #   Any child In Progress / In Review / Done  → Epic "In Progress"
 #   All children In Review or Done            → Epic "In Review"
 #   All children Done                         → Epic "Done"
@@ -222,7 +223,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Fetch parent epic
         id: epic
-        if: steps.apply.outputs.success == 'true' && steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
+        if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
         env:
           TICKET: ${{ steps.ticket.outputs.key }}
         run: |
@@ -378,7 +379,7 @@ jobs:
           fi
 
       # -----------------------------------------------------------------------
-      # 10. Transition the epic (non-fatal — child transition already succeeded)
+      # 10. Transition the epic (non-fatal — epic sync is best-effort)
       # -----------------------------------------------------------------------
       - name: Transition epic
         if: steps.epic-current.outputs.skip == 'false'
@@ -421,5 +422,5 @@ jobs:
             BODY=$(echo "$RESPONSE" | head -n -1)
             echo "⚠️  Failed to transition epic $EPIC_KEY to '$TARGET'. HTTP $HTTP_CODE"
             echo "$BODY"
-            # Non-fatal: the child ticket transition already succeeded
+            # Non-fatal: epic sync is best-effort and should not fail the workflow
           fi
