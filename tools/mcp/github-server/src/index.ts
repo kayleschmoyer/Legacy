@@ -215,7 +215,7 @@ server.tool(
 // --- github_pr_scan ---
 server.tool(
   'github_pr_scan',
-  'Scan all open PRs and return pre-bucketed arrays for the pr-operations sweep workflow. Returns: conflicting (merge conflicts), reviews (unresolved threads with body/path/line details), ciFailing (with failedChecks names), ciPending, and clean. Equivalent to running scripts/scan-prs.ps1 but works in any environment without PowerShell.',
+  'Scan all open PRs and return pre-bucketed arrays for the pr-operations sweep workflow. Returns: conflicting (merge conflicts), reviews (unresolved threads with body/path/line details), ciFailing (with failedChecks names), ciPending, and clean. By default, also syncs CI failure labels (adds labels to ciFailing PRs, removes stale labels from clean PRs). Equivalent to running scripts/scan-prs.ps1 but works in any environment without PowerShell.',
   {
     limit: z.coerce
       .number()
@@ -224,6 +224,12 @@ server.tool(
       .max(200)
       .default(200)
       .describe('Maximum number of open PRs to scan (default: 200)'),
+    applyLabels: z
+      .boolean()
+      .default(true)
+      .describe(
+        'Sync CI failure labels after scan — add labels to ciFailing PRs, remove stale labels from clean PRs (default: true)',
+      ),
   },
   async (params) => prScan(params),
 );

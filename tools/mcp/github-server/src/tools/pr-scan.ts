@@ -1,8 +1,9 @@
-import { runGhJson, runGraphQL, getRepoOwnerName } from '../gh.js';
+import { runGh, runGhJson, runGraphQL, getRepoOwnerName } from '../gh.js';
 import type { ToolResult } from '../types.js';
 
 interface PRScanParams {
   limit?: number;
+  applyLabels?: boolean;
 }
 
 interface PRListItem {
@@ -10,6 +11,7 @@ interface PRListItem {
   title: string;
   headRefName: string;
   mergeable: string;
+  labels: Array<{ name: string }>;
   statusCheckRollup: Array<{
     name: string;
     status: string;
@@ -68,7 +70,110 @@ const PR_FIELDS = [
   'headRefName',
   'mergeable',
   'statusCheckRollup',
+  'labels',
 ];
+
+/**
+ * Map CI check names to PR labels. Each entry is a regex tested against the
+ * failed check name and the label to apply when it matches. Order matters —
+ * the first match wins for a given check.
+ */
+const CHECK_NAME_TO_LABEL: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /Quality Gates/i, label: 'CI: Quality Gates' },
+  { pattern: /Build Validation/i, label: 'CI: Build Failure' },
+  { pattern: /E2E Tests/i, label: 'CI: E2E Failure' },
+  { pattern: /Migration/i, label: 'CI: Migration' },
+];
+
+/** All CI failure labels managed by this tool. */
+const ALL_CI_LABELS = CHECK_NAME_TO_LABEL.map((e) => e.label);
+
+/** Derive CI failure labels from a list of failed check names. */
+function labelsForFailedChecks(failedChecks: string[]): string[] {
+  const labels = new Set<string>();
+  for (const check of failedChecks) {
+    for (const { pattern, label } of CHECK_NAME_TO_LABEL) {
+      if (pattern.test(check)) {
+        labels.add(label);
+        break;
+      }
+    }
+  }
+  return [...labels];
+}
+
+interface LabelAction {
+  prNumber: number;
+  added: string[];
+  removed: string[];
+  error?: string;
+}
+
+/**
+ * Synchronize CI failure labels on scanned PRs:
+ * - ciFailing PRs get labels matching their failed checks (additive)
+ * - clean PRs get stale CI labels removed
+ */
+async function syncCILabels(
+  ciFailing: Array<{ number: number; failedChecks: string[] }>,
+  clean: Array<{ number: number }>,
+  existingLabels: Map<number, string[]>,
+): Promise<LabelAction[]> {
+  const actions: LabelAction[] = [];
+
+  for (const pr of ciFailing) {
+    const desired = labelsForFailedChecks(pr.failedChecks);
+    const current = existingLabels.get(pr.number) ?? [];
+    const toAdd = desired.filter((l) => !current.includes(l));
+    // Remove CI labels that no longer apply (check passed/not failing)
+    const toRemove = current.filter(
+      (l) => ALL_CI_LABELS.includes(l) && !desired.includes(l),
+    );
+
+    if (toAdd.length === 0 && toRemove.length === 0) continue;
+
+    const args = ['pr', 'edit', String(pr.number)];
+    for (const l of toAdd) args.push('--add-label', l);
+    for (const l of toRemove) args.push('--remove-label', l);
+
+    try {
+      await runGh(args);
+      actions.push({ prNumber: pr.number, added: toAdd, removed: toRemove });
+    } catch (err) {
+      // Label failures are non-fatal — record intended changes + error and continue
+      actions.push({
+        prNumber: pr.number,
+        added: toAdd,
+        removed: toRemove,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  for (const pr of clean) {
+    const current = existingLabels.get(pr.number) ?? [];
+    const toRemove = current.filter((l) => ALL_CI_LABELS.includes(l));
+    if (toRemove.length === 0) continue;
+
+    const args = ['pr', 'edit', String(pr.number)];
+    for (const l of toRemove) args.push('--remove-label', l);
+
+    try {
+      await runGh(args);
+      actions.push({ prNumber: pr.number, added: [], removed: toRemove });
+    } catch (err) {
+      // non-fatal — record intended removals + error
+      actions.push({
+        prNumber: pr.number,
+        added: [],
+        removed: toRemove,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return actions;
+}
 
 function buildBatchThreadDetailQuery(prNumbers: number[]): string {
   const fragments = prNumbers.map(
@@ -238,6 +343,15 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
       }
     }
 
+    // Sync CI failure labels when applyLabels is enabled (default: true)
+    let labelActions: LabelAction[] = [];
+    if (params.applyLabels !== false) {
+      const existingLabels = new Map<number, string[]>(
+        prs.map((pr) => [pr.number, pr.labels.map((l) => l.name)]),
+      );
+      labelActions = await syncCILabels(ciFailing, clean, existingLabels);
+    }
+
     const output = {
       scannedAt: new Date().toISOString(),
       totalOpen: prs.length,
@@ -246,6 +360,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
       ciFailing,
       ciPending,
       clean,
+      ...(labelActions.length > 0 ? { labelActions } : {}),
     };
 
     return {
