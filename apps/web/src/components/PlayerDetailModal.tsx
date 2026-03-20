@@ -1,10 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import { BaseModal } from './BaseModal';
+import { CareerArcChart, type CareerArcMode } from './CareerArcChart';
 import { StatCard, type StatRowData } from './StatCard';
 import { StatTable } from './StatTable';
-import { useGetAllPlayerSeasonStatsQuery } from '../api/db/graphql.generated';
+import {
+  useGetAllPlayerSeasonStatsQuery,
+  useGetPlayerCareerArcQuery,
+} from '../api/db/graphql.generated';
 import {
   ipToDecimalInnings,
   ipToOuts,
@@ -70,7 +74,7 @@ interface SeasonRow {
   };
 }
 
-type StatsTab = 'batting' | 'pitching' | 'fielding';
+type StatsTab = 'career-arc' | 'batting' | 'pitching' | 'fielding';
 
 // ---------------------------------------------------------------------------
 // Tab Button
@@ -210,10 +214,17 @@ export function PlayerDetailModal({
 }: PlayerDetailModalProps) {
   LOGGER.debug('[PlayerDetailModal] render', { playerId, playerName, open });
 
-  const [activeTab, setActiveTab] = useState<StatsTab>('batting');
+  const [activeTab, setActiveTab] = useState<StatsTab>('career-arc');
+
+  const [arcMode, setArcMode] = useState<CareerArcMode>('batting');
 
   // ------ Data fetching ------
   const { data, loading, error } = useGetAllPlayerSeasonStatsQuery({
+    variables: { playerId: playerId ?? 0 },
+    skip: !playerId || !open,
+  });
+
+  const { data: arcData } = useGetPlayerCareerArcQuery({
     variables: { playerId: playerId ?? 0 },
     skip: !playerId || !open,
   });
@@ -444,8 +455,13 @@ export function PlayerDetailModal({
   );
 
   // ------ Available tabs ------
+  const hasBattingArc = (arcData?.playerSeasonBatting?.length ?? 0) > 0;
+  const hasPitchingArc = (arcData?.playerSeasonPitching?.length ?? 0) > 0;
+
   const availableTabs = useMemo(() => {
     const tabs: { key: StatsTab; label: string }[] = [];
+    if (hasBattingArc || hasPitchingArc)
+      tabs.push({ key: 'career-arc', label: 'Career Arc' });
     if (battingTableRows.length > 0)
       tabs.push({ key: 'batting', label: 'Batting' });
     if (pitchingTableRows.length > 0)
@@ -453,7 +469,24 @@ export function PlayerDetailModal({
     if (fieldingTableRows.length > 0)
       tabs.push({ key: 'fielding', label: 'Fielding' });
     return tabs;
-  }, [battingTableRows, pitchingTableRows, fieldingTableRows]);
+  }, [
+    hasBattingArc,
+    hasPitchingArc,
+    battingTableRows,
+    pitchingTableRows,
+    fieldingTableRows,
+  ]);
+
+  // Sync activeTab with available tabs — if the current tab isn't available,
+  // fall back to the first available tab.
+  useEffect(() => {
+    if (
+      availableTabs.length > 0 &&
+      !availableTabs.some((t) => t.key === activeTab)
+    ) {
+      setActiveTab(availableTabs[0].key);
+    }
+  }, [availableTabs, activeTab]);
 
   // ------ Career stat card data ------
   const battingCardRows = useMemo((): StatRowData[] => {
@@ -650,6 +683,33 @@ export function PlayerDetailModal({
               </XStack>
 
               {/* Tab content */}
+              {activeTab === 'career-arc' && (
+                <YStack gap="$3">
+                  {/* Arc mode toggle (batting/pitching) */}
+                  {hasBattingArc && hasPitchingArc && (
+                    <XStack gap="$1">
+                      <TabButton
+                        label="Batting"
+                        tabKey="arc-batting"
+                        active={arcMode === 'batting'}
+                        onPress={() => setArcMode('batting')}
+                      />
+                      <TabButton
+                        label="Pitching"
+                        tabKey="arc-pitching"
+                        active={arcMode === 'pitching'}
+                        onPress={() => setArcMode('pitching')}
+                      />
+                    </XStack>
+                  )}
+                  <CareerArcChart
+                    battingSeasons={arcData?.playerSeasonBatting}
+                    pitchingSeasons={arcData?.playerSeasonPitching}
+                    mode={hasBattingArc ? arcMode : 'pitching'}
+                  />
+                </YStack>
+              )}
+
               {activeTab === 'batting' && battingTableRows.length > 0 && (
                 <StatTable
                   title="Batting by Season"

@@ -1,0 +1,45 @@
+query GetPlayerCareerArc($playerId: Int!) {
+  player(id: $playerId) {
+    firstName
+    lastName
+    eligiblePositions
+    careerAchievements {
+      allStarSelections
+      goldGloves
+      silverSluggers
+      mvpAwards
+      cyYoungAwards
+      hallOfFame
+      rookieOfTheYear
+    }
+  }
+  playerSeasonBatting(playerId: $playerId) {
+    season
+    team
+    games
+    hits
+    atBats
+    homeRuns
+    rbi
+    stolenBases
+    battingAverage
+    onBasePercentage
+    sluggingPercentage
+    onBasePlusSlugging
+    onBasePlusSluggingPlus
+    awardSummary
+  }
+  playerSeasonPitching(playerId: $playerId) {
+    season
+    team
+    games
+    wins
+    losses
+    earnedRunAverage
+    earnedRunAveragePlus
+    whip
+    strikeouts
+    inningsPitched
+    awardSummary
+  }
+}

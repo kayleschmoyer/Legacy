@@ -15,6 +15,7 @@ export function PlayerCard({
   onDraft,
   onToggleWatch,
   onToggleQueue,
+  onPlayerClick,
 }: {
   player: DraftPlayer;
   index: number;
@@ -24,6 +25,7 @@ export function PlayerCard({
   onDraft: () => void;
   onToggleWatch: () => void;
   onToggleQueue?: () => void;
+  onPlayerClick?: (playerId: number) => void;
 }) {
   const posColor = getPositionColor(player.position);
 
@@ -39,9 +41,24 @@ export function PlayerCard({
         {/* Header */}
         <div className="d-card-header">
           <div>
-            <h3 className="d-card-name" id={`pn-${player.id}`}>
-              {player.name}
-            </h3>
+            {onPlayerClick ? (
+              <button
+                type="button"
+                className="d-card-name"
+                id={`pn-${player.id}`}
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  onPlayerClick(player.id);
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {player.name}
+              </button>
+            ) : (
+              <h3 className="d-card-name" id={`pn-${player.id}`}>
+                {player.name}
+              </h3>
+            )}
             <div className="d-card-meta">
               {player.games > 0
                 ? `${player.games} G · ${player.hits} H`

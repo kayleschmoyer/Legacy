@@ -2480,6 +2480,7 @@ enum ScoringStatGroup {
 
 type SeasonBatting {
   atBats: Int
+  awardSummary: String
   baseOnBalls: Int
   battingAverage: Float
   caughtStealing: Int
@@ -2492,6 +2493,8 @@ type SeasonBatting {
   intentionalBaseOnBalls: Int
   league: String
   onBasePercentage: Float
+  onBasePlusSlugging: Float
+  onBasePlusSluggingPlus: Float
   plateAppearances: Int
   playerId: Int
   rbi: Int

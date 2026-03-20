@@ -666,6 +666,11 @@ SeasonBattingRef.implement({
         return stats.tb / stats.ab;
       },
     }),
+    onBasePlusSlugging: t.exposeFloat('onbasePlusSlugging', { nullable: true }),
+    onBasePlusSluggingPlus: t.exposeFloat('onbasePlusSluggingPlus', {
+      nullable: true,
+    }),
+    awardSummary: t.exposeString('awardSummary', { nullable: true }),
   }),
 });
 

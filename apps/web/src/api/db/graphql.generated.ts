@@ -2716,6 +2716,7 @@ export enum ScoringStatGroup {
 export type SeasonBatting = {
   __typename?: 'SeasonBatting';
   atBats?: Maybe<Scalars['Int']['output']>;
+  awardSummary?: Maybe<Scalars['String']['output']>;
   baseOnBalls?: Maybe<Scalars['Int']['output']>;
   battingAverage?: Maybe<Scalars['Float']['output']>;
   caughtStealing?: Maybe<Scalars['Int']['output']>;
@@ -2728,6 +2729,8 @@ export type SeasonBatting = {
   intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
   league?: Maybe<Scalars['String']['output']>;
   onBasePercentage?: Maybe<Scalars['Float']['output']>;
+  onBasePlusSlugging?: Maybe<Scalars['Float']['output']>;
+  onBasePlusSluggingPlus?: Maybe<Scalars['Float']['output']>;
   plateAppearances?: Maybe<Scalars['Int']['output']>;
   playerId?: Maybe<Scalars['Int']['output']>;
   rbi?: Maybe<Scalars['Int']['output']>;
@@ -6468,6 +6471,61 @@ export type MarkAllNotificationsAsReadMutationVariables = Exact<{
 export type MarkAllNotificationsAsReadMutation = {
   __typename?: 'Mutation';
   markAllNotificationsAsRead?: boolean | null;
+};
+
+export type GetPlayerCareerArcQueryVariables = Exact<{
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type GetPlayerCareerArcQuery = {
+  __typename?: 'Query';
+  player?: {
+    __typename?: 'Player';
+    firstName?: string | null;
+    lastName?: string | null;
+    eligiblePositions?: Array<string> | null;
+    careerAchievements?: {
+      __typename?: 'CareerAchievements';
+      allStarSelections?: number | null;
+      goldGloves?: number | null;
+      silverSluggers?: number | null;
+      mvpAwards?: number | null;
+      cyYoungAwards?: number | null;
+      hallOfFame?: boolean | null;
+      rookieOfTheYear?: boolean | null;
+    } | null;
+  } | null;
+  playerSeasonBatting?: Array<{
+    __typename?: 'SeasonBatting';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    hits?: number | null;
+    atBats?: number | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    stolenBases?: number | null;
+    battingAverage?: number | null;
+    onBasePercentage?: number | null;
+    sluggingPercentage?: number | null;
+    onBasePlusSlugging?: number | null;
+    onBasePlusSluggingPlus?: number | null;
+    awardSummary?: string | null;
+  }> | null;
+  playerSeasonPitching?: Array<{
+    __typename?: 'SeasonPitching';
+    season?: number | null;
+    team?: string | null;
+    games?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    earnedRunAverage?: string | null;
+    earnedRunAveragePlus?: number | null;
+    whip?: number | null;
+    strikeouts?: number | null;
+    inningsPitched?: number | null;
+    awardSummary?: string | null;
+  }> | null;
 };
 
 export type GetAllPlayerSeasonStatsQueryVariables = Exact<{
@@ -15850,6 +15908,136 @@ export type MarkAllNotificationsAsReadMutationResult =
 export type MarkAllNotificationsAsReadMutationOptions = BaseMutationOptions<
   MarkAllNotificationsAsReadMutation,
   MarkAllNotificationsAsReadMutationVariables
+>;
+export const GetPlayerCareerArc = gql`
+  query GetPlayerCareerArc($playerId: Int!) {
+    player(id: $playerId) {
+      firstName
+      lastName
+      eligiblePositions
+      careerAchievements {
+        allStarSelections
+        goldGloves
+        silverSluggers
+        mvpAwards
+        cyYoungAwards
+        hallOfFame
+        rookieOfTheYear
+      }
+    }
+    playerSeasonBatting(playerId: $playerId) {
+      season
+      team
+      games
+      hits
+      atBats
+      homeRuns
+      rbi
+      stolenBases
+      battingAverage
+      onBasePercentage
+      sluggingPercentage
+      onBasePlusSlugging
+      onBasePlusSluggingPlus
+      awardSummary
+    }
+    playerSeasonPitching(playerId: $playerId) {
+      season
+      team
+      games
+      wins
+      losses
+      earnedRunAverage
+      earnedRunAveragePlus
+      whip
+      strikeouts
+      inningsPitched
+      awardSummary
+    }
+  }
+`;
+
+/**
+ * __useGetPlayerCareerArcQuery__
+ *
+ * To run a query within a React component, call `useGetPlayerCareerArcQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPlayerCareerArcQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPlayerCareerArcQuery({
+ *   variables: {
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useGetPlayerCareerArcQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetPlayerCareerArcQuery,
+    GetPlayerCareerArcQueryVariables
+  > &
+    (
+      | { variables: GetPlayerCareerArcQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetPlayerCareerArcQuery,
+    GetPlayerCareerArcQueryVariables
+  >(GetPlayerCareerArc, options);
+}
+export function useGetPlayerCareerArcLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPlayerCareerArcQuery,
+    GetPlayerCareerArcQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPlayerCareerArcQuery,
+    GetPlayerCareerArcQueryVariables
+  >(GetPlayerCareerArc, options);
+}
+export function useGetPlayerCareerArcSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPlayerCareerArcQuery,
+        GetPlayerCareerArcQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPlayerCareerArcQuery,
+    GetPlayerCareerArcQueryVariables
+  >(
+    GetPlayerCareerArc,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayerCareerArcQuery,
+          GetPlayerCareerArcQueryVariables
+        >,
+  );
+}
+export type GetPlayerCareerArcQueryHookResult = ReturnType<
+  typeof useGetPlayerCareerArcQuery
+>;
+export type GetPlayerCareerArcLazyQueryHookResult = ReturnType<
+  typeof useGetPlayerCareerArcLazyQuery
+>;
+export type GetPlayerCareerArcSuspenseQueryHookResult = ReturnType<
+  typeof useGetPlayerCareerArcSuspenseQuery
+>;
+export type GetPlayerCareerArcQueryResult = Apollo.QueryResult<
+  GetPlayerCareerArcQuery,
+  GetPlayerCareerArcQueryVariables
 >;
 export const GetAllPlayerSeasonStats = gql`
   query GetAllPlayerSeasonStats($playerId: Int!) {
