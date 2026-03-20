@@ -204,18 +204,52 @@ For each PR in `$scan.reviews`:
 
 For each PR in `$scan.ciFailing`:
 
-1. Download CI logs: `.\scripts\ci-failure-log.ps1 -PRNumber $pr.number`
-2. Read `scratch/pr-$($pr.number)-ci.txt` to find the specific error
-3. Enter the worktree (Step 2)
-4. **Load `skills/debug-ci-failure/SKILL.md`** — it contains the full diagnostic playbook
-5. Apply the fix based on error category:
-   - **Formatting**: `pnpm exec nx format:write`
-   - **Lint**: `pnpm exec nx affected -t lint --fix` + manual fixes
-   - **Type errors**: fix the specific file/line
-   - **Test failures**: investigate root cause, fix implementation
-   - **Build failures**: fix missing imports/modules
-6. Validate: `make pc`
-7. Commit and push
+### 3a. Automated CI Triage
+
+Before diving into manual debugging, use existing CI MCP tools to diagnose the failure:
+
+1. **Get logs**: `ci_get_logs(runId: <runId>)` to retrieve full CI output
+2. **Search for patterns**: `ci_search_logs(runId: <runId>, pattern: "error|failed|Error")` to find failure points
+3. **Classify** the failure based on log output and apply the appropriate fix:
+
+| Classification   | Fix Action                                                                |
+| ---------------- | ------------------------------------------------------------------------- |
+| `formatting`     | Run `pnpm exec nx format:write` in the worktree, commit and push          |
+| `stale_branch`   | Rebase onto main via `worktree_rebase`, then re-run CI                    |
+| `codegen`        | Run `make codegen` in the worktree, commit and push                       |
+| `type_error`     | Check if error exists on main — if not, rebase (stale); if so, manual fix |
+| `test_failure`   | Load `skills/debug-ci-failure/SKILL.md` for investigation                 |
+| `lint`           | Run `pnpm exec nx affected -t lint --fix`, commit and push                |
+| `flaky`          | Re-run CI: `ci_rerun(runId: <id>, failedOnly: true)` — no code change     |
+| `infrastructure` | Re-run CI — timeout or GitHub Actions infra issue                         |
+| `unknown`        | Load `skills/debug-ci-failure/SKILL.md` for manual investigation          |
+
+### 3b. Stale Branch Detection
+
+The most common CI failure is **type errors from stale branches** — errors that don't exist on main but appear because the PR branch is missing recent main commits. Signs:
+
+- Type errors referencing identifiers that exist on main but not on the branch
+- "Duplicate identifier" errors from overlapping PRs
+- Import errors for modules that were renamed/moved on main
+
+**Fix**: Rebase the branch onto main using `worktree_rebase`, then re-run CI. No code changes needed.
+
+### 3c. Stale CI Labels
+
+During triage, clean up stale `ci-failure-*` labels. The `github_pr_scan` tool already syncs these labels automatically (`applyLabels: true`), but if you spot stale labels during manual triage:
+
+- If CI re-ran and passed after a previous failure, remove the failure label
+- Use `github_manage_labels(number: <PR#>, remove: ["ci-failure-lint"])` to clean up
+
+### 3d. Manual Debugging Fallback
+
+If automated classification returns `unknown` or the auto-fix doesn't resolve the issue:
+
+1. Enter the worktree (Step 2)
+2. **Load `skills/debug-ci-failure/SKILL.md`** — it contains the full diagnostic playbook
+3. Apply the fix based on error category
+4. Validate: `make pc`
+5. Commit and push
 
 ### Pending CI
 
