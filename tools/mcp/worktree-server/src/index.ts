@@ -115,11 +115,49 @@ function getWorktrees(): WorktreeInfo[] {
   return worktrees;
 }
 
-/** Look up a worktree by key (e.g. "LS-1134" or "1134"). */
-function resolveWorktreePath(key: string): string | null {
+/**
+ * Look up a worktree by key, branch name, or directory name.
+ *
+ * Resolution order:
+ * 1. Exact branch name match (e.g. "LS-1508/worktree-commit-secrets-tf")
+ * 2. Exact directory name match (e.g. "LS-1508-worktree-commit-secrets-tf")
+ * 3. Ticket key prefix match (e.g. "LS-1508" or "1508")
+ *    - If multiple worktrees share the same key, returns an error listing options
+ */
+function resolveWorktreePath(
+  key: string,
+): { path: string } | { error: string } {
   const worktrees = getWorktrees();
+
+  // 1. Exact branch name match
+  const branchMatch = worktrees.find((w) => w.branch === key);
+  if (branchMatch) return { path: branchMatch.path };
+
+  // 2. Exact directory name match (last segment of path)
+  const dirMatch = worktrees.find((w) => w.path.split(/[\\/]/).pop() === key);
+  if (dirMatch) return { path: dirMatch.path };
+
+  // 3. Ticket key prefix match
   const normalised = key.startsWith('LS-') ? key : `LS-${key}`;
-  return worktrees.find((w) => w.key === normalised)?.path ?? null;
+  const keyMatches = worktrees.filter((w) => w.key === normalised);
+
+  if (keyMatches.length === 0) {
+    return { error: `No worktree found for key '${key}'.` };
+  }
+
+  if (keyMatches.length === 1) {
+    return { path: keyMatches[0].path };
+  }
+
+  // Multiple matches — return error with disambiguation options
+  const options = keyMatches
+    .map((w) => `  - branch: ${w.branch ?? '(detached)'}  path: ${w.path}`)
+    .join('\n');
+  return {
+    error:
+      `Ambiguous: ${keyMatches.length} worktrees match key '${normalised}'.\n` +
+      `Specify the full branch name or directory name instead:\n${options}`,
+  };
 }
 
 /**
@@ -130,10 +168,7 @@ function resolveTargetDir(
   worktreeKey?: string,
 ): { path: string } | { error: string } {
   if (worktreeKey) {
-    const resolved = resolveWorktreePath(worktreeKey);
-    if (!resolved)
-      return { error: `No worktree found for key '${worktreeKey}'.` };
-    return { path: resolved };
+    return resolveWorktreePath(worktreeKey);
   }
   if (activeWorktree) return { path: activeWorktree };
   return {
@@ -611,22 +646,22 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
       const { key } = args as { key: string };
       const resolved = resolveWorktreePath(key);
 
-      if (!resolved) {
+      if ('error' in resolved) {
         return {
           content: [
             {
               type: 'text',
-              text: `No worktree found for key '${key}'. Run worktree_list to see available worktrees.`,
+              text: `${resolved.error}\nRun worktree_list to see available worktrees.`,
             },
           ],
           isError: true,
         };
       }
 
-      activeWorktree = resolved;
+      activeWorktree = resolved.path;
       return {
         content: [
-          { type: 'text', text: `Active worktree set to: ${resolved}` },
+          { type: 'text', text: `Active worktree set to: ${resolved.path}` },
         ],
       };
     }
@@ -645,18 +680,18 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
 
       if (worktree) {
         const resolved = resolveWorktreePath(worktree);
-        if (!resolved) {
+        if ('error' in resolved) {
           return {
             content: [
               {
                 type: 'text',
-                text: `No worktree found for key '${worktree}'.`,
+                text: resolved.error,
               },
             ],
             isError: true,
           };
         }
-        targetDir = resolved;
+        targetDir = resolved.path;
       } else if (activeWorktree) {
         targetDir = activeWorktree;
       } else {
