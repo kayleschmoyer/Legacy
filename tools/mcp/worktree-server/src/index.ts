@@ -156,6 +156,63 @@ function runGit(
   });
 }
 
+/**
+ * Perform a single rebase-continue step: stage files, run `git rebase --continue`,
+ * and return structured state. Shared by `worktree_rebase` (auto-continue loop)
+ * and `worktree_rebase_continue` tool.
+ */
+function rebaseContinueStep(
+  cwd: string,
+  files?: string[],
+): {
+  completed: boolean;
+  conflicted: string[];
+  error?: string;
+} {
+  const agentEnv = {
+    GIT_EDITOR: 'true',
+    GIT_SEQUENCE_EDITOR: 'true',
+  };
+
+  const getConflictedFiles = (): string[] => {
+    try {
+      return run('git diff --name-only --diff-filter=U', cwd)
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  };
+
+  // Stage resolved files
+  if (files && files.length > 0) {
+    runGit(['add', '--', ...files], cwd);
+  } else {
+    runGit(['add', '-A'], cwd);
+  }
+
+  // Continue rebase — may throw if new conflicts arise
+  run('git rebase --continue', cwd, {
+    timeout: 120_000,
+    env: agentEnv,
+  });
+
+  // Check if rebase is still in progress
+  const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
+  const stillRebasing =
+    existsSync(join(gitDir, 'rebase-merge')) ||
+    existsSync(join(gitDir, 'rebase-apply'));
+
+  if (!stillRebasing) {
+    return { completed: true, conflicted: [] };
+  }
+
+  // Still rebasing — check for new conflicts
+  const conflictedFiles = getConflictedFiles();
+  return { completed: false, conflicted: conflictedFiles };
+}
+
 /** Run a command in a directory and return stdout. Throws on non-zero exit. */
 function run(
   command: string,
@@ -793,11 +850,136 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         log.push(`Exit code: ${e.status ?? 'unknown'}`, output);
 
         if (hasConflicts) {
+          // Check if rerere auto-resolved all conflicts.
+          // rerere may populate the working tree without staging, so stage
+          // resolved files first, then check for remaining unmerged entries.
+          let rerereResolved = false;
+          try {
+            runGit(['add', '-u'], cwd);
+            const conflictCheck = run(
+              'git diff --name-only --diff-filter=U',
+              cwd,
+            ).trim();
+            if (!conflictCheck) {
+              // No unresolved conflicts — rerere handled them all
+              rerereResolved = true;
+            }
+          } catch {
+            // If we can't check, fall through to manual resolution
+          }
+
+          if (rerereResolved) {
+            log.push(
+              '',
+              'rerere auto-resolved all conflicts. Continuing rebase...',
+            );
+
+            // Auto-continue loop using shared helper
+            const maxIterations = 50; // Safety limit
+            let iterations = 0;
+
+            while (iterations < maxIterations) {
+              iterations++;
+              try {
+                const step = rebaseContinueStep(cwd);
+
+                if (step.completed) {
+                  log.push(
+                    `Rebase completed after ${iterations} auto-continue step(s).`,
+                  );
+                  log.push(
+                    '',
+                    'Rebase complete (rerere auto-resolved). Next steps:',
+                    '1. worktree_stabilize — run post-rebase stabilization',
+                    '2. worktree_run(command: "make pc") — validate',
+                    '3. worktree_push — push the validated branch',
+                  );
+                  return {
+                    content: [{ type: 'text', text: log.join('\n') }],
+                  };
+                }
+
+                if (step.conflicted.length > 0) {
+                  log.push(
+                    `Step ${iterations}: new conflicts that rerere could not resolve:`,
+                    step.conflicted.join('\n'),
+                    '',
+                    'Rebase paused. Resolve remaining conflicts, then:',
+                    '  worktree_rebase_continue',
+                    'Or: worktree_rebase(abort: true) to abort.',
+                  );
+                  return {
+                    content: [{ type: 'text', text: log.join('\n') }],
+                    isError: true,
+                  };
+                }
+
+                // No conflicts but still rebasing — continue the loop
+                log.push(
+                  `Step ${iterations}: auto-continued (rerere resolved)`,
+                );
+              } catch (continueErr: unknown) {
+                const ce = continueErr as {
+                  stdout?: string;
+                  stderr?: string;
+                };
+                const continueOutput = [ce.stdout, ce.stderr]
+                  .filter(Boolean)
+                  .join('\n');
+
+                // Check if this step has new unresolvable conflicts
+                try {
+                  const remainingConflicts = run(
+                    'git diff --name-only --diff-filter=U',
+                    cwd,
+                  )
+                    .trim()
+                    .split('\n')
+                    .filter(Boolean);
+                  if (remainingConflicts.length > 0) {
+                    log.push(
+                      `Step ${iterations}: new conflicts encountered:`,
+                      remainingConflicts.join('\n'),
+                      '',
+                      'Rebase paused. Resolve remaining conflicts, then:',
+                      '  worktree_rebase_continue',
+                      'Or: worktree_rebase(abort: true) to abort.',
+                    );
+                    return {
+                      content: [{ type: 'text', text: log.join('\n') }],
+                      isError: true,
+                    };
+                  }
+                } catch {
+                  // Fall through
+                }
+
+                log.push(
+                  `Auto-continue failed at step ${iterations}:`,
+                  continueOutput,
+                );
+                return {
+                  content: [{ type: 'text', text: log.join('\n') }],
+                  isError: true,
+                };
+              }
+            }
+
+            log.push(
+              `Safety limit reached (${maxIterations} iterations). Rebase still in progress.`,
+            );
+            return {
+              content: [{ type: 'text', text: log.join('\n') }],
+              isError: true,
+            };
+          }
+
+          // rerere did not resolve all conflicts — manual resolution needed
           log.push(
             '',
             'Rebase paused due to conflicts. Resolve them, then:',
             '  git add <resolved-files>',
-            '  worktree_run(command: "git rebase --continue")',
+            '  worktree_rebase_continue',
             'Or: worktree_rebase(abort: true) to abort.',
           );
         }
@@ -963,11 +1145,9 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         } | null = null;
 
         try {
-          const mbSha = runGit(
-            ['merge-base', 'HEAD', 'origin/main'],
-            cwd,
-            { timeout: 10_000 },
-          ).trim();
+          const mbSha = runGit(['merge-base', 'HEAD', 'origin/main'], cwd, {
+            timeout: 10_000,
+          }).trim();
           // Count commits on origin/main not reachable from HEAD
           const behindOutput = runGit(
             ['rev-list', '--count', 'HEAD..origin/main'],
@@ -1292,59 +1472,20 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         };
       }
 
-      const agentEnv = {
-        GIT_EDITOR: 'true',
-        GIT_SEQUENCE_EDITOR: 'true',
-      };
-
-      // Helper: get conflicted files reliably via git diff
-      const getConflictedFiles = (): string[] => {
-        try {
-          return run('git diff --name-only --diff-filter=U', cwd)
-            .trim()
-            .split('\n')
-            .filter(Boolean);
-        } catch {
-          return [];
-        }
-      };
-
       try {
-        // Stage resolved files using execFileSync (safe argument passing)
-        if (files && files.length > 0) {
-          runGit(['add', '--', ...files], cwd);
-        } else {
-          runGit(['add', '-A'], cwd);
-        }
+        const step = rebaseContinueStep(cwd, files);
 
-        // Continue rebase
-        run('git rebase --continue', cwd, {
-          timeout: 120_000,
-          env: agentEnv,
-        });
-
-        // Check if rebase is still in progress
-        const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
-        const stillRebasing =
-          existsSync(join(gitDir, 'rebase-merge')) ||
-          existsSync(join(gitDir, 'rebase-apply'));
-
-        if (stillRebasing) {
-          const conflictedFiles = getConflictedFiles();
-          const message =
-            conflictedFiles.length > 0
-              ? 'Rebase paused — more conflicts to resolve.'
-              : 'Rebase paused — awaiting action (e.g., edit/reword step).';
-
+        if (step.completed) {
           return {
             content: [
               {
                 type: 'text',
                 text: JSON.stringify(
                   {
-                    completed: false,
-                    remainingConflicts: conflictedFiles,
-                    message,
+                    completed: true,
+                    remainingConflicts: [],
+                    message:
+                      'Rebase complete. Next: worktree_stabilize, then make pc, then worktree_push.',
                   },
                   null,
                   2,
@@ -1354,16 +1495,20 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
           };
         }
 
+        const message =
+          step.conflicted.length > 0
+            ? 'Rebase paused — more conflicts to resolve.'
+            : 'Rebase paused — awaiting action (e.g., edit/reword step).';
+
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify(
                 {
-                  completed: true,
-                  remainingConflicts: [],
-                  message:
-                    'Rebase complete. Next: worktree_stabilize, then make pc, then worktree_push.',
+                  completed: false,
+                  remainingConflicts: step.conflicted,
+                  message,
                 },
                 null,
                 2,
@@ -1378,7 +1523,16 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
           output.includes('CONFLICT') || output.includes('could not apply');
 
         if (hasConflicts) {
-          const conflictedFiles = getConflictedFiles();
+          const conflictedFiles = (() => {
+            try {
+              return run('git diff --name-only --diff-filter=U', cwd)
+                .trim()
+                .split('\n')
+                .filter(Boolean);
+            } catch {
+              return [];
+            }
+          })();
           return {
             content: [
               {
