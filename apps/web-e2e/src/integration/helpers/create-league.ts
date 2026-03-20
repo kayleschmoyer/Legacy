@@ -53,11 +53,47 @@ export async function createLeagueViaUI(
 
     const response = await responsePromise;
 
-    // If the mutation response failed at the network level, retry immediately
-    if (!response || !response.ok()) {
+    // If the mutation response failed at the network level, retry or fail
+    if (!response) {
       if (attempt < maxAttempts) {
         await page.waitForTimeout(2_000 * attempt);
         continue;
+      }
+    }
+
+    // Fail immediately on HTTP-level errors — waiting for a redirect is futile
+    if (response && !response.ok()) {
+      if (attempt < maxAttempts) {
+        await page.waitForTimeout(2_000 * attempt);
+        continue;
+      }
+      const statusText = await response
+        .text()
+        .catch(() => '(unable to read body)');
+      throw new Error(
+        `League creation failed with HTTP ${response.status()}: ${statusText}`,
+      );
+    }
+
+    // Check for GraphQL-level errors in the response body (e.g. free-tier
+    // league limit).  Fail immediately with a descriptive message instead of
+    // waiting 45 s for a redirect that will never come.
+    if (response) {
+      let body: { errors?: Array<{ message: string }> } | null = null;
+      try {
+        body = (await response.json()) as {
+          errors?: Array<{ message: string }>;
+        };
+      } catch (err) {
+        if (!(err instanceof SyntaxError)) {
+          throw err;
+        }
+      }
+      if (body?.errors?.length) {
+        const messages = body.errors.map((e) => e.message).join('; ');
+        throw new Error(
+          `League creation failed with GraphQL error: ${messages}`,
+        );
       }
     }
 
