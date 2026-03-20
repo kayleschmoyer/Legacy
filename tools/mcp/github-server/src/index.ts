@@ -14,6 +14,7 @@ import { getRepoInfo } from './tools/get-repo-info.js';
 import { prDashboard } from './tools/pr-dashboard.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
 import { prScan } from './tools/pr-scan.js';
+import { mergePR } from './tools/merge-pr.js';
 
 const server = new McpServer({
   name: 'legacy-sports-github',
@@ -269,6 +270,22 @@ server.tool(
       ),
   },
   async (params) => prScan(params),
+);
+
+// --- github_merge_pr ---
+server.tool(
+  'github_merge_pr',
+  'Merge a pull request. Defaults to merge queue (--auto --squash) which respects branch protection. Use strategy "direct" only when explicitly authorized — it uses --admin to bypass branch protection.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number to merge'),
+    strategy: z
+      .enum(['queue', 'direct'])
+      .default('queue')
+      .describe(
+        'Merge strategy: "queue" (default) enqueues via --auto respecting branch protection, "direct" uses --admin to bypass protection (requires explicit authorization)',
+      ),
+  },
+  async (params) => mergePR(params),
 );
 
 // Start the server
