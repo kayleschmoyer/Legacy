@@ -745,10 +745,24 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
           };
         }
 
-        // Fetch origin
+        // Fetch origin and update local main ref
         log.push('$ git fetch origin');
         const fetchOut = run('git fetch origin', cwd, { timeout: 30_000 });
         if (fetchOut.trim()) log.push(fetchOut.trim());
+
+        // Update remote-tracking ref origin/main so twig rebase sees latest commits
+        try {
+          log.push('$ git fetch origin main');
+          const ffOut = run('git fetch origin main', cwd, {
+            timeout: 30_000,
+          });
+          if (ffOut.trim()) log.push(ffOut.trim());
+        } catch (fetchErr: unknown) {
+          // Non-fatal: twig rebase will still work against whatever origin/main ref is available.
+          const reason =
+            fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+          log.push(`(warning: could not update origin/main — ${reason})`);
+        }
 
         // Rebase via twig (knows the parent branch)
         log.push('$ twig rebase');
