@@ -15,6 +15,7 @@ import { prDashboard } from './tools/pr-dashboard.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
 import { prScan } from './tools/pr-scan.js';
 import { mergePR } from './tools/merge-pr.js';
+import { closePR } from './tools/close-pr.js';
 
 const server = new McpServer({
   name: 'legacy-sports-github',
@@ -286,6 +287,22 @@ server.tool(
       ),
   },
   async (params) => mergePR(params),
+);
+
+// --- github_close_pr ---
+server.tool(
+  'github_close_pr',
+  'Close a pull request with an optional comment. Use for closing redundant, superseded, or abandoned PRs.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number to close'),
+    comment: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe('Optional comment to add when closing the PR'),
+  },
+  async (params) => closePR(params),
 );
 
 // Start the server
