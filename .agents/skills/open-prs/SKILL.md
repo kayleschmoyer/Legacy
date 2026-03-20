@@ -94,6 +94,9 @@ This skill delegates to specialized sub-skills for each operation category. Load
 
 - **Remove `@me` filter** — use `--limit 200` to catch all open PRs, not just yours
 - **Resolve review threads after fixing** — leaving threads unresolved is incomplete work
+- **Label step is REQUIRED** — the sweep is NOT complete until clean PRs are labeled `merge-when-ready`. Stopping after fixes without labeling is the most common sweep failure mode.
+- **Wait for CI before labeling** — if all fixes are pushed but CI is still `mixed`/pending, poll every 3 minutes (max 5 polls) until runs complete. Only then scan and label. Do not skip labeling because CI hasn't finished yet.
+- **Dashboard CI summary can be stale** — the dashboard reports `ciStatus` as `none`, `pass`, `fail`, or `pending`. Stale checks (e.g., Enhanced Merge Queue on an old SHA) can cause a PR to show `fail` or `pending` even when current-SHA checks all pass. Use `github_pr_batch_status` to inspect actual job-level results: if all CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, the PR is clean regardless of dashboard `ciStatus`.
 
 ### Local Agent Only
 
@@ -220,9 +223,11 @@ PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle
 
 ---
 
-## Label Clean PRs for Merge
+## Label Clean PRs for Merge (REQUIRED)
 
-After all fixes (or as a standalone operation), add `merge-when-ready` to every clean PR:
+> **Do NOT stop before this step.** Fixing code without labeling clean PRs defeats the purpose of the sweep. If CI is still running, wait and re-scan — do not skip.
+
+After all fixes (or as a standalone operation), add `merge-when-ready` to every clean PR. If most PRs show stale `ciStatus` (`fail` or `pending` due to old-SHA checks), use `github_pr_batch_status` to inspect job-level results — a PR is clean if all CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, even when the dashboard disagrees:
 
 ```powershell
 # Re-scan to get final state
@@ -240,6 +245,8 @@ foreach ($pr in $scan.clean) {
   }
 }
 ```
+
+> **Stale-check gap**: The loop above only iterates `$scan.clean`, which won't include PRs misclassified by stale checks. When the dashboard marks PRs as `fail` or `pending` due to old-SHA checks, use `github_pr_batch_status` to identify PRs where all current-SHA CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, then label them directly via `github_manage_labels(number: <PR#>, add: ["merge-when-ready"])`.
 
 > **Only add `merge-when-ready`**. Do **not** add or remove `merge-to-parent` — that label is managed manually for stacked PRs targeting non-main branches.
 
