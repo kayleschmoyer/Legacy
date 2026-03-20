@@ -423,6 +423,38 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_diff',
+      description:
+        'Show git diff for the active (or specified) worktree. ' +
+        'Defaults to diffing against origin/main. Supports stat-only, name-only, ' +
+        'and path-filtered modes.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: { type: 'string', description: 'Optional ticket key.' },
+          base: {
+            type: 'string',
+            description:
+              'Base ref to diff against (default: "origin/main"). ' +
+              'Use "HEAD" for working-tree + index vs HEAD, "HEAD~1" for last commit, etc.',
+          },
+          paths: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Restrict diff to specific file paths.',
+          },
+          stat: {
+            type: 'boolean',
+            description: 'Show diffstat summary instead of full diff.',
+          },
+          nameOnly: {
+            type: 'boolean',
+            description: 'List only changed file names.',
+          },
+        },
+      },
+    },
+    {
       name: 'worktree_push',
       description:
         'Push the current branch with --force-with-lease. Refuses to push ' +
@@ -1745,6 +1777,135 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
           String(err);
         return {
           content: [{ type: 'text', text: `Failed to show commit: ${output}` }],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_diff
+    // -----------------------------------------------------------------------
+    case 'worktree_diff': {
+      const {
+        worktree: wtKey,
+        base = 'origin/main',
+        paths,
+        stat,
+        nameOnly,
+      } = args as {
+        worktree?: string;
+        base?: string;
+        paths?: string[];
+        stat?: boolean;
+        nameOnly?: boolean;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      // Validate base ref (only safe rev chars; reject option-like values)
+      if (base.startsWith('-')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid base ref: "${base}". Base ref must not start with '-'.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(base)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid base ref: "${base}". Only alphanumeric, '.', '/', '~', '^', '-', '_', '{', '}' allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Enforce mutual exclusivity of stat and nameOnly
+      if (stat && nameOnly) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Cannot use both "stat" and "nameOnly" — pick one.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const gitArgs = ['diff', base];
+        if (stat) gitArgs.push('--stat');
+        if (nameOnly) gitArgs.push('--name-only');
+        if (paths?.length) {
+          gitArgs.push('--');
+          gitArgs.push(...paths);
+        }
+
+        const output = runGit(gitArgs, cwd);
+        const trimmed = output.trim();
+
+        if (!trimmed) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `No differences found between ${base} and HEAD.`,
+              },
+            ],
+          };
+        }
+
+        // Truncate large diffs to prevent exceeding MCP/stdio limits
+        const MAX_DIFF_BYTES = 512_000; // 500 KB
+        if (trimmed.length > MAX_DIFF_BYTES) {
+          const truncated = trimmed.slice(0, MAX_DIFF_BYTES);
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  truncated +
+                  `\n\n... [truncated — diff exceeds ${MAX_DIFF_BYTES / 1000}KB. Use path filters to narrow scope.]`,
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [{ type: 'text', text: trimmed }],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `git diff failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
           isError: true,
         };
       }
