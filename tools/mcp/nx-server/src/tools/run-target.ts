@@ -16,11 +16,15 @@ const ALLOWED_TARGETS = new Set([
   'storybook',
 ]);
 
+/** Shell metacharacters that must not appear in passthrough args (prevents injection via shell: true). */
+const SHELL_METACHAR_REGEX = /[;&|`$(){}]/;
+
 interface RunTargetParams {
   project: string;
   target: string;
   configuration?: string;
   noCache?: boolean;
+  args?: string | string[];
   worktreePath?: string;
 }
 
@@ -46,6 +50,28 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
 
     const nxArgs = ['run', runSpec];
     if (params.noCache) nxArgs.push('--skip-nx-cache');
+    if (params.args) {
+      const tokens = Array.isArray(params.args)
+        ? params.args
+        : params.args.split(/\s+/).filter(Boolean);
+
+      for (const token of tokens) {
+        if (SHELL_METACHAR_REGEX.test(token)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Arg "${token}" contains shell metacharacters (;&|\`$(){}) which are not allowed. Pass each flag as a separate array element.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      nxArgs.push('--', ...tokens);
+    }
+
     const output = await runNx(nxArgs, cwd);
 
     return {

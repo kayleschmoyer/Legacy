@@ -118,6 +118,12 @@ server.tool(
       .describe(
         'If true, bypasses the Nx cache (--skip-nx-cache). Use when cache may be stale.',
       ),
+    args: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .describe(
+        'Extra flags passed through to the underlying tool after "--" (e.g., ["-u"] for Jest snapshot updates, ["--grep=pattern"] for test filtering). Prefer passing as an array of strings; a single string is accepted for backwards compatibility but will be split on whitespace.',
+      ),
     worktreePath: z
       .string()
       .optional()
