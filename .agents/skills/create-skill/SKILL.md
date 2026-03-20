@@ -233,13 +233,9 @@ $c = Get-Content ".agents\skills\<name>\SKILL.md" -Raw
 
 If over 500 lines or 5,000 tokens, extract content to `references/` (see Token Budget section).
 
-### 4. Register the skill in `AGENTS.md`
+### 4. Verify discovery
 
-Add the new skill to the "Skills Reference" table in `AGENTS.md` (repo root, alphabetical order):
-
-```markdown
-| **New skill** | `<skill-name>` |
-```
+Skills are auto-discovered from `.agents/skills/<name>/SKILL.md` frontmatter — no manual registration in `AGENTS.md` is needed.
 
 > `AGENTS.md` is the single canonical agent instructions file. `CLAUDE.md` is a copy of it (symlink where supported; on Windows with `core.symlinks=false` it is a plain copy). Claude Code auto-reads `CLAUDE.md`; GitHub Copilot reads `AGENTS.md` directly.
 
@@ -276,4 +272,4 @@ uvx --from skills-ref agentskills validate .agents/skills/<name>
 | Validator fails on frontmatter             | Ensure line 1 is `---` (no BOM, no leading whitespace) and `name` matches directory name |
 | Skill loads but agent ignores instructions | Move critical rules to the top of the file — agents sometimes truncate long skills       |
 | SKILL.md exceeds 500 lines or 5,000 tokens | Extract verbose sections to `references/` — see Token Budget section above               |
-| Skill table in AGENTS.md broken            | Ensure table rows use `\|` delimiters and match the existing column count                |
+| Skill not listed in AGENTS.md Skills table | The Skills Reference table in AGENTS.md is manually maintained — add a row if needed     |

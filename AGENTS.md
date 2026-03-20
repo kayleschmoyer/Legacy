@@ -117,41 +117,9 @@ scripts/       PowerShell and shell automation scripts
 - Web E2E: Playwright (hermetic — mock all network with `route.fulfill()`, never `route.continue()`)
 - Mobile E2E: WebdriverIO
 
-## Skills Reference
+## Skills
 
-Detailed how-to docs under `.agents/skills/<name>/SKILL.md`. Skills are auto-matched by the VS Code skills system. For manual lookup:
-
-| Task                     | Skill                                                            |
-| ------------------------ | ---------------------------------------------------------------- |
-| Full workflow            | `worktree-workflow`                                              |
-| Add secret / env var     | `add-secret-or-env-var`                                          |
-| Architecture             | `architecture`                                                   |
-| AWS orphan cleanup       | `aws-orphan-cleanup`                                             |
-| Config reference         | `config-standards`                                               |
-| DB queries / schema      | `db-query`, `db-schema`                                          |
-| DB dump / restore        | `db-dump`, `db-restore`                                          |
-| Debug distributed        | `debug-distributed`                                              |
-| Docker local stack       | `docker-local`                                                   |
-| E2E / Integration tests  | `e2e-testing`, `integration-testing`                             |
-| Install packages         | `install-packages`                                               |
-| Bug fixes / lint / types | `fix-bugs`, `fix-lint`, `fix-types`                              |
-| Fix Copilot reviews      | `fix-copilot-reviews`                                            |
-| Never edit generated     | `no-edit-generated`                                              |
-| New app/lambda/lib/MCP   | `create-app`, `create-lambda`, `create-lib`, `create-mcp-server` |
-| New skill                | `create-skill`                                                   |
-| Platform files           | `platform-file-convention`                                       |
-| MCP gap audit            | `mcp-gap-audit`                                                  |
-| PR creation/operations   | `create-pr`, `open-prs`                                          |
-| Scratch output           | `scratch-dir`                                                    |
-| Troubleshooting          | `troubleshoot`                                                   |
-| Storybook                | `storybook`                                                      |
-| UI (brand/standards)     | `ui-brand-colors`, `ui-standards`                                |
-| User testing             | `user-testing`                                                   |
-| WebSocket refetch UX     | `websocket-refetch-ux`                                           |
-| Rebase / merge conflicts | `rebase-conflicts`, `resolve-merge-conflicts`                    |
-| Makefile / MCP           | `makefile`, `mcp-db`, `mcp-jira`                                 |
-| All skills               | `.agents/skills/`                                                |
-| CSV reference data       | `docs/agents/*.csv`                                              |
+Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. Copilot auto-discovers skills from frontmatter; other agents can browse the directory directly. CSV reference data is in `docs/agents/*.csv`.
 
 ## MCP Servers
 
