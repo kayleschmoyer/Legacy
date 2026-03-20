@@ -231,8 +231,14 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
 
     if (STRUCTURED_TARGETS.has(target)) {
       const steps = parseSteps(output);
+      // The definitive success indicator is the "All pre-commit checks passed"
+      // marker at the end of output. Step-level regex matching can produce false
+      // positives (e.g., "error" in a URL or log line), so the final marker wins.
+      const hasPassedMarker = /All pre-commit checks passed/i.test(output);
       const allPassed =
-        steps.length === 0 || steps.every((s) => s.status !== 'failed');
+        hasPassedMarker ||
+        steps.length === 0 ||
+        steps.every((s) => s.status !== 'failed');
       const result: Record<string, unknown> = {
         success: allPassed,
         target,
