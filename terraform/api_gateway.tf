@@ -88,11 +88,70 @@ resource "aws_api_gateway_deployment" "main" {
   ]
 }
 
+# CloudWatch log group for API Gateway access logs
+resource "aws_cloudwatch_log_group" "api_gateway_access_logs" {
+  name              = "/aws/apigateway/${local.name_prefix}-api/access-logs"
+  retention_in_days = var.environment == "prod" ? 90 : 30
+
+  tags = local.common_tags
+}
+
+# IAM role for API Gateway to write CloudWatch logs
+resource "aws_iam_role" "api_gateway_cloudwatch" {
+  name = "${local.name_prefix}-api-gateway-cloudwatch"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "apigateway.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch" {
+  role       = aws_iam_role.api_gateway_cloudwatch.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+}
+
+# API Gateway account-level CloudWatch role (required for access logging)
+resource "aws_api_gateway_account" "main" {
+  cloudwatch_role_arn = aws_iam_role.api_gateway_cloudwatch.arn
+}
+
 # API Gateway Stage
 resource "aws_api_gateway_stage" "main" {
   deployment_id = aws_api_gateway_deployment.main.id
   rest_api_id   = aws_api_gateway_rest_api.main.id
   stage_name    = var.environment
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gateway_access_logs.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      caller         = "$context.identity.caller"
+      user           = "$context.identity.user"
+      userAgent      = "$context.identity.userAgent"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      resourcePath   = "$context.resourcePath"
+      status         = "$context.status"
+      protocol       = "$context.protocol"
+      responseLength = "$context.responseLength"
+      errorMessage   = "$context.error.message"
+      integrationErr = "$context.integrationErrorMessage"
+    })
+  }
+
+  depends_on = [aws_api_gateway_account.main]
 
   tags = local.common_tags
 }
