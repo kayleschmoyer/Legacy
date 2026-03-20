@@ -359,23 +359,32 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_checkout_file',
       description:
-        'Resolve conflicted files by checking out theirs or ours version and staging them.',
+        'Restore files to a specific ref or resolve conflicts using theirs/ours. ' +
+        'Two modes: (1) With strategy ("theirs"/"ours") — resolves conflicted files and stages them. ' +
+        '(2) Without strategy — restores files to a ref (default HEAD), discarding local changes.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           files: {
             type: 'array' as const,
             items: { type: 'string' },
-            description: 'File paths to resolve.',
+            description: 'File paths to restore or resolve.',
           },
           strategy: {
             type: 'string',
             enum: ['theirs', 'ours'],
-            description: '"theirs" or "ours".',
+            description:
+              'Conflict resolution strategy. If omitted, restores files to ref instead.',
+          },
+          ref: {
+            type: 'string',
+            description:
+              'Git ref to restore files from (e.g. "HEAD", "origin/main"). ' +
+              'Default: "HEAD". Only used when strategy is omitted.',
           },
           worktree: { type: 'string', description: 'Optional ticket key.' },
         },
-        required: ['files', 'strategy'],
+        required: ['files'],
       },
     },
     {
@@ -1475,10 +1484,12 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
       const {
         files,
         strategy,
+        ref = 'HEAD',
         worktree: wtKey,
       } = args as {
         files: string[];
-        strategy: 'theirs' | 'ours';
+        strategy?: 'theirs' | 'ours';
+        ref?: string;
         worktree?: string;
       };
       const target = resolveTargetDir(wtKey);
@@ -1489,22 +1500,46 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
         };
       }
       const cwd = target.path;
+
+      // Validate ref (only safe rev chars)
+      if (!strategy && !/^[a-zA-Z0-9_./~^{}-]+$/.test(ref)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Only alphanumeric, '.', '/', '~', '^', '-' allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
       try {
-        const resolvedFiles: string[] = [];
+        const restoredFiles: string[] = [];
         for (const file of files) {
-          runGit(['checkout', `--${strategy}`, '--', file], cwd);
-          runGit(['add', '--', file], cwd);
-          resolvedFiles.push(file);
+          if (strategy) {
+            // Conflict resolution mode: checkout --theirs/--ours and stage
+            runGit(['checkout', `--${strategy}`, '--', file], cwd);
+            runGit(['add', '--', file], cwd);
+          } else {
+            // Restore mode: checkout file from ref
+            runGit(['checkout', ref, '--', file], cwd);
+          }
+          restoredFiles.push(file);
         }
+
+        const mode = strategy ? `--${strategy}` : ref;
+        const verb = strategy ? 'Resolved' : 'Restored';
+        const suffix = strategy ? ' and staged them' : '';
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify(
                 {
-                  strategy,
-                  resolved: resolvedFiles,
-                  message: `Resolved ${resolvedFiles.length} file(s) using --${strategy} and staged them.`,
+                  mode,
+                  files: restoredFiles,
+                  message: `${verb} ${restoredFiles.length} file(s) using ${mode}${suffix}.`,
                 },
                 null,
                 2,
