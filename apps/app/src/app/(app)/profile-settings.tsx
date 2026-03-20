@@ -69,10 +69,10 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
   const [updateAvatar, { loading: updatingAvatar }] =
     useUpdateUserAvatarMutation();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      logout();
+      await logout();
     } finally {
       setLoggingOut(false);
     }

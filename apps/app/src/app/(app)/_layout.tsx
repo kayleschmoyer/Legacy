@@ -5,8 +5,11 @@ import {
 } from '@react-navigation/drawer';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Separator, Text, YStack } from 'tamagui';
-
+import { getExpoPushTokenAsync } from 'expo-notifications';
+import * as Device from 'expo-device';
+import { LOGGER } from '@legacy-sports/logging';
 import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
+
 import BaseballHome from './baseball';
 import DraftBoardPage from './DraftBoardPage';
 import FootballHome from './football';
@@ -30,11 +33,13 @@ import ProfileSettingsScreen from './profile-settings';
 import PreferencesScreen from './preferences';
 import NotificationsScreen from './notifications';
 import SubscriptionSettingsScreen from './subscription-settings';
+import { useDisableDeviceTokenMutation } from '../../api/db/graphql.generated';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
 import {
   useAuthHandlers,
   useCurrentUserInfo,
 } from '../../common/auth/AuthHooks';
+import { usePushNotifications } from '../../features/notifications/hooks/usePushNotifications';
 import Home from '.';
 
 export type AppDrawerParamList = {
@@ -147,10 +152,25 @@ function CustomDrawerContent(
 ): React.JSX.Element {
   const router = useRouter();
   const { logout } = useAuthHandlers();
+  const [disableDeviceToken] = useDisableDeviceTokenMutation();
 
-  const doLogout = () => {
-    logout();
-    router.navigate('/login');
+  const doLogout = async () => {
+    // Best-effort: deactivate push token before clearing credentials
+    if (Device.isDevice) {
+      try {
+        const tokenData = await getExpoPushTokenAsync();
+        await disableDeviceToken({
+          variables: { deviceToken: tokenData.data },
+        });
+      } catch (err) {
+        LOGGER.warn(
+          'Could not deactivate push token on logout:',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+
+    await logout();
     props.navigation.closeDrawer();
   };
 
@@ -177,7 +197,9 @@ function CustomDrawerContent(
         padding="$3"
         fontSize="$5"
         color="$red10"
-        onPress={doLogout}
+        onPress={() => {
+          void doLogout();
+        }}
         pressStyle={{ backgroundColor: '$gray3' }}
       >
         Logout
@@ -188,6 +210,8 @@ function CustomDrawerContent(
 
 export default function Layout() {
   const { data: currentUser, loading } = useCurrentUserInfo();
+
+  usePushNotifications(currentUser?.id ?? null);
 
   if (loading) {
     return <UnifiedLoadingPanel />;

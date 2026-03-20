@@ -209,7 +209,8 @@
     "@esbuild-kit/core-utils": {
       "esbuild": "^0.25.10"
     },
-    "axios": "1.13.6"
+    "axios": "1.13.6",
+    "graphql": "^16.13.1"
   },
   "optionalDependencies": {
     "@nx/storybook": "^21.5.2",

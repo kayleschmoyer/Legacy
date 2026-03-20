@@ -21,7 +21,7 @@ import { EnvironmentVariable } from '../EnvironmentVariables';
 
 export interface AuthHandlers {
   googleLogin: () => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export interface AuthCallbacks {

@@ -54,6 +54,15 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.legacy-sports-433915"
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "Legacy Sports",
+          "iosDisplayInForeground": true
+        }
       ]
     ]
   }
