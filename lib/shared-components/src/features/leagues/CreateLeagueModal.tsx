@@ -147,7 +147,6 @@ function CreateLeagueModal({
           exitStyle={{ opacity: 0 }}
         />
         <Dialog.Content
-          bordered
           elevate
           key="content"
           animateOnly={['transform', 'opacity']}
@@ -166,6 +165,9 @@ function CreateLeagueModal({
           width={Platform.OS === 'web' ? 400 : '90%'}
           maxHeight="80%"
           overflow="hidden"
+          borderWidth={1}
+          borderColor="$borderColor"
+          borderRadius="$4"
         >
           <Dialog.Title
             fontSize="$6"
