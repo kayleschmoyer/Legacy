@@ -28,13 +28,12 @@
  *     src/integration/tests/matchup-roster-recap-ui.integration.spec.ts
  */
 
-import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { test } from '../fixtures/ui';
+import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
 // Shared state set in beforeAll and consumed by subsequent phases
@@ -182,34 +181,6 @@ const GET_MATCHUP_PLAYERS = `
     }
   }
 `;
-
-// ---------------------------------------------------------------------------
-// UI helper — swap JWT in localStorage
-// ---------------------------------------------------------------------------
-
-async function switchUser(
-  page: Page,
-  jwt: string,
-  url?: string,
-): Promise<void> {
-  if (url) {
-    await page.goto(url);
-    await page.waitForLoadState('domcontentloaded');
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  } else {
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Serial test suite

@@ -20,10 +20,9 @@
  *     src/integration/tests/league-qr-invite-ui.integration.spec.ts
  */
 
-import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { test } from '../fixtures/ui';
+import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial phases.
@@ -41,31 +40,6 @@ let state: InviteState;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Switch the logged-in user by writing a new JWT into localStorage. */
-async function switchUser(
-  page: Page,
-  jwt: string,
-  url?: string,
-): Promise<void> {
-  if (url) {
-    await page.goto(url);
-    await page.waitForLoadState('domcontentloaded');
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  } else {
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  }
-}
 
 const GQL_URL =
   (

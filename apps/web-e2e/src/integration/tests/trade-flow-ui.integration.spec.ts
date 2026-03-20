@@ -27,7 +27,7 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { test } from '../fixtures/ui';
+import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial phases.
@@ -61,31 +61,6 @@ const GQL_URL =
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Swap the logged-in user by writing a new JWT into localStorage. */
-async function switchUser(
-  page: Page,
-  jwt: string,
-  url?: string,
-): Promise<void> {
-  if (url) {
-    await page.goto(url);
-    await page.waitForLoadState('domcontentloaded');
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  } else {
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  }
-}
 
 /** Fire a raw GraphQL query against the live backend (Node fetch, no browser). */
 async function gqlFetch<T>(

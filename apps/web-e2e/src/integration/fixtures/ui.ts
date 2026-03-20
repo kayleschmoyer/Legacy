@@ -76,11 +76,13 @@ function buildIntegrationStorageState(jwt: string) {
   // both the web app (legacy-fantasy.com) and the API subdomain
   // (api.legacy-fantasy.com), matching how the OAuth proxy sets them in
   // production with Domain=.legacy-fantasy.com.
-  // For localhost or other non-FQDN hosts, use the hostname directly
-  // because `.localhost` is not a valid cookie domain in most browsers.
-  const isLocalhost =
-    url.hostname === 'localhost' || !url.hostname.includes('.');
-  const cookieDomain = isLocalhost ? url.hostname : `.${url.hostname}`;
+  // For localhost, other non-FQDN hosts, or IP addresses, use the hostname
+  // directly because `.localhost` and `.127.0.0.1` are not valid cookie
+  // domains in most browsers.
+  const isIpAddress = /^\d{1,3}(\.\d{1,3}){3}$/.test(url.hostname);
+  const isHostOnly =
+    url.hostname === 'localhost' || !url.hostname.includes('.') || isIpAddress;
+  const cookieDomain = isHostOnly ? url.hostname : `.${url.hostname}`;
 
   return {
     cookies: [
@@ -325,3 +327,97 @@ export const test = base.extend<UIIntegrationFixtures>({
 });
 
 export { expect } from '@playwright/test';
+
+/**
+ * Switch the authenticated user in an existing browser page by updating the
+ * HttpOnly `ls_jwt` cookie, cached user profile, and CSRF token.
+ *
+ * After LS-775 moved auth from localStorage to HttpOnly cookies, the old
+ * approach of setting `localStorage['auth_jwt']` no longer works — the
+ * `useAuth` hook treats it as an invalid impersonation attempt and removes it.
+ *
+ * This helper mirrors `buildIntegrationStorageState` for an existing context:
+ * it replaces the `ls_jwt` cookie, updates `ls_user_profile` and
+ * `ls_token_expiry` in localStorage, and ensures no stale `auth_jwt` key
+ * triggers the broken impersonation path.
+ */
+export async function switchUser(
+  page: Page,
+  jwt: string,
+  url?: string,
+): Promise<void> {
+  const payload = JSON.parse(
+    Buffer.from(jwt.split('.')[1], 'base64url').toString(),
+  ) as {
+    id?: number;
+    email?: string;
+    username?: string;
+    accessLevel?: string;
+    exp?: number;
+  };
+
+  const userProfile = {
+    id: payload.id ?? 1,
+    email: payload.email ?? 'user@test.com',
+    username: payload.username ?? 'testuser',
+    accessLevel: payload.accessLevel ?? 'none',
+  };
+
+  const expiry = payload.exp ?? Math.floor(Date.now() / 1000) + 3600;
+  const webUrl = new URL(WEB_BASE);
+  const isIpAddress = /^\d{1,3}(\.\d{1,3}){3}$/.test(webUrl.hostname);
+  const isHostOnly =
+    webUrl.hostname === 'localhost' ||
+    !webUrl.hostname.includes('.') ||
+    isIpAddress;
+  const cookieDomain = isHostOnly ? webUrl.hostname : `.${webUrl.hostname}`;
+
+  // Update cookies in the browser context
+  await page.context().addCookies([
+    {
+      name: 'ls_jwt',
+      value: jwt,
+      domain: cookieDomain,
+      path: '/',
+      httpOnly: true,
+      secure: webUrl.protocol === 'https:',
+      sameSite: 'None',
+      expires: expiry,
+    },
+    {
+      name: 'ls_csrf',
+      value: 'integration-csrf-token',
+      domain: cookieDomain,
+      path: '/',
+      httpOnly: false,
+      secure: webUrl.protocol === 'https:',
+      sameSite: 'None',
+      expires: expiry,
+    },
+  ]);
+
+  // Navigate to the target URL (or WEB_BASE) to establish the correct origin
+  // before accessing localStorage. On a fresh newPage() the page is
+  // about:blank and any localStorage access would throw a SecurityError.
+  const targetUrl = url ?? WEB_BASE;
+  await page.goto(targetUrl);
+  await page.waitForLoadState('domcontentloaded');
+
+  // Update localStorage: user profile, expiry, CSRF token, and remove stale
+  // auth_jwt to prevent the useAuth hook from entering the broken impersonation
+  // code path.
+  await page.evaluate(
+    ({ profile, exp }) => {
+      localStorage.setItem('ls_user_profile', JSON.stringify(profile));
+      localStorage.setItem('ls_token_expiry', String(exp));
+      localStorage.setItem('ls_csrf_token', 'integration-csrf-token');
+      localStorage.removeItem('auth_jwt');
+      localStorage.removeItem('ls_admin_profile');
+    },
+    { profile: userProfile, exp: expiry },
+  );
+
+  // Reload so the app re-initializes with the new auth state.
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+}

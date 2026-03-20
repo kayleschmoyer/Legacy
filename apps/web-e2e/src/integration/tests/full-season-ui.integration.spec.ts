@@ -20,9 +20,8 @@
  */
 
 import { expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { test } from '../fixtures/ui';
+import { switchUser, test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
 // Shared state accumulated across serial tests.
@@ -41,37 +40,6 @@ let state: SeasonState;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Swap the auth JWT in localStorage so subsequent navigations act as a
- * different user.  Navigates to `url` (or the current origin) first to
- * ensure we are on a valid origin for localStorage access, then sets the
- * token and reloads so Apollo picks it up.
- */
-async function switchUser(
-  page: Page,
-  jwt: string,
-  url?: string,
-): Promise<void> {
-  if (url) {
-    // Navigate first to establish the correct origin, then set JWT and reload
-    await page.goto(url);
-    await page.waitForLoadState('domcontentloaded');
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  } else {
-    await page.evaluate(
-      (token) => localStorage.setItem('auth_jwt', token),
-      jwt,
-    );
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Serial test suite — every phase drives the browser UI
