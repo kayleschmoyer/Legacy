@@ -101,6 +101,8 @@ const NavLinks = styled(XStack, {
   gap: '$3',
   flex: 1,
   justifyContent: 'center',
+  minWidth: 0,
+  flexWrap: 'wrap',
 });
 
 /** Pill-shaped nav link button with active indicator dot */
