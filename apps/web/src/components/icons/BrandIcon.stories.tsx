@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import React from 'react';
-import { BrandIcon, BrandIconBadge, type BrandIconName } from './BrandIcon';
+import {
+  ALL_BRAND_ICON_NAMES,
+  BrandIcon,
+  BrandIconBadge,
+  type BrandIconName,
+} from './BrandIcon';
 import {
   BG_DARK,
   BRAND_GOLD_LIGHT,
@@ -25,17 +30,7 @@ function BrandIconStory(props: BrandIconStoryProps) {
   return <BrandIcon {...props} decorative />;
 }
 
-const ALL_ICONS: BrandIconName[] = [
-  'baseball',
-  'football',
-  'stats',
-  'draft',
-  'live',
-  'secure',
-  'settings',
-  'book',
-  'google',
-];
+const ALL_ICONS: BrandIconName[] = ALL_BRAND_ICON_NAMES;
 
 // ─── Wrapper helpers ──────────────────────────────────────────────────────────
 
@@ -222,8 +217,12 @@ function BadgeVariants() {
 
 function FeatureCardContext() {
   const features: { icon: BrandIconName; label: string }[] = [
+    { icon: 'baseball', label: 'Fantasy Baseball' },
     { icon: 'stats', label: 'Live Stats' },
     { icon: 'draft', label: 'Draft Tools' },
+    { icon: 'matchup', label: 'Head-to-Head' },
+    { icon: 'trophy', label: 'League Champion' },
+    { icon: 'trade', label: 'Trade Center' },
     { icon: 'live', label: 'Instant Updates' },
     { icon: 'secure', label: 'Secure Leagues' },
   ];

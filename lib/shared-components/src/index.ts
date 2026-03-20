@@ -178,3 +178,6 @@ export * from './features/matchup';
 // Picker components (avatar, banner)
 export * from './components/AvatarPicker';
 export * from './components/BannerPicker';
+
+// Heritage Line icon system
+export * from './components/icons';
