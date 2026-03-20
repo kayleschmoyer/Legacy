@@ -19,6 +19,7 @@ interface RunTargetParams {
   project: string;
   target: string;
   configuration?: string;
+  noCache?: boolean;
   worktreePath?: string;
 }
 
@@ -42,7 +43,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       ? `${params.project}:${params.target}:${params.configuration}`
       : `${params.project}:${params.target}`;
 
-    const output = await runNx(['run', runSpec], cwd);
+    const nxArgs = ['run', runSpec];
+    if (params.noCache) nxArgs.push('--skip-nx-cache');
+    const output = await runNx(nxArgs, cwd);
 
     return {
       content: [

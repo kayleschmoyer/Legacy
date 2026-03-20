@@ -110,6 +110,12 @@ server.tool(
       .describe(
         'Named configuration to use (e.g., "production"). Omit for defaults.',
       ),
+    noCache: z
+      .boolean()
+      .default(false)
+      .describe(
+        'If true, bypasses the Nx cache (--skip-nx-cache). Use when cache may be stale.',
+      ),
     worktreePath: z
       .string()
       .optional()
