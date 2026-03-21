@@ -17,6 +17,7 @@ import { prBatchStatus } from './tools/pr-batch-status.js';
 import { prScan } from './tools/pr-scan.js';
 import { mergePR } from './tools/merge-pr.js';
 import { closePR } from './tools/close-pr.js';
+import { rebasePR } from './tools/rebase-pr.js';
 
 // Check gh CLI auth on startup (non-blocking warning)
 runGh(['auth', 'status']).catch((error: unknown) => {
@@ -331,6 +332,17 @@ server.tool(
       .describe('Optional comment to add when closing the PR'),
   },
   async (params) => closePR(params),
+);
+
+// --- github_rebase_pr ---
+server.tool(
+  'github_rebase_pr',
+  'Rebase a PR branch onto its base branch (usually main) and force-push. ' +
+    'Handles the full fetch → rebase → push cycle. Returns conflict details if rebase fails.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number to rebase'),
+  },
+  async (params) => rebasePR(params),
 );
 
 // Start the server
