@@ -1,4 +1,4 @@
-import { runGh } from '../gh.js';
+import { githubPost } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface RerunParams {
@@ -9,20 +9,24 @@ interface RerunParams {
 }
 
 export async function rerun(params: RerunParams): Promise<ToolResult> {
-  const args = ['run', 'rerun', String(params.runId)];
-
-  if (params.jobId) {
-    args.push('--job', String(params.jobId));
-  } else if (params.failedOnly !== false) {
-    args.push('--failed');
-  }
-
-  if (params.debug) {
-    args.push('--debug');
-  }
-
   try {
-    const output = await runGh(args);
+    if (params.jobId) {
+      // Rerun a specific job
+      await githubPost(`/actions/jobs/${params.jobId}/rerun`);
+    } else if (params.failedOnly !== false) {
+      // Rerun only failed jobs
+      await githubPost(
+        `/actions/runs/${params.runId}/rerun-failed-jobs`,
+        params.debug ? { enable_debug_logging: true } : undefined,
+      );
+    } else {
+      // Rerun entire run
+      await githubPost(
+        `/actions/runs/${params.runId}/rerun`,
+        params.debug ? { enable_debug_logging: true } : undefined,
+      );
+    }
+
     return {
       content: [
         {
@@ -37,7 +41,7 @@ export async function rerun(params: RerunParams): Promise<ToolResult> {
                   ? 'run'
                   : 'failed-jobs',
               debug: params.debug ?? false,
-              message: output || 'Rerun requested successfully.',
+              message: 'Rerun requested successfully.',
             },
             null,
             2,
