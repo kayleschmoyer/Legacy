@@ -774,15 +774,15 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
 
     await test.step('5.4 Process waivers', async () => {
       const data = await graphqlOk<{
-        processWaiverClaims: { processedCount: number };
+        processWaiverClaims: { processed: number };
       }>(
         apiCommissioner,
         `mutation ProcessWaivers($leagueId: Int) {
-           processWaiverClaims(leagueId: $leagueId) { processedCount }
+           processWaiverClaims(leagueId: $leagueId) { processed }
          }`,
         { leagueId: state.leagueId },
       );
-      expect(data.processWaiverClaims.processedCount).toBeGreaterThanOrEqual(0);
+      expect(data.processWaiverClaims.processed).toBeGreaterThanOrEqual(0);
     });
   });
 
