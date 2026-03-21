@@ -104,6 +104,12 @@ describe('Premium authorization helpers', () => {
     username: 'premium',
     isAdmin: false,
   };
+  const adminUser = {
+    id: 3,
+    email: 'admin@test.com',
+    username: 'admin',
+    isAdmin: true,
+  };
 
   function makeContext(
     user: typeof freeUser | null,
@@ -200,6 +206,13 @@ describe('Premium authorization helpers', () => {
       await expect(requirePremium(ctx as any)).rejects.toMatchObject({
         extensions: { code: 'UNAUTHENTICATED' },
       });
+    });
+
+    it('resolves without throwing for admin users on free tier', async () => {
+      const ctx = makeContext(adminUser, 'free');
+      const selectSpy = jest.spyOn(ctx.db, 'select');
+      await expect(requirePremium(ctx as any)).resolves.toBeUndefined();
+      expect(selectSpy).not.toHaveBeenCalled();
     });
   });
 

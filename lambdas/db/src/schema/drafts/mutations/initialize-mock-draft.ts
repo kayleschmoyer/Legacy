@@ -107,23 +107,26 @@ builder.mutationField('initializeMockDraft', (t) =>
       }
 
       // ── Premium feature gating: max 2 mock drafts/week for free tier ────
-      const tier = await getSubscriptionTier(context);
-      if (tier !== 'premium') {
-        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const [{ mockDraftCount }] = await context.db
-          .select({ mockDraftCount: count() })
-          .from(PublicSchema.leagues)
-          .where(
-            and(
-              eq(PublicSchema.leagues.owner, userId),
-              eq(PublicSchema.leagues.isMockDraft, true),
-              gte(PublicSchema.leagues.createdAt, oneWeekAgo),
-            ),
-          );
-        if (mockDraftCount >= 2) {
-          throw PremiumRequiredError(
-            'Free tier is limited to 2 mock drafts per week. Upgrade to premium for unlimited mock drafts.',
-          );
+      const isAdmin = context.user?.isAdmin === true;
+      if (!isAdmin) {
+        const tier = await getSubscriptionTier(context);
+        if (tier !== 'premium') {
+          const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          const [{ mockDraftCount }] = await context.db
+            .select({ mockDraftCount: count() })
+            .from(PublicSchema.leagues)
+            .where(
+              and(
+                eq(PublicSchema.leagues.owner, userId),
+                eq(PublicSchema.leagues.isMockDraft, true),
+                gte(PublicSchema.leagues.createdAt, oneWeekAgo),
+              ),
+            );
+          if (mockDraftCount >= 2) {
+            throw PremiumRequiredError(
+              'Free tier is limited to 2 mock drafts per week. Upgrade to premium for unlimited mock drafts.',
+            );
+          }
         }
       }
 

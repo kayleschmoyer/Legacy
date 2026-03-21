@@ -205,51 +205,54 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       const username = context.user.username || 'User';
 
       // ── Premium feature gating ──────────────────────────────────────────────
-      const tier = await getSubscriptionTier(context);
-      if (tier !== 'premium') {
-        // Enforce max 3 non-mock leagues for free tier
-        const [{ leagueCount }] = await context.db
-          .select({ leagueCount: count() })
-          .from(PublicSchema.leagues)
-          .where(
-            and(
-              eq(PublicSchema.leagues.owner, userId),
-              eq(PublicSchema.leagues.isMockDraft, false),
-            ),
-          );
-        if (leagueCount >= 3) {
-          throw PremiumRequiredError(
-            'Free tier is limited to 3 leagues. Upgrade to premium for unlimited leagues.',
-          );
-        }
+      const isAdmin = context.user.isAdmin === true;
+      if (!isAdmin) {
+        const tier = await getSubscriptionTier(context);
+        if (tier !== 'premium') {
+          // Enforce max 3 non-mock leagues for free tier
+          const [{ leagueCount }] = await context.db
+            .select({ leagueCount: count() })
+            .from(PublicSchema.leagues)
+            .where(
+              and(
+                eq(PublicSchema.leagues.owner, userId),
+                eq(PublicSchema.leagues.isMockDraft, false),
+              ),
+            );
+          if (leagueCount >= 3) {
+            throw PremiumRequiredError(
+              'Free tier is limited to 3 leagues. Upgrade to premium for unlimited leagues.',
+            );
+          }
 
-        // FAAB waiver type is premium only
-        if (inputWaiverType === 'faab') {
-          throw PremiumRequiredError(
-            'FAAB waiver type requires a premium subscription. Upgrade to unlock advanced waiver settings.',
-          );
-        }
+          // FAAB waiver type is premium only
+          if (inputWaiverType === 'faab') {
+            throw PremiumRequiredError(
+              'FAAB waiver type requires a premium subscription. Upgrade to unlock advanced waiver settings.',
+            );
+          }
 
-        // Salary cap is premium only
-        if (inputSalaryCapEnabled) {
-          throw PremiumRequiredError(
-            'Salary cap leagues require a premium subscription. Upgrade to unlock salary cap features.',
-          );
-        }
+          // Salary cap is premium only
+          if (inputSalaryCapEnabled) {
+            throw PremiumRequiredError(
+              'Salary cap leagues require a premium subscription. Upgrade to unlock salary cap features.',
+            );
+          }
 
-        // Non-modern era filters are premium only
-        const premiumEraFilters = [
-          'dead_ball',
-          'golden_age',
-          'expansion',
-          'free_agency',
-          'steroid_era',
-          'custom',
-        ];
-        if (inputEraFilter && premiumEraFilters.includes(inputEraFilter)) {
-          throw PremiumRequiredError(
-            'Era-based filtering (non-Modern eras) requires a premium subscription. Upgrade to access historical era leagues.',
-          );
+          // Non-modern era filters are premium only
+          const premiumEraFilters = [
+            'dead_ball',
+            'golden_age',
+            'expansion',
+            'free_agency',
+            'steroid_era',
+            'custom',
+          ];
+          if (inputEraFilter && premiumEraFilters.includes(inputEraFilter)) {
+            throw PremiumRequiredError(
+              'Era-based filtering (non-Modern eras) requires a premium subscription. Upgrade to access historical era leagues.',
+            );
+          }
         }
       }
 
@@ -741,21 +744,24 @@ builder.mutationField('createLeague', (t) =>
       const userId = context.user.id;
 
       // ── Premium feature gating: max 3 leagues for free tier ──────────────
-      const tier = await getSubscriptionTier(context);
-      if (tier !== 'premium') {
-        const [{ leagueCount }] = await context.db
-          .select({ leagueCount: count() })
-          .from(PublicSchema.leagues)
-          .where(
-            and(
-              eq(PublicSchema.leagues.owner, userId),
-              eq(PublicSchema.leagues.isMockDraft, false),
-            ),
-          );
-        if (leagueCount >= 3) {
-          throw PremiumRequiredError(
-            'Free tier is limited to 3 leagues. Upgrade to premium for unlimited leagues.',
-          );
+      const isAdmin = context.user.isAdmin === true;
+      if (!isAdmin) {
+        const tier = await getSubscriptionTier(context);
+        if (tier !== 'premium') {
+          const [{ leagueCount }] = await context.db
+            .select({ leagueCount: count() })
+            .from(PublicSchema.leagues)
+            .where(
+              and(
+                eq(PublicSchema.leagues.owner, userId),
+                eq(PublicSchema.leagues.isMockDraft, false),
+              ),
+            );
+          if (leagueCount >= 3) {
+            throw PremiumRequiredError(
+              'Free tier is limited to 3 leagues. Upgrade to premium for unlimited leagues.',
+            );
+          }
         }
       }
 

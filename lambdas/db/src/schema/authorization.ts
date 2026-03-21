@@ -169,7 +169,15 @@ export async function requirePremium(
   context: Context,
   featureDescription?: string,
 ): Promise<void> {
-  const tier = await getSubscriptionTier(context);
+  const user = requireAuth(context);
+  if (user.isAdmin) return;
+
+  const rows = await context.db
+    .select({ tier: InternalSchema.usersInAppInternal.subscriptionTier })
+    .from(InternalSchema.usersInAppInternal)
+    .where(eq(InternalSchema.usersInAppInternal.id, user.id))
+    .limit(1);
+  const tier = rows[0]?.tier ?? 'free';
   if (tier !== 'premium') {
     const msg = featureDescription
       ? `${featureDescription} requires a premium subscription. Upgrade to unlock this feature.`
