@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Separator,
@@ -328,10 +328,24 @@ export function LeagueScoringEditor(
   const [updateScoring, { loading: saving }] =
     useUpdateLeagueScoringProfileMutation();
 
+  // Guard against the stats-sync effect overwriting optimistic baseline updates
+  // mid-save. When onRefetch() returns, the parent re-renders with a new profile
+  // → new stats ref → the effect fires and resets baselineMultipliers. If the
+  // refetch returns stale cache data, that reset re-introduces the dirty state
+  // and the "unsaved" badge reappears even though the save succeeded.
+  const isSavingRef = useRef(false);
+
   useEffect(() => {
-    setBaselineMultipliers(
-      Object.fromEntries(stats.map((s) => [s.id, s.multiplier])),
-    );
+    // Only guard the baseline overwrite during save — the optimistic baseline
+    // set in handleSave is correct and must not be clobbered by a refetch that
+    // may return stale cache data. All other resync work (formValues,
+    // fieldErrors, flags) still runs so that added/removed stats or
+    // server-normalized multipliers are picked up immediately.
+    if (!isSavingRef.current) {
+      setBaselineMultipliers(
+        Object.fromEntries(stats.map((s) => [s.id, s.multiplier])),
+      );
+    }
     setFormValues(createInitialValues(stats));
     setFieldErrors(createInitialErrors(stats));
     setSaveError(null);
@@ -416,6 +430,10 @@ export function LeagueScoringEditor(
     // Snapshot the updates before the async gap — state may change mid-flight.
     const updatesToSave = pendingUpdates;
 
+    // Prevent the stats-sync effect from overwriting our optimistic baseline
+    // while the refetch is in flight (see isSavingRef comment above).
+    isSavingRef.current = true;
+
     try {
       await updateScoring({
         variables: {
@@ -453,6 +471,8 @@ export function LeagueScoringEditor(
           ? mutationError.message
           : 'Failed to update scoring multipliers',
       );
+    } finally {
+      isSavingRef.current = false;
     }
   };
 
