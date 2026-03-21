@@ -1,8 +1,12 @@
 name: Copilot Auto-Approve
 
 # Workflow jobs:
-# 1. request-review: automatically requests a Copilot review when a PR is opened or updated
+# 1. request-review: requests a Copilot review when a PR is opened or updated
 # 2. auto-approve: approves the PR when Copilot's review has no unresolved comments
+#
+# The auto-approve job uses workflow_run to chain off the built-in "Copilot code review"
+# workflow. This bypasses GitHub's anti-recursion rule which prevents events from
+# GitHub Apps (like Copilot) from triggering workflows via pull_request_review.
 #
 # Uses a GitHub App (ID: 3142924) for bot identity.
 # Requires BOT_APP_PRIVATE_KEY secret containing the app's PEM private key.
@@ -10,8 +14,13 @@ name: Copilot Auto-Approve
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  pull_request_review:
-    types: [submitted]
+  workflow_run:
+    workflows: ["Copilot code review"]
+    types: [completed]
+
+permissions:
+  pull-requests: write
+  contents: read
 
 jobs:
   request-review:
@@ -38,28 +47,78 @@ jobs:
             }
 
   auto-approve:
-    # Only run on pull_request_review events from Copilot
-    # The webhook event uses login 'Copilot' (not 'copilot-pull-request-reviewer[bot]')
+    # Runs when the built-in "Copilot code review" workflow completes for a PR
     if: >-
-      github.event_name == 'pull_request_review' &&
-      (github.event.review.user.login == 'Copilot' ||
-       github.event.review.user.login == 'copilot-pull-request-reviewer[bot]') &&
-      github.event.review.state != 'changes_requested'
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
+      - name: Get PR number
+        id: pr
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // workflow_run.pull_requests may be empty for cross-repo PRs
+            const prs = context.payload.workflow_run.pull_requests;
+            if (prs && prs.length > 0) {
+              core.setOutput('number', prs[0].number.toString());
+              core.info(`Found PR #${prs[0].number} from workflow_run payload`);
+              return;
+            }
+            // Fallback: search for PR by head SHA to avoid approving a stale revision
+            const headSha = context.payload.workflow_run.head_sha;
+            const headOwner = context.payload.workflow_run.head_repository?.owner?.login || context.repo.owner;
+            const branch = context.payload.workflow_run.head_branch;
+            const { data } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${headOwner}:${branch}`,
+              state: 'open',
+            });
+            const matchingPr = data.find(pr => pr.head.sha === headSha);
+            if (matchingPr) {
+              core.setOutput('number', matchingPr.number.toString());
+              core.info(`Found PR #${matchingPr.number} by SHA match`);
+            } else {
+              core.setOutput('number', '');
+              core.warning(`No open PR found with head SHA ${headSha} on branch ${branch}`);
+            }
+
       - name: Generate bot token
+        if: steps.pr.outputs.number != ''
         id: bot-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: 3142924
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
-      - name: Check for review comments
+      - name: Check for review comments and review state
+        if: steps.pr.outputs.number != ''
         id: check
         uses: actions/github-script@v8
         with:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
+            const prNumber = parseInt('${{ steps.pr.outputs.number }}', 10);
+
+            // Check latest Copilot review state — skip if changes_requested
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const copilotReviewLogins = ['copilot-pull-request-reviewer[bot]', 'Copilot'];
+            const copilotReviews = reviews.data
+              .filter(r => copilotReviewLogins.includes(r.user.login))
+              .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+            if (copilotReviews.length > 0 && copilotReviews[0].state === 'CHANGES_REQUESTED') {
+              core.setOutput('has_comments', 'true');
+              core.info('Latest Copilot review requested changes — skipping approval');
+              return;
+            }
+
+            // Check for unresolved Copilot review threads
             let allThreads = [];
             let hasNextPage = true;
             let cursor = null;
@@ -90,7 +149,7 @@ jobs:
               `, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                number: context.payload.pull_request.number,
+                number: prNumber,
                 cursor,
               });
 
@@ -115,10 +174,10 @@ jobs:
             core.info(`Copilot unresolved threads: ${copilotThreads.length}`);
 
       - name: Approve PR and label for merge
-        if: steps.check.outputs.has_comments == 'false'
+        if: steps.pr.outputs.number != '' && steps.check.outputs.has_comments == 'false'
         env:
           GH_TOKEN: ${{ steps.bot-token.outputs.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
           REPO: ${{ github.repository }}
         run: |
           gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" \
