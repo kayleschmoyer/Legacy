@@ -65,24 +65,34 @@ jobs:
               core.info(`Found PR #${prs[0].number} from workflow_run payload`);
               return;
             }
-            // Fallback: search for PR by head SHA to avoid approving a stale revision
-            const headSha = context.payload.workflow_run.head_sha;
-            const headOwner = context.payload.workflow_run.head_repository?.owner?.login || context.repo.owner;
-            const branch = context.payload.workflow_run.head_branch;
-            const { data } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              head: `${headOwner}:${branch}`,
-              state: 'open',
-            });
-            const matchingPr = data.find(pr => pr.head.sha === headSha);
-            if (matchingPr) {
-              core.setOutput('number', matchingPr.number.toString());
-              core.info(`Found PR #${matchingPr.number} by SHA match`);
-            } else {
-              core.setOutput('number', '');
-              core.warning(`No open PR found with head SHA ${headSha} on branch ${branch}`);
+            // Fallback: Copilot's head_branch is "refs/pull/N/head" — extract PR number directly
+            const headBranch = context.payload.workflow_run.head_branch || '';
+            const prMatch = headBranch.match(/^refs\/pull\/(\d+)\/head$/);
+            if (prMatch) {
+              const prNum = prMatch[1];
+              // Verify the PR is still open and the reviewed SHA matches
+              try {
+                const { data: pr } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: parseInt(prNum, 10),
+                });
+                const reviewedSha = context.payload.workflow_run.head_sha;
+                if (pr.state !== 'open') {
+                  core.info(`PR #${prNum} is ${pr.state} — skipping`);
+                } else if (reviewedSha && pr.head.sha !== reviewedSha) {
+                  core.info(`PR #${prNum} head SHA changed since review (${reviewedSha} → ${pr.head.sha}) — skipping`);
+                } else {
+                  core.setOutput('number', prNum);
+                  core.info(`Found PR #${prNum} from head_branch ref`);
+                  return;
+                }
+              } catch (e) {
+                core.warning(`PR #${prNum} lookup failed: ${e instanceof Error ? e.message : String(e)}`);
+              }
             }
+            core.setOutput('number', '');
+            core.warning(`Could not resolve PR from head_branch: ${headBranch}`);
 
       - name: Generate bot token
         if: steps.pr.outputs.number != ''
