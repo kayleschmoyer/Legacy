@@ -209,3 +209,10 @@ output "draft_processor_lambda_function_name" {
   description = "Name of the draft processor Lambda function"
   value       = aws_lambda_function.draft_processor.function_name
 }
+
+# ── Self-hosted runners ──────────────────────────────────────────────────────
+
+output "github_runners_webhook_url" {
+  description = "Webhook URL for GitHub App to send workflow_job events"
+  value       = var.enable_github_runners ? module.github_runners[0].webhook.endpoint : null
+}

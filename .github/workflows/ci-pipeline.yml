@@ -121,7 +121,7 @@ jobs:
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
       needs.detect-changes.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     env:
       NX_PARALLEL: 4
@@ -184,7 +184,7 @@ jobs:
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'skip-ci') &&
       needs.detect-changes.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     env:
       NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
@@ -256,7 +256,7 @@ jobs:
       needs.build-validation.result == 'success' &&
       needs.build-validation.outputs.overall-result == 'success' &&
       (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.requires-full-build == 'true')
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     strategy:
       fail-fast: false

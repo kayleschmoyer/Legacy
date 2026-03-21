@@ -163,12 +163,12 @@ resource "aws_ssm_parameter" "ci_readonly_db_creds_secret_name" {
 output "lambda_version_parameters" {
   description = "SSM parameter names for Lambda versions"
   value = {
-    bucket_name    = aws_ssm_parameter.lambda_deployments_bucket.name
-    graphql        = aws_ssm_parameter.graphql_lambda_version.name
-    stats          = aws_ssm_parameter.stats_lambda_version.name
-    oauth_proxy    = aws_ssm_parameter.oauth_proxy_lambda_version.name
-    game_selection = aws_ssm_parameter.game_selection_lambda_version.name
-    websocket      = aws_ssm_parameter.websocket_lambda_version.name
+    bucket_name     = aws_ssm_parameter.lambda_deployments_bucket.name
+    graphql         = aws_ssm_parameter.graphql_lambda_version.name
+    stats           = aws_ssm_parameter.stats_lambda_version.name
+    oauth_proxy     = aws_ssm_parameter.oauth_proxy_lambda_version.name
+    game_selection  = aws_ssm_parameter.game_selection_lambda_version.name
+    websocket       = aws_ssm_parameter.websocket_lambda_version.name
     jira_proxy      = aws_ssm_parameter.jira_proxy_lambda_version.name
     rollbar_discord = aws_ssm_parameter.rollbar_discord_lambda_version.name
   }

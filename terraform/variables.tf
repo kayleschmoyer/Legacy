@@ -162,3 +162,43 @@ locals {
     prod    = 30
   }
 }
+
+# ── Self-hosted GitHub Actions runners ────────────────────────────────────────
+
+variable "enable_github_runners" {
+  description = "Enable self-hosted GitHub Actions runners on EC2 spot instances"
+  type        = bool
+  default     = false
+}
+
+variable "github_runners_instance_types" {
+  description = "EC2 instance types for runners, in priority order (spot fleet diversification)"
+  type        = list(string)
+  default     = ["c7a.xlarge", "c6a.xlarge", "c7i.xlarge", "m7a.xlarge"]
+}
+
+variable "github_runners_max_count" {
+  description = "Maximum number of concurrent runner instances"
+  type        = number
+  default     = 10
+}
+
+variable "github_app_id" {
+  description = "GitHub App ID for self-hosted runner registration"
+  type        = string
+  default     = ""
+}
+
+variable "github_app_key_base64" {
+  description = "GitHub App private key (base64-encoded PEM)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "github_app_webhook_secret" {
+  description = "Shared secret for GitHub webhook HMAC signature verification"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

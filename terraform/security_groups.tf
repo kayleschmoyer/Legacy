@@ -35,9 +35,9 @@ resource "aws_security_group" "lambda" {
 
   # PostgreSQL egress — RDS and RDS Proxy within the VPC
   egress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
+    from_port = 5432
+    to_port   = 5432
+    protocol  = "tcp"
     security_groups = compact([
       aws_security_group.rds.id,
       try(aws_security_group.rds_proxy[0].id, ""),

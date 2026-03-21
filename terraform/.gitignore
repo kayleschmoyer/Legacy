@@ -3,6 +3,7 @@
 *.tfstate.*
 *.tfvars.backup
 *.tfplan
+*.pkrvars.hcl
 .terraform/
 
 # Lambda deployment packages
