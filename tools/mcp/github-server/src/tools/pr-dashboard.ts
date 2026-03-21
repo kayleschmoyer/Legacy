@@ -178,7 +178,9 @@ export async function prDashboard(
                   withUnresolvedThreads: 0,
                   drafts: 0,
                   approved: 0,
+                  withStaleChecks: 0,
                 },
+                recommendBatchStatus: false,
                 prs: [],
                 message: 'No PRs found matching filters.',
               },
@@ -245,13 +247,32 @@ export async function prDashboard(
       withUnresolvedThreads: rows.filter((r) => r.unresolvedThreads > 0).length,
       drafts: rows.filter((r) => r.isDraft).length,
       approved: rows.filter((r) => r.reviewDecision === 'APPROVED').length,
+      withStaleChecks: rows.filter((r) => r.hadStaleChecks).length,
     };
+
+    const recommendBatchStatus = summary.withStaleChecks > 0;
+    const stalePRNumbers = rows
+      .filter((r) => r.hadStaleChecks)
+      .map((r) => r.number);
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ summary, prs: rows }, null, 2),
+          text: JSON.stringify(
+            {
+              summary,
+              recommendBatchStatus,
+              ...(recommendBatchStatus
+                ? {
+                    note: `${summary.withStaleChecks} PR(s) had stale CI checks that were deduplicated (${stalePRNumbers.map((n) => `#${n}`).join(', ')}). Use github_pr_batch_status for job-level CI details on these PRs.`,
+                  }
+                : {}),
+              prs: rows,
+            },
+            null,
+            2,
+          ),
         },
       ],
     };
