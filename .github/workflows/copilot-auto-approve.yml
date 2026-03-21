@@ -13,7 +13,7 @@ name: Copilot Auto-Approve
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_run:
     workflows: ["Copilot code review"]
     types: [completed]
@@ -21,6 +21,7 @@ on:
 permissions:
   pull-requests: write
   contents: read
+  statuses: write
 
 jobs:
   request-review:
@@ -46,11 +47,22 @@ jobs:
               core.warning(`Failed to request Copilot review: ${error.message}`);
             }
 
+      - name: Set pending bot-review status
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: 'pending',
+              context: 'bot-review',
+              description: 'Waiting for Copilot review to complete',
+            });
+
   auto-approve:
     # Runs when the built-in "Copilot code review" workflow completes for a PR
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
     steps:
       - name: Get PR number
@@ -94,8 +106,27 @@ jobs:
             core.setOutput('number', '');
             core.warning(`Could not resolve PR from head_branch: ${headBranch}`);
 
+      - name: Set failure status for non-successful Copilot review
+        if: >-
+          steps.pr.outputs.number != '' &&
+          github.event.workflow_run.conclusion != 'success'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const conclusion = '${{ github.event.workflow_run.conclusion }}';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ github.event.workflow_run.head_sha }}',
+              state: 'failure',
+              context: 'bot-review',
+              description: `Copilot review ${conclusion} — re-push to retry`,
+            });
+
       - name: Generate bot token
-        if: steps.pr.outputs.number != ''
+        if: >-
+          steps.pr.outputs.number != '' &&
+          github.event.workflow_run.conclusion == 'success'
         id: bot-token
         uses: actions/create-github-app-token@v3
         with:
@@ -103,7 +134,9 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
       - name: Check for review comments and review state
-        if: steps.pr.outputs.number != ''
+        if: >-
+          steps.pr.outputs.number != '' &&
+          github.event.workflow_run.conclusion == 'success'
         id: check
         uses: actions/github-script@v8
         with:
@@ -182,8 +215,31 @@ jobs:
             core.setOutput('has_comments', hasComments.toString());
             core.info(`Copilot unresolved threads: ${copilotThreads.length}`);
 
+      - name: Set bot-review status
+        if: >-
+          steps.pr.outputs.number != '' &&
+          github.event.workflow_run.conclusion == 'success'
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ steps.bot-token.outputs.token }}
+          script: |
+            const hasComments = '${{ steps.check.outputs.has_comments }}' === 'true';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ github.event.workflow_run.head_sha }}',
+              state: hasComments ? 'failure' : 'success',
+              context: 'bot-review',
+              description: hasComments
+                ? 'Copilot review has unresolved comments'
+                : 'Copilot review passed — approved',
+            });
+
       - name: Approve PR and label for merge
-        if: steps.pr.outputs.number != '' && steps.check.outputs.has_comments == 'false'
+        if: >-
+          steps.pr.outputs.number != '' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          steps.check.outputs.has_comments == 'false'
         env:
           GH_TOKEN: ${{ steps.bot-token.outputs.token }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
