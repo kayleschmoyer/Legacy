@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { runGh } from './gh.js';
 import { listPRs } from './tools/list-prs.js';
 import { viewPR } from './tools/view-pr.js';
 import { createPR } from './tools/create-pr.js';
@@ -16,6 +17,33 @@ import { prBatchStatus } from './tools/pr-batch-status.js';
 import { prScan } from './tools/pr-scan.js';
 import { mergePR } from './tools/merge-pr.js';
 import { closePR } from './tools/close-pr.js';
+
+// Check gh CLI auth on startup (non-blocking warning)
+runGh(['auth', 'status']).catch((error: unknown) => {
+  const hasToken = Boolean(process.env.GH_TOKEN || process.env.GITHUB_TOKEN);
+  const hint = hasToken
+    ? 'GH_TOKEN/GITHUB_TOKEN is set but gh auth still failed — the token may be invalid or expired.'
+    : 'No GH_TOKEN or GITHUB_TOKEN env var found. Set one or run `gh auth login`.';
+
+  let diagnostic = '';
+  const err = error as NodeJS.ErrnoException | Error | undefined;
+
+  if (
+    err &&
+    typeof err === 'object' &&
+    'code' in err &&
+    (err as NodeJS.ErrnoException).code === 'ENOENT'
+  ) {
+    diagnostic =
+      ' Diagnostic: gh CLI was not found on PATH. Install from https://cli.github.com.';
+  } else if (err instanceof Error && err.message) {
+    diagnostic = ` Diagnostic: ${err.message}`;
+  }
+
+  process.stderr.write(
+    `[legacy-sports-github] WARNING: gh CLI auth check failed. ${hint}${diagnostic}\n`,
+  );
+});
 
 const server = new McpServer({
   name: 'legacy-sports-github',

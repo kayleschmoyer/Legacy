@@ -12,6 +12,7 @@
 #   - Dev seed database restore (anonymized data)
 #   - Database migrations
 #   - Git LFS (for dev-seed.dump)
+#   - GitHub CLI authentication (for PR creation via MCP server)
 #
 # What this does NOT set up (by design):
 #   - twig CLI (not needed — cloud agents work in single-branch ephemeral envs)
@@ -30,6 +31,20 @@ steps:
     run: |
       corepack enable
       corepack prepare pnpm@9.12.1 --activate
+
+  - name: Authenticate GitHub CLI
+    run: |
+      if ! command -v gh &> /dev/null; then
+        echo "ERROR: gh CLI not found on PATH. Install from https://cli.github.com"
+        exit 1
+      fi
+      if [ -n "$GITHUB_TOKEN" ]; then
+        echo "$GITHUB_TOKEN" | gh auth login --with-token
+        echo "gh auth: authenticated via GITHUB_TOKEN"
+      else
+        echo "WARNING: GITHUB_TOKEN not set — gh CLI will not be authenticated"
+        echo "PR creation via the legacy-sports-github MCP server will fail"
+      fi
 
   - name: Install dependencies
     run: pnpm install --frozen-lockfile

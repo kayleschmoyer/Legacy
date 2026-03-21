@@ -32,7 +32,11 @@
     "legacy-sports-github": {
       "type": "stdio",
       "command": "node",
-      "args": ["--import", "tsx", "tools/mcp/github-server/src/index.ts"]
+      "args": ["--import", "tsx", "tools/mcp/github-server/src/index.ts"],
+      "_comment": "env override is Copilot-agent-only — local clients use gh auth login instead",
+      "env": {
+        "GH_TOKEN": "${GITHUB_TOKEN}"
+      }
     },
     "legacy-sports-nx": {
       "type": "stdio",

@@ -153,9 +153,11 @@ Use MCP tools first for Jira operations (`jira_view`, `jira_create_ticket`, `jir
 
 **AWS operations — MCP first**: use `aws_logs_tail` instead of `aws logs tail` via Bash, and `aws_sso_status` to check credentials before any AWS operation.
 
-## Cloud Agent Mode (Copilot Coding Agent)
+## Cloud Agent Mode
 
-When running as a **cloud coding agent** (Codespace-like environment, set up by `.github/copilot-setup-steps.yml`):
+This section applies to **all** cloud agent platforms (Claude Code on the web, Copilot Coding Agent, etc.).
+
+When running as a **cloud coding agent**:
 
 - **No worktrees/twig/acli** — work directly in the repo root. Use `git` for branches, MCP tools for Jira.
 - **No AWS access** — DB MCP server uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`.
@@ -163,12 +165,24 @@ When running as a **cloud coding agent** (Codespace-like environment, set up by 
 
 **Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make <target>` → `pnpm --prefix lib/db-client run db:status` → `pnpm --prefix lib/db-client run db:up` → `make pc` → commit + push → `gh pr create` → Jira "In Review"
 
+**GitHub CLI authentication (required for PR creation):**
+
+The `legacy-sports-github` MCP server uses the `gh` CLI, which requires a GitHub token. The MCP config forwards `GH_TOKEN` from the host environment automatically. How the token gets into the environment depends on the platform:
+
+| Platform                   | How to provide `GH_TOKEN` / `GITHUB_TOKEN`                                                                                                                     |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Claude Code on the web** | Set `GH_TOKEN` as an environment variable in the cloud environment settings UI. Install `gh` CLI via the setup script field: `apt update && apt install -y gh` |
+| **Copilot Coding Agent**   | Automatically available via `${{ github.token }}`. Authenticated in `copilot-setup-steps.yml`                                                                  |
+| **Local development**      | Already authenticated via `gh auth login` — no env var needed                                                                                                  |
+
+If `gh` is not authenticated, the MCP server logs a diagnostic warning at startup with remediation hints.
+
 **Available MCP servers in cloud:**
 
 - `legacy-sports-ci` — CI log queries, workflow reruns
 - `legacy-sports-db` — local Docker Postgres queries, migrations, schema generation
 - `legacy-sports-jira` — ticket CRUD, transitions, blocker checks (requires `JIRA_EMAIL` and `JIRA_API_TOKEN` secrets)
-- `legacy-sports-github` — PR and review lifecycle management (uses `gh` CLI, authenticated via GitHub token)
+- `legacy-sports-github` — PR and review lifecycle management (requires `GH_TOKEN` — see table above)
 - `legacy-sports-nx` — Nx project discovery, affected analysis, and target execution
 
 **Unavailable in cloud (by design):**

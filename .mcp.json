@@ -27,7 +27,10 @@
     },
     "legacy-sports-github": {
       "command": "pnpm",
-      "args": ["exec", "tsx", "tools/mcp/github-server/src/index.ts"]
+      "args": ["exec", "tsx", "tools/mcp/github-server/src/index.ts"],
+      "env": {
+        "GH_TOKEN": "${GITHUB_TOKEN}"
+      }
     },
     "legacy-sports-nx": {
       "command": "pnpm",
