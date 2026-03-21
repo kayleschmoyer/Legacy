@@ -353,25 +353,27 @@ pnpm exec nx lint web
 
 Before pushing the fix, always rebase onto the parent branch so the new CI run is based on the latest tip. Skipping this wastes a CI run if the parent has moved ahead.
 
-**Use `twig rebase`** — it reads the branch's configured parent from twig metadata and rebases correctly, whether the parent is `main` or another feature branch.
+**Preferred (MCP):** Use `worktree_rebase` — it fetches, rebases onto the configured parent, and sets `GIT_EDITOR=true` automatically to prevent editor blocking.
 
-```powershell
+**Shell fallback — use `twig rebase`** with `GIT_EDITOR=true` to prevent the editor from blocking:
+
+```bash
 # Always fetch first so twig sees the latest remote state
 git fetch origin
 
 # Rebase onto the configured parent (main or a stacked branch)
-twig rebase
+GIT_EDITOR=true twig rebase
 
 # If there are conflicts, resolve them, then:
 #   git add <resolved-files>
-#   $env:GIT_EDITOR = "true" ; git rebase --continue
+#   GIT_EDITOR=true git rebase --continue
 ```
 
 If `twig rebase` is unavailable or the parent is confirmed to be `main`, fall back to an explicit rebase:
 
-```powershell
+```bash
 git fetch origin main
-git rebase origin/main
+GIT_EDITOR=true git rebase origin/main
 ```
 
 Then push (force-with-lease is required after a rebase):

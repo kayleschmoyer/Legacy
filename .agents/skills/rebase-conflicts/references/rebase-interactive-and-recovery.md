@@ -4,13 +4,15 @@
 
 When you need to clean up commit history before a PR:
 
-```powershell
+```bash
 # Squash last N commits interactively
 git rebase -i HEAD~N
 
 # Squash onto a specific base
 git rebase -i origin/main
 ```
+
+> **Note:** For interactive rebases, only `GIT_SEQUENCE_EDITOR=true` is needed to prevent the todo-list editor from blocking. However, `GIT_EDITOR=true` should also be set for `--continue` steps (see below).
 
 In the editor, change `pick` to:
 
@@ -22,8 +24,8 @@ In the editor, change `pick` to:
 
 After saving, resolve any conflicts that arise (same process as above), then:
 
-```powershell
-$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
+```bash
+GIT_EDITOR=true git rebase --continue
 ```
 
 ---
@@ -50,9 +52,9 @@ if (Test-Path .git/rebase-merge) {
 
 1. **Continue** (if all conflicts are resolved):
 
-   ```powershell
+   ```bash
    git diff --name-only --diff-filter=U   # should be empty
-   $env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
+   GIT_EDITOR=true git rebase --continue
    ```
 
 2. **Skip this commit** (if it's a duplicate or no longer needed):

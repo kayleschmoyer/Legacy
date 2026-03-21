@@ -29,9 +29,13 @@ When the automated scripts can't fully resolve conflicts, an agent can help. Her
 
 #### 2a. Start the Rebase
 
-```powershell
+**Preferred (MCP):** Use `worktree_rebase` — it fetches, rebases, and sets `GIT_EDITOR=true` automatically.
+
+**Shell fallback:**
+
+```bash
 git fetch origin
-git rebase origin/main
+GIT_EDITOR=true git rebase origin/main
 ```
 
 #### 2b. Check What Conflicted
@@ -78,9 +82,9 @@ For each conflicted source file, the agent should:
 
 #### 2e. Continue Through All Commits
 
-```powershell
+```bash
 # Set GIT_EDITOR=true to avoid blocking on commit-message prompts
-$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
+GIT_EDITOR=true git rebase --continue
 ```
 
 Repeat 2b–2d for each commit that conflicts.
@@ -148,11 +152,11 @@ If a migration file has a **real** conflict (two different migrations editing th
 
 The lockfile should never be manually merged. Regenerate it:
 
-```powershell
+```bash
 # Accept either side first to clear the conflict
 git checkout --theirs pnpm-lock.yaml
 git add pnpm-lock.yaml
-$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
+GIT_EDITOR=true git rebase --continue
 
 # After rebase completes, regenerate the lockfile
 pnpm install --no-frozen-lockfile

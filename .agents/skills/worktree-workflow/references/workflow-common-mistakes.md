@@ -31,10 +31,10 @@ twig switch LS-200 -p=current  # ✅ properly stacked under LS-199
 
 If you made this mistake, fix it by rebasing and updating twig:
 
-```powershell
+```bash
 # Rebase child onto correct parent
 git checkout LS-200/branch-name
-git rebase --no-edit LS-199/branch-name  # resolve any conflicts
+GIT_EDITOR=true git rebase LS-199/branch-name  # resolve any conflicts
 
 # Update twig dependency map
 twig branch depend --exclusive LS-200/branch-name LS-199/branch-name

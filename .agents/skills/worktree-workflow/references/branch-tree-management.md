@@ -33,7 +33,7 @@ make rebase-tree-auto
 make rebase-tree-skip SKIP_COMMITS_FILE="skip-commits.txt"
 ```
 
-> Always use `--no-edit` with `git rebase` so git never opens a text editor.
+> Always prepend `GIT_EDITOR=true GIT_SEQUENCE_EDITOR=true` to `git rebase` commands so git never opens a text editor. Prefer the `worktree_rebase` MCP tool which handles this automatically.
 
 ## Cascade Rebase
 
@@ -44,7 +44,7 @@ twig cascade --show-graph --autostash
 
 ## Skip-Commits Pattern (After Squashing)
 
-```powershell
+```bash
 # 1. Squash parent
 git checkout LS-23/parent-branch
 git rebase -i main

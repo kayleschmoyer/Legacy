@@ -30,7 +30,8 @@ Rebasing replays your branch's commits on top of another branch (usually `main`)
 
 | Situation                                | Command                                                                                                                    |
 | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Simple rebase onto main                  | `git fetch origin ; git rebase origin/main`                                                                                |
+| Simple rebase onto main (MCP)            | `worktree_rebase` (preferred — sets `GIT_EDITOR=true` automatically)                                                       |
+| Simple rebase onto main (shell fallback) | `git fetch origin ; GIT_EDITOR=true git rebase origin/main`                                                                |
 | Rebase entire branch tree                | `make rebase-tree`                                                                                                         |
 | Auto-rebase tree (no prompts)            | `make rebase-tree-auto`                                                                                                    |
 | Rebase tree skipping commits             | `make rebase-tree-skip SKIP_COMMITS=hash1,hash2`                                                                           |
@@ -38,8 +39,7 @@ Rebasing replays your branch's commits on top of another branch (usually `main`)
 | Accept **your** version of a file        | `git checkout --ours <file>`                                                                                               |
 | Accept **incoming** version of a file    | `git checkout --theirs <file>`                                                                                             |
 | Mark file as resolved after editing      | `git add <file>`                                                                                                           |
-| Continue rebase after resolving          | `git rebase --continue`                                                                                                    |
-| Continue rebase (no editor / agent-safe) | `$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue`                                     |
+| Continue rebase after resolving          | `GIT_EDITOR=true git rebase --continue`                                                                                    |
 | Skip current commit entirely             | `git rebase --skip`                                                                                                        |
 | Abort and return to pre-rebase state     | `git rebase --abort`                                                                                                       |
 | Resolve generated file conflicts         | `.\scripts\resolve-generated-conflicts.ps1`                                                                                |
@@ -55,9 +55,9 @@ Rebasing replays your branch's commits on top of another branch (usually `main`)
 
 When Git needs to open a text editor during rebase (e.g. to edit a commit message on `--continue`), it will **block indefinitely** in non-interactive environments. Always set these env vars before any rebase operation in automated or agent-driven workflows:
 
-```powershell
-$env:GIT_EDITOR = "true"
-$env:GIT_SEQUENCE_EDITOR = "true"
+```bash
+GIT_EDITOR=true
+GIT_SEQUENCE_EDITOR=true
 ```
 
 This makes Git accept the default commit message without opening an editor. The `scripts/rebase-branch-tree.ps1` script already does this automatically.
@@ -76,9 +76,13 @@ git stash --include-untracked
 
 ### Step 2: Fetch Latest and Start Rebase
 
-```powershell
+**Preferred (MCP):** Use `worktree_rebase` — it fetches, rebases, and sets `GIT_EDITOR=true` automatically.
+
+**Shell fallback:**
+
+```bash
 git fetch origin
-git rebase origin/main
+GIT_EDITOR=true git rebase origin/main
 ```
 
 If it says "Already up to date" — you're done.
@@ -130,11 +134,11 @@ const MAX_TEAMS = 16;
 
 ### Step 5: Stage Resolved Files and Continue
 
-```powershell
+```bash
 git add <resolved-file>
 # After ALL conflicts in this commit are resolved:
 # Use GIT_EDITOR=true to prevent Git from blocking on a commit-message editor
-$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
+GIT_EDITOR=true git rebase --continue
 ```
 
 If more commits have conflicts, Git will pause again. Repeat Steps 3–5 for each commit.
@@ -240,10 +244,14 @@ Write-Host "Total conflicting: $($conflicting.Count) of $(($raw | ConvertFrom-Js
 
 When working in a worktree (see [worktree-workflow skill](../worktree-workflow/SKILL.md)):
 
-```powershell
+**Preferred (MCP):** Use `worktree_rebase` — it targets the active worktree, fetches, rebases, and sets `GIT_EDITOR=true` automatically.
+
+**Shell fallback:**
+
+```bash
 # Fetch and rebase (use -C to target the worktree without cd)
 git -C $wt fetch origin
-git -C $wt rebase origin/main
+GIT_EDITOR=true git -C $wt rebase origin/main
 
 # Resolve conflicts (same process as above)
 
@@ -291,17 +299,17 @@ make rebase-tree-skip SKIP_COMMITS_FILE=skip-commits.txt
 
 If the automated scripts fail, cascade manually:
 
-```powershell
+```bash
 # 1. Rebase parent onto main
 git checkout LS-100/parent-branch
 git fetch origin
-git rebase origin/main
+GIT_EDITOR=true git rebase origin/main
 # (resolve conflicts, continue)
 git push --force-with-lease origin HEAD
 
 # 2. Rebase child onto updated parent
 git checkout LS-101/child-branch
-git rebase LS-100/parent-branch
+GIT_EDITOR=true git rebase LS-100/parent-branch
 # (resolve conflicts, continue)
 git push --force-with-lease origin HEAD
 
@@ -365,9 +373,9 @@ git push --force-with-lease origin HEAD
 
 ### "Cannot rebase: You have unstaged changes"
 
-```powershell
+```bash
 git stash --include-untracked
-git rebase origin/main
+GIT_EDITOR=true git rebase origin/main
 # after rebase:
 git stash pop
 ```
@@ -410,12 +418,12 @@ git reset --hard <hash>
 
 ### Conflict markers left in files after "resolving"
 
-```powershell
+```bash
 # Search for leftover markers
-Select-String -Path "*.ts","*.tsx" -Pattern "^(<<<<<<<|=======|>>>>>>>)" -Recurse
+grep -rn '^<<<<<<<\|^=======\|^>>>>>>>' --include='*.ts' --include='*.tsx'
 # If found: edit the files to remove markers, then:
 git add <file>
-$env:GIT_EDITOR = "true" ; $env:GIT_SEQUENCE_EDITOR = "true" ; git rebase --continue
+GIT_EDITOR=true git rebase --continue
 ```
 
 ## Related Skills
