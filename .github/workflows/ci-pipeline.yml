@@ -124,7 +124,8 @@ jobs:
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     env:
-      NX_PARALLEL: 4
+      NX_PARALLEL: 2
+      NODE_OPTIONS: "--max_old_space_size=2048"
       NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
     outputs:
       result: ${{ steps.check-results.outputs.result }}
@@ -161,7 +162,7 @@ jobs:
         id: quality
         uses: ./.github/actions/quality-gates
         with:
-          parallel: "4"
+          parallel: "2"
 
       - name: "Collect Quality Gate Results"
         id: check-results
