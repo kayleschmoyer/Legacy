@@ -173,10 +173,13 @@ Set-Location D:\code\legacy-sports
 For each PR in `$scan.conflicting`:
 
 1. Enter the worktree (Step 2)
-2. Rebase: `.\scripts\rebase-pr.ps1 -Branch $branch`
-3. If conflicts arise → load `skills/rebase-conflicts/SKILL.md` and `skills/resolve-merge-conflicts/SKILL.md`
-4. After rebasing ALL PRs, batch-validate with parallel `make pc` (see Parallelization Strategy below)
-5. Push passing PRs: `git push --force-with-lease origin HEAD`
+2. **Fetch latest remote state so `origin/main` is up to date before rebasing**: from either the main repo or the worktree, run `git fetch origin`. Without this, `rebase origin/main` may use an outdated ref and GitHub will still show the PR as CONFLICTING.
+3. Rebase from the worktree: `git rebase origin/main` (or `.\scripts\rebase-pr.ps1 -Branch $branch`). If running from the main repo, use `git -C "$wtPath" rebase origin/main` instead.
+4. If conflicts arise → load `skills/rebase-conflicts/SKILL.md` and `skills/resolve-merge-conflicts/SKILL.md`
+5. After rebasing ALL PRs, batch-validate with parallel `make pc` (see Parallelization Strategy below)
+6. Push passing PRs: `git -C "$wtPath" push --force-with-lease origin HEAD`
+
+> **Multiple PRs touching the same files**: When several PRs add code to the same location (e.g., tool registrations in `index.ts`), they conflict with each other — not just with main. After one merges, the next will conflict with the updated main. Rebase these sequentially, fetching whenever `main` changes (e.g., after each merge and before rebasing the next PR). Consider alphabetizing shared files (imports, registrations) so git can auto-merge concurrent additions.
 
 If a rebase fails irrecoverably: `git rebase --abort`, log it, move on.
 
