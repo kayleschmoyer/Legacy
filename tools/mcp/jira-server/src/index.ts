@@ -9,6 +9,7 @@ import { setParent } from './tools/set-parent.js';
 import { getComments } from './tools/get-comments.js';
 import { listChildren } from './tools/list-children.js';
 import { editTicket } from './tools/edit-ticket.js';
+import { linkIssues } from './tools/link-issues.js';
 import { getAtlassianCredentials } from './netrc.js';
 
 // Validate credentials at startup so the server fails fast with a clear
@@ -162,6 +163,39 @@ server.tool(
       .describe('Change issue type'),
   },
   async (params) => editTicket(params),
+);
+
+// --- jira_link_issues ---
+server.tool(
+  'jira_link_issues',
+  'Create an issue link between two Jira tickets. Common link types: "Blocks" (inwardIssue "is blocked by" outwardIssue — outward is the blocker), "Relates" (bidirectional). Use to establish dependencies so jira_check_blockers can detect them.',
+  {
+    inwardKey: z
+      .string()
+      .regex(
+        /^[A-Z][A-Z0-9_]+-\d+$/,
+        'Must be a valid Jira issue key (e.g., LS-123)',
+      )
+      .describe(
+        'The issue that reads the inward phrase. For "Blocks" (inward = "is blocked by"): this is the blocked ticket — the one that depends on the other. Example: if LS-100 is blocked by LS-99, inwardKey = "LS-100".',
+      ),
+    outwardKey: z
+      .string()
+      .regex(
+        /^[A-Z][A-Z0-9_]+-\d+$/,
+        'Must be a valid Jira issue key (e.g., LS-123)',
+      )
+      .describe(
+        'The issue that reads the outward phrase. For "Blocks" (outward = "blocks"): this is the blocker — the one that must be completed first. Example: if LS-100 is blocked by LS-99, outwardKey = "LS-99". Note: jira_check_blockers reads blockers from inwardIssue on GET responses (Jira flips perspective), so links created here are correctly detected.',
+      ),
+    linkType: z
+      .string()
+      .min(1, 'Link type must be a non-empty string')
+      .describe(
+        'Jira link type name. Common values: "Blocks", "Relates", "Cloners", "Duplicate"',
+      ),
+  },
+  async (params) => linkIssues(params),
 );
 
 // Start the server
