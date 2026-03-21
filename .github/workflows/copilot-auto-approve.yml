@@ -47,14 +47,105 @@ jobs:
               core.warning(`Failed to request Copilot review: ${error.message}`);
             }
 
-      - name: Set pending bot-review status
+      - name: Set bot-review status
         uses: actions/github-script@v8
         with:
           script: |
+            const prNumber = context.payload.pull_request.number;
+            const sha = context.payload.pull_request.head.sha;
+
+            // On synchronize (rebase/force-push), check if Copilot already has
+            // a clean review. The "Copilot code review" built-in workflow may not
+            // re-trigger after a force-push, which would leave bot-review stuck
+            // at PENDING forever. Carry forward success if the review is clean.
+            if (context.payload.action === 'synchronize') {
+              try {
+                const reviews = await github.rest.pulls.listReviews({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber,
+                });
+                const copilotReviewLogins = [
+                  'copilot-pull-request-reviewer[bot]',
+                  'Copilot',
+                ];
+                // Filter to Copilot reviews and sort by most recent first
+                const copilotReviews = reviews.data
+                  .filter(r => copilotReviewLogins.includes(r.user.login))
+                  .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+
+                // Only carry forward if the latest Copilot review is not CHANGES_REQUESTED
+                if (copilotReviews.length > 0 && copilotReviews[0].state !== 'CHANGES_REQUESTED') {
+                  // Check for unresolved Copilot review threads
+                  let allThreads = [];
+                  let hasNextPage = true;
+                  let cursor = null;
+                  while (hasNextPage) {
+                    const result = await github.graphql(`
+                      query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                        repository(owner: $owner, name: $repo) {
+                          pullRequest(number: $number) {
+                            reviewThreads(first: 100, after: $cursor) {
+                              pageInfo { hasNextPage endCursor }
+                              nodes {
+                                isResolved
+                                isOutdated
+                                comments(first: 1) {
+                                  nodes { author { login } }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    `, {
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      number: prNumber,
+                      cursor,
+                    });
+                    const threads = result.repository.pullRequest.reviewThreads;
+                    allThreads.push(...threads.nodes);
+                    hasNextPage = threads.pageInfo.hasNextPage;
+                    cursor = threads.pageInfo.endCursor;
+                  }
+
+                  const copilotLogins = [
+                    'copilot-pull-request-reviewer',
+                    'copilot-pull-request-reviewer[bot]',
+                    'Copilot',
+                  ];
+                  const unresolvedThreads = allThreads.filter(t =>
+                    !t.isOutdated &&
+                    !t.isResolved &&
+                    t.comments.nodes.some(c => copilotLogins.includes(c.author.login))
+                  );
+
+                  if (unresolvedThreads.length === 0) {
+                    await github.rest.repos.createCommitStatus({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      sha,
+                      state: 'success',
+                      context: 'bot-review',
+                      description: 'Copilot review passed — carried forward after rebase',
+                    });
+                    core.info(`Copilot already reviewed with no unresolved threads — carrying forward success for PR #${prNumber}`);
+                    return;
+                  }
+                  core.info(`Copilot has ${unresolvedThreads.length} unresolved thread(s) — setting pending`);
+                } else if (copilotReviews.length > 0) {
+                  core.info(`Latest Copilot review is ${copilotReviews[0].state} — not carrying forward, setting pending`);
+                }
+              } catch (error) {
+                core.warning(`Carry-forward check failed: ${error.message} — falling back to pending`);
+              }
+            }
+
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: context.payload.pull_request.head.sha,
+              sha,
               state: 'pending',
               context: 'bot-review',
               description: 'Waiting for Copilot review to complete',
