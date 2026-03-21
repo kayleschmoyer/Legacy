@@ -236,6 +236,15 @@ Fix any issues found before proceeding to commit.
 
 ### Step 6: Commit and Push
 
+> **MCP-first**: prefer `worktree_commit` over raw `git add`/`git commit` — it handles staging and committing in one operation and refuses to stage likely credential/secret files (e.g., `.env`, `credentials.*`, `*.pem`, `*.key`). Requires an active worktree via `worktree_set` or an explicit `worktree:` argument. Use `worktree_push` over raw `git push` — it supports `setUpstream`, uses `--force-with-lease`, and refuses dangerous operations.
+
+```
+worktree_commit(message: "feat(scope): description (LS-####)")
+worktree_push(setUpstream: true)
+```
+
+Fall back to shell only when MCP is unavailable:
+
 ```powershell
 cd $wt
 git add .
@@ -375,9 +384,11 @@ jira_transition(key: "LS-####", status: "In Progress")
 $wt = "<path-from-twig-worktree-list>"
 make wt-setup WT=$wt
 
-# 4. Work + self-review + commit + push (from inside worktree)
+# 4. Work + self-review + commit + push (MCP tools — primary)
 # Run /review (see review skill) to catch rule violations and quality issues
-git -C $wt add . ; git -C $wt commit -m "feat(scope): msg (LS-####)" ; git -C $wt push -u origin HEAD
+worktree_commit(worktree: "LS-####", message: "feat(scope): msg (LS-####)")
+worktree_push(worktree: "LS-####", setUpstream: true)
+# Shell fallback: git -C $wt add . ; git -C $wt commit -m "feat(scope): msg (LS-####)" ; git -C $wt push -u origin HEAD
 
 # 5. Migrations + validate
 pnpm --prefix $wt/lib/db-client run db:up
