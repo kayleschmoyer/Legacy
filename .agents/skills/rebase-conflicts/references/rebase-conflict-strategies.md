@@ -23,9 +23,9 @@ These scripts:
 3. Auto-skip duplicate migration commits
 4. Run validation (typecheck + lint) after completion
 
-### Strategy 2: Copilot-Assisted Conflict Resolution
+### Strategy 2: Agent-Assisted Conflict Resolution
 
-When the automated scripts can't fully resolve conflicts, Copilot can help. Here's the workflow:
+When the automated scripts can't fully resolve conflicts, an agent can help. Here's the workflow:
 
 #### 2a. Start the Rebase
 
@@ -50,14 +50,14 @@ Classify each conflicted file and apply the correct strategy:
 | `**/migrations/*.ts`      | Usually skip (duplicate) | `.\scripts\skip-migration-conflict.ps1`         |
 | `docs/api/*.md`           | Accept theirs            | `git checkout --theirs <file> ; git add <file>` |
 | `pnpm-lock.yaml`          | Regenerate               | See lockfile section below                      |
-| `*.ts` / `*.tsx` (source) | Read both sides, merge   | Manual or Copilot-assisted                      |
-| `*.json` (config)         | Read both sides, merge   | Manual or Copilot-assisted                      |
+| `*.ts` / `*.tsx` (source) | Read both sides, merge   | Manual or agent-assisted                        |
+| `*.json` (config)         | Read both sides, merge   | Manual or agent-assisted                        |
 
-#### 2d. Resolve Source File Conflicts with Copilot
+#### 2d. Resolve Source File Conflicts with Agent Assistance
 
 > **⚠️ CRITICAL: Load the [resolve-merge-conflicts](../../resolve-merge-conflicts/SKILL.md) skill before resolving any source conflicts.** It contains the full reasoning framework, worked examples, and decision checklist that prevents the #1 agent mistake: blindly picking one side instead of synthesizing both changes.
 
-For each conflicted source file, Copilot should:
+For each conflicted source file, the agent should:
 
 1. **Read the full file** (not just the conflict block) to understand surrounding context
 2. **Understand both sides**: what `main` changed vs what the feature branch changed — and **why**

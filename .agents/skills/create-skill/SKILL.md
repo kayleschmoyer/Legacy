@@ -7,7 +7,7 @@ description: 'Create or update an agent skill following the agentskills.io forma
 
 ## Overview
 
-Agent skills live at `.agents/skills/<name>/SKILL.md` and follow the [agentskills.io](https://agentskills.io) open standard. Copilot reads the `description` frontmatter field to decide when to auto-load a skill — write it as if answering "when should this be loaded?"
+Agent skills live at `.agents/skills/<name>/SKILL.md` and follow the [agentskills.io](https://agentskills.io) open standard. Agents read the `description` frontmatter field to decide when to auto-load a skill — write it as if answering "when should this be loaded?"
 
 This repo currently has 60+ skills covering everything from workflow automation to infrastructure deployment. Skills are the primary way domain knowledge is packaged for AI agents.
 
@@ -48,19 +48,19 @@ description: '<what this skill does and when to use it>'
 | Field         | Constraints                                                                |
 | ------------- | -------------------------------------------------------------------------- |
 | `name`        | Lowercase + hyphens only · Max 64 chars · Must match parent directory name |
-| `description` | Max 1024 chars · Shown to Copilot to decide auto-load · Be specific        |
+| `description` | Max 1024 chars · Used by agents to decide auto-load · Be specific          |
 
 ### Optional Frontmatter
 
 ```yaml
 argument-hint: '<hint shown to user when invoking>' # e.g. "ticket number"
 user-invokable: false # hide from slash-command list (default: true)
-disable-model-invocation: true # prevent Copilot from auto-loading (manual only)
+disable-model-invocation: true # prevent agents from auto-loading (manual only)
 ```
 
 ## Writing a Good Description
 
-The `description` is the **most important field** — it determines whether Copilot auto-loads your skill. Copilot matches user intent against this text.
+The `description` is the **most important field** — it determines whether agents auto-load your skill. Agents match user intent against this text.
 
 ### Description Principles ([agentskills.io best practices](https://agentskills.io/skill-creation/optimizing-descriptions))
 
@@ -84,7 +84,7 @@ The `description` is the **most important field** — it determines whether Copi
 
 ## Token Budget & Progressive Disclosure
 
-Every SKILL.md must stay under **500 lines** and **5,000 tokens** (the [agentskills.io](https://agentskills.io) spec). SKILL.md files are loaded in full when Copilot matches a user request — oversized skills waste context window on every invocation.
+Every SKILL.md must stay under **500 lines** and **5,000 tokens** (the [agentskills.io](https://agentskills.io) spec). SKILL.md files are loaded in full when an agent matches a user request — oversized skills waste context window on every invocation.
 
 ### How to measure
 
@@ -127,7 +127,7 @@ When a skill exceeds the limits (or approaches them), extract verbose content in
 
 ### Always-loaded overhead
 
-Skill **descriptions** (~50 tokens each × 59 skills ≈ 3,300T) load on **every request** for Copilot to decide which skills to invoke. The SKILL.md body only loads for matched skills (typically 1–3 per request). Keep descriptions impactful but concise — they're the most expensive text per character in the system.
+Skill **descriptions** (~50 tokens each × 59 skills ≈ 3,300T) load on **every request** for agents to decide which skills to invoke. The SKILL.md body only loads for matched skills (typically 1–3 per request). Keep descriptions impactful but concise — they're the most expensive text per character in the system.
 
 ### Budget guidelines
 
@@ -237,13 +237,13 @@ If over 500 lines or 5,000 tokens, extract content to `references/` (see Token B
 
 Skills are auto-discovered from `.agents/skills/<name>/SKILL.md` frontmatter — no manual registration in `AGENTS.md` is needed.
 
-> `AGENTS.md` is the single canonical agent instructions file. `CLAUDE.md` is a copy of it (symlink where supported; on Windows with `core.symlinks=false` it is a plain copy). Claude Code auto-reads `CLAUDE.md`; GitHub Copilot reads `AGENTS.md` directly.
+> `AGENTS.md` is the single canonical agent instructions file. `CLAUDE.md` is a compatibility shim (symlink where supported; on Windows with `core.symlinks=false` it is a plain copy). Different agents may read either file based on their configuration.
 
 ### 5. Verify the skill loads
 
 After committing, test that the agent can discover the skill:
 
-1. Open a new chat (Copilot) or conversation (Claude Code)
+1. Open a new conversation with your agent
 2. Describe the scenario your skill covers (use the trigger phrases from your description)
 3. Confirm the agent auto-loads your skill (it appears under "Used skills" in the chat)
 

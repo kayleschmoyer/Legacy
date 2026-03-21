@@ -6,17 +6,17 @@ Model Context Protocol (MCP) servers that extend AI coding agents with project-s
 
 MCP server configuration is maintained in multiple files to support different AI clients:
 
-| File                       | Client(s)                         | Top-level key | Env var syntax |
-| -------------------------- | --------------------------------- | ------------- | -------------- |
-| `.vscode/mcp.json`         | VS Code Copilot, Cursor, Windsurf | `servers`     | `${env:VAR}`   |
-| `.github/copilot/mcp.json` | GitHub Copilot (agent mode)       | `servers`     | `${VAR}`       |
-| `.mcp.json`                | Claude Code CLI                   | `mcpServers`  | `${VAR}`       |
+| File                       | Client(s)                   | Top-level key | Env var syntax |
+| -------------------------- | --------------------------- | ------------- | -------------- |
+| `.vscode/mcp.json`         | VS Code IDE agents          | `servers`     | `${env:VAR}`   |
+| `.github/copilot/mcp.json` | GitHub Copilot (agent mode) | `servers`     | `${VAR}`       |
+| `.mcp.json`                | CLI-based agents            | `mcpServers`  | `${VAR}`       |
 
 **Keep all files in sync.** When adding or removing a server, update all config files. The `create-mcp-server` skill (`.agents/skills/create-mcp-server/SKILL.md`) documents the full registration steps.
 
 ### Config Differences
 
-VS Code and GitHub Copilot (agent mode) use a `"type": "stdio"` field per server; Claude Code omits it (stdio is the default transport). VS Code env var references use `${env:VAR_NAME}` while the other clients use `${VAR_NAME}`.
+VS Code-based agents use a `"type": "stdio"` field per server; CLI-based agents omit it (stdio is the default transport). VS Code env var references use `${env:VAR_NAME}` while other clients use `${VAR_NAME}`.
 
 ## Servers
 

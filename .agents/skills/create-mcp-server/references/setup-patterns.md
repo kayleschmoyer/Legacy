@@ -198,7 +198,7 @@ server.tool(
 }
 ```
 
-### `.mcp.json` (Claude Code CLI)
+### `.mcp.json` (CLI-based agents)
 
 ```json
 {
@@ -215,13 +215,13 @@ server.tool(
 
 **Key differences**:
 
-| Feature         | VS Code           | Claude Code       |
+| Feature         | VS Code agents    | CLI agents        |
 | --------------- | ----------------- | ----------------- |
 | Top-level key   | `servers`         | `mcpServers`      |
 | Transport field | `"type": "stdio"` | Omitted (default) |
 | Env var syntax  | `${env:VAR_NAME}` | `${VAR_NAME}`     |
 
-> ⚠️ **Keep all config files in sync.** When adding or removing a server, update `.vscode/mcp.json`, `.github/copilot/mcp.json`, and `.mcp.json` together.
+> ⚠️ **Keep all config files in sync.** When adding or removing a server, update all MCP config files (`.vscode/mcp.json`, `.github/copilot/mcp.json`, `.mcp.json`) together.
 
 ### Return Values
 

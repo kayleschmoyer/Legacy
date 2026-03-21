@@ -1,13 +1,13 @@
 ---
 name: rebase-conflicts
-description: 'Guide Copilot through rebasing a branch onto main (or another base) and resolving all merge conflicts step-by-step; covers simple rebases, large multi-conflict rebases, generated-file conflicts, migration conflicts, interactive rebases, and recovery from failed rebases. Use when a developer says "rebase", "merge conflicts", "branch is behind", or "update my branch".'
+description: 'Rebase a branch onto main (or another base) and resolve all merge conflicts step-by-step; covers simple rebases, large multi-conflict rebases, generated-file conflicts, migration conflicts, interactive rebases, and recovery from failed rebases. Use when a developer says "rebase", "merge conflicts", "branch is behind", or "update my branch".'
 ---
 
 # Skill: Rebase & Conflict Resolution
 
 ## Overview
 
-Rebasing replays your branch's commits on top of another branch (usually `main`). When the same files were changed in both branches, Git pauses with **merge conflicts** that must be resolved before continuing. This skill walks through the entire process — from simple one-conflict rebases to massive multi-file conflict storms — and teaches Copilot how to resolve them automatically or guide the developer through manual resolution.
+Rebasing replays your branch's commits on top of another branch (usually `main`). When the same files were changed in both branches, Git pauses with **merge conflicts** that must be resolved before continuing. This skill walks through the entire process — from simple one-conflict rebases to massive multi-file conflict storms — and teaches agents how to resolve them automatically or guide the developer through manual resolution.
 
 ## When to Use
 
@@ -230,7 +230,7 @@ Write-Host "Total conflicting: $($conflicting.Count) of $(($raw | ConvertFrom-Js
 
 ---
 
-> 📎 **Conflict resolution strategies** (automated tree rebase, Copilot-assisted resolution, special conflict types — generated files, migrations, pnpm-lock, schema): see [references/rebase-conflict-strategies.md](references/rebase-conflict-strategies.md)
+> 📎 **Conflict resolution strategies** (automated tree rebase, agent-assisted resolution, special conflict types — generated files, migrations, pnpm-lock, schema): see [references/rebase-conflict-strategies.md](references/rebase-conflict-strategies.md)
 
 > 📎 **Interactive rebase & recovery** (squash/fixup/reword/drop/edit, stuck mid-rebase diagnosis and recovery): see [references/rebase-interactive-and-recovery.md](references/rebase-interactive-and-recovery.md)
 
@@ -310,9 +310,9 @@ git push --force-with-lease origin HEAD
 
 ---
 
-## Copilot Decision Framework
+## Conflict Resolution Decision Framework
 
-When Copilot is resolving conflicts autonomously, follow this priority order:
+When resolving conflicts autonomously, follow this priority order:
 
 1. **Generated files** → Always regenerate, never manually merge
 2. **Lock files** → Regenerate (`pnpm install`)

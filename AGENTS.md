@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to AI agents (Claude Code, GitHub Copilot, Cursor, Windsurf, etc.) when working with code in this repository.
+This file provides guidance to AI coding agents working with code in this repository.
 
 > **NEVER commit to main** — locally: create a worktree first (`make worktree TICKET=#### DESC=description`). Cloud agents already have an isolated branch checkout.
 
@@ -120,7 +120,7 @@ scripts/       PowerShell and shell automation scripts
 
 ## Skills
 
-Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. Copilot auto-discovers skills from frontmatter; other agents can browse the directory directly. CSV reference data is in `docs/agents/*.csv`.
+Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description` frontmatter field enables skill auto-discovery; agents can also browse the directory directly. CSV reference data is in `docs/agents/*.csv`.
 
 ## MCP Servers
 
