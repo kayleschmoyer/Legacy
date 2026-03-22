@@ -8,7 +8,7 @@ After analyzing the database schema, the issue with players having no eligible p
 
 1. **Field Positions (C, 1B, 2B, 3B, SS, LF, CF, RF, DH):**
    - Must have played **more than 50 games** at that position in their career
-   - Excludes pitcher position ('P') 
+   - Excludes pitcher position ('P')
 
 2. **Starting Pitcher (SP):**
    - Must have **more than 50 games started** (`gs > 50`) in their career
@@ -39,11 +39,14 @@ The draft processor **must handle players with no eligible positions** gracefull
 ## Recommended Solutions
 
 ### 1. Immediate Fix (Draft Processor)
+
 Update the draft processor to handle players without positions:
 
 ```typescript
 // Filter out players with no eligible positions during loading
-const assignablePlayers = allPlayers.filter(p => p.eligiblePositions.length > 0);
+const assignablePlayers = allPlayers.filter(
+  (p) => p.eligiblePositions.length > 0,
+);
 
 // Or provide fallback logic for unassignable players
 if (player.eligiblePositions.length === 0) {
@@ -54,6 +57,7 @@ if (player.eligiblePositions.length === 0) {
 ```
 
 ### 2. Database View Enhancement (Optional)
+
 Consider relaxing eligibility criteria for better draft coverage:
 
 ```sql
@@ -68,6 +72,7 @@ WHERE career_fielding_by_position.g > 25  -- Lowered from 50
 ```
 
 ### 3. Position Assignment Fallbacks
+
 Add intelligent fallbacks in the draft system:
 
 ```typescript

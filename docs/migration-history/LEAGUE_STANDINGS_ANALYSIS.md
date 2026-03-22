@@ -5,6 +5,7 @@
 ### Current Implementation Status
 
 #### What's Working:
+
 1. **GraphQL Schema** ✅
    - `leagueTeams` query exists in localhost:5000 schema
    - Returns `Array<Team>` with `id`, `name`, `leagueId`
@@ -14,30 +15,36 @@
    - Using `useLazyQuery` with inline `GET_LEAGUE_TEAMS` query
    - Fetches teams when "standings" tab is selected
    - Passes data to `LeagueStandings` component correctly
+
    ```tsx
-   const [getLeagueTeams, { data: leagueTeamsData, loading: leagueTeamsLoading }] = 
-     useLazyQuery(GET_LEAGUE_TEAMS);
-   
+   const [
+     getLeagueTeams,
+     { data: leagueTeamsData, loading: leagueTeamsLoading },
+   ] = useLazyQuery(GET_LEAGUE_TEAMS);
+
    // In standings tab:
    <LeagueStandings
      teams={leagueTeamsData?.leagueTeams || []}
      loading={leagueTeamsLoading}
-   />
+   />;
    ```
 
 3. **Web App** ✅
    - Using `useLazyQuery` with inline `GET_LEAGUE_TEAMS` query
    - Fetches teams when "standings" tab is selected
    - Passes data to `LeagueStandings` component correctly
+
    ```tsx
-   const [getLeagueTeams, { data: leagueTeamsData, loading: leagueTeamsLoading }] =
-     useLazyQuery(GET_LEAGUE_TEAMS);
-   
+   const [
+     getLeagueTeams,
+     { data: leagueTeamsData, loading: leagueTeamsLoading },
+   ] = useLazyQuery(GET_LEAGUE_TEAMS);
+
    // In standings tab:
    <LeagueStandings
      teams={leagueTeamsData?.leagueTeams || []}
      loading={leagueTeamsLoading}
-   />
+   />;
    ```
 
 4. **LeagueStandings Component** ✅
@@ -49,16 +56,19 @@
 ### What This Fixes:
 
 #### ✅ Schema Validation Issue
+
 - **Before:** Codegen failed because remote AWS schema didn't have `leagueTeams`
 - **After:** Codegen uses localhost:5000 which has the `leagueTeams` query
 - **Result:** Types generate successfully, no more validation errors
 
 #### ✅ Data Fetching Issue
+
 - **Before:** No way to fetch teams for a league (teams field didn't exist)
 - **After:** `leagueTeams(leagueId: Int!)` query is available
 - **Result:** Both apps can fetch teams and display standings
 
 #### ✅ Type Safety Issue
+
 - **Before:** Inline queries without generated types
 - **After:** Full TypeScript types generated from schema
 - **Result:** Type-safe queries with IntelliSense support
@@ -89,14 +99,14 @@ const GET_LEAGUE_TEAMS = gql`
 `;
 
 // This matches the generated types:
-export type GetLeagueTeamsQuery = { 
-  __typename?: 'Query', 
-  leagueTeams?: Array<{ 
-    __typename?: 'Team', 
-    id?: number | null, 
-    name?: string | null, 
-    leagueId?: number | null 
-  }> | null 
+export type GetLeagueTeamsQuery = {
+  __typename?: 'Query';
+  leagueTeams?: Array<{
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+    leagueId?: number | null;
+  }> | null;
 };
 ```
 
@@ -128,11 +138,13 @@ But the current implementation will work fine!
 7. ✅ Lazy loading only fetches when standings tab is selected
 
 **The feature should work perfectly now!** Just make sure:
+
 - Your GraphQL server is running on localhost:5000
 - The database has teams in the league you're viewing
 - You've run the codegen (which you have)
 
 Test it by:
+
 1. Starting your dev server
 2. Navigating to a league detail page
 3. Clicking the "Standings" tab

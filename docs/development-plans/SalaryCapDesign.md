@@ -20,15 +20,15 @@ Add salary cap league support where player salaries are determined by auction dr
 
 ## Epic Structure
 
-| Ticket | Summary | Depends On |
-|--------|---------|------------|
-| **LS-634** | Salary cap schema foundations | — |
-| **LS-642** | Implement auction draft bidding flow | LS-634 |
-| **LS-643** | Bridge FAAB waiver claims to player salary | LS-634 |
-| **LS-644** | Enforce salary cap on roster transactions | LS-634, LS-642, LS-643 |
-| **LS-645** | Salary escalation on rollover + free agent decay | LS-634, LS-309 |
-| **LS-309** | Season renewal/new season flow | — |
-| **LS-646** | Salary cap UI: roster payroll, cap space, auction room | LS-644, LS-642 |
+| Ticket     | Summary                                                | Depends On             |
+| ---------- | ------------------------------------------------------ | ---------------------- |
+| **LS-634** | Salary cap schema foundations                          | —                      |
+| **LS-642** | Implement auction draft bidding flow                   | LS-634                 |
+| **LS-643** | Bridge FAAB waiver claims to player salary             | LS-634                 |
+| **LS-644** | Enforce salary cap on roster transactions              | LS-634, LS-642, LS-643 |
+| **LS-645** | Salary escalation on rollover + free agent decay       | LS-634, LS-309         |
+| **LS-309** | Season renewal/new season flow                         | —                      |
+| **LS-646** | Salary cap UI: roster payroll, cap space, auction room | LS-644, LS-642         |
 
 ---
 
@@ -36,17 +36,17 @@ Add salary cap league support where player salaries are determined by auction dr
 
 ### New columns on `leagues`
 
-| Column | Type | Default | Description |
-|--------|------|---------|-------------|
-| `salary_cap_enabled` | `boolean` | `false` | Enables salary cap mode for the league |
-| `salary_cap` | `integer` | `null` | Total salary budget per team (e.g., 260) |
-| `salary_floor` | `integer` | `null` | Optional minimum total payroll a team must carry |
-| `luxury_tax_threshold` | `integer` | `null` | Optional threshold above cap before penalties apply |
-| `min_salary` | `integer` | `1` | Minimum salary any player can have after decay |
-| `salary_escalation_pct` | `integer` | `10` | Annual escalation rate as a whole-number percentage (10 = 10%) |
-| `salary_decay_pct` | `integer` | `25` | Annual free agent decay rate as a whole-number percentage (25 = 25%) |
-| `auction_budget` | `integer` | `260` | Total auction draft budget per team (distinct from FAAB) |
-| `auction_min_bid` | `integer` | `1` | Minimum bid allowed in auction draft |
+| Column                  | Type      | Default | Description                                                          |
+| ----------------------- | --------- | ------- | -------------------------------------------------------------------- |
+| `salary_cap_enabled`    | `boolean` | `false` | Enables salary cap mode for the league                               |
+| `salary_cap`            | `integer` | `null`  | Total salary budget per team (e.g., 260)                             |
+| `salary_floor`          | `integer` | `null`  | Optional minimum total payroll a team must carry                     |
+| `luxury_tax_threshold`  | `integer` | `null`  | Optional threshold above cap before penalties apply                  |
+| `min_salary`            | `integer` | `1`     | Minimum salary any player can have after decay                       |
+| `salary_escalation_pct` | `integer` | `10`    | Annual escalation rate as a whole-number percentage (10 = 10%)       |
+| `salary_decay_pct`      | `integer` | `25`    | Annual free agent decay rate as a whole-number percentage (25 = 25%) |
+| `auction_budget`        | `integer` | `260`   | Total auction draft budget per team (distinct from FAAB)             |
+| `auction_min_bid`       | `integer` | `1`     | Minimum bid allowed in auction draft                                 |
 
 > **Why whole-number percentages instead of decimals?** Integer math avoids floating-point
 > rounding issues in salary calculations. `salary_escalation_pct = 10` means 10%, applied
@@ -54,15 +54,15 @@ Add salary cap league support where player salaries are determined by auction dr
 
 ### New column on `draft_picks`
 
-| Column | Type | Default | Description |
-|--------|------|---------|-------------|
-| `bid_amount` | `integer` | `null` | Winning auction bid. Null for non-auction drafts. |
+| Column       | Type      | Default | Description                                       |
+| ------------ | --------- | ------- | ------------------------------------------------- |
+| `bid_amount` | `integer` | `null`  | Winning auction bid. Null for non-auction drafts. |
 
 ### New column on `team_members`
 
-| Column | Type | Default | Description |
-|--------|------|---------|-------------|
-| `salary` | `integer` | `null` | Current salary cap hit for this player on this team. Null in non-salary-cap leagues. |
+| Column   | Type      | Default | Description                                                                          |
+| -------- | --------- | ------- | ------------------------------------------------------------------------------------ |
+| `salary` | `integer` | `null`  | Current salary cap hit for this player on this team. Null in non-salary-cap leagues. |
 
 ### New table: `player_salaries`
 
@@ -221,7 +221,9 @@ export const auctionState = pgTable(
     nominatedPlayerId: integer('nominated_player_id'),
     currentBid: integer('current_bid'),
     currentBidderTeamId: integer('current_bidder_team_id'),
-    nominationDeadline: timestamp('nomination_deadline', { withTimezone: true }),
+    nominationDeadline: timestamp('nomination_deadline', {
+      withTimezone: true,
+    }),
     bidDeadline: timestamp('bid_deadline', { withTimezone: true }),
     nominationOrder: integer('nomination_order').notNull(),
   },
@@ -304,28 +306,29 @@ new_salary = Math.max(min_salary, Math.floor(current_salary * (100 - salary_deca
 
 ### Salary Lifecycle
 
-| Event | Salary Effect |
-|-------|--------------|
-| Auction draft: team wins bid of $X | `initial_salary = X`, `current_salary = X` |
-| FAAB claim: team bids $X | `initial_salary = X`, `current_salary = X` |
-| Commissioner assignment | `current_salary = min_salary` (commissioner can override) |
-| Season rollover (rostered) | `current_salary = escalated value` |
-| Season rollover (free agent) | `current_salary = decayed value`, `free_agent_years += 1` |
-| Player cut mid-season | Player's `player_salaries` row keeps current salary; team's cap freed immediately (no dead money in v1) |
-| Trade | Player moves to new team at same salary — no salary match requirement in v1 |
+| Event                              | Salary Effect                                                                                           |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Auction draft: team wins bid of $X | `initial_salary = X`, `current_salary = X`                                                              |
+| FAAB claim: team bids $X           | `initial_salary = X`, `current_salary = X`                                                              |
+| Commissioner assignment            | `current_salary = min_salary` (commissioner can override)                                               |
+| Season rollover (rostered)         | `current_salary = escalated value`                                                                      |
+| Season rollover (free agent)       | `current_salary = decayed value`, `free_agent_years += 1`                                               |
+| Player cut mid-season              | Player's `player_salaries` row keeps current salary; team's cap freed immediately (no dead money in v1) |
+| Trade                              | Player moves to new team at same salary — no salary match requirement in v1                             |
 
 ### Cap Enforcement
 
 Cap is enforced at transaction time. A transaction is blocked if `team_payroll + new_salary > salary_cap`:
 
-| Transaction | Validation |
-|-------------|-----------|
-| Auction draft bid | `committed_payroll + bid ≤ salary_cap`. Also: `bid ≤ remaining_auction_budget`. Must reserve $1 per unfilled roster slot. |
-| FAAB claim | `current_payroll + faab_bid ≤ salary_cap` AND `faab_bid >= player's current_salary` (in addition to existing FAAB budget check) |
-| Trade (receiving side) | `current_payroll - outgoing_salaries + incoming_salaries ≤ salary_cap` |
-| Season rollover | NOT enforced — teams may exceed cap after escalation. Must cut to compliance before new season roster lock. |
+| Transaction            | Validation                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Auction draft bid      | `committed_payroll + bid ≤ salary_cap`. Also: `bid ≤ remaining_auction_budget`. Must reserve $1 per unfilled roster slot.       |
+| FAAB claim             | `current_payroll + faab_bid ≤ salary_cap` AND `faab_bid >= player's current_salary` (in addition to existing FAAB budget check) |
+| Trade (receiving side) | `current_payroll - outgoing_salaries + incoming_salaries ≤ salary_cap`                                                          |
+| Season rollover        | NOT enforced — teams may exceed cap after escalation. Must cut to compliance before new season roster lock.                     |
 
 Where:
+
 - `current_payroll = SUM(team_members.salary) for the team`
 - `committed_payroll = current_payroll + sum of pending winning bids not yet on roster` (auction context)
 
@@ -343,12 +346,14 @@ Where:
 **Minimum bid rule**: In a salary cap league, the minimum FAAB bid for a free agent is the player's `currentSalary` in `player_salaries` (or `leagues.minSalary` if no record exists). This is how salary decay creates market value — a player whose salary has decayed to $3 can be claimed for as little as $3, while a recently-cut $40 player requires at least a $40 bid. The existing `leagues.auctionMinBid` does **not** apply to FAAB — it's auction-draft-only.
 
 **Claim validation** (in `claimFreeAgent` mutation):
+
 1. Look up `player_salaries` for the target player in this league.
 2. If a record exists: `faabBid >= player_salaries.currentSalary` (else reject).
 3. If no record exists: `faabBid >= leagues.minSalary` (player has never been in the salary system).
 4. Existing validations still apply: `faabBid <= team.faabBudget`, roster capacity, etc.
 
 **On successful claim** (in `processWaiverClaims`):
+
 1. Upsert `player_salaries` row: `current_salary = faab_bid`, `initial_salary = faab_bid`, `acquisition_type = 'waiver'`, `year_acquired = current_league_season`, `free_agent_years = 0`.
 2. Set `team_members.salary = faab_bid` on the new roster entry.
 3. If the claim involves dropping a player, that player's `player_salaries` row keeps its `current_salary` (they enter FA at their existing salary, decay applies at rollover).
@@ -379,8 +384,8 @@ type League {
 ```graphql
 type Team {
   # ... existing fields ...
-  totalPayroll: Int        # sum of team_members.salary (computed)
-  capSpace: Int            # salary_cap - totalPayroll (computed, null if cap disabled)
+  totalPayroll: Int # sum of team_members.salary (computed)
+  capSpace: Int # salary_cap - totalPayroll (computed, null if cap disabled)
 }
 ```
 
@@ -419,7 +424,7 @@ type AuctionBudget {
   team: Team!
   remainingBudget: Int!
   playersWon: Int!
-  maxBid: Int!   # computed: remaining - (unfilled_slots - 1) * min_bid
+  maxBid: Int! # computed: remaining - (unfilled_slots - 1) * min_bid
 }
 ```
 

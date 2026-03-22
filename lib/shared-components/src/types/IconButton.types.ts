@@ -13,51 +13,59 @@ export type IconButtonVariant = 'default' | 'primary' | 'secondary' | 'accent';
 /**
  * Color scheme options for gradient effects
  */
-export type IconButtonColorScheme = 'blue' | 'purple' | 'green' | 'red' | 'gold';
+export type IconButtonColorScheme =
+  | 'blue'
+  | 'purple'
+  | 'green'
+  | 'red'
+  | 'gold';
 
 /**
  * Props for the IconButton component
  */
-export interface IconButtonProps extends Omit<TamaguiButtonProps, 'variant' | 'icon'> {
+export interface IconButtonProps extends Omit<
+  TamaguiButtonProps,
+  'variant' | 'icon'
+> {
   /**
    * Icon name to display - should match available icons in the platform-specific Icon component
    */
   icon: string;
-  
+
   /**
    * Optional text label to display below the icon
    */
   label?: string;
-  
+
   /**
    * Size of the icon button
    * @default 'md'
    */
   size?: IconButtonSize;
-  
+
   /**
    * Visual variant of the button
    * @default 'default'
    */
   variant?: IconButtonVariant;
-  
+
   /**
    * Color scheme for the gradient effect
    * @default 'blue'
    */
   colorScheme?: IconButtonColorScheme;
-  
+
   /**
    * Whether to show the gradient shadow effect on hover
    * @default true
    */
   showGradient?: boolean;
-  
+
   /**
    * Accessibility label for screen readers
    */
   accessibilityLabel?: string;
-  
+
   /**
    * Test ID for testing purposes
    */
@@ -75,7 +83,7 @@ export interface IconButtonStyleVariants {
       padding: number;
     };
   };
-  
+
   variant: {
     [key in IconButtonVariant]: {
       backgroundColor: string;
@@ -89,7 +97,7 @@ export interface IconButtonStyleVariants {
       };
     };
   };
-  
+
   showGradient: {
     true: {
       shadowColor: string;

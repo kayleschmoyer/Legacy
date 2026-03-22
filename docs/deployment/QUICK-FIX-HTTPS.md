@@ -66,6 +66,7 @@ Once HTTPS is working (green padlock in browser):
 2. **Find OAuth Client:** `1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3`
 
 3. **Add Authorized JavaScript Origins:**
+
    ```
    https://legacy-fantasy.com
    https://www.legacy-fantasy.com
@@ -77,25 +78,27 @@ Once HTTPS is working (green padlock in browser):
 
 ## 🕐 Timeline
 
-| Step | Time | What's Happening |
-|------|------|------------------|
-| Configure GitHub Pages | 2 min | Add custom domain |
-| DNS Check | 5-30 min | GitHub verifies DNS |
-| Enable HTTPS | 1 min | Check the box |
-| Certificate Provisioning | 15-60 min | Let's Encrypt issues cert |
-| Google OAuth Config | 5 min | Add domain to authorized origins |
-| Google Propagation | 5-10 min | Changes take effect |
-| **Total** | **30 min - 2 hours** | Usually ~45 minutes |
+| Step                     | Time                 | What's Happening                 |
+| ------------------------ | -------------------- | -------------------------------- |
+| Configure GitHub Pages   | 2 min                | Add custom domain                |
+| DNS Check                | 5-30 min             | GitHub verifies DNS              |
+| Enable HTTPS             | 1 min                | Check the box                    |
+| Certificate Provisioning | 15-60 min            | Let's Encrypt issues cert        |
+| Google OAuth Config      | 5 min                | Add domain to authorized origins |
+| Google Propagation       | 5-10 min             | Changes take effect              |
+| **Total**                | **30 min - 2 hours** | Usually ~45 minutes              |
 
 ## ✅ How to Know It's Working
 
 ### HTTPS is Working When:
+
 - ✅ Visit `https://legacy-fantasy.com`
 - ✅ Green padlock appears in browser
 - ✅ No certificate warnings
 - ✅ Click padlock → Certificate says "Let's Encrypt"
 
 ### One Tap is Working When:
+
 - ✅ Visit site
 - ✅ One Tap prompt appears within 2 seconds
 - ✅ Shows "Sign in with Google" with your accounts
@@ -104,6 +107,7 @@ Once HTTPS is working (green padlock in browser):
 ## 🐛 If Something Goes Wrong
 
 ### DNS Check Failing?
+
 ```powershell
 # Verify Terraform applied successfully
 cd terraform
@@ -120,6 +124,7 @@ terraform apply
 This means GitHub Pages hasn't requested the certificate yet. Follow these steps:
 
 1. **Check DNS first:**
+
    ```powershell
    nslookup legacy-fantasy.com
    # MUST return: 185.199.108.153 (or similar GitHub IPs)
@@ -134,6 +139,7 @@ This means GitHub Pages hasn't requested the certificate yet. Follow these steps
    - Check "Enforce HTTPS" and wait 15-60 minutes
 
 3. **If DNS is NOT pointing to GitHub:**
+
    ```powershell
    cd terraform
    terraform apply
@@ -148,6 +154,7 @@ This means GitHub Pages hasn't requested the certificate yet. Follow these steps
    - Wait for DNS check to complete
 
 ### One Tap Still Not Showing?
+
 - Clear browser cache
 - Check browser console for errors
 - Verify HTTPS is working (green padlock)
@@ -162,12 +169,14 @@ This means GitHub Pages hasn't requested the certificate yet. Follow these steps
 ## 🎯 Current Status of Your Deployment
 
 ✅ **Already Configured:**
+
 - DNS records in Terraform (`terraform/route53.tf`)
 - CNAME file in deployment (`.github/workflows/deploy-web.yml`)
 - CAA records for Let's Encrypt
 - Web app builds and deploys automatically
 
 ❓ **Needs Verification:**
+
 - [ ] DNS records actually applied? (`terraform apply`)
 - [ ] Custom domain set in GitHub Pages?
 - [ ] "Enforce HTTPS" enabled in GitHub Pages?

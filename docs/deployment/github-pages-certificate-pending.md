@@ -5,6 +5,7 @@
 ✅ **Good news:** This is a **normal intermediate state**, not an error!
 
 This message appears when:
+
 1. ✅ Your DNS is configured correctly
 2. ✅ GitHub Pages DNS check has passed
 3. ✅ You've enabled "Enforce HTTPS"
@@ -28,25 +29,27 @@ This message appears when:
 
 ## How Long Does It Take?
 
-| Stage | Duration | Status |
-|-------|----------|--------|
-| DNS Check | 5-30 min | ✅ Complete (you passed this) |
-| Certificate Request | Instant | ✅ Complete (GitHub sent request) |
-| **Certificate Issuance** | **15-60 min** | ⏳ **You are here** |
-| Certificate Installation | 1-5 min | ⏳ Pending |
-| **Total from "Enforce HTTPS"** | **20-65 min** | **Typical: 30 min** |
+| Stage                          | Duration      | Status                            |
+| ------------------------------ | ------------- | --------------------------------- |
+| DNS Check                      | 5-30 min      | ✅ Complete (you passed this)     |
+| Certificate Request            | Instant       | ✅ Complete (GitHub sent request) |
+| **Certificate Issuance**       | **15-60 min** | ⏳ **You are here**               |
+| Certificate Installation       | 1-5 min       | ⏳ Pending                        |
+| **Total from "Enforce HTTPS"** | **20-65 min** | **Typical: 30 min**               |
 
 ## What You Should Do Now
 
 ### Option 1: Wait (Recommended)
 
 **Just wait 30-60 minutes.** This is the normal process. GitHub Pages will:
+
 1. Prove to Let's Encrypt you own `legacy-fantasy.com`
 2. Receive the signed certificate
 3. Install it on their CDN
 4. Start serving HTTPS automatically
 
 **Check back in 30 minutes by:**
+
 - Visiting `https://legacy-fantasy.com`
 - Looking for green padlock in browser
 - Checking GitHub Pages settings for "Certificate issued" message
@@ -80,6 +83,7 @@ If after 2 hours you still see this message, something might be blocking certifi
 **Common blockers:**
 
 1. **CAA records not configured:**
+
    ```powershell
    cd terraform
    terraform state show aws_route53_record.caa
@@ -108,7 +112,7 @@ Let's verify where you are in the process:
 - [ ] **DNS Check:** ✅ Passed (green checkmark in GitHub Pages)
 - [ ] **Enforce HTTPS:** ✅ Enabled (checkbox is checked)
 - [ ] **Error Message:** ⏳ Shows "certificate has not yet been issued"
-- [ ] **Time Elapsed:** ___ minutes since enabling HTTPS
+- [ ] **Time Elapsed:** \_\_\_ minutes since enabling HTTPS
 - [ ] **Expected Wait:** 15-60 minutes total
 
 **If you've waited less than 60 minutes:** ☕ Grab a coffee and wait!
@@ -131,6 +135,7 @@ nslookup legacy-fantasy.com
 ```
 
 **If DNS is wrong:**
+
 ```powershell
 cd terraform
 terraform apply
@@ -149,6 +154,7 @@ nslookup -type=CAA legacy-fantasy.com
 ```
 
 **If CAA is missing:**
+
 ```powershell
 cd terraform
 terraform state show aws_route53_record.caa
@@ -169,6 +175,7 @@ curl https://bkrupa.github.io/legacy-sports/CNAME
 ```
 
 **If CNAME is missing:**
+
 - Check `.github/workflows/deploy-web.yml` has CNAME creation step
 - Re-run the deployment workflow
 - Wait for deployment to complete
@@ -216,31 +223,38 @@ Check if Let's Encrypt can reach your domain:
 When configuring custom domain, you'll see these states:
 
 ### State 1: Initial Configuration
+
 ```
 Custom domain: [legacy-fantasy.com    ] [Save]
 ☐ Enforce HTTPS (unavailable until DNS check completes)
 DNS check in progress...
 ```
+
 **Action:** Wait for DNS check
 
 ### State 2: DNS Check Passed
+
 ```
 Custom domain: legacy-fantasy.com
 ✅ DNS check successful
 ☐ Enforce HTTPS
 ```
+
 **Action:** Check "Enforce HTTPS"
 
 ### State 3: Certificate Provisioning (YOU ARE HERE)
+
 ```
 Custom domain: legacy-fantasy.com
 ✅ DNS check successful
 ☑ Enforce HTTPS
 ⚠️ Unavailable for your site because a certificate has not yet been issued for your domain
 ```
+
 **Action:** Wait 30-60 minutes
 
 ### State 4: Success!
+
 ```
 Custom domain: legacy-fantasy.com
 ✅ DNS check successful
@@ -248,6 +262,7 @@ Custom domain: legacy-fantasy.com
 ✅ HTTPS is active
 Your site is published at https://legacy-fantasy.com
 ```
+
 **Action:** Celebrate! 🎉 Then configure Google OAuth
 
 ## What NOT to Do
@@ -261,6 +276,7 @@ Your site is published at https://legacy-fantasy.com
 ## When to Ask for Help
 
 Seek help if:
+
 - ⏰ More than 2 hours have passed
 - ✅ All DNS checks pass
 - ✅ CAA records are correct
@@ -268,6 +284,7 @@ Seek help if:
 - ❌ Still showing "certificate has not yet been issued"
 
 **Where to get help:**
+
 - GitHub Support: https://support.github.com
 - Let's Encrypt Community: https://community.letsencrypt.org
 - Stack Overflow: Tag with `github-pages` and `lets-encrypt`
@@ -289,6 +306,7 @@ Once you see the green padlock (✅ HTTPS working):
    - Test Google One Tap
 
 3. **Update environment variables:**
+
    ```env
    VITE_APP_URL=https://legacy-fantasy.com
    ```
@@ -302,12 +320,14 @@ Once you see the green padlock (✅ HTTPS working):
 ## Summary
 
 **Current situation:**
+
 - ✅ DNS is configured correctly (passed GitHub's check)
 - ✅ You enabled "Enforce HTTPS"
 - ⏳ **GitHub is requesting certificate from Let's Encrypt**
 - ⏳ **This takes 30-60 minutes - YOU NEED TO WAIT**
 
 **Next steps:**
+
 1. ☕ Wait 30-60 minutes
 2. ✅ Visit site and check for green padlock
 3. 🎉 Configure Google OAuth once HTTPS works

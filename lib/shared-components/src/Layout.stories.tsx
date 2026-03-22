@@ -58,7 +58,9 @@ export const CardWithTitleAndSubtitle: CardStory = {
         <Paragraph>
           This card demonstrates both title and subtitle functionality.
         </Paragraph>
-        <Button onPress={fn()}><Text>Action Button</Text></Button>
+        <Button onPress={fn()}>
+          <Text>Action Button</Text>
+        </Button>
       </YStack>
     ),
   },

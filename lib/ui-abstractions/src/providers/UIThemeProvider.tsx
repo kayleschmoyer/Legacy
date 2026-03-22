@@ -86,16 +86,20 @@ export function UIThemeProvider({
   customDarkTheme,
   tamaguiConfig,
 }: UIThemeProviderProps) {
-  const [currentTheme, setCurrentTheme] = React.useState<'light' | 'dark'>(() => {
-    if (theme === 'auto') {
-      // In browser environment, check for dark mode preference
-      if (typeof window !== 'undefined') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const [currentTheme, setCurrentTheme] = React.useState<'light' | 'dark'>(
+    () => {
+      if (theme === 'auto') {
+        // In browser environment, check for dark mode preference
+        if (typeof window !== 'undefined') {
+          return window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light';
+        }
+        return 'light';
       }
-      return 'light';
-    }
-    return theme;
-  });
+      return theme;
+    },
+  );
 
   // Listen for system theme changes when in auto mode
   React.useEffect(() => {
@@ -104,7 +108,7 @@ export function UIThemeProvider({
       const handleChange = (e: MediaQueryListEvent) => {
         setCurrentTheme(e.matches ? 'dark' : 'light');
       };
-      
+
       mediaQuery.addEventListener('change', handleChange);
       return () => mediaQuery.removeEventListener('change', handleChange);
     }
@@ -113,42 +117,57 @@ export function UIThemeProvider({
   }, [theme]);
 
   // Merge custom themes with defaults
-  const lightTheme = useMemo(() => ({
-    ...defaultLightTheme,
-    ...customLightTheme && {
-      colors: { ...defaultLightTheme.colors, ...customLightTheme.colors },
-      spacing: { ...defaultLightTheme.spacing, ...customLightTheme.spacing },
-      typography: { ...defaultLightTheme.typography, ...customLightTheme.typography },
-      radii: { ...defaultLightTheme.radii, ...customLightTheme.radii },
-    },
-  }), [customLightTheme]);
+  const lightTheme = useMemo(
+    () => ({
+      ...defaultLightTheme,
+      ...(customLightTheme && {
+        colors: { ...defaultLightTheme.colors, ...customLightTheme.colors },
+        spacing: { ...defaultLightTheme.spacing, ...customLightTheme.spacing },
+        typography: {
+          ...defaultLightTheme.typography,
+          ...customLightTheme.typography,
+        },
+        radii: { ...defaultLightTheme.radii, ...customLightTheme.radii },
+      }),
+    }),
+    [customLightTheme],
+  );
 
-  const darkTheme = useMemo(() => ({
-    ...defaultDarkTheme,
-    ...customDarkTheme && {
-      colors: { ...defaultDarkTheme.colors, ...customDarkTheme.colors },
-      spacing: { ...defaultDarkTheme.spacing, ...customDarkTheme.spacing },
-      typography: { ...defaultDarkTheme.typography, ...customDarkTheme.typography },
-      radii: { ...defaultDarkTheme.radii, ...customDarkTheme.radii },
-    },
-  }), [customDarkTheme]);
+  const darkTheme = useMemo(
+    () => ({
+      ...defaultDarkTheme,
+      ...(customDarkTheme && {
+        colors: { ...defaultDarkTheme.colors, ...customDarkTheme.colors },
+        spacing: { ...defaultDarkTheme.spacing, ...customDarkTheme.spacing },
+        typography: {
+          ...defaultDarkTheme.typography,
+          ...customDarkTheme.typography,
+        },
+        radii: { ...defaultDarkTheme.radii, ...customDarkTheme.radii },
+      }),
+    }),
+    [customDarkTheme],
+  );
 
   const activeTheme = currentTheme === 'dark' ? darkTheme : lightTheme;
 
   const toggleTheme = useCallback(() => {
-    setCurrentTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setCurrentTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   }, []);
 
   const setThemeMode = useCallback((themeMode: 'light' | 'dark') => {
     setCurrentTheme(themeMode);
   }, []);
 
-  const contextValue = useMemo((): UIThemeContextValue => ({
-    theme: activeTheme,
-    isDark: currentTheme === 'dark',
-    toggleTheme,
-    setTheme: setThemeMode,
-  }), [activeTheme, currentTheme, toggleTheme, setThemeMode]);
+  const contextValue = useMemo(
+    (): UIThemeContextValue => ({
+      theme: activeTheme,
+      isDark: currentTheme === 'dark',
+      toggleTheme,
+      setTheme: setThemeMode,
+    }),
+    [activeTheme, currentTheme, toggleTheme, setThemeMode],
+  );
 
   return (
     <TamaguiProvider config={tamaguiConfig}>
@@ -177,7 +196,7 @@ export function useTamaguiTokens(): any {
 
 // Utility to create theme-aware styles
 export function createStyles<T extends Record<string, any>>(
-  styleCreator: (theme: UITheme) => T
+  styleCreator: (theme: UITheme) => T,
 ): () => T {
   return (): T => {
     const { theme } = useUITheme();

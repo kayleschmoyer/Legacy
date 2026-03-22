@@ -12,12 +12,14 @@ This document outlines the systemic improvements implemented to address type saf
 
 **Problem Solved**: Complex Drizzle queries in `StatisticsService.ts` were using `any` type assertions throughout the query building process.
 
-**Solution**: 
+**Solution**:
+
 - Created `CareerBattingQueryBuilder` and `CareerPitchingQueryBuilder` classes
 - Uses Drizzle's `.$dynamic()` method to maintain type safety through query building chains
 - Builds complete queries in one go to avoid type inference issues
 
 **Usage Example**:
+
 ```typescript
 // OLD (with any assertions):
 finalQuery = (finalQuery as any).where(whereClause);
@@ -36,11 +38,13 @@ return await queryBuilder.executeQuery(filters, options);
 **Problem Solved**: Database introspection queries and debug scripts were using `any` for raw SQL results.
 
 **Solution**:
+
 - Created specific interfaces: `DatabaseIntrospectionResult`, `PlayerWithPositionStatsResult`, `LeagueStatusResult`, etc.
 - Added type guards for runtime validation
 - Provided utility functions for safe result extraction
 
 **Usage Example**:
+
 ```typescript
 // OLD (unsafe):
 playersWithoutPositionsResult.rows.forEach((player: any) => {
@@ -48,8 +52,11 @@ playersWithoutPositionsResult.rows.forEach((player: any) => {
 });
 
 // NEW (type-safe):
-const players = extractTypedResults(playersWithoutPositionsResult, isPlayerWithPositionStatsResult);
-players.forEach(player => {
+const players = extractTypedResults(
+  playersWithoutPositionsResult,
+  isPlayerWithPositionStatsResult,
+);
+players.forEach((player) => {
   console.log(`${player.first_name} ${player.last_name}`); // Fully typed
 });
 ```
@@ -61,15 +68,24 @@ players.forEach(player => {
 **Problem Solved**: Repeated complex queries needed better type safety and performance.
 
 **Solution**:
+
 - Created `TypeSafeQueryUtils` with static methods for common queries
 - Each method maintains full Drizzle type safety
 - Uses `.$dynamic()` for conditional query building
 
 **Usage Example**:
+
 ```typescript
 // Fully typed common queries
-const battingStats = await TypeSafeQueryUtils.getCareerBattingByPlayer(db, playerId);
-const topHitters = await TypeSafeQueryUtils.getPlayersWithMinHomeRuns(db, 300, 10);
+const battingStats = await TypeSafeQueryUtils.getCareerBattingByPlayer(
+  db,
+  playerId,
+);
+const topHitters = await TypeSafeQueryUtils.getPlayersWithMinHomeRuns(
+  db,
+  300,
+  10,
+);
 ```
 
 ### 4. Runtime Validation System
@@ -79,17 +95,19 @@ const topHitters = await TypeSafeQueryUtils.getPlayersWithMinHomeRuns(db, 300, 1
 **Problem Solved**: Bridge between untyped database results and TypeScript types needed better safety.
 
 **Solution**:
+
 - Created comprehensive type guards for all database entities
 - Added `ValidationError` class for detailed error reporting
 - Provided utilities for safe result extraction with fallbacks
 
 **Usage Example**:
+
 ```typescript
 // Safe validation with detailed error handling
 const validPlayers = validateQueryResults(
   results,
   isPlayer,
-  'getActivePlayers'
+  'getActivePlayers',
 );
 
 // Single result validation
@@ -103,6 +121,7 @@ const player = validateSingleResult(result, isPlayer, 'getPlayerById');
 **Problem Solved**: Need for graduated enforcement of type safety rules across different file types.
 
 **Solution**:
+
 - Strict rules for core library files (`src/lib/**`, `src/types/**`)
 - Graduated warnings for scripts during migration period
 - Specific rules for query builders and services
@@ -111,18 +130,21 @@ const player = validateSingleResult(result, isPlayer, 'getPlayerById');
 ## 🎯 Implementation Strategy
 
 ### Phase 1: Foundation (Completed)
+
 1. ✅ Create type-safe query builder patterns
-2. ✅ Add typed raw SQL result interfaces  
+2. ✅ Add typed raw SQL result interfaces
 3. ✅ Implement validation utilities
 4. ✅ Update ESLint configuration
 
 ### Phase 2: Migration (Recommended Next Steps)
+
 1. **Update StatisticsService.ts** to use new query builders
 2. **Migrate script files** to use typed interfaces
 3. **Apply improved ESLint configuration**
 4. **Update existing services** to use TypeSafeQueryUtils
 
 ### Phase 3: Enforcement
+
 1. **Enable strict ESLint rules** across all files
 2. **Add pre-commit hooks** to prevent type safety regressions
 3. **Create developer documentation** for new patterns
@@ -130,8 +152,12 @@ const player = validateSingleResult(result, isPlayer, 'getPlayerById');
 ## 📋 Usage Guidelines
 
 ### For Query Building (Services)
+
 ```typescript
-import { CareerBattingQueryBuilder, QueryBuilderFactory } from '@legacy-sports/db-client';
+import {
+  CareerBattingQueryBuilder,
+  QueryBuilderFactory,
+} from '@legacy-sports/db-client';
 
 // Use query builders for complex filtering
 const queryBuilder = QueryBuilderFactory.createCareerBattingBuilder(db);
@@ -139,11 +165,12 @@ const results = await queryBuilder.executeQuery(filters, options);
 ```
 
 ### For Raw SQL (Scripts)
+
 ```typescript
-import { 
-  DatabaseIntrospectionResult, 
-  extractTypedResults, 
-  isDatabaseIntrospectionResult 
+import {
+  DatabaseIntrospectionResult,
+  extractTypedResults,
+  isDatabaseIntrospectionResult,
 } from '@legacy-sports/db-client';
 
 // Type raw SQL results
@@ -152,17 +179,29 @@ const typedResults = extractTypedResults(result, isDatabaseIntrospectionResult);
 ```
 
 ### For Common Queries
+
 ```typescript
 import { TypeSafeQueryUtils } from '@legacy-sports/db-client';
 
 // Use utilities for frequently used queries
-const battingStats = await TypeSafeQueryUtils.getCareerBattingByPlayer(db, playerId);
-const eligiblePositions = await TypeSafeQueryUtils.getPlayerEligiblePositions(db, playerId);
+const battingStats = await TypeSafeQueryUtils.getCareerBattingByPlayer(
+  db,
+  playerId,
+);
+const eligiblePositions = await TypeSafeQueryUtils.getPlayerEligiblePositions(
+  db,
+  playerId,
+);
 ```
 
 ### For Validation
+
 ```typescript
-import { validateQueryResults, isPlayer, ValidationError } from '@legacy-sports/db-client';
+import {
+  validateQueryResults,
+  isPlayer,
+  ValidationError,
+} from '@legacy-sports/db-client';
 
 try {
   const players = validateQueryResults(results, isPlayer, 'getAllPlayers');
@@ -178,7 +217,9 @@ try {
 ## 🔄 Migration Path for Existing Code
 
 ### 1. StatisticsService.ts
+
 Replace type assertions with query builders:
+
 ```typescript
 // Replace this pattern:
 let finalQuery = queryBuilder;
@@ -194,7 +235,9 @@ return await builder.executeQuery(filters, options);
 ```
 
 ### 2. Script Files
+
 Replace `any` with typed interfaces:
+
 ```typescript
 // Replace this:
 result.rows.forEach((player: any) => {
@@ -203,13 +246,15 @@ result.rows.forEach((player: any) => {
 
 // With this:
 const players = validatePlayerStatsResults(result.rows);
-players.forEach(player => {
+players.forEach((player) => {
   console.log(player.first_name); // Fully typed
 });
 ```
 
 ### 3. Service Layer
+
 Use TypeSafeQueryUtils for common operations:
+
 ```typescript
 // Replace direct queries with utility methods
 const stats = await TypeSafeQueryUtils.getCareerBattingByPlayer(db, playerId);
@@ -228,11 +273,13 @@ After implementing these changes:
 ## 🚀 Benefits
 
 ### Immediate Benefits
+
 - ✅ Resolve all current type safety violations
 - ✅ Establish clear patterns for complex queries
 - ✅ Provide runtime validation for untyped data
 
 ### Long-term Benefits
+
 - ✅ Prevent future type safety regressions
 - ✅ Improve maintainability and debugging
 - ✅ Better alignment with Legacy Sports type safety standards

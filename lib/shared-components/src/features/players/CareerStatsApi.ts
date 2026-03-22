@@ -11,7 +11,8 @@ import {
 // Use generated types instead of manual interfaces
 export type CareerBattingStats = CareerBattingFragment;
 export type GetCareerBattingStatsResponse = GetCareerBattingStatsQuery;
-export type GetCareerBattingStatsVariables = GetCareerBattingStatsQueryVariables;
+export type GetCareerBattingStatsVariables =
+  GetCareerBattingStatsQueryVariables;
 
 // Enhanced player interface that combines basic player info with career stats
 export interface PlayerWithCareerStats {
@@ -44,23 +45,25 @@ export interface PlayerWithCareerStats {
 export function useCareerBattingStatsQuery(
   variables?: GetCareerBattingStatsVariables,
 ) {
-  const { data, loading, error, refetch, fetchMore } = useGetCareerBattingStatsQuery({
-    variables,
-    errorPolicy: 'all',
-    notifyOnNetworkStatusChange: true,
-  });
+  const { data, loading, error, refetch, fetchMore } =
+    useGetCareerBattingStatsQuery({
+      variables,
+      errorPolicy: 'all',
+      notifyOnNetworkStatusChange: true,
+    });
 
   // Transform GraphQL data to enhanced player format with career stats
   // Note: Using abbreviated field names from generated schema (g, pa, ab, etc.)
-  const rawStats = data?.careerBattingStats?.edges?.map(edge => edge?.node);
+  const rawStats = data?.careerBattingStats?.edges?.map((edge) => edge?.node);
   if (!Array.isArray(rawStats)) {
     return { data: [], loading, error, refetch };
   }
 
-  const transformedData: PlayerWithCareerStats[] =
-    rawStats.filter(stats => stats !== null && stats !== undefined).map((stats) => {
+  const transformedData: PlayerWithCareerStats[] = rawStats
+    .filter((stats) => stats !== null && stats !== undefined)
+    .map((stats) => {
       if (!stats) return null;
-      
+
       return {
         playerId: stats.playerId,
         displayName: `Player ${stats.playerId || 'Unknown'}`, // We'll need to join with player names later
@@ -86,7 +89,8 @@ export function useCareerBattingStatsQuery(
         onBasePercentage: null,
         sluggingPercentage: null,
       };
-    }).filter(Boolean) as PlayerWithCareerStats[];
+    })
+    .filter(Boolean) as PlayerWithCareerStats[];
 
   return {
     data: transformedData,

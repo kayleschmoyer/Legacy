@@ -35,8 +35,8 @@ query GetLeagueDraft($leagueId: Int!) {
     leagueId
     draftMode
     selectionMethod
-    draftOrder        # 'snake' | 'linear'
-    currentPick       # number of picks made so far
+    draftOrder # 'snake' | 'linear'
+    currentPick # number of picks made so far
     draftStartedAt
     draftCompletedAt
     createdAt
@@ -50,11 +50,11 @@ query GetLeagueDraft($leagueId: Int!) {
 query GetCurrentDraftPick($draftId: Int!) {
   getCurrentDraftPick(draftId: $draftId) {
     draftId
-    teamId          # which team is on the clock
+    teamId # which team is on the clock
     round
-    pickNumber      # pick within the round (1-indexed)
-    overallPick     # overall pick number (1-indexed)
-    isComplete      # true when draft is finished
+    pickNumber # pick within the round (1-indexed)
+    overallPick # overall pick number (1-indexed)
+    isComplete # true when draft is finished
     team {
       id
       name
@@ -128,22 +128,32 @@ mutation MakeDraftPick($draftId: Int!, $playerId: Int!) {
 
 **Error cases the UI should handle:**
 
-| Error Message | Meaning | UI Action |
-|---|---|---|
-| `"Not authorized: It is not your turn..."` | Not this user's turn | Show "Not your turn" toast, disable pick button |
-| `"Player has already been drafted"` | Race condition / stale list | Remove player from available list, show toast |
-| `"Draft is currently paused..."` | Commissioner paused the draft | Show paused overlay |
-| `"Draft is not in progress"` | Draft hasn't started or is done | Redirect to appropriate state |
-| `"Team roster is full"` | Hit maxRosterSize | Show roster full message |
-| `"Player is not in the AL/NL player pool"` | Player pool restriction | Remove from list, show toast |
+| Error Message                              | Meaning                         | UI Action                                       |
+| ------------------------------------------ | ------------------------------- | ----------------------------------------------- |
+| `"Not authorized: It is not your turn..."` | Not this user's turn            | Show "Not your turn" toast, disable pick button |
+| `"Player has already been drafted"`        | Race condition / stale list     | Remove player from available list, show toast   |
+| `"Draft is currently paused..."`           | Commissioner paused the draft   | Show paused overlay                             |
+| `"Draft is not in progress"`               | Draft hasn't started or is done | Redirect to appropriate state                   |
+| `"Team roster is full"`                    | Hit maxRosterSize               | Show roster full message                        |
+| `"Player is not in the AL/NL player pool"` | Player pool restriction         | Remove from list, show toast                    |
 
 **Idempotency:** If the user double-clicks or retries, the server detects duplicate picks and returns the existing pick without error.
 
 ### Initialize a Draft (Commissioner Only)
 
 ```graphql
-mutation InitializeDraft($leagueId: Int!, $draftOrder: String, $draftMode: String, $selectionMethod: String) {
-  initializeDraft(leagueId: $leagueId, draftOrder: $draftOrder, draftMode: $draftMode, selectionMethod: $selectionMethod) {
+mutation InitializeDraft(
+  $leagueId: Int!
+  $draftOrder: String
+  $draftMode: String
+  $selectionMethod: String
+) {
+  initializeDraft(
+    leagueId: $leagueId
+    draftOrder: $draftOrder
+    draftMode: $draftMode
+    selectionMethod: $selectionMethod
+  ) {
     id
     leagueId
     draftMode
@@ -199,7 +209,10 @@ mutation CommissionerPick($draftId: Int!, $playerId: Int!) {
 Use the `@legacy-sports/websocket-client` library to listen for real-time events:
 
 ```typescript
-import { WebSocketClient, ClientNotificationType } from '@legacy-sports/websocket-client';
+import {
+  WebSocketClient,
+  ClientNotificationType,
+} from '@legacy-sports/websocket-client';
 import type {
   DraftStartedNotification,
   DraftPickNotification,
@@ -222,7 +235,6 @@ client.on('draft-started', (data: DraftStartedNotification) => {
   // data.draftOrder — 'snake' | 'linear'
   // data.teamCount  — number of teams
   // data.startedAt  — ISO-8601 timestamp
-
   // → Navigate users to the draft board
   // → Initialize draft state
 });
@@ -249,7 +261,6 @@ client.on('draft-pick-made', (data: DraftPickNotification) => {
   //   data.nextPick.round       — next round
   //   data.nextPick.pickNumber  — next pick in round
   //   data.nextPick.overallPick — next overall pick number
-
   // → Add pick to draft board grid
   // → Remove player from available players list
   // → Update "on the clock" indicator using nextPick
@@ -266,7 +277,6 @@ Fired when the commissioner pauses the draft.
 client.on('draft-paused', (data: DraftPausedNotification) => {
   // data.leagueId — league ID
   // data.pausedAt — ISO-8601 timestamp
-
   // → Show "Draft Paused" overlay
   // → Disable pick button
   // → Pause the pick timer
@@ -281,7 +291,6 @@ Fired when the commissioner resumes the draft.
 client.on('draft-resumed', (data: DraftResumedNotification) => {
   // data.leagueId  — league ID
   // data.resumedAt — ISO-8601 timestamp
-
   // → Hide "Draft Paused" overlay
   // → Re-enable pick button if it's your turn
   // → Restart the pick timer
@@ -297,7 +306,6 @@ client.on('draft-completed', (data: DraftCompletedNotification) => {
   // data.leagueId       — league ID
   // data.selectionMethod — 'standard' | 'random' | 'auction'
   // data.completedAt    — ISO-8601 timestamp
-
   // → Show "Draft Complete" screen
   // → Navigate to roster view or recap
 });
@@ -321,7 +329,7 @@ interface DraftBoardState {
     round: number;
     pickNumber: number;
     overallPick: number;
-    isMyTurn: boolean;   // derived: currentPick.teamId === myTeamId
+    isMyTurn: boolean; // derived: currentPick.teamId === myTeamId
   } | null;
 
   // Draft history — array of all picks made so far
@@ -449,7 +457,7 @@ async function initializeDraftBoard(leagueId: number) {
   });
 
   // Return cleanup function
-  return () => unsubscribers.forEach(unsub => unsub());
+  return () => unsubscribers.forEach((unsub) => unsub());
 }
 ```
 
@@ -457,26 +465,26 @@ async function initializeDraftBoard(leagueId: number) {
 
 ## 8. Error Recovery & Edge Cases
 
-| Scenario | Strategy |
-|---|---|
-| **User refreshes mid-draft** | Re-fetch all picks + current pick on mount. The draft board is fully recoverable from DB state. |
-| **WebSocket disconnects** | The `WebSocketClient` auto-reconnects. On reconnect, refetch `getCurrentDraftPick` and `getDraftPicks` to reconcile any missed picks. |
-| **Double-click on pick** | The mutation is idempotent — server detects the same (draftId, playerId, teamId, overallPick) and returns the existing pick. |
-| **Stale player list** | When a `draft-pick-made` notification arrives, optimistically remove `playerId` from the local available list. Periodically refetch for full accuracy. |
-| **Commissioner override** | `commissionerPick` mutation works the same as `makeDraftPick` but bypasses turn-ownership checks. The same `draft-pick-made` notification is broadcast. |
-| **Draft paused during your turn** | The pick button should be disabled on `draft-paused`. If a pick mutation is in-flight, the server will reject with "Draft is currently paused." |
+| Scenario                          | Strategy                                                                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **User refreshes mid-draft**      | Re-fetch all picks + current pick on mount. The draft board is fully recoverable from DB state.                                                         |
+| **WebSocket disconnects**         | The `WebSocketClient` auto-reconnects. On reconnect, refetch `getCurrentDraftPick` and `getDraftPicks` to reconcile any missed picks.                   |
+| **Double-click on pick**          | The mutation is idempotent — server detects the same (draftId, playerId, teamId, overallPick) and returns the existing pick.                            |
+| **Stale player list**             | When a `draft-pick-made` notification arrives, optimistically remove `playerId` from the local available list. Periodically refetch for full accuracy.  |
+| **Commissioner override**         | `commissionerPick` mutation works the same as `makeDraftPick` but bypasses turn-ownership checks. The same `draft-pick-made` notification is broadcast. |
+| **Draft paused during your turn** | The pick button should be disabled on `draft-paused`. If a pick mutation is in-flight, the server will reject with "Draft is currently paused."         |
 
 ---
 
 ## 9. DB Tables (Reference)
 
-| Table | Purpose |
-|---|---|
-| `drafts` | Per-league draft record: mode, order, currentPick counter, timestamps |
-| `draft_teams` | Links teams to draft with randomized `draft_order` (1-indexed) |
-| `draft_picks` | Historical record: every pick with round, pickNumber, overallPick, teamId, playerId, pickedAt |
-| `team_members` | Roster: players assigned to teams. `acquisitionType = 'draft'` for drafted players |
-| `leagues` | `draftStatus` column: `not-started`, `in-progress`, `paused`, `completed` |
+| Table          | Purpose                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| `drafts`       | Per-league draft record: mode, order, currentPick counter, timestamps                         |
+| `draft_teams`  | Links teams to draft with randomized `draft_order` (1-indexed)                                |
+| `draft_picks`  | Historical record: every pick with round, pickNumber, overallPick, teamId, playerId, pickedAt |
+| `team_members` | Roster: players assigned to teams. `acquisitionType = 'draft'` for drafted players            |
+| `leagues`      | `draftStatus` column: `not-started`, `in-progress`, `paused`, `completed`                     |
 
 ### Key Constraints
 
@@ -490,10 +498,10 @@ async function initializeDraftBoard(leagueId: number) {
 
 Import these from `@legacy-sports/utils/notification-types`:
 
-| Wire (backend) | Client (frontend) | Event |
-|---|---|---|
-| `DRAFT_STARTED` | `draft-started` | Commissioner initialized the draft |
+| Wire (backend)    | Client (frontend) | Event                               |
+| ----------------- | ----------------- | ----------------------------------- |
+| `DRAFT_STARTED`   | `draft-started`   | Commissioner initialized the draft  |
 | `DRAFT_PICK_MADE` | `draft-pick-made` | A pick was made (includes nextPick) |
-| `DRAFT_PAUSED` | `draft-paused` | Commissioner paused the draft |
-| `DRAFT_RESUMED` | `draft-resumed` | Commissioner resumed the draft |
-| `DRAFT_COMPLETED` | `draft-completed` | Final pick was made, draft is done |
+| `DRAFT_PAUSED`    | `draft-paused`    | Commissioner paused the draft       |
+| `DRAFT_RESUMED`   | `draft-resumed`   | Commissioner resumed the draft      |
+| `DRAFT_COMPLETED` | `draft-completed` | Final pick was made, draft is done  |

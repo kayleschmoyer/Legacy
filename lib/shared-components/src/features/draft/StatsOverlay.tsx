@@ -24,7 +24,7 @@ export const StatsOverlay: React.FC<StatsOverlayProps> = ({
         marginBottom="$2"
       >
         <Text fontSize="$6" fontWeight="bold">
-          {player?.name ? `${player.name} Stats` : 'Stats'}
+          {player?.name} Stats
         </Text>
         <Button size="$2" onPress={onClose}>
           <Text>X</Text>

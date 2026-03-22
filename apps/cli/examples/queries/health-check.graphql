@@ -8,7 +8,7 @@ query HealthCheck {
       name
     }
   }
-  
+
   # Test user authentication and permissions
   currentUser {
     id
@@ -16,13 +16,13 @@ query HealthCheck {
     username
     accessLevel
   }
-  
+
   # Test data access (if available)
   users(limit: 1) {
     id
     email
   }
-  
+
   # Test if player data is accessible
   players(limit: 1) {
     id

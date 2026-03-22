@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * Git Pre-Commit Hook - Secret Validation, YAML & JSON Linting
- * 
+ *
  * This hook automatically runs before every git commit to ensure:
  * 1. No secrets are accidentally committed to the repository
  * 2. All YAML files have valid syntax
  * 3. All JSON files have valid syntax
- * 
+ *
  * Installation: Copy this file to .git/hooks/pre-commit and make executable
  */
 
@@ -16,43 +16,48 @@ const path = require('path');
 try {
   // Run the secret validation script
   console.log('🔒 Running pre-commit secret validation...\n');
-  
+
   const scriptPath = path.join(__dirname, '../../scripts/validate-secrets.js');
   execSync(`node "${scriptPath}"`, { stdio: 'inherit' });
-  
+
   console.log('✅ Pre-commit validation passed!\n');
-  
+
   // Run YAML linting on staged YAML files
   console.log('📝 Running YAML validation...\n');
-  
+
   try {
     // Get staged YAML files
-    const stagedFiles = execSync('git diff --cached --name-only --diff-filter=ACM', { 
-      encoding: 'utf8' 
-    }).trim();
-    
+    const stagedFiles = execSync(
+      'git diff --cached --name-only --diff-filter=ACM',
+      {
+        encoding: 'utf8',
+      },
+    ).trim();
+
     if (stagedFiles) {
       const yamlFiles = stagedFiles
         .split('\n')
-        .filter(file => file.match(/\.(ya?ml)$/i))
-        .filter(file => !file.endsWith('pnpm-lock.yaml'));
-      
+        .filter((file) => file.match(/\.(ya?ml)$/i))
+        .filter((file) => !file.endsWith('pnpm-lock.yaml'));
+
       if (yamlFiles.length > 0) {
         console.log(`Found ${yamlFiles.length} YAML file(s) to validate:`);
-        yamlFiles.forEach(file => console.log(`  • ${file}`));
+        yamlFiles.forEach((file) => console.log(`  • ${file}`));
         console.log('');
-        
+
         // Run yamllint on each file
         for (const file of yamlFiles) {
           try {
             execSync(`python -m yamllint "${file}"`, { stdio: 'inherit' });
           } catch (error) {
             console.error(`\n❌ YAML validation failed for: ${file}`);
-            console.error('Please fix the YAML syntax errors before committing.\n');
+            console.error(
+              'Please fix the YAML syntax errors before committing.\n',
+            );
             process.exit(1);
           }
         }
-        
+
         console.log('✅ YAML validation passed!\n');
       } else {
         console.log('No YAML files staged for commit.\n');
@@ -63,45 +68,50 @@ try {
     console.error(error.message);
     process.exit(1);
   }
-  
+
   // Run JSON linting on staged JSON files
   console.log('📋 Running JSON validation...\n');
-  
+
   try {
     // Get staged JSON files
-    const stagedFiles = execSync('git diff --cached --name-only --diff-filter=ACM', { 
-      encoding: 'utf8' 
-    }).trim();
-    
+    const stagedFiles = execSync(
+      'git diff --cached --name-only --diff-filter=ACM',
+      {
+        encoding: 'utf8',
+      },
+    ).trim();
+
     if (stagedFiles) {
       const jsonFiles = stagedFiles
         .split('\n')
-        .filter(file => file.match(/\.json$/i));
-      
+        .filter((file) => file.match(/\.json$/i));
+
       if (jsonFiles.length > 0) {
         console.log(`Found ${jsonFiles.length} JSON file(s) to validate:`);
-        jsonFiles.forEach(file => console.log(`  • ${file}`));
+        jsonFiles.forEach((file) => console.log(`  • ${file}`));
         console.log('');
-        
+
         // Run jsonlint on each file
         for (const file of jsonFiles) {
           try {
             execSync(`pnpm exec jsonlint -q "${file}"`, { stdio: 'pipe' });
           } catch (error) {
             console.error(`\n❌ JSON validation failed for: ${file}`);
-            
+
             // Try to get better error output
             try {
               execSync(`pnpm exec jsonlint "${file}"`, { stdio: 'inherit' });
             } catch (e) {
               // Error already displayed
             }
-            
-            console.error('Please fix the JSON syntax errors before committing.\n');
+
+            console.error(
+              'Please fix the JSON syntax errors before committing.\n',
+            );
             process.exit(1);
           }
         }
-        
+
         console.log('✅ JSON validation passed!\n');
       } else {
         console.log('No JSON files staged for commit.\n');
@@ -112,12 +122,15 @@ try {
     console.error(error.message);
     process.exit(1);
   }
-  
+
   // Check that no previously-landed migrations have been modified or deleted
   console.log('🔒 Running migration immutability check...\n');
 
   try {
-    const migrationCheckScript = path.join(__dirname, '../../scripts/check-migration-immutability.js');
+    const migrationCheckScript = path.join(
+      __dirname,
+      '../../scripts/check-migration-immutability.js',
+    );
     execSync(`node "${migrationCheckScript}"`, { stdio: 'inherit' });
   } catch (error) {
     console.error('\n❌ Migration immutability check failed!');
@@ -127,27 +140,35 @@ try {
 
   // Run @legacy-sports package validation on staged package.json files
   console.log('📦 Running @legacy-sports package validation...\n');
-  
+
   try {
     // Get staged package.json files
-    const stagedFiles = execSync('git diff --cached --name-only --diff-filter=ACM', { 
-      encoding: 'utf8' 
-    }).trim();
-    
+    const stagedFiles = execSync(
+      'git diff --cached --name-only --diff-filter=ACM',
+      {
+        encoding: 'utf8',
+      },
+    ).trim();
+
     if (stagedFiles) {
       const packageJsonFiles = stagedFiles
         .split('\n')
-        .filter(file => file.endsWith('package.json'));
-      
+        .filter((file) => file.endsWith('package.json'));
+
       if (packageJsonFiles.length > 0) {
-        console.log(`Found ${packageJsonFiles.length} package.json file(s) to validate:`);
-        packageJsonFiles.forEach(file => console.log(`  • ${file}`));
+        console.log(
+          `Found ${packageJsonFiles.length} package.json file(s) to validate:`,
+        );
+        packageJsonFiles.forEach((file) => console.log(`  • ${file}`));
         console.log('');
-        
+
         // Run validation script
-        const validationScript = path.join(__dirname, '../../scripts/validate-legacy-sports-packages.js');
+        const validationScript = path.join(
+          __dirname,
+          '../../scripts/validate-legacy-sports-packages.js',
+        );
         execSync(`node "${validationScript}"`, { stdio: 'inherit' });
-        
+
         console.log('✅ @legacy-sports package validation passed!\n');
       } else {
         console.log('No package.json files staged for commit.\n');
@@ -155,10 +176,12 @@ try {
     }
   } catch (error) {
     console.error('\n❌ @legacy-sports package validation failed!');
-    console.error('Commit blocked to prevent npm installation of workspace packages.\n');
+    console.error(
+      'Commit blocked to prevent npm installation of workspace packages.\n',
+    );
     process.exit(1);
   }
-  
+
   console.log('✅ All pre-commit checks passed!\n');
   process.exit(0);
 } catch (error) {

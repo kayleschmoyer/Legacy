@@ -10,7 +10,8 @@ const meta: Meta<typeof IconButton> = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'An animated icon button component with hover effects and gradient shadows, similar to modern mobile interfaces.',
+        component:
+          'An animated icon button component with hover effects and gradient shadows, similar to modern mobile interfaces.',
       },
     },
   },
@@ -19,7 +20,18 @@ const meta: Meta<typeof IconButton> = {
     onPress: { action: 'pressed' },
     icon: {
       control: 'select',
-      options: ['home', 'search', 'settings', 'user', 'star', 'heart', 'edit', 'delete', 'plus', 'check'],
+      options: [
+        'home',
+        'search',
+        'settings',
+        'user',
+        'star',
+        'heart',
+        'edit',
+        'delete',
+        'plus',
+        'check',
+      ],
       description: 'Icon to display in the button',
     },
     label: {
@@ -116,24 +128,9 @@ export const Accent: Story = {
 export const Sizes: Story = {
   render: () => (
     <XStack gap="$4" alignItems="center">
-      <IconButton
-        icon="user"
-        label="Small"
-        size="sm"
-        onPress={fn()}
-      />
-      <IconButton
-        icon="user"
-        label="Medium"
-        size="md"
-        onPress={fn()}
-      />
-      <IconButton
-        icon="user"
-        label="Large"
-        size="lg"
-        onPress={fn()}
-      />
+      <IconButton icon="user" label="Small" size="sm" onPress={fn()} />
+      <IconButton icon="user" label="Medium" size="md" onPress={fn()} />
+      <IconButton icon="user" label="Large" size="lg" onPress={fn()} />
     </XStack>
   ),
 };
@@ -159,12 +156,7 @@ export const Variants: Story = {
         variant="secondary"
         onPress={fn()}
       />
-      <IconButton
-        icon="check"
-        label="Accent"
-        variant="accent"
-        onPress={fn()}
-      />
+      <IconButton icon="check" label="Accent" variant="accent" onPress={fn()} />
     </XStack>
   ),
 };

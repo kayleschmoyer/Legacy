@@ -15,7 +15,11 @@ interface DraftTeam {
   picks: string[];
 }
 
-export const useDraftData = (sport: string, leagueId: string, teamId: string) => {
+export const useDraftData = (
+  sport: string,
+  leagueId: string,
+  teamId: string,
+) => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [draftOrder, setDraftOrder] = useState<DraftTeam[]>([]);
   const [currentPick, setCurrentPick] = useState<number>(1);
@@ -25,9 +29,15 @@ export const useDraftData = (sport: string, leagueId: string, teamId: string) =>
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`/api/draft/${sport}/${leagueId}/${teamId}`);
+        const response = await fetch(
+          `/api/draft/${sport}/${leagueId}/${teamId}`,
+        );
         if (!response.ok) throw new Error('Failed to fetch draft data');
-        const data = await response.json() as { players: Player[]; draftOrder: DraftTeam[]; currentPick: number };
+        const data = (await response.json()) as {
+          players: Player[];
+          draftOrder: DraftTeam[];
+          currentPick: number;
+        };
         setPlayers(data.players);
         setDraftOrder(data.draftOrder);
         setCurrentPick(data.currentPick);

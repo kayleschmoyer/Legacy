@@ -38,7 +38,7 @@ test('should perform action', async ({ page }) => {
     test.skip();
     return;
   }
-  
+
   // ... test implementation
 });
 ```
@@ -51,7 +51,7 @@ test('should perform action', async ({ page }) => {
   if (!someCondition) {
     test.skip();
   }
-  
+
   // ... test implementation
 });
 ```
@@ -84,6 +84,7 @@ if (skipCondition) {
 Many E2E tests require a running GraphQL server. Best practices:
 
 1. **Check availability in `beforeAll`**:
+
    ```typescript
    let isGraphQLAvailable = false;
 
@@ -146,7 +147,10 @@ test.afterEach(async () => {
 // SKIP-REASON: GraphQL server must be running for E2E tests
 // TODO: Document GraphQL server startup in test README
 if (!isGraphQLAvailable) {
-  console.log('⚠️  Skipping test - GraphQL server not available:', GRAPHQL_ENDPOINT);
+  console.log(
+    '⚠️  Skipping test - GraphQL server not available:',
+    GRAPHQL_ENDPOINT,
+  );
   test.skip();
   return;
 }
@@ -205,7 +209,7 @@ Add to your CI workflow:
       Where-Object { $_.tests.results.status -eq 'skipped' } | 
       Measure-Object | 
       Select-Object -ExpandProperty Count
-    
+
     if ($skippedCount -gt 0) {
       Write-Warning "⚠️  $skippedCount test(s) were skipped - review skip reasons"
     }
@@ -267,6 +271,7 @@ grep -r "SKIP-REASON" tests/ apps/
 ## Questions?
 
 For questions about E2E test maintenance, check:
+
 - [Troubleshooting Guide](../guides/troubleshooting.md)
 - [Development Setup](../guides/development-setup.md)
 

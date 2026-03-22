@@ -32,12 +32,7 @@ const { projections } = usePlayerProjections(
   scoringError ?? statsError,
 );
 
-return (
-  <PlayersTable
-    showProjections
-    projectedPoints={projections}
-  />
-);
+return <PlayersTable showProjections projectedPoints={projections} />;
 ```
 
 ## Key Concepts

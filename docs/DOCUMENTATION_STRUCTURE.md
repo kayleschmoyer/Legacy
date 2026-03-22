@@ -9,7 +9,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ## 🗂️ Main Categories
 
 ### 🚀 **Getting Started** → `/guides/`
-*Start here if you're new to the project*
+
+_Start here if you're new to the project_
 
 - Setting up your development environment
 - Authentication and security basics
@@ -21,7 +22,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### 🏗️ **Architecture** → `/architecture/`
-*Understanding how the system works*
+
+_Understanding how the system works_
 
 - Build system and dependency management
 - Cross-platform architecture
@@ -34,7 +36,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### 🔐 **Authentication** → `/authentication/`
-*OAuth, user management, and security*
+
+_OAuth, user management, and security_
 
 - OAuth 2.0 implementation
 - CLI authentication
@@ -48,7 +51,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### ⚙️ **CI/CD** → `/ci-cd/`
-*Continuous integration and deployment pipelines*
+
+_Continuous integration and deployment pipelines_
 
 - GitHub Actions workflows
 - CI system architecture
@@ -63,7 +67,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### 🔧 **Build & Tooling** → `/build-and-tooling/`
-*Nx, Jest, and development tools*
+
+_Nx, Jest, and development tools_
 
 - Nx Cloud configuration and optimization
 - Jest testing setup
@@ -77,9 +82,11 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### ☁️ **Deployment** → `/deployment/`
-*AWS infrastructure and deployment*
+
+_AWS infrastructure and deployment_
 
 #### Main Deployment Docs:
+
 - AWS infrastructure overview
 - Cost optimization strategies
 - Lambda deployment
@@ -88,6 +95,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 - Infrastructure changelog
 
 #### Terraform Subdirectory: `/deployment/terraform/`
+
 - Terraform setup and configuration
 - State management
 - Lambda infrastructure as code
@@ -99,7 +107,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### 🛡️ **Security** → `/security/`
-*Security scanning, secrets, and audits*
+
+_Security scanning, secrets, and audits_
 
 - Security audit status
 - Scanning implementation
@@ -111,7 +120,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### 📱 **Mobile** → `/mobile/`
-*React Native and Android development*
+
+_React Native and Android development_
 
 - Android build setup
 - Version matrix and compatibility
@@ -123,7 +133,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### 🌐 **Web** → `/web/`
-*Next.js and web application*
+
+_Next.js and web application_
 
 - Web build configurations
 - Hash routing setup
@@ -135,7 +146,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### 💾 **Database** → `/database/`
-*Database migrations and schema changes*
+
+_Database migrations and schema changes_
 
 - Drizzle ORM upgrades
 - Migration analysis
@@ -146,7 +158,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### 📋 **Migration History** → `/migration-history/`
-*Historical records of completed work*
+
+_Historical records of completed work_
 
 - Feature implementation summaries
 - System migrations
@@ -158,7 +171,8 @@ This document provides a bird's-eye view of the entire documentation structure a
 ---
 
 ### 🤖 **AI Agents** → `/agents/`
-*Structured instructions for AI assistance*
+
+_Structured instructions for AI assistance_
 
 - Platform component rules (CSV)
 - Build system guidelines (CSV)
@@ -173,6 +187,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ## 📊 Documentation by Role
 
 ### 👨‍💻 **Software Developer**
+
 ```
 1. /guides/development-setup.md
 2. /architecture/cross-platform-system.md
@@ -182,6 +197,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ```
 
 ### ☁️ **DevOps Engineer**
+
 ```
 1. /deployment/aws-infrastructure.md
 2. /ci-cd/ci-system-documentation.md
@@ -191,6 +207,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ```
 
 ### 📱 **Mobile Developer**
+
 ```
 1. /mobile/android-build-setup.md
 2. /architecture/cross-platform-system.md
@@ -200,6 +217,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ```
 
 ### 🌐 **Web Developer**
+
 ```
 1. /web/web-build-configurations.md
 2. /architecture/cross-platform-system.md
@@ -209,6 +227,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ```
 
 ### 🧪 **QA Engineer**
+
 ```
 1. /build-and-tooling/e2e-testing-migration.md
 2. /build-and-tooling/jest-changed-files-config.md
@@ -217,6 +236,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ```
 
 ### 🏗️ **Platform Engineer**
+
 ```
 1. /build-and-tooling/nx-cloud-optimization-strategy.md
 2. /ci-cd/
@@ -230,47 +250,50 @@ This document provides a bird's-eye view of the entire documentation structure a
 
 ### By Topic
 
-| Topic | Location |
-|-------|----------|
-| AWS Setup | `/deployment/aws-infrastructure.md` |
-| Authentication | `/authentication/` |
+| Topic             | Location                                               |
+| ----------------- | ------------------------------------------------------ |
+| AWS Setup         | `/deployment/aws-infrastructure.md`                    |
+| Authentication    | `/authentication/`                                     |
 | Build Performance | `/build-and-tooling/nx-cloud-optimization-strategy.md` |
-| CI/CD Pipeline | `/ci-cd/ci-system-documentation.md` |
-| Cross-Platform | `/architecture/cross-platform-system.md` |
-| Database Schema | `/architecture/database-schema.md` |
-| Deployment | `/deployment/` |
-| Development Setup | `/guides/development-setup.md` |
-| Docker | `/deployment/aws-infrastructure.md` |
-| GitHub Actions | `/ci-cd/` |
-| GraphQL | `/architecture/graphql-integration.md` |
-| Jest Testing | `/build-and-tooling/jest-changed-files-config.md` |
-| Lambda Functions | `/deployment/lambda-build-strategy.md` |
-| Mobile Builds | `/mobile/` |
-| Nx Cloud | `/build-and-tooling/` (all nx-* files) |
-| OAuth | `/authentication/` |
-| React Native | `/mobile/` |
-| Security | `/security/` |
-| Terraform | `/deployment/terraform/` |
-| Troubleshooting | `/guides/troubleshooting.md` |
-| TypeScript | `/architecture/` |
-| Web App | `/web/` |
+| CI/CD Pipeline    | `/ci-cd/ci-system-documentation.md`                    |
+| Cross-Platform    | `/architecture/cross-platform-system.md`               |
+| Database Schema   | `/architecture/database-schema.md`                     |
+| Deployment        | `/deployment/`                                         |
+| Development Setup | `/guides/development-setup.md`                         |
+| Docker            | `/deployment/aws-infrastructure.md`                    |
+| GitHub Actions    | `/ci-cd/`                                              |
+| GraphQL           | `/architecture/graphql-integration.md`                 |
+| Jest Testing      | `/build-and-tooling/jest-changed-files-config.md`      |
+| Lambda Functions  | `/deployment/lambda-build-strategy.md`                 |
+| Mobile Builds     | `/mobile/`                                             |
+| Nx Cloud          | `/build-and-tooling/` (all nx-\* files)                |
+| OAuth             | `/authentication/`                                     |
+| React Native      | `/mobile/`                                             |
+| Security          | `/security/`                                           |
+| Terraform         | `/deployment/terraform/`                               |
+| Troubleshooting   | `/guides/troubleshooting.md`                           |
+| TypeScript        | `/architecture/`                                       |
+| Web App           | `/web/`                                                |
 
 ---
 
 ## 📈 Documentation Maturity
 
 ### ✅ **Mature & Complete**
+
 - Development guides (`/guides/`)
 - Architecture documentation (`/architecture/`)
 - CI/CD system (`/ci-cd/`)
 - Authentication system (`/authentication/`)
 
 ### 🚧 **In Progress**
+
 - API documentation (`/api/`)
 - Deployment runbooks (`/deployment/`)
 - Security scanning (`/security/`)
 
 ### 📝 **Planned**
+
 - Architecture Decision Records (ADRs)
 - Component library documentation
 - Performance optimization guides
@@ -281,6 +304,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ## 🎯 Common Tasks
 
 ### "I need to deploy a Lambda function"
+
 ```
 1. /deployment/lambda-build-strategy.md
 2. /deployment/terraform/terraform-lambda-deployment.md
@@ -288,6 +312,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ```
 
 ### "I need to set up OAuth"
+
 ```
 1. /authentication/oauth-auto-provisioning.md
 2. /authentication/CLI_OAUTH_AUTHENTICATION.md
@@ -295,6 +320,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ```
 
 ### "CI is failing"
+
 ```
 1. /ci-cd/ci-troubleshooting-guide.md
 2. /ci-cd/ci-system-documentation.md
@@ -302,6 +328,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ```
 
 ### "I need to optimize build times"
+
 ```
 1. /build-and-tooling/nx-cloud-optimization-strategy.md
 2. /build-and-tooling/intelligent-dte-detection.md
@@ -309,6 +336,7 @@ This document provides a bird's-eye view of the entire documentation structure a
 ```
 
 ### "Setting up a new developer"
+
 ```
 1. /guides/development-setup.md
 2. /guides/authentication-guide.md
@@ -347,4 +375,4 @@ This document provides a bird's-eye view of the entire documentation structure a
 
 ---
 
-*Last updated: February 28, 2026*
+_Last updated: February 28, 2026_

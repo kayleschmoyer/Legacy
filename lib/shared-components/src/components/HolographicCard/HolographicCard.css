@@ -19,16 +19,16 @@
     rgba(20, 20, 30, 0.9) 50%,
     rgba(0, 0, 0, 0.8) 100%
   );
-  
+
   /* Initial animation */
   animation: holographic-entrance 0.8s ease-out var(--animation-delay, 0ms);
   animation-fill-mode: both;
-  
+
   /* Performance optimizations */
   transform: translateZ(0);
   will-change: transform, filter;
   backface-visibility: hidden;
-  
+
   /* Ensure effects stay within bounds */
   overflow: hidden;
 }
@@ -59,12 +59,12 @@
   background-size: 300% 300%;
   opacity: 0;
   animation: none;
-  -webkit-mask: 
-    linear-gradient(#fff 0 0) content-box, 
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
-  mask: 
-    linear-gradient(#fff 0 0) content-box, 
+  mask:
+    linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
   mask-composite: exclude;
   pointer-events: none;
@@ -98,19 +98,21 @@
 
 /* Rainbow variant */
 .holographic-card--rainbow {
-  background: 
-    radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
-      rgba(255, 0, 128, 0.1) 0%, 
-      transparent 50%),
-    linear-gradient(135deg, 
-      rgba(128, 0, 255, 0.1) 0%, 
+  background:
+    radial-gradient(
+      circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+      rgba(255, 0, 128, 0.1) 0%,
+      transparent 50%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(128, 0, 255, 0.1) 0%,
       rgba(0, 128, 255, 0.1) 25%,
       rgba(0, 255, 128, 0.1) 50%,
       rgba(255, 128, 0, 0.1) 75%,
-      rgba(255, 0, 128, 0.1) 100%),
-    linear-gradient(45deg, 
-      rgba(0, 0, 0, 0.8) 0%, 
-      rgba(20, 20, 30, 0.9) 100%);
+      rgba(255, 0, 128, 0.1) 100%
+    ),
+    linear-gradient(45deg, rgba(0, 0, 0, 0.8) 0%, rgba(20, 20, 30, 0.9) 100%);
   backdrop-filter: blur(10px) saturate(180%);
   -webkit-backdrop-filter: blur(10px) saturate(180%);
 }
@@ -129,22 +131,26 @@
     #ff0040 360deg
   );
   background-size: 200% 200%;
-  animation: holographic-rotate 4s linear infinite, holographic-pulse 2s ease-in-out infinite;
+  animation:
+    holographic-rotate 4s linear infinite,
+    holographic-pulse 2s ease-in-out infinite;
 }
 
 /* Chrome variant */
 .holographic-card--chrome {
-  background: 
-    radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
-      rgba(200, 200, 255, 0.1) 0%, 
-      transparent 50%),
-    linear-gradient(135deg, 
-      rgba(180, 180, 200, 0.1) 0%, 
+  background:
+    radial-gradient(
+      circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+      rgba(200, 200, 255, 0.1) 0%,
+      transparent 50%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(180, 180, 200, 0.1) 0%,
       rgba(220, 220, 240, 0.05) 50%,
-      rgba(180, 180, 200, 0.1) 100%),
-    linear-gradient(45deg, 
-      rgba(0, 0, 0, 0.85) 0%, 
-      rgba(30, 30, 40, 0.9) 100%);
+      rgba(180, 180, 200, 0.1) 100%
+    ),
+    linear-gradient(45deg, rgba(0, 0, 0, 0.85) 0%, rgba(30, 30, 40, 0.9) 100%);
 }
 
 .holographic-card--chrome::before {
@@ -163,15 +169,19 @@
 
 /* Aurora variant */
 .holographic-card--aurora {
-  background: 
-    radial-gradient(ellipse at var(--mouse-x, 50%) var(--mouse-y, 50%), 
-      rgba(0, 255, 150, 0.15) 0%, 
+  background:
+    radial-gradient(
+      ellipse at var(--mouse-x, 50%) var(--mouse-y, 50%),
+      rgba(0, 255, 150, 0.15) 0%,
       rgba(100, 200, 255, 0.1) 30%,
       rgba(150, 100, 255, 0.1) 60%,
-      transparent 80%),
-    linear-gradient(135deg, 
-      rgba(0, 20, 40, 0.9) 0%, 
-      rgba(10, 30, 50, 0.85) 100%);
+      transparent 80%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(0, 20, 40, 0.9) 0%,
+      rgba(10, 30, 50, 0.85) 100%
+    );
 }
 
 .holographic-card--aurora::before {
@@ -294,7 +304,8 @@
 }
 
 @keyframes holographic-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.6;
     transform: scale(1);
   }
@@ -319,7 +330,8 @@
 }
 
 @keyframes holographic-aurora {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 0%;
     filter: hue-rotate(0deg) saturate(100%);
   }

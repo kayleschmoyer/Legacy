@@ -12,7 +12,11 @@ This package provides reusable UI primitives and hooks for working with player d
 The projection helpers pair career averages with scoring profiles to calculate estimated fantasy production. They accept any `PlayerFragment` collection and a `Map` of `PlayerCareerStats`. All multipliers default to the baseline values provided by `@legacy-sports/scoring`, but consumers can supply overrides for custom leagues.
 
 ```ts
-const { projections } = usePlayerProjections(players, careerStats, scoringOverrides);
+const { projections } = usePlayerProjections(
+  players,
+  careerStats,
+  scoringOverrides,
+);
 const formatted = formatProjection(projections.get(playerId));
 ```
 

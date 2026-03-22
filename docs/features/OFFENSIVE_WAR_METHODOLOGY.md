@@ -101,24 +101,24 @@ run-value components into wins.
 
 ## Data Sources
 
-| Table | Rows | Source | Loaded By |
-|---|---|---|---|
-| `woba_season_weights` | 155 | FanGraphs (1871–2025) | `load-woba-weights` CLI command |
-| `park_factors` | 2,934 | Baseball Reference BPF | `load-br-park-factors` CLI command |
-| `positional_adjustments` | 155 | Baseball Reference | `load-positional-adjustments` CLI command |
+| Table                    | Rows  | Source                 | Loaded By                                 |
+| ------------------------ | ----- | ---------------------- | ----------------------------------------- |
+| `woba_season_weights`    | 155   | FanGraphs (1871–2025)  | `load-woba-weights` CLI command           |
+| `park_factors`           | 2,934 | Baseball Reference BPF | `load-br-park-factors` CLI command        |
+| `positional_adjustments` | 155   | Baseball Reference     | `load-positional-adjustments` CLI command |
 
 ---
 
 ## Known Deviations from Baseball Reference
 
-| Component | BR Approach | Our Approach | Impact |
-|---|---|---|---|
-| **Rdp** (double play runs) | Play-by-play DP opportunity data | Omitted | ~0–2 career WAR for slow power hitters |
-| **Rbaser** (baserunning beyond SB) | Play-by-play: advancing on hits, outs on bases | Omitted | ~±1–3 career WAR |
-| **Rrep granularity** | Varies slightly by league/season | Fixed 20.5 per 600 PA | Minor |
-| **wOBA weights source** | BR-computed | FanGraphs-sourced | < 0.001 per weight |
-| **OF fallback** | Distinct LF/CF/RF for all eras | Uses LF value when only "OF" summary exists | Slightly penalizes CF-primary players in early eras |
-| **Multi-team park factor** | Exact PA splits per park | PA-weighted team BPF | Small; only differs for mid-season trades |
+| Component                          | BR Approach                                    | Our Approach                                | Impact                                              |
+| ---------------------------------- | ---------------------------------------------- | ------------------------------------------- | --------------------------------------------------- |
+| **Rdp** (double play runs)         | Play-by-play DP opportunity data               | Omitted                                     | ~0–2 career WAR for slow power hitters              |
+| **Rbaser** (baserunning beyond SB) | Play-by-play: advancing on hits, outs on bases | Omitted                                     | ~±1–3 career WAR                                    |
+| **Rrep granularity**               | Varies slightly by league/season               | Fixed 20.5 per 600 PA                       | Minor                                               |
+| **wOBA weights source**            | BR-computed                                    | FanGraphs-sourced                           | < 0.001 per weight                                  |
+| **OF fallback**                    | Distinct LF/CF/RF for all eras                 | Uses LF value when only "OF" summary exists | Slightly penalizes CF-primary players in early eras |
+| **Multi-team park factor**         | Exact PA splits per park                       | PA-weighted team BPF                        | Small; only differs for mid-season trades           |
 
 ### Why These Deviations Exist
 
@@ -154,11 +154,11 @@ league_rpa → combined_rpa → league_sb → team_season_batting → season_tot
 
 ## Migration History
 
-| Migration | Description |
-|---|---|
-| `20260226_040000_woba_season_weights.ts` | Add `woba_season_weights` table, rewrite view with wRAA formula |
-| `20260226_050000_league_adjusted_owar.ts` | Add league adjustment component |
-| `20260226_060000_br_park_factors.ts` | Switch from FanGraphs to BR park factors |
-| `20260226_070000_positional_adjustments.ts` | Add year-specific positional adjustments, /150 proration, 20.5 replacement |
-| `20260226_080000_league_relative_wsb.ts` | Switch BsR from absolute to league-relative wSB |
-| `20260226_090000_innings_based_positional_adj.ts` | Switch positional proration from games to innings |
+| Migration                                         | Description                                                                |
+| ------------------------------------------------- | -------------------------------------------------------------------------- |
+| `20260226_040000_woba_season_weights.ts`          | Add `woba_season_weights` table, rewrite view with wRAA formula            |
+| `20260226_050000_league_adjusted_owar.ts`         | Add league adjustment component                                            |
+| `20260226_060000_br_park_factors.ts`              | Switch from FanGraphs to BR park factors                                   |
+| `20260226_070000_positional_adjustments.ts`       | Add year-specific positional adjustments, /150 proration, 20.5 replacement |
+| `20260226_080000_league_relative_wsb.ts`          | Switch BsR from absolute to league-relative wSB                            |
+| `20260226_090000_innings_based_positional_adj.ts` | Switch positional proration from games to innings                          |

@@ -55,7 +55,10 @@ export function useTeamMemberProjections(
   const players = useMemo(() => buildPlayers(teamMembers), [teamMembers]);
 
   const playerIds = useMemo(
-    () => players.map((player) => player.id).filter((id): id is number => typeof id === 'number'),
+    () =>
+      players
+        .map((player) => player.id)
+        .filter((id): id is number => typeof id === 'number'),
     [players],
   );
 

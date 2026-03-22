@@ -6,7 +6,10 @@ interface AccessibilitySettingsProps {
   onChange: (mode: boolean) => void;
 }
 
-export const AccessibilitySettings: React.FC<AccessibilitySettingsProps> = ({ mode, onChange }) => {
+export const AccessibilitySettings: React.FC<AccessibilitySettingsProps> = ({
+  mode,
+  onChange,
+}) => {
   return (
     <Button size="$3" onPress={() => onChange(!mode)}>
       <Text>{mode ? 'Disable' : 'Enable'} Accessibility</Text>

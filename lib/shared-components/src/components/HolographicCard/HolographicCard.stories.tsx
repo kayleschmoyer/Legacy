@@ -51,9 +51,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // Sample content component
-const CardContent = ({ title, subtitle, showButton = false }: { 
-  title: string; 
-  subtitle: string; 
+const CardContent = ({
+  title,
+  subtitle,
+  showButton = false,
+}: {
+  title: string;
+  subtitle: string;
   showButton?: boolean;
 }) => (
   <YStack padding="$6" gap="$4" minHeight={200} justifyContent="space-between">
@@ -75,7 +79,10 @@ const CardContent = ({ title, subtitle, showButton = false }: {
         fontWeight="600"
         marginTop="$3"
       >
-        <span role="img" aria-label="Sparkles">✨</span> Interact
+        <span role="img" aria-label="Sparkles">
+          ✨
+        </span>{' '}
+        Interact
       </Button>
     )}
   </YStack>
@@ -90,10 +97,10 @@ export const Rainbow: Story = {
   },
   render: (args) => (
     <HolographicCard {...args} style={{ width: 320, height: 240 }}>
-      <CardContent 
-        title="Rainbow Holographic" 
-        subtitle="Beautiful rainbow effects with mouse tracking and smooth animations" 
-        showButton 
+      <CardContent
+        title="Rainbow Holographic"
+        subtitle="Beautiful rainbow effects with mouse tracking and smooth animations"
+        showButton
       />
     </HolographicCard>
   ),
@@ -108,10 +115,10 @@ export const Chrome: Story = {
   },
   render: (args) => (
     <HolographicCard {...args} style={{ width: 320, height: 240 }}>
-      <CardContent 
-        title="Chrome Finish" 
-        subtitle="Metallic chrome effect with subtle reflections" 
-        showButton 
+      <CardContent
+        title="Chrome Finish"
+        subtitle="Metallic chrome effect with subtle reflections"
+        showButton
       />
     </HolographicCard>
   ),
@@ -126,10 +133,10 @@ export const Aurora: Story = {
   },
   render: (args) => (
     <HolographicCard {...args} style={{ width: 320, height: 240 }}>
-      <CardContent 
-        title="Aurora Borealis" 
-        subtitle="Northern lights inspired with flowing colors" 
-        showButton 
+      <CardContent
+        title="Aurora Borealis"
+        subtitle="Northern lights inspired with flowing colors"
+        showButton
       />
     </HolographicCard>
   ),
@@ -138,13 +145,25 @@ export const Aurora: Story = {
 export const IntensityComparison: Story = {
   render: () => (
     <XStack gap="$4" flexWrap="wrap">
-      <HolographicCard variant="rainbow" intensity="subtle" style={{ width: 280, height: 200 }}>
+      <HolographicCard
+        variant="rainbow"
+        intensity="subtle"
+        style={{ width: 280, height: 200 }}
+      >
         <CardContent title="Subtle" subtitle="Gentle holographic effects" />
       </HolographicCard>
-      <HolographicCard variant="rainbow" intensity="normal" style={{ width: 280, height: 200 }}>
+      <HolographicCard
+        variant="rainbow"
+        intensity="normal"
+        style={{ width: 280, height: 200 }}
+      >
         <CardContent title="Normal" subtitle="Balanced holographic effects" />
       </HolographicCard>
-      <HolographicCard variant="rainbow" intensity="intense" style={{ width: 280, height: 200 }}>
+      <HolographicCard
+        variant="rainbow"
+        intensity="intense"
+        style={{ width: 280, height: 200 }}
+      >
         <CardContent title="Intense" subtitle="Maximum holographic effects" />
       </HolographicCard>
     </XStack>
@@ -170,16 +189,32 @@ export const VariantShowcase: Story = {
 export const AnimationDelays: Story = {
   render: () => (
     <XStack gap="$4" flexWrap="wrap">
-      <HolographicCard variant="rainbow" animationDelay={0} style={{ width: 200, height: 150 }}>
+      <HolographicCard
+        variant="rainbow"
+        animationDelay={0}
+        style={{ width: 200, height: 150 }}
+      >
         <CardContent title="No Delay" subtitle="Immediate" />
       </HolographicCard>
-      <HolographicCard variant="rainbow" animationDelay={200} style={{ width: 200, height: 150 }}>
+      <HolographicCard
+        variant="rainbow"
+        animationDelay={200}
+        style={{ width: 200, height: 150 }}
+      >
         <CardContent title="200ms" subtitle="Slight delay" />
       </HolographicCard>
-      <HolographicCard variant="rainbow" animationDelay={400} style={{ width: 200, height: 150 }}>
+      <HolographicCard
+        variant="rainbow"
+        animationDelay={400}
+        style={{ width: 200, height: 150 }}
+      >
         <CardContent title="400ms" subtitle="More delay" />
       </HolographicCard>
-      <HolographicCard variant="rainbow" animationDelay={600} style={{ width: 200, height: 150 }}>
+      <HolographicCard
+        variant="rainbow"
+        animationDelay={600}
+        style={{ width: 200, height: 150 }}
+      >
         <CardContent title="600ms" subtitle="Staggered" />
       </HolographicCard>
     </XStack>
@@ -195,10 +230,18 @@ export const Interactive: Story = {
   },
   render: (args) => (
     <HolographicCard {...args} style={{ width: 350, height: 260 }}>
-      <YStack padding="$6" gap="$4" minHeight={200} justifyContent="space-between">
+      <YStack
+        padding="$6"
+        gap="$4"
+        minHeight={200}
+        justifyContent="space-between"
+      >
         <YStack gap="$2">
           <H3 color="$color" fontSize="$8" fontWeight="800">
-            <span role="img" aria-label="Game controller">🎮</span> Interactive Card
+            <span role="img" aria-label="Game controller">
+              🎮
+            </span>{' '}
+            Interactive Card
           </H3>
           <Paragraph color="$color11" fontSize="$4" opacity={0.9}>
             Click me to see the interaction! Hover for mouse tracking effects.
@@ -243,38 +286,47 @@ export const Playground: Story = {
       <YStack padding="$6" gap="$4" flex={1} justifyContent="space-between">
         <YStack gap="$3">
           <H3 color="$color" fontSize="$8" fontWeight="800">
-            <span role="img" aria-label="Rainbow">🌈</span> Playground
+            <span role="img" aria-label="Rainbow">
+              🌈
+            </span>{' '}
+            Playground
           </H3>
           <Paragraph color="$color11" fontSize="$4" opacity={0.9}>
-            Adjust the controls above to customize the holographic effects. 
-            Move your mouse around to see the interactive tracking!
+            Adjust the controls above to customize the holographic effects. Move
+            your mouse around to see the interactive tracking!
           </Paragraph>
           <Paragraph color="$color10" fontSize="$3" opacity={0.7}>
             Variant: {args.variant} • Intensity: {args.intensity}
           </Paragraph>
         </YStack>
         <XStack gap="$2" justifyContent="center">
-          <div style={{
-            width: 12,
-            height: 12,
-            borderRadius: '50%',
-            background: 'linear-gradient(45deg, #ff0080, #0080ff)',
-            animation: 'pulse 2s infinite'
-          }} />
-          <div style={{
-            width: 12,
-            height: 12,
-            borderRadius: '50%',
-            background: 'linear-gradient(45deg, #00ff80, #ff8000)',
-            animation: 'pulse 2s infinite 0.2s'
-          }} />
-          <div style={{
-            width: 12,
-            height: 12,
-            borderRadius: '50%',
-            background: 'linear-gradient(45deg, #8000ff, #ff0040)',
-            animation: 'pulse 2s infinite 0.4s'
-          }} />
+          <div
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              background: 'linear-gradient(45deg, #ff0080, #0080ff)',
+              animation: 'pulse 2s infinite',
+            }}
+          />
+          <div
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              background: 'linear-gradient(45deg, #00ff80, #ff8000)',
+              animation: 'pulse 2s infinite 0.2s',
+            }}
+          />
+          <div
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              background: 'linear-gradient(45deg, #8000ff, #ff0040)',
+              animation: 'pulse 2s infinite 0.4s',
+            }}
+          />
         </XStack>
       </YStack>
     </HolographicCard>

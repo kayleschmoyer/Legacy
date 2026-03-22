@@ -1,1 +1,5 @@
-export { HolographicCard as default, HolographicCard, type HolographicCardProps } from './HolographicCard';
+export {
+  HolographicCard as default,
+  HolographicCard,
+  type HolographicCardProps,
+} from './HolographicCard';

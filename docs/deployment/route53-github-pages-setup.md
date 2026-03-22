@@ -13,6 +13,7 @@ This guide covers setting up a custom domain with AWS Route 53 and pointing it t
 Your web application is currently deployed to GitHub Pages automatically via CI/CD. We'll configure DNS to point your custom domain to this deployment.
 
 **Architecture:**
+
 ```
 Custom Domain (Route 53)
     ↓
@@ -71,7 +72,6 @@ After DNS records are created:
 
 1. **Go to GitHub Repository Settings:**
    - Navigate to: `https://github.com/bkrupa/legacy-sports/settings/pages`
-   
 2. **Set Custom Domain:**
    - Enter your domain: `yourdomain.com`
    - Click "Save"
@@ -114,6 +114,7 @@ nslookup api.yourdomain.com
 ```
 
 **Browser test:**
+
 - Visit `https://yourdomain.com` - Should load your web app
 - Visit `https://www.yourdomain.com` - Should redirect to apex domain
 - Check SSL certificate is valid (green padlock)
@@ -126,12 +127,12 @@ nslookup api.yourdomain.com
 
 ## 🔧 DNS Records Created
 
-| Record Type | Name | Value | Purpose |
-|-------------|------|-------|---------|
-| A | @ | 185.199.108-111.153 | GitHub Pages apex domain |
-| CNAME | www | bkrupa.github.io | WWW subdomain |
-| CNAME | api | <api-gateway-id>.execute-api.us-east-1.amazonaws.com | Custom API domain |
-| CAA | @ | letsencrypt.org | SSL certificate authorization |
+| Record Type | Name | Value                                                | Purpose                       |
+| ----------- | ---- | ---------------------------------------------------- | ----------------------------- |
+| A           | @    | 185.199.108-111.153                                  | GitHub Pages apex domain      |
+| CNAME       | www  | bkrupa.github.io                                     | WWW subdomain                 |
+| CNAME       | api  | <api-gateway-id>.execute-api.us-east-1.amazonaws.com | Custom API domain             |
+| CAA         | @    | letsencrypt.org                                      | SSL certificate authorization |
 
 ## 🎨 Advanced Options
 
@@ -197,6 +198,7 @@ For improved global performance, add CloudFront in front of GitHub Pages:
 **Issue:** `nslookup` doesn't return GitHub Pages IPs
 
 **Solutions:**
+
 1. Wait 5-60 minutes for DNS propagation
 2. Check name servers match in Route 53 and domain registrar:
    ```powershell
@@ -209,6 +211,7 @@ For improved global performance, add CloudFront in front of GitHub Pages:
 **Issue:** GitHub says "DNS check unsuccessful"
 
 **Solutions:**
+
 1. Ensure DNS records are applied: `terraform apply`
 2. Wait for DNS propagation
 3. Remove and re-add custom domain in GitHub settings
@@ -219,6 +222,7 @@ For improved global performance, add CloudFront in front of GitHub Pages:
 **Issue:** "Not secure" warning in browser
 
 **Solutions:**
+
 1. Ensure HTTPS is enforced in GitHub Pages settings
 2. Check CAA records allow `letsencrypt.org`
 3. Wait 15-60 minutes for certificate provisioning
@@ -229,18 +233,19 @@ For improved global performance, add CloudFront in front of GitHub Pages:
 **Issue:** `api.yourdomain.com` returns error
 
 **Solutions:**
+
 1. Verify API Gateway is deployed: `terraform apply`
 2. Check CNAME record points to correct API Gateway endpoint
 3. Test direct API Gateway URL first: `https://<api-id>.execute-api.us-east-1.amazonaws.com/dev/graphql`
 
 ## 💰 Cost Estimate
 
-| Service | Cost | Notes |
-|---------|------|-------|
-| Route 53 Hosted Zone | $0.50/month | Per hosted zone |
-| Route 53 Queries | $0.40/million | First billion queries |
-| Domain Registration | $12-50/year | Varies by TLD (.com, .io, etc.) |
-| **Total Monthly** | **~$1-2** | Plus annual domain cost |
+| Service              | Cost          | Notes                           |
+| -------------------- | ------------- | ------------------------------- |
+| Route 53 Hosted Zone | $0.50/month   | Per hosted zone                 |
+| Route 53 Queries     | $0.40/million | First billion queries           |
+| Domain Registration  | $12-50/year   | Varies by TLD (.com, .io, etc.) |
+| **Total Monthly**    | **~$1-2**     | Plus annual domain cost         |
 
 GitHub Pages is free for public repos!
 
@@ -282,6 +287,7 @@ GitHub Pages is free for public repos!
 ---
 
 **Need Help?**
+
 - Check Terraform outputs: `terraform output`
 - View Route 53 console: https://console.aws.amazon.com/route53/
 - GitHub Pages settings: https://github.com/bkrupa/legacy-sports/settings/pages

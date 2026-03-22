@@ -1,9 +1,11 @@
 # Google OAuth Domain Configuration for One Tap
 
 ## Problem
+
 Google One Tap authentication not displaying on deployed site `legacy-fantasy.com`
 
 ## Root Cause
+
 Google Identity Services (GSI) One Tap requires all domains to be explicitly authorized in Google Cloud Console.
 
 ## Solution
@@ -19,12 +21,14 @@ Google Identity Services (GSI) One Tap requires all domains to be explicitly aut
    - Click to edit
 
 3. **Add Authorized JavaScript Origins:**
+
    ```
    https://legacy-fantasy.com
    https://www.legacy-fantasy.com
    ```
 
 4. **Add Authorized Redirect URIs (optional for callback flow):**
+
    ```
    https://legacy-fantasy.com/oauth-callback.html
    https://www.legacy-fantasy.com/oauth-callback.html
@@ -35,21 +39,25 @@ Google Identity Services (GSI) One Tap requires all domains to be explicitly aut
 ### 2. Verify Configuration
 
 #### Check Browser Console
+
 Open DevTools on your deployed site and look for:
 
 **Success indicators:**
+
 ```
 WebOAuthProvider.signIn() called - using Google Identity Services authorization code flow
 One Tap initialized successfully
 ```
 
 **Error indicators:**
+
 ```
 [GSI] Not a valid origin for the client
 [GSI] Unauthorized domain
 ```
 
 #### Test One Tap Display
+
 1. Clear browser cache
 2. Visit `https://legacy-fantasy.com`
 3. One Tap should appear within 1-2 seconds on page load
@@ -57,13 +65,16 @@ One Tap initialized successfully
 ### 3. Common Issues & Solutions
 
 #### One Tap Not Appearing
+
 **Possible reasons:**
+
 - Domain not yet propagated (wait 10 minutes after adding)
 - User previously dismissed One Tap on this domain (cooldown period)
 - Browser blocking third-party cookies
 - User not signed into any Google accounts in browser
 
 **Debug steps:**
+
 ```javascript
 // Run in browser console on your site:
 console.log('Current hostname:', window.location.hostname);
@@ -71,6 +82,7 @@ console.log('GSI loaded:', !!window.google?.accounts);
 ```
 
 #### FedCM Errors
+
 If you see `dismissed_moment_fedcm_disabled`, this is normal and handled gracefully. The code automatically disables FedCM for localhost but keeps it enabled for production domains.
 
 ### 4. Environment Variables
@@ -78,24 +90,28 @@ If you see `dismissed_moment_fedcm_disabled`, this is normal and handled gracefu
 Ensure your build has the correct Google Client ID:
 
 **In `.env` or build configuration:**
+
 ```bash
 VITE_GOOGLE_CLIENT_ID=1025244625243-dpatg6bbda3g86sipjr6eis4olnp6rc3.apps.googleusercontent.com
 ```
 
 **Verify in deployed build:**
+
 ```javascript
 // Check in browser console:
-import.meta.env.VITE_GOOGLE_CLIENT_ID
+import.meta.env.VITE_GOOGLE_CLIENT_ID;
 ```
 
 ### 5. Code References
 
 The One Tap initialization happens in:
+
 - `lib/shared-components/src/platform-components/web/WebOAuthProvider.ts`
   - Line 197-270: `initializeOneTap()` method
   - Line 117-134: Configuration on page load
 
 The configuration is set in:
+
 - `apps/web/src/config/environment.ts` - Environment config
 - `apps/web/src/main.tsx` - App initialization with OAuth config
 
@@ -147,6 +163,7 @@ terraform apply
 ```
 
 **Required DNS Records:**
+
 - ✅ **A records** pointing to GitHub Pages IPs (185.199.108-111.153)
 - ✅ **CAA records** allowing Let's Encrypt to issue certificates
 - ✅ **CNAME for www** (optional but recommended)
@@ -154,21 +171,25 @@ terraform apply
 ### Troubleshooting HTTPS
 
 **"DNS check unsuccessful" in GitHub Pages:**
+
 - Wait 15-30 minutes for DNS propagation
 - Verify DNS with: `nslookup legacy-fantasy.com`
 - Should return: 185.199.108.153 (or similar GitHub IP)
 
 **"Certificate error" or "Not secure" warning:**
+
 - Ensure "Enforce HTTPS" is checked in GitHub settings
 - Wait 15-60 minutes after enabling HTTPS
 - Certificate provisioning can take time
 - Try clearing browser cache
 
 **"Mixed content" errors:**
+
 - All resources (scripts, images) must load over HTTPS
 - Check browser console for mixed content warnings
 
 **DNS configured but certificate still invalid:**
+
 1. Remove custom domain from GitHub Pages
 2. Wait 5 minutes
 3. Re-add domain and save
@@ -194,12 +215,12 @@ nslookup -type=CAA legacy-fantasy.com
 
 ### Timeline Expectations
 
-| Step | Time Required |
-|------|--------------|
-| DNS propagation | 5-30 minutes |
-| GitHub DNS check | 5-15 minutes |
-| Certificate provisioning | 15-60 minutes |
-| **Total** | **30-90 minutes** |
+| Step                     | Time Required     |
+| ------------------------ | ----------------- |
+| DNS propagation          | 5-30 minutes      |
+| GitHub DNS check         | 5-15 minutes      |
+| Certificate provisioning | 15-60 minutes     |
+| **Total**                | **30-90 minutes** |
 
 **Important:** Google One Tap will NOT work until HTTPS is properly configured with a valid certificate!
 
@@ -213,7 +234,7 @@ const authConfig: OAuthConfig = {
   googleClientId: env.googleClientId,
   oauthProxyUrl: env.oauthProxyUrl,
   gsi: {
-    oneTap: false,  // Disable One Tap
+    oneTap: false, // Disable One Tap
   },
 };
 ```
@@ -226,8 +247,10 @@ For local development, One Tap automatically disables FedCM to avoid token retri
 
 ```typescript
 // This is already in the code:
-if (window.location.hostname === 'localhost' || 
-    window.location.hostname === '127.0.0.1') {
+if (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1'
+) {
   gsiConfig.use_fedcm_for_prompt = false;
 }
 ```
@@ -235,15 +258,16 @@ if (window.location.hostname === 'localhost' ||
 ### 9. Monitoring & Logs
 
 **Client-side logs to watch:**
+
 ```javascript
 // Success:
-"One Tap initialized successfully"
+'One Tap initialized successfully';
 
 // Dismissal (normal):
-"One Tap dismissed: dismissed_moment_*"
+'One Tap dismissed: dismissed_moment_*';
 
 // Failure (requires attention):
-"Failed to initialize One Tap: ..."
+'Failed to initialize One Tap: ...';
 ```
 
 **Server-side (OAuth Proxy Lambda):**

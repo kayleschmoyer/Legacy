@@ -7,6 +7,7 @@
 Added path filters to only trigger security scans when relevant files change:
 
 **Pull Requests:**
+
 - `package*.json` - Dependency manifests
 - `**/package.json` - Workspace package files
 - `apps/**/*.{ts,tsx,js,jsx}` - Application code
@@ -18,9 +19,11 @@ Added path filters to only trigger security scans when relevant files change:
 - `.npmrc` - NPM configuration
 
 **Main/Develop Branch:**
+
 - Same paths (ensures comprehensive scanning on merges)
 
 **Weekly Schedule:**
+
 - Runs unconditionally (safety net)
 
 ### 2. Skip CodeQL on PRs (20-minute time save)
@@ -32,6 +35,7 @@ Modified the SAST scan job to skip CodeQL analysis on PR events:
 - ✅ **Weekly Scans**: Run full CodeQL analysis
 
 **Jobs Modified:**
+
 - "🛡️ CodeQL Analysis Setup" - Added condition: `if: github.event_name != 'pull_request'`
 - "📦 Build for Analysis" - Added condition: `if: github.event_name != 'pull_request'`
 - "🔍 Perform CodeQL Analysis" - Added condition: `if: github.event_name != 'pull_request'`
@@ -40,45 +44,52 @@ Modified the SAST scan job to skip CodeQL analysis on PR events:
 
 ## 📊 Performance Impact
 
-| Scenario | Before | After | Time Saved |
-|----------|--------|-------|------------|
-| PR (docs only) | 43 min | 0 min (skipped) | **100%** |
-| PR (code changes) | 43 min | ~5-8 min | **85%** |
-| Main branch push | 43 min | ~15 min | **65%** |
-| Weekly scan | 43 min | ~43 min | 0% (unchanged) |
+| Scenario          | Before | After           | Time Saved     |
+| ----------------- | ------ | --------------- | -------------- |
+| PR (docs only)    | 43 min | 0 min (skipped) | **100%**       |
+| PR (code changes) | 43 min | ~5-8 min        | **85%**        |
+| Main branch push  | 43 min | ~15 min         | **65%**        |
+| Weekly scan       | 43 min | ~43 min         | 0% (unchanged) |
 
 ## 🎯 What Still Runs on PRs
 
 ✅ **Secret Detection** (fast, critical)
+
 - GitLeaks scan
 - Manual pattern detection
 - ~3-5 minutes
 
 ✅ **Dependency Scanning** (fast, important)
+
 - npm audit
 - Snyk vulnerability scan
 - ~5-8 minutes
 
 ✅ **ESLint Security Rules** (fast, helpful)
+
 - Security-focused linting
 - ~1-2 minutes
 
 ❌ **CodeQL** (slow, run on main + weekly)
+
 - Skipped on PRs
 - Saves ~20 minutes
 
 ## 🔒 Security Coverage Maintained
 
 ✅ Every PR gets:
+
 - Secret detection
 - Dependency vulnerability scanning
 - ESLint security rules
 
 ✅ Every merge to main gets:
+
 - Full CodeQL SAST analysis
 - All PR checks plus comprehensive code analysis
 
 ✅ Every week gets:
+
 - Complete comprehensive scan
 - Safety net for anything missed
 

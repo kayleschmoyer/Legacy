@@ -7,6 +7,7 @@ Your site shows an **invalid certificate error** because GitHub Pages hasn't pro
 ## Why GitHub Pages for HTTPS?
 
 GitHub Pages provides **free, automatic HTTPS** using Let's Encrypt certificates:
+
 - ✅ **Free SSL certificates** (auto-renewed every 90 days)
 - ✅ **Automatic provisioning** (no manual certificate management)
 - ✅ **Zero configuration** (works out of the box)
@@ -50,6 +51,7 @@ terraform apply
 ```
 
 **DNS Records Created by Terraform:**
+
 - ✅ A records → GitHub Pages IPs (4 records)
 - ✅ CNAME www → bkrupa.github.io
 - ✅ CAA records → Allow Let's Encrypt to issue certificates
@@ -59,6 +61,7 @@ terraform apply
 This is the critical step for HTTPS certificate provisioning.
 
 1. **Navigate to GitHub Pages Settings:**
+
    ```
    https://github.com/bkrupa/legacy-sports/settings/pages
    ```
@@ -71,7 +74,7 @@ This is the critical step for HTTPS certificate provisioning.
 
 3. **Wait for DNS Check:**
    - GitHub will verify DNS records
-   - Shows "DNS check in progress..." 
+   - Shows "DNS check in progress..."
    - Wait until you see **green checkmark** "DNS check successful"
    - This can take **5-30 minutes**
 
@@ -92,17 +95,20 @@ This is the critical step for HTTPS certificate provisioning.
 #### Issue 1: "DNS check unsuccessful"
 
 **Symptoms:**
+
 - Red X or "DNS check unsuccessful" in GitHub Pages settings
 
 **Solutions:**
 
 1. **Verify DNS propagation:**
+
    ```powershell
    nslookup legacy-fantasy.com
    # Should return GitHub Pages IPs: 185.199.108.153, etc.
    ```
 
 2. **Check DNS from different location:**
+
    ```powershell
    # Use Google's DNS
    nslookup legacy-fantasy.com 8.8.8.8
@@ -113,6 +119,7 @@ This is the critical step for HTTPS certificate provisioning.
    - Usually 5-30 minutes for Route 53
 
 4. **Verify Route 53 configuration:**
+
    ```powershell
    cd terraform
    terraform state show aws_route53_record.apex
@@ -126,12 +133,14 @@ This is the critical step for HTTPS certificate provisioning.
 #### Issue 2: Certificate Not Provisioning
 
 **Symptoms:**
+
 - "Enforce HTTPS" checkbox available but site still shows certificate error
 - Certificate is for wrong domain or GitHub's domain
 
 **Solutions:**
 
 1. **Check CAA records:**
+
    ```powershell
    nslookup -type=CAA legacy-fantasy.com
    # Should show: 0 issue "letsencrypt.org"
@@ -158,6 +167,7 @@ This is the critical step for HTTPS certificate provisioning.
 #### Issue 3: "Mixed Content" Warnings
 
 **Symptoms:**
+
 - Site loads but some resources blocked
 - Browser console shows mixed content errors
 
@@ -178,6 +188,7 @@ This is the critical step for HTTPS certificate provisioning.
 #### Issue 4: Certificate for Wrong Domain
 
 **Symptoms:**
+
 - Certificate shows `bkrupa.github.io` instead of `legacy-fantasy.com`
 - Browser says "Certificate is not valid for this domain"
 
@@ -188,6 +199,7 @@ This is the critical step for HTTPS certificate provisioning.
    - Domain should show: `legacy-fantasy.com`
 
 2. **Check CNAME file in deployed site:**
+
    ```powershell
    # Should contain your domain
    curl https://bkrupa.github.io/legacy-sports/CNAME
@@ -202,12 +214,14 @@ This is the critical step for HTTPS certificate provisioning.
 After setup, verify everything is working:
 
 - [ ] **DNS Resolution:**
+
   ```powershell
   nslookup legacy-fantasy.com
   # Returns: 185.199.108.153 (or similar GitHub IP)
   ```
 
 - [ ] **HTTPS Loads:**
+
   ```powershell
   curl -I https://legacy-fantasy.com
   # Returns: HTTP/2 200 (or 301 redirect)
@@ -234,14 +248,14 @@ After setup, verify everything is working:
 
 ## Timeline Expectations
 
-| Phase | Duration | What Happens |
-|-------|----------|--------------|
-| **1. DNS Update** | 5-30 min | Terraform applies DNS records |
-| **2. DNS Propagation** | 5-30 min | DNS resolves to GitHub Pages IPs |
-| **3. GitHub DNS Check** | 5-15 min | GitHub verifies DNS configuration |
-| **4. Certificate Request** | Instant | GitHub requests Let's Encrypt cert |
-| **5. Certificate Provisioning** | 15-60 min | Let's Encrypt validates and issues cert |
-| **Total Time** | **30 min - 2 hours** | Typical: 45 minutes |
+| Phase                           | Duration             | What Happens                            |
+| ------------------------------- | -------------------- | --------------------------------------- |
+| **1. DNS Update**               | 5-30 min             | Terraform applies DNS records           |
+| **2. DNS Propagation**          | 5-30 min             | DNS resolves to GitHub Pages IPs        |
+| **3. GitHub DNS Check**         | 5-15 min             | GitHub verifies DNS configuration       |
+| **4. Certificate Request**      | Instant              | GitHub requests Let's Encrypt cert      |
+| **5. Certificate Provisioning** | 15-60 min            | Let's Encrypt validates and issues cert |
+| **Total Time**                  | **30 min - 2 hours** | Typical: 45 minutes                     |
 
 ⚠️ **Important:** Do NOT enable "Enforce HTTPS" until DNS check passes (green checkmark)!
 
@@ -289,18 +303,21 @@ After setup, verify everything is working:
 If you absolutely cannot use GitHub Pages HTTPS, alternatives include:
 
 ### Option A: CloudFlare (Free CDN + Certificate)
+
 - Add domain to CloudFlare
 - Enable "Full" SSL mode
 - Use CloudFlare nameservers
 - ⚠️ Requires changing DNS provider
 
 ### Option B: AWS CloudFront + ACM
+
 - Request certificate in AWS Certificate Manager
 - Create CloudFront distribution
 - Point domain to CloudFront
 - 💰 Costs ~$1-5/month
 
 ### Option C: Custom Server with Certbot
+
 - Deploy to EC2/Docker
 - Install Certbot
 - Run Let's Encrypt verification
@@ -310,13 +327,13 @@ If you absolutely cannot use GitHub Pages HTTPS, alternatives include:
 
 ## Cost Breakdown
 
-| Service | Cost | Notes |
-|---------|------|-------|
-| **GitHub Pages Hosting** | $0/month | Free for public repos |
-| **SSL Certificate** | $0/month | Free Let's Encrypt cert |
-| **Route 53 Hosted Zone** | $0.50/month | DNS management |
-| **Route 53 Queries** | ~$0.01/month | First million free tier |
-| **Total** | **~$0.50/month** | Cheapest production hosting! |
+| Service                  | Cost             | Notes                        |
+| ------------------------ | ---------------- | ---------------------------- |
+| **GitHub Pages Hosting** | $0/month         | Free for public repos        |
+| **SSL Certificate**      | $0/month         | Free Let's Encrypt cert      |
+| **Route 53 Hosted Zone** | $0.50/month      | DNS management               |
+| **Route 53 Queries**     | ~$0.01/month     | First million free tier      |
+| **Total**                | **~$0.50/month** | Cheapest production hosting! |
 
 ## Next Steps After HTTPS Is Working
 
@@ -325,6 +342,7 @@ If you absolutely cannot use GitHub Pages HTTPS, alternatives include:
    - Add `https://legacy-fantasy.com` to authorized origins
 
 2. **Update environment variables:**
+
    ```env
    VITE_OAUTH_PROXY_URL=https://your-api-gateway.com
    VITE_APP_URL=https://legacy-fantasy.com
@@ -342,14 +360,17 @@ If you absolutely cannot use GitHub Pages HTTPS, alternatives include:
 ## Support
 
 **GitHub Pages Issues:**
+
 - Docs: https://docs.github.com/en/pages
 - Support: https://support.github.com
 
 **Let's Encrypt Issues:**
+
 - Community: https://community.letsencrypt.org
 - Status: https://letsencrypt.status.io
 
 **AWS Route 53 Issues:**
+
 - Docs: https://docs.aws.amazon.com/route53/
 - Support: AWS Support console
 

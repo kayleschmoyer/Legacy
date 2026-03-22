@@ -1,6 +1,7 @@
 # Draft Functionality Implementation Summary
 
 ## Overview
+
 Implemented complete backend functionality for supporting drafts in a league, including pick order management, GraphQL mutations/queries, authorization, player draft position persistence, and WebSocket notifications.
 
 ## Components Implemented
@@ -8,18 +9,21 @@ Implemented complete backend functionality for supporting drafts in a league, in
 ### 1. Database Schema (`lib/db-client/migrations/20260218_000000_add_draft_picks_table.ts`)
 
 **New Tables:**
+
 - `draft_picks`: Tracks each individual pick made during a draft
   - Fields: id, draft_id, team_id, player_id, round, pick_number, overall_pick, picked_at
   - Unique constraints prevent duplicate picks and players being drafted twice
   - Indexed for performance on draft_id, team_id, player_id
 
 **Extended Tables:**
+
 - `drafts`: Added current_pick, draft_started_at, draft_completed_at
 - `team_members`: Added draft_round, draft_pick, acquisition_type to track how players were acquired
 
 ### 2. Drizzle ORM Models (`lib/db-client/src/drizzle/public/models/Leagues.ts`)
 
 Updated schema models to include:
+
 - `draftPicks` table definition
 - Extended `drafts` with pick tracking fields
 - Extended `teamMembers` with draft information
@@ -27,22 +31,26 @@ Updated schema models to include:
 ### 3. GraphQL Schema (`lambdas/db/src/schema/draft-schema.ts`)
 
 **Types:**
+
 - `DraftPick`: Represents a single draft pick with all metadata
 - `Draft`: Extended draft type with current pick tracking
 - `CurrentDraftPick`: Information about whose turn it is to pick
 
 **Queries:**
+
 - `getDraft(draftId)`: Get draft by ID
 - `getLeagueDraft(leagueId)`: Get most recent draft for a league
 - `getCurrentDraftPick(draftId)`: Get current pick information (whose turn it is)
 - `getDraftPicks(draftId)`: Get all picks made in a draft
 
 **Mutations:**
+
 - `makeDraftPick(draftId, playerId)`: Make a draft pick with authorization
 
 ### 4. Authorization Logic
 
 The `makeDraftPick` mutation implements strict authorization:
+
 - Verifies user is authenticated
 - Checks that it's the user's turn to pick (compares current pick to user's team)
 - Prevents picking a player who has already been drafted
@@ -51,10 +59,12 @@ The `makeDraftPick` mutation implements strict authorization:
 ### 5. Draft Order Calculation
 
 Supports both **snake** and **normal** draft orders:
+
 - **Normal**: Teams pick in the same order every round (1, 2, 3... 1, 2, 3...)
 - **Snake**: Teams reverse order on even rounds (1, 2, 3... 3, 2, 1...)
 
 The `getCurrentDraftPickInfo` function calculates:
+
 - Current round (1-indexed)
 - Pick number within round (1-indexed)
 - Overall pick number
@@ -63,15 +73,18 @@ The `getCurrentDraftPickInfo` function calculates:
 ### 6. WebSocket Notifications
 
 **New Notification Type:**
+
 - `DraftPickNotification`: Sent when a pick is made
   - Contains: leagueId, draftId, pickId, teamId, playerId, round, pickNumber, overallPick
 
 **Implementation:**
+
 - Added `notifyDraftPickMade` method to `WebSocketNotificationService`
 - Broadcasts to all connections for the league
 - Integrated into GraphQL mutation context
 
 **Client Support:**
+
 - Updated `@legacy-sports/websocket-client` types
 - Extended `useWebSocket` React hook with `onDraftPickMade` callback
 - Added `draft-pick-made` event handler
@@ -79,6 +92,7 @@ The `getCurrentDraftPickInfo` function calculates:
 ### 7. Integration Tests (`lambdas/db/src/schema/draft-picks.resolver.integration.spec.ts`)
 
 Comprehensive test suite covering:
+
 - ✅ User can make a pick when it's their turn
 - ✅ User cannot pick when it's not their turn (authorization)
 - ✅ Player cannot be drafted twice
@@ -89,6 +103,7 @@ Comprehensive test suite covering:
 ### 8. Database Integration
 
 Updated test schemas and setup:
+
 - `integration-test-schema.ts`: Added draft_picks and team_members tables
 - `integration-test-setup.ts`: Added table creation SQL for tests
 
@@ -179,12 +194,14 @@ function DraftBoard({ leagueId, draftId }) {
 To use this functionality:
 
 1. **Run Migration**: Deploy the database migration to add the new tables
+
    ```bash
    # Apply migration to your database
    pnpm exec nx run db-client:migrate
    ```
 
 2. **Deploy Lambda**: Deploy the updated GraphQL lambda with draft schema
+
    ```bash
    pnpm exec nx run db:deploy
    ```
@@ -198,11 +215,13 @@ To use this functionality:
 ## Files Modified/Created
 
 ### Created:
+
 - `lib/db-client/migrations/20260218_000000_add_draft_picks_table.ts`
 - `lambdas/db/src/schema/draft-schema.ts`
 - `lambdas/db/src/schema/draft-picks.resolver.integration.spec.ts`
 
 ### Modified:
+
 - `lib/db-client/src/drizzle/public/models/Leagues.ts`
 - `lib/aws-utils/src/notification/WebSocketNotificationService.ts`
 - `lib/websocket-client/src/types.ts`

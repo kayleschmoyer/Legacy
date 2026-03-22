@@ -103,6 +103,7 @@ Result: Optimized bundle, tree-shaken, faster
 ### Build From Source (Our Lambdas) ✅
 
 Use when:
+
 - Building serverless functions
 - Want smallest possible bundle
 - Deploy individual services independently
@@ -111,6 +112,7 @@ Use when:
 ### Build Dependencies First
 
 Use when:
+
 - Building publishable libraries
 - Multiple projects consume the same libs
 - Need to verify lib builds independently

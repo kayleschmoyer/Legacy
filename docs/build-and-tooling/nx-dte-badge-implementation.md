@@ -9,9 +9,11 @@ Added a new badge to display whether Nx Distributed Task Execution (DTE) was wor
 ### 1. Badge Action (`/.github/actions/update-badges/action.yml`)
 
 **Added new input parameter:**
+
 - `dte-status`: Accepts `true` or `false` to indicate if DTE was available and used
 
 **Added badge generation logic:**
+
 ```bash
 # Create DTE Status badge
 if [ "$DTE_STATUS" = "true" ]; then
@@ -24,12 +26,14 @@ fi
 ### 2. CI Pipeline Workflow (`/.github/workflows/ci-pipeline.yml`)
 
 **Updated the "Update CI Status Badges" step:**
+
 - Added `dte-status: ${{ steps.detect-dte.outputs.dte-available }}` parameter
 - This passes the actual DTE availability from the detect-dte action to the badge generator
 
 ### 3. README.md
 
 **Added new badge to CI Status section:**
+
 ```markdown
 [![Nx DTE Status](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Nx-DTE-Status.json)](https://github.com/bkrupa/legacy-sports/actions)
 ```
@@ -39,6 +43,7 @@ Positioned between "DTE Detection" and "Change Detection" badges for logical flo
 ### 4. Documentation (`/docs/CI_BADGES_SETUP.md`)
 
 **Added badge template:**
+
 - Included `Nx DTE Status.json` badge template in the setup guide
 - Shows default state as "disabled" with orange color
 
@@ -46,10 +51,10 @@ Positioned between "DTE Detection" and "Change Detection" badges for logical flo
 
 ### Colors & Messages
 
-| DTE Status | Badge Message | Color | Meaning |
-|-----------|---------------|-------|---------|
-| Available & Working | `enabled` | 🟢 Green (`brightgreen`) | DTE is active, using distributed execution |
-| Not Available | `disabled` | 🟠 Orange | Fallback to local execution |
+| DTE Status          | Badge Message | Color                    | Meaning                                    |
+| ------------------- | ------------- | ------------------------ | ------------------------------------------ |
+| Available & Working | `enabled`     | 🟢 Green (`brightgreen`) | DTE is active, using distributed execution |
+| Not Available       | `disabled`    | 🟠 Orange                | Fallback to local execution                |
 
 ### When Badge Updates
 

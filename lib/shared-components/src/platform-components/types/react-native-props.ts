@@ -72,8 +72,9 @@ export interface VirtualizedListProps<ItemT> {
 }
 
 // FlatList interface matching React Native's FlatListProps<ItemT>
-export interface FlatListProps<ItemT = unknown>
-  extends VirtualizedListProps<ItemT> {
+export interface FlatListProps<
+  ItemT = unknown,
+> extends VirtualizedListProps<ItemT> {
   /**
    * Optional custom style for multi-item rows generated when numColumns > 1
    */

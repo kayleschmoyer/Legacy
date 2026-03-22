@@ -3,6 +3,7 @@
 ## 📋 Current Configuration
 
 ### Primary Versions (Production)
+
 - **React Native**: `0.79.6`
 - **Expo SDK**: `53.0.22`
 - **Java JDK**: `17` (Temurin distribution)
@@ -18,25 +19,25 @@
 
 ### React Native 0.79.x Compatibility
 
-| Component | Minimum | Recommended | Maximum | Notes |
-|-----------|---------|-------------|---------|--------|
-| **Java JDK** | 11 | 17 | 21 | JDK 17 recommended for best compatibility |
-| **Node.js** | 18.18.0 | 22 | 22.x | Active LTS versions |
-| **Android SDK** | 33 | 35 | 35 | Target SDK 35 for Google Play |
-| **Min SDK** | 24 | 24 | - | Android 7.0+ (covers 95%+ devices) |
-| **NDK** | 25.x | 27.1.12297006 | 27.x | Latest stable for RN 0.79 |
-| **Gradle** | 8.6 | 8.8.2 | 8.10.x | AGP 8.8.2 compatibility |
-| **Kotlin** | 1.8.0 | 1.9.10 | 1.9.x | Stable with current Gradle |
+| Component       | Minimum | Recommended   | Maximum | Notes                                     |
+| --------------- | ------- | ------------- | ------- | ----------------------------------------- |
+| **Java JDK**    | 11      | 17            | 21      | JDK 17 recommended for best compatibility |
+| **Node.js**     | 18.18.0 | 22            | 22.x    | Active LTS versions                       |
+| **Android SDK** | 33      | 35            | 35      | Target SDK 35 for Google Play             |
+| **Min SDK**     | 24      | 24            | -       | Android 7.0+ (covers 95%+ devices)        |
+| **NDK**         | 25.x    | 27.1.12297006 | 27.x    | Latest stable for RN 0.79                 |
+| **Gradle**      | 8.6     | 8.8.2         | 8.10.x  | AGP 8.8.2 compatibility                   |
+| **Kotlin**      | 1.8.0   | 1.9.10        | 1.9.x   | Stable with current Gradle                |
 
 ### Build Tools Compatibility
 
-| Tool | Version | Compatibility Notes |
-|------|---------|-------------------|
-| **Android Gradle Plugin** | 8.8.2 | Matches Gradle version |
-| **Build Tools** | 35.0.0 | Automatic with SDK 35 |
-| **React Native CLI** | 18.0.0+ | Via @react-native-community/cli |
-| **Metro** | 0.81.1 | Bundled with RN 0.79.6 |
-| **Hermes** | Bundled | Enabled by default |
+| Tool                      | Version | Compatibility Notes             |
+| ------------------------- | ------- | ------------------------------- |
+| **Android Gradle Plugin** | 8.8.2   | Matches Gradle version          |
+| **Build Tools**           | 35.0.0  | Automatic with SDK 35           |
+| **React Native CLI**      | 18.0.0+ | Via @react-native-community/cli |
+| **Metro**                 | 0.81.1  | Bundled with RN 0.79.6          |
+| **Hermes**                | Bundled | Enabled by default              |
 
 ## 🏗️ Matrix Strategy
 
@@ -47,34 +48,34 @@ strategy:
   matrix:
     include:
       # Production Configuration (Primary)
-      - name: "Production (RN 0.79.6)"
-        react_native_version: "0.79.6"
-        java_version: "17"
-        node_version: "22"
-        android_api_level: "35"
-        ndk_version: "27.1.12297006"
-        gradle_version: "8.8.2"
-        kotlin_version: "1.9.10"
-        
+      - name: 'Production (RN 0.79.6)'
+        react_native_version: '0.79.6'
+        java_version: '17'
+        node_version: '22'
+        android_api_level: '35'
+        ndk_version: '27.1.12297006'
+        gradle_version: '8.8.2'
+        kotlin_version: '1.9.10'
+
       # Compatibility Testing
-      - name: "Minimum Supported"
-        react_native_version: "0.79.6"
-        java_version: "11"
-        node_version: "18"
-        android_api_level: "33"
-        ndk_version: "25.2.9519653"
-        gradle_version: "8.6"
-        kotlin_version: "1.8.22"
-        
+      - name: 'Minimum Supported'
+        react_native_version: '0.79.6'
+        java_version: '11'
+        node_version: '18'
+        android_api_level: '33'
+        ndk_version: '25.2.9519653'
+        gradle_version: '8.6'
+        kotlin_version: '1.8.22'
+
       # Future Compatibility
-      - name: "Latest Stable"
-        react_native_version: "0.79.6"
-        java_version: "21"
-        node_version: "22"
-        android_api_level: "35"
-        ndk_version: "27.1.12297006"
-        gradle_version: "8.10.2"
-        kotlin_version: "1.9.25"
+      - name: 'Latest Stable'
+        react_native_version: '0.79.6'
+        java_version: '21'
+        node_version: '22'
+        android_api_level: '35'
+        ndk_version: '27.1.12297006'
+        gradle_version: '8.10.2'
+        kotlin_version: '1.9.25'
 ```
 
 ### Operating System Matrix
@@ -85,19 +86,19 @@ strategy:
     os: [ubuntu-latest, macos-latest, windows-latest]
     include:
       - os: ubuntu-latest
-        gradle_executable: "./gradlew"
+        gradle_executable: './gradlew'
         cache_paths: |
           ~/.gradle/caches
           ~/.gradle/wrapper
           ~/.android/sdk
-      - os: macos-latest  
-        gradle_executable: "./gradlew"
+      - os: macos-latest
+        gradle_executable: './gradlew'
         cache_paths: |
           ~/.gradle/caches
           ~/.gradle/wrapper
           ~/Library/Android/sdk
       - os: windows-latest
-        gradle_executable: "gradlew.bat"
+        gradle_executable: 'gradlew.bat'
         cache_paths: |
           ~/.gradle/caches
           ~/.gradle/wrapper
@@ -118,15 +119,15 @@ on:
     branches: [main, develop]
   pull_request:
     paths:
-      - "apps/app/**"
-      - "android/**"
-      - ".github/workflows/build-android-matrix.yml"
+      - 'apps/app/**'
+      - 'android/**'
+      - '.github/workflows/build-android-matrix.yml'
   workflow_dispatch:
     inputs:
       matrix_type:
-        description: "Matrix Type"
+        description: 'Matrix Type'
         required: false
-        default: "production"
+        default: 'production'
         type: choice
         options:
           - production
@@ -135,10 +136,10 @@ on:
 
 jobs:
   matrix-build:
-    name: "Build ${{ matrix.name }}"
+    name: 'Build ${{ matrix.name }}'
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     timeout-minutes: 45
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -173,7 +174,7 @@ ext.getVersionFromMatrix = { component ->
         androidApi: System.getenv('ANDROID_API_LEVEL') ?: '35',
         ndk: System.getenv('NDK_VERSION') ?: '27.1.12297006'
     ]
-    
+
     return matrixVersions[component]
 }
 ```
@@ -183,7 +184,7 @@ ext.getVersionFromMatrix = { component ->
 ### Java Version Compatibility
 
 - **Java 11**: Minimum for RN 0.79.x
-- **Java 17**: Recommended (LTS, best performance)  
+- **Java 17**: Recommended (LTS, best performance)
 - **Java 21**: Supported but not extensively tested
 
 ### Android SDK Updates
@@ -212,14 +213,14 @@ ext.getVersionFromMatrix = { component ->
 ✅ **Size Validation**: APK size within acceptable limits  
 ✅ **Hermes Compilation**: JavaScript bundle optimization  
 ✅ **Architecture Support**: ARM64, ARM32, x86_64, x86  
-✅ **API Level**: Runs on minimum SDK 24  
+✅ **API Level**: Runs on minimum SDK 24
 
 ## 📊 Performance Metrics
 
 ### Build Time Targets
 
 - **Production Config**: < 15 minutes
-- **Compatibility Matrix**: < 25 minutes  
+- **Compatibility Matrix**: < 25 minutes
 - **Full Matrix**: < 45 minutes
 
 ### Cache Efficiency

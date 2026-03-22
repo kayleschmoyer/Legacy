@@ -16,17 +16,20 @@ The authentication system uses two AWS Lambda functions for security and scalabi
 ### Key Features
 
 ✨ **Modern UI Components**
+
 - Beautiful `ModernLoginPage` with gradient backgrounds and glass morphism effects
 - Cross-platform design system using Tamagui
 - Accessible with proper contrast and focus states
 
 🔐 **Secure Authentication**
+
 - Google OAuth integration (primary method)
 - Email/password fallback authentication
 - Secure token storage with platform-specific implementations
 - JWT-based session management
 
 📱 **Cross-Platform Support**
+
 - React web application support
 - React Native mobile application support
 - Shared components with platform-specific implementations
@@ -62,7 +65,7 @@ import {
   AuthProvider,
   EnhancedAuthGuard,
   ModernLoginPage,
-  useAuth
+  useAuth,
 } from '@legacy-sports/shared-components';
 
 function App() {
@@ -77,7 +80,7 @@ function App() {
 
 function YourApp() {
   const { user, logout } = useAuth();
-  
+
   return (
     <div>
       <h1>Welcome, {user.name}!</h1>
@@ -95,15 +98,13 @@ import {
   AuthProvider,
   EnhancedAuthGuard,
   ModernLoginPage,
-  useAuth
+  useAuth,
 } from '@legacy-sports/shared-components';
 
 export default function App() {
   return (
     <AuthProvider>
-      <EnhancedAuthGuard
-        fallbackComponent={<ModernLoginPage />}
-      >
+      <EnhancedAuthGuard fallbackComponent={<ModernLoginPage />}>
         <YourMobileApp />
       </EnhancedAuthGuard>
     </AuthProvider>
@@ -207,11 +208,13 @@ PUT /users/profile
 ### Platform-Specific Security
 
 **Web Security:**
+
 - HTTP-only cookies for token storage
 - SameSite cookie attributes
 - Secure flag for HTTPS environments
 
 **Mobile Security:**
+
 - iOS Keychain Services integration
 - Android Keystore integration
 - Biometric authentication support (optional)
@@ -221,14 +224,14 @@ PUT /users/profile
 ### Common Issues
 
 **OAuth popup blocked:**
+
 ```tsx
 // Ensure OAuth is triggered by user interaction
-<Button onPress={() => initiateOAuth()}>
-  Sign in with Google
-</Button>
+<Button onPress={() => initiateOAuth()}>Sign in with Google</Button>
 ```
 
 **Token expired errors:**
+
 ```tsx
 // Auth provider automatically handles token refresh
 // If you see persistent errors, check:
@@ -238,6 +241,7 @@ PUT /users/profile
 ```
 
 **Cross-platform styling issues:**
+
 ```tsx
 // Use Shared Components alongside UI Abstractions for Tamagui primitives
 import { Button } from '@legacy-sports/shared-components';

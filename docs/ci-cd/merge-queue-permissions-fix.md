@@ -23,7 +23,6 @@ Select the following options:
 
 - ✅ **"Read and write permissions"**
   - This allows workflows to write to the repository (merge PRs, create commits, etc.)
-  
 - ✅ **"Allow GitHub Actions to create and approve pull requests"**
   - This specifically allows workflows to merge and approve PRs
 
@@ -53,7 +52,7 @@ If you need more control or the above solution doesn't work, you can use a Perso
 steps:
   - uses: actions/checkout@v5
     with:
-      token: ${{ secrets.MERGE_QUEUE_PAT }}  # Instead of GITHUB_TOKEN
+      token: ${{ secrets.MERGE_QUEUE_PAT }} # Instead of GITHUB_TOKEN
 ```
 
 ### Option B: GitHub App (Most Secure)
@@ -70,7 +69,7 @@ After applying the fix, you should see:
 
 ✅ Merge queue successfully merges PRs  
 ✅ No "Resource not accessible by integration" errors  
-✅ Success comments posted on merged PRs  
+✅ Success comments posted on merged PRs
 
 ## Troubleshooting
 

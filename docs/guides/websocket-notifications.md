@@ -86,9 +86,9 @@ try {
 }
 
 // ❌ WRONG — fire-and-forget
-notificationService.notifyLeagueChatMessage(leagueId, payload).catch((err) =>
-  LOGGER.warn('notification failed', { err }),
-);
+notificationService
+  .notifyLeagueChatMessage(leagueId, payload)
+  .catch((err) => LOGGER.warn('notification failed', { err }));
 ```
 
 #### Why This Matters
@@ -553,6 +553,7 @@ completed.
 `await` + try/catch. See [Critical Rules](#critical-rules).
 
 **Files fixed:**
+
 - `lambdas/db/src/schema/chat-and-tiebreakers.ts` — `sendLeagueMessage` resolver
 - `lambdas/db/src/schema/leagues.ts` — `renameTeam` resolver (2 calls)
 

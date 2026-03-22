@@ -52,20 +52,20 @@ The commissioner creates a league with all settings configured upfront.
 
 **Key settings:**
 
-| Setting | Column | Default | Description |
-|---------|--------|---------|-------------|
-| Team count | `teams` created | ΓÇö | Number of teams (creates N team rows) |
-| Games per matchup | `gamesPerMatchup` | 5 | How many games each player plays per week |
-| Min games per season | `minGamesPerSeason` | 10 | Minimum games for a season to be eligible |
-| Total matchups | `totalMatchups` | 10 | Number of weeks in the regular season |
-| Roster size | `maxRosterSize` | 25 | Max players per team |
-| SP starts per matchup | `spStartsPerMatchup` | 1 | Starting pitcher starts per week |
-| Waiver type | `waiverType` | `'standard'` | `'standard'` or `'faab'` |
-| FAAB budget | `faabBudgetDefault` | 100 | Starting budget for FAAB leagues |
-| Player pool | `playerPool` | `'all'` | `'all'`, `'nl'`, or `'al'` |
-| Era filter | `eraFilter` | `'all'` | Historical era restriction |
-| Scheduling | `schedulingStrategy` | `'round-robin'` | `'round-robin'`, `'divisional'`, `'random'` |
-| Salary cap | `salaryCapEnabled` | false | Enable salary cap mode |
+| Setting               | Column               | Default         | Description                                 |
+| --------------------- | -------------------- | --------------- | ------------------------------------------- |
+| Team count            | `teams` created      | ΓÇö             | Number of teams (creates N team rows)       |
+| Games per matchup     | `gamesPerMatchup`    | 5               | How many games each player plays per week   |
+| Min games per season  | `minGamesPerSeason`  | 10              | Minimum games for a season to be eligible   |
+| Total matchups        | `totalMatchups`      | 10              | Number of weeks in the regular season       |
+| Roster size           | `maxRosterSize`      | 25              | Max players per team                        |
+| SP starts per matchup | `spStartsPerMatchup` | 1               | Starting pitcher starts per week            |
+| Waiver type           | `waiverType`         | `'standard'`    | `'standard'` or `'faab'`                    |
+| FAAB budget           | `faabBudgetDefault`  | 100             | Starting budget for FAAB leagues            |
+| Player pool           | `playerPool`         | `'all'`         | `'all'`, `'nl'`, or `'al'`                  |
+| Era filter            | `eraFilter`          | `'all'`         | Historical era restriction                  |
+| Scheduling            | `schedulingStrategy` | `'round-robin'` | `'round-robin'`, `'divisional'`, `'random'` |
+| Salary cap            | `salaryCapEnabled`   | false           | Enable salary cap mode                      |
 
 ### What gets created
 
@@ -106,13 +106,13 @@ drafts:  { id, leagueId, draftMode='live', draftStatus via league }
 
 ### Draft configuration
 
-| Setting | Values | Default |
-|---------|--------|---------|
-| Draft mode | `'live'`, `'automated'` | `'live'` |
+| Setting          | Values                                | Default      |
+| ---------------- | ------------------------------------- | ------------ |
+| Draft mode       | `'live'`, `'automated'`               | `'live'`     |
 | Selection method | `'standard'`, `'auction'`, `'random'` | `'standard'` |
-| Draft order | `'snake'`, `'linear'` | `'snake'` |
-| Pick time limit | 30–172800 seconds | 120s |
-| Player pool | `'all'`, `'nl'`, `'al'` | `'all'` |
+| Draft order      | `'snake'`, `'linear'`                 | `'snake'`    |
+| Pick time limit  | 30–172800 seconds                     | 120s         |
+| Player pool      | `'all'`, `'nl'`, `'al'`               | `'all'`      |
 
 ### Commissioner starts the draft
 
@@ -129,6 +129,7 @@ drafts:  { id, leagueId, draftMode='live', draftStatus via league }
 ### Draft modes
 
 **Live draft** (`draftMode = 'live'`):
+
 - Real-time picking via UI; each team owner picks in turn
 - `makeDraftPick(draftId, playerId)` ΓÇö only accepts player ID; **no season parameter**
 - Snake order: Round 1 goes 1ΓåÆN, Round 2 goes NΓåÆ1, etc.
@@ -136,6 +137,7 @@ drafts:  { id, leagueId, draftMode='live', draftStatus via league }
 - Auto-pick on timeout: Best available player (position-aware) is selected automatically
 
 **Automated draft** (`draftMode = 'automated'`):
+
 - System auto-picks all players using the draft queue or best-available logic
 - Runs to completion without user interaction
 
@@ -342,10 +344,10 @@ Waivers allow teams to pick up undrafted players (free agents) mid-season.
 
 **Waiver types:**
 
-| Type | Column value | How it works |
-|------|-------------|--------------|
-| Standard | `'standard'` | Claims processed by `teams.waiverOrder` (lower = higher priority) |
-| FAAB | `'faab'` | Blind-bid auction; highest `faabBid` wins. Budget tracked in `teams.faabBudget` |
+| Type     | Column value | How it works                                                                    |
+| -------- | ------------ | ------------------------------------------------------------------------------- |
+| Standard | `'standard'` | Claims processed by `teams.waiverOrder` (lower = higher priority)               |
+| FAAB     | `'faab'`     | Blind-bid auction; highest `faabBid` wins. Budget tracked in `teams.faabBudget` |
 
 ### Claiming a free agent
 
@@ -457,28 +459,28 @@ The lifecycle then restarts from Phase 3 (Draft).
 
 ### SQS Queues (all FIFO)
 
-| Queue | Connects | Purpose |
-|-------|----------|---------|
-| `{prefix}-automatic-drafts.fifo` | DB Lambda ΓåÆ Draft Processor | Queued draft execution |
-| `{prefix}-select-game.fifo` | DB Lambda ΓåÆ Game Selection Lambda | Game selection jobs |
-| `{prefix}-load-game-stats.fifo` | Game Selection ΓåÆ Stats Lambda | Stats scraping + scoring |
-| `{prefix}-load-season-stats.fifo` | DB Lambda ΓåÆ Stats Lambda | Career stats loading |
+| Queue                             | Connects                            | Purpose                  |
+| --------------------------------- | ----------------------------------- | ------------------------ |
+| `{prefix}-automatic-drafts.fifo`  | DB Lambda ΓåÆ Draft Processor       | Queued draft execution   |
+| `{prefix}-select-game.fifo`       | DB Lambda ΓåÆ Game Selection Lambda | Game selection jobs      |
+| `{prefix}-load-game-stats.fifo`   | Game Selection ΓåÆ Stats Lambda     | Stats scraping + scoring |
+| `{prefix}-load-season-stats.fifo` | DB Lambda ΓåÆ Stats Lambda          | Career stats loading     |
 
 Each queue has a corresponding DLQ (`-dlq.fifo`) for failed messages.
 
 ### WebSocket Notifications
 
-| Event | When sent | Payload includes |
-|-------|-----------|-----------------|
-| `DRAFT_STARTED` | Draft begins | leagueId, draftId |
-| `DRAFT_PICK_MADE` | Each pick | leagueId, playerId, teamId, round, wasAutoPick |
-| `DRAFT_COMPLETED` | Last pick made | leagueId, draftId |
-| `PLAYER_STATS_LOADING` | Game selection starts | matchupId, leagueId |
-| `PLAYER_STATS_UPDATED` | Individual player done | playerId, matchupId |
-| `MATCHUP_STATS_COMPLETE` | All stats loaded | matchupId, leagueId |
-| `WEEK_ADVANCED` | Week incremented | leagueId, currentWeek |
-| `ROSTER_UPDATE` | Waiver/trade completed | leagueId, teamId |
-| `PLAYOFF_BRACKET_CREATED` | Season ends | leagueId |
+| Event                     | When sent              | Payload includes                               |
+| ------------------------- | ---------------------- | ---------------------------------------------- |
+| `DRAFT_STARTED`           | Draft begins           | leagueId, draftId                              |
+| `DRAFT_PICK_MADE`         | Each pick              | leagueId, playerId, teamId, round, wasAutoPick |
+| `DRAFT_COMPLETED`         | Last pick made         | leagueId, draftId                              |
+| `PLAYER_STATS_LOADING`    | Game selection starts  | matchupId, leagueId                            |
+| `PLAYER_STATS_UPDATED`    | Individual player done | playerId, matchupId                            |
+| `MATCHUP_STATS_COMPLETE`  | All stats loaded       | matchupId, leagueId                            |
+| `WEEK_ADVANCED`           | Week incremented       | leagueId, currentWeek                          |
+| `ROSTER_UPDATE`           | Waiver/trade completed | leagueId, teamId                               |
+| `PLAYOFF_BRACKET_CREATED` | Season ends            | leagueId                                       |
 
 ### Commissioner Next Step Control
 
@@ -486,13 +488,13 @@ Each queue has a corresponding DLQ (`-dlq.fifo`) for failed messages.
 
 The commissioner sees exactly one action button at a time:
 
-| State | Button | Mutation called |
-|-------|--------|----------------|
-| `draftStatus = 'not-started'` | "Start Draft" | `initializeDraft` ΓåÆ `startDraft` |
-| Draft completed, no games selected | "Select Next Game" | `autoSelectGames` |
-| Games in progress (not all selected) | "Select Next Game" | `autoSelectGames` |
-| All games selected + stats loaded | "Advance Matchups" | `autoAdvanceMatchups` |
-| After advancement | "Select Next Game" (next week) | `autoSelectGames` |
+| State                                | Button                         | Mutation called                    |
+| ------------------------------------ | ------------------------------ | ---------------------------------- |
+| `draftStatus = 'not-started'`        | "Start Draft"                  | `initializeDraft` ΓåÆ `startDraft` |
+| Draft completed, no games selected   | "Select Next Game"             | `autoSelectGames`                  |
+| Games in progress (not all selected) | "Select Next Game"             | `autoSelectGames`                  |
+| All games selected + stats loaded    | "Advance Matchups"             | `autoAdvanceMatchups`              |
+| After advancement                    | "Select Next Game" (next week) | `autoSelectGames`                  |
 
 ### Data Flow: Game Selection Pipeline
 
@@ -531,53 +533,53 @@ Frontend receives notification ΓåÆ refetches matchup data ΓåÆ displays sco
 
 ### `leagues.draftStatus`
 
-| Value | Meaning |
-|-------|---------|
-| `'not-started'` | League created, draft not yet begun |
-| `'queued'` | Draft queued for processing via SQS |
+| Value           | Meaning                                   |
+| --------------- | ----------------------------------------- |
+| `'not-started'` | League created, draft not yet begun       |
+| `'queued'`      | Draft queued for processing via SQS       |
 | `'in-progress'` | Draft actively running (picks being made) |
-| `'paused'` | Draft paused by commissioner |
-| `'completed'` | All picks made, rosters filled |
+| `'paused'`      | Draft paused by commissioner              |
+| `'completed'`   | All picks made, rosters filled            |
 
 ### `matchups.status`
 
-| Value | Meaning |
-|-------|---------|
-| `'scheduled'` | Matchup created, no games selected yet |
+| Value           | Meaning                                      |
+| --------------- | -------------------------------------------- |
+| `'scheduled'`   | Matchup created, no games selected yet       |
 | `'in_progress'` | At least one game selected, not all complete |
-| `'completed'` | All games selected and scored |
-| `'cancelled'` | Matchup cancelled |
+| `'completed'`   | All games selected and scored                |
+| `'cancelled'`   | Matchup cancelled                            |
 
 ### `matchups.statsLoadingStatus`
 
-| Value | Meaning |
-|-------|---------|
-| `'not_started'` | No stats loading requested yet |
-| `'queued'` | SQS message sent for stats loading |
-| `'loading'` | Stats Lambda actively scraping/processing |
-| `'completed'` | All player stats loaded and scores calculated |
-| `'failed'` | Stats loading failed (will be retried) |
-| `'retry'` | Queued for retry after failure |
+| Value           | Meaning                                       |
+| --------------- | --------------------------------------------- |
+| `'not_started'` | No stats loading requested yet                |
+| `'queued'`      | SQS message sent for stats loading            |
+| `'loading'`     | Stats Lambda actively scraping/processing     |
+| `'completed'`   | All player stats loaded and scores calculated |
+| `'failed'`      | Stats loading failed (will be retried)        |
+| `'retry'`       | Queued for retry after failure                |
 
 ### `leagues.weekAdvanceStatus`
 
-| Value | Meaning |
-|-------|---------|
-| `'idle'` | No advancement in progress |
-| `'queued'` | Advancement requested |
+| Value          | Meaning                            |
+| -------------- | ---------------------------------- |
+| `'idle'`       | No advancement in progress         |
+| `'queued'`     | Advancement requested              |
 | `'processing'` | Backend processing week transition |
-| `'success'` | Advancement complete |
-| `'failed'` | Advancement failed |
+| `'success'`    | Advancement complete               |
+| `'failed'`     | Advancement failed                 |
 
 ### `waiver_claims.status`
 
-| Value | Meaning |
-|-------|---------|
-| `'pending'` | Claim submitted, awaiting processing |
-| `'processing'` | Currently being evaluated |
-| `'completed'` | Player successfully claimed |
-| `'failed'` | Claim failed (player unavailable, budget exceeded, etc.) |
-| `'cancelled'` | Claim cancelled by user |
+| Value          | Meaning                                                  |
+| -------------- | -------------------------------------------------------- |
+| `'pending'`    | Claim submitted, awaiting processing                     |
+| `'processing'` | Currently being evaluated                                |
+| `'completed'`  | Player successfully claimed                              |
+| `'failed'`     | Claim failed (player unavailable, budget exceeded, etc.) |
+| `'cancelled'`  | Claim cancelled by user                                  |
 
 ---
 
@@ -585,42 +587,42 @@ Frontend receives notification ΓåÆ refetches matchup data ΓåÆ displays sco
 
 ### Core tables
 
-| Table | Purpose | Key columns |
-|-------|---------|-------------|
-| `leagues` | League configuration | `id`, `name`, `draftStatus`, `currentWeek`, `totalMatchups`, `gamesPerMatchup`, `waiverType`, `seasonNumber`, `previousLeagueId`, `frozenAt` |
-| `teams` | Teams within a league | `id`, `name`, `leagueId`, `waiverOrder`, `faabBudget`, `isLocked` |
-| `league_members` | User Γåö team Γåö league mapping | `leagueId`, `userId`, `teamId`, `permissionLevel` |
-| `team_members` | Player roster assignments | `id`, `teamId`, `playerId`, `positionId`, `acquisitionType`, `salary` |
+| Table            | Purpose                          | Key columns                                                                                                                                  |
+| ---------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `leagues`        | League configuration             | `id`, `name`, `draftStatus`, `currentWeek`, `totalMatchups`, `gamesPerMatchup`, `waiverType`, `seasonNumber`, `previousLeagueId`, `frozenAt` |
+| `teams`          | Teams within a league            | `id`, `name`, `leagueId`, `waiverOrder`, `faabBudget`, `isLocked`                                                                            |
+| `league_members` | User Γåö team Γåö league mapping | `leagueId`, `userId`, `teamId`, `permissionLevel`                                                                                            |
+| `team_members`   | Player roster assignments        | `id`, `teamId`, `playerId`, `positionId`, `acquisitionType`, `salary`                                                                        |
 
 ### Draft tables
 
-| Table | Purpose | Key columns |
-|-------|---------|-------------|
-| `drafts` | Draft configuration and state | `id`, `leagueId`, `draftMode`, `selectionMethod`, `draftOrder`, `currentPick`, `pickTimeLimitSeconds`, `currentPickDeadline` |
-| `draft_picks` | Individual picks made | `id`, `draftId`, `teamId`, `playerId`, `round`, `overallPick`, `bidAmount` |
-| `draft_teams` | Team participation + order | `draftId`, `teamId`, `draftOrder`, `autoPick` |
-| `draft_queue` | Auto-pick priority queue | `draftId`, `teamId`, `playerId`, `priority` |
+| Table         | Purpose                       | Key columns                                                                                                                  |
+| ------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `drafts`      | Draft configuration and state | `id`, `leagueId`, `draftMode`, `selectionMethod`, `draftOrder`, `currentPick`, `pickTimeLimitSeconds`, `currentPickDeadline` |
+| `draft_picks` | Individual picks made         | `id`, `draftId`, `teamId`, `playerId`, `round`, `overallPick`, `bidAmount`                                                   |
+| `draft_teams` | Team participation + order    | `draftId`, `teamId`, `draftOrder`, `autoPick`                                                                                |
+| `draft_queue` | Auto-pick priority queue      | `draftId`, `teamId`, `playerId`, `priority`                                                                                  |
 
 ### Matchup tables
 
-| Table | Purpose | Key columns |
-|-------|---------|-------------|
-| `matchups` | Weekly matchup pairings + scores | `id`, `leagueId`, `weekNumber`, `team1Id`, `team2Id`, `team1Score`, `team2Score`, `status`, `statsLoadingStatus`, `gamesPerMatchup` |
-| `matchup_players` | Players linked to matchups | `id`, `matchupId`, `playerId`, `teamId`, `positionId` |
-| `matchup_player_games` | Selected games per player | `id`, `matchupPlayerId`, `gameNum`, `gameIdentifier`, `statsLoadingStatus` |
-| `league_week_player_seasons` | Player season assignments | `leagueId`, `weekNumber`, `playerId`, `season` (UNIQUE per league+week+player) |
+| Table                        | Purpose                          | Key columns                                                                                                                         |
+| ---------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `matchups`                   | Weekly matchup pairings + scores | `id`, `leagueId`, `weekNumber`, `team1Id`, `team2Id`, `team1Score`, `team2Score`, `status`, `statsLoadingStatus`, `gamesPerMatchup` |
+| `matchup_players`            | Players linked to matchups       | `id`, `matchupId`, `playerId`, `teamId`, `positionId`                                                                               |
+| `matchup_player_games`       | Selected games per player        | `id`, `matchupPlayerId`, `gameNum`, `gameIdentifier`, `statsLoadingStatus`                                                          |
+| `league_week_player_seasons` | Player season assignments        | `leagueId`, `weekNumber`, `playerId`, `season` (UNIQUE per league+week+player)                                                      |
 
 ### Waiver tables
 
-| Table | Purpose | Key columns |
-|-------|---------|-------------|
+| Table           | Purpose                      | Key columns                                                                                 |
+| --------------- | ---------------------------- | ------------------------------------------------------------------------------------------- |
 | `waiver_claims` | Pending and processed claims | `id`, `leagueId`, `teamId`, `playerId`, `dropPlayerId`, `faabBid`, `status`, `errorMessage` |
 
 ### Stats tables
 
-| Table | Purpose |
-|-------|---------|
-| `game_batting` | Per-game batting stats (scraped from Baseball Reference) |
-| `game_pitching` | Per-game pitching stats |
-| `game_fielding` | Per-game fielding stats |
-| `player_scoring_cache` | Materialized career scoring data (LS-696 optimization) |
+| Table                  | Purpose                                                  |
+| ---------------------- | -------------------------------------------------------- |
+| `game_batting`         | Per-game batting stats (scraped from Baseball Reference) |
+| `game_pitching`        | Per-game pitching stats                                  |
+| `game_fielding`        | Per-game fielding stats                                  |
+| `player_scoring_cache` | Materialized career scoring data (LS-696 optimization)   |

@@ -5,15 +5,11 @@
     "<rootDir>/src/**/*.test.ts?(x)",
     "<rootDir>/src/**/*.spec.ts?(x)"
   ],
-  "testPathIgnorePatterns": [
-    "<rootDir>/src/disabled-tests/"
-  ],
+  "testPathIgnorePatterns": ["<rootDir>/src/disabled-tests/"],
   "testTimeout": 120000,
   "maxWorkers": 1,
   "testEnvironment": "node",
-  "setupFilesAfterEnv": [
-    "<rootDir>/test-setup.ts"
-  ],
+  "setupFilesAfterEnv": ["<rootDir>/test-setup.ts"],
   "transform": {
     "^.+\\.(ts|js|html)$": [
       "ts-jest",

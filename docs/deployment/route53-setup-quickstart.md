@@ -75,16 +75,19 @@ See: `docs/deployment/route53-github-pages-setup.md`
 ## 🆘 Common Issues
 
 **GitHub DNS check failing?**
+
 - Wait 15-30 minutes for DNS propagation
 - Verify Terraform applied successfully
 - Check name servers match in Route 53
 
 **SSL not working?**
+
 - Ensure "Enforce HTTPS" is enabled in GitHub Pages
 - Wait 15-30 minutes for certificate provisioning
 - Check CAA records exist (Terraform creates these)
 
 **Can't access api.yourdomain.com?**
+
 - Verify API Gateway is deployed
 - Check CNAME points to correct API Gateway endpoint
 - Test direct API Gateway URL first

@@ -140,26 +140,31 @@ docs/
 ## Benefits of New Structure
 
 ### 1. **Clear Categorization**
+
 - Each category has a dedicated folder
 - Related documents are grouped together
 - Easy to find documentation by topic
 
 ### 2. **Better Navigation**
+
 - Each category has a README.md with overview
 - Main README.md updated with clear links
 - Consistent naming conventions
 
 ### 3. **Scalability**
+
 - Easy to add new documents to existing categories
 - Clear place for new topics
 - Subdirectories for complex topics (e.g., deployment/terraform/)
 
 ### 4. **Reduced Clutter**
+
 - Root docs/ only has README.md and category folders
 - No more 58+ files in one directory
 - Easier to browse in file explorer
 
 ### 5. **Role-Based Access**
+
 - Developers: guides/, architecture/, authentication/
 - DevOps: deployment/, ci-cd/, security/
 - Mobile Developers: mobile/, authentication/
@@ -169,22 +174,26 @@ docs/
 ## Migration Strategy
 
 ### Phase 1: Create New Structure (No Breaking Changes)
+
 1. Create new directories
 2. Add README.md files to each directory
 3. Copy (don't move) files to new locations
 4. Update main README.md with new structure
 
 ### Phase 2: Update References
+
 1. Search for internal links between documents
 2. Update all cross-references to new locations
 3. Test that all links work
 
 ### Phase 3: Archive Old Files
+
 1. Move old files to `docs/_archive/` folder
 2. Add deprecation notices in archive
 3. Keep for 30 days before deletion
 
 ### Phase 4: Clean Up
+
 1. Remove archived files after 30 days
 2. Final verification of all links
 3. Announce new structure to team
@@ -192,6 +201,7 @@ docs/
 ## File Movement Map
 
 ### Authentication (8 files)
+
 - `CLI_OAUTH_AUTHENTICATION.md` → `authentication/`
 - `oauth-auto-provisioning.md` → `authentication/`
 - `oauth-auto-provisioning-summary.md` → `authentication/`
@@ -201,6 +211,7 @@ docs/
 - `google-oauth-domain-setup.md` → `authentication/`
 
 ### CI/CD (15 files)
+
 - `ci-system-documentation.md` → `ci-cd/`
 - `ci-migration-plan.md` → `ci-cd/`
 - `ci-workflow-migration-status.md` → `ci-cd/`
@@ -218,6 +229,7 @@ docs/
 - `intelligent-dte-detection.md` → `ci-cd/`
 
 ### Build & Tooling (13 files)
+
 - `nx-cloud-optimization-strategy.md` → `build-and-tooling/`
 - `nx-cloud-ci-strategy.md` → `build-and-tooling/`
 - `nx-cloud-workflow-migration.md` → `build-and-tooling/`
@@ -233,6 +245,7 @@ docs/
 - `script-cleanup-summary.md` → `build-and-tooling/`
 
 ### Deployment & Terraform (12 files)
+
 - `route53-setup-quickstart.md` → `deployment/`
 - `s3-lambda-deployment.md` → `deployment/`
 - `lambda-build-strategy.md` → `deployment/`
@@ -248,22 +261,26 @@ docs/
 - `terraform-quick-reference.md` → `deployment/terraform/`
 
 ### Security (4 files)
+
 - `security-audit-status.md` → `security/`
 - `security-scanning-implementation.md` → `security/`
 - `security-scanning-optimization.md` → `security/`
 - `GITHUB_SECRETS_GUIDE.md` → `security/`
 
 ### Mobile (3 files)
+
 - `android-build-setup.md` → `mobile/`
 - `android-version-matrix.md` → `mobile/`
 - `mobile-build-automation.md` → `mobile/`
 
 ### Web (3 files)
+
 - `web-build-configurations.md` → `web/`
 - `web-hash-routing.md` → `web/`
 - `navigation-menu-reorganization.md` → `web/`
 
 ### Database (2 files)
+
 - `drizzle-upgrade-analysis.md` → `database/`
 - `drizzle-upgrade-completed.md` → `database/`
 

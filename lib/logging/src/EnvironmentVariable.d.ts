@@ -1,4 +1,4 @@
 export declare enum EnvironmentVariable {
-    LOG_LEVEL = "LOG_LEVEL",
-    LOG_LOCATION = "LOG_LOCATION"
+  LOG_LEVEL = 'LOG_LEVEL',
+  LOG_LOCATION = 'LOG_LOCATION',
 }

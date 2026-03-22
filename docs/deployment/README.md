@@ -29,9 +29,11 @@ This directory contains AWS infrastructure and deployment documentation for the 
 
 - **[Deployment Security](deployment-security.md)** - Production security guidelines
 - **[Headless Development](headless-development.md)** - Headless/CI environment setup
+
 ### Release Plans
 
 - **[Custom Scoring Rollout Plan](custom-scoring-rollout-plan.md)** - End-to-end launch checklist for LS-6 custom scoring
+
 ### Infrastructure as Code
 
 - **[Terraform →](terraform/)** - Complete Terraform documentation

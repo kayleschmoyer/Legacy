@@ -95,9 +95,12 @@ function sumWithMultipliers(
 }
 
 function determineGamesPlayed(stats: PlayerCareerStats): number {
-  const battingGames = typeof stats.batting.g === 'number' ? stats.batting.g : 0;
-  const fieldingGames = typeof stats.fielding.g === 'number' ? stats.fielding.g : 0;
-  const pitchingGames = typeof stats.pitching.g === 'number' ? stats.pitching.g : 0;
+  const battingGames =
+    typeof stats.batting.g === 'number' ? stats.batting.g : 0;
+  const fieldingGames =
+    typeof stats.fielding.g === 'number' ? stats.fielding.g : 0;
+  const pitchingGames =
+    typeof stats.pitching.g === 'number' ? stats.pitching.g : 0;
 
   return Math.max(battingGames, fieldingGames, pitchingGames, 0);
 }

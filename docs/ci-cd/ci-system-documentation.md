@@ -747,6 +747,7 @@ outputs:
 inputs:
   comment-on-failure: 'true' # Enable PR commenting
 
+
 # No outputs - validation focuses on enforcement
 ```
 

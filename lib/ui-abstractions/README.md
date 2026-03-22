@@ -19,13 +19,13 @@ This package provides:
 This package is automatically available in the Legacy Sports monorepo:
 
 ```typescript
-import { 
-  Button, 
-  Text, 
-  View, 
-  XStack, 
+import {
+  Button,
+  Text,
+  View,
+  XStack,
   YStack,
-  UIThemeProvider 
+  UIThemeProvider,
 } from '@legacy-sports/ui-abstractions';
 ```
 
@@ -33,12 +33,12 @@ import {
 
 ```typescript
 import React from 'react';
-import { 
-  UIThemeProvider, 
-  Container, 
-  YStack, 
-  Text, 
-  Button 
+import {
+  UIThemeProvider,
+  Container,
+  YStack,
+  Text,
+  Button
 } from '@legacy-sports/ui-abstractions';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 
@@ -50,8 +50,8 @@ function App() {
           <Text fontSize="$6" fontWeight="bold">
             Welcome to Legacy Sports
           </Text>
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             onPress={() => console.log('Pressed!')}
           >
             Get Started
@@ -66,15 +66,17 @@ function App() {
 ## 📦 Components
 
 ### Layout Components
+
 - **View**: Basic container component
 - **XStack**: Horizontal stack layout
-- **YStack**: Vertical stack layout  
+- **YStack**: Vertical stack layout
 - **ZStack**: Layered stack layout
 - **Card**: Elevated card container
 - **Container**: Screen-level container
 - **ScrollView**: Scrollable container
 
 ### Text Components
+
 - **Text**: Base text component with variants
 - **H1, H2, H3, H4, H5, H6**: Heading components
 - **Paragraph**: Body text component
@@ -82,6 +84,7 @@ function App() {
 - **Caption**: Secondary text
 
 ### Input Components
+
 - **Input**: Base input component
 - **TextArea**: Multiline text input
 - **PasswordInput**: Password input with secure entry
@@ -90,6 +93,7 @@ function App() {
 - **NumberInput**: Numeric input
 
 ### Button Components
+
 - **Button**: Base button with variants
 - **PrimaryButton**: Primary action button
 - **SecondaryButton**: Secondary action button
@@ -98,6 +102,7 @@ function App() {
 - **LinkButton**: Link-style button
 
 ### Utility Components
+
 - **Spinner**: Loading indicator
 - **LoadingPanel**: Full loading screen
 - **Separator/Divider**: Visual separator

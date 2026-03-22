@@ -15,12 +15,14 @@ This guide will help you set up the CI badges system for the Legacy Sports proje
 1. Go to https://gist.github.com
 2. Create a new **public** gist
 3. Add a file named `setup.md` with content:
+
    ```markdown
    # Legacy Sports CI Badges
-   
+
    This gist stores the badge JSON files for the Legacy Sports CI pipeline.
    Updated automatically by GitHub Actions on main branch builds.
    ```
+
 4. Create the gist and copy the **Gist ID** from the URL (e.g., `c0b25f4a406c1216b17211cc13a9c1af`)
 
 ### Step 2: Add Repository Secrets
@@ -29,7 +31,6 @@ Add these secrets to your GitHub repository:
 
 1. Go to your repository → Settings → Secrets and variables → Actions
 2. Add the following repository secrets:
-
    - **Name**: `CI_BADGES_GIST_ID`  
      **Value**: Your gist ID from Step 1
 
@@ -37,7 +38,7 @@ Add these secrets to your GitHub repository:
 
 ### Step 3: Initialize Badge Files (Optional)
 
-You can manually create initial badge files in your gist, or let the workflow create them automatically on the first run. 
+You can manually create initial badge files in your gist, or let the workflow create them automatically on the first run.
 
 To create them manually:
 
@@ -45,6 +46,7 @@ To create them manually:
 2. Add these files with the initial content:
 
 #### `CI Pipeline.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -59,6 +61,7 @@ To create them manually:
 ```
 
 #### `DTE Detection.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -73,6 +76,7 @@ To create them manually:
 ```
 
 #### `Change Detection.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -87,6 +91,7 @@ To create them manually:
 ```
 
 #### `Execution Plan.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -101,6 +106,7 @@ To create them manually:
 ```
 
 #### `Quality Gates.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -115,6 +121,7 @@ To create them manually:
 ```
 
 #### `Build Validation.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -129,6 +136,7 @@ To create them manually:
 ```
 
 #### `E2E Testing.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -143,6 +151,7 @@ To create them manually:
 ```
 
 #### `Deployment Gate.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -157,6 +166,7 @@ To create them manually:
 ```
 
 #### `Branch.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -171,6 +181,7 @@ To create them manually:
 ```
 
 #### `Nx DTE Status.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -185,6 +196,7 @@ To create them manually:
 ```
 
 #### `Last Updated.json`
+
 ```json
 {
   "schemaVersion": 1,
@@ -218,7 +230,7 @@ Replace `YOUR_GIST_ID` in the README.md with your actual gist ID:
 - **Updates**: Badges are updated only on `main` branch integration builds
 - **Status Colors**:
   - 🟢 `brightgreen` - Success/Passing
-  - 🔴 `red` - Failure/Failing  
+  - 🔴 `red` - Failure/Failing
   - 🟡 `yellow` - Cancelled
   - ⚪ `lightgrey` - Skipped
   - 🔵 `blue` - Info (timestamps, branch names)
@@ -245,7 +257,7 @@ If you add new CI steps:
 Once set up, you'll have:
 
 - ✅ Real-time CI status badges in your README
-- 🔄 Automatic updates on every main branch build  
+- 🔄 Automatic updates on every main branch build
 - 🎯 Individual badges for each CI step
 - 📈 Professional project presentation
 
