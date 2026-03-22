@@ -52,6 +52,13 @@ variable "discord_webhook_url" {
   sensitive   = true
 }
 
+variable "discord_user_signup_webhook_url" {
+  description = "Discord webhook URL for new-user signup notifications (oauth-proxy Lambda)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # =============================================================================
 # GENERATED SECRETS
 # =============================================================================

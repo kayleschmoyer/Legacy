@@ -219,6 +219,9 @@ resource "aws_lambda_function" "oauth_proxy" {
 
       # Device-flow DynamoDB table
       DEVICE_FLOW_TABLE_NAME = aws_dynamodb_table.oauth_device_flows.name
+
+      # Discord new-user signup notification webhook (optional — empty string disables)
+      DISCORD_USER_SIGNUP_WEBHOOK_URL = var.discord_user_signup_webhook_url
     }
   }
 

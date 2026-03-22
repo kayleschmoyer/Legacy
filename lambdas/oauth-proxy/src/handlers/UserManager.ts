@@ -5,6 +5,7 @@ import {
   InternalUser,
 } from '@legacy-sports/db-client';
 import { withDbClient } from '../util/db';
+import { notifyNewUserSignup } from '../util/discord';
 
 /**
  * Get or create a user in the database by email
@@ -12,23 +13,34 @@ import { withDbClient } from '../util/db';
  * Used by the OAuth flow to ensure all authenticated users have a database record
  */
 export async function getOrCreateUser(email: string): Promise<InternalUser> {
-  const maskedEmail = email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+  const [localPart, domain] = email.split('@');
+  const maskedLocal = localPart.length <= 1 ? '***' : `${localPart[0]}***`;
+  const maskedEmail = `${maskedLocal}@${domain}`;
   LOGGER.debug(`Getting or creating user: ${maskedEmail}`);
 
   try {
-    return await withDbClient(async (db) => {
-      let user = await getUserByEmail(db, email);
+    let isNewUser = false;
+    const user = await withDbClient(async (db) => {
+      let u = await getUserByEmail(db, email);
 
-      if (!user) {
+      if (!u) {
         LOGGER.info(`User not found, creating new user (ID will be assigned)`);
-        user = await createUser(db, email);
-        LOGGER.info(`Successfully created new user (ID: ${user.id})`);
+        u = await createUser(db, email);
+        LOGGER.info(`Successfully created new user (ID: ${u.id})`);
+        isNewUser = true;
       } else {
-        LOGGER.debug(`User found (ID: ${user.id})`);
+        LOGGER.debug(`User found (ID: ${u.id})`);
       }
 
-      return user;
+      return u;
     });
+
+    // Best-effort Discord notification — sent after DB connection is released
+    if (isNewUser) {
+      await notifyNewUserSignup(email, user.id, 'google');
+    }
+
+    return user;
   } catch (error) {
     LOGGER.error(
       'Error getting or creating user:',
@@ -45,7 +57,9 @@ export async function getOrCreateUser(email: string): Promise<InternalUser> {
 export async function checkUserExists(
   email: string,
 ): Promise<InternalUser | null> {
-  const maskedEmail = email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+  const [localPart, domain] = email.split('@');
+  const maskedLocal = localPart.length <= 1 ? '***' : `${localPart[0]}***`;
+  const maskedEmail = `${maskedLocal}@${domain}`;
   LOGGER.debug(`Checking if user exists: ${maskedEmail}`);
 
   try {
