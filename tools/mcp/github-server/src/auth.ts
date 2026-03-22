@@ -307,6 +307,58 @@ async function validateToken(token: string): Promise<boolean> {
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Source of the resolved GitHub token. */
+export type TokenSource =
+  | 'env'
+  | 'cached-file'
+  | 'netrc'
+  | 'gh-cli'
+  | 'device-flow';
+
+/**
+ * Non-interactive token resolution — tries all passive sources (env, cached
+ * file, .netrc, gh CLI) but does NOT trigger the interactive device flow.
+ * Returns the token and its source, or null if no valid token is found.
+ *
+ * This is used by `github_auth_status` to report auth state without side effects.
+ */
+export async function tryResolveToken(): Promise<{
+  token: string;
+  source: TokenSource;
+} | null> {
+  if (cachedToken) return { token: cachedToken, source: 'env' };
+
+  // 1. Environment variables
+  const envToken = process.env['GH_TOKEN'] || process.env['GITHUB_TOKEN'];
+  if (envToken) {
+    cachedToken = envToken;
+    return { token: envToken, source: 'env' };
+  }
+
+  // 2. Cached token file
+  const fileToken = await readCachedToken();
+  if (fileToken) {
+    cachedToken = fileToken;
+    return { token: fileToken, source: 'cached-file' };
+  }
+
+  // 3. .netrc file
+  const netrcToken = await readNetrcToken();
+  if (netrcToken) {
+    cachedToken = netrcToken;
+    return { token: netrcToken, source: 'netrc' };
+  }
+
+  // 4. gh auth token
+  const ghToken = await tryGhAuthToken();
+  if (ghToken) {
+    cachedToken = ghToken;
+    return { token: ghToken, source: 'gh-cli' };
+  }
+
+  return null;
+}
+
 /**
  * Get a valid GitHub token. Resolution order:
  * 1. GH_TOKEN or GITHUB_TOKEN env var

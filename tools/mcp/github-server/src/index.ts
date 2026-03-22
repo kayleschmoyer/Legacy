@@ -1,7 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { getToken } from './auth.js';
+import { getToken, tryResolveToken } from './auth.js';
+import type { TokenSource } from './auth.js';
+import type { ToolResult } from './types.js';
 import { closePR } from './tools/close-pr.js';
 import { createPR } from './tools/create-pr.js';
 import { getRepoInfo } from './tools/get-repo-info.js';
@@ -20,6 +22,83 @@ import { resolveThread } from './tools/resolve-thread.js';
 import { resolveThreads } from './tools/resolve-threads.js';
 import { viewPR } from './tools/view-pr.js';
 
+const GH_AUTH_TOKEN_TIMEOUT_MS = 5_000;
+
+/**
+ * Passive auth check — reuses the non-interactive token resolution from auth.ts
+ * (env vars → cached file → .netrc → gh CLI). Does NOT trigger interactive
+ * OAuth device flow.
+ */
+async function tryGetGitHubAuth(): Promise<{
+  token: string;
+  source: TokenSource;
+} | null> {
+  return tryResolveToken();
+}
+
+/** Result of a GitHub user lookup. */
+type GitHubUserResult =
+  | { status: 'valid'; login: string }
+  | { status: 'invalid' }
+  | { status: 'unknown'; reason: string };
+
+/**
+ * Validate a GitHub token by fetching the authenticated user via direct API.
+ * Distinguishes auth failures from transient errors (rate-limit, 5xx, network).
+ */
+async function getGitHubUser(token: string): Promise<GitHubUserResult> {
+  try {
+    const res = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      signal: AbortSignal.timeout(GH_AUTH_TOKEN_TIMEOUT_MS),
+    });
+
+    if (res.ok) {
+      const data = (await res.json()) as { login?: string };
+      const login = data.login;
+      if (login) return { status: 'valid', login };
+      return {
+        status: 'unknown',
+        reason: 'API returned 200 but no login field',
+      };
+    }
+
+    // 401 — definitively invalid/expired token
+    if (res.status === 401) return { status: 'invalid' };
+
+    // Rate limiting (429, or 403 with exhausted rate limit)
+    if (
+      res.status === 429 ||
+      (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0')
+    ) {
+      return {
+        status: 'unknown',
+        reason: `GitHub API rate-limited (${res.status}). Token may still be valid.`,
+      };
+    }
+
+    // Server errors (5xx) — transient, don't treat as invalid
+    if (res.status >= 500) {
+      return {
+        status: 'unknown',
+        reason: `GitHub API server error (${res.status}). Token may still be valid.`,
+      };
+    }
+
+    // Other 4xx — likely invalid
+    return { status: 'invalid' };
+  } catch {
+    return {
+      status: 'unknown',
+      reason: 'Network error contacting GitHub API. Token may still be valid.',
+    };
+  }
+}
+
 // Preflight auth — best-effort, non-blocking so server starts even if
 // device flow is needed (deferred until first API call).
 void getToken().catch((err) => {
@@ -32,6 +111,104 @@ const server = new McpServer({
   name: 'legacy-sports-github',
   version: '1.0.0',
 });
+
+// --- github_auth_status ---
+server.tool(
+  'github_auth_status',
+  'Check GitHub API authentication status (passive check only — does not trigger interactive auth). Call this first in any GitHub workflow to verify API access is available.',
+  {},
+  async (): Promise<ToolResult> => {
+    const auth = await tryGetGitHubAuth();
+
+    if (!auth) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                configured: false,
+                source: null,
+                user: null,
+                fallback:
+                  'No GitHub token found. Set GH_TOKEN or GITHUB_TOKEN env var, or run `gh auth login` to authenticate the gh CLI.',
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    const userResult = await getGitHubUser(auth.token);
+
+    if (userResult.status === 'invalid') {
+      const fallback =
+        auth.source === 'env'
+          ? 'A GitHub token was found in the environment, but it appears to be invalid or expired. Double-check GH_TOKEN or GITHUB_TOKEN, or run `gh auth login` to refresh your credentials.'
+          : `A GitHub token was found via ${auth.source}, but it appears to be invalid or expired. Run \`gh auth login\` to refresh your credentials.`;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                configured: false,
+                source: auth.source,
+                user: null,
+                fallback,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    if (userResult.status === 'unknown') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                configured: 'unknown',
+                source: auth.source,
+                user: null,
+                reason: userResult.reason,
+                fallback:
+                  'A GitHub token was found but could not be validated due to a transient error. It may still work — proceed and retry if API calls fail.',
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              configured: true,
+              source: auth.source,
+              user: userResult.login,
+              fallback: null,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  },
+);
 
 // --- github_close_pr ---
 server.tool(

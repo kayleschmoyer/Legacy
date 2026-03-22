@@ -125,18 +125,32 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 ## MCP Servers
 
-| Server                  | Purpose                                                                                                       |
+<<<<<<< HEAD
+| Server | Purpose |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-db`      | Database queries, migrations, schema generation                                                               |
-| `legacy-sports-jira`    | Ticket CRUD, transitions, blocker checks                                                                      |
-| `legacy-sports-ci`      | CI log queries, workflow reruns                                                                               |
-| `legacy-sports-github`  | PR and review lifecycle (uses `gh` CLI)                                                                       |
-| `legacy-sports-nx`      | Nx project discovery, affected analysis, target execution                                                     |
-| `legacy-sports-make`    | Makefile targets: validation, build, install, worktree setup                                                  |
-| `worktree`              | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                     |
-| `legacy-sports-aws`     | CloudWatch log tailing, AWS SSO status checks                                                                 |
-| `claude_ai_Stripe`      | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`) |
-| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload                                               |
+| `legacy-sports-db` | Database queries, migrations, schema generation |
+| `legacy-sports-jira` | Ticket CRUD, transitions, blocker checks |
+| `legacy-sports-ci` | CI log queries, workflow reruns |
+| `legacy-sports-github` | PR and review lifecycle (uses `gh` CLI) |
+| `legacy-sports-nx` | Nx project discovery, affected analysis, target execution |
+| `legacy-sports-make` | Makefile targets: validation, build, install, worktree setup |
+| `worktree` | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push |
+| `legacy-sports-aws` | CloudWatch log tailing, AWS SSO status checks |
+| `claude_ai_Stripe` | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`) |
+| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload |
+=======
+| Server | Purpose |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `legacy-sports-db` | Database queries, migrations, schema generation |
+| `legacy-sports-jira` | Ticket CRUD, transitions, blocker checks |
+| `legacy-sports-ci` | CI log queries, workflow reruns |
+| `legacy-sports-github` | PR and review lifecycle (uses `gh` CLI); `github_auth_status` for passive auth check |
+| `legacy-sports-nx` | Nx project discovery, affected analysis, target execution |
+| `legacy-sports-make` | Makefile targets: validation, build, install, worktree setup |
+| `worktree` | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push |
+| `legacy-sports-aws` | CloudWatch log tailing, AWS SSO status checks |
+
+> > > > > > > 68d81e7f3 (feat(mcp): add github_auth_status tool for auth-aware routing)
 
 Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`, use our custom tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false`, fall back to Claude's built-in Atlassian tools (`mcp__claude_ai_Atlassian__*`). Last resort: `acli` CLI — never direct HTTP.
 
@@ -149,6 +163,8 @@ Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`
 **Git operations in worktrees — MCP first**: use `worktree_commit` instead of `git add`/`git commit` via Bash — it handles staging and committing in one operation and refuses to stage likely credential/secret files (e.g., `.env`, `credentials.*`, `*.pem`, `*.key`). Use `worktree_push` (supports `setUpstream`) instead of `git push`, `worktree_rebase` instead of `git fetch && twig rebase`, and `worktree_run` for other git commands. These tools auto-resolve the worktree directory, refuse dangerous operations (pushing `main`, pushing during rebase), and require no manual `cd` or `-C` flags.
 
 **GitHub PR operations — MCP first**: use `github_create_pr` instead of `gh pr create` via Bash, `github_resolve_thread` instead of `gh api graphql` mutations, `github_get_review_threads` instead of raw GraphQL queries, and `github_manage_labels` instead of `gh pr edit --add-label`. These tools handle temp file body encoding, GraphQL thread IDs, and structured output.
+
+**GitHub auth-aware routing**: call `github_auth_status` at the start of any GitHub workflow. If `configured: true`, use our custom GitHub MCP tools. If `configured: false`, fall back to `gh` CLI commands directly (which may have their own authentication via `gh auth login`).
 
 **CI operations — MCP first**: use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, and `ci_rerun` instead of `gh run` commands via Bash. These tools parse and structure log output for agent consumption.
 
