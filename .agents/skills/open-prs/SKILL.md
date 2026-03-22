@@ -1,6 +1,6 @@
 ---
 name: open-prs
-description: 'Orchestrate PR maintenance across all open PRs: scan for conflicts/reviews/CI failures, rebase conflicting branches, fix review comments, debug CI failures, label clean PRs merge-when-ready, and report results. Supports full overnight sweep (loop until all clean) or individual operations (rebase only, reviews only, label only). Works in both local (worktree) and cloud agent (read-only) modes. Use when asked to clean up PRs, sweep open PRs, fix all PR issues, rebase all PRs, label clean PRs, or get PRs ready to merge.'
+description: 'Orchestrate PR maintenance across all open PRs: scan for conflicts/reviews/CI failures, rebase conflicting branches, fix review comments, debug CI failures, label clean PRs merge-when-ready, and report results. Burns through every open PR until each reaches a settled state (clean or labeled requires-human-review). Supports full overnight sweep (loop until all settled) or individual operations (rebase only, reviews only, label only). Works in both local (worktree) and cloud agent (read-only) modes. Use when asked to clean up PRs, sweep open PRs, fix all PR issues, rebase all PRs, label clean PRs, or get PRs ready to merge.'
 ---
 
 # Skill: PR Operations
@@ -9,11 +9,13 @@ description: 'Orchestrate PR maintenance across all open PRs: scan for conflicts
 
 Orchestrate PR maintenance across all open PRs. This skill is a **coordinator** — it discovers problems, delegates to specialized sub-skills for the actual fixes, and manages the overall flow.
 
+The core principle is **burn through until settled**: every PR must reach a terminal state before the sweep ends. A PR is **settled** when it is either clean (no conflicts, CI passing, no unresolved threads) or explicitly labeled `requires-human-review` because the agent could not resolve its issues.
+
 Supports three modes:
 
-- **Full sweep** (local) — loop through all open PRs fixing conflicts, reviews, and CI until everything is clean
+- **Full sweep** (local) — loop through all open PRs fixing conflicts, reviews, and CI until every PR is settled
 - **Targeted operation** — run a single operation (e.g., "rebase all conflicting PRs", "label clean PRs")
-- **Cloud agent sweep** — scan, triage, and take all API-only actions (label, re-run CI, resolve threads, request reviews); report remaining items that require code changes
+- **Cloud agent sweep** — scan, triage, and take all API-only actions (label, re-run CI, resolve threads, request reviews); label unsettled PRs `requires-human-review` and report
 
 ## Environment Compatibility
 
@@ -91,8 +93,10 @@ This skill delegates to specialized sub-skills for each operation category. Load
 
 - **Remove `@me` filter** — use `--limit 200` to catch all open PRs, not just yours
 - **Resolve review threads after fixing** — leaving threads unresolved is incomplete work
-- **Labeling is automated** — the `copilot-auto-approve` GitHub Action adds `merge-when-ready` when Copilot's review has no comments. Do not manually label PRs — fix comments, push, and let the bot handle approval + labeling after Copilot re-reviews.
+- **Proactively label clean PRs** — when a PR has no unresolved review threads, add `merge-when-ready` immediately via `github_manage_labels(number: <PR#>, add: ["merge-when-ready"])`. Failing CI will automatically remove the label, so there is no risk in labeling early. The `copilot-auto-approve` bot also adds this label, but the agent should not wait for it.
 - **Dashboard CI summary can be stale** — the dashboard reports `ciStatus` as `none`, `pass`, `fail`, or `pending`. Stale checks (e.g., Enhanced Merge Queue on an old SHA) can cause a PR to show `fail` or `pending` even when current-SHA checks all pass. Use `github_pr_batch_status` to inspect actual job-level results: if all CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, the PR is clean regardless of dashboard `ciStatus`.
+- **Burn through until settled** — every PR must reach a terminal state. A PR is settled when it is clean OR labeled `requires-human-review`. Do not stop the sweep while unsettled PRs remain (subject to the max-passes safety cap).
+- **`requires-human-review` label** — when a fix attempt fails (rebase irrecoverable, review fix too complex, CI failure not auto-fixable after investigation), add the label via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` and count the PR as settled. Always include a PR comment explaining why. In local environments, use `gh pr comment <PR#> --body "Agent could not resolve: <reason>"`; in cloud environments, prefer the appropriate MCP GitHub tool over raw `gh` commands.
 
 ### Local Agent Only
 
@@ -181,7 +185,7 @@ For each PR in `$scan.conflicting`:
 
 > **Multiple PRs touching the same files**: When several PRs add code to the same location (e.g., tool registrations in `index.ts`), they conflict with each other — not just with main. After one merges, the next will conflict with the updated main. Rebase these sequentially, fetching whenever `main` changes (e.g., after each merge and before rebasing the next PR). Consider alphabetizing shared files (imports, registrations) so git can auto-merge concurrent additions.
 
-If a rebase fails irrecoverably: `git rebase --abort`, log it, move on.
+If a rebase fails irrecoverably: `git rebase --abort`, label the PR `requires-human-review` via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])`, comment with the failure reason, and move on. The PR is now **settled**.
 
 > **Full step-by-step rebase instructions** are in `skills/rebase-conflicts/SKILL.md`. Do not duplicate them here — load the skill.
 
@@ -194,6 +198,7 @@ For each PR in `$scan.reviews`:
 1. Enter the worktree (Step 2)
 2. **Load `skills/fix-copilot-reviews/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
 3. After pushing, re-check for new threads (Copilot re-reviews on push)
+4. If a review comment cannot be fixed (too complex, requires architectural decision, outside agent capability), label the PR `requires-human-review` via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` and comment explaining which threads could not be resolved and why. The PR is now **settled**.
 
 > **No manual labeling needed.** The `copilot-auto-approve` bot labels clean PRs automatically after Copilot re-reviews the pushed fixes.
 
@@ -249,6 +254,7 @@ If automated classification returns `unknown` or the auto-fix doesn't resolve th
 3. Apply the fix based on error category
 4. Validate: `make pc`
 5. Commit and push
+6. If the fix attempt fails or the failure is beyond agent capability, label the PR `requires-human-review` via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` and comment with the diagnosed root cause and what was attempted. The PR is now **settled**.
 
 ### Pending CI
 
@@ -256,60 +262,94 @@ PRs in `$scan.ciPending` are NOT skipped — continue with other work and circle
 
 ---
 
-## Verify Clean PRs Are Labeled
+## Label Clean PRs
 
-> **Labeling is automated.** The `copilot-auto-approve` GitHub Action adds `merge-when-ready` when Copilot's review has no comments. After fixing review comments and pushing, Copilot re-reviews and the bot labels clean PRs automatically.
-
-After all fixes, verify that clean PRs have been labeled. If any PRs are missing the label (e.g., the bot hasn't triggered yet), request a Copilot review to trigger the auto-approve flow:
+After each pass, proactively label PRs that have no unresolved review threads with `merge-when-ready`:
 
 ```
-github_request_review(number: <PR#>, copilot: true)
+github_manage_labels(number: <PR#>, add: ["merge-when-ready"])
 ```
 
-> **Only the bot should add `merge-when-ready`**. Do **not** manually add or remove `merge-to-parent` — that label is managed manually for stacked PRs targeting non-main branches.
+This is safe to do even if CI is still running or pending — failing CI will automatically remove the label. Do not wait for the `copilot-auto-approve` bot; label immediately when reviews are clean.
+
+> **Do not manually add or remove `merge-to-parent`** — that label is managed manually for stacked PRs targeting non-main branches.
 
 ---
 
 ## Full Sweep: Outer Loop
 
-For full sweeps, run passes 1–3 in a loop (max 5 iterations) until all PRs are clean. Fixing one category often creates issues in another (rebase → CI fail, fix → new review).
+For full sweeps, run passes 1–3 in a loop until every PR is **settled** — either clean or labeled `requires-human-review`. Fixing one category often creates issues in another (rebase → CI fail, fix → new review), so multiple passes are expected.
+
+**Settled states** — a PR is settled when it reaches any of these terminal states:
+
+| State                     | Meaning                                                 |
+| ------------------------- | ------------------------------------------------------- |
+| **Clean**                 | No conflicts, CI passing, no unresolved threads         |
+| **requires-human-review** | Agent attempted fix but could not resolve the issue     |
+| **CI pending (final)**    | CI is running after the last fix pass — settled on exit |
 
 **Algorithm:**
 
-1. Scan all open PRs (Step 1)
-2. Pass 1: Rebase all conflicting PRs
-3. Pass 2: Fix all unresolved review comments
-4. Pass 3: Fix all CI failures
-5. Validate all changed PRs: `make pc` in each worktree
-6. Repeat passes 1–3 until no new changes are made (or max 5 iterations)
-7. Verify clean PRs are labeled (bot handles labeling automatically after Copilot re-review)
+```
+settled = {}  # PR numbers that have reached a terminal state
 
-> 📎 **Parallelization details**: see [references/sweep-and-parallelization.md](references/sweep-and-parallelization.md)
+REPEAT (max 10 passes):
+  Scan all open PRs (Step 1)
+  all_prs = scan.conflicting + scan.reviews + scan.ciFailing + scan.ciPending + scan.clean
+  unsettled = [pr for pr in all_prs if pr.number not in settled]
+
+  IF unsettled is empty → EXIT (all settled)
+
+  Pass 1: Rebase unsettled conflicting PRs
+    - On irrecoverable failure → label requires-human-review → add to settled
+  Pass 2: Fix unsettled PRs with unresolved reviews
+    - On unfixable review → label requires-human-review → add to settled
+  Pass 3: Fix unsettled PRs with failing CI
+    - On unfixable CI failure → label requires-human-review → add to settled
+  Validate all changed PRs: make pc in each worktree
+  Push passing PRs
+
+  Mark clean PRs (no conflicts, CI pass, no threads) → add to settled
+  Mark PRs with only pending CI after final pass → add to settled
+
+  IF all PRs in settled → EXIT
+```
+
+**Key differences from a simple pass counter:**
+
+- PRs that are settled (clean or labeled) are **skipped** in subsequent passes — no wasted effort
+- The loop exits when all PRs are settled, not after a fixed number of passes
+- The max 10 pass cap is a safety net, not the expected exit condition
+- If the cap is hit with unsettled PRs remaining, label them all `requires-human-review` before exiting
+
+> 📎 **Parallelization details**: see [references/sweep-and-parallelization.md](../pr-workflow/references/sweep-and-parallelization.md)
 
 ---
 
 ## Final Summary
 
-After completion, print a summary table:
+After completion, print a summary table. Every PR must show a settled status — no PR should be left in an ambiguous state.
 
 ```
-| PR    | Title                        | Conflicts | Reviews | CI      | Label            | Status         |
-|-------|------------------------------|-----------|---------|---------|------------------|----------------|
-| #101  | feat(scoring): new algo      | Rebased   | Fixed 3 | —       | merge-when-ready | ✅ Clean       |
-| #102  | fix(ui): button color        | —         | —       | Fixed   | merge-when-ready | ✅ Clean       |
-| #103  | feat(db): add index          | Failed    | —       | —       | —                | ⚠️ Needs human  |
-| #104  | chore(deps): bump lodash     | —         | Fixed 1 | Fixed   | merge-when-ready | ✅ Clean       |
-| #105  | feat(ws): reconnect logic    | —         | —       | Pending | —                | ⏳ CI running   |
+| PR    | Title                        | Conflicts | Reviews | CI      | Label                  | Settled | Reason                          |
+|-------|------------------------------|-----------|---------|---------|------------------------|---------|---------------------------------|
+| #101  | feat(scoring): new algo      | Rebased   | Fixed 3 | —       | merge-when-ready       | ✅      | Clean                           |
+| #102  | fix(ui): button color        | —         | —       | Fixed   | merge-when-ready       | ✅      | Clean                           |
+| #103  | feat(db): add index          | Failed    | —       | —       | requires-human-review  | ✅      | Rebase conflict in schema.ts    |
+| #104  | chore(deps): bump lodash     | —         | Fixed 1 | Fixed   | merge-when-ready       | ✅      | Clean                           |
+| #105  | feat(ws): reconnect logic    | —         | —       | Pending | —                      | ✅      | CI running after final pass     |
+| #106  | feat(auth): token refresh    | —         | —       | Failed  | requires-human-review  | ✅      | Test failure in auth.spec.ts    |
 ```
 
 Report:
 
 - Total PRs processed
-- Issues fixed per category (conflicts, reviews, CI)
-- PRs labeled `merge-when-ready` (count)
-- Any PRs that could not be fixed (with reason)
-- Any PRs where CI was still running at exit
+- PRs settled as **clean** (count)
+- PRs settled as **requires-human-review** (count + PR numbers + reasons)
+- PRs settled as **CI pending** (count — CI running after final pass)
+- Issues fixed per category (conflicts rebased, reviews fixed, CI fixed)
 - Number of passes required
+- Whether the max-pass safety cap was hit
 
 ---
 
@@ -333,13 +373,15 @@ For detailed inspection of specific PRs, use `github_pr_batch_status` with an ar
 
 > For a **scan-only** request, stop here and report the results.
 
-## Cloud Step 2: Verify Clean PRs Are Labeled
+## Cloud Step 2: Label Clean PRs
 
-The `copilot-auto-approve` workflow automatically requests Copilot reviews on PR open/update and adds `merge-when-ready` when the review has no comments. Verify that clean PRs have the label. If any are missing it (e.g., the workflow didn't fire for older PRs), request a review manually to trigger the auto-approve flow:
+Proactively add `merge-when-ready` to any PR with no unresolved review threads:
 
 ```
-github_request_review(number: <PR#>, copilot: true)
+github_manage_labels(number: <PR#>, add: ["merge-when-ready"])
 ```
+
+This is safe even if CI is pending — failing CI will automatically remove the label. Do not wait for the `copilot-auto-approve` bot.
 
 ## Cloud Step 3: Re-run Flaky / Failed CI
 
@@ -355,14 +397,14 @@ ci_get_logs(runId: <runId>, failedOnly: true)
 ci_search_logs(runId: <runId>, pattern: "error|FAIL|Error:", context: 5)
 ```
 
-### 3b. Decide: re-run or defer
+### 3b. Decide: re-run or escalate
 
-| Log Evidence                                     | Action                                               |
-| ------------------------------------------------ | ---------------------------------------------------- |
-| Flaky test (different test fails each run)       | Re-run: `ci_rerun(runId: <id>, failedOnly: true)`    |
-| Timeout / infrastructure error                   | Re-run: `ci_rerun(runId: <id>, failedOnly: true)`    |
-| Consistent lint/type/build/test error            | **Defer** — flag for local agent (requires code fix) |
-| Formatting failure (`nx format:write` would fix) | **Defer** — flag for local agent                     |
+| Log Evidence                                     | Action                                                                    |
+| ------------------------------------------------ | ------------------------------------------------------------------------- |
+| Flaky test (different test fails each run)       | Re-run: `ci_rerun(runId: <id>, failedOnly: true)`                         |
+| Timeout / infrastructure error                   | Re-run: `ci_rerun(runId: <id>, failedOnly: true)`                         |
+| Consistent lint/type/build/test error            | Label `requires-human-review` — requires code fix cloud agent cannot make |
+| Formatting failure (`nx format:write` would fix) | Label `requires-human-review` — requires code fix cloud agent cannot make |
 
 ```
 ci_rerun(runId: <runId>, failedOnly: true)
@@ -394,7 +436,7 @@ For each thread, read the comment body. If the thread is a **process/meta commen
 github_resolve_thread(threadId: "<threadId>")
 ```
 
-**Do NOT resolve threads that request actual code changes** — those must be deferred to a local agent.
+**Do NOT resolve threads that request actual code changes** — those require a local agent. If a PR has unresolved threads that all require code changes, label it `requires-human-review` via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` and comment listing the unresolved threads. The PR is now **settled**.
 
 ## Cloud Step 6: Final Report
 
@@ -403,26 +445,27 @@ After completing all API-only actions, produce a summary report. This is the pri
 ### Summary Table
 
 ```
-| PR    | Title                        | Mergeable   | CI        | Threads | Label            | Cloud Action         | Status              |
-|-------|------------------------------|-------------|-----------|---------|------------------|----------------------|---------------------|
-| #101  | feat(scoring): new algo      | MERGEABLE   | pass      | 0       | merge-when-ready | Labeled              | ✅ Clean            |
-| #102  | fix(ui): button color        | CONFLICTING | —         | 0       | —                | —                    | ⚠️ Needs rebase     |
-| #103  | feat(db): add index          | MERGEABLE   | fail      | 2       | —                | Re-ran CI            | ⏳ CI re-running    |
-| #104  | chore(deps): bump lodash     | MERGEABLE   | pass      | 1       | —                | Resolved 1 thread    | ✅ Clean            |
-| #105  | feat(ws): reconnect logic    | MERGEABLE   | fail      | 0       | —                | Diagnosed            | 🔧 Needs code fix   |
-| #106  | fix(auth): token refresh     | MERGEABLE   | pass      | 3       | —                | Resolved 1 meta      | 🔧 Needs code fix   |
+| PR    | Title                        | Mergeable   | CI        | Threads | Label                  | Cloud Action         | Settled | Reason                        |
+|-------|------------------------------|-------------|-----------|---------|------------------------|----------------------|---------|-------------------------------|
+| #101  | feat(scoring): new algo      | MERGEABLE   | pass      | 0       | merge-when-ready       | Verified clean       | ✅      | Clean                         |
+| #102  | fix(ui): button color        | CONFLICTING | —         | 0       | requires-human-review  | Diagnosed            | ✅      | Needs local rebase            |
+| #103  | feat(db): add index          | MERGEABLE   | fail      | 2       | —                      | Re-ran CI            | ⏳      | CI re-running                 |
+| #104  | chore(deps): bump lodash     | MERGEABLE   | pass      | 1       | —                      | Resolved 1 thread    | ✅      | Clean                         |
+| #105  | feat(ws): reconnect logic    | MERGEABLE   | fail      | 0       | requires-human-review  | Diagnosed            | ✅      | Type error needs code fix     |
+| #106  | fix(auth): token refresh     | MERGEABLE   | pass      | 3       | requires-human-review  | Resolved 1 meta      | ✅      | 2 threads need code changes   |
 ```
 
 ### Report Sections
 
 1. **Actions Taken** — list every API action performed:
    - PRs labeled `merge-when-ready` (count + PR numbers)
+   - PRs labeled `requires-human-review` (count + PR numbers + reasons)
    - CI runs re-triggered (count + PR numbers + run IDs)
    - Review threads resolved (count + PR numbers)
    - Copilot reviews requested (count + PR numbers)
 
-2. **Deferred to Local Agent** — items that require code changes:
-   - PRs with merge conflicts (need rebase)
+2. **Settled as requires-human-review** — PRs the agent could not fully resolve:
+   - PRs with merge conflicts (need local rebase)
    - PRs with CI failures requiring code fixes (include the diagnosed root cause)
    - PRs with unresolved review threads requiring code changes (include thread summaries)
 
@@ -430,17 +473,20 @@ After completing all API-only actions, produce a summary report. This is the pri
    - PRs with CI still running or re-running
    - PRs where Copilot review was just requested (no results yet)
 
+All PRs should appear in exactly one settled category. No PR should be left unaccounted for.
+
 ## Cloud Full Sweep Algorithm
 
-For a full cloud sweep, run steps 1–7 in order. Unlike the local sweep, there is no outer loop because the cloud agent cannot fix code issues that cascade.
+For a full cloud sweep, run steps 1–8 in order. Unlike the local sweep, there is no outer loop because the cloud agent cannot fix code issues that cascade. Instead, the cloud agent settles every PR by either confirming it is clean or labeling it `requires-human-review`.
 
 1. Scan all open PRs (Cloud Step 1)
 2. Re-run flaky CI (Cloud Step 3) — do this early so CI has time to complete
 3. Request Copilot reviews on unreviewed PRs (Cloud Step 4) — triggers auto-approve for clean PRs
 4. Resolve process/meta review threads (Cloud Step 5)
-5. Wait ~3 minutes if any CI re-runs were triggered, then re-scan
-6. Verify clean PRs are labeled (Cloud Step 2)
-7. Produce final report (Cloud Step 6)
+5. Label PRs with issues the cloud agent cannot fix (conflicts, code-level CI failures, code-level review threads) as `requires-human-review` — comment with the reason on each
+6. Wait ~3 minutes if any CI re-runs were triggered, then re-scan
+7. Verify clean PRs are labeled (Cloud Step 2)
+8. Produce final report (Cloud Step 6) — every PR must appear in a settled category
 
 ---
 

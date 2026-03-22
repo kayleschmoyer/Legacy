@@ -2,18 +2,35 @@
 
 ## Full Sweep: Outer Loop
 
-For a full sweep, run passes in a loop until everything is clean:
+For a full sweep, run passes in a loop until every PR is **settled** (clean, labeled `requires-human-review`, or with CI pending after the final pass):
 
 ```
-REPEAT (max 5 passes):
-  problems_found = 0
-  pending_ci = 0
-  Pass 1: Rebase all conflicting PRs         → problems_found += count
-  Pass 2: Fix all unresolved review comments  → problems_found += count
-  Pass 3: Fix all failing CI runs             → problems_found += count
-           Track PRs with pending CI           → pending_ci += count
-  IF problems_found == 0 AND pending_ci == 0 → EXIT (all clean)
-  IF problems_found == 0 AND pending_ci > 0  → WAIT 3 minutes, re-scan
+settled = {}  # PR numbers that have reached a terminal state
+
+REPEAT (max 10 passes):
+  Scan all open PRs
+  unsettled = [pr for pr in all_prs if pr.number not in settled]
+
+  IF unsettled is empty → EXIT (all settled)
+
+  Pass 1: Rebase unsettled conflicting PRs
+    - On irrecoverable failure → label requires-human-review → add to settled
+  Pass 2: Fix unsettled PRs with unresolved reviews
+    - On unfixable review → label requires-human-review → add to settled
+  Pass 3: Fix unsettled PRs with failing CI
+    - On unfixable CI failure → label requires-human-review → add to settled
+  Validate changed PRs: make pc in each worktree
+  Push passing PRs
+
+  For each unsettled PR:
+    IF clean (no conflicts, CI pass, no threads) → add to settled
+    IF CI pending after final pass → add to settled (CI pending)
+
+  IF all PRs in settled → EXIT
+
+IF unsettled PRs remain after max passes:
+  Label all remaining unsettled PRs requires-human-review
+  Comment: "Agent reached max pass limit without resolving this PR"
 ```
 
 **Why loop?** Fixing one category often creates issues in another:
@@ -23,7 +40,7 @@ REPEAT (max 5 passes):
 - Review fixes may need a re-rebase if main moved ahead
 - Freshly pushed code has pending CI that hasn't reported yet
 
-Expect 2–3 passes. Cap at **5 passes** — if issues persist, report remaining problems and stop.
+**Key difference from the old pass-counter approach:** settled PRs are skipped in subsequent passes, so work is never repeated. The loop exits when all PRs are settled, not after a fixed count. The max 10 pass cap is a safety net — expect 2–4 passes in practice.
 
 ## Parallelization Strategy
 
