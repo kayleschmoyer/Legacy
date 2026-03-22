@@ -22,7 +22,6 @@ query GetPlayersWithStats(
     id
     firstName
     lastName
-    brefId
     eligiblePositions
     scoring {
       battingScore

@@ -836,13 +836,10 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                   key={player.id}
                   backgroundColor={index % 2 === 0 ? 'transparent' : '$color1'}
                 >
-                  {/* Player name & ID */}
+                  {/* Player name */}
                   <YStack flex={2} gap="$0.5">
                     <Text fontWeight="600" fontSize="$3" color="$color12">
                       {player.firstName} {player.lastName}
-                    </Text>
-                    <Text fontSize={11} color="$color8" fontFamily="$mono">
-                      {player.brefId}
                     </Text>
                     {/* Accolades */}
                     {(() => {

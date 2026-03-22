@@ -6766,7 +6766,6 @@ export type GetPlayersWithStatsQuery = {
     id?: number | null;
     firstName?: string | null;
     lastName?: string | null;
-    brefId?: string | null;
     eligiblePositions?: Array<string> | null;
     primaryEra?: string | null;
     scoring?: {
@@ -16409,7 +16408,6 @@ export const GetPlayersWithStats = gql`
       id
       firstName
       lastName
-      brefId
       eligiblePositions
       scoring {
         battingScore
