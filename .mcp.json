@@ -39,6 +39,10 @@
     "legacy-sports-make": {
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/make-server/src/index.ts"]
+    },
+    "legacy-sports-browser": {
+      "command": "pnpm",
+      "args": ["exec", "tsx", "tools/mcp/browser-server/src/index.ts"]
     }
   }
 }

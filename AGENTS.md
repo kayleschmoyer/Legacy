@@ -17,7 +17,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 - **E2E tests are hermetic** — never use `route.continue()` in E2E tests — there is no backend in CI. Use `route.fulfill()` for unmatched operations (return a diagnostic error so missing mocks surface immediately). When changing login/landing page UI, update E2E selectors in the same PR (see `skills/e2e-testing/SKILL.md`).
 - **Prefer `.graphql` + codegen over inline `gql`** — for new code in `apps/web` and `lib/shared-components`, define queries in `.graphql` files and import generated hooks from `graphql.generated.ts`. Legacy inline `gql` usage exists in the codebase and generated files necessarily contain `gql` strings.
 - **Never manually remove worktrees**: always `twig worktree clean` — never `git worktree remove` or manual deletion (destroys junctions).
-- **Kill background servers when done** — stop all `isBackground=true` processes before workflow ends. Run `make kill-stale` to find stale node processes holding addon locks.
+- **Kill background servers when done** — stop all `isBackground=true` processes before workflow ends. Run `make kill-stale` to find stale node processes holding addon locks. Call `browser_cleanup` to close any Playwright browsers and dev servers started by the browser MCP server.
 - **Jira — auth-aware routing**: call `jira_auth_status` at the start of any Jira workflow. If `configured: true`, use `jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent` for all Jira operations. If `configured: false`, fall back to Claude's built-in Atlassian tools (`mcp__claude_ai_Atlassian__*`). Last resort: `acli` CLI — never direct HTTP.
 - **Resolve PR review threads**: after fixing review comments, resolve each thread via GraphQL `resolveReviewThread` mutation. See `skills/create-pr/SKILL.md`.
 
@@ -124,17 +124,18 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 ## MCP Servers
 
-| Server                 | Purpose                                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-db`     | Database queries, migrations, schema generation                                                               |
-| `legacy-sports-jira`   | Ticket CRUD, transitions, blocker checks                                                                      |
-| `legacy-sports-ci`     | CI log queries, workflow reruns                                                                               |
-| `legacy-sports-github` | PR and review lifecycle (uses `gh` CLI)                                                                       |
-| `legacy-sports-nx`     | Nx project discovery, affected analysis, target execution                                                     |
-| `legacy-sports-make`   | Makefile targets: validation, build, install, worktree setup                                                  |
-| `worktree`             | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                     |
-| `legacy-sports-aws`    | CloudWatch log tailing, AWS SSO status checks                                                                 |
-| `claude_ai_Stripe`     | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`) |
+| Server                  | Purpose                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-db`      | Database queries, migrations, schema generation                                                               |
+| `legacy-sports-jira`    | Ticket CRUD, transitions, blocker checks                                                                      |
+| `legacy-sports-ci`      | CI log queries, workflow reruns                                                                               |
+| `legacy-sports-github`  | PR and review lifecycle (uses `gh` CLI)                                                                       |
+| `legacy-sports-nx`      | Nx project discovery, affected analysis, target execution                                                     |
+| `legacy-sports-make`    | Makefile targets: validation, build, install, worktree setup                                                  |
+| `worktree`              | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                     |
+| `legacy-sports-aws`     | CloudWatch log tailing, AWS SSO status checks                                                                 |
+| `claude_ai_Stripe`      | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`) |
+| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload                                               |
 
 Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`, use our custom tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false`, fall back to Claude's built-in Atlassian tools (`mcp__claude_ai_Atlassian__*`). Last resort: `acli` CLI — never direct HTTP.
 
@@ -158,6 +159,8 @@ Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`
 
 - **Stripe** (`mcp__claude_ai_Stripe__*`): Full Stripe API access — create/list customers, products, prices, invoices, subscriptions, payment links, refunds, coupons, and disputes. Use when working on `lambdas/stripe-webhook`, `lambdas/apple-iap`, or any billing/payment code. Search Stripe docs with `search_stripe_documentation`.
 - **Atlassian** (`mcp__claude_ai_Atlassian__*`): Jira + Confluence access — used as fallback when local Jira credentials are unavailable (see Jira MCP server prerequisites: `JIRA_EMAIL`/`JIRA_API_TOKEN` and troubleshooting docs in this repo).
+
+**Browser operations — MCP first**: use `browser_dev_start` to start a dev server, `browser_navigate` + `browser_screenshot` to capture UI state, and `browser_screenshot_upload` to get GitHub-hosted image URLs for PR bodies. Always call `browser_cleanup` before ending a workflow. See `.agents/skills/agent-screenshots/SKILL.md` for the full workflow.
 
 ## Cloud Agent Mode
 

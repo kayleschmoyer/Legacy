@@ -40,6 +40,9 @@ resources/*.dump.bak
 npm-debug.log
 yarn-error.log
 
+# Agent browser screenshots (captured by legacy-sports-browser MCP server)
+.screenshots/
+
 # AI Agent Commands (temporary files)
 NEXT_AGENT_COMMAND.md
 .github/tmp-pr-body.md

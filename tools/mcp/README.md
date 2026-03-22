@@ -130,17 +130,34 @@ Makefile target execution with whitelisted targets, appropriate timeouts, and wo
 - **make_wt_setup** — Set up a worktree (node_modules junction, .env, hooks) with optional junction removal and independent install
 - **make_worktree_create** — Create a new git worktree for a Jira ticket (branch + worktree directory + parent registration)
 
+### browser-server
+
+> **Server ID:** `legacy-sports-browser`
+
+Agent-driven browser debugging and screenshot capture:
+
+- **browser_dev_start** — Start a Next.js dev server in a worktree (port 4300-4399 auto-allocation)
+- **browser_dev_stop** — Stop a tracked dev server by port, worktree path, or all
+- **browser_dev_status** — List running dev servers and browser state
+- **browser_navigate** — Open a URL in headless Chromium with snapshot-prep CSS injection
+- **browser_screenshot** — Capture page or element screenshot as PNG (returns inline image)
+- **browser_screenshot_upload** — Upload PNG to GitHub draft release for PR body embedding
+- **browser_cleanup** — Close browser and kill all tracked dev servers
+
+See `.agents/skills/agent-screenshots/SKILL.md` for the end-to-end screenshot workflow.
+
 ## Cloud vs Local Availability
 
 Some servers depend on infrastructure that is unavailable in the GitHub Copilot cloud agent environment. Use this table when deciding which servers you can call:
 
-| Server ID              | Local (Windows dev) | Cloud agent (Copilot) | Notes                                                                                                                                     |
-| ---------------------- | :-----------------: | :-------------------: | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-ci`     |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                    |
-| `legacy-sports-db`     |         ✅          |          ✅           | Cloud uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`                                                                  |
-| `legacy-sports-jira`   |         ✅          |  ✅ (needs secrets)   | Requires `JIRA_EMAIL` + `JIRA_API_TOKEN` env vars / GitHub secrets                                                                        |
-| `legacy-sports-github` |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                    |
-| `legacy-sports-nx`     |         ✅          |          ✅           | Uses `pnpm exec nx`; available after `pnpm install`                                                                                       |
-| `worktree`             |         ✅          |          ❌           | Cloud agents work directly in a branch checkout — no worktrees needed                                                                     |
-| `legacy-sports-make`   |         ✅          |          ✅           | Uses `make` CLI; worktree-create/wt-setup are Windows-only                                                                                |
-| `legacy-sports-aws`    |         ✅          |          ❌           | No AWS SSO or OIDC credentials in cloud; no CloudWatch access — use GitHub Actions/CI logs via `legacy-sports-ci` (`ci_get_logs`) instead |
+| Server ID               | Local (Windows dev) | Cloud agent (Copilot) | Notes                                                                                                                                     |
+| ----------------------- | :-----------------: | :-------------------: | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-ci`      |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                    |
+| `legacy-sports-db`      |         ✅          |          ✅           | Cloud uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`                                                                  |
+| `legacy-sports-jira`    |         ✅          |  ✅ (needs secrets)   | Requires `JIRA_EMAIL` + `JIRA_API_TOKEN` env vars / GitHub secrets                                                                        |
+| `legacy-sports-github`  |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                    |
+| `legacy-sports-nx`      |         ✅          |          ✅           | Uses `pnpm exec nx`; available after `pnpm install`                                                                                       |
+| `worktree`              |         ✅          |          ❌           | Cloud agents work directly in a branch checkout — no worktrees needed                                                                     |
+| `legacy-sports-make`    |         ✅          |          ✅           | Uses `make` CLI; worktree-create/wt-setup are Windows-only                                                                                |
+| `legacy-sports-aws`     |         ✅          |          ❌           | No AWS SSO or OIDC credentials in cloud; no CloudWatch access — use GitHub Actions/CI logs via `legacy-sports-ci` (`ci_get_logs`) instead |
+| `legacy-sports-browser` |         ✅          |          ✅           | Requires Playwright browsers installed; cloud needs `npx playwright install chromium` in setup steps                                      |

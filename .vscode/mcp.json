@@ -47,6 +47,11 @@
       "type": "stdio",
       "command": "node",
       "args": ["--import", "tsx", "tools/mcp/make-server/src/index.ts"]
+    },
+    "legacy-sports-browser": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["--import", "tsx", "tools/mcp/browser-server/src/index.ts"]
     }
   }
 }
