@@ -2,22 +2,22 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { getToken } from './auth.js';
-import { listPRs } from './tools/list-prs.js';
-import { viewPR } from './tools/view-pr.js';
+import { closePR } from './tools/close-pr.js';
 import { createPR } from './tools/create-pr.js';
-import { requestReview } from './tools/request-review.js';
+import { getRepoInfo } from './tools/get-repo-info.js';
 import { getReviewThreads } from './tools/get-review-threads.js';
-import { resolveThread } from './tools/resolve-thread.js';
-import { resolveThreads } from './tools/resolve-threads.js';
+import { listPRs } from './tools/list-prs.js';
 import { manageLabels } from './tools/manage-labels.js';
 import { manageLabelsBatch } from './tools/manage-labels-batch.js';
-import { getRepoInfo } from './tools/get-repo-info.js';
-import { prDashboard } from './tools/pr-dashboard.js';
-import { prBatchStatus } from './tools/pr-batch-status.js';
-import { prScan } from './tools/pr-scan.js';
 import { mergePR } from './tools/merge-pr.js';
-import { closePR } from './tools/close-pr.js';
+import { prBatchStatus } from './tools/pr-batch-status.js';
+import { prDashboard } from './tools/pr-dashboard.js';
+import { prScan } from './tools/pr-scan.js';
 import { rebasePR } from './tools/rebase-pr.js';
+import { requestReview } from './tools/request-review.js';
+import { resolveThread } from './tools/resolve-thread.js';
+import { resolveThreads } from './tools/resolve-threads.js';
+import { viewPR } from './tools/view-pr.js';
 
 // Preflight auth — best-effort, non-blocking so server starts even if
 // device flow is needed (deferred until first API call).
@@ -32,44 +32,20 @@ const server = new McpServer({
   version: '1.0.0',
 });
 
-// --- github_list_prs ---
+// --- github_close_pr ---
 server.tool(
-  'github_list_prs',
-  'List pull requests with optional filters for state, branch, author, label, and search query.',
+  'github_close_pr',
+  'Close a pull request with an optional comment. Use for closing redundant, superseded, or abandoned PRs.',
   {
-    state: z
-      .enum(['open', 'closed', 'merged', 'all'])
-      .default('open')
-      .describe('PR state filter (default: open)'),
-    branch: z
+    number: z.coerce.number().int().positive().describe('PR number to close'),
+    comment: z
       .string()
+      .trim()
+      .min(1)
       .optional()
-      .describe('Filter by head branch name, e.g. LS-1254/my-feature'),
-    author: z.string().optional().describe('Filter by PR author username'),
-    label: z
-      .string()
-      .optional()
-      .describe('Filter by label, e.g. merge-when-ready'),
-    search: z.string().optional().describe('GitHub search query to filter PRs'),
-    limit: z.coerce
-      .number()
-      .int()
-      .positive()
-      .max(100)
-      .default(20)
-      .describe('Maximum number of PRs to return (default: 20)'),
+      .describe('Optional comment to add when closing the PR'),
   },
-  async (params) => listPRs(params),
-);
-
-// --- github_view_pr ---
-server.tool(
-  'github_view_pr',
-  'View detailed information about a specific pull request including title, body, state, checks, reviews, and diff stats.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number to view'),
-  },
-  async (params) => viewPR(params),
+  async (params) => closePR(params),
 );
 
 // --- github_create_pr ---
@@ -104,28 +80,12 @@ server.tool(
   async (params) => createPR(params),
 );
 
-// --- github_request_review ---
+// --- github_get_repo_info ---
 server.tool(
-  'github_request_review',
-  'Request reviewers on a PR. Copilot reviews are now auto-requested by the copilot-auto-approve workflow on PR open/update — use this tool as a fallback or to add human reviewers. Requests Copilot bot review by default (uses copilot-pull-request-reviewer[bot]).',
-  {
-    number: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('PR number to request review on'),
-    reviewers: z
-      .array(z.string())
-      .optional()
-      .describe('GitHub usernames of human reviewers to add'),
-    copilot: z
-      .boolean()
-      .default(true)
-      .describe(
-        'Request Copilot bot review (default: true). Uses copilot-pull-request-reviewer[bot].',
-      ),
-  },
-  async (params) => requestReview(params),
+  'github_get_repo_info',
+  'Get repository information (owner, name, default branch, URL). Useful for constructing GraphQL queries or API calls.',
+  {},
+  async () => getRepoInfo(),
 );
 
 // --- github_get_review_threads ---
@@ -146,34 +106,34 @@ server.tool(
   async (params) => getReviewThreads(params),
 );
 
-// --- github_resolve_thread ---
+// --- github_list_prs ---
 server.tool(
-  'github_resolve_thread',
-  'Resolve a review thread via GraphQL mutation. Use after addressing review feedback and pushing the fix. Get thread IDs from github_get_review_threads.',
+  'github_list_prs',
+  'List pull requests with optional filters for state, branch, author, label, and search query.',
   {
-    threadId: z
+    state: z
+      .enum(['open', 'closed', 'merged', 'all'])
+      .default('open')
+      .describe('PR state filter (default: open)'),
+    branch: z
       .string()
-      .describe(
-        'GraphQL node ID of the review thread to resolve (from github_get_review_threads)',
-      ),
-  },
-  async (params) => resolveThread(params),
-);
-
-// --- github_resolve_threads ---
-server.tool(
-  'github_resolve_threads',
-  'Batch-resolve multiple review threads in batched GraphQL calls (groups of 50). Much faster than calling github_resolve_thread individually during PR sweeps. Get thread IDs from github_get_review_threads.',
-  {
-    threadIds: z
-      .array(z.string())
-      .min(1)
+      .optional()
+      .describe('Filter by head branch name, e.g. LS-1254/my-feature'),
+    author: z.string().optional().describe('Filter by PR author username'),
+    label: z
+      .string()
+      .optional()
+      .describe('Filter by label, e.g. merge-when-ready'),
+    search: z.string().optional().describe('GitHub search query to filter PRs'),
+    limit: z.coerce
+      .number()
+      .int()
+      .positive()
       .max(100)
-      .describe(
-        'Array of GraphQL node IDs of review threads to resolve (from github_get_review_threads)',
-      ),
+      .default(20)
+      .describe('Maximum number of PRs to return (default: 20)'),
   },
-  async (params) => resolveThreads(params),
+  async (params) => listPRs(params),
 );
 
 // --- github_manage_labels ---
@@ -214,12 +174,34 @@ server.tool(
   async (params) => manageLabelsBatch(params),
 );
 
-// --- github_get_repo_info ---
+// --- github_merge_pr ---
 server.tool(
-  'github_get_repo_info',
-  'Get repository information (owner, name, default branch, URL). Useful for constructing GraphQL queries or API calls.',
-  {},
-  async () => getRepoInfo(),
+  'github_merge_pr',
+  'Merge a pull request. Defaults to merge queue (--auto --squash) which respects branch protection. Use strategy "direct" only when explicitly authorized — it uses --admin to bypass branch protection.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number to merge'),
+    strategy: z
+      .enum(['queue', 'direct'])
+      .default('queue')
+      .describe(
+        'Merge strategy: "queue" (default) enqueues via --auto respecting branch protection, "direct" uses --admin to bypass protection (requires explicit authorization)',
+      ),
+  },
+  async (params) => mergePR(params),
+);
+
+// --- github_pr_batch_status ---
+server.tool(
+  'github_pr_batch_status',
+  'Detailed status for specific PRs by number. Returns mergeable status, CI job results by name, review approval state, individual reviews, and unresolved thread count for each PR. Uses batched GraphQL for efficiency.',
+  {
+    prNumbers: z
+      .array(z.coerce.number().int().positive())
+      .min(1)
+      .max(50)
+      .describe('Array of PR numbers to fetch detailed status for'),
+  },
+  async (params) => prBatchStatus(params),
 );
 
 // --- github_pr_dashboard ---
@@ -247,20 +229,6 @@ server.tool(
   async (params) => prDashboard(params),
 );
 
-// --- github_pr_batch_status ---
-server.tool(
-  'github_pr_batch_status',
-  'Detailed status for specific PRs by number. Returns mergeable status, CI job results by name, review approval state, individual reviews, and unresolved thread count for each PR. Uses batched GraphQL for efficiency.',
-  {
-    prNumbers: z
-      .array(z.coerce.number().int().positive())
-      .min(1)
-      .max(50)
-      .describe('Array of PR numbers to fetch detailed status for'),
-  },
-  async (params) => prBatchStatus(params),
-);
-
 // --- github_pr_scan ---
 server.tool(
   'github_pr_scan',
@@ -283,38 +251,6 @@ server.tool(
   async (params) => prScan(params),
 );
 
-// --- github_merge_pr ---
-server.tool(
-  'github_merge_pr',
-  'Merge a pull request. Defaults to merge queue (--auto --squash) which respects branch protection. Use strategy "direct" only when explicitly authorized — it uses --admin to bypass branch protection.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number to merge'),
-    strategy: z
-      .enum(['queue', 'direct'])
-      .default('queue')
-      .describe(
-        'Merge strategy: "queue" (default) enqueues via --auto respecting branch protection, "direct" uses --admin to bypass protection (requires explicit authorization)',
-      ),
-  },
-  async (params) => mergePR(params),
-);
-
-// --- github_close_pr ---
-server.tool(
-  'github_close_pr',
-  'Close a pull request with an optional comment. Use for closing redundant, superseded, or abandoned PRs.',
-  {
-    number: z.coerce.number().int().positive().describe('PR number to close'),
-    comment: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe('Optional comment to add when closing the PR'),
-  },
-  async (params) => closePR(params),
-);
-
 // --- github_rebase_pr ---
 server.tool(
   'github_rebase_pr',
@@ -324,6 +260,70 @@ server.tool(
     number: z.coerce.number().int().positive().describe('PR number to rebase'),
   },
   async (params) => rebasePR(params),
+);
+
+// --- github_request_review ---
+server.tool(
+  'github_request_review',
+  'Request reviewers on a PR. Copilot reviews are now auto-requested by the copilot-auto-approve workflow on PR open/update — use this tool as a fallback or to add human reviewers. Requests Copilot bot review by default (uses copilot-pull-request-reviewer[bot]).',
+  {
+    number: z.coerce
+      .number()
+      .int()
+      .positive()
+      .describe('PR number to request review on'),
+    reviewers: z
+      .array(z.string())
+      .optional()
+      .describe('GitHub usernames of human reviewers to add'),
+    copilot: z
+      .boolean()
+      .default(true)
+      .describe(
+        'Request Copilot bot review (default: true). Uses copilot-pull-request-reviewer[bot].',
+      ),
+  },
+  async (params) => requestReview(params),
+);
+
+// --- github_resolve_thread ---
+server.tool(
+  'github_resolve_thread',
+  'Resolve a review thread via GraphQL mutation. Use after addressing review feedback and pushing the fix. Get thread IDs from github_get_review_threads.',
+  {
+    threadId: z
+      .string()
+      .describe(
+        'GraphQL node ID of the review thread to resolve (from github_get_review_threads)',
+      ),
+  },
+  async (params) => resolveThread(params),
+);
+
+// --- github_resolve_threads ---
+server.tool(
+  'github_resolve_threads',
+  'Batch-resolve multiple review threads in batched GraphQL calls (groups of 50). Much faster than calling github_resolve_thread individually during PR sweeps. Get thread IDs from github_get_review_threads.',
+  {
+    threadIds: z
+      .array(z.string())
+      .min(1)
+      .max(100)
+      .describe(
+        'Array of GraphQL node IDs of review threads to resolve (from github_get_review_threads)',
+      ),
+  },
+  async (params) => resolveThreads(params),
+);
+
+// --- github_view_pr ---
+server.tool(
+  'github_view_pr',
+  'View detailed information about a specific pull request including title, body, state, checks, reviews, and diff stats.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number to view'),
+  },
+  async (params) => viewPR(params),
 );
 
 // Start the server

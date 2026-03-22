@@ -276,120 +276,34 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, () => ({
   tools: [
     {
-      name: 'worktree_list',
+      name: 'worktree_checkout_file',
       description:
-        'List all active worktrees with junction status and branch info.',
-      inputSchema: { type: 'object' as const, properties: {} },
-    },
-    {
-      name: 'worktree_set',
-      description: 'Set the active worktree for subsequent commands.',
+        'Restore files to a specific ref or resolve conflicts using theirs/ours. ' +
+        'Two modes: (1) With strategy ("theirs"/"ours") — resolves conflicted files and stages them. ' +
+        '(2) Without strategy — restores files to a ref (default HEAD), discarding local changes.',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          key: {
-            type: 'string',
-            description: "Ticket key like 'LS-1134' or just '1134'",
+          files: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'File paths to restore or resolve.',
           },
-        },
-        required: ['key'],
-      },
-    },
-    {
-      name: 'worktree_run',
-      description:
-        'Run a shell command in the active (or specified) worktree. ' +
-        'Refuses to run in the main repo when worktrees are active unless overridden.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          command: { type: 'string', description: 'Shell command to execute' },
-          worktree: {
+          strategy: {
+            type: 'string',
+            enum: ['theirs', 'ours'],
+            description:
+              'Conflict resolution strategy. If omitted, restores files to ref instead.',
+          },
+          ref: {
             type: 'string',
             description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+              'Git ref to restore files from (e.g. "HEAD", "origin/main"). ' +
+              'Default: "HEAD". Only used when strategy is omitted.',
           },
-          allowMainRepo: {
-            type: 'boolean',
-            description:
-              'Override: allow running in the main repo even when worktrees exist.',
-          },
+          worktree: { type: 'string', description: 'Optional ticket key.' },
         },
-        required: ['command'],
-      },
-    },
-    {
-      name: 'worktree_guard',
-      description:
-        'Check whether a path is inside the main repo and warn if worktrees are active.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          path: { type: 'string', description: 'Path to check' },
-        },
-        required: ['path'],
-      },
-    },
-    {
-      name: 'worktree_rebase',
-      description:
-        'Fetch origin and rebase the active worktree branch onto its parent ' +
-        '(via twig rebase). Sets GIT_EDITOR to prevent blocking in agent workflows. ' +
-        'Use worktree_stabilize after a successful rebase before pushing.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          worktree: {
-            type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
-          },
-          abort: {
-            type: 'boolean',
-            description:
-              'If true, aborts an in-progress rebase instead of starting one.',
-          },
-          skip: {
-            type: 'boolean',
-            description:
-              'If true, skips the current commit/patch in an in-progress rebase ' +
-              '(for example, an empty or duplicate commit) and continues the rebase.',
-          },
-        },
-      },
-    },
-    {
-      name: 'worktree_stabilize',
-      description:
-        'Run post-rebase stabilization: make install, regenerate schema, ' +
-        'and run codegen on affected projects. Must be run BEFORE pushing ' +
-        'after a rebase to prevent CI failures.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          worktree: {
-            type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
-          },
-        },
-      },
-    },
-    {
-      name: 'worktree_status',
-      description:
-        'Get structured git status for the active (or specified) worktree. ' +
-        'Returns modified, staged, untracked files, branch info, ahead/behind counts, ' +
-        'rebase/merge/conflict state, and merge-base info relative to origin/main as structured JSON.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          worktree: {
-            type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
-          },
-        },
+        required: ['files'],
       },
     },
     {
@@ -432,27 +346,6 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
-      name: 'worktree_rebase_continue',
-      description:
-        'Continue an in-progress rebase after conflicts have been resolved. ' +
-        'Stages resolved files, runs git rebase --continue, returns structured JSON.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          files: {
-            type: 'array' as const,
-            items: { type: 'string' },
-            description:
-              'Files to stage before continuing. If omitted, stages all (git add -A).',
-          },
-          worktree: {
-            type: 'string',
-            description: "Optional ticket key (e.g. 'LS-1134').",
-          },
-        },
-      },
-    },
-    {
       name: 'worktree_conflict_info',
       description:
         'List all conflicted files with line ranges and short previews of each side.',
@@ -461,72 +354,6 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         properties: {
           worktree: { type: 'string', description: 'Optional ticket key.' },
         },
-      },
-    },
-    {
-      name: 'worktree_checkout_file',
-      description:
-        'Restore files to a specific ref or resolve conflicts using theirs/ours. ' +
-        'Two modes: (1) With strategy ("theirs"/"ours") — resolves conflicted files and stages them. ' +
-        '(2) Without strategy — restores files to a ref (default HEAD), discarding local changes.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          files: {
-            type: 'array' as const,
-            items: { type: 'string' },
-            description: 'File paths to restore or resolve.',
-          },
-          strategy: {
-            type: 'string',
-            enum: ['theirs', 'ours'],
-            description:
-              'Conflict resolution strategy. If omitted, restores files to ref instead.',
-          },
-          ref: {
-            type: 'string',
-            description:
-              'Git ref to restore files from (e.g. "HEAD", "origin/main"). ' +
-              'Default: "HEAD". Only used when strategy is omitted.',
-          },
-          worktree: { type: 'string', description: 'Optional ticket key.' },
-        },
-        required: ['files'],
-      },
-    },
-    {
-      name: 'worktree_log',
-      description:
-        'Show structured commit log for the active (or specified) worktree. ' +
-        'Returns a JSON object with a commits array containing sha, shortSha, message, author, date, and refs.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          worktree: { type: 'string', description: 'Optional ticket key.' },
-          maxCount: { type: 'number', description: 'Max commits. Default 20.' },
-          path: { type: 'string', description: 'File path filter.' },
-          range: {
-            type: 'string',
-            description: 'Commit range (e.g. "origin/main..HEAD").',
-          },
-        },
-      },
-    },
-    {
-      name: 'worktree_show',
-      description:
-        'Show a specific commit metadata, stat summary, and optional file-filtered diff.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          sha: {
-            type: 'string',
-            description: 'Commit SHA (hex only, e.g. "abc1234" or "HEAD").',
-          },
-          worktree: { type: 'string', description: 'Optional ticket key.' },
-          path: { type: 'string', description: 'File path for filtered diff.' },
-        },
-        required: ['sha'],
       },
     },
     {
@@ -562,22 +389,37 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
-      name: 'worktree_push',
+      name: 'worktree_guard',
       description:
-        'Push the current branch with --force-with-lease. Refuses to push ' +
-        'the main branch. Intended for use after rebase + stabilize + make pc.',
+        'Check whether a path is inside the main repo and warn if worktrees are active.',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          worktree: {
+          path: { type: 'string', description: 'Path to check' },
+        },
+        required: ['path'],
+      },
+    },
+    {
+      name: 'worktree_list',
+      description:
+        'List all active worktrees with junction status and branch info.',
+      inputSchema: { type: 'object' as const, properties: {} },
+    },
+    {
+      name: 'worktree_log',
+      description:
+        'Show structured commit log for the active (or specified) worktree. ' +
+        'Returns a JSON object with a commits array containing sha, shortSha, message, author, date, and refs.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: { type: 'string', description: 'Optional ticket key.' },
+          maxCount: { type: 'number', description: 'Max commits. Default 20.' },
+          path: { type: 'string', description: 'File path filter.' },
+          range: {
             type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
-          },
-          setUpstream: {
-            type: 'boolean',
-            description:
-              'If true, adds -u to set the upstream tracking branch. Default false.',
+            description: 'Commit range (e.g. "origin/main..HEAD").',
           },
         },
       },
@@ -616,6 +458,164 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_push',
+      description:
+        'Push the current branch with --force-with-lease. Refuses to push ' +
+        'the main branch. Intended for use after rebase + stabilize + make pc.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+          setUpstream: {
+            type: 'boolean',
+            description:
+              'If true, adds -u to set the upstream tracking branch. Default false.',
+          },
+        },
+      },
+    },
+    {
+      name: 'worktree_rebase',
+      description:
+        'Fetch origin and rebase the active worktree branch onto its parent ' +
+        '(via twig rebase). Sets GIT_EDITOR to prevent blocking in agent workflows. ' +
+        'Use worktree_stabilize after a successful rebase before pushing.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+          abort: {
+            type: 'boolean',
+            description:
+              'If true, aborts an in-progress rebase instead of starting one.',
+          },
+          skip: {
+            type: 'boolean',
+            description:
+              'If true, skips the current commit/patch in an in-progress rebase ' +
+              '(for example, an empty or duplicate commit) and continues the rebase.',
+          },
+        },
+      },
+    },
+    {
+      name: 'worktree_rebase_continue',
+      description:
+        'Continue an in-progress rebase after conflicts have been resolved. ' +
+        'Stages resolved files, runs git rebase --continue, returns structured JSON.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          files: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description:
+              'Files to stage before continuing. If omitted, stages all (git add -A).',
+          },
+          worktree: {
+            type: 'string',
+            description: "Optional ticket key (e.g. 'LS-1134').",
+          },
+        },
+      },
+    },
+    {
+      name: 'worktree_run',
+      description:
+        'Run a shell command in the active (or specified) worktree. ' +
+        'Refuses to run in the main repo when worktrees are active unless overridden.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          command: { type: 'string', description: 'Shell command to execute' },
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+          allowMainRepo: {
+            type: 'boolean',
+            description:
+              'Override: allow running in the main repo even when worktrees exist.',
+          },
+        },
+        required: ['command'],
+      },
+    },
+    {
+      name: 'worktree_set',
+      description: 'Set the active worktree for subsequent commands.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          key: {
+            type: 'string',
+            description: "Ticket key like 'LS-1134' or just '1134'",
+          },
+        },
+        required: ['key'],
+      },
+    },
+    {
+      name: 'worktree_show',
+      description:
+        'Show a specific commit metadata, stat summary, and optional file-filtered diff.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          sha: {
+            type: 'string',
+            description: 'Commit SHA (hex only, e.g. "abc1234" or "HEAD").',
+          },
+          worktree: { type: 'string', description: 'Optional ticket key.' },
+          path: { type: 'string', description: 'File path for filtered diff.' },
+        },
+        required: ['sha'],
+      },
+    },
+    {
+      name: 'worktree_stabilize',
+      description:
+        'Run post-rebase stabilization: make install, regenerate schema, ' +
+        'and run codegen on affected projects. Must be run BEFORE pushing ' +
+        'after a rebase to prevent CI failures.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+        },
+      },
+    },
+    {
+      name: 'worktree_status',
+      description:
+        'Get structured git status for the active (or specified) worktree. ' +
+        'Returns modified, staged, untracked files, branch info, ahead/behind counts, ' +
+        'rebase/merge/conflict state, and merge-base info relative to origin/main as structured JSON.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+        },
+      },
+    },
+    {
       name: 'worktree_unjunction',
       description:
         'Remove the node_modules junction/symlink in a worktree so it can get independent ' +
@@ -640,162 +640,72 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
 
   switch (name) {
     // -----------------------------------------------------------------------
-    // worktree_list
+    // worktree_checkout_file
     // -----------------------------------------------------------------------
-    case 'worktree_list': {
-      const worktrees = getWorktrees();
-      const activeLabel = activeWorktree
-        ? `\nActive worktree: ${activeWorktree}`
-        : '\nNo active worktree set.';
-
-      if (worktrees.length === 0) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `No worktrees found.${activeLabel}`,
-            },
-          ],
-        };
-      }
-
-      const lines = worktrees.map((w) => {
-        const nmStatus = w.hasJunctionedNodeModules
-          ? `node_modules: junctioned -> ${w.nodeModulesTarget}`
-          : existsSync(join(w.path, 'node_modules'))
-            ? 'node_modules: independent'
-            : 'node_modules: missing';
-        return [
-          w.key,
-          `  Path:   ${w.path}`,
-          `  Branch: ${w.branch ?? 'unknown'}`,
-          `  ${nmStatus}`,
-        ].join('\n');
-      });
-
-      return {
-        content: [{ type: 'text', text: lines.join('\n\n') + activeLabel }],
+    case 'worktree_checkout_file': {
+      const {
+        files,
+        strategy,
+        ref = 'HEAD',
+        worktree: wtKey,
+      } = args as {
+        files: string[];
+        strategy?: 'theirs' | 'ours';
+        ref?: string;
+        worktree?: string;
       };
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_set
-    // -----------------------------------------------------------------------
-    case 'worktree_set': {
-      const { key } = args as { key: string };
-      const resolved = resolveWorktreePath(key);
-
-      if ('error' in resolved) {
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
         return {
-          content: [
-            {
-              type: 'text',
-              text: `${resolved.error}\nRun worktree_list to see available worktrees.`,
-            },
-          ],
+          content: [{ type: 'text', text: target.error }],
           isError: true,
         };
       }
+      const cwd = target.path;
 
-      activeWorktree = resolved.path;
-      return {
-        content: [
-          { type: 'text', text: `Active worktree set to: ${resolved.path}` },
-        ],
-      };
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_run
-    // -----------------------------------------------------------------------
-    case 'worktree_run': {
-      const { command, worktree, allowMainRepo } = args as {
-        command: string;
-        worktree?: string;
-        allowMainRepo?: boolean;
-      };
-
-      let targetDir: string;
-
-      if (worktree) {
-        const resolved = resolveWorktreePath(worktree);
-        if ('error' in resolved) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: resolved.error,
-              },
-            ],
-            isError: true,
-          };
-        }
-        targetDir = resolved.path;
-      } else if (activeWorktree) {
-        targetDir = activeWorktree;
-      } else {
-        const wts = getWorktrees();
-        if (wts.length > 0 && !allowMainRepo) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text:
-                  `Refused: no active worktree set and ${wts.length} worktree(s) exist.\n` +
-                  'Running commands in the main repo while worktrees are active is dangerous.\n' +
-                  'Use worktree_set first, pass the worktree parameter, or set allowMainRepo=true.\n\n' +
-                  `Available: ${wts.map((w) => w.key).join(', ')}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-        targetDir = MAIN_REPO;
-      }
-
-      // Guard: refuse main-repo execution when worktrees exist
-      if (resolve(targetDir) === resolve(MAIN_REPO) && !allowMainRepo) {
-        const wts = getWorktrees();
-        if (wts.length > 0) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text:
-                  `Refused: cannot run in main repo (${MAIN_REPO}) while ` +
-                  `${wts.length} worktree(s) are active. Set allowMainRepo=true to override.`,
-              },
-            ],
-            isError: true,
-          };
-        }
-      }
-
-      if (!existsSync(targetDir)) {
+      // Validate ref (only safe rev chars)
+      if (!strategy && !/^[a-zA-Z0-9_./~^{}-]+$/.test(ref)) {
         return {
           content: [
-            { type: 'text', text: `Directory does not exist: ${targetDir}` },
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Only alphanumeric, '_', '.', '/', '~', '^', '{', '}', '-' allowed.`,
+            },
           ],
           isError: true,
         };
       }
 
       try {
-        const shell =
-          process.platform === 'win32' ? 'powershell.exe' : '/bin/sh';
-        const output = execSync(command, {
-          cwd: targetDir,
-          encoding: 'utf-8',
-          timeout: 120_000,
-          shell,
-          maxBuffer: 10 * 1024 * 1024,
-        });
+        const restoredFiles: string[] = [];
+        for (const file of files) {
+          if (strategy) {
+            // Conflict resolution mode: checkout --theirs/--ours and stage
+            runGit(['checkout', `--${strategy}`, '--', file], cwd);
+            runGit(['add', '--', file], cwd);
+          } else {
+            // Restore mode: checkout file from ref
+            runGit(['checkout', ref, '--', file], cwd);
+          }
+          restoredFiles.push(file);
+        }
 
+        const mode = strategy ? `--${strategy}` : ref;
+        const verb = strategy ? 'Resolved' : 'Restored';
+        const suffix = strategy ? ' and staged them' : '';
         return {
           content: [
             {
               type: 'text',
-              text: `[cwd: ${targetDir}]\n$ ${command}\n\n${output}`,
+              text: JSON.stringify(
+                {
+                  mode,
+                  files: restoredFiles,
+                  message: `${verb} ${restoredFiles.length} file(s) using ${mode}${suffix}.`,
+                },
+                null,
+                2,
+              ),
             },
           ],
         };
@@ -804,13 +714,528 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
           stdout?: string;
           stderr?: string;
           status?: number;
+          message?: string;
         };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_commit
+    // -----------------------------------------------------------------------
+    case 'worktree_commit': {
+      const {
+        message,
+        files,
+        worktree: wtKey,
+        amend,
+      } = args as {
+        message?: string;
+        files?: string[];
+        worktree?: string;
+        amend?: boolean;
+      };
+
+      // message is required for new commits, optional for amend
+      if (!amend && !message) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: message is required when not amending.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+
+      // Safety: refuse main, detached HEAD, and in-progress rebase/merge
+      try {
+        const branch = run('git branch --show-current', cwd).trim();
+        if (!branch) {
+          const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
+          const inRebase =
+            existsSync(join(gitDir, 'rebase-merge')) ||
+            existsSync(join(gitDir, 'rebase-apply'));
+          return {
+            content: [
+              {
+                type: 'text',
+                text: inRebase
+                  ? 'Refused: rebase is in progress. Finish the rebase before committing.'
+                  : 'Refused: HEAD is detached (no branch checked out). Aborting commit.',
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (branch === 'main') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Refused: cannot commit on main. Create a worktree first.',
+              },
+            ],
+            isError: true,
+          };
+        }
+        // Check for in-progress merge
+        const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
+        if (existsSync(join(gitDir, 'MERGE_HEAD'))) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Refused: merge is in progress. Complete or abort the merge first.',
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Could not determine current branch. Aborting commit.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Validate conventional commit format (scope is optional) — skip for amend
+      const conventionalPattern =
+        /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?:\s.+/;
+      if (!amend && !conventionalPattern.test(message as string)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Invalid commit message format: "${message}"\n\n` +
+                'Expected conventional commit: type[(scope)]: description\n' +
+                'Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert\n' +
+                'Scope is optional. Examples: "feat(auth): add oauth", "fix: typo"',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Refuse to stage dangerous files
+      // "Always block" patterns — no safe-extension exemption applies
+      const alwaysBlockPatterns = [
+        /\.env$/,
+        /\.env\./,
+        /credentials/i,
+        /\.pem$/,
+        /\.key$/,
+      ];
+      // "Name-based" patterns that cause false positives on IaC/source files
+      // (e.g. secrets.tf, secrets.ts) — safe extensions are exempted
+      const nameBasedPatterns = [/secrets?\./i];
+
+      // IaC and source code files that reference secrets but don't contain them
+      const safeExtensions =
+        /\.(tf|ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|sh)$/i;
+
+      // Distinguish files=undefined (stage all) from files=[] (error: nothing specified)
+      const stageAll = files === undefined;
+      if (!stageAll && files.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'No files specified. Either omit the files parameter to stage all, or provide file paths.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const isDangerous = (f: string) =>
+        alwaysBlockPatterns.some((p) => p.test(f)) ||
+        (nameBasedPatterns.some((p) => p.test(f)) && !safeExtensions.test(f));
+
+      if (!stageAll) {
+        for (const f of files) {
+          if (isDangerous(f)) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Refused: "${f}" looks like a credential/secret file. Remove it from the file list.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+      }
+
+      try {
+        // Stage files using execFileSync to avoid shell injection
+        if (!stageAll) {
+          runGit(['add', '--', ...files], cwd);
+        } else {
+          // Stage all modified files, but check for dangerous files first
+          const status = run('git status --porcelain', cwd).trim();
+          if (!status && !amend) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: 'Nothing to commit — working tree is clean.',
+                },
+              ],
+            };
+          }
+
+          // Check for dangerous files in the changeset
+          const changedFiles = status
+            .split('\n')
+            .map((l) => l.slice(3).trim())
+            .filter(Boolean);
+          for (const f of changedFiles) {
+            if (isDangerous(f)) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text:
+                      `Refused: "${f}" looks like a credential/secret file and would be staged by git add -A.\n` +
+                      'Specify files explicitly to exclude it.',
+                  },
+                ],
+                isError: true,
+              };
+            }
+          }
+
+          runGit(['add', '-A'], cwd);
+        }
+
+        // Commit
+        if (amend) {
+          runGit(['commit', '--amend', '--no-edit'], cwd, {
+            env: { GIT_EDITOR: 'true' },
+          });
+        } else {
+          const fullMessage =
+            message + '\n\nCo-Authored-By: Claude <noreply@anthropic.com>';
+          const msgPath = join(
+            tmpdir(),
+            `worktree-commit-msg-${Date.now()}.txt`,
+          );
+          writeFileSync(msgPath, fullMessage, 'utf-8');
+          try {
+            runGit(['commit', '-F', msgPath], cwd, {
+              env: { GIT_EDITOR: 'true' },
+            });
+          } finally {
+            try {
+              unlinkSync(msgPath);
+            } catch {
+              // Ignore cleanup errors
+            }
+          }
+        }
+
+        // Get commit info (works on orphan/first commits too)
+        const sha = run('git rev-parse --short HEAD', cwd).trim();
+        const filesChanged = run(
+          'git diff-tree --no-commit-id --name-only -r HEAD',
+          cwd,
+        ).trim();
+
+        const commitMessage = amend
+          ? run('git log -1 --pretty=%B', cwd).trim()
+          : message;
+
+        const result = {
+          sha,
+          message: commitMessage,
+          filesChanged: filesChanged.split('\n').filter(Boolean),
+          ...(amend ? { amended: true } : {}),
+        };
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; status?: number };
         const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
         return {
           content: [
             {
               type: 'text',
-              text: `[cwd: ${targetDir}]\n$ ${command}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
+              text: `Commit failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_conflict_info
+    // -----------------------------------------------------------------------
+    case 'worktree_conflict_info': {
+      const { worktree: wtKey } = args as { worktree?: string };
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+      try {
+        // Use NUL-delimited output for safe path handling
+        const rawConflicts = run(
+          'git diff --name-only --diff-filter=U -z',
+          cwd,
+        );
+        const conflictedPaths = rawConflicts.split('\0').filter(Boolean);
+        if (conflictedPaths.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  { files: [], message: 'No conflicts found.' },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+        const files: Array<{
+          path: string;
+          conflicts: Array<{
+            startLine: number;
+            separatorLine: number;
+            endLine: number;
+            oursPreview: string;
+            theirsPreview: string;
+          }>;
+        }> = [];
+        for (const filePath of conflictedPaths) {
+          const fullPath = join(cwd, filePath);
+          if (!existsSync(fullPath)) {
+            files.push({ path: filePath, conflicts: [] });
+            continue;
+          }
+          const content = readFileSync(fullPath, 'utf-8');
+          const lines = content.split('\n');
+          const conflicts: Array<{
+            startLine: number;
+            separatorLine: number;
+            endLine: number;
+            oursPreview: string;
+            theirsPreview: string;
+          }> = [];
+          let i = 0;
+          while (i < lines.length) {
+            if (lines[i].startsWith('<<<<<<<')) {
+              const startLine = i + 1;
+              const oursLines: string[] = [];
+              i++;
+              while (i < lines.length && !lines[i].startsWith('=======')) {
+                oursLines.push(lines[i]);
+                i++;
+              }
+              const separatorLine = i + 1;
+              i++;
+              const theirsLines: string[] = [];
+              while (i < lines.length && !lines[i].startsWith('>>>>>>>')) {
+                theirsLines.push(lines[i]);
+                i++;
+              }
+              const endLine = i + 1;
+              const preview = (arr: string[]) => {
+                const suffix =
+                  arr.length > 3 ? `\n... (${arr.length} lines total)` : '';
+                const maxContent = 200 - suffix.length;
+                return arr.slice(0, 3).join('\n').slice(0, maxContent) + suffix;
+              };
+              conflicts.push({
+                startLine,
+                separatorLine,
+                endLine,
+                oursPreview: preview(oursLines),
+                theirsPreview: preview(theirsLines),
+              });
+            }
+            i++;
+          }
+          files.push({ path: filePath, conflicts });
+        }
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ files }, null, 2) }],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            { type: 'text', text: `Failed to inspect conflicts: ${output}` },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_diff
+    // -----------------------------------------------------------------------
+    case 'worktree_diff': {
+      const {
+        worktree: wtKey,
+        base = 'origin/main',
+        paths,
+        stat,
+        nameOnly,
+      } = args as {
+        worktree?: string;
+        base?: string;
+        paths?: string[];
+        stat?: boolean;
+        nameOnly?: boolean;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      // Validate base ref (only safe rev chars; reject option-like values)
+      if (base.startsWith('-')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid base ref: "${base}". Base ref must not start with '-'.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(base)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid base ref: "${base}". Only alphanumeric, '.', '/', '~', '^', '-', '_', '{', '}' allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Enforce mutual exclusivity of stat and nameOnly
+      if (stat && nameOnly) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Cannot use both "stat" and "nameOnly" — pick one.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const gitArgs = ['diff', base];
+        if (stat) gitArgs.push('--stat');
+        if (nameOnly) gitArgs.push('--name-only');
+        if (paths?.length) {
+          gitArgs.push('--');
+          gitArgs.push(...paths);
+        }
+
+        const output = runGit(gitArgs, cwd);
+        const trimmed = output.trim();
+
+        if (!trimmed) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `No differences found between ${base} and HEAD.`,
+              },
+            ],
+          };
+        }
+
+        // Truncate large diffs to prevent exceeding MCP/stdio limits
+        const MAX_DIFF_BYTES = 512_000; // 500 KB
+        if (trimmed.length > MAX_DIFF_BYTES) {
+          const truncated = trimmed.slice(0, MAX_DIFF_BYTES);
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  truncated +
+                  `\n\n... [truncated — diff exceeds ${MAX_DIFF_BYTES / 1000}KB. Use path filters to narrow scope.]`,
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [{ type: 'text', text: trimmed }],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `git diff failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
             },
           ],
           isError: true,
@@ -851,6 +1276,329 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_list
+    // -----------------------------------------------------------------------
+    case 'worktree_list': {
+      const worktrees = getWorktrees();
+      const activeLabel = activeWorktree
+        ? `\nActive worktree: ${activeWorktree}`
+        : '\nNo active worktree set.';
+
+      if (worktrees.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `No worktrees found.${activeLabel}`,
+            },
+          ],
+        };
+      }
+
+      const lines = worktrees.map((w) => {
+        const nmStatus = w.hasJunctionedNodeModules
+          ? `node_modules: junctioned -> ${w.nodeModulesTarget}`
+          : existsSync(join(w.path, 'node_modules'))
+            ? 'node_modules: independent'
+            : 'node_modules: missing';
+        return [
+          w.key,
+          `  Path:   ${w.path}`,
+          `  Branch: ${w.branch ?? 'unknown'}`,
+          `  ${nmStatus}`,
+        ].join('\n');
+      });
+
+      return {
+        content: [{ type: 'text', text: lines.join('\n\n') + activeLabel }],
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_log
+    // -----------------------------------------------------------------------
+    case 'worktree_log': {
+      const {
+        worktree: wtKey,
+        maxCount = 20,
+        path: filterPath,
+        range,
+      } = args as {
+        worktree?: string;
+        maxCount?: number;
+        path?: string;
+        range?: string;
+      };
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+      const limit = Math.min(Math.max(maxCount, 1), 100);
+
+      // Validate range if provided (only safe rev chars)
+      if (range && !/^[a-zA-Z0-9_./~^{}-]+$/.test(range)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid range: "${range}". Only rev characters allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        // Use record/field separators to avoid delimiter collisions with commit text
+        const RS = '\x1e'; // record separator
+        const FS = '\x1f'; // field separator
+        const gitArgs = [
+          'log',
+          `--format=${RS}%H${FS}%h${FS}%s${FS}%an${FS}%aI${FS}%D`,
+          `-n`,
+          `${limit}`,
+        ];
+        if (range) gitArgs.push(range);
+        if (filterPath) gitArgs.push('--', filterPath);
+
+        const output = runGit(gitArgs, cwd, { timeout: 30_000 });
+        const commits = output
+          .split(RS)
+          .filter((b) => b.trim())
+          .map((record) => {
+            const fields = record.trim().split(FS);
+            return {
+              sha: fields[0] ?? '',
+              shortSha: fields[1] ?? '',
+              message: fields[2] ?? '',
+              author: fields[3] ?? '',
+              date: fields[4] ?? '',
+              refs: fields[5] ?? '',
+            };
+          });
+        return {
+          content: [
+            { type: 'text', text: JSON.stringify({ commits }, null, 2) },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [{ type: 'text', text: `Failed to get log: ${output}` }],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_ls_tree
+    // -----------------------------------------------------------------------
+    case 'worktree_ls_tree': {
+      const {
+        ref,
+        path: dirPath,
+        recursive = true,
+        worktree,
+      } = args as {
+        ref: string;
+        path?: string;
+        recursive?: boolean;
+        worktree?: string;
+      };
+
+      let cwd: string;
+      if (worktree) {
+        const target = resolveTargetDir(worktree);
+        if ('error' in target) {
+          return {
+            content: [{ type: 'text', text: target.error }],
+            isError: true,
+          };
+        }
+        cwd = target.path;
+      } else if (activeWorktree) {
+        cwd = activeWorktree;
+      } else {
+        cwd = MAIN_REPO;
+      }
+
+      // Validate ref (only safe rev chars; reject option-like values)
+      if (ref.startsWith('-')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Ref must not start with '-'.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(ref)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Only alphanumeric, '_', '.', '/', '~', '^', '{', '}', '-' allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const MAX_FILES = 500;
+        const gitArgs = ['ls-tree', '--name-only'];
+        if (recursive) gitArgs.push('-r');
+
+        // For non-recursive mode with a directory path, use <ref>:<dirPath>
+        // so git returns the directory's children instead of just the directory entry.
+        if (dirPath && !recursive) {
+          gitArgs.push(`${ref}:${dirPath}`);
+        } else {
+          gitArgs.push(ref);
+          if (dirPath) gitArgs.push('--', dirPath);
+        }
+
+        const output = runGit(gitArgs, cwd);
+        const allFiles = output.trim().split('\n').filter(Boolean);
+        const truncated = allFiles.length > MAX_FILES;
+        const files = truncated ? allFiles.slice(0, MAX_FILES) : allFiles;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                ref,
+                path: dirPath ?? '/',
+                fileCount: allFiles.length,
+                truncated,
+                files,
+              }),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { message?: string; stderr?: string };
+        const msg = e.stderr || e.message || String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to list files at ${ref}${dirPath ? `:${dirPath}` : ''}: ${msg.trim()}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_push
+    // -----------------------------------------------------------------------
+    case 'worktree_push': {
+      const { worktree: wtKey, setUpstream } = args as {
+        worktree?: string;
+        setUpstream?: boolean;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+
+      // Safety: refuse to push main or in detached HEAD / mid-rebase state
+      try {
+        const branch = run('git branch --show-current', cwd).trim();
+        if (!branch) {
+          // Detached HEAD — check if a rebase is in progress
+          const gitDir = run('git rev-parse --git-dir', cwd).trim();
+          const inRebase =
+            existsSync(join(gitDir, 'rebase-merge')) ||
+            existsSync(join(gitDir, 'rebase-apply'));
+          return {
+            content: [
+              {
+                type: 'text',
+                text: inRebase
+                  ? 'Refused: rebase is in progress. Finish the rebase before pushing.'
+                  : 'Refused: HEAD is detached (no branch checked out). Aborting push.',
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (branch === 'main') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Refused: cannot force-push main. Use git revert instead.',
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch {
+        // If we can't determine the branch, refuse to proceed
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Could not determine current branch. Aborting push.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const upstreamFlag = setUpstream ? ' -u' : '';
+      const cmd = `git push${upstreamFlag} --force-with-lease origin HEAD`;
+
+      try {
+        const out = run(cmd, cwd, { timeout: 30_000 });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[cwd: ${cwd}]\n$ ${cmd}\n\n${out.trim()}`,
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+        };
+        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[cwd: ${cwd}]\n$ ${cmd}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
 
     // -----------------------------------------------------------------------
@@ -1148,6 +1896,379 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
     }
 
     // -----------------------------------------------------------------------
+    // worktree_rebase_continue
+    // -----------------------------------------------------------------------
+    case 'worktree_rebase_continue': {
+      const { files, worktree: wtKey } = args as {
+        files?: string[];
+        worktree?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const cwd = target.path;
+
+      // Verify rebase is in progress
+      try {
+        const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
+        const inRebase =
+          existsSync(join(gitDir, 'rebase-merge')) ||
+          existsSync(join(gitDir, 'rebase-apply'));
+        if (!inRebase) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'No rebase in progress. Use worktree_rebase to start one.',
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch {
+        return {
+          content: [{ type: 'text', text: 'Could not determine git state.' }],
+          isError: true,
+        };
+      }
+
+      try {
+        const step = rebaseContinueStep(cwd, files);
+
+        if (step.completed) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    completed: true,
+                    remainingConflicts: [],
+                    message:
+                      'Rebase complete. Next: worktree_stabilize, then make pc, then worktree_push.',
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        const message =
+          step.conflicted.length > 0
+            ? 'Rebase paused — more conflicts to resolve.'
+            : 'Rebase paused — awaiting action (e.g., edit/reword step).';
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  completed: false,
+                  remainingConflicts: step.conflicted,
+                  message,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; status?: number };
+        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+        const hasConflicts =
+          output.includes('CONFLICT') || output.includes('could not apply');
+
+        if (hasConflicts) {
+          const conflictedFiles = (() => {
+            try {
+              return run('git diff --name-only --diff-filter=U', cwd)
+                .trim()
+                .split('\n')
+                .filter(Boolean);
+            } catch {
+              return [];
+            }
+          })();
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    completed: false,
+                    remainingConflicts: conflictedFiles,
+                    message:
+                      'New conflicts encountered. Resolve them and call worktree_rebase_continue again.',
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Rebase continue failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_run
+    // -----------------------------------------------------------------------
+    case 'worktree_run': {
+      const { command, worktree, allowMainRepo } = args as {
+        command: string;
+        worktree?: string;
+        allowMainRepo?: boolean;
+      };
+
+      let targetDir: string;
+
+      if (worktree) {
+        const resolved = resolveWorktreePath(worktree);
+        if ('error' in resolved) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: resolved.error,
+              },
+            ],
+            isError: true,
+          };
+        }
+        targetDir = resolved.path;
+      } else if (activeWorktree) {
+        targetDir = activeWorktree;
+      } else {
+        const wts = getWorktrees();
+        if (wts.length > 0 && !allowMainRepo) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Refused: no active worktree set and ${wts.length} worktree(s) exist.\n` +
+                  'Running commands in the main repo while worktrees are active is dangerous.\n' +
+                  'Use worktree_set first, pass the worktree parameter, or set allowMainRepo=true.\n\n' +
+                  `Available: ${wts.map((w) => w.key).join(', ')}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        targetDir = MAIN_REPO;
+      }
+
+      // Guard: refuse main-repo execution when worktrees exist
+      if (resolve(targetDir) === resolve(MAIN_REPO) && !allowMainRepo) {
+        const wts = getWorktrees();
+        if (wts.length > 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Refused: cannot run in main repo (${MAIN_REPO}) while ` +
+                  `${wts.length} worktree(s) are active. Set allowMainRepo=true to override.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      if (!existsSync(targetDir)) {
+        return {
+          content: [
+            { type: 'text', text: `Directory does not exist: ${targetDir}` },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const shell =
+          process.platform === 'win32' ? 'powershell.exe' : '/bin/sh';
+        const output = execSync(command, {
+          cwd: targetDir,
+          encoding: 'utf-8',
+          timeout: 120_000,
+          shell,
+          maxBuffer: 10 * 1024 * 1024,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[cwd: ${targetDir}]\n$ ${command}\n\n${output}`,
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          (err instanceof Error ? err.message : String(err));
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[cwd: ${targetDir}]\n$ ${command}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_set
+    // -----------------------------------------------------------------------
+    case 'worktree_set': {
+      const { key } = args as { key: string };
+      const resolved = resolveWorktreePath(key);
+
+      if ('error' in resolved) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `${resolved.error}\nRun worktree_list to see available worktrees.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      activeWorktree = resolved.path;
+      return {
+        content: [
+          { type: 'text', text: `Active worktree set to: ${resolved.path}` },
+        ],
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_show
+    // -----------------------------------------------------------------------
+    case 'worktree_show': {
+      const {
+        sha,
+        worktree: wtKey,
+        path: filterPath,
+      } = args as {
+        sha: string;
+        worktree?: string;
+        path?: string;
+      };
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      // Validate SHA — allow hex, HEAD, HEAD~N, branch names
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(sha)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid SHA: "${sha}". Only rev characters allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        // Use execFileSync via runGit for safe argument passing
+        const meta = runGit(
+          ['show', sha, '--no-patch', '--format=%H%n%s%n%an%n%aI'],
+          cwd,
+          { timeout: 10_000 },
+        ).trim();
+        const metaLines = meta.split('\n');
+
+        const stat = runGit(['show', sha, '--stat', '--format='], cwd, {
+          timeout: 10_000,
+        }).trim();
+        const statEntries = stat
+          .split('\n')
+          .filter((l) => l.includes('|'))
+          .map((l) => {
+            const match = l.match(/^\s*(.+?)\s*\|\s*(\d+)\s*([+-]*)/);
+            return match
+              ? { file: match[1].trim(), changes: parseInt(match[2], 10) }
+              : { file: l.trim(), changes: 0 };
+          });
+
+        const result: Record<string, unknown> = {
+          sha: metaLines[0] ?? sha,
+          message: metaLines[1] ?? '',
+          author: metaLines[2] ?? '',
+          date: metaLines[3] ?? '',
+          stat: statEntries,
+        };
+
+        if (filterPath) {
+          try {
+            const diff = runGit(['show', sha, '--', filterPath], cwd, {
+              timeout: 30_000,
+            }).trim();
+            result.diff =
+              diff.length > 50_000
+                ? diff.slice(0, 50_000) + '\n... [truncated]'
+                : diff;
+          } catch {
+            result.diff =
+              '(diff unavailable — file may not exist in this commit)';
+          }
+        }
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [{ type: 'text', text: `Failed to show commit: ${output}` }],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
     // worktree_stabilize
     // -----------------------------------------------------------------------
     case 'worktree_stabilize': {
@@ -1356,1021 +2477,6 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
     }
 
     // -----------------------------------------------------------------------
-    // worktree_commit
-    // -----------------------------------------------------------------------
-    case 'worktree_commit': {
-      const {
-        message,
-        files,
-        worktree: wtKey,
-        amend,
-      } = args as {
-        message?: string;
-        files?: string[];
-        worktree?: string;
-        amend?: boolean;
-      };
-
-      // message is required for new commits, optional for amend
-      if (!amend && !message) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Missing required parameter: message is required when not amending.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      const target = resolveTargetDir(wtKey);
-      if ('error' in target) {
-        return {
-          content: [{ type: 'text', text: target.error }],
-          isError: true,
-        };
-      }
-
-      const cwd = target.path;
-
-      // Safety: refuse main, detached HEAD, and in-progress rebase/merge
-      try {
-        const branch = run('git branch --show-current', cwd).trim();
-        if (!branch) {
-          const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
-          const inRebase =
-            existsSync(join(gitDir, 'rebase-merge')) ||
-            existsSync(join(gitDir, 'rebase-apply'));
-          return {
-            content: [
-              {
-                type: 'text',
-                text: inRebase
-                  ? 'Refused: rebase is in progress. Finish the rebase before committing.'
-                  : 'Refused: HEAD is detached (no branch checked out). Aborting commit.',
-              },
-            ],
-            isError: true,
-          };
-        }
-        if (branch === 'main') {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Refused: cannot commit on main. Create a worktree first.',
-              },
-            ],
-            isError: true,
-          };
-        }
-        // Check for in-progress merge
-        const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
-        if (existsSync(join(gitDir, 'MERGE_HEAD'))) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Refused: merge is in progress. Complete or abort the merge first.',
-              },
-            ],
-            isError: true,
-          };
-        }
-      } catch {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Could not determine current branch. Aborting commit.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      // Validate conventional commit format (scope is optional) — skip for amend
-      const conventionalPattern =
-        /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?:\s.+/;
-      if (!amend && !conventionalPattern.test(message as string)) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text:
-                `Invalid commit message format: "${message}"\n\n` +
-                'Expected conventional commit: type[(scope)]: description\n' +
-                'Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert\n' +
-                'Scope is optional. Examples: "feat(auth): add oauth", "fix: typo"',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      // Refuse to stage dangerous files
-      // "Always block" patterns — no safe-extension exemption applies
-      const alwaysBlockPatterns = [
-        /\.env$/,
-        /\.env\./,
-        /credentials/i,
-        /\.pem$/,
-        /\.key$/,
-      ];
-      // "Name-based" patterns that cause false positives on IaC/source files
-      // (e.g. secrets.tf, secrets.ts) — safe extensions are exempted
-      const nameBasedPatterns = [/secrets?\./i];
-
-      // IaC and source code files that reference secrets but don't contain them
-      const safeExtensions =
-        /\.(tf|ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|sh)$/i;
-
-      // Distinguish files=undefined (stage all) from files=[] (error: nothing specified)
-      const stageAll = files === undefined;
-      if (!stageAll && files.length === 0) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'No files specified. Either omit the files parameter to stage all, or provide file paths.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      const isDangerous = (f: string) =>
-        alwaysBlockPatterns.some((p) => p.test(f)) ||
-        (nameBasedPatterns.some((p) => p.test(f)) && !safeExtensions.test(f));
-
-      if (!stageAll) {
-        for (const f of files) {
-          if (isDangerous(f)) {
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Refused: "${f}" looks like a credential/secret file. Remove it from the file list.`,
-                },
-              ],
-              isError: true,
-            };
-          }
-        }
-      }
-
-      try {
-        // Stage files using execFileSync to avoid shell injection
-        if (!stageAll) {
-          runGit(['add', '--', ...files], cwd);
-        } else {
-          // Stage all modified files, but check for dangerous files first
-          const status = run('git status --porcelain', cwd).trim();
-          if (!status && !amend) {
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: 'Nothing to commit — working tree is clean.',
-                },
-              ],
-            };
-          }
-
-          // Check for dangerous files in the changeset
-          const changedFiles = status
-            .split('\n')
-            .map((l) => l.slice(3).trim())
-            .filter(Boolean);
-          for (const f of changedFiles) {
-            if (isDangerous(f)) {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text:
-                      `Refused: "${f}" looks like a credential/secret file and would be staged by git add -A.\n` +
-                      'Specify files explicitly to exclude it.',
-                  },
-                ],
-                isError: true,
-              };
-            }
-          }
-
-          runGit(['add', '-A'], cwd);
-        }
-
-        // Commit
-        if (amend) {
-          runGit(['commit', '--amend', '--no-edit'], cwd, {
-            env: { GIT_EDITOR: 'true' },
-          });
-        } else {
-          const fullMessage =
-            message + '\n\nCo-Authored-By: Claude <noreply@anthropic.com>';
-          const msgPath = join(
-            tmpdir(),
-            `worktree-commit-msg-${Date.now()}.txt`,
-          );
-          writeFileSync(msgPath, fullMessage, 'utf-8');
-          try {
-            runGit(['commit', '-F', msgPath], cwd, {
-              env: { GIT_EDITOR: 'true' },
-            });
-          } finally {
-            try {
-              unlinkSync(msgPath);
-            } catch {
-              // Ignore cleanup errors
-            }
-          }
-        }
-
-        // Get commit info (works on orphan/first commits too)
-        const sha = run('git rev-parse --short HEAD', cwd).trim();
-        const filesChanged = run(
-          'git diff-tree --no-commit-id --name-only -r HEAD',
-          cwd,
-        ).trim();
-
-        const commitMessage = amend
-          ? run('git log -1 --pretty=%B', cwd).trim()
-          : message;
-
-        const result = {
-          sha,
-          message: commitMessage,
-          filesChanged: filesChanged.split('\n').filter(Boolean),
-          ...(amend ? { amended: true } : {}),
-        };
-
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
-      } catch (err: unknown) {
-        const e = err as { stdout?: string; stderr?: string; status?: number };
-        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Commit failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_rebase_continue
-    // -----------------------------------------------------------------------
-    case 'worktree_rebase_continue': {
-      const { files, worktree: wtKey } = args as {
-        files?: string[];
-        worktree?: string;
-      };
-
-      const target = resolveTargetDir(wtKey);
-      if ('error' in target) {
-        return {
-          content: [{ type: 'text', text: target.error }],
-          isError: true,
-        };
-      }
-
-      const cwd = target.path;
-
-      // Verify rebase is in progress
-      try {
-        const gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
-        const inRebase =
-          existsSync(join(gitDir, 'rebase-merge')) ||
-          existsSync(join(gitDir, 'rebase-apply'));
-        if (!inRebase) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'No rebase in progress. Use worktree_rebase to start one.',
-              },
-            ],
-            isError: true,
-          };
-        }
-      } catch {
-        return {
-          content: [{ type: 'text', text: 'Could not determine git state.' }],
-          isError: true,
-        };
-      }
-
-      try {
-        const step = rebaseContinueStep(cwd, files);
-
-        if (step.completed) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    completed: true,
-                    remainingConflicts: [],
-                    message:
-                      'Rebase complete. Next: worktree_stabilize, then make pc, then worktree_push.',
-                  },
-                  null,
-                  2,
-                ),
-              },
-            ],
-          };
-        }
-
-        const message =
-          step.conflicted.length > 0
-            ? 'Rebase paused — more conflicts to resolve.'
-            : 'Rebase paused — awaiting action (e.g., edit/reword step).';
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  completed: false,
-                  remainingConflicts: step.conflicted,
-                  message,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      } catch (err: unknown) {
-        const e = err as { stdout?: string; stderr?: string; status?: number };
-        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
-        const hasConflicts =
-          output.includes('CONFLICT') || output.includes('could not apply');
-
-        if (hasConflicts) {
-          const conflictedFiles = (() => {
-            try {
-              return run('git diff --name-only --diff-filter=U', cwd)
-                .trim()
-                .split('\n')
-                .filter(Boolean);
-            } catch {
-              return [];
-            }
-          })();
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  {
-                    completed: false,
-                    remainingConflicts: conflictedFiles,
-                    message:
-                      'New conflicts encountered. Resolve them and call worktree_rebase_continue again.',
-                  },
-                  null,
-                  2,
-                ),
-              },
-            ],
-          };
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Rebase continue failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_conflict_info
-    // -----------------------------------------------------------------------
-    case 'worktree_conflict_info': {
-      const { worktree: wtKey } = args as { worktree?: string };
-      const target = resolveTargetDir(wtKey);
-      if ('error' in target) {
-        return {
-          content: [{ type: 'text', text: target.error }],
-          isError: true,
-        };
-      }
-      const cwd = target.path;
-      try {
-        // Use NUL-delimited output for safe path handling
-        const rawConflicts = run(
-          'git diff --name-only --diff-filter=U -z',
-          cwd,
-        );
-        const conflictedPaths = rawConflicts.split('\0').filter(Boolean);
-        if (conflictedPaths.length === 0) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(
-                  { files: [], message: 'No conflicts found.' },
-                  null,
-                  2,
-                ),
-              },
-            ],
-          };
-        }
-        const files: Array<{
-          path: string;
-          conflicts: Array<{
-            startLine: number;
-            separatorLine: number;
-            endLine: number;
-            oursPreview: string;
-            theirsPreview: string;
-          }>;
-        }> = [];
-        for (const filePath of conflictedPaths) {
-          const fullPath = join(cwd, filePath);
-          if (!existsSync(fullPath)) {
-            files.push({ path: filePath, conflicts: [] });
-            continue;
-          }
-          const content = readFileSync(fullPath, 'utf-8');
-          const lines = content.split('\n');
-          const conflicts: Array<{
-            startLine: number;
-            separatorLine: number;
-            endLine: number;
-            oursPreview: string;
-            theirsPreview: string;
-          }> = [];
-          let i = 0;
-          while (i < lines.length) {
-            if (lines[i].startsWith('<<<<<<<')) {
-              const startLine = i + 1;
-              const oursLines: string[] = [];
-              i++;
-              while (i < lines.length && !lines[i].startsWith('=======')) {
-                oursLines.push(lines[i]);
-                i++;
-              }
-              const separatorLine = i + 1;
-              i++;
-              const theirsLines: string[] = [];
-              while (i < lines.length && !lines[i].startsWith('>>>>>>>')) {
-                theirsLines.push(lines[i]);
-                i++;
-              }
-              const endLine = i + 1;
-              const preview = (arr: string[]) => {
-                const suffix =
-                  arr.length > 3 ? `\n... (${arr.length} lines total)` : '';
-                const maxContent = 200 - suffix.length;
-                return arr.slice(0, 3).join('\n').slice(0, maxContent) + suffix;
-              };
-              conflicts.push({
-                startLine,
-                separatorLine,
-                endLine,
-                oursPreview: preview(oursLines),
-                theirsPreview: preview(theirsLines),
-              });
-            }
-            i++;
-          }
-          files.push({ path: filePath, conflicts });
-        }
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ files }, null, 2) }],
-        };
-      } catch (err: unknown) {
-        const e = err as { stdout?: string; stderr?: string; message?: string };
-        const output =
-          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
-          e.message ||
-          String(err);
-        return {
-          content: [
-            { type: 'text', text: `Failed to inspect conflicts: ${output}` },
-          ],
-          isError: true,
-        };
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_checkout_file
-    // -----------------------------------------------------------------------
-    case 'worktree_checkout_file': {
-      const {
-        files,
-        strategy,
-        ref = 'HEAD',
-        worktree: wtKey,
-      } = args as {
-        files: string[];
-        strategy?: 'theirs' | 'ours';
-        ref?: string;
-        worktree?: string;
-      };
-      const target = resolveTargetDir(wtKey);
-      if ('error' in target) {
-        return {
-          content: [{ type: 'text', text: target.error }],
-          isError: true,
-        };
-      }
-      const cwd = target.path;
-
-      // Validate ref (only safe rev chars)
-      if (!strategy && !/^[a-zA-Z0-9_./~^{}-]+$/.test(ref)) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid ref: "${ref}". Only alphanumeric, '.', '/', '~', '^', '-' allowed.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      try {
-        const restoredFiles: string[] = [];
-        for (const file of files) {
-          if (strategy) {
-            // Conflict resolution mode: checkout --theirs/--ours and stage
-            runGit(['checkout', `--${strategy}`, '--', file], cwd);
-            runGit(['add', '--', file], cwd);
-          } else {
-            // Restore mode: checkout file from ref
-            runGit(['checkout', ref, '--', file], cwd);
-          }
-          restoredFiles.push(file);
-        }
-
-        const mode = strategy ? `--${strategy}` : ref;
-        const verb = strategy ? 'Resolved' : 'Restored';
-        const suffix = strategy ? ' and staged them' : '';
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  mode,
-                  files: restoredFiles,
-                  message: `${verb} ${restoredFiles.length} file(s) using ${mode}${suffix}.`,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      } catch (err: unknown) {
-        const e = err as {
-          stdout?: string;
-          stderr?: string;
-          status?: number;
-          message?: string;
-        };
-        const output =
-          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
-          e.message ||
-          String(err);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_log
-    // -----------------------------------------------------------------------
-    case 'worktree_log': {
-      const {
-        worktree: wtKey,
-        maxCount = 20,
-        path: filterPath,
-        range,
-      } = args as {
-        worktree?: string;
-        maxCount?: number;
-        path?: string;
-        range?: string;
-      };
-      const target = resolveTargetDir(wtKey);
-      if ('error' in target) {
-        return {
-          content: [{ type: 'text', text: target.error }],
-          isError: true,
-        };
-      }
-      const cwd = target.path;
-      const limit = Math.min(Math.max(maxCount, 1), 100);
-
-      // Validate range if provided (only safe rev chars)
-      if (range && !/^[a-zA-Z0-9_./~^{}-]+$/.test(range)) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid range: "${range}". Only rev characters allowed.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      try {
-        // Use record/field separators to avoid delimiter collisions with commit text
-        const RS = '\x1e'; // record separator
-        const FS = '\x1f'; // field separator
-        const gitArgs = [
-          'log',
-          `--format=${RS}%H${FS}%h${FS}%s${FS}%an${FS}%aI${FS}%D`,
-          `-n`,
-          `${limit}`,
-        ];
-        if (range) gitArgs.push(range);
-        if (filterPath) gitArgs.push('--', filterPath);
-
-        const output = runGit(gitArgs, cwd, { timeout: 30_000 });
-        const commits = output
-          .split(RS)
-          .filter((b) => b.trim())
-          .map((record) => {
-            const fields = record.trim().split(FS);
-            return {
-              sha: fields[0] ?? '',
-              shortSha: fields[1] ?? '',
-              message: fields[2] ?? '',
-              author: fields[3] ?? '',
-              date: fields[4] ?? '',
-              refs: fields[5] ?? '',
-            };
-          });
-        return {
-          content: [
-            { type: 'text', text: JSON.stringify({ commits }, null, 2) },
-          ],
-        };
-      } catch (err: unknown) {
-        const e = err as { stdout?: string; stderr?: string; message?: string };
-        const output =
-          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
-          e.message ||
-          String(err);
-        return {
-          content: [{ type: 'text', text: `Failed to get log: ${output}` }],
-          isError: true,
-        };
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_show
-    // -----------------------------------------------------------------------
-    case 'worktree_show': {
-      const {
-        sha,
-        worktree: wtKey,
-        path: filterPath,
-      } = args as {
-        sha: string;
-        worktree?: string;
-        path?: string;
-      };
-      const target = resolveTargetDir(wtKey);
-      if ('error' in target) {
-        return {
-          content: [{ type: 'text', text: target.error }],
-          isError: true,
-        };
-      }
-      const cwd = target.path;
-
-      // Validate SHA — allow hex, HEAD, HEAD~N, branch names
-      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(sha)) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid SHA: "${sha}". Only rev characters allowed.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      try {
-        // Use execFileSync via runGit for safe argument passing
-        const meta = runGit(
-          ['show', sha, '--no-patch', '--format=%H%n%s%n%an%n%aI'],
-          cwd,
-          { timeout: 10_000 },
-        ).trim();
-        const metaLines = meta.split('\n');
-
-        const stat = runGit(['show', sha, '--stat', '--format='], cwd, {
-          timeout: 10_000,
-        }).trim();
-        const statEntries = stat
-          .split('\n')
-          .filter((l) => l.includes('|'))
-          .map((l) => {
-            const match = l.match(/^\s*(.+?)\s*\|\s*(\d+)\s*([+-]*)/);
-            return match
-              ? { file: match[1].trim(), changes: parseInt(match[2], 10) }
-              : { file: l.trim(), changes: 0 };
-          });
-
-        const result: Record<string, unknown> = {
-          sha: metaLines[0] ?? sha,
-          message: metaLines[1] ?? '',
-          author: metaLines[2] ?? '',
-          date: metaLines[3] ?? '',
-          stat: statEntries,
-        };
-
-        if (filterPath) {
-          try {
-            const diff = runGit(['show', sha, '--', filterPath], cwd, {
-              timeout: 30_000,
-            }).trim();
-            result.diff =
-              diff.length > 50_000
-                ? diff.slice(0, 50_000) + '\n... [truncated]'
-                : diff;
-          } catch {
-            result.diff =
-              '(diff unavailable — file may not exist in this commit)';
-          }
-        }
-
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
-      } catch (err: unknown) {
-        const e = err as { stdout?: string; stderr?: string; message?: string };
-        const output =
-          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
-          e.message ||
-          String(err);
-        return {
-          content: [{ type: 'text', text: `Failed to show commit: ${output}` }],
-          isError: true,
-        };
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_diff
-    // -----------------------------------------------------------------------
-    case 'worktree_diff': {
-      const {
-        worktree: wtKey,
-        base = 'origin/main',
-        paths,
-        stat,
-        nameOnly,
-      } = args as {
-        worktree?: string;
-        base?: string;
-        paths?: string[];
-        stat?: boolean;
-        nameOnly?: boolean;
-      };
-
-      const target = resolveTargetDir(wtKey);
-      if ('error' in target) {
-        return {
-          content: [{ type: 'text', text: target.error }],
-          isError: true,
-        };
-      }
-      const cwd = target.path;
-
-      // Validate base ref (only safe rev chars; reject option-like values)
-      if (base.startsWith('-')) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid base ref: "${base}". Base ref must not start with '-'.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(base)) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid base ref: "${base}". Only alphanumeric, '.', '/', '~', '^', '-', '_', '{', '}' allowed.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      // Enforce mutual exclusivity of stat and nameOnly
-      if (stat && nameOnly) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Cannot use both "stat" and "nameOnly" — pick one.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      try {
-        const gitArgs = ['diff', base];
-        if (stat) gitArgs.push('--stat');
-        if (nameOnly) gitArgs.push('--name-only');
-        if (paths?.length) {
-          gitArgs.push('--');
-          gitArgs.push(...paths);
-        }
-
-        const output = runGit(gitArgs, cwd);
-        const trimmed = output.trim();
-
-        if (!trimmed) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `No differences found between ${base} and HEAD.`,
-              },
-            ],
-          };
-        }
-
-        // Truncate large diffs to prevent exceeding MCP/stdio limits
-        const MAX_DIFF_BYTES = 512_000; // 500 KB
-        if (trimmed.length > MAX_DIFF_BYTES) {
-          const truncated = trimmed.slice(0, MAX_DIFF_BYTES);
-          return {
-            content: [
-              {
-                type: 'text',
-                text:
-                  truncated +
-                  `\n\n... [truncated — diff exceeds ${MAX_DIFF_BYTES / 1000}KB. Use path filters to narrow scope.]`,
-              },
-            ],
-          };
-        }
-
-        return {
-          content: [{ type: 'text', text: trimmed }],
-        };
-      } catch (err: unknown) {
-        const e = err as {
-          stdout?: string;
-          stderr?: string;
-          status?: number;
-          message?: string;
-        };
-        const output =
-          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
-          e.message ||
-          String(err);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `git diff failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_push
-    // -----------------------------------------------------------------------
-    case 'worktree_push': {
-      const { worktree: wtKey, setUpstream } = args as {
-        worktree?: string;
-        setUpstream?: boolean;
-      };
-
-      const target = resolveTargetDir(wtKey);
-      if ('error' in target) {
-        return {
-          content: [{ type: 'text', text: target.error }],
-          isError: true,
-        };
-      }
-
-      const cwd = target.path;
-
-      // Safety: refuse to push main or in detached HEAD / mid-rebase state
-      try {
-        const branch = run('git branch --show-current', cwd).trim();
-        if (!branch) {
-          // Detached HEAD — check if a rebase is in progress
-          const gitDir = run('git rev-parse --git-dir', cwd).trim();
-          const inRebase =
-            existsSync(join(gitDir, 'rebase-merge')) ||
-            existsSync(join(gitDir, 'rebase-apply'));
-          return {
-            content: [
-              {
-                type: 'text',
-                text: inRebase
-                  ? 'Refused: rebase is in progress. Finish the rebase before pushing.'
-                  : 'Refused: HEAD is detached (no branch checked out). Aborting push.',
-              },
-            ],
-            isError: true,
-          };
-        }
-        if (branch === 'main') {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Refused: cannot force-push main. Use git revert instead.',
-              },
-            ],
-            isError: true,
-          };
-        }
-      } catch {
-        // If we can't determine the branch, refuse to proceed
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Could not determine current branch. Aborting push.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      const upstreamFlag = setUpstream ? ' -u' : '';
-      const cmd = `git push${upstreamFlag} --force-with-lease origin HEAD`;
-
-      try {
-        const out = run(cmd, cwd, { timeout: 30_000 });
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `[cwd: ${cwd}]\n$ ${cmd}\n\n${out.trim()}`,
-            },
-          ],
-        };
-      } catch (err: unknown) {
-        const e = err as {
-          stdout?: string;
-          stderr?: string;
-          status?: number;
-        };
-        const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `[cwd: ${cwd}]\n$ ${cmd}\n\nExit code: ${e.status ?? 'unknown'}\n${output}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-
-    // -----------------------------------------------------------------------
     // worktree_unjunction
     // -----------------------------------------------------------------------
     case 'worktree_unjunction': {
@@ -2479,110 +2585,6 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
             {
               type: 'text',
               text: `Failed to remove node_modules junction/symlink: ${e.message ?? String(err)}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_ls_tree
-    // -----------------------------------------------------------------------
-    case 'worktree_ls_tree': {
-      const {
-        ref,
-        path: dirPath,
-        recursive = true,
-        worktree,
-      } = args as {
-        ref: string;
-        path?: string;
-        recursive?: boolean;
-        worktree?: string;
-      };
-
-      let cwd: string;
-      if (worktree) {
-        const target = resolveTargetDir(worktree);
-        if ('error' in target) {
-          return {
-            content: [{ type: 'text', text: target.error }],
-            isError: true,
-          };
-        }
-        cwd = target.path;
-      } else if (activeWorktree) {
-        cwd = activeWorktree;
-      } else {
-        cwd = MAIN_REPO;
-      }
-
-      // Validate ref (only safe rev chars; reject option-like values)
-      if (ref.startsWith('-')) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid ref: "${ref}". Ref must not start with '-'.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(ref)) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid ref: "${ref}". Only alphanumeric, '.', '/', '~', '^', '-' allowed.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      try {
-        const MAX_FILES = 500;
-        const gitArgs = ['ls-tree', '--name-only'];
-        if (recursive) gitArgs.push('-r');
-
-        // For non-recursive mode with a directory path, use <ref>:<dirPath>
-        // so git returns the directory's children instead of just the directory entry.
-        if (dirPath && !recursive) {
-          gitArgs.push(`${ref}:${dirPath}`);
-        } else {
-          gitArgs.push(ref);
-          if (dirPath) gitArgs.push('--', dirPath);
-        }
-
-        const output = runGit(gitArgs, cwd);
-        const allFiles = output.trim().split('\n').filter(Boolean);
-        const truncated = allFiles.length > MAX_FILES;
-        const files = truncated ? allFiles.slice(0, MAX_FILES) : allFiles;
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                ref,
-                path: dirPath ?? '/',
-                fileCount: allFiles.length,
-                truncated,
-                files,
-              }),
-            },
-          ],
-        };
-      } catch (err: unknown) {
-        const e = err as { message?: string; stderr?: string };
-        const msg = e.stderr || e.message || String(err);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Failed to list files at ${ref}${dirPath ? `:${dirPath}` : ''}: ${msg.trim()}`,
             },
           ],
           isError: true,

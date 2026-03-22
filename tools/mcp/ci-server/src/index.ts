@@ -1,12 +1,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { autoFix } from './tools/auto-fix.js';
 import { getLogs } from './tools/get-logs.js';
 import { listRuns } from './tools/list-runs.js';
 import { rerun } from './tools/rerun.js';
 import { searchLogs } from './tools/search-logs.js';
 import { viewRun } from './tools/view-run.js';
-import { autoFix } from './tools/auto-fix.js';
 
 const server = new McpServer({
   name: 'legacy-sports-ci',
@@ -14,66 +14,31 @@ const server = new McpServer({
 });
 
 server.tool(
-  'ci_list_runs',
-  'List recent GitHub Actions workflow runs with optional filters for branch, workflow, status, event, commit, and user.',
-  {
-    branch: z
-      .string()
-      .optional()
-      .describe(
-        'Branch name to filter by, e.g. LS-1255/ci-server-for-ci-failure-triage',
-      ),
-    workflow: z
-      .string()
-      .optional()
-      .describe('Workflow file or name, e.g. ci-orchestrator.yml'),
-    status: z
-      .string()
-      .optional()
-      .describe(
-        'Workflow run status or conclusion, e.g. failure, in_progress, success',
-      ),
-    event: z
-      .string()
-      .optional()
-      .describe('GitHub event name, e.g. pull_request or push'),
-    commit: z.string().optional().describe('Commit SHA to filter by'),
-    user: z
-      .string()
-      .optional()
-      .describe('GitHub username that triggered the run'),
-    limit: z.coerce
-      .number()
-      .int()
-      .positive()
-      .max(100)
-      .default(10)
-      .describe('Maximum number of runs to return (default: 10)'),
-  },
-  async (params) => listRuns(params),
-);
-
-server.tool(
-  'ci_view_run',
-  'View a GitHub Actions workflow run summary, including jobs and conclusions for triage.',
+  'ci_auto_fix',
+  'Analyze CI failure logs and classify the failure type. Returns the failure category ' +
+    '(formatting, stale_branch, codegen, type_error, test_failure, lint, flaky, infrastructure, unknown), ' +
+    'confidence level, evidence lines, and a structured recommendation for how to fix it. ' +
+    'Use this before manual debugging to attempt automated triage.',
   {
     runId: z.coerce
       .number()
       .int()
       .positive()
-      .describe('GitHub Actions run database ID'),
+      .describe('GitHub Actions run database ID to analyze'),
+    jobId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Optional job database ID to analyze instead of the whole run'),
     attempt: z.coerce
       .number()
       .int()
       .positive()
       .optional()
       .describe('Specific attempt number for the run'),
-    includeJobs: z
-      .boolean()
-      .default(true)
-      .describe('Include job details in the response (default: true)'),
   },
-  async (params) => viewRun(params),
+  async (params) => autoFix(params),
 );
 
 server.tool(
@@ -117,6 +82,75 @@ server.tool(
       ),
   },
   async (params) => getLogs(params),
+);
+
+server.tool(
+  'ci_list_runs',
+  'List recent GitHub Actions workflow runs with optional filters for branch, workflow, status, event, commit, and user.',
+  {
+    branch: z
+      .string()
+      .optional()
+      .describe(
+        'Branch name to filter by, e.g. LS-1255/ci-server-for-ci-failure-triage',
+      ),
+    workflow: z
+      .string()
+      .optional()
+      .describe('Workflow file or name, e.g. ci-orchestrator.yml'),
+    status: z
+      .string()
+      .optional()
+      .describe(
+        'Workflow run status or conclusion, e.g. failure, in_progress, success',
+      ),
+    event: z
+      .string()
+      .optional()
+      .describe('GitHub event name, e.g. pull_request or push'),
+    commit: z.string().optional().describe('Commit SHA to filter by'),
+    user: z
+      .string()
+      .optional()
+      .describe('GitHub username that triggered the run'),
+    limit: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .default(10)
+      .describe('Maximum number of runs to return (default: 10)'),
+  },
+  async (params) => listRuns(params),
+);
+
+server.tool(
+  'ci_rerun',
+  'Rerun failed jobs, a specific job, or an entire GitHub Actions workflow run.',
+  {
+    runId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .describe('GitHub Actions run database ID'),
+    failedOnly: z
+      .boolean()
+      .default(true)
+      .describe(
+        'When true, rerun only failed jobs unless jobId is provided (default: true)',
+      ),
+    jobId: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Optional job database ID to rerun instead of the whole run'),
+    debug: z
+      .boolean()
+      .default(false)
+      .describe('Enable debug logging for the rerun request'),
+  },
+  async (params) => rerun(params),
 );
 
 server.tool(
@@ -181,60 +215,26 @@ server.tool(
 );
 
 server.tool(
-  'ci_rerun',
-  'Rerun failed jobs, a specific job, or an entire GitHub Actions workflow run.',
+  'ci_view_run',
+  'View a GitHub Actions workflow run summary, including jobs and conclusions for triage.',
   {
     runId: z.coerce
       .number()
       .int()
       .positive()
       .describe('GitHub Actions run database ID'),
-    failedOnly: z
-      .boolean()
-      .default(true)
-      .describe(
-        'When true, rerun only failed jobs unless jobId is provided (default: true)',
-      ),
-    jobId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('Optional job database ID to rerun instead of the whole run'),
-    debug: z
-      .boolean()
-      .default(false)
-      .describe('Enable debug logging for the rerun request'),
-  },
-  async (params) => rerun(params),
-);
-
-server.tool(
-  'ci_auto_fix',
-  'Analyze CI failure logs and classify the failure type. Returns the failure category ' +
-    '(formatting, stale_branch, codegen, type_error, test_failure, lint, flaky, infrastructure, unknown), ' +
-    'confidence level, evidence lines, and a structured recommendation for how to fix it. ' +
-    'Use this before manual debugging to attempt automated triage.',
-  {
-    runId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('GitHub Actions run database ID to analyze'),
-    jobId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('Optional job database ID to analyze instead of the whole run'),
     attempt: z.coerce
       .number()
       .int()
       .positive()
       .optional()
       .describe('Specific attempt number for the run'),
+    includeJobs: z
+      .boolean()
+      .default(true)
+      .describe('Include job details in the response (default: true)'),
   },
-  async (params) => autoFix(params),
+  async (params) => viewRun(params),
 );
 
 const transport = new StdioServerTransport();
