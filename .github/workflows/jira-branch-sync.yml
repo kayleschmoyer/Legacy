@@ -16,6 +16,9 @@ name: "🎯 Jira Branch Sync"
 #   Any child In Progress / In Review / Done  → Epic "In Progress"
 #   All children In Review or Done            → Epic "In Review"
 #   All children Done                         → Epic "Done"
+#
+# Epics with the Jira label "pinned-status" are excluded from automatic
+# status transitions — they remain at whatever status was set manually.
 
 on:
   push:
@@ -253,11 +256,40 @@ jobs:
           fi
 
       # -----------------------------------------------------------------------
+      # 7b. Check if epic has "pinned-status" label (skip sync if so)
+      # -----------------------------------------------------------------------
+      - name: Check epic pinned-status label
+        id: epic-pinned
+        if: steps.epic.outputs.skip == 'false'
+        env:
+          EPIC_KEY: ${{ steps.epic.outputs.key }}
+        run: |
+          RESPONSE=$(curl -sf \
+            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Accept: application/json" \
+            "$JIRA_BASE_URL/rest/api/3/issue/$EPIC_KEY?fields=labels" \
+            2>&1) || {
+            echo "⚠️  Could not fetch labels for $EPIC_KEY — proceeding with sync."
+            echo "pinned=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          LABELS=$(echo "$RESPONSE" | jq -r '.fields.labels[]? // empty')
+          echo "Epic $EPIC_KEY labels: $LABELS"
+
+          if echo "$LABELS" | grep -qx "pinned-status"; then
+            echo "🔒 Epic $EPIC_KEY has 'pinned-status' label — skipping auto-sync."
+            echo "pinned=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pinned=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -----------------------------------------------------------------------
       # 8. Determine correct epic status from all children
       # -----------------------------------------------------------------------
       - name: Determine epic target status
         id: epic-status
-        if: steps.epic.outputs.skip == 'false'
+        if: steps.epic.outputs.skip == 'false' && steps.epic-pinned.outputs.pinned != 'true'
         env:
           EPIC_KEY: ${{ steps.epic.outputs.key }}
         run: |
@@ -353,7 +385,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Check epic current status
         id: epic-current
-        if: steps.epic-status.outputs.skip == 'false'
+        if: steps.epic-pinned.outputs.pinned != 'true' && steps.epic-status.outputs.skip == 'false'
         env:
           EPIC_KEY: ${{ steps.epic.outputs.key }}
           TARGET: ${{ steps.epic-status.outputs.transition }}
@@ -382,7 +414,7 @@ jobs:
       # 10. Transition the epic (non-fatal — epic sync is best-effort)
       # -----------------------------------------------------------------------
       - name: Transition epic
-        if: steps.epic-current.outputs.skip == 'false'
+        if: steps.epic-pinned.outputs.pinned != 'true' && steps.epic-current.outputs.skip == 'false'
         env:
           EPIC_KEY: ${{ steps.epic.outputs.key }}
           TARGET: ${{ steps.epic-status.outputs.transition }}
