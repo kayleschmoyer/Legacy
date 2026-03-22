@@ -11,17 +11,17 @@ import { listChildren } from './tools/list-children.js';
 import { editTicket } from './tools/edit-ticket.js';
 import { linkIssues } from './tools/link-issues.js';
 import { search } from './tools/search.js';
-import { getAtlassianCredentials } from './netrc.js';
+import { tryGetAtlassianCredentials } from './netrc.js';
 
-// Validate credentials at startup so the server fails fast with a clear
-// error instead of silently starting with every tool call failing.
-try {
-  await getAtlassianCredentials();
-} catch (error) {
-  const msg =
-    error instanceof Error ? error.message : 'Unknown credential error';
-  process.stderr.write(`[legacy-sports-jira] ${msg}\n`);
-  process.exit(1);
+// Check credentials at startup — warn if missing but don't exit.
+// The jira_auth_status tool lets agents decide whether to use this server
+// or fall back to Claude's built-in Atlassian integration.
+const startupCreds = await tryGetAtlassianCredentials();
+if (!startupCreds) {
+  process.stderr.write(
+    '[legacy-sports-jira] No Jira credentials found. Tools requiring direct API access will fail. ' +
+      'Agent should call jira_auth_status and fall back to built-in Atlassian tools.\n',
+  );
 }
 
 const server = new McpServer({
@@ -218,6 +218,31 @@ server.tool(
       .describe('Maximum number of results (default: 50, max: 100)'),
   },
   async (params) => search(params),
+);
+
+// --- jira_auth_status ---
+server.tool(
+  'jira_auth_status',
+  'Check if this server has configured Jira API credentials (presence check only; does not call Jira). Call this first in any Jira workflow. ' +
+    "If configured is false, use Claude's built-in Atlassian tools (mcp__claude_ai_Atlassian__*) instead.",
+  {},
+  async () => {
+    const creds = await tryGetAtlassianCredentials();
+    const emailFromEnv = process.env['JIRA_EMAIL'];
+    const tokenFromEnv = process.env['JIRA_API_TOKEN'];
+    const source =
+      creds === null ? null : emailFromEnv && tokenFromEnv ? 'env' : 'netrc';
+    const result = {
+      configured: creds !== null,
+      source,
+      fallback: creds
+        ? null
+        : 'Use built-in Atlassian MCP tools (mcp__claude_ai_Atlassian__*) for Jira operations.',
+    };
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  },
 );
 
 // Start the server

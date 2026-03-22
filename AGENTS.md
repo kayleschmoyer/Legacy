@@ -18,8 +18,8 @@ This file provides guidance to AI coding agents working with code in this reposi
 - **Prefer `.graphql` + codegen over inline `gql`** — for new code in `apps/web` and `lib/shared-components`, define queries in `.graphql` files and import generated hooks from `graphql.generated.ts`. Legacy inline `gql` usage exists in the codebase and generated files necessarily contain `gql` strings.
 - **Never manually remove worktrees**: always `twig worktree clean` — never `git worktree remove` or manual deletion (destroys junctions).
 - **Kill background servers when done** — stop all `isBackground=true` processes before workflow ends. Run `make kill-stale` to find stale node processes holding addon locks.
-- **Jira — MCP tools first**: use `jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent` for all Jira operations. Fall back to `acli` CLI — never direct HTTP.
-- **Resolve PR review threads**: after fixing review comments, resolve each thread via GraphQL `resolveReviewThread` mutation. See `skills/pr-workflow/SKILL.md`.
+- **Jira — auth-aware routing**: call `jira_auth_status` at the start of any Jira workflow. If `configured: true`, use `jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent` for all Jira operations. If `configured: false`, fall back to Claude's built-in Atlassian tools (`mcp__claude_ai_Atlassian__*`). Last resort: `acli` CLI — never direct HTTP.
+- **Resolve PR review threads**: after fixing review comments, resolve each thread via GraphQL `resolveReviewThread` mutation. See `skills/create-pr/SKILL.md`.
 
 ## Workflow
 
@@ -136,7 +136,7 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 | `legacy-sports-aws`    | CloudWatch log tailing, AWS SSO status checks                                                                 |
 | `claude_ai_Stripe`     | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`) |
 
-Use MCP tools first for Jira operations (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). Fall back to `acli` CLI — never direct HTTP.
+Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`, use our custom tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false`, fall back to Claude's built-in Atlassian tools (`mcp__claude_ai_Atlassian__*`). Last resort: `acli` CLI — never direct HTTP.
 
 > **MCP-first principle**: the shell commands shown elsewhere in this document (Workflow, Commands sections) are **fallbacks** for when MCP servers are unavailable. When MCP tools are available, always prefer them over the equivalent shell commands listed below.
 

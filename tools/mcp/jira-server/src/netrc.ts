@@ -45,6 +45,21 @@ export async function getAtlassianCredentials(): Promise<NetrcCredentials> {
   return { login: match[1], password: match[2] };
 }
 
+/**
+ * Non-throwing version of getAtlassianCredentials.
+ * Returns credentials if available, or null if not configured.
+ */
+export async function tryGetAtlassianCredentials(): Promise<NetrcCredentials | null> {
+  try {
+    return await getAtlassianCredentials();
+  } catch (error) {
+    process.stderr.write(
+      `[legacy-sports-jira] Credential lookup failed: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    return null;
+  }
+}
+
 /** Build a Basic Auth header value from credentials. */
 export function basicAuthHeader(creds: NetrcCredentials): string {
   return `Basic ${Buffer.from(`${creds.login}:${creds.password}`).toString('base64')}`;
