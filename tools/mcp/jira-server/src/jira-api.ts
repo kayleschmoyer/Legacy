@@ -3,7 +3,7 @@ import { getAtlassianCredentials, basicAuthHeader } from './netrc.js';
 const JIRA_BASE = 'https://bkrupa.atlassian.net';
 
 interface JiraRequestOptions {
-  method: 'GET' | 'PUT' | 'POST';
+  method: 'GET' | 'PUT' | 'POST' | 'DELETE';
   path: string;
   body?: Record<string, unknown>;
   query?: Record<string, string>;

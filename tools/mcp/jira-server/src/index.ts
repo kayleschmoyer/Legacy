@@ -7,6 +7,7 @@ import { editTicket } from './tools/edit-ticket.js';
 import { getComments } from './tools/get-comments.js';
 import { linkIssues } from './tools/link-issues.js';
 import { listChildren } from './tools/list-children.js';
+import { deleteTicket } from './tools/delete-ticket.js';
 import { search } from './tools/search.js';
 import { setParent } from './tools/set-parent.js';
 import { transition, VALID_STATUSES } from './tools/transition.js';
@@ -261,6 +262,21 @@ server.tool(
     status: z.enum(VALID_STATUSES).describe('Target status for all tickets'),
   },
   async (params) => bulkTransition(params),
+);
+
+// --- jira_delete_ticket ---
+server.tool(
+  'jira_delete_ticket',
+  'Delete a Jira ticket. Use with caution — this is irreversible.',
+  {
+    key: z.string().describe('Jira ticket key to delete, e.g. LS-1528'),
+    confirm: z
+      .literal(true)
+      .describe(
+        'Must be set to true to confirm deletion. This operation is irreversible.',
+      ),
+  },
+  async (params) => deleteTicket(params),
 );
 
 // Start the server
