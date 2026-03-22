@@ -8,9 +8,8 @@
 # This runs ONCE when a new cloud session is created (not on resume).
 # It installs tools that aren't in the default Ubuntu 24.04 image.
 #
-# For full environment setup (database, dependencies, etc.), see
-# copilot-setup-steps.yml — those steps must be run manually or via
-# a SessionStart hook in cloud sessions.
+# This also installs Node.js dependencies (pnpm install) so that
+# `make pc` works for code changes, not just docs-only PRs.
 # =============================================================================
 
 set -euo pipefail
@@ -91,5 +90,26 @@ if ! command -v git-lfs &>/dev/null && ! git lfs version &>/dev/null 2>&1; then
 fi
 git lfs install --skip-smudge >/dev/null 2>&1 || true
 echo "Git LFS: $(git lfs version 2>/dev/null | head -1 || echo 'installed')"
+
+# ---------------------------------------------------------------------------
+# 5. Install Node.js dependencies
+# ---------------------------------------------------------------------------
+# Required for `make pc` (lint, typecheck, test, build) on code changes.
+# Uses corepack to activate the correct pnpm version, then installs deps.
+if command -v corepack &>/dev/null; then
+  corepack enable
+  corepack prepare pnpm@9.12.1 --activate 2>/dev/null || true
+  echo "pnpm $(pnpm --version 2>/dev/null || echo 'unknown') activated"
+else
+  echo "WARNING: corepack not found — skipping pnpm install"
+fi
+
+if command -v pnpm &>/dev/null; then
+  echo "Installing dependencies (pnpm install)..."
+  pnpm install --frozen-lockfile 2>&1 | tail -3
+  echo "Dependencies installed"
+else
+  echo "WARNING: pnpm not available — make pc will not work for code changes"
+fi
 
 echo "=== Cloud setup complete ==="
