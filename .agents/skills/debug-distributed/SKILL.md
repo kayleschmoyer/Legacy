@@ -242,7 +242,6 @@ Use this checklist for any distributed failure:
 ## Related Skills
 
 - [cloudwatch-logs](../cloudwatch-logs/SKILL.md) — Detailed CloudWatch querying
-- [db-query](../db-query/SKILL.md) — SQL queries for verification
-- [db-schema](../db-schema/SKILL.md) — Table/column reference
+- [database](../database/SKILL.md) — SQL queries, schema reference, migrations
 - [architecture](../architecture/SKILL.md) — System architecture overview
 - [troubleshoot](../troubleshoot/SKILL.md) — General dev environment issues

@@ -224,7 +224,7 @@ All commands run from within the worktree directory (`cd $wt`). Write code, add 
 
 Before committing, run a self-review of all changes on the branch. This catches project-rule violations and code-quality issues that `make pc` does not cover.
 
-See the [review skill](../review/SKILL.md) for the full checklist. Key checks:
+See the [pr-workflow skill](../pr-workflow/SKILL.md) for the full checklist. Key checks:
 
 - No `console.*` (use `LOGGER`)
 - No `@ts-ignore` / `eslint-disable`
@@ -325,7 +325,7 @@ If tests fail:
 
 ### Step 8: Create Pull Request
 
-See the [create-pr skill](../create-pr/SKILL.md) for the full PR template workflow. For a quick PR:
+See the [pr-workflow skill](../pr-workflow/SKILL.md) for the full PR template workflow. For a quick PR:
 
 ```powershell
 gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main

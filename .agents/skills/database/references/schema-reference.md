@@ -1,15 +1,10 @@
----
-name: db-schema
-description: 'Load before writing or reviewing SQL queries to understand the public and app_internal PostgreSQL schemas and avoid table/column mistakes.'
----
-
 # Skill: Database Schema Reference
 
 ## Overview
 
 Schema reference for writing correct SQL queries in Legacy Sports. Load this before writing any database queries to avoid common mistakes.
 
-## 🚨 Critical: Two Schemas
+## Critical: Two Schemas
 
 Legacy Sports uses **two separate PostgreSQL schemas**:
 
@@ -21,10 +16,10 @@ Legacy Sports uses **two separate PostgreSQL schemas**:
 **Always use the schema prefix** in queries:
 
 ```sql
--- ❌ WRONG — defaults to public, but users is in app_internal
+-- WRONG — defaults to public, but users is in app_internal
 SELECT * FROM users WHERE id = 123;
 
--- ✅ CORRECT
+-- CORRECT
 SELECT * FROM app_internal.users WHERE id = 123;
 SELECT * FROM public.leagues WHERE id = 16;
 ```
@@ -70,7 +65,7 @@ SELECT * FROM public.leagues WHERE id = 16;
 | `invite_code`               | VARCHAR(8) UNIQUE |                                                               |
 | `created_at` / `updated_at` | TIMESTAMP         |                                                               |
 
-> ❌ Column is `draft_status`, NOT `status`
+> Column is `draft_status`, NOT `status`
 
 ### `public.matchups`
 
@@ -86,8 +81,8 @@ SELECT * FROM public.leagues WHERE id = 16;
 | `start_time` / `end_time`     | TIMESTAMP     |                                                                     |
 | `created_at` / `updated_at`   | TIMESTAMP     |                                                                     |
 
-> ❌ Column is `stats_loading_status`, NOT `loading_status`
-> ❌ `selected_season` column was removed — use `league_week_player_seasons` instead
+> Column is `stats_loading_status`, NOT `loading_status`
+> `selected_season` column was removed — use `league_week_player_seasons` instead
 
 ### `public.players`
 
@@ -112,7 +107,7 @@ SELECT * FROM public.leagues WHERE id = 16;
 | `career_fielding_by_position` | **VIEW** | Read-only aggregate              |
 | `player_eligible_positions`   | **VIEW** | Read-only                        |
 
-> ❌ **Do not UPDATE/INSERT into views** — write to `season_*` source tables; views auto-recalculate
+> **Do not UPDATE/INSERT into views** — write to `season_*` source tables; views auto-recalculate
 
 ### League Structure
 
@@ -125,7 +120,7 @@ SELECT * FROM public.leagues WHERE id = 16;
 | `league_week_player_seasons` | Per-week player season assignments |
 | `drafts`, `draft_teams`      | Draft state                        |
 
-> 🚨 **Every league MUST have a `drafts` record.** Use `LeagueService.createLeague()` (in `lib/db-client/src/lib/services/LeagueService.ts`) which creates the draft record automatically. Never insert into `leagues` without also inserting into `drafts`. Missing draft records cause `startDraft` to use wrong defaults.
+> **Every league MUST have a `drafts` record.** Use `LeagueService.createLeague()` (in `lib/db-client/src/lib/services/LeagueService.ts`) which creates the draft record automatically. Never insert into `leagues` without also inserting into `drafts`. Missing draft records cause `startDraft` to use wrong defaults.
 
 ### Scoring
 
@@ -200,23 +195,3 @@ JOIN public.players p ON tm.player_id = p.id
 JOIN public.league_positions lp ON tm.position_id = lp.id
 WHERE tm.team_id = 5 AND tm.league_id = 16;
 ```
-
----
-
-## Running Queries
-
-```powershell
-# From repo root
-.\scripts\db-query.ps1 -Query "SELECT id, name, draft_status FROM public.leagues WHERE id = 16"
-
-# JSON output
-.\scripts\db-query.ps1 -Query "SELECT * FROM public.matchups LIMIT 5" -Format json
-```
-
-See [db-query.md](../db-query/SKILL.md) for full query script usage, connection details, and troubleshooting.
-
-## Related Skills
-
-- [db-query.md](../db-query/SKILL.md) — Running SQL queries
-- [db-migration-write.md](../db-migration-write/SKILL.md) — Writing new migrations
-- [db-migrate.md](../db-migrate/SKILL.md) — Running migrations

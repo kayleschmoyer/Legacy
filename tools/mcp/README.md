@@ -63,7 +63,7 @@ Database operations with built-in safety guardrails:
 - **db_codegen** — Run GraphQL codegen via Nx affected (optional print-schema first)
 - **db_restore_dev_seed** — Restore `resources/dev-seed.dump` into local DB (destructive, explicit confirmation required)
 
-See `.agents/skills/mcp-db/SKILL.md` for usage.
+See `.agents/skills/database/SKILL.md` for usage.
 
 ### worktree-server
 
@@ -105,7 +105,7 @@ Pull request and review lifecycle management:
 - **github_manage_labels** — Add or remove labels (e.g. `merge-when-ready`)
 - **github_get_repo_info** — Get repo owner, name, default branch, and URL
 
-See `.agents/skills/create-pr/SKILL.md` and `.agents/skills/fix-copilot-reviews/SKILL.md` for the workflows this server supports.
+See `.agents/skills/pr-workflow/SKILL.md` for the workflows this server supports.
 
 ### nx-server
 

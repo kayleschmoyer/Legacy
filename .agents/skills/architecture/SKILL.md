@@ -99,7 +99,7 @@ Used for DbOptions, SecureStorage, AwsSecrets:
 - `career_*` — aggregated totals (views, read-only, AL/NL only)
 - Drizzle ORM for type-safe queries
 
-See [db-schema.md](../db-schema/SKILL.md) for full schema reference and [db-query.md](../db-query/SKILL.md) for running queries.
+See [database](../database/SKILL.md) for full schema reference, query tools, and migration workflow.
 
 ---
 
@@ -179,7 +179,7 @@ cd ..
 3. **Use Nx affected**: `pnpm exec nx affected -t <target>`
 4. **PowerShell**: Windows dev environment, `;` for chaining
 5. **Conventional commits**: `type(scope): message`
-6. **Always add timestamps to new DB tables** — see [db-migration-write.md](../db-migration-write/SKILL.md)
+6. **Always add timestamps to new DB tables** — see [database](../database/SKILL.md)
 7. **Create leagues via `LeagueService.createLeague()`** — never raw-insert leagues. The service guarantees all related records (teams, positions, draft) are created together.
 8. **Draft records must exist for every league** — `startDraft` and `initializeDraft` self-heal by upserting, but prevention is better than cure.
 9. **Always `await` notification service calls** — never fire-and-forget. Lambda freezes the execution context after the handler returns; unawaited async work is silently killed. Wrap in try/catch so notification failure doesn't break the primary operation. See [WebSocket Notifications](../../docs/guides/websocket-notifications.md#critical-rules).
@@ -187,7 +187,7 @@ cd ..
 
 ## Related Skills
 
-- [db-schema.md](../db-schema/SKILL.md) — Database schema reference
+- [database](../database/SKILL.md) — Database schema, queries, migrations
 - [build.md](../build/SKILL.md) — Build system details
 - [deploy-lambda.md](../deploy-lambda/SKILL.md) — Lambda deployment
 - [affected-check.md](../affected-check/SKILL.md) — Nx dependency graph

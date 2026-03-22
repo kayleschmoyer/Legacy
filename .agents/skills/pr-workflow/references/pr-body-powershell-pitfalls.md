@@ -1,6 +1,6 @@
 # PowerShell PR Body Pitfalls
 
-## 🚨 CRITICAL: Always Use --body-file, Never --body
+## CRITICAL: Always Use --body-file, Never --body
 
 PowerShell corrupts inline markdown passed via `--body`:
 
@@ -31,7 +31,7 @@ $prNumber = gh pr view --json number --jq .number
 .\scripts\cleanup-pr-body.ps1
 ```
 
-### ❌ NEVER Do These
+### NEVER Do These
 
 ```powershell
 # BAD - PowerShell will mangle the markdown
@@ -62,11 +62,11 @@ some-command > .github/tmp-pr-body.md
 > `^@F^@i^@x^@e^@s^@...` output visible in the PR body. **Always use `create_file` to write
 > the PR body — never shell-redirect into the file.**
 
-### 🚨 Do NOT Escape Backticks in PR Body Content
+### Do NOT Escape Backticks in PR Body Content
 
 When writing the PR body markdown (via `create_file` or any method), use **plain backtick characters** for inline code — never write `\`` (backslash + backtick).
 
-| ❌ Wrong               | ✅ Correct               |
+| Wrong                  | Correct                  |
 | ---------------------- | ------------------------ |
 | `\`git worktree add\`` | `` `git worktree add` `` |
 | `\`make install\``     | `` `make install` ``     |

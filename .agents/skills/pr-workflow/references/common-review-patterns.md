@@ -24,10 +24,10 @@ These issues appear in 80%+ of Copilot reviews. Knowing them speeds up fixes.
 `getDbOptions` lives in `@legacy-sports/utils/node`, not `@legacy-sports/utils` (the browser-compatible root). Mocking only `getDbOptions` without spreading other exports also breaks sibling imports.
 
 ```typescript
-// ❌ Wrong — browser-compatible root, no spread
+// Wrong — browser-compatible root, no spread
 jest.doMock('@legacy-sports/utils', () => ({ getDbOptions: jest.fn() }));
 
-// ✅ Correct — Node-specific path with requireActual spread
+// Correct — Node-specific path with requireActual spread
 jest.doMock('@legacy-sports/utils/node', () => ({
   ...jest.requireActual('@legacy-sports/utils/node'),
   getDbOptions: jest.fn(),
@@ -41,13 +41,13 @@ Reference: `lambdas/db/src/schema/playoff.resolver.spec.ts` for correct pattern.
 A check like `postData.includes('getleague')` matches `getleagueteams`, `getleaguemembers`, etc. Use `extractOperationName()` from `apps/web-e2e/src/fixtures/shared-mocks.ts` or quote the operation name.
 
 ```typescript
-// ❌ Matches getleague, getleagueteams, getleaguemembers...
+// Wrong — Matches getleague, getleagueteams, getleaguemembers...
 if (postData.includes('getleague')) { ... }
 
-// ✅ Exact match via quoted JSON field
+// Correct — Exact match via quoted JSON field
 if (postData.includes('"getleague"')) { ... }
 
-// ✅ Best — use the helper
+// Best — use the helper
 const op = extractOperationName(route);
 if (op === 'GetLeague') { ... }
 ```
@@ -61,10 +61,10 @@ Within the 3-layer mock architecture (test → auth.ts → baseline), test handl
 `RollbarOutputDestination` scans args for `arg instanceof Error` to extract stack traces. Wrapping in `{ error }` hides the Error instance.
 
 ```typescript
-// ❌ Rollbar synthesizes generic Error, loses stack trace
+// Wrong — Rollbar synthesizes generic Error, loses stack trace
 LOGGER.error('Failed to load', { error });
 
-// ✅ Rollbar extracts original stack trace
+// Correct — Rollbar extracts original stack trace
 LOGGER.error('Failed to load', error);
 LOGGER.error('Failed to load', error, { userId });
 ```
@@ -76,9 +76,9 @@ Reference: `lib/rollbar/src/lib/RollbarOutputDestination.ts` lines 33–34.
 Apollo client expects `response.data.operationName`, not `response.operationName`. Always wrap in `{ data: { ... } }`. Check `apps/web-e2e/src/fixtures/shared-mocks.ts` for correct baseline patterns.
 
 ```typescript
-// ❌ Missing data wrapper
+// Wrong — Missing data wrapper
 route.fulfill({ json: { getLeagueById: null } });
 
-// ✅ Correct structure
+// Correct structure
 route.fulfill({ json: { data: { league: null } } });
 ```

@@ -80,6 +80,6 @@ Example:
 
 ### What NOT to do when stuck:
 
-- ❌ Pick `--ours` or `--theirs` and move on — this is the exact anti-pattern this skill exists to prevent
-- ❌ Make your best guess without telling the developer you were uncertain — if it's wrong, nobody will know until something breaks
-- ❌ Abort the entire rebase — ask about the specific conflict first; the rest may be fine
+- Pick `--ours` or `--theirs` and move on — this is the exact anti-pattern this skill exists to prevent
+- Make your best guess without telling the developer you were uncertain — if it's wrong, nobody will know until something breaks
+- Abort the entire rebase — ask about the specific conflict first; the rest may be fine

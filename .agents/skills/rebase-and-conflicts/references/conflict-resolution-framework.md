@@ -1,26 +1,8 @@
----
-name: resolve-merge-conflicts
-description: 'Resolve merge conflicts by analyzing both sides and synthesizing correct resolutions instead of blindly accepting one side. Load alongside rebase-conflicts whenever a rebase produces source-code conflicts that require manual resolution.'
----
-
-# Skill: Intelligent Merge Conflict Resolution
-
-## Overview
-
-The #1 mistake AI agents make when resolving merge conflicts is **blindly picking one side** — either `--ours` or `--theirs` — instead of reasoning about what both sides intended and producing a correct synthesis. This skill teaches the analysis framework agents must follow when resolving any non-trivial source conflict.
-
-**Core principle**: A conflict means two people changed the same code for (usually) different reasons. The correct resolution almost always preserves the intent of **both** changes, not just one.
-
-## When to Use
-
-- A `git rebase` or `git merge` produces conflicts in source files (`.ts`, `.tsx`, `.json`, etc.)
-- You're about to run `git checkout --ours` or `git checkout --theirs` on a source file — **STOP and use this skill instead**
-- The rebase-conflicts skill directed you here for manual source conflict resolution
-- You see conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) in a file
+# Conflict Resolution Framework
 
 ## The Anti-Pattern: Picking a Side
 
-❌ **What agents typically do wrong:**
+**What agents typically do wrong:**
 
 ```
 # "There's a conflict in utils.ts, I'll just take theirs"
@@ -94,17 +76,17 @@ If main **renamed** a function, variable, type, or file:
 - Reapply the feature branch's behavioral changes using the new names
 
 ```typescript
-// ❌ WRONG: Take feature branch's version (uses old name)
+// WRONG: Take feature branch's version (uses old name)
 function calculateScore(player: Player): number {
   return player.points * 2 + player.bonus; // feature branch added bonus
 }
 
-// ❌ WRONG: Take main's version (loses the bonus logic)
+// WRONG: Take main's version (loses the bonus logic)
 function computePlayerScore(player: Player): number {
   return player.points * 2;
 }
 
-// ✅ CORRECT: Main's rename + feature branch's logic
+// CORRECT: Main's rename + feature branch's logic
 function computePlayerScore(player: Player): number {
   return player.points * 2 + player.bonus;
 }
@@ -125,7 +107,7 @@ import { validateEmail } from './validators';
 // Feature branch added:
 import { formatName } from './formatters';
 
-// ✅ CORRECT: Keep both imports
+// CORRECT: Keep both imports
 import { formatName } from './formatters';
 import { validateEmail } from './validators';
 ```
@@ -141,9 +123,9 @@ If main changed a function signature, type definition, or interface:
 ```typescript
 // Main changed the signature to add a required `context` param:
 // HEAD:  async function processPlayer(id: string, context: AppContext)
-// Ours:  async function processPlayer(id: string)  ← still has old sig
+// Ours:  async function processPlayer(id: string)  <- still has old sig
 
-// ✅ CORRECT: Use main's new signature, adapt feature branch's body
+// CORRECT: Use main's new signature, adapt feature branch's body
 async function processPlayer(id: string, context: AppContext) {
   // feature branch's new logic goes here, using the new context param if needed
 }
@@ -169,7 +151,7 @@ If both sides changed a config value, constant, or feature flag:
 // HEAD changed MAX_RETRIES and added TIMEOUT_MS
 // Feature branch changed MAX_RETRIES differently and added BATCH_SIZE
 
-// ✅ CORRECT: Keep main's structural additions, use correct values for each
+// CORRECT: Keep main's structural additions, use correct values for each
 const MAX_RETRIES = 5; // Feature branch's value (needed for new feature)
 const TIMEOUT_MS = 30000; // Main's addition (keep it)
 const BATCH_SIZE = 100; // Feature branch's addition (keep it)
@@ -206,17 +188,3 @@ pnpm exec nx affected -t test --base=origin/main
 ```
 
 If typecheck or lint fails, the resolution was likely incomplete. **Don't suppress the errors** — go back and fix the merge.
-
----
-
-## Load-on-Demand References
-
-- **[Worked Examples](references/worked-examples.md)** — 3 detailed conflict resolution examples (import conflicts, overlapping modifications, refactor + feature)
-- **[Pitfalls & Escalation](references/pitfalls-and-escalation.md)** — Decision checklist, 5 common pitfalls, when/how to ask the developer for help
-
-## Related Skills
-
-- [rebase-conflicts](../rebase-conflicts/SKILL.md) — Git commands and mechanical rebase workflow
-- [fix-types](../fix-types/SKILL.md) — Fix TypeScript errors that emerge after conflict resolution
-- [fix-lint](../fix-lint/SKILL.md) — Fix lint errors after resolution
-- [no-edit-generated](../no-edit-generated/SKILL.md) — Never manually merge generated files

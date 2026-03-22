@@ -59,9 +59,15 @@ Classify each conflicted file and apply the correct strategy:
 
 #### 2d. Resolve Source File Conflicts with Agent Assistance
 
+<<<<<<< HEAD:.agents/skills/rebase-conflicts/references/rebase-conflict-strategies.md
+
 > **⚠️ CRITICAL: Load the [resolve-merge-conflicts](../../resolve-merge-conflicts/SKILL.md) skill before resolving any source conflicts.** It contains the full reasoning framework, worked examples, and decision checklist that prevents the #1 agent mistake: blindly picking one side instead of synthesizing both changes.
 
-For each conflicted source file, the agent should:
+# For each conflicted source file, the agent should:
+
+For each conflicted source file, Copilot should:
+
+> > > > > > > 0452e240d (docs(skills): consolidate agent skills with progressive disclosure):.agents/skills/rebase-and-conflicts/references/rebase-conflict-strategies.md
 
 1. **Read the full file** (not just the conflict block) to understand surrounding context
 2. **Understand both sides**: what `main` changed vs what the feature branch changed — and **why**

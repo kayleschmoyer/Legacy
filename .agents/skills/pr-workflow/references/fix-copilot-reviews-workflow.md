@@ -1,25 +1,8 @@
----
-name: fix-copilot-reviews
-description: 'Batch-process all open PRs that have been reviewed by Copilot: for each PR with review comments, check out the branch in a worktree and fix every comment. Clean PRs are auto-approved and labeled by the copilot-auto-approve GitHub Action. Use when asked to address Copilot review feedback across all PRs or batch-fix PR reviews.'
----
+# Fix Copilot Reviews — Batch Workflow
 
-# Skill: Fix Copilot Reviews (Batch)
+Detailed batch workflow for fixing Copilot review comments across all open PRs.
 
-## Overview
-
-Iterate over every open PR that has been reviewed by GitHub Copilot and **fix all review comments**.
-
-> **Copilot reviews are automatic.** The `copilot-auto-approve` workflow requests Copilot reviews on PR open/update, and auto-approves + labels `merge-when-ready` when the review has no comments. This skill only handles PRs that have unresolved comments requiring code changes.
-
-## When to Use
-
-- "Fix all Copilot review comments"
-- "Address Copilot feedback on open PRs"
-- Periodic review-sweep before a release
-
-## Workflow
-
-### Step 0 — Discover PRs Reviewed by Copilot
+## Step 0 — Discover PRs Reviewed by Copilot
 
 ```powershell
 # List open PRs reviewed by Copilot (JSON array)
@@ -39,7 +22,7 @@ foreach ($pr in $prs) {
 Write-Host "Found $($reviewed.Count) PRs reviewed by Copilot"
 ```
 
-### Step 1 — Find PRs With Unresolved Comments
+## Step 1 — Find PRs With Unresolved Comments
 
 For each Copilot-reviewed PR, fetch the review threads and collect those with
 unresolved, non-outdated comments. PRs with no comments are skipped — the
@@ -98,7 +81,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
 }
 ```
 
-### Step 2 — Fix Review Comments (per PR)
+## Step 2 — Fix Review Comments (per PR)
 
 For each entry in `$toFix`, create a worktree (or use the existing one)
 and address every comment:
@@ -153,11 +136,11 @@ foreach ($entry in $toFix) {
    }  # end foreach ($entry in $toFix)
    ```
 
-### Step 2b — Re-resolve threads after push
+### Re-resolve threads after push
 
 Copilot often **re-reviews** after you push, creating new threads on the same
-or nearby lines. After Step 2's commit & push (step 5 in the loop), re-run the
-resolve script inside the per-PR loop so each PR is cleaned up before moving on:
+or nearby lines. After the commit & push, re-run the resolve script inside the
+per-PR loop so each PR is cleaned up before moving on:
 
 ```powershell
 # Inside the foreach ($entry in $toFix) loop, after push:
@@ -165,7 +148,7 @@ Set-Location D:\code\legacy-sports
 .\scripts\resolve-review-threads.ps1 -PRNumber $entry.pr.number
 ```
 
-### Step 2c — Batch-scale considerations
+### Batch-scale considerations
 
 When fixing >10 PRs in a single session:
 
@@ -182,7 +165,7 @@ When fixing >10 PRs in a single session:
 - **Re-resolve after all pushes** — Copilot re-reviews trigger new threads.
   Do a final sweep of all PR numbers after all fixes are pushed.
 
-### Step 3 — Summary
+## Step 3 — Summary
 
 After processing every PR, print a summary table:
 
@@ -192,10 +175,6 @@ After processing every PR, print a summary table:
 | #124 | fix(ui): ...       | No comments      | skipped (bot handles it)    |
 
 ## Common Copilot Review Patterns (Top 10)
-
-The most frequent Copilot review issues — knowing these speeds up fixes significantly.
-
-> Full pattern table + code examples: [references/common-review-patterns.md](references/common-review-patterns.md)
 
 | #   | Pattern                          | Quick Fix                                                |
 | --- | -------------------------------- | -------------------------------------------------------- |
@@ -208,6 +187,8 @@ The most frequent Copilot review issues — knowing these speeds up fixes signif
 | 7–8 | Wrong mock structure/field names | Wrap in `{ data: { ... } }`, check `.graphql` files      |
 | 9   | Test name ≠ assertion            | Rename test                                              |
 | 10  | Process/scope comments           | Resolve thread directly — no code change                 |
+
+> Full pattern details + code examples: [common-review-patterns.md](common-review-patterns.md)
 
 ## Important Notes
 
@@ -222,11 +203,3 @@ The most frequent Copilot review issues — knowing these speeds up fixes signif
   and leave a reply on the thread explaining why: `gh api ... --method POST`.
 - **Do not manually add `merge-when-ready`** — the `copilot-auto-approve` bot adds it
   automatically when Copilot's review is clean after your fixes are pushed.
-
-## Related Skills
-
-- [Create PR](../create-pr/SKILL.md)
-- [Worktree Workflow](../worktree-workflow/SKILL.md)
-- [Rebase & Conflicts](../rebase-conflicts/SKILL.md)
-- [Fix Lint](../fix-lint/SKILL.md)
-- [Fix Types](../fix-types/SKILL.md)

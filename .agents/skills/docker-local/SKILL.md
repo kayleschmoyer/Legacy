@@ -218,7 +218,5 @@ docker compose up -d            # start fresh
 
 ## Related Skills
 
-- [db-restore-dev](../db-restore-dev/SKILL.md) — restore local database from seed (no AWS)
-- [db-restore](../db-restore/SKILL.md) — restore local database from production S3 dump
-- [db-migrate](../db-migrate/SKILL.md) — run pending database migrations
+- [database](../database/SKILL.md) — restore database, run migrations, query data
 - [sync-env](../sync-env/SKILL.md) — refresh `.env` from AWS Parameter Store
