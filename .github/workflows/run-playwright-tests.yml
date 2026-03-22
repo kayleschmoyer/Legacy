@@ -354,3 +354,68 @@ jobs:
           path: playwright-report/
           retention-days: 14
           if-no-files-found: ignore
+
+  # ===========================================================================
+  # Deploy report to GitHub Pages (legacy-sports-deploys)
+  # ===========================================================================
+  deploy-report:
+    name: "Deploy Playwright Report"
+    needs: [run-tests, merge-reports]
+    if: ${{ !cancelled() && needs.run-tests.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Download HTML Report (single shard)"
+        if: inputs.shard-total == '1'
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: playwright-report-0
+          path: playwright-report
+
+      - name: "Download Merged Report (multi-shard)"
+        if: inputs.shard-total != '1' && needs.merge-reports.result == 'success'
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: playwright-report-merged
+          path: playwright-report
+
+      - name: "Check for Report"
+        id: check-report
+        run: |
+          if [ -d "playwright-report" ] && [ "$(ls -A playwright-report 2>/dev/null)" ]; then
+            echo "has-report=true" >> $GITHUB_OUTPUT
+            echo "Found report — proceeding with deploy"
+          else
+            echo "has-report=false" >> $GITHUB_OUTPUT
+            echo "No report found — skipping deploy"
+          fi
+
+      - name: "Generate App Token"
+        id: app-token
+        if: steps.check-report.outputs.has-report == 'true'
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: bkrupa
+          repositories: legacy-sports-deploys
+
+      - name: "Deploy Playwright Report"
+        if: steps.check-report.outputs.has-report == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ steps.app-token.outputs.token }}
+          external_repository: bkrupa/legacy-sports-deploys
+          publish_branch: gh-pages
+          publish_dir: ./playwright-report
+          destination_dir: playwright-report/manual-${{ github.run_number }}
+
+      - name: "Print Report URL"
+        if: steps.check-report.outputs.has-report == 'true'
+        run: |
+          echo "## 🎭 Playwright Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Report:** https://bkrupa.github.io/legacy-sports-deploys/playwright-report/manual-${{ github.run_number }}/" >> $GITHUB_STEP_SUMMARY
+          echo "**Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
