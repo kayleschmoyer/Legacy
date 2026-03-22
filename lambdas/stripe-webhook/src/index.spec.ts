@@ -66,6 +66,7 @@ describe('stripe-webhook handler', () => {
 
     jest.doMock('@legacy-sports/aws-utils', () => ({
       createNotificationService: jest.fn(() => null),
+      createNotificationPublisher: jest.fn(() => null),
       retrieveSecretParameterValue: jest.fn(),
     }));
 

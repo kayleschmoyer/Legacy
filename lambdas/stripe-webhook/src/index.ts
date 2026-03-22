@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { eq } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  createNotificationPublisher,
   createNotificationService,
   retrieveSecretParameterValue,
 } from '@legacy-sports/aws-utils';
@@ -26,6 +27,12 @@ const rollbarConfig = getRollbarConfigFromEnv();
 if (rollbarConfig) {
   initRollbar(rollbarConfig);
 }
+
+// ── Module-scoped push publisher (reused across warm Lambda invocations) ─────
+// NOTE: Requires sqs:SendMessage on the notifications queue in Terraform.
+// Until the IAM policy is added, publish calls will fail with AccessDenied
+// and degrade gracefully via the non-fatal catch blocks.
+const pushPublisher = createNotificationPublisher();
 
 // ── Secrets ──────────────────────────────────────────────────────────────────
 
@@ -593,6 +600,23 @@ async function handleTrialWillEnd(
     }
   }
 
+  // Push notification for trial ending
+  if (pushPublisher && trialEndsAt) {
+    try {
+      await pushPublisher.publish({
+        userId,
+        notificationType: 'trial_will_end',
+        title: 'Trial Ending Soon',
+        body: `Your free trial ends on ${trialEndsAt.toLocaleDateString()}. Upgrade to keep Premium features!`,
+      });
+    } catch (err) {
+      LOGGER.warn('Trial will end push notification failed (non-fatal)', {
+        err,
+        userId,
+      });
+    }
+  }
+
   return userId;
 }
 
@@ -603,7 +627,6 @@ async function pushSubscriptionUpdated(
   stripeSubscriptionId: string,
 ): Promise<void> {
   const notificationService = createNotificationService();
-  if (!notificationService) return;
 
   const sub = await runWithInternalClient(getDbOptions(), async (db) => {
     const rows = await db
@@ -624,17 +647,37 @@ async function pushSubscriptionUpdated(
 
   if (!sub) return;
 
-  try {
-    await notificationService.notifySubscriptionUpdated(
-      userId,
-      sub.tier as 'free' | 'premium',
-      sub.status,
-    );
-  } catch (err) {
-    LOGGER.warn('WebSocket subscription notification failed (non-fatal)', {
-      err,
-      userId,
-    });
+  if (notificationService) {
+    try {
+      await notificationService.notifySubscriptionUpdated(
+        userId,
+        sub.tier as 'free' | 'premium',
+        sub.status,
+      );
+    } catch (err) {
+      LOGGER.warn('WebSocket subscription notification failed (non-fatal)', {
+        err,
+        userId,
+      });
+    }
+  }
+
+  // Push notification for subscription change
+  if (pushPublisher) {
+    try {
+      const tierLabel = sub.tier === 'premium' ? 'Premium' : 'Free';
+      await pushPublisher.publish({
+        userId,
+        notificationType: 'subscription_updated',
+        title: 'Subscription Updated',
+        body: `Your subscription has been updated to ${tierLabel}.`,
+      });
+    } catch (err) {
+      LOGGER.warn('Push subscription notification failed (non-fatal)', {
+        err,
+        userId,
+      });
+    }
   }
 }
 

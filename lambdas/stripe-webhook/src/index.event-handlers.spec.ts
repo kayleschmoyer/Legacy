@@ -116,6 +116,8 @@ function makeRecordEventDb() {
 
 // ── Common mock setup ─────────────────────────────────────────────────────────
 
+const mockPushPublish = jest.fn().mockResolvedValue(undefined);
+
 describe('stripe-webhook event handlers', () => {
   let handler: HandlerModule['handler'];
   let mockConstructEvent: jest.Mock;
@@ -130,6 +132,7 @@ describe('stripe-webhook event handlers', () => {
     mockRunWithInternalClient = jest.fn();
     mockHandleSubscriptionDowngrade = jest.fn().mockResolvedValue(undefined);
     mockClearLeagueTierFreezes = jest.fn().mockResolvedValue(undefined);
+    mockPushPublish.mockClear();
 
     jest.doMock('@legacy-sports/rollbar', () => ({
       getRollbarConfigFromEnv: jest.fn(() => null),
@@ -148,6 +151,10 @@ describe('stripe-webhook event handlers', () => {
 
     jest.doMock('@legacy-sports/aws-utils', () => ({
       createNotificationService: jest.fn(() => null),
+      createNotificationPublisher: jest.fn(() => ({
+        publish: mockPushPublish,
+        publishToMany: jest.fn(),
+      })),
       retrieveSecretParameterValue: jest.fn(),
     }));
 
@@ -240,6 +247,11 @@ describe('stripe-webhook event handlers', () => {
           cb(makeInsertUpdateDb()),
       );
       setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup (runs after recordEvent)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
 
       const result = await handler(makeEvent());
 
@@ -300,6 +312,11 @@ describe('stripe-webhook event handlers', () => {
           cb(makeInsertUpdateDb()),
       );
       setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup (runs after recordEvent)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
 
       await handler(makeEvent());
 
@@ -343,6 +360,11 @@ describe('stripe-webhook event handlers', () => {
         (_opts: unknown, cb: (db: unknown) => unknown) =>
           cb(makeInsertUpdateDb()),
       );
+      // pushSubscriptionUpdated DB lookup
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
       setupRecordEvent();
 
       const result = await handler(makeEvent());
@@ -383,6 +405,11 @@ describe('stripe-webhook event handlers', () => {
           cb(makeInsertUpdateDb()),
       );
       setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup (runs after recordEvent)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'canceled' }])),
+      );
 
       await handler(makeEvent());
 
@@ -392,6 +419,15 @@ describe('stripe-webhook event handlers', () => {
         expect.any(Object),
       );
       expect(mockClearLeagueTierFreezes).not.toHaveBeenCalled();
+
+      // Push notification should be published for subscription change
+      expect(mockPushPublish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 42,
+          notificationType: 'subscription_updated',
+          title: 'Subscription Updated',
+        }),
+      );
     });
 
     it('does not call side-effect helpers when tier does not change', async () => {
@@ -423,6 +459,11 @@ describe('stripe-webhook event handlers', () => {
           cb(makeInsertUpdateDb()),
       );
       setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup (runs after recordEvent)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
 
       await handler(makeEvent());
 
@@ -451,6 +492,11 @@ describe('stripe-webhook event handlers', () => {
           cb(makeSelectThenUpdateDb([{ userId: 42, tier: 'premium' }])),
       );
       setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup (runs after recordEvent)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'canceled' }])),
+      );
 
       const result = await handler(makeEvent());
 
@@ -473,6 +519,11 @@ describe('stripe-webhook event handlers', () => {
           cb(makeSelectThenUpdateDb([{ userId: 42, tier: 'premium' }])),
       );
       setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup (runs after recordEvent)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'canceled' }])),
+      );
 
       await handler(makeEvent());
 
@@ -555,6 +606,11 @@ describe('stripe-webhook event handlers', () => {
         },
       );
       setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup (runs after recordEvent)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
     }
 
     it('returns 200 and retains premium tier within grace period', async () => {
@@ -645,6 +701,11 @@ describe('stripe-webhook event handlers', () => {
           cb(makeSelectThenUpdateDb([{ userId: 42 }])),
       );
       setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup (runs after recordEvent)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
 
       const result = await handler(makeEvent());
 
@@ -705,6 +766,15 @@ describe('stripe-webhook event handlers', () => {
       expect(result.statusCode).toBe(200);
       // Only isEventProcessed + recordEvent — no extra DB calls
       expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
+
+      // Push notification should be published for trial ending
+      expect(mockPushPublish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 42,
+          notificationType: 'trial_will_end',
+          title: 'Trial Ending Soon',
+        }),
+      );
     });
 
     it('falls back to DB lookup when userId is absent from metadata', async () => {

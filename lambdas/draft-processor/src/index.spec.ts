@@ -124,10 +124,15 @@ jest.mock('@legacy-sports/db-client', () => ({
 }));
 
 const mockNotifyDraftCompleted = jest.fn();
+const mockPublish = jest.fn();
 jest.mock('@legacy-sports/aws-utils', () => ({
   createNotificationService: jest.fn(() => ({
     notifyDraftCompleted: (...args: unknown[]): unknown =>
       mockNotifyDraftCompleted(...args),
+  })),
+  createNotificationPublisher: jest.fn(() => ({
+    publish: (...args: unknown[]): unknown => mockPublish(...args),
+    publishToMany: jest.fn(),
   })),
   DraftProcessingResult: {},
   SqsDraftMessage: {},
@@ -289,6 +294,15 @@ describe('draft-processor handler', () => {
 
       // Valid message should not produce any batch failures
       expect(result.batchItemFailures).toHaveLength(0);
+
+      // Push notification should be published for draft completion
+      expect(mockPublish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: msg.payload.requestedBy,
+          notificationType: 'draft_completed',
+          title: 'Draft Complete',
+        }),
+      );
     });
 
     it('tracks batch failures per-record', async () => {

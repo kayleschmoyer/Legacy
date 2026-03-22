@@ -15,6 +15,7 @@ import {
   getVersionInfo,
 } from '@legacy-sports/utils/node';
 import {
+  createNotificationPublisher,
   createNotificationService,
   DraftProcessingResult,
   SqsDraftMessage,
@@ -63,8 +64,9 @@ LOGGER.info('Draft Processor Lambda initialized', {
   ...versionInfo,
 });
 
-// Initialize notification service
+// Initialize notification services
 const notificationService = createNotificationService();
+const pushPublisher = createNotificationPublisher();
 
 const SqsDraftMessageSchema = z.object({
   messageType: z.literal('START_DRAFT'),
@@ -1538,6 +1540,51 @@ async function processDraftMessage(
           extra: { leagueId, selectionMethod },
         },
       );
+    }
+
+    // Step 5: Publish push notification for draft completion
+    // NOTE: Requires sqs:SendMessage on the notifications queue in Terraform.
+    // Until the IAM policy is added, publish calls will fail with AccessDenied
+    // and degrade gracefully via the non-fatal catch block below.
+    if (pushPublisher) {
+      try {
+        await pushPublisher.publish({
+          userId: message.payload.requestedBy,
+          notificationType: 'draft_completed',
+          title: 'Draft Complete',
+          body: `Your ${selectionMethod} draft for league ${leagueId} has been completed. Check your roster!`,
+          data: { leagueId },
+        });
+        addBreadcrumb('Push notification queued for draft completion', {
+          leagueId,
+          selectionMethod,
+          userId: message.payload.requestedBy,
+        });
+      } catch (pushNotificationError) {
+        // Don't fail the draft if push notification queuing fails
+        LOGGER.error('Failed to queue draft completion push notification', {
+          error: pushNotificationError,
+          leagueId,
+          selectionMethod,
+          userId: message.payload.requestedBy,
+        });
+        captureError(
+          pushNotificationError instanceof Error
+            ? pushNotificationError
+            : new Error(String(pushNotificationError)),
+          {
+            tags: {
+              lambda: 'draft-processor',
+              operation: 'push_notification',
+            },
+            extra: {
+              leagueId,
+              selectionMethod,
+              userId: message.payload.requestedBy,
+            },
+          },
+        );
+      }
     }
 
     LOGGER.info(
