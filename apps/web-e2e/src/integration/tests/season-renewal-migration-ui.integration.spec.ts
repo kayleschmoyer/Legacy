@@ -115,34 +115,38 @@ test.describe
     state.leagueId = result.leagueId;
     state.inviteCode = result.inviteCode;
 
-    await test.step('Reduce season to 1 matchup and disable playoffs via API (fast-complete)', async () => {
-      // Setting totalMatchups = 1 before the draft ensures the automated
-      // draft will call createAllMatchupsForLeague with only 1 week,
-      // so we can advance the entire season in a single API call.
+    await test.step('Reduce season to 1 matchup, 1 game/matchup, and disable playoffs via API (fast-complete)', async () => {
+      // Setting totalMatchups = 1 and gamesPerMatchup = 1 before the draft
+      // ensures the automated draft will call createAllMatchupsForLeague
+      // with only 1 week and 1 game, so we can advance the entire season
+      // in a single autoSelectGames + autoAdvanceMatchups call.
       // Disabling playoffs ensures the season completes cleanly
       // (currentMatchup → null) instead of transitioning to a playoff bracket.
       const data = await gqlFetch<{
         updateLeagueSettings: {
           id: number;
           totalMatchups: number | null;
+          gamesPerMatchup: number | null;
           playoffEnabled: boolean;
         };
       }>(
         commissionerJwt,
-        `mutation SetTotalMatchups($input: UpdateLeagueSettingsInput!) {
+        `mutation SetSeasonConfig($input: UpdateLeagueSettingsInput!) {
              updateLeagueSettings(input: $input) {
-               id totalMatchups playoffEnabled
+               id totalMatchups gamesPerMatchup playoffEnabled
              }
            }`,
         {
           input: {
             leagueId: state.leagueId,
             totalMatchups: 1,
+            gamesPerMatchup: 1,
             playoffEnabled: false,
           },
         },
       );
       expect(data.updateLeagueSettings.totalMatchups).toBe(1);
+      expect(data.updateLeagueSettings.gamesPerMatchup).toBe(1);
       expect(data.updateLeagueSettings.playoffEnabled).toBe(false);
     });
   });
