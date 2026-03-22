@@ -1,7 +1,14 @@
 import { execFile } from 'node:child_process';
-import { getRepoRoot } from './gh.js';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const GITHUB_API = 'https://api.github.com';
+
+/** Resolve the repository root from this script's location (tools/mcp/ci-server/src/). */
+export function getRepoRoot(): string {
+  const thisDir = resolve(fileURLToPath(import.meta.url), '..');
+  return resolve(thisDir, '..', '..', '..', '..');
+}
 
 /** Resolve the GitHub token from env or fall back to `gh auth token`. */
 async function getToken(): Promise<string> {
@@ -9,7 +16,7 @@ async function getToken(): Promise<string> {
   if (envToken) return envToken;
 
   // Fall back to gh CLI token (local dev)
-  return new Promise((resolve, reject) => {
+  return new Promise((resolvePromise, reject) => {
     const cmd = process.platform === 'win32' ? 'gh.exe' : 'gh';
     execFile(cmd, ['auth', 'token'], { timeout: 5_000 }, (err, stdout) => {
       if (err) {
@@ -21,14 +28,14 @@ async function getToken(): Promise<string> {
         );
         return;
       }
-      resolve(stdout.trim());
+      resolvePromise(stdout.trim());
     });
   });
 }
 
 /** Parse owner/repo from the git remote origin URL. */
 async function getRepoSlug(): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolvePromise, reject) => {
     const cmd = process.platform === 'win32' ? 'git.exe' : 'git';
     execFile(
       cmd,
@@ -49,7 +56,7 @@ async function getRepoSlug(): Promise<string> {
           );
           return;
         }
-        resolve(match[1]);
+        resolvePromise(match[1]);
       },
     );
   });
@@ -65,7 +72,16 @@ async function ensureAuth(): Promise<{ token: string; slug: string }> {
   return { token: cachedToken, slug: cachedSlug };
 }
 
-/** Make a GET request to the GitHub REST API. */
+function buildHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'legacy-sports-ci-server',
+  };
+}
+
+/** Make a GET request to the GitHub REST API, returning parsed JSON. */
 export async function githubGet<T>(
   path: string,
   params?: Record<string, string>,
@@ -79,12 +95,7 @@ export async function githubGet<T>(
   }
 
   const res = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'legacy-sports-ci-server',
-    },
+    headers: buildHeaders(token),
   });
 
   if (!res.ok) {
@@ -95,6 +106,53 @@ export async function githubGet<T>(
   return (await res.json()) as T;
 }
 
+/**
+ * Make a GET request to the GitHub REST API, returning the response as plain text.
+ * Used for endpoints that return raw content (e.g., job logs).
+ */
+export async function githubGetText(path: string): Promise<string> {
+  const { token, slug } = await ensureAuth();
+  const url = `${GITHUB_API}/repos/${slug}${path}`;
+
+  const res = await fetch(url, {
+    headers: {
+      ...buildHeaders(token),
+      Accept: 'application/vnd.github+json',
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub API ${res.status}: ${body}`);
+  }
+
+  return res.text();
+}
+
+/**
+ * Make a GET request to the GitHub REST API, returning the response as an ArrayBuffer.
+ * Used for binary endpoints like Actions log downloads that return ZIP archives.
+ * Follows redirects automatically (e.g., 302 from job log endpoints).
+ */
+export async function githubGetArrayBuffer(path: string): Promise<ArrayBuffer> {
+  const { token, slug } = await ensureAuth();
+  const url = `${GITHUB_API}/repos/${slug}${path}`;
+
+  const res = await fetch(url, {
+    headers: {
+      ...buildHeaders(token),
+      Accept: 'application/vnd.github+json',
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub API ${res.status}: ${body}`);
+  }
+
+  return res.arrayBuffer();
+}
+
 /** Make a POST request to the GitHub REST API. */
 export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
   const { token, slug } = await ensureAuth();
@@ -103,11 +161,8 @@ export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
+      ...buildHeaders(token),
       'Content-Type': 'application/json',
-      'User-Agent': 'legacy-sports-ci-server',
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });

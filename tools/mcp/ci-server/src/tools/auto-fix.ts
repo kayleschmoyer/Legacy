@@ -1,5 +1,4 @@
-import { streamGhLogs } from '../gh.js';
-import { buildLogArgs } from '../logs.js';
+import { fetchRunLogsRing } from '../logs.js';
 import type { ToolResult } from '../types.js';
 
 type FailureCategory =
@@ -203,13 +202,15 @@ function classifyLogs(logs: string): Classification {
 export async function autoFix(params: AutoFixParams): Promise<ToolResult> {
   try {
     const maxLines = params.maxLines ?? 500;
-    const args = buildLogArgs({
-      runId: params.runId,
-      jobId: params.jobId,
-      attempt: params.attempt,
-      failedOnly: true,
-    });
-    const { lines } = await streamGhLogs(args, maxLines);
+    const { lines } = await fetchRunLogsRing(
+      {
+        runId: params.runId,
+        jobId: params.jobId,
+        attempt: params.attempt,
+        failedOnly: true,
+      },
+      maxLines,
+    );
     const logs = lines.join('\n');
 
     const classification = classifyLogs(logs);

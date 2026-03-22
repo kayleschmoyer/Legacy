@@ -1,5 +1,4 @@
-import { streamGhLogs } from '../gh.js';
-import { buildLogArgs } from '../logs.js';
+import { fetchRunLogsRing } from '../logs.js';
 import type { ToolResult } from '../types.js';
 
 interface GetLogsParams {
@@ -77,14 +76,19 @@ function extractErrorSummary(allLines: string[]): string[] {
 }
 
 export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
-  const args = buildLogArgs(params);
   const maxLines = params.maxLines ?? 0;
 
   try {
-    // Always stream so we never buffer more than maxLines (or the default cap)
-    // into memory — avoids maxBuffer errors on large workflow runs.
     const streamLimit = maxLines > 0 ? maxLines : 10_000;
-    const { lines, totalLines } = await streamGhLogs(args, streamLimit);
+    const { lines, totalLines } = await fetchRunLogsRing(
+      {
+        runId: params.runId,
+        jobId: params.jobId,
+        failedOnly: params.failedOnly,
+        attempt: params.attempt,
+      },
+      streamLimit,
+    );
 
     // When errorSummary is requested, filter to only error lines + context
     if (params.errorSummary) {
