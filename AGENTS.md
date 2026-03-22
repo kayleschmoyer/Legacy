@@ -175,17 +175,42 @@ When running as a **cloud coding agent**:
 
 **Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make <target>` → `pnpm --prefix lib/db-client run db:status` → `pnpm --prefix lib/db-client run db:up` → `make pc` → commit + push → `gh pr create` → Jira "In Review"
 
-**GitHub CLI authentication (required for PR creation):**
+**GitHub authentication for PR creation:**
 
-The `legacy-sports-github` MCP server uses the `gh` CLI, which requires a GitHub token. The MCP config forwards `GH_TOKEN` from the host environment automatically. How the token gets into the environment depends on the platform:
+The `legacy-sports-github` MCP server has a **5-tier auth fallback chain** (see `tools/mcp/github-server/src/auth.ts`). It does NOT require the `gh` CLI — it calls the GitHub API directly with a Bearer token:
 
-| Platform                   | How to provide `GH_TOKEN` / `GITHUB_TOKEN`                                                                                                                     |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Claude Code on the web** | Set `GH_TOKEN` as an environment variable in the cloud environment settings UI. Install `gh` CLI via the setup script field: `apt update && apt install -y gh` |
-| **Copilot Coding Agent**   | Automatically available via `${{ github.token }}`. Authenticated in `copilot-setup-steps.yml`                                                                  |
-| **Local development**      | Already authenticated via `gh auth login` — no env var needed                                                                                                  |
+1. `GH_TOKEN` or `GITHUB_TOKEN` env var
+2. Cached token file (`~/.config/legacy-sports-github/token.json`)
+3. `~/.netrc` password for `machine github.com`
+4. `gh auth token` CLI output (5s timeout, silent fallback)
+5. **Built-in OAuth device flow** (interactive — prompts via stderr)
 
-If `gh` is not authenticated, the MCP server logs a diagnostic warning at startup with remediation hints.
+For **interactive sessions** (local, Claude Code on the web), no token setup is needed — the device flow handles first-time auth automatically and caches the token for future sessions.
+
+For **non-interactive agents**, a token must be provided via environment variable. How it gets there depends on the platform:
+
+| Platform                   | Token source                            | Config file                | Setup                                                                                                                      |
+| -------------------------- | --------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Local development**      | `gh auth login` or device flow          | `.mcp.json`                | No env var needed — fallback chain handles it                                                                              |
+| **Claude Code on the web** | `GH_TOKEN` env var in cloud settings UI | `.mcp.json`                | Set `GH_TOKEN` in environment settings. Use the setup script from `.claude/cloud-setup.sh` to install `gh` CLI (optional). |
+| **Copilot Coding Agent**   | Agent Author app token (auto-generated) | `.github/copilot/mcp.json` | `copilot-setup-steps.yml` generates a 1-hour installation token from the Agent Author GitHub App (ID `3158619`)            |
+
+**Token options (for `GH_TOKEN` in Claude Code cloud settings):**
+
+| Method                            | Security | Lifetime         | Recommended for               |
+| --------------------------------- | -------- | ---------------- | ----------------------------- |
+| **Fine-grained PAT**              | Good     | Up to 1 year     | Solo developer cloud use      |
+| **GitHub App installation token** | Best     | 1 hour (rotates) | Automated/shared agent setups |
+
+**Required token permissions** (minimum for PR creation):
+
+- **Fine-grained PAT**: Repository access → your repo. Permissions: _Contents_ (read/write), _Pull requests_ (read/write), _Metadata_ (read).
+- **Classic PAT** (not recommended): `repo` scope.
+- **GitHub App**: _Contents_ + _Pull requests_ read/write permissions on the repository.
+
+> **Separation of duties:** Two GitHub Apps handle agent operations — the **Agent Author** app (ID `3158619`) pushes code and creates PRs, while the **Agent Reviewer** app (ID `3142924`) approves and merges. The same app never both authors and approves code.
+
+> **Note:** The `.mcp.json` and `.vscode/mcp.json` configs forward `GH_TOKEN` from the host environment. The `.github/copilot/mcp.json` forwards both `GH_TOKEN` (from the Agent Author app) and `GITHUB_TOKEN` (auto-provided by GitHub). The MCP server checks `GH_TOKEN` first, then `GITHUB_TOKEN` at runtime.
 
 **Available MCP servers in cloud:**
 

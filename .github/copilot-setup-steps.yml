@@ -32,19 +32,37 @@ steps:
       corepack enable
       corepack prepare pnpm@9.12.1 --activate
 
+  - name: Generate GitHub App token (Agent Author bot)
+    uses: actions/create-github-app-token@v2
+    id: agent-author-token
+    with:
+      app-id: 3158619
+      private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+
   - name: Authenticate GitHub CLI
     run: |
       if ! command -v gh &> /dev/null; then
         echo "ERROR: gh CLI not found on PATH. Install from https://cli.github.com"
         exit 1
       fi
-      if [ -n "$GITHUB_TOKEN" ]; then
-        echo "$GITHUB_TOKEN" | gh auth login --with-token
-        echo "gh auth: authenticated via GITHUB_TOKEN"
+      # Prefer the scoped Agent Author app token (short-lived, least-privilege).
+      # Falls back to GITHUB_TOKEN if the app token wasn't generated.
+      TOKEN="${AGENT_AUTHOR_TOKEN:-$GITHUB_TOKEN}"
+      if [ -n "$TOKEN" ]; then
+        echo "$TOKEN" | gh auth login --with-token
+        echo "gh auth: authenticated via ${AGENT_AUTHOR_TOKEN:+Agent Author app token}${AGENT_AUTHOR_TOKEN:-GITHUB_TOKEN}"
       else
-        echo "WARNING: GITHUB_TOKEN not set — gh CLI will not be authenticated"
+        echo "WARNING: No GitHub token available — gh CLI will not be authenticated"
         echo "PR creation via the legacy-sports-github MCP server will fail"
       fi
+      # Export GH_TOKEN so the legacy-sports-github MCP server picks it up.
+      # The MCP server checks GH_TOKEN first, then GITHUB_TOKEN at runtime.
+      if [ -n "$AGENT_AUTHOR_TOKEN" ]; then
+        echo "GH_TOKEN=$AGENT_AUTHOR_TOKEN" >> "$GITHUB_ENV"
+        echo "GH_TOKEN exported to environment for MCP server"
+      fi
+    env:
+      AGENT_AUTHOR_TOKEN: ${{ steps.agent-author-token.outputs.token }}
 
   - name: Install dependencies
     run: pnpm install --frozen-lockfile

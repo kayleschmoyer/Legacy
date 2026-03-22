@@ -29,7 +29,7 @@
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/github-server/src/index.ts"],
       "env": {
-        "GH_TOKEN": "${GITHUB_TOKEN}"
+        "GH_TOKEN": "${GH_TOKEN}"
       }
     },
     "legacy-sports-nx": {
