@@ -41,9 +41,13 @@ module "github_runners" {
   enable_ephemeral_runners    = true  # one job per instance, then terminate
   enable_jit_config           = false # Disable JIT — let instance register on boot (JIT tokens expire before boot completes)
 
-  # Spot instances with fallback types
-  instance_target_capacity_type = "spot"
-  instance_types                = var.github_runners_instance_types
+  # Spot instances with fleet diversification across types and AZs.
+  # capacity-optimized-prioritized picks from the pools with the most
+  # available capacity (fewest reclamations) while respecting the type
+  # priority order in var.github_runners_instance_types.
+  instance_target_capacity_type  = "spot"
+  instance_allocation_strategy   = "capacity-optimized-prioritized"
+  instance_types                 = var.github_runners_instance_types
 
   # Scale-to-zero: check every 5 minutes for idle runners
   scale_down_schedule_expression = "cron(*/5 * * * ? *)"
