@@ -1,0 +1,137 @@
+import { getToken, invalidateToken } from './auth.js';
+
+const BASE_URL = 'https://api.github.com';
+const API_VERSION = '2022-11-28';
+
+interface RestOptions {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  path: string;
+  body?: unknown;
+  query?: Record<string, string>;
+}
+
+async function buildHeaders(): Promise<Record<string, string>> {
+  const token = await getToken();
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': API_VERSION,
+    'Content-Type': 'application/json',
+  };
+}
+
+/**
+ * Make an authenticated GitHub REST API request.
+ *
+ * - 401: invalidates token cache and retries once
+ * - 502/503: retries once after 1 second
+ * - Rate limit (403 with x-ratelimit-remaining=0): includes reset time in error
+ */
+export async function githubRest<T>(opts: RestOptions): Promise<T> {
+  return doRest<T>(opts, true);
+}
+
+async function doRest<T>(opts: RestOptions, canRetry: boolean): Promise<T> {
+  const headers = await buildHeaders();
+  let url = `${BASE_URL}${opts.path}`;
+
+  if (opts.query) {
+    const params = new URLSearchParams(opts.query);
+    url += `?${params.toString()}`;
+  }
+
+  const response = await fetch(url, {
+    method: opts.method,
+    headers,
+    body: opts.body != null ? JSON.stringify(opts.body) : undefined,
+  });
+
+  // 401 — token invalid, invalidate and retry once
+  if (response.status === 401 && canRetry) {
+    await invalidateToken();
+    return doRest<T>(opts, false);
+  }
+
+  // 502/503 — transient, retry once after 1s
+  if ((response.status === 502 || response.status === 503) && canRetry) {
+    await new Promise((r) => setTimeout(r, 1_000));
+    return doRest<T>(opts, false);
+  }
+
+  // Rate limit
+  if (
+    response.status === 403 &&
+    response.headers.get('x-ratelimit-remaining') === '0'
+  ) {
+    const reset = response.headers.get('x-ratelimit-reset');
+    const resetAt = reset
+      ? new Date(Number(reset) * 1000).toISOString()
+      : 'unknown';
+    throw new Error(`GitHub API rate limit exceeded. Resets at ${resetAt}.`);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `GitHub API ${opts.method} ${opts.path} failed (${response.status}): ${text}`,
+    );
+  }
+
+  // DELETE returns 204 No Content
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+interface GraphQLResponse<T> {
+  data: T;
+  errors?: Array<{ message: string; type?: string; path?: string[] }>;
+}
+
+/**
+ * Make an authenticated GitHub GraphQL API request.
+ *
+ * GitHub returns 200 even on GraphQL errors — this function checks the
+ * `errors` array and throws if present.
+ */
+export async function githubGraphQL<T>(
+  query: string,
+  variables: Record<string, string | number>,
+): Promise<{ data: T }> {
+  return doGraphQL<T>(query, variables, true);
+}
+
+async function doGraphQL<T>(
+  query: string,
+  variables: Record<string, string | number>,
+  canRetry: boolean,
+): Promise<{ data: T }> {
+  const headers = await buildHeaders();
+
+  const response = await fetch(`${BASE_URL}/graphql`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ query, variables }),
+  });
+
+  if (response.status === 401 && canRetry) {
+    await invalidateToken();
+    return doGraphQL<T>(query, variables, false);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`GitHub GraphQL failed (${response.status}): ${text}`);
+  }
+
+  const result = (await response.json()) as GraphQLResponse<T>;
+  if (result.errors?.length) {
+    throw new Error(
+      `GitHub GraphQL errors: ${result.errors.map((e) => e.message).join('; ')}`,
+    );
+  }
+
+  return { data: result.data };
+}
