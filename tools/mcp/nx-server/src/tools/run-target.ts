@@ -70,7 +70,16 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
         }
       }
 
-      nxArgs.push('--', ...tokens);
+      // Translate deprecated Jest flags to current equivalents
+      const translated = tokens.map((t) =>
+        t.startsWith('--testPathPattern=')
+          ? t.replace('--testPathPattern=', '--testPathPatterns=')
+          : t === '--testPathPattern'
+            ? '--testPathPatterns'
+            : t,
+      );
+
+      nxArgs.push('--', ...translated);
     }
 
     const output = await runNx(nxArgs, cwd);
