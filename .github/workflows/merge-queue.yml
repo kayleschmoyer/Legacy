@@ -48,7 +48,11 @@ jobs:
         (github.event_name == 'pull_request' && github.event.action == 'labeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent')) ||
         (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent'))
       )
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # Always use GitHub-hosted runner — this job primarily makes API calls (no builds,
+    # no node_modules needed, only a minimal checkout for the github-script steps).
+    # Avoids paying ~2.5 min self-hosted runner spin-up + workspace overhead for a
+    # job that runs in ~90s of pure API calls.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
@@ -164,6 +168,16 @@ jobs:
             }
 
       # ── Heavy merge-queue processing ──
+
+      # When multiple CI runs complete within seconds, multiple workflow_run triggers
+      # fire. With cancel-in-progress: false, the concurrency group serializes runs:
+      # one executes while one queues, and any further arrivals replace the queued run.
+      # This sleep works WITH that behavior — while the running job sleeps, new triggers
+      # replace the single queued slot, so when this run finishes processing, only the
+      # most recent trigger remains to execute (which then scans all merge-ready PRs).
+      - name: Debounce (let concurrent triggers settle)
+        if: github.event_name == 'workflow_run' || github.event_name == 'pull_request_review'
+        run: sleep 30
 
       - name: Process Enhanced Merge Queue
         uses: actions/github-script@v8
