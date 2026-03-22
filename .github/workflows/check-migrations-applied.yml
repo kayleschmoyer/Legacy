@@ -9,10 +9,11 @@ name: "Check Migrations Applied"
 #
 # How it works:
 #   1. Resolves ci_readonly DB credentials from AWS Secrets Manager.
-#   2. Temporarily opens port 5432 in the RDS security group for the runner IP.
+#   2. If GitHub-hosted: temporarily opens port 5432 in the RDS SG for the runner IP.
+#      If self-hosted (VPC): uses static SG rule (rds_from_ci_runners) — no change needed.
 #   3. Connects as ci_readonly (SELECT-only on drizzle.__drizzle_migrations).
 #   4. Compares applied hashes against migration files on disk.
-#   5. Revokes the temporary security group rule (always, even on failure).
+#   5. If GitHub-hosted: revokes the temporary security group rule (always, even on failure).
 #
 # The ci_readonly PostgreSQL role is created by migration:
 #   lib/db-client/migrations/20260303_150000_add_ci_readonly_role.ts
@@ -117,10 +118,24 @@ jobs:
 
       # -----------------------------------------------------------------------
       # Temporarily allow the runner to reach port 5432 on the RDS instance.
-      # The rule is always revoked in the cleanup step below.
+      # Self-hosted runners are in the VPC and use a static SG rule (Terraform:
+      # aws_security_group_rule.rds_from_ci_runners), so this step is skipped.
+      # GitHub-hosted runners need a temporary public-IP-based rule.
       # -----------------------------------------------------------------------
+      - name: "Detect runner environment"
+        id: runner-env
+        run: |
+          if [ -n "${{ vars.CI_RUNNER_LABEL }}" ]; then
+            echo "is_self_hosted=true" >> "$GITHUB_OUTPUT"
+            echo "ℹ️  Self-hosted runner (label: ${{ vars.CI_RUNNER_LABEL }}) — using VPC private network"
+          else
+            echo "is_self_hosted=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️  GitHub-hosted runner — will open temporary SG rule"
+          fi
+
       - name: "Open RDS port 5432 for this runner"
         id: open-sg
+        if: steps.runner-env.outputs.is_self_hosted == 'false'
         run: |
           echo "::group::Open RDS security group"
 
@@ -175,7 +190,7 @@ jobs:
       # Always revoke the temporary security group rule
       # -----------------------------------------------------------------------
       - name: "Close RDS port 5432 (cleanup)"
-        if: always() && steps.open-sg.outputs.runner_ip != ''
+        if: always() && steps.runner-env.outputs.is_self_hosted == 'false' && steps.open-sg.outputs.runner_ip != ''
         run: |
           echo "::group::Close RDS security group"
 

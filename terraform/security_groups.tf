@@ -88,6 +88,19 @@ resource "aws_security_group_rule" "rds_from_proxy" {
 # - Security: Controlled via security group rules (source-based access control)
 # =============================================================================
 
+# Self-Hosted CI Runner Access - runners are in the same VPC and connect via private IP
+resource "aws_security_group_rule" "rds_from_ci_runners" {
+  count = var.enable_github_runners ? 1 : 0
+
+  type              = "ingress"
+  from_port         = 5432
+  to_port           = 5432
+  protocol          = "tcp"
+  cidr_blocks       = aws_subnet.public[*].cidr_block
+  security_group_id = aws_security_group.rds.id
+  description       = "PostgreSQL from self-hosted CI runners (public subnet traffic)"
+}
+
 # CLI Development Access - Direct RDS connection for development tools
 resource "aws_security_group_rule" "rds_from_cli_dev" {
   count = var.environment == "dev" && length(var.allowed_public_ips) > 0 ? 1 : 0
