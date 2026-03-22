@@ -117,9 +117,9 @@ server.tool(
       .number()
       .int()
       .positive()
-      .max(100)
+      .max(25)
       .default(10)
-      .describe('Maximum number of runs to return (default: 10)'),
+      .describe('Maximum number of runs to return (default: 10, max: 25)'),
   },
   async (params) => listRuns(params),
 );
