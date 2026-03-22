@@ -9,11 +9,11 @@ description: 'REQUIRED workflow step 12b — run after shipping PR, before clean
 
 After every agent session, review the Bash commands that were executed and determine which ones should have been (or could become) MCP tool invocations. For each identified gap, check whether a ticket already exists under the **LS-1455** epic ("AI Workspace Improvements") and create one if not.
 
-This skill enforces the **MCP-first principle** from AGENTS.md: shell commands are fallbacks, not defaults.
+This skill enforces the **MCP-first principle** from AGENTS.md: shell commands are fallbacks, not defaults. It also catches MCP tools that _were_ used but returned results too large for the context window — a silent productivity killer that wastes context on failed tool calls.
 
 ## When to Use
 
-- At the end of any agent session that involved Bash commands
+- At the end of any agent session that involved Bash commands or MCP tool calls
 - When the user asks to audit MCP coverage or identify tooling gaps
 - During retrospectives on agent workflow friction
 
@@ -110,15 +110,75 @@ Identified during agent session on <date>.
 <Any additional context about why this would improve agent workflows.>
 ```
 
-### 6. Report findings
+### 6. Audit MCP tool result overflows
+
+Review the conversation history for MCP tool calls that returned errors containing:
+
+- `exceeds maximum allowed tokens`
+- `Output has been saved to`
+
+These overflows waste context — the agent pays for the request/response overhead but gets no usable data back. Retries or reading the saved file burn even more context.
+
+For each overflow, record:
+
+| Field           | Description                                                                     |
+| --------------- | ------------------------------------------------------------------------------- |
+| **MCP tool**    | Server and tool name (e.g., `legacy-sports-ci / ci_get_logs`)                   |
+| **Params used** | The parameters that caused the overflow                                         |
+| **Result size** | The character count from the error message                                      |
+| **Root cause**  | Why the result was too large (no pagination, verbose output, large diff, etc.)  |
+| **Fix type**    | `bad-default`, `missing-parameter`, or `agent-error` (see classification below) |
+
+#### Classification
+
+- **`agent-error`**: The tool has appropriate limiting parameters but the agent didn't use them or passed excessively large values (e.g., `limit: 100` when `limit: 10` suffices). This is a **skill/documentation issue** — update AGENTS.md or the relevant skill doc to guide agents toward safe defaults. Do not create a ticket.
+- **`bad-default`**: The tool returns too much data when no limiting parameter is specified (e.g., `ci_get_logs` without `maxLines` returns the full log). Create a ticket to change the server-side default.
+- **`missing-parameter`**: The tool has no way to limit output size — no pagination, no summary mode, no `maxResults` flag. Create a ticket to add the parameter.
+
+#### Known high-frequency overflow patterns
+
+| Tool                       | Frequency | Root cause                            | Typical fix                         |
+| -------------------------- | --------- | ------------------------------------- | ----------------------------------- |
+| `ci_get_logs`              | Very high | Full CI job logs without `maxLines`   | Enforce `maxLines` default          |
+| `searchJiraIssuesUsingJql` | High      | Broad JQL without `maxResults`        | Add `maxResults` pagination         |
+| `ci_search_logs`           | Medium    | Large log search results              | Limit result count or add filters   |
+| `worktree_run`             | Medium    | Commands like `git diff` on lockfiles | Use `--stat` or `--name-only` flags |
+| `ci_list_runs`             | Medium    | Listing many workflow runs            | Lower default `limit`               |
+| `nx_run_affected`          | Low       | Verbose build/test output             | Summary mode or truncation          |
+| `make_run`                 | Low       | Verbose build output                  | Summary mode                        |
+| `github_list_prs`          | Low       | Large PR listings                     | Pagination or filters               |
+
+For `missing-parameter` and `bad-default` gaps, follow Steps 4–5 to check for existing tickets and create new ones under LS-1455. Use this description template:
+
+```
+## Gap Identified — MCP Result Overflow
+
+**MCP tool**: `<server> / <tool_name>`
+**Parameters that caused overflow**: `<params>`
+**Result size**: <N characters>
+**Fix type**: missing-parameter | bad-default
+
+## Proposed Fix
+
+**Option A**: <e.g., add `maxResults` parameter with default of 20>
+**Option B**: <e.g., server-side truncation with `truncated: true` flag>
+
+## Impact
+
+This tool overflowed <N> times in recent sessions, wasting agent context on each occurrence.
+Identified during MCP overflow audit on <date>.
+```
+
+### 7. Report findings
 
 Summarize the audit results to the user:
 
 - Total Bash commands reviewed
 - Commands identified as MCP gaps
+- MCP tool overflows identified (with fix types)
 - Existing tickets found (with keys)
 - New tickets created (with keys)
-- Any `missing-awareness` issues noted (skill/doc fixes needed)
+- Any `missing-awareness` or `agent-error` issues noted (skill/doc fixes needed)
 
 ## Gotchas
 
@@ -126,3 +186,5 @@ Summarize the audit results to the user:
 - **Don't ticket one-off commands** — only commands that represent a repeatable pattern across sessions. **Heuristic**: ask "Would another agent triaging a different CI failure (or reviewing a different PR) need this same capability?" If yes, it's a repeatable pattern regardless of how simple or investigative it appears.
 - **`missing-feature` vs `missing-tool`** — if a tool exists but needs a new parameter (e.g., `nx_run` lacking `--updateSnapshot`), that's `missing-feature`, not `missing-tool`. The ticket should reference the existing tool.
 - **MCP server scope** — each server has a defined domain (see AGENTS.md MCP Servers table). Don't propose adding a git tool to the DB server.
+- **Overflow ≠ gap** — if the tool works fine with correct parameters, it's `agent-error`, not a tooling gap. Fix the docs, not the tool.
+- **Third-party MCP tools** (e.g., `claude_ai_Atlassian`) — overflows in tools we don't control should still be documented. The fix is usually an `agent-error` doc update (guide agents to pass `maxResults`) since we can't change the server defaults.
