@@ -105,6 +105,7 @@ This skill delegates to specialized sub-skills for each operation category. Load
 - **One worktree per PR** — never mix fixes for different PRs in the same worktree
 - **All file edits happen in the worktree**, never in `D:\code\legacy-sports`
 - **Always `make pc` before pushing** — do not push broken code
+- **Dirty-tree guard before push** — after `make pc` passes, check `worktree_status` (or `git status --porcelain`). If the working tree is dirty (formatting auto-amend may leave changes on Windows), commit with `style: apply formatting` and re-run `make pc` before pushing.
 - **Always `--force-with-lease`** when pushing rebased branches
 
 ### Cloud Agent Only
@@ -183,7 +184,8 @@ For each PR in `$scan.conflicting`:
 3. Rebase from the worktree: `git -C $wt rebase origin/main` (or `.\scripts\rebase-pr.ps1 -Branch $branch`)
 4. If conflicts arise → load `skills/rebase-conflicts/SKILL.md` and `skills/resolve-merge-conflicts/SKILL.md`
 5. After rebasing ALL PRs, batch-validate with parallel `make pc` (see Parallelization Strategy below)
-6. Push passing PRs: `git -C "$wtPath" push --force-with-lease origin HEAD`
+6. **Dirty-tree guard**: after `make pc` passes, run `git status --porcelain` in each worktree. If dirty (e.g., `tsconfig.base.json` reformatted), commit with `style: apply formatting after rebase` and re-run `make pc`.
+7. Push passing PRs: `git -C "$wtPath" push --force-with-lease origin HEAD`
 
 > **Multiple PRs touching the same files**: When several PRs add code to the same location (e.g., tool registrations in `index.ts`), they conflict with each other — not just with main. After one merges, the next will conflict with the updated main. Rebase these sequentially, fetching whenever `main` changes (e.g., after each merge and before rebasing the next PR). Consider alphabetizing shared files (imports, registrations) so git can auto-merge concurrent additions.
 

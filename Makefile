@@ -733,16 +733,21 @@ pre-commit: ## Run all pre-commit validation checks
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && pnpm exec nx affected -t typecheck --base=main,@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
 	@$(call echo_plain,5/9 Formatting...)
 ifeq ($(DETECTED_OS),Windows)
-	@powershell -NoProfile -Command "$$preState = git status --porcelain; pnpm exec nx format:write; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = git diff --name-only; if ($$changed) { if ($$preState) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$changed | ForEach-Object { Write-Host ('  ' + $$_) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; auto-amending last commit...' -ForegroundColor Yellow; git add -A; git commit --amend --no-edit; Write-Host '  ✓ Format fixes folded into previous commit.' -ForegroundColor Green } }"
+	@powershell -NoProfile -Command "$$preState = @(git status --porcelain -uno); pnpm exec nx format:write; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = @(git status --porcelain -uno); $$newChanges = @(); foreach ($$line in $$changed) { if (-not ($$preState -contains $$line)) { $$newChanges += $$line } }; if ($$newChanges.Count -eq 0) { $$diffFiles = @(git diff --name-only); if ($$diffFiles.Count -gt 0) { $$newChanges = $$diffFiles | ForEach-Object { '?? ' + $$_ } } }; if ($$newChanges.Count -gt 0) { if ($$preState.Count -gt 0) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$newChanges | ForEach-Object { Write-Host ('  ' + $$_.Substring(3)) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; auto-amending last commit...' -ForegroundColor Yellow; git add -A; git commit --amend --no-edit; Write-Host '  ✓ Format fixes folded into previous commit.' -ForegroundColor Green } }"
 else
-	@pre_state=$$(git status --porcelain); \
+	@pre_state=$$(git status --porcelain -uno); \
 	pnpm exec nx format:write; \
-	changed=$$(git diff --name-only); \
+	post_state=$$(git status --porcelain -uno); \
+	changed=$$(comm -13 <(echo "$$pre_state" | sort) <(echo "$$post_state" | sort)); \
+	if [ -z "$$changed" ]; then \
+		diff_files=$$(git diff --name-only); \
+		if [ -n "$$diff_files" ]; then changed="$$diff_files"; fi; \
+	fi; \
 	if [ -n "$$changed" ]; then \
 		if [ -n "$$pre_state" ]; then \
 			echo ""; \
 			echo "ERROR: Formatting rewrote the following files:"; \
-			git diff --name-only | sed 's/^/  /'; \
+			echo "$$changed" | sed 's/^.../  /'; \
 			echo ""; \
 			echo "You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc."; \
 			exit 1; \
