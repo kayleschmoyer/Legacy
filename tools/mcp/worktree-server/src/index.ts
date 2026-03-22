@@ -616,6 +616,34 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_show_file',
+      description:
+        'Read the contents of a file at a specific git ref (branch, tag, or SHA) ' +
+        'without checking it out. Useful for inspecting files on remote branches ' +
+        'during CI triage. Runs `git show <ref>:<path>`.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          ref: {
+            type: 'string',
+            description:
+              'Git ref to read from (e.g. "origin/main", "origin/LS-1234/branch", "HEAD~1", a SHA).',
+          },
+          path: {
+            type: 'string',
+            description:
+              'File path relative to repo root (e.g. "lib/db-client/src/schema.ts").',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Optional ticket key. Uses active worktree if omitted, falls back to main repo if no active worktree is set.',
+          },
+        },
+        required: ['ref', 'path'],
+      },
+    },
+    {
       name: 'worktree_unjunction',
       description:
         'Remove the node_modules junction/symlink in a worktree so it can get independent ' +
@@ -2585,6 +2613,144 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
             {
               type: 'text',
               text: `Failed to remove node_modules junction/symlink: ${e.message ?? String(err)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_show_file
+    // -----------------------------------------------------------------------
+    case 'worktree_show_file': {
+      const {
+        ref,
+        path: filePath,
+        worktree,
+      } = args as {
+        ref: string;
+        path: string;
+        worktree?: string;
+      };
+
+      let cwd: string;
+      if (worktree) {
+        const target = resolveTargetDir(worktree);
+        if ('error' in target) {
+          return {
+            content: [{ type: 'text', text: target.error }],
+            isError: true,
+          };
+        }
+        cwd = target.path;
+      } else if (activeWorktree) {
+        cwd = activeWorktree;
+      } else {
+        cwd = MAIN_REPO;
+      }
+
+      // Validate ref (reject option-like values and only safe rev chars)
+      if (ref.startsWith('-')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Ref must not start with '-'.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(ref)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Only alphanumeric, '.', '/', '~', '^', '-', '_', '{', '}' allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Reject paths that could cause issues with git show
+      if (
+        filePath.startsWith('/') ||
+        filePath.includes(':') ||
+        filePath.startsWith('-') ||
+        /(?:^|\/)\.\.(?:\/|$)/.test(filePath)
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid path: "${filePath}". Path must be relative and must not contain ':', start with '-' or '/', or contain '..' segments.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const content = runGit(['show', `${ref}:${filePath}`], cwd);
+
+        // Truncate large file contents to prevent exceeding MCP/stdio limits.
+        // We use a character limit (not byte limit) to avoid splitting multi-byte
+        // UTF-8 characters, and apply it after JSON.stringify so the final
+        // serialized output respects the size budget.
+        const MAX_OUTPUT_CHARS = 512_000; // ~512 KB for ASCII content
+        const jsonPayload = JSON.stringify(
+          {
+            ref,
+            path: filePath,
+            content,
+            truncated: false,
+          },
+          null,
+          2,
+        );
+
+        const truncated = jsonPayload.length > MAX_OUTPUT_CHARS;
+        const safeText = truncated
+          ? JSON.stringify(
+              {
+                ref,
+                path: filePath,
+                content:
+                  content.slice(0, MAX_OUTPUT_CHARS) +
+                  `\n\n... [truncated — output exceeds ${MAX_OUTPUT_CHARS / 1000}KB. Consider reading a smaller file or a specific section.]`,
+                truncated: true,
+              },
+              null,
+              2,
+            )
+          : jsonPayload;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: safeText,
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const MAX_ERROR_CHARS = 4_000;
+        const rawOutput =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        const output =
+          rawOutput.length > MAX_ERROR_CHARS
+            ? rawOutput.slice(0, MAX_ERROR_CHARS) + '\n... [truncated]'
+            : rawOutput;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to read ${filePath} at ${ref}: ${output.trim()}`,
             },
           ],
           isError: true,
