@@ -1,4 +1,5 @@
 import { getRepoRoot, runNx } from '../run-command.js';
+import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
 const ALLOWED_TARGETS = new Set([
@@ -51,7 +52,7 @@ export async function runAffected(
               success: true,
               target: params.target,
               base,
-              output,
+              output: truncateOutput(output, MAX_OUTPUT_CHARS),
             },
             null,
             2,
@@ -64,7 +65,10 @@ export async function runAffected(
       content: [
         {
           type: 'text',
-          text: `Failed to run affected ${params.target}: ${error instanceof Error ? error.message : String(error)}`,
+          text: truncateOutput(
+            `Failed to run affected ${params.target}: ${error instanceof Error ? error.message : String(error)}`,
+            MAX_OUTPUT_CHARS,
+          ),
         },
       ],
       isError: true,

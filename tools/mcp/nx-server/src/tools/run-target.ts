@@ -1,4 +1,5 @@
 import { getRepoRoot, runNx } from '../run-command.js';
+import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
 const ALLOWED_TARGETS = new Set([
@@ -93,7 +94,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
               success: true,
               project: params.project,
               target: params.target,
-              output,
+              output: truncateOutput(output, MAX_OUTPUT_CHARS),
             },
             null,
             2,
@@ -106,7 +107,10 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: `Failed to run ${params.project}:${params.target}: ${error instanceof Error ? error.message : String(error)}`,
+          text: truncateOutput(
+            `Failed to run ${params.project}:${params.target}: ${error instanceof Error ? error.message : String(error)}`,
+            MAX_OUTPUT_CHARS,
+          ),
         },
       ],
       isError: true,
