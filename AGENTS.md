@@ -124,16 +124,17 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 ## MCP Servers
 
-| Server                 | Purpose                                                                   |
-| ---------------------- | ------------------------------------------------------------------------- |
-| `legacy-sports-db`     | Database queries, migrations, schema generation                           |
-| `legacy-sports-jira`   | Ticket CRUD, transitions, blocker checks                                  |
-| `legacy-sports-ci`     | CI log queries, workflow reruns                                           |
-| `legacy-sports-github` | PR and review lifecycle (uses `gh` CLI)                                   |
-| `legacy-sports-nx`     | Nx project discovery, affected analysis, target execution                 |
-| `legacy-sports-make`   | Makefile targets: validation, build, install, worktree setup              |
-| `worktree`             | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push |
-| `legacy-sports-aws`    | CloudWatch log tailing, AWS SSO status checks                             |
+| Server                 | Purpose                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-db`     | Database queries, migrations, schema generation                                                               |
+| `legacy-sports-jira`   | Ticket CRUD, transitions, blocker checks                                                                      |
+| `legacy-sports-ci`     | CI log queries, workflow reruns                                                                               |
+| `legacy-sports-github` | PR and review lifecycle (uses `gh` CLI)                                                                       |
+| `legacy-sports-nx`     | Nx project discovery, affected analysis, target execution                                                     |
+| `legacy-sports-make`   | Makefile targets: validation, build, install, worktree setup                                                  |
+| `worktree`             | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                     |
+| `legacy-sports-aws`    | CloudWatch log tailing, AWS SSO status checks                                                                 |
+| `claude_ai_Stripe`     | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`) |
 
 Use MCP tools first for Jira operations (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). Fall back to `acli` CLI — never direct HTTP.
 
@@ -152,6 +153,11 @@ Use MCP tools first for Jira operations (`jira_view`, `jira_create_ticket`, `jir
 **Database operations — MCP first**: use `db_migration_status` and `db_migrate` instead of `pnpm --prefix lib/db-client run db:status/db:up` via Bash, `db_query` for ad-hoc SQL, `db_codegen` for GraphQL codegen, and `db_print_schema` for schema regeneration.
 
 **AWS operations — MCP first**: use `aws_logs_tail` instead of `aws logs tail` via Bash, and `aws_sso_status` to check credentials before any AWS operation.
+
+**Claude built-in integrations**: Claude Code provides native integrations that work without local credentials. Use these when working on related code:
+
+- **Stripe** (`mcp__claude_ai_Stripe__*`): Full Stripe API access — create/list customers, products, prices, invoices, subscriptions, payment links, refunds, coupons, and disputes. Use when working on `lambdas/stripe-webhook`, `lambdas/apple-iap`, or any billing/payment code. Search Stripe docs with `search_stripe_documentation`.
+- **Atlassian** (`mcp__claude_ai_Atlassian__*`): Jira + Confluence access — used as fallback when local Jira credentials are unavailable (see Jira MCP server prerequisites: `JIRA_EMAIL`/`JIRA_API_TOKEN` and troubleshooting docs in this repo).
 
 ## Cloud Agent Mode
 
