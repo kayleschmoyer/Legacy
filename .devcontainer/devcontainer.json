@@ -6,7 +6,7 @@
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/git-lfs:1": {}
   },
-  "postCreateCommand": "corepack enable && corepack prepare pnpm@9.12.1 --activate && pnpm install --frozen-lockfile",
+  "postCreateCommand": ".devcontainer/post-create.sh",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -18,6 +18,8 @@
   },
   "forwardPorts": [5432],
   "remoteEnv": {
-    "NX_DAEMON": "false"
+    "NX_DAEMON": "false",
+    "USE_LOCAL_CREDENTIALS": "true",
+    "DATABASE_URL": "postgresql://legacy_sports:legacy_sports_dev@localhost:5432/legacy_sports_dev"
   }
 }

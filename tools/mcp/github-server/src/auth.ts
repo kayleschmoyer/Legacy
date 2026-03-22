@@ -259,21 +259,20 @@ async function deviceFlow(): Promise<string> {
 // ---------------------------------------------------------------------------
 
 async function validateToken(token: string): Promise<boolean> {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+
   try {
-    const res = await fetch('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-    });
+    // Try GET /user first (works for PATs, OAuth tokens, and gh CLI tokens)
+    const res = await fetch('https://api.github.com/user', { headers });
 
     if (res.ok) return true;
-
-    // 401/403 with no rate-limit issue means truly invalid token
     if (res.status === 401) return false;
 
-    // Rate limiting (403 with rate-limit headers or 429) — token may still be valid
+    // Rate limiting — token may still be valid
     if (
       res.status === 429 ||
       (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0')
@@ -292,7 +291,53 @@ async function validateToken(token: string): Promise<boolean> {
       return true;
     }
 
-    // Other 4xx (e.g. 403 without rate-limit) — treat as invalid
+    // 403 without rate-limit: may be a GitHub App installation token (ghs_*).
+    // App tokens return 403 for /user because they represent an app, not a user.
+    // Fall back to a repo-scoped endpoint that works for both token types.
+    if (res.status === 403) {
+      try {
+        const { owner, name } = await getRepoOwnerName();
+        const repoRes = await fetch(
+          `https://api.github.com/repos/${owner}/${name}`,
+          { headers },
+        );
+        if (repoRes.ok) return true;
+        if (repoRes.status === 401) return false;
+
+        // Rate limiting on repo endpoint — token may still be valid
+        if (
+          repoRes.status === 429 ||
+          (repoRes.status === 403 &&
+            repoRes.headers.get('x-ratelimit-remaining') === '0')
+        ) {
+          process.stderr.write(
+            'Warning: GitHub API rate-limited during repo token validation; assuming token is valid.\n',
+          );
+          return true;
+        }
+
+        // 403/404 means no access to this repo — treat as invalid
+        if (repoRes.status === 403 || repoRes.status === 404) return false;
+
+        // Server errors (5xx) — don't invalidate a potentially good token
+        if (repoRes.status >= 500) {
+          process.stderr.write(
+            `Warning: GitHub API returned ${repoRes.status} during repo token validation; assuming token is valid.\n`,
+          );
+          return true;
+        }
+
+        // Any other 4xx — treat as invalid
+        return false;
+      } catch {
+        // Can't determine repo — assume token is valid (don't invalidate on infra issues)
+        process.stderr.write(
+          'Warning: Could not validate app token against repo endpoint; assuming valid.\n',
+        );
+        return true;
+      }
+    }
+
     return false;
   } catch {
     // Network errors — don't invalidate token, assume it might be valid

@@ -31,13 +31,18 @@ No setup needed. The fallback chain will:
 - Otherwise, trigger the device flow (one-time interactive prompt)
 - Cache the token for future sessions
 
-### Claude Code on the web
+### Claude Code on the web (recommended: GitHub App)
 
-Set `GH_TOKEN` in the cloud environment settings UI:
+The easiest setup uses the **Agent Author GitHub App** to auto-generate tokens:
 
 1. Go to claude.ai/code → Settings → Environment
-2. Add environment variable: `GH_TOKEN=github_pat_your_token_here`
-3. (Optional) Paste `.claude/cloud-setup.sh` into the Setup script field to install `gh` CLI
+2. Add environment variable: `AGENT_AUTHOR_APP_PRIVATE_KEY=<paste PEM contents>`
+   - Replace literal newlines with `\n` if the UI requires single-line values
+3. Paste `.claude/cloud-setup.sh` into the Setup script field
+
+The setup script calls `scripts/generate-github-app-token.mjs` to generate a 1-hour scoped token and exports it as `GH_TOKEN`. Both the MCP server and `gh` CLI pick it up automatically.
+
+**Alternative**: set `GH_TOKEN` directly with a fine-grained PAT (see Option 1 below).
 
 **If no token is set**, the MCP server will attempt the OAuth device flow on first API call. This works in interactive sessions — watch stderr for the device code prompt.
 
@@ -69,11 +74,7 @@ The repo uses two GitHub Apps for separation of duties:
 
 **For Copilot Coding Agent**, this is already automated — `copilot-setup-steps.yml` generates a 1-hour token from the Agent Author app via `actions/create-github-app-token@v2` and exports it as `GH_TOKEN`.
 
-**For Claude Code on the web**, generate an installation token manually:
-
-1. Use the Agent Author app (ID `3158619`, installation `118260223`)
-2. Generate a token via the GitHub API or a helper script
-3. Set it as `GH_TOKEN` in cloud environment settings
+**For Claude Code on the web**, this is automated via `.claude/cloud-setup.sh` — set `AGENT_AUTHOR_APP_PRIVATE_KEY` in cloud environment settings and the setup script generates a token automatically (see [Claude Code on the web](#claude-code-on-the-web-recommended-github-app) above).
 
 The token expires after 1 hour — for longer sessions, the MCP server's device flow (Option 3) is more practical.
 

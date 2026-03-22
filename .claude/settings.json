@@ -16,6 +16,17 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-github-auth.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "^(Edit|Write)$",

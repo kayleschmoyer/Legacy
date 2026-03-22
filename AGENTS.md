@@ -41,7 +41,8 @@ This file provides guidance to AI coding agents working with code in this reposi
    - 9b. **Post-rebase stabilization (BEFORE push)**: `make install ; pnpm exec nx run db:print-schema ; pnpm exec nx affected -t codegen --base=origin/main` — main may have changed deps, schema, or formatting. **Do NOT push until `make pc` passes** (see `skills/rebase-and-conflicts/SKILL.md` Step 4).
 10. **Migrations (BEFORE make pc)**: run `pnpm --prefix lib/db-client run db:status` and `pnpm --prefix lib/db-client run db:up` — **always do this even if you think no migrations were added.** Confirm `Applied N new migrations` or `No new migrations to apply`. (See `skills/database/SKILL.md`.) _Note: `pnpm run` is allowed here because these are `lib/db-client` package scripts with no Nx target equivalent._
 11. Validate: `make pc` — must pass before pushing or opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
-    - 11b. **Push only after `make pc` passes**: `git push --force-with-lease origin HEAD` — pushing before validating is the #1 cause of post-rebase CI failures.
+    - 11b. **Self-review (BEFORE first push)**: run the `/review` skill (or follow the self-review steps in `skills/pr-workflow/SKILL.md`) to catch project-rule violations and code quality issues that `make pc` does not check. This significantly reduces Copilot review rounds.
+    - 11c. **Push only after `make pc` passes**: `git push --force-with-lease origin HEAD` — pushing before validating is the #1 cause of post-rebase CI failures.
 12. **Ship (REQUIRED — do NOT stop before this step)**: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` then `bash scripts/cleanup-pr-body.sh` then Jira "In Review" (see `skills/pr-workflow/SKILL.md`)
     - 12b. **MCP gap audit (REQUIRED)**: review all Bash commands from this session, identify any that should be MCP tools, and file tickets under LS-1455 for gaps not already tracked. See `skills/mcp-gap-audit/SKILL.md`.
 13. Cleanup: `twig worktree clean` then `git branch -d LS-####/description` then Jira "Done" — **NEVER use `git worktree remove` directly** (see Rules)
@@ -201,15 +202,15 @@ The `legacy-sports-github` MCP server has a **5-tier auth fallback chain** (see 
 4. `gh auth token` CLI output (5s timeout, silent fallback)
 5. **Built-in OAuth device flow** (interactive — prompts via stderr)
 
-For **interactive sessions** (local, Claude Code on the web), no token setup is needed — the device flow handles first-time auth automatically and caches the token for future sessions.
+For **local interactive sessions**, no token setup is needed — the device flow handles first-time auth automatically and caches the token for future sessions.
 
-For **non-interactive agents**, a token must be provided via environment variable. How it gets there depends on the platform:
+For **cloud environments** (Claude Code on the web, Copilot), pre-configuring a token is recommended — the device flow may not surface stderr prompts reliably. How the token gets there depends on the platform:
 
-| Platform                   | Token source                            | Config file                | Setup                                                                                                                      |
-| -------------------------- | --------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **Local development**      | `gh auth login` or device flow          | `.mcp.json`                | No env var needed — fallback chain handles it                                                                              |
-| **Claude Code on the web** | `GH_TOKEN` env var in cloud settings UI | `.mcp.json`                | Set `GH_TOKEN` in environment settings. Use the setup script from `.claude/cloud-setup.sh` to install `gh` CLI (optional). |
-| **Copilot Coding Agent**   | Agent Author app token (auto-generated) | `.github/copilot/mcp.json` | `copilot-setup-steps.yml` generates a 1-hour installation token from the Agent Author GitHub App (ID `3158619`)            |
+| Platform                   | Token source                            | Config file                | Setup                                                                                                                           |
+| -------------------------- | --------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Local development**      | `gh auth login` or device flow          | `.mcp.json`                | No env var needed — fallback chain handles it                                                                                   |
+| **Claude Code on the web** | Agent Author app token (auto-generated) | `.mcp.json`                | Set `AGENT_AUTHOR_APP_PRIVATE_KEY` in env settings + paste `.claude/cloud-setup.sh` as setup script. Auto-generates `GH_TOKEN`. |
+| **Copilot Coding Agent**   | Agent Author app token (auto-generated) | `.github/copilot/mcp.json` | `copilot-setup-steps.yml` generates a 1-hour installation token from the Agent Author GitHub App (ID `3158619`)                 |
 
 **Token options (for `GH_TOKEN` in Claude Code cloud settings):**
 

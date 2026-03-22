@@ -72,6 +72,16 @@ When Copilot reviews have unresolved comments requiring code changes:
 6. Resolve threads: `github_resolve_thread(threadId: "<id>")`
 7. Copilot re-reviews automatically — bot approves and labels when clean
 
+### Two-Round Cap
+
+Copilot may find new comments each round (it reviews the full diff, not just deltas). **Cap fix iterations at 2 rounds:**
+
+- **Round 1**: Fix all Tier 1–2 issues (security, bugs, error handling, type safety)
+- **Round 2**: Fix remaining actionable comments
+- **After round 2**: Resolve any remaining threads as "acknowledged — out of scope for this PR" and proceed to merge. Copilot's incremental suggestions have diminishing returns beyond round 2.
+
+Do not enter a fix-review loop beyond 2 rounds. The `copilot-instructions.md` instructs Copilot to be thorough in a single pass, but this is a safety net for when it isn't.
+
 > Top 10 common Copilot review patterns: [references/common-review-patterns.md](references/common-review-patterns.md)
 
 ### Batch Processing (All Open PRs)
