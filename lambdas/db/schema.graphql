@@ -914,6 +914,27 @@ type LeagueChatMessage {
 }
 
 """
+Per-league dues configuration set by the commissioner
+"""
+type LeagueDuesSettings {
+  """
+  Dues amount in cents (e.g. 5000 = $50.00)
+  """
+  amountCents: Int
+  createdAt: String
+  enabled: Boolean
+  id: Int
+  leagueId: Int
+
+  """
+  Day of week for reminders (0=Sunday, 6=Saturday)
+  """
+  reminderDayOfWeek: Int
+  reminderEnabled: Boolean
+  updatedAt: String
+}
+
+"""
 A member of a league
 """
 type LeagueMember {
@@ -921,6 +942,21 @@ type LeagueMember {
   permissionLevel: String
   team: Team
   teamId: Int
+  userId: Int
+  username: String
+}
+
+"""
+Payment status for a single league member
+"""
+type LeagueMemberPaymentStatus {
+  createdAt: String
+  id: Int
+  leagueId: Int
+  markedBy: Int
+  paid: Boolean
+  paidAt: String
+  updatedAt: String
   userId: Int
   username: String
 }
@@ -1436,6 +1472,16 @@ type Mutation {
     team: String
   ): Boolean
   markAllNotificationsAsRead: Boolean
+
+  """
+  Mark a league member as paid. Commissioner/GM access required.
+  """
+  markMemberPaid(leagueId: Int!, userId: Int!): LeagueMemberPaymentStatus
+
+  """
+  Mark a league member as unpaid. Commissioner/GM access required.
+  """
+  markMemberUnpaid(leagueId: Int!, userId: Int!): LeagueMemberPaymentStatus
   markNotificationAsRead(notificationId: Int!): Boolean
   nominatePlayer(draftId: Int!, playerId: Int!): AuctionState
   pauseDraft(leagueId: Int!): Draft
@@ -1615,6 +1661,11 @@ type Mutation {
   updateDraftSettings(
     input: UpdateDraftSettingsInput!
   ): UpdateDraftSettingsPayload
+
+  """
+  Create or update dues settings for a league. Commissioner/GM access required.
+  """
+  updateDuesSettings(input: UpdateDuesSettingsInput!): LeagueDuesSettings
   updateLeagueAnnouncement(
     id: Int!
     leagueId: Int!
@@ -2192,6 +2243,16 @@ type Query {
     leagueId: Int!
     limit: Int = 20
   ): [LeagueActivityEvent!]
+
+  """
+  Get dues settings for a league. Requires league membership.
+  """
+  leagueDuesSettings(leagueId: Int!): LeagueDuesSettings
+
+  """
+  Get payment status for all league members. Requires league membership.
+  """
+  leagueDuesStatus(leagueId: Int!): [LeagueMemberPaymentStatus!]
   leaguePositions(leagueId: Int!): [LeaguePosition!]
   leagueScoringProfile(leagueId: Int!): ScoringConfig
 
@@ -2953,6 +3014,14 @@ type UpdateDraftSettingsPayload {
   playerPool: String
   scheduledAt: String
   selectionMethod: String
+}
+
+input UpdateDuesSettingsInput {
+  amountCents: Int!
+  enabled: Boolean!
+  leagueId: Int!
+  reminderDayOfWeek: Int
+  reminderEnabled: Boolean!
 }
 
 input UpdateLeagueScoringMultiplierInput {
