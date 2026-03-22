@@ -9,6 +9,8 @@ description: 'Query and stream AWS CloudWatch logs for Lambda functions to debug
 
 Query and stream AWS CloudWatch logs for Lambda functions and other AWS services to debug production issues and monitor application behavior.
 
+> **Local only** — This skill requires AWS credentials and is unavailable in cloud agent environments (Claude Code on the web, Copilot Coding Agent). If you need to debug production logs, inform the user that CloudWatch log access requires a local development session with active AWS SSO credentials.
+
 ## When to Use
 
 - Debugging production errors in Lambda functions

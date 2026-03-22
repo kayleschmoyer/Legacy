@@ -9,6 +9,8 @@ description: 'Handle AWS SSO authentication when credentials expire; use when en
 
 Handle AWS SSO authentication when credentials expire, prompting for login when SSO-related errors are detected.
 
+> **Local only** — AWS SSO login requires interactive device authorization in a browser and the ability to persist refreshed credentials in the same environment where the agent runs. Most cloud agent environments cannot complete this flow or store the resulting credentials, so cloud agents should inform the user that AWS operations requiring SSO must be performed from a local environment.
+
 ## When to Use
 
 - When seeing "SSO session associated with this profile has expired" errors

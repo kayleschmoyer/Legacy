@@ -9,6 +9,8 @@ description: 'Find and clean up AWS resources not tracked by Terraform. Use when
 
 Identifies and removes AWS resources that exist in the account but are not tracked by Terraform state. Uses `terraform state list` as the source of truth and cross-references live AWS CLI queries for each resource type.
 
+> **Local only** — This skill requires AWS credentials and Terraform state access, both unavailable in cloud agent environments. Cloud agents should inform the user that orphan cleanup must be performed from a local session with active AWS SSO credentials and Terraform state access.
+
 **Known permanent exceptions** (do not flag these):
 
 - `eipalloc-09338b5c6924e14cf` (`52.70.156.59`) auto-assigned by RDS (`ServiceManaged: rds`) because the DB instance has `publicly_accessible = true`. Tagged `ManagedBy: rds`. Cannot be released manually.
