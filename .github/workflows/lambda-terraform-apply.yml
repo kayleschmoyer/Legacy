@@ -208,7 +208,7 @@ jobs:
         uses: ./.github/actions/rollbar-deploy
         with:
           rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
-          environment: production
+          environment: ${{ env.AWS_STAGE }}
           status: started
           comment: "Lambda infrastructure apply (run ${{ github.run_id }})"
 
@@ -248,7 +248,7 @@ jobs:
         uses: ./.github/actions/rollbar-deploy
         with:
           rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
-          environment: production
+          environment: ${{ env.AWS_STAGE }}
           status: succeeded
           comment: "Lambda infrastructure apply (run ${{ github.run_id }})"
 
@@ -257,9 +257,29 @@ jobs:
         uses: ./.github/actions/rollbar-deploy
         with:
           rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
-          environment: production
+          environment: ${{ env.AWS_STAGE }}
           status: failed
           comment: "Lambda infrastructure apply (run ${{ github.run_id }})"
+
+      - name: "Discord Deploy Succeeded"
+        if: steps.apply.outcome == 'success'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: success
+          title: "Lambda Infrastructure Deploy"
+          environment: ${{ env.AWS_STAGE }}
+          description: "Applied Terraform changes for ${{ steps.check-updates.outputs.total_lambdas }} Lambda function(s)"
+
+      - name: "Discord Deploy Failed"
+        if: always() && steps.apply.outcome == 'failure'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: failure
+          title: "Lambda Infrastructure Deploy"
+          environment: ${{ env.AWS_STAGE }}
+          description: "Terraform apply failed"
 
       - name: Verify Deployment
         if: steps.plan.outputs.has_changes == 'true'

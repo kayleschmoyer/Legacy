@@ -1,0 +1,154 @@
+name: "Discord Notification"
+description: "Post deployment status or CI failure notifications to a Discord webhook channel"
+
+inputs:
+  webhook-url:
+    description: "Discord webhook URL. If empty, the step is silently skipped."
+    required: false
+    default: ""
+  status:
+    description: "Event status: success, failure, or cancelled"
+    required: true
+  title:
+    description: "Embed title (e.g. 'Web Deploy', 'Lambda Infrastructure', 'CI Pipeline')"
+    required: true
+  environment:
+    description: "Target environment (e.g. production, staging). Omit for CI notifications."
+    required: false
+    default: ""
+  commit-sha:
+    description: "Git commit SHA"
+    required: false
+    default: ${{ github.sha }}
+  actor:
+    description: "User who triggered the workflow"
+    required: false
+    default: ${{ github.actor }}
+  run-id:
+    description: "GitHub Actions run ID (used to build the run URL)"
+    required: false
+    default: ${{ github.run_id }}
+  description:
+    description: "Optional extra description text for the embed body"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Post to Discord"
+      if: inputs.webhook-url != ''
+      shell: bash
+      env:
+        DISCORD_WEBHOOK_URL: ${{ inputs.webhook-url }}
+        NOTIFY_STATUS: ${{ inputs.status }}
+        NOTIFY_TITLE: ${{ inputs.title }}
+        NOTIFY_ENV: ${{ inputs.environment }}
+        NOTIFY_SHA: ${{ inputs.commit-sha }}
+        NOTIFY_ACTOR: ${{ inputs.actor }}
+        NOTIFY_RUN_ID: ${{ inputs.run-id }}
+        NOTIFY_DESC: ${{ inputs.description }}
+        GITHUB_REPO: ${{ github.repository }}
+        GITHUB_SERVER: ${{ github.server_url }}
+      run: |
+        # Ensure required CLI tools are available
+        for cmd in jq curl; do
+          if ! command -v "$cmd" &>/dev/null; then
+            echo "::warning::Discord notification skipped: '$cmd' is not installed on this runner"
+            exit 0
+          fi
+        done
+
+        # Map status to color and emoji
+        case "$NOTIFY_STATUS" in
+          success)
+            COLOR=5763719   # Green (0x57F287)
+            EMOJI="✅"
+            STATUS_TEXT="Succeeded"
+            ;;
+          failure)
+            COLOR=15548997  # Red (0xED4245)
+            EMOJI="❌"
+            STATUS_TEXT="Failed"
+            ;;
+          cancelled)
+            COLOR=16705372  # Yellow (0xFEE75C)
+            EMOJI="⚠️"
+            STATUS_TEXT="Cancelled"
+            ;;
+          *)
+            COLOR=5793266   # Blurple (0x5865F2)
+            EMOJI="ℹ️"
+            STATUS_TEXT="$NOTIFY_STATUS"
+            ;;
+        esac
+
+        SHORT_SHA="${NOTIFY_SHA:0:7}"
+        RUN_URL="${GITHUB_SERVER}/${GITHUB_REPO}/actions/runs/${NOTIFY_RUN_ID}"
+        COMMIT_URL="${GITHUB_SERVER}/${GITHUB_REPO}/commit/${NOTIFY_SHA}"
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+        # Build fields array
+        FIELDS="[]"
+        FIELDS=$(echo "$FIELDS" | jq \
+          --arg status "${EMOJI} ${STATUS_TEXT}" \
+          '. + [{"name": "Status", "value": $status, "inline": true}]')
+
+        if [ -n "$NOTIFY_ENV" ]; then
+          FIELDS=$(echo "$FIELDS" | jq \
+            --arg env "$NOTIFY_ENV" \
+            '. + [{"name": "Environment", "value": $env, "inline": true}]')
+        fi
+
+        FIELDS=$(echo "$FIELDS" | jq \
+          --arg actor "$NOTIFY_ACTOR" \
+          '. + [{"name": "Triggered by", "value": $actor, "inline": true}]')
+
+        FIELDS=$(echo "$FIELDS" | jq \
+          --arg sha "[\`${SHORT_SHA}\`](${COMMIT_URL})" \
+          '. + [{"name": "Commit", "value": $sha, "inline": true}]')
+
+        FIELDS=$(echo "$FIELDS" | jq \
+          --arg url "[View Run](${RUN_URL})" \
+          '. + [{"name": "Workflow", "value": $url, "inline": true}]')
+
+        # Build description
+        DESC=""
+        if [ -n "$NOTIFY_DESC" ]; then
+          DESC="$NOTIFY_DESC"
+        fi
+
+        # Build the embed payload
+        PAYLOAD=$(jq -n \
+          --arg title "$NOTIFY_TITLE" \
+          --arg desc "$DESC" \
+          --argjson color "$COLOR" \
+          --argjson fields "$FIELDS" \
+          --arg timestamp "$TIMESTAMP" \
+          '{
+            embeds: [{
+              title: $title,
+              description: (if $desc == "" then null else $desc end),
+              color: $color,
+              fields: $fields,
+              timestamp: $timestamp,
+              footer: { text: "Legacy Sports CI/CD" }
+            }]
+          }')
+
+        # Send to Discord
+        HTTP_CODE=$(curl --connect-timeout 5 --max-time 15 --retry 3 --retry-all-errors \
+          -s -o /tmp/discord-response.txt -w "%{http_code}" \
+          -X POST "$DISCORD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD")
+
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          echo "✅ Discord notification sent (status=$NOTIFY_STATUS, http=$HTTP_CODE)"
+        else
+          RESPONSE=$(cat /tmp/discord-response.txt 2>/dev/null || echo "(empty)")
+          echo "::warning::Discord notification failed (http=$HTTP_CODE): $RESPONSE"
+          # Don't fail the workflow for a notification issue
+        fi
+
+        rm -f /tmp/discord-response.txt

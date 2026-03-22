@@ -584,6 +584,18 @@ jobs:
               }
             }
 
+      - name: "Discord CI Failure"
+        if: >-
+          always() &&
+          steps.collect-results.outputs.overall-status == 'failure' &&
+          github.ref == 'refs/heads/main'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_CI_WEBHOOK_URL }}
+          status: failure
+          title: "CI Pipeline Failure"
+          description: "Failed steps: ${{ steps.collect-results.outputs.failed-steps }}"
+
       - name: "Final Status"
         run: |
           STATUS="${{ steps.collect-results.outputs.overall-status }}"

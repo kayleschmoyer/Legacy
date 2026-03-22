@@ -169,6 +169,26 @@ jobs:
           status: failed
           comment: "Web deploy via GitHub Pages (run ${{ github.run_id }})"
 
+      - name: "Discord Deploy Succeeded"
+        if: github.ref == 'refs/heads/main' && success()
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: success
+          title: "Web Deploy"
+          environment: production
+          description: "Web app deployed to GitHub Pages"
+
+      - name: "Discord Deploy Failed"
+        if: always() && github.ref == 'refs/heads/main' && failure()
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: failure
+          title: "Web Deploy"
+          environment: production
+          description: "Web app deployment failed"
+
       - name: Update Deployment Badge
         if: always()
         uses: ./.github/actions/update-deployment-badge
