@@ -1,6 +1,7 @@
-# CloudWatch Monitoring — DLQ Alarms
-# Alarms fire immediately when messages land in any dead-letter queue,
-# ensuring stats loading failures surface as alerts rather than silent user-visible bugs.
+# CloudWatch Monitoring — DLQ Alarms & Lambda Error Alarms
+# DLQ alarms fire immediately when messages land in any dead-letter queue.
+# Lambda error alarms fire when a function's error count exceeds the configured
+# threshold within a rolling window, providing real-time visibility via Discord.
 
 # ─── SNS topic ────────────────────────────────────────────────────────────────
 
@@ -91,6 +92,58 @@ resource "aws_cloudwatch_metric_alarm" "load_season_stats_dlq_visible" {
   metric_name = "ApproximateNumberOfMessagesVisible"
   dimensions = {
     QueueName = aws_sqs_queue.load_season_stats_dlq.name
+  }
+
+  statistic = "Sum"
+
+  alarm_actions = [aws_sns_topic.ops_alerts.arn]
+  ok_actions    = [aws_sns_topic.ops_alerts.arn]
+
+  treat_missing_data = "notBreaching"
+
+  tags = local.common_tags
+}
+
+# ─── Lambda error alarms ─────────────────────────────────────────────────────
+# One alarm per Lambda function, based on the Lambda Errors metric (count).
+# When the error count breaches the threshold over the configured evaluation
+# window, the alarm transitions to ALARM and notifies the ops_alerts SNS topic,
+# which routes to the rollbar-discord Lambda → Discord channel.
+#
+# CloudWatch sends notifications on alarm state transitions (for example,
+# OK → ALARM or ALARM → OK). The evaluation window is determined by the period
+# and evaluation_periods values on each alarm; period does not act as a manual
+# cooldown or re-fire delay.
+
+locals {
+  # Map of Terraform resource name → Lambda function resource reference.
+  # Excludes rollbar-discord to avoid a self-referential alert loop.
+  monitored_lambdas = {
+    graphql         = aws_lambda_function.graphql
+    oauth_proxy     = aws_lambda_function.oauth_proxy
+    stats           = aws_lambda_function.stats
+    stripe_webhook  = aws_lambda_function.stripe_webhook
+    draft_processor = aws_lambda_function.draft_processor
+    game_selection  = aws_lambda_function.game_selection
+    jira_proxy      = aws_lambda_function.jira_proxy
+    websocket       = aws_lambda_function.websocket
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
+  for_each = local.monitored_lambdas
+
+  alarm_name          = "${local.name_prefix}-${each.key}-errors"
+  alarm_description   = "Lambda ${each.value.function_name} error count met or exceeded ${var.lambda_error_alarm_threshold} in ${var.lambda_error_alarm_evaluation_periods}x${var.lambda_error_alarm_period}s (${var.lambda_error_alarm_evaluation_periods * var.lambda_error_alarm_period}s window)"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = var.lambda_error_alarm_threshold
+  evaluation_periods  = var.lambda_error_alarm_evaluation_periods
+  period              = var.lambda_error_alarm_period
+
+  namespace   = "AWS/Lambda"
+  metric_name = "Errors"
+  dimensions = {
+    FunctionName = each.value.function_name
   }
 
   statistic = "Sum"

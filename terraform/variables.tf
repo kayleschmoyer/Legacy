@@ -104,6 +104,24 @@ variable "alert_email" {
   default     = ""
 }
 
+variable "lambda_error_alarm_threshold" {
+  description = "Number of Lambda errors within the evaluation period that triggers an alarm"
+  type        = number
+  default     = 5
+}
+
+variable "lambda_error_alarm_period" {
+  description = "CloudWatch metric period in seconds (length of each data point window). The total evaluation window is period * evaluation_periods."
+  type        = number
+  default     = 300 # 5 minutes
+}
+
+variable "lambda_error_alarm_evaluation_periods" {
+  description = "Number of consecutive periods the threshold must be breached before alarming. The total evaluation window is period * evaluation_periods."
+  type        = number
+  default     = 1
+}
+
 # Route 53 / DNS Configuration
 variable "domain_name" {
   description = "Primary domain name for the application (e.g., legacysports.com)"

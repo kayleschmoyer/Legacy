@@ -45,9 +45,9 @@ module "github_runners" {
   # capacity-optimized-prioritized picks from the pools with the most
   # available capacity (fewest reclamations) while respecting the type
   # priority order in var.github_runners_instance_types.
-  instance_target_capacity_type  = "spot"
-  instance_allocation_strategy   = "capacity-optimized-prioritized"
-  instance_types                 = var.github_runners_instance_types
+  instance_target_capacity_type = "spot"
+  instance_allocation_strategy  = "capacity-optimized-prioritized"
+  instance_types                = var.github_runners_instance_types
 
   # Scale-to-zero: check every 5 minutes for idle runners
   scale_down_schedule_expression = "cron(*/5 * * * ? *)"
