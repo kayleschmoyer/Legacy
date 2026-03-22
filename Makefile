@@ -715,20 +715,22 @@ else
 	@./scripts/resolve-generated-conflicts.sh
 endif
 
+# Codegen command varies by platform (needs env var for schema path)
+ifeq ($(DETECTED_OS),Windows)
+_PC_CODEGEN_CMD = set "GRAPHQL_SCHEMA=$(WORKSPACE_PATH_WIN)\lambdas\db\schema.graphql" && pnpm exec nx affected -t codegen --base=main
+else
+_PC_CODEGEN_CMD = GRAPHQL_SCHEMA=$(WORKSPACE_PATH)/lambdas/db/schema.graphql pnpm exec nx affected -t codegen --base=main
+endif
+
+pre-commit: _PC_FLAGS := $(shell node scripts/classify-changes.js)
 pre-commit: ## Run all pre-commit validation checks
 	@$(call echo_blue,Running pre-commit validation...)
-	@$(call echo_plain,1/9 Migration immutability check...)
-	@node scripts/check-migration-immutability.js --branch
-	@$(call echo_plain,2/9 Schema generation...)
-	@pnpm exec nx run db:print-schema
-	@$(call echo_plain,3/9 Code generation...)
-ifeq ($(DETECTED_OS),Windows)
-	@set "GRAPHQL_SCHEMA=$(WORKSPACE_PATH_WIN)\lambdas\db\schema.graphql" && pnpm exec nx affected -t codegen --base=main
-else
-	@GRAPHQL_SCHEMA=$(WORKSPACE_PATH)/lambdas/db/schema.graphql pnpm exec nx affected -t codegen --base=main
-endif
-	@$(call echo_plain,4/9 Type checking...)
-	@pnpm exec nx affected -t typecheck --base=main
+	@$(call echo_plain,Classifying changed files...)
+	@node scripts/classify-changes.js --print-summary
+	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,1/9 Migration immutability check...) && node scripts/check-migration-immutability.js --branch,@$(call echo_yellow,1/9 Migration immutability check... SKIPPED (no db changes)))
+	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,2/9 Schema generation...) && pnpm exec nx run db:print-schema,@$(call echo_yellow,2/9 Schema generation... SKIPPED (no db changes)))
+	$(if $(findstring PC_HAS_DB=1,$(_PC_FLAGS)),@$(call echo_plain,3/9 Code generation...) && $(_PC_CODEGEN_CMD),@$(call echo_yellow,3/9 Code generation... SKIPPED (no db changes)))
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && pnpm exec nx affected -t typecheck --base=main,@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
 	@$(call echo_plain,5/9 Formatting...)
 ifeq ($(DETECTED_OS),Windows)
 	@powershell -NoProfile -Command "$$preState = git status --porcelain; pnpm exec nx format:write; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = git diff --name-only; if ($$changed) { if ($$preState) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$changed | ForEach-Object { Write-Host ('  ' + $$_) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; auto-amending last commit...' -ForegroundColor Yellow; git add -A; git commit --amend --no-edit; Write-Host '  ✓ Format fixes folded into previous commit.' -ForegroundColor Green } }"
@@ -752,14 +754,10 @@ else
 		fi; \
 	fi
 endif
-	@$(call echo_plain,6/9 Linting...)
-	@pnpm exec nx affected -t lint --fix --base=main
-	@$(call echo_plain,7/9 Workflow validation...)
-	@node scripts/validate-workflows.js
-	@$(call echo_plain,8/9 Testing...)
-	@pnpm exec nx affected -t test --base=main
-	@$(call echo_plain,9/9 Building...)
-	@pnpm exec nx affected -t build --base=main
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && pnpm exec nx affected -t lint --fix --base=main,@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && node scripts/validate-workflows.js,@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && pnpm exec nx affected -t test --base=main,@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,9/9 Building...) && pnpm exec nx affected -t build --base=main,@$(call echo_yellow,9/9 Building... SKIPPED (docs-only changes)))
 	@$(call echo_green,✓ All pre-commit checks passed!)
 
 pc: pre-commit ## Alias for pre-commit
