@@ -144,7 +144,12 @@ pnpm exec prettier --write path/to/file.ts
 
 ### Pre-push Hook
 
-A pre-push Git hook runs `nx format:write` automatically before every push. If the working tree is clean, it auto-amends the last commit with formatting fixes and aborts the push — run `git push` again. If uncommitted changes exist, it blocks the push. To bypass in an emergency: `git push --no-verify`.
+A pre-push Git hook runs `nx format:write` automatically before every push. If the working tree is clean, it auto-amends the last commit with formatting fixes and aborts the push — run `git push` again. If uncommitted changes exist, it blocks the push.
+
+**Bypass options:**
+
+- `SKIP_PREPUSH_LINT=1 git push` — skip the formatting check (useful for CI scripts or WIP pushes)
+- `git push --no-verify` — skip all pre-push hooks entirely (emergency only)
 
 ### Recommended Order
 
