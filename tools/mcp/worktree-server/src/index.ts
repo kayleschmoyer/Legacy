@@ -349,6 +349,12 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'If true, aborts an in-progress rebase instead of starting one.',
           },
+          skip: {
+            type: 'boolean',
+            description:
+              'If true, skips the current commit/patch in an in-progress rebase ' +
+              '(for example, an empty or duplicate commit) and continues the rebase.',
+          },
         },
       },
     },
@@ -851,9 +857,10 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
     // worktree_rebase
     // -----------------------------------------------------------------------
     case 'worktree_rebase': {
-      const { worktree, abort } = args as {
+      const { worktree, abort, skip } = args as {
         worktree?: string;
         abort?: boolean;
+        skip?: boolean;
       };
 
       const target = resolveTargetDir(worktree);
@@ -874,9 +881,27 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
       };
 
       try {
+        if (abort && skip) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `[cwd: ${cwd}] Cannot specify both abort and skip. Use one or the other.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
         if (abort) {
-          const out = run('git rebase --abort', cwd, { env: agentEnv });
+          const out = runGit(['rebase', '--abort'], cwd, { env: agentEnv });
           log.push('$ git rebase --abort', out);
+          return { content: [{ type: 'text', text: log.join('\n') }] };
+        }
+
+        if (skip) {
+          const out = runGit(['rebase', '--skip'], cwd, { env: agentEnv });
+          log.push('$ git rebase --skip', out);
           return { content: [{ type: 'text', text: log.join('\n') }] };
         }
 
