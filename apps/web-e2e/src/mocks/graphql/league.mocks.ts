@@ -318,3 +318,80 @@ export function joinPublicLeagueErrorResponse(message = 'Failed to join') {
     },
   };
 }
+
+// ── Season progression factories ──────────────────────────────────
+
+export type MockLeaguePhase =
+  | 'pre_season'
+  | 'regular_season'
+  | 'playoffs'
+  | 'off_season';
+
+export interface MockLeagueAtWeek extends MockLeague {
+  currentWeek: number;
+  totalWeeks: number;
+  phase: MockLeaguePhase;
+}
+
+/**
+ * League state at a specific week of the season.
+ *
+ * Automatically derives phase from the week number:
+ * - Week 0 = pre_season
+ * - Week 1..totalWeeks = regular_season
+ * - Beyond totalWeeks = off_season (unless overridden to playoffs)
+ */
+export function mockLeagueAtWeek(
+  week: number,
+  totalWeeks = 22,
+  overrides: Partial<MockLeagueAtWeek> = {},
+): MockLeagueAtWeek {
+  let phase: MockLeaguePhase;
+  if (week <= 0) {
+    phase = 'pre_season';
+  } else if (week <= totalWeeks) {
+    phase = 'regular_season';
+  } else {
+    phase = 'off_season';
+  }
+
+  return {
+    ...mockLeague({
+      currentMatchup: week > 0 ? week : null,
+      draftStatus: week > 0 ? 'completed' : 'not-started',
+      startDate: '2025-03-27',
+      ...overrides,
+    }),
+    currentWeek: week,
+    totalWeeks,
+    phase: overrides.phase ?? phase,
+  };
+}
+
+/** League with the playoff phase active. */
+export function mockLeagueInPlayoffs(
+  overrides: Partial<MockLeagueAtWeek> = {},
+): MockLeagueAtWeek {
+  return mockLeagueAtWeek(23, 22, {
+    phase: 'playoffs',
+    draftStatus: 'completed',
+    startDate: '2025-03-27',
+    ...overrides,
+  });
+}
+
+// ── Season progression response factories ─────────────────────────
+
+export function leagueAtWeekResponse(
+  week: number,
+  totalWeeks?: number,
+  overrides?: Partial<MockLeagueAtWeek>,
+) {
+  return { data: { league: mockLeagueAtWeek(week, totalWeeks, overrides) } };
+}
+
+export function leagueInPlayoffsResponse(
+  overrides?: Partial<MockLeagueAtWeek>,
+) {
+  return { data: { league: mockLeagueInPlayoffs(overrides) } };
+}
