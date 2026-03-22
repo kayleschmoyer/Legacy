@@ -48,7 +48,7 @@ jobs:
         (github.event_name == 'pull_request' && github.event.action == 'labeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent')) ||
         (github.event_name == 'pull_request' && github.event.action == 'unlabeled' && (github.event.label.name == 'merge-when-ready' || github.event.label.name == 'merge-to-parent'))
       )
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     permissions:
       contents: write
       pull-requests: write

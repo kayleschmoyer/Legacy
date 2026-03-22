@@ -42,7 +42,7 @@ env:
 jobs:
   build-and-deploy:
     name: Build & Deploy Storybook
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
 
     steps:

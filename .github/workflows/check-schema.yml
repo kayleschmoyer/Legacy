@@ -43,7 +43,7 @@ jobs:
   # ---------------------------------------------------------------------------
   check-schema-and-codegen:
     name: "GraphQL Schema & Codegen"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
 

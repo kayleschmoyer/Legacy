@@ -57,7 +57,7 @@ env:
 jobs:
   build-android:
     name: Build Android APK
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     outputs:
       apk_path: ${{ steps.build.outputs.apk-path }}
       apk_name: ${{ steps.apk-name.outputs.apk_name }}

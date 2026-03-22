@@ -32,7 +32,7 @@ env:
 jobs:
   test-cache-setup:
     name: "Test: ${{ inputs.test-scenario }}"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
 
     steps:
@@ -169,7 +169,7 @@ jobs:
 
   test-cache-comparison:
     name: "Compare: With vs Without Cache"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 45
 
     steps:
@@ -233,7 +233,7 @@ jobs:
 
   test-pr-simulation:
     name: "Simulate PR Build"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
 
     steps:
