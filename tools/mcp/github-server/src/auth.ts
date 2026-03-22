@@ -70,6 +70,73 @@ export async function invalidateToken(): Promise<void> {
   await invalidateCachedToken();
 }
 
+// ---------------------------------------------------------------------------
+// .netrc parsing
+// ---------------------------------------------------------------------------
+
+/**
+ * Read a token for github.com from ~/.netrc (Unix) or ~/_netrc (Windows).
+ * Supports both multi-line and single-line machine entries.
+ * Returns null if the file doesn't exist or has no github.com entry.
+ */
+async function readNetrcToken(): Promise<string | null> {
+  const candidates =
+    process.platform === 'win32'
+      ? [join(homedir(), '_netrc'), join(homedir(), '.netrc')]
+      : [join(homedir(), '.netrc')];
+
+  for (const netrcPath of candidates) {
+    try {
+      const content = await readFile(netrcPath, 'utf-8');
+      const token = parseNetrcPassword(content, 'github.com');
+      if (token) return token;
+    } catch {
+      // File doesn't exist or isn't readable
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse a .netrc file and return the password for the given machine.
+ * Handles both multi-line and single-line formats.
+ */
+function parseNetrcPassword(content: string, machine: string): string | null {
+  // Tokenize: split on whitespace, ignoring comments.
+  // - Ignore full-line comments (optionally indented) starting with '#'.
+  // - Strip inline comments beginning with '#'.
+  const sanitizedLines = content.split(/\r?\n/).map((line) => {
+    const leftTrimmed = line.replace(/^\s+/, '');
+    if (!leftTrimmed || leftTrimmed.startsWith('#')) {
+      return '';
+    }
+    const hashIndex = leftTrimmed.indexOf('#');
+    const withoutComment =
+      hashIndex === -1 ? leftTrimmed : leftTrimmed.slice(0, hashIndex);
+    return withoutComment.trimEnd();
+  });
+  const tokens = sanitizedLines.join(' ').split(/\s+/).filter(Boolean);
+
+  let inMachine = false;
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i] === 'machine' && tokens[i + 1]) {
+      inMachine = tokens[i + 1] === machine;
+      i++; // skip machine name
+      continue;
+    }
+
+    if (tokens[i] === 'default') {
+      inMachine = false;
+      continue;
+    }
+
+    if (inMachine && tokens[i] === 'password' && tokens[i + 1]) {
+      return tokens[i + 1];
+    }
+  }
+  return null;
+}
+
 /** Try `gh auth token` with a 5-second timeout. Returns null on any failure. */
 function tryGhAuthToken(): Promise<string | null> {
   const cmd = process.platform === 'win32' ? 'gh.exe' : 'gh';
@@ -244,8 +311,9 @@ async function validateToken(token: string): Promise<boolean> {
  * Get a valid GitHub token. Resolution order:
  * 1. GH_TOKEN or GITHUB_TOKEN env var
  * 2. Cached token from ~/.config/legacy-sports-github/token.json
- * 3. `gh auth token` shell command (5s timeout, silent fallback)
- * 4. GitHub OAuth device flow (interactive via stderr)
+ * 3. ~/.netrc or ~/_netrc (password for machine github.com)
+ * 4. `gh auth token` shell command (5s timeout, silent fallback)
+ * 5. GitHub OAuth device flow (interactive via stderr)
  *
  * On first use, validates the token with GET /user. If invalid, invalidates
  * the cache and re-resolves.
@@ -275,7 +343,18 @@ export async function getToken(): Promise<string> {
     await invalidateCachedToken();
   }
 
-  // 3. gh auth token
+  // 3. .netrc file
+  const netrcToken = await readNetrcToken();
+  if (netrcToken) {
+    if (await validateToken(netrcToken)) {
+      cachedToken = netrcToken;
+      // Cache it so we don't re-parse .netrc every time
+      await writeCachedToken(netrcToken);
+      return netrcToken;
+    }
+  }
+
+  // 4. gh auth token
   const ghToken = await tryGhAuthToken();
   if (ghToken) {
     if (await validateToken(ghToken)) {
@@ -286,7 +365,7 @@ export async function getToken(): Promise<string> {
     }
   }
 
-  // 4. Device flow
+  // 5. Device flow
   const deviceToken = await deviceFlow();
   cachedToken = deviceToken;
   await writeCachedToken(deviceToken);
