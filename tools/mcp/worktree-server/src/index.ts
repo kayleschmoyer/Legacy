@@ -660,6 +660,29 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         },
       },
     },
+    {
+      name: 'worktree_unstage',
+      description:
+        'Remove files from the git staging area (index) without losing changes. ' +
+        'Equivalent to `git reset HEAD -- <files>`. Use to unstage accidentally added files.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          files: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description:
+              'File paths to unstage (relative to repo root). Use ["."] to unstage all.',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+        },
+        required: ['files'],
+      },
+    },
   ],
 }));
 
@@ -2751,6 +2774,78 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
             {
               type: 'text',
               text: `Failed to read ${filePath} at ${ref}: ${output.trim()}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_unstage
+    // -----------------------------------------------------------------------
+    case 'worktree_unstage': {
+      const { files, worktree: wtKey } = args as {
+        files: string[];
+        worktree?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      if (!files || files.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'No files specified. Pass file paths or ["."] to unstage all.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        runGit(['reset', 'HEAD', '--', ...files], cwd);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  requestedPaths: files,
+                  message: `Unstage requested for ${files.length} path(s).`,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Unstage failed (exit code ${e.status ?? 'unknown'}):\n${output}`,
             },
           ],
           isError: true,
