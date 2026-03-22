@@ -133,9 +133,9 @@ describe('WebSocketClient', () => {
       jest.advanceTimersByTime(100);
     });
 
-    it('should be a no-op when token is missing', () => {
+    it('should connect without token for cookie-based auth', () => {
       const logging = jest.requireMock<{
-        LOGGER: { warn: jest.Mock };
+        LOGGER: { debug: jest.Mock };
       }>('@legacy-sports/logging');
 
       mockServer = new Server(mockUrl);
@@ -149,14 +149,15 @@ describe('WebSocketClient', () => {
       client.connect();
       jest.advanceTimersByTime(100);
 
-      expect(client.getState()).toBe('disconnected');
-      expect(logging.LOGGER.warn).toHaveBeenCalledWith(
-        expect.stringContaining('no auth token'),
+      expect(logging.LOGGER.debug).toHaveBeenCalledWith(
+        expect.stringContaining('cookie-based auth'),
       );
+      // Verify the client actually reaches connected state
+      expect(client.getState()).toBe('connected');
       client.dispose();
     });
 
-    it('should not auto-connect when token is missing', () => {
+    it('should auto-connect without token for cookie-based auth', () => {
       mockServer = new Server(mockUrl);
 
       const client = new WebSocketClient({
@@ -167,7 +168,8 @@ describe('WebSocketClient', () => {
 
       jest.advanceTimersByTime(100);
 
-      expect(client.getState()).toBe('disconnected');
+      // Client should successfully connect, not just avoid error state
+      expect(client.getState()).toBe('connected');
       client.dispose();
     });
 

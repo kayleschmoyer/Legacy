@@ -98,10 +98,9 @@ export class WebSocketClient {
     }
 
     if (!this.options.token) {
-      LOGGER.warn(
-        'Cannot connect - no auth token provided. Connection deferred until token is available.',
+      LOGGER.debug(
+        'No auth token provided — connection will rely on cookie-based auth.',
       );
-      return;
     }
 
     if (this.ws?.readyState === WebSocket.OPEN) {
