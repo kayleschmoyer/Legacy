@@ -327,9 +327,9 @@ If tests fail:
 
 See the [pr-workflow skill](../pr-workflow/SKILL.md) for the full PR template workflow. For a quick PR:
 
-```powershell
+```bash
 gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
-./scripts/cleanup-pr-body.ps1
+bash scripts/cleanup-pr-body.sh
 ```
 
 ### Step 9: Update Jira to In Review
@@ -396,7 +396,7 @@ make -C $wt pc
 
 # 6. PR + Jira (DO NOT stop at make pc)
 gh pr create --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
-./scripts/cleanup-pr-body.ps1
+bash scripts/cleanup-pr-body.sh "$wt"
 jira_transition(key: "LS-####", status: "In Review")  # MCP tool — primary
 
 # 7. Cleanup after merge

@@ -28,7 +28,7 @@ $prNumber = gh pr view --json number --jq .number
 '{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
 
 # 4. Clean up the temp file
-.\scripts\cleanup-pr-body.ps1
+Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
 ```
 
 ### NEVER Do These
@@ -85,10 +85,10 @@ gh pr create --fill --base main
 
 If a PR was already created with broken formatting:
 
-```powershell
+```bash
 # 1. Write corrected body to a temp file (use create_file tool)
 # 2. Update the existing PR
 gh pr edit <PR_NUMBER> --body-file ".github/tmp-pr-body.md"
 # 3. Clean up
-.\scripts\cleanup-pr-body.ps1
+bash scripts/cleanup-pr-body.sh
 ```

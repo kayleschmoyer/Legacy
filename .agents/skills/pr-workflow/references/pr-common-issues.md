@@ -41,7 +41,7 @@ twig github setup
 gh pr edit <PR_NUMBER> --body-file ".github/tmp-pr-body.md"
 
 # 3. Clean up
-.\scripts\cleanup-pr-body.ps1
+Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
 ```
 
 ### Issue: PR body contains `^@` null bytes / garbled UTF-16 output

@@ -20,9 +20,9 @@ This skill covers the complete PR lifecycle: creation, self-review, review fixin
 
 ### Command
 
-Always use `--body-file` for the PR body (never inline `--body` in PowerShell):
+Always use `--body-file` for the PR body (avoid inlining `--body` in any shell; PowerShell is especially problematic):
 
-```powershell
+```bash
 # Write PR body to temp file (use create_file tool, NOT heredoc)
 # File: .github/tmp-pr-body.md
 
@@ -30,7 +30,7 @@ Always use `--body-file` for the PR body (never inline `--body` in PowerShell):
 gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
 # Clean up
-.\scripts\cleanup-pr-body.ps1
+bash scripts/cleanup-pr-body.sh
 ```
 
 Or use the `github_create_pr` MCP tool (preferred).

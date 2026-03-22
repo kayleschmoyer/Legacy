@@ -42,7 +42,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 10. **Migrations (BEFORE make pc)**: run `pnpm --prefix lib/db-client run db:status` and `pnpm --prefix lib/db-client run db:up` — **always do this even if you think no migrations were added.** Confirm `Applied N new migrations` or `No new migrations to apply`. (See `skills/database/SKILL.md`.) _Note: `pnpm run` is allowed here because these are `lib/db-client` package scripts with no Nx target equivalent._
 11. Validate: `make pc` — must pass before pushing or opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
     - 11b. **Push only after `make pc` passes**: `git push --force-with-lease origin HEAD` — pushing before validating is the #1 cause of post-rebase CI failures.
-12. **Ship (REQUIRED — do NOT stop before this step)**: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` then `.\scripts\cleanup-pr-body.ps1` then Jira "In Review" (see `skills/pr-workflow/SKILL.md`)
+12. **Ship (REQUIRED — do NOT stop before this step)**: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` then `bash scripts/cleanup-pr-body.sh` then Jira "In Review" (see `skills/pr-workflow/SKILL.md`)
     - 12b. **MCP gap audit (REQUIRED)**: review all Bash commands from this session, identify any that should be MCP tools, and file tickets under LS-1455 for gaps not already tracked. See `skills/mcp-gap-audit/SKILL.md`.
 13. Cleanup: `twig worktree clean` then `git branch -d LS-####/description` then Jira "Done" — **NEVER use `git worktree remove` directly** (see Rules)
 
