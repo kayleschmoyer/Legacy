@@ -278,30 +278,25 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_checkout_file',
       description:
-        'Restore files to a specific ref or resolve conflicts using theirs/ours. ' +
-        'Two modes: (1) With strategy ("theirs"/"ours") — resolves conflicted files and stages them. ' +
-        '(2) Without strategy — restores files to a ref (default HEAD), discarding local changes.',
+        'Restore files to a ref, or resolve conflicts with theirs/ours strategy.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           files: {
             type: 'array' as const,
             items: { type: 'string' },
-            description: 'File paths to restore or resolve.',
+            description: 'File paths',
           },
           strategy: {
             type: 'string',
             enum: ['theirs', 'ours'],
-            description:
-              'Conflict resolution strategy. If omitted, restores files to ref instead.',
+            description: 'Conflict resolution strategy',
           },
-          ref: {
+          ref: { type: 'string', description: 'Restore ref (default: HEAD)' },
+          worktree: {
             type: 'string',
-            description:
-              'Git ref to restore files from (e.g. "HEAD", "origin/main"). ' +
-              'Default: "HEAD". Only used when strategy is omitted.',
+            description: 'Ticket key (default: active)',
           },
-          worktree: { type: 'string', description: 'Optional ticket key.' },
         },
         required: ['files'],
       },
@@ -309,37 +304,26 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_commit',
       description:
-        'Stage files and create a conventional commit in the active (or specified) worktree. ' +
-        'Supports --amend to amend the previous commit. ' +
-        'Refuses to commit on main. Refuses to stage .env or credential files (Terraform .tf files are allowed). ' +
-        'For new commits, auto-appends a Co-Authored-By line and validates conventional commit message format; ' +
-        'when amending, it skips these steps and keeps the existing commit message.',
+        'Stage and commit. Refuses main. Refuses .env/credentials. Supports amend. Auto-appends Co-Authored-By.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           message: {
             type: 'string',
-            description:
-              'Commit message in conventional format: type(scope): description. ' +
-              'Example: "feat(auth): add oauth flow"',
+            description: 'Conventional format: type(scope): description',
           },
           files: {
             type: 'array' as const,
             items: { type: 'string' },
-            description:
-              'Files to stage. If omitted, stages all modified/untracked files (like git add -A). ' +
-              'Prefer specifying files explicitly over staging all.',
+            description: 'Files to stage (default: all)',
           },
           worktree: {
             type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+            description: 'Ticket key (default: active)',
           },
           amend: {
             type: 'boolean',
-            description:
-              'If true, amends the previous commit instead of creating a new one. ' +
-              'Uses --amend --no-edit (keeps the original message). The message parameter is ignored when amending.',
+            description: 'Amend previous commit (--no-edit)',
           },
         },
         required: [],
@@ -347,51 +331,45 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     },
     {
       name: 'worktree_conflict_info',
-      description:
-        'List all conflicted files with line ranges and short previews of each side.',
+      description: 'List conflicted files with line ranges and previews.',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          worktree: { type: 'string', description: 'Optional ticket key.' },
+          worktree: {
+            type: 'string',
+            description: 'Ticket key (default: active)',
+          },
         },
       },
     },
     {
       name: 'worktree_diff',
       description:
-        'Show git diff for the active (or specified) worktree. ' +
-        'Defaults to diffing against origin/main. Supports stat-only, name-only, ' +
-        'and path-filtered modes.',
+        'Git diff against a base ref (default: origin/main). Supports stat/name-only.',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          worktree: { type: 'string', description: 'Optional ticket key.' },
+          worktree: {
+            type: 'string',
+            description: 'Ticket key (default: active)',
+          },
           base: {
             type: 'string',
-            description:
-              'Base ref to diff against (default: "origin/main"). ' +
-              'Use "HEAD" for working-tree + index vs HEAD, "HEAD~1" for last commit, etc.',
+            description: 'Base ref (default: origin/main)',
           },
           paths: {
             type: 'array' as const,
             items: { type: 'string' },
-            description: 'Restrict diff to specific file paths.',
+            description: 'Path filter',
           },
-          stat: {
-            type: 'boolean',
-            description: 'Show diffstat summary instead of full diff.',
-          },
-          nameOnly: {
-            type: 'boolean',
-            description: 'List only changed file names.',
-          },
+          stat: { type: 'boolean', description: 'Diffstat only' },
+          nameOnly: { type: 'boolean', description: 'File names only' },
         },
       },
     },
     {
       name: 'worktree_guard',
-      description:
-        'Check whether a path is inside the main repo and warn if worktrees are active.',
+      description: 'Check if a path is inside the main repo and warn.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -403,55 +381,46 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_list',
       description:
-        'List all active worktrees with junction status and branch info.',
+        'List active worktrees with junction status and branch info.',
       inputSchema: { type: 'object' as const, properties: {} },
     },
     {
       name: 'worktree_log',
-      description:
-        'Show structured commit log for the active (or specified) worktree. ' +
-        'Returns a JSON object with a commits array containing sha, shortSha, message, author, date, and refs.',
+      description: 'Structured commit log as JSON.',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          worktree: { type: 'string', description: 'Optional ticket key.' },
-          maxCount: { type: 'number', description: 'Max commits. Default 20.' },
-          path: { type: 'string', description: 'File path filter.' },
-          range: {
+          worktree: {
             type: 'string',
-            description: 'Commit range (e.g. "origin/main..HEAD").',
+            description: 'Ticket key (default: active)',
           },
+          maxCount: {
+            type: 'number',
+            description: 'Max commits (default: 20)',
+          },
+          path: { type: 'string', description: 'File path filter' },
+          range: { type: 'string', description: 'Commit range' },
         },
       },
     },
     {
       name: 'worktree_ls_tree',
-      description:
-        'List files in a directory at a specific git ref (branch, tag, or SHA) ' +
-        'without checking it out. Useful for checking file existence on remote branches ' +
-        'during CI triage. Runs `git ls-tree`.',
+      description: 'List files at a git ref without checkout (git ls-tree).',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          ref: {
-            type: 'string',
-            description:
-              'Git ref to list from (e.g. "origin/main", "origin/LS-1234/branch", a SHA).',
-          },
+          ref: { type: 'string', description: 'Git ref to list from' },
           path: {
             type: 'string',
-            description:
-              'Optional directory path relative to repo root (e.g. "lib/db-client/src/"). ' +
-              'Omit to list the entire tree.',
+            description: 'Directory path (relative to root)',
           },
           recursive: {
             type: 'boolean',
-            description: 'If true, list files recursively (default: true).',
+            description: 'Recursive (default: true)',
           },
           worktree: {
             type: 'string',
-            description:
-              'Optional ticket key. Uses active worktree if omitted.',
+            description: 'Ticket key (default: active)',
           },
         },
         required: ['ref'],
@@ -459,70 +428,51 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     },
     {
       name: 'worktree_push',
-      description:
-        'Push the current branch with --force-with-lease. Refuses to push ' +
-        'the main branch. Intended for use after rebase + stabilize + make pc.',
+      description: 'Push with --force-with-lease. Refuses main.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           worktree: {
             type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+            description: 'Ticket key (default: active)',
           },
-          setUpstream: {
-            type: 'boolean',
-            description:
-              'If true, adds -u to set the upstream tracking branch. Default false.',
-          },
+          setUpstream: { type: 'boolean', description: 'Set upstream (-u)' },
         },
       },
     },
     {
       name: 'worktree_rebase',
       description:
-        'Fetch origin and rebase the active worktree branch onto its parent ' +
-        '(via twig rebase). Sets GIT_EDITOR to prevent blocking in agent workflows. ' +
-        'Use worktree_stabilize after a successful rebase before pushing.',
+        'Fetch and rebase onto parent. Run worktree_stabilize after before pushing.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           worktree: {
             type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+            description: 'Ticket key (default: active)',
           },
-          abort: {
-            type: 'boolean',
-            description:
-              'If true, aborts an in-progress rebase instead of starting one.',
-          },
+          abort: { type: 'boolean', description: 'Abort in-progress rebase' },
           skip: {
             type: 'boolean',
-            description:
-              'If true, skips the current commit/patch in an in-progress rebase ' +
-              '(for example, an empty or duplicate commit) and continues the rebase.',
+            description: 'Skip current commit in rebase',
           },
         },
       },
     },
     {
       name: 'worktree_rebase_continue',
-      description:
-        'Continue an in-progress rebase after conflicts have been resolved. ' +
-        'Stages resolved files, runs git rebase --continue, returns structured JSON.',
+      description: 'Continue rebase after resolving conflicts.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           files: {
             type: 'array' as const,
             items: { type: 'string' },
-            description:
-              'Files to stage before continuing. If omitted, stages all (git add -A).',
+            description: 'Files to stage (default: all)',
           },
           worktree: {
             type: 'string',
-            description: "Optional ticket key (e.g. 'LS-1134').",
+            description: 'Ticket key (default: active)',
           },
         },
       },
@@ -530,22 +480,16 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_run',
       description:
-        'Run a shell command in the active (or specified) worktree. ' +
-        'Refuses to run in the main repo when worktrees are active unless overridden.',
+        'Run a command in the active worktree. Refuses main repo unless overridden.',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          command: { type: 'string', description: 'Shell command to execute' },
+          command: { type: 'string', description: 'Shell command' },
           worktree: {
             type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+            description: 'Ticket key (default: active)',
           },
-          allowMainRepo: {
-            type: 'boolean',
-            description:
-              'Override: allow running in the main repo even when worktrees exist.',
-          },
+          allowMainRepo: { type: 'boolean', description: 'Allow main repo' },
         },
         required: ['command'],
       },
@@ -556,10 +500,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       inputSchema: {
         type: 'object' as const,
         properties: {
-          key: {
-            type: 'string',
-            description: "Ticket key like 'LS-1134' or just '1134'",
-          },
+          key: { type: 'string', description: 'Ticket key or number' },
         },
         required: ['key'],
       },
@@ -567,16 +508,16 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_show',
       description:
-        'Show a specific commit metadata, stat summary, and optional file-filtered diff.',
+        'Show commit metadata, stat summary, and optional filtered diff.',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          sha: {
+          sha: { type: 'string', description: 'Commit SHA or HEAD' },
+          worktree: {
             type: 'string',
-            description: 'Commit SHA (hex only, e.g. "abc1234" or "HEAD").',
+            description: 'Ticket key (default: active)',
           },
-          worktree: { type: 'string', description: 'Optional ticket key.' },
-          path: { type: 'string', description: 'File path for filtered diff.' },
+          path: { type: 'string', description: 'File path for filtered diff' },
         },
         required: ['sha'],
       },
@@ -584,16 +525,13 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_stabilize',
       description:
-        'Run post-rebase stabilization: make install, regenerate schema, ' +
-        'and run codegen on affected projects. Must be run BEFORE pushing ' +
-        'after a rebase to prevent CI failures.',
+        'Post-rebase stabilization: install, schema, codegen. Must run BEFORE push.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           worktree: {
             type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+            description: 'Ticket key (default: active)',
           },
         },
       },
@@ -601,16 +539,13 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_status',
       description:
-        'Get structured git status for the active (or specified) worktree. ' +
-        'Returns modified, staged, untracked files, branch info, ahead/behind counts, ' +
-        'rebase/merge/conflict state, and merge-base info relative to origin/main as structured JSON.',
+        'Structured git status: files, branch, ahead/behind, rebase/conflict state.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           worktree: {
             type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+            description: 'Ticket key (default: active)',
           },
         },
       },
@@ -646,16 +581,13 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_unjunction',
       description:
-        'Remove the node_modules junction/symlink in a worktree so it can get independent ' +
-        'node_modules via make install. Detects whether node_modules is a junction, symlink, ' +
-        'real directory, or missing, and handles platform differences (Windows NTFS junctions vs Unix symlinks).',
+        'Remove node_modules junction so worktree gets independent deps via make install.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           worktree: {
             type: 'string',
-            description:
-              "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+            description: 'Ticket key (default: active)',
           },
         },
       },

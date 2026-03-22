@@ -34,8 +34,7 @@ const server = new McpServer({
 // --- jira_auth_status ---
 server.tool(
   'jira_auth_status',
-  'Check if this server has configured Jira API credentials (presence check only; does not call Jira). Call this first in any Jira workflow. ' +
-    "If configured is false, use Claude's built-in Atlassian tools (mcp__claude_ai_Atlassian__*) instead.",
+  'Check if Jira API credentials are configured. Call first in any Jira workflow. If false, use mcp__claude_ai_Atlassian__* instead.',
   {},
   async () => {
     const creds = await tryGetAtlassianCredentials();
@@ -59,9 +58,9 @@ server.tool(
 // --- jira_check_blockers ---
 server.tool(
   'jira_check_blockers',
-  "Check if a ticket's blockers are resolved. Implements the 3-way dependency check: STOP if blocker not ready, use blocker branch if In Review, base off main if Done/no blockers.",
+  '3-way dependency check: STOP if blocker not ready, use blocker branch if In Review, base off main if Done/no blockers.',
   {
-    key: z.string().describe('Jira ticket key to check blockers for'),
+    key: z.string().describe('Ticket key to check'),
   },
   async (params) => checkBlockers(params),
 );
@@ -69,30 +68,20 @@ server.tool(
 // --- jira_create_ticket ---
 server.tool(
   'jira_create_ticket',
-  'Create a Jira ticket with proper defaults. Avoids the acli --json duplication bug.',
+  'Create a Jira ticket with proper defaults.',
   {
     summary: z.string().describe('Ticket summary / title'),
     type: z
       .enum(['Task', 'Bug', 'Story', 'Epic'])
       .default('Task')
-      .describe(
-        'Issue type: one of "Task", "Bug", "Story", or "Epic" (default: Task)',
-      ),
-    description: z
-      .string()
-      .optional()
-      .describe('Ticket description (optional)'),
-    parent: z
-      .string()
-      .optional()
-      .describe('Parent epic key, e.g. LS-640 (optional)'),
+      .describe('Issue type (default: Task)'),
+    description: z.string().optional().describe('Ticket description'),
+    parent: z.string().optional().describe('Parent epic key'),
     sprint: z
       .string()
       .regex(/^(?:current|\d+)$/, 'Must be "current" or a numeric sprint ID')
       .optional()
-      .describe(
-        'Sprint to add the ticket to. Use "current" to auto-detect the active sprint, or pass a numeric sprint ID. Omit to leave unassigned.',
-      ),
+      .describe('"current" for active sprint, or numeric sprint ID'),
   },
   async (params) => createTicket(params),
 );
@@ -100,9 +89,9 @@ server.tool(
 // --- jira_edit_ticket ---
 server.tool(
   'jira_edit_ticket',
-  'Update fields on an existing Jira ticket. Provide at least one field to update.',
+  'Update fields on a ticket. Provide at least one field.',
   {
-    key: z.string().describe('Jira ticket key, e.g. LS-1578'),
+    key: z.string().describe('Ticket key'),
     summary: z.string().optional().describe('New summary/title'),
     description: z.string().optional().describe('New description'),
     type: z
@@ -116,9 +105,9 @@ server.tool(
 // --- jira_get_comments ---
 server.tool(
   'jira_get_comments',
-  'Fetch all comments on a Jira ticket, ordered by creation date. Returns author, plain-text body, and timestamps for each comment.',
+  'Fetch all comments on a ticket, ordered by creation date.',
   {
-    key: z.string().describe('Jira ticket key, e.g. LS-1137'),
+    key: z.string().describe('Ticket key'),
   },
   async (params) => getComments(params),
 );
@@ -126,7 +115,7 @@ server.tool(
 // --- jira_link_issues ---
 server.tool(
   'jira_link_issues',
-  'Create an issue link between two Jira tickets. Common link types: "Blocks" (inwardIssue "is blocked by" outwardIssue — outward is the blocker), "Relates" (bidirectional). Use to establish dependencies so jira_check_blockers can detect them.',
+  'Create a link between two tickets. For "Blocks": inwardKey is blocked by outwardKey.',
   {
     inwardKey: z
       .string()
@@ -134,24 +123,18 @@ server.tool(
         /^[A-Z][A-Z0-9_]+-\d+$/,
         'Must be a valid Jira issue key (e.g., LS-123)',
       )
-      .describe(
-        'The issue that reads the inward phrase. For "Blocks" (inward = "is blocked by"): this is the blocked ticket — the one that depends on the other. Example: if LS-100 is blocked by LS-99, inwardKey = "LS-100".',
-      ),
+      .describe('The blocked ticket (reads inward phrase "is blocked by")'),
     outwardKey: z
       .string()
       .regex(
         /^[A-Z][A-Z0-9_]+-\d+$/,
         'Must be a valid Jira issue key (e.g., LS-123)',
       )
-      .describe(
-        'The issue that reads the outward phrase. For "Blocks" (outward = "blocks"): this is the blocker — the one that must be completed first. Example: if LS-100 is blocked by LS-99, outwardKey = "LS-99". Note: jira_check_blockers reads blockers from inwardIssue on GET responses (Jira flips perspective), so links created here are correctly detected.',
-      ),
+      .describe('The blocker ticket (reads outward phrase "blocks")'),
     linkType: z
       .string()
       .min(1, 'Link type must be a non-empty string')
-      .describe(
-        'Jira link type name. Common values: "Blocks", "Relates", "Cloners", "Duplicate"',
-      ),
+      .describe('Link type: "Blocks", "Relates", "Cloners", "Duplicate"'),
   },
   async (params) => linkIssues(params),
 );
@@ -159,7 +142,7 @@ server.tool(
 // --- jira_list_children ---
 server.tool(
   'jira_list_children',
-  'List child tickets of an epic or story. Returns key, summary, status, type, priority, and created date for each child. Optionally filter by status.',
+  'List child tickets of an epic or story. Optionally filter by status.',
   {
     key: z
       .string()
@@ -167,13 +150,11 @@ server.tool(
         /^[A-Z][A-Z0-9_]+-\d+$/,
         'Must be a valid Jira issue key (e.g., LS-123)',
       )
-      .describe('Parent ticket key, e.g. LS-1455 (epic or story)'),
+      .describe('Parent ticket key'),
     status: z
       .string()
       .optional()
-      .describe(
-        'Filter children by status (e.g. "To Do", "In Progress", "In Review", "Done"). Omit to return all.',
-      ),
+      .describe('Filter by status (e.g. "To Do", "Done")'),
   },
   async (params) => listChildren(params),
 );
@@ -181,20 +162,16 @@ server.tool(
 // --- jira_search ---
 server.tool(
   'jira_search',
-  'Search Jira issues using JQL. Returns key, summary, status, type, assignee, and priority for each match. Useful for querying sprint tickets, epic children, or any ad-hoc JQL.',
+  'Search Jira issues using JQL.',
   {
-    jql: z
-      .string()
-      .describe(
-        'JQL query string, e.g. "parent = LS-1455", "sprint in openSprints()", "status = \\"In Progress\\""',
-      ),
+    jql: z.string().describe('JQL query string'),
     maxResults: z.coerce
       .number()
       .int()
       .positive()
       .max(100)
       .default(50)
-      .describe('Maximum number of results (default: 50, max: 100)'),
+      .describe('Max results (default: 50, max: 100)'),
   },
   async (params) => search(params),
 );
@@ -202,10 +179,10 @@ server.tool(
 // --- jira_set_parent ---
 server.tool(
   'jira_set_parent',
-  'Set or change the parent epic of an existing ticket via Jira REST API (acli cannot do this).',
+  'Set or change the parent epic of a ticket via REST API.',
   {
-    key: z.string().describe('Jira ticket key to update'),
-    parent: z.string().describe('Parent epic key to set, e.g. LS-640'),
+    key: z.string().describe('Ticket key to update'),
+    parent: z.string().describe('Parent epic key'),
   },
   async (params) => setParent(params),
 );
@@ -213,8 +190,7 @@ server.tool(
 // --- jira_transition ---
 server.tool(
   'jira_transition',
-  'Transition a Jira ticket to a new status. Validates the status string. ' +
-    'When transitioning to Done, warns about open subtasks. Use cascade: true to auto-transition them.',
+  'Transition a ticket to a new status. On Done, warns about open subtasks; use cascade=true to auto-transition them.',
   {
     key: z
       .string()
@@ -222,17 +198,14 @@ server.tool(
         /^[A-Z][A-Z0-9_]+-\d+$/,
         'Must be a valid Jira issue key (e.g., LS-1137)',
       )
-      .describe('Jira ticket key, e.g. LS-1137'),
+      .describe('Ticket key'),
     status: z
       .enum(['In Progress', 'In Review', 'Done'])
       .describe('Target status'),
     cascade: z
       .boolean()
       .default(false)
-      .describe(
-        'When transitioning to Done, auto-transition open subtasks to Done as well. ' +
-          'Without this flag, the tool warns about orphaned subtasks but does not cascade.',
-      ),
+      .describe('Auto-transition open subtasks to Done (default: false)'),
   },
   async (params) => transition(params),
 );
@@ -240,9 +213,9 @@ server.tool(
 // --- jira_view ---
 server.tool(
   'jira_view',
-  'View ticket details in a structured format, including linked blockers.',
+  'View ticket details including linked blockers.',
   {
-    key: z.string().describe('Jira ticket key, e.g. LS-1137'),
+    key: z.string().describe('Ticket key'),
   },
   async (params) => view(params),
 );

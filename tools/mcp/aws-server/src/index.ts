@@ -12,29 +12,18 @@ const server = new McpServer({
 // --- aws_logs_tail ---
 server.tool(
   'aws_logs_tail',
-  'Fetch recent CloudWatch logs for a Legacy Sports Lambda function. Returns log events for the given time range. Automatically handles AWS_PAGER and Unicode encoding issues. If you get an SSO error, run `aws sso login` and retry.',
+  'Fetch recent CloudWatch logs for a Lambda function.',
   {
-    function: z
-      .enum(LAMBDA_FUNCTIONS)
-      .describe(
-        'Lambda function short name. One of: graphql, db, oauth-proxy, notifications, stats, stats-lambda, game-selection, draft-processor, websocket, apple-iap, stripe-webhook.',
-      ),
+    function: z.enum(LAMBDA_FUNCTIONS).describe('Lambda function short name'),
     since: z
       .string()
       .default('1h')
-      .describe(
-        'How far back to look. Examples: 5m, 30m, 1h, 2h, 1d. Defaults to 1h.',
-      ),
-    filter: z
-      .string()
-      .optional()
-      .describe(
-        'Filter pattern to search within log messages. Examples: "ERROR", "authentication failed". Omit to return all logs.',
-      ),
+      .describe('Lookback period, e.g. 5m, 1h, 1d (default: 1h)'),
+    filter: z.string().optional().describe('Filter pattern for log messages'),
     environment: z
       .enum(['dev', 'prod'])
       .default('dev')
-      .describe('AWS environment. Defaults to dev.'),
+      .describe('AWS environment (default: dev)'),
   },
   async (params) => logsTail(params),
 );
@@ -42,7 +31,7 @@ server.tool(
 // --- aws_sso_status ---
 server.tool(
   'aws_sso_status',
-  'Check whether the current AWS SSO session is authenticated. Runs `aws sts get-caller-identity` and returns the caller identity (UserId, Account, ARN) on success, or a clear error with remedy instructions on failure. Run this before any AWS operation to detect expired credentials early.',
+  'Check AWS SSO session authentication. Returns caller identity or error with remedy.',
   {},
   async () => ssoStatus(),
 );

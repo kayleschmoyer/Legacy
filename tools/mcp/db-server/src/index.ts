@@ -17,7 +17,7 @@ const server = new McpServer({
 // --- db_check_health ---
 server.tool(
   'db_check_health',
-  'Pre-flight health check: is Docker running, is Postgres reachable, are migrations current? Run this before starting work.',
+  'Pre-flight check: Docker running, Postgres reachable, migrations current.',
   {},
   async () => checkHealth(),
 );
@@ -25,28 +25,21 @@ server.tool(
 // --- db_codegen ---
 server.tool(
   'db_codegen',
-  'Run GraphQL code generation via Nx affected. Optionally runs db:print-schema first when Pothos schema code changed.',
+  'Run GraphQL codegen via Nx affected. Optionally runs print-schema first.',
   {
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
     printSchemaFirst: z
       .boolean()
       .default(false)
-      .describe('Set true to run `nx run db:print-schema` before codegen.'),
+      .describe('Run print-schema before codegen'),
     base: z
       .string()
       .optional()
-      .describe(
-        'Optional Nx affected base ref, for example `origin/main` or a stacked parent branch.',
-      ),
-    skipNxCache: z
-      .boolean()
-      .default(false)
-      .describe('Set true to run codegen with --skip-nx-cache.'),
+      .describe('Nx affected base ref (default: origin/main)'),
+    skipNxCache: z.boolean().default(false).describe('Skip Nx cache'),
   },
   async (params) => codegen(params),
 );
@@ -54,14 +47,12 @@ server.tool(
 // --- db_migrate ---
 server.tool(
   'db_migrate',
-  'Apply pending database migrations. Checks for pending migrations first and warns if none to apply.',
+  'Apply pending database migrations.',
   {
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => migrate(params),
 );
@@ -69,14 +60,12 @@ server.tool(
 // --- db_migration_status ---
 server.tool(
   'db_migration_status',
-  'Check pending database migration status. Returns applied/pending counts and pending migration names.',
+  'Check pending migration status. Returns applied/pending counts.',
   {
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => migrationStatus(params),
 );
@@ -84,14 +73,12 @@ server.tool(
 // --- db_print_schema ---
 server.tool(
   'db_print_schema',
-  'Regenerate schema.graphql from the Pothos schema implementation. Reports whether schema.graphql changed.',
+  'Regenerate schema.graphql from Pothos. Reports whether it changed.',
   {
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => printSchema(params),
 );
@@ -99,7 +86,7 @@ server.tool(
 // --- db_query ---
 server.tool(
   'db_query',
-  'Execute an ad-hoc SQL query against the database. READ-ONLY by default — refuses INSERT/UPDATE/DELETE/DROP/TRUNCATE/ALTER unless allowWrite is set.',
+  'Execute ad-hoc SQL. READ-ONLY by default — refuses writes unless allowWrite is set.',
   {
     query: z.string().describe('SQL query to execute'),
     format: z
@@ -109,9 +96,7 @@ server.tool(
     allowWrite: z
       .boolean()
       .default(false)
-      .describe(
-        'Set to true to allow write operations. Defaults to false (read-only).',
-      ),
+      .describe('Allow write operations (default: false)'),
   },
   async (params) => query(params),
 );
@@ -119,24 +104,20 @@ server.tool(
 // --- db_restore_dev_seed ---
 server.tool(
   'db_restore_dev_seed',
-  'Restore resources/dev-seed.dump into local Docker postgres. DESTRUCTIVE: drops and recreates local legacy_sports_dev. Requires confirmDestructive=true.',
+  'Restore dev-seed.dump into local Docker postgres. DESTRUCTIVE: drops and recreates DB. Requires confirmDestructive=true.',
   {
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
     confirmDestructive: z
       .boolean()
       .default(false)
-      .describe(
-        'Safety guard. Must be true to run because local DB data will be replaced.',
-      ),
+      .describe('Must be true to run (safety guard)'),
     runMigrationsAfter: z
       .boolean()
       .default(true)
-      .describe('Set false to skip automatic `make db-migrate` after restore.'),
+      .describe('Run migrations after restore (default: true)'),
   },
   async (params) => restoreDevSeed(params),
 );

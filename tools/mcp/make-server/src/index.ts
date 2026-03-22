@@ -18,32 +18,18 @@ const server = new McpServer({
 // --- make_run ---
 server.tool(
   'make_run',
-  'Run a Makefile target in the specified directory. Targets are whitelisted for safety. ' +
-    'Covers: validation (pc, quick-check), build, test, lint, typecheck, format, codegen, ' +
-    'install, clean-safe, kill-stale, diagnose, and more. ' +
-    'Prefer this over running `make` via Bash — it enforces the target whitelist and ' +
-    'sets appropriate timeouts for heavy targets like pc and install.',
+  'Run a whitelisted Makefile target. Covers: pc, build, test, lint, typecheck, format, codegen, install, kill-stale, etc.',
   {
-    target: z
-      .string()
-      .describe(
-        'Make target to run (e.g., "pc", "install", "build", "test", "lint-fix", "typecheck", "kill-stale").',
-      ),
+    target: z.string().describe('Make target'),
     cwd: z
       .string()
       .regex(ABSOLUTE_PATH_REGEX, 'cwd must be an absolute path')
       .optional()
-      .describe(
-        'Absolute path to run the make target in. Typically a worktree path. ' +
-          'If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Working directory (default: repo root)'),
     variables: z
       .string()
       .optional()
-      .describe(
-        'Optional make variables as a space-separated string (e.g., "DRYRUN=1", "FORCE=1"). ' +
-          'Each must be KEY=VALUE format.',
-      ),
+      .describe('Make variables, e.g. "DRYRUN=1 FORCE=1"'),
   },
   async (params) => runTarget(params),
 );
@@ -80,33 +66,21 @@ server.tool(
 // --- make_wt_setup ---
 server.tool(
   'make_wt_setup',
-  'Set up a worktree for development: creates node_modules junction, copies .env, ' +
-    'configures .twig, and installs git hooks. Optionally removes the junction and ' +
-    'installs independent node_modules (needed when the branch has different dependencies). ' +
-    'Run this after make_worktree_create or worktree_create.',
+  'Set up a worktree: junction node_modules, copy .env, configure .twig, install hooks. Run after worktree creation.',
   {
     worktreePath: z
       .string()
       .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
-      .describe(
-        'Absolute path to the worktree directory (e.g., "D:\\code\\legacy-sports-worktrees\\LS-1234-fix-scoring").',
-      ),
+      .describe('Absolute worktree path'),
     removeJunction: z
       .boolean()
       .default(false)
-      .describe(
-        'If true, removes the node_modules junction and runs `make install` to create ' +
-          'independent node_modules in the worktree. Use when the branch has added/removed ' +
-          'packages or when you need isolated dependencies.',
-      ),
+      .describe('Remove junction and install independent node_modules'),
     noFrozenLockfile: z
       .boolean()
       .default(false)
       .describe(
-        'If true, runs `pnpm install --no-frozen-lockfile` first, then `make install` for ' +
-          'Poetry sync and git hooks (the frozen-lockfile pnpm step inside make install is a ' +
-          'fast no-op since deps are already resolved). ' +
-          'Use when the branch has added new workspace packages that changed the lockfile.',
+        'Run pnpm install --no-frozen-lockfile first (for new workspace packages)',
       ),
   },
   async (params) => wtSetup(params),
@@ -115,28 +89,21 @@ server.tool(
 // --- terraform_fmt ---
 server.tool(
   'terraform_fmt',
-  'Format Terraform (.tf) files using terraform fmt. Runs in the terraform/ subdirectory ' +
-    'of the repo or worktree. Use before committing infrastructure changes.',
+  'Format .tf files in the terraform/ subdirectory.',
   {
     worktreePath: z
       .string()
       .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
     check: z
       .boolean()
       .default(false)
-      .describe(
-        'If true, check-only mode — lists unformatted files without modifying them.',
-      ),
+      .describe('Check-only mode (no modifications)'),
     files: z
       .array(z.string())
       .optional()
-      .describe(
-        'Specific .tf files to format (relative to terraform/ directory). If omitted, formats all.',
-      ),
+      .describe('Specific .tf files (relative to terraform/)'),
   },
   async (params) => {
     const baseDir = params.worktreePath || getRepoRoot();

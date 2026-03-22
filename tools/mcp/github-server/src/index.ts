@@ -213,15 +213,10 @@ server.tool(
 // --- github_close_pr ---
 server.tool(
   'github_close_pr',
-  'Close a pull request with an optional comment. Use for closing redundant, superseded, or abandoned PRs.',
+  'Close a PR with optional comment.',
   {
-    number: z.coerce.number().int().positive().describe('PR number to close'),
-    comment: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe('Optional comment to add when closing the PR'),
+    number: z.coerce.number().int().positive().describe('PR number'),
+    comment: z.string().trim().min(1).optional().describe('Closing comment'),
   },
   async (params) => closePR(params),
 );
@@ -229,31 +224,19 @@ server.tool(
 // --- github_create_pr ---
 server.tool(
   'github_create_pr',
-  'Create a new pull request. Title should include the Jira ticket key (e.g. "LS-1254 feat(scope): description").',
+  'Create a pull request. Title should include Jira key.',
   {
-    title: z
-      .string()
-      .describe(
-        'PR title, should include Jira key, e.g. "LS-1254 feat(mcp): github server"',
-      ),
-    body: z.string().describe('PR body in markdown format'),
-    base: z
-      .string()
-      .default('main')
-      .describe('Base branch for the PR (default: main)'),
-    draft: z
-      .boolean()
-      .default(false)
-      .describe('Create as draft PR (default: false)'),
+    title: z.string().describe('PR title with Jira key'),
+    body: z.string().describe('PR body (markdown)'),
+    base: z.string().default('main').describe('Base branch (default: main)'),
+    draft: z.boolean().default(false).describe('Create as draft'),
     worktreePath: z
       .string()
       .refine((p) => !p || /^([A-Za-z]:\\|\/)/.test(p), {
         message: 'worktreePath must be an absolute path',
       })
       .optional()
-      .describe(
-        'Absolute path to a worktree directory. If provided, determines the head branch from this directory instead of the repo root.',
-      ),
+      .describe('Worktree path to run gh from'),
   },
   async (params) => createPR(params),
 );
@@ -261,7 +244,7 @@ server.tool(
 // --- github_get_repo_info ---
 server.tool(
   'github_get_repo_info',
-  'Get repository information (owner, name, default branch, URL). Useful for constructing GraphQL queries or API calls.',
+  'Get repo info: owner, name, default branch, URL.',
   {},
   async () => getRepoInfo(),
 );
@@ -269,17 +252,13 @@ server.tool(
 // --- github_get_review_threads ---
 server.tool(
   'github_get_review_threads',
-  'Fetch review threads on a PR via GraphQL. Returns thread ID, resolution status, outdated flag, and all comments with author, body, file path, and line number. Use for processing Copilot review feedback.',
+  'Fetch review threads on a PR via GraphQL.',
   {
-    number: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('PR number to fetch review threads for'),
+    number: z.coerce.number().int().positive().describe('PR number'),
     unresolvedOnly: z
       .boolean()
       .default(false)
-      .describe('Return only unresolved threads (default: false, returns all)'),
+      .describe('Only unresolved threads'),
   },
   async (params) => getReviewThreads(params),
 );
@@ -287,29 +266,23 @@ server.tool(
 // --- github_list_prs ---
 server.tool(
   'github_list_prs',
-  'List pull requests with optional filters for state, branch, author, label, and search query.',
+  'List PRs with optional filters.',
   {
     state: z
       .enum(['open', 'closed', 'merged', 'all'])
       .default('open')
-      .describe('PR state filter (default: open)'),
-    branch: z
-      .string()
-      .optional()
-      .describe('Filter by head branch name, e.g. LS-1254/my-feature'),
-    author: z.string().optional().describe('Filter by PR author username'),
-    label: z
-      .string()
-      .optional()
-      .describe('Filter by label, e.g. merge-when-ready'),
-    search: z.string().optional().describe('GitHub search query to filter PRs'),
+      .describe('State filter (default: open)'),
+    branch: z.string().optional().describe('Head branch filter'),
+    author: z.string().optional().describe('Author filter'),
+    label: z.string().optional().describe('Label filter'),
+    search: z.string().optional().describe('Search query'),
     limit: z.coerce
       .number()
       .int()
       .positive()
       .max(100)
       .default(20)
-      .describe('Maximum number of PRs to return (default: 20)'),
+      .describe('Max results (default: 20)'),
   },
   async (params) => listPRs(params),
 );
@@ -336,18 +309,11 @@ server.tool(
 // --- github_manage_labels ---
 server.tool(
   'github_manage_labels',
-  'Add or remove labels on a pull request. Common labels: merge-when-ready, do-not-merge.',
+  'Add or remove labels on a PR.',
   {
-    number: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('PR number to update labels on'),
-    add: z.array(z.string()).optional().describe('Labels to add to the PR'),
-    remove: z
-      .array(z.string())
-      .optional()
-      .describe('Labels to remove from the PR'),
+    number: z.coerce.number().int().positive().describe('PR number'),
+    add: z.array(z.string()).optional().describe('Labels to add'),
+    remove: z.array(z.string()).optional().describe('Labels to remove'),
   },
   async (params) => manageLabels(params),
 );
@@ -355,18 +321,15 @@ server.tool(
 // --- github_manage_labels_batch ---
 server.tool(
   'github_manage_labels_batch',
-  'Add or remove labels on multiple PRs in one call. During sweeps, this is much faster than calling github_manage_labels individually for 30+ PRs.',
+  'Add or remove labels on multiple PRs in one call.',
   {
     prs: z
       .array(z.coerce.number().int().positive())
       .min(1)
       .max(100)
-      .describe('Array of PR numbers to update labels on'),
-    add: z.array(z.string()).optional().describe('Labels to add to each PR'),
-    remove: z
-      .array(z.string())
-      .optional()
-      .describe('Labels to remove from each PR'),
+      .describe('PR numbers'),
+    add: z.array(z.string()).optional().describe('Labels to add'),
+    remove: z.array(z.string()).optional().describe('Labels to remove'),
   },
   async (params) => manageLabelsBatch(params),
 );
@@ -374,14 +337,14 @@ server.tool(
 // --- github_merge_pr ---
 server.tool(
   'github_merge_pr',
-  'Merge a pull request. Defaults to merge queue (--auto --squash) which respects branch protection. Use strategy "direct" only when explicitly authorized — it uses --admin to bypass branch protection.',
+  'Merge a PR. Default: merge queue (--auto --squash). "direct" uses --admin (requires authorization).',
   {
-    number: z.coerce.number().int().positive().describe('PR number to merge'),
+    number: z.coerce.number().int().positive().describe('PR number'),
     strategy: z
       .enum(['queue', 'direct'])
       .default('queue')
       .describe(
-        'Merge strategy: "queue" (default) enqueues via --auto respecting branch protection, "direct" uses --admin to bypass protection (requires explicit authorization)',
+        '"queue" (default) or "direct" (--admin, requires authorization)',
       ),
   },
   async (params) => mergePR(params),
@@ -390,13 +353,13 @@ server.tool(
 // --- github_pr_batch_status ---
 server.tool(
   'github_pr_batch_status',
-  'Detailed status for specific PRs by number. Returns mergeable status, CI job results by name, review approval state, individual reviews, and unresolved thread count for each PR. Uses batched GraphQL for efficiency.',
+  'Detailed status for specific PRs: mergeable, CI jobs, reviews, unresolved threads. Batched GraphQL.',
   {
     prNumbers: z
       .array(z.coerce.number().int().positive())
       .min(1)
       .max(50)
-      .describe('Array of PR numbers to fetch detailed status for'),
+      .describe('PR numbers'),
   },
   async (params) => prBatchStatus(params),
 );
@@ -404,24 +367,21 @@ server.tool(
 // --- github_pr_dashboard ---
 server.tool(
   'github_pr_dashboard',
-  'Cross-PR triage dashboard. Returns all open PRs with mergeable status, CI pass/fail/pending, unresolved review thread count, labels, and a summary with counts of conflicting/failing/pending/approved PRs. Replaces multiple gh CLI calls + JSON parsing for PR triage.',
+  'Triage dashboard: open PRs with mergeable status, CI state, unresolved threads, labels, and summary counts.',
   {
     state: z
       .enum(['open', 'closed', 'merged', 'all'])
       .default('open')
-      .describe('PR state filter (default: open)'),
-    author: z.string().optional().describe('Filter by PR author username'),
-    label: z
-      .string()
-      .optional()
-      .describe('Filter by label, e.g. merge-when-ready'),
+      .describe('State filter (default: open)'),
+    author: z.string().optional().describe('Author filter'),
+    label: z.string().optional().describe('Label filter'),
     limit: z.coerce
       .number()
       .int()
       .positive()
       .max(100)
       .default(30)
-      .describe('Maximum number of PRs to return (default: 30)'),
+      .describe('Max results (default: 30)'),
   },
   async (params) => prDashboard(params),
 );
@@ -429,7 +389,7 @@ server.tool(
 // --- github_pr_scan ---
 server.tool(
   'github_pr_scan',
-  'Scan all open PRs and return pre-bucketed arrays for the pr-operations sweep workflow. Returns: conflicting (merge conflicts), reviews (unresolved threads with body/path/line details), ciFailing (with failedChecks names), ciPending, and clean. By default, also syncs CI failure labels (adds labels to ciFailing PRs, removes stale labels from clean PRs). Equivalent to running scripts/scan-prs.ps1 but works in any environment without PowerShell.',
+  'Scan open PRs into buckets: conflicting, reviews, ciFailing, ciPending, clean. Syncs CI failure labels by default.',
   {
     limit: z.coerce
       .number()
@@ -437,13 +397,11 @@ server.tool(
       .positive()
       .max(200)
       .default(200)
-      .describe('Maximum number of open PRs to scan (default: 200)'),
+      .describe('Max PRs to scan (default: 200)'),
     applyLabels: z
       .boolean()
       .default(true)
-      .describe(
-        'Sync CI failure labels after scan — add labels to ciFailing PRs, remove stale labels from clean PRs (default: true)',
-      ),
+      .describe('Sync CI failure labels (default: true)'),
   },
   async (params) => prScan(params),
 );
@@ -451,10 +409,9 @@ server.tool(
 // --- github_rebase_pr ---
 server.tool(
   'github_rebase_pr',
-  'Rebase a PR branch onto its base branch (usually main) and force-push. ' +
-    'Handles the full fetch → rebase → push cycle. Returns conflict details if rebase fails.',
+  'Rebase a PR branch onto base and force-push. Returns conflict details on failure.',
   {
-    number: z.coerce.number().int().positive().describe('PR number to rebase'),
+    number: z.coerce.number().int().positive().describe('PR number'),
   },
   async (params) => rebasePR(params),
 );
@@ -462,23 +419,17 @@ server.tool(
 // --- github_request_review ---
 server.tool(
   'github_request_review',
-  'Request reviewers on a PR. Copilot reviews are now auto-requested by the copilot-auto-approve workflow on PR open/update — use this tool as a fallback or to add human reviewers. Requests Copilot bot review by default (uses copilot-pull-request-reviewer[bot]).',
+  'Request reviewers on a PR. Requests Copilot by default.',
   {
-    number: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('PR number to request review on'),
+    number: z.coerce.number().int().positive().describe('PR number'),
     reviewers: z
       .array(z.string())
       .optional()
-      .describe('GitHub usernames of human reviewers to add'),
+      .describe('Human reviewer usernames'),
     copilot: z
       .boolean()
       .default(true)
-      .describe(
-        'Request Copilot bot review (default: true). Uses copilot-pull-request-reviewer[bot].',
-      ),
+      .describe('Request Copilot review (default: true)'),
   },
   async (params) => requestReview(params),
 );
@@ -486,13 +437,11 @@ server.tool(
 // --- github_resolve_thread ---
 server.tool(
   'github_resolve_thread',
-  'Resolve a review thread via GraphQL mutation. Use after addressing review feedback and pushing the fix. Get thread IDs from github_get_review_threads.',
+  'Resolve a single review thread via GraphQL.',
   {
     threadId: z
       .string()
-      .describe(
-        'GraphQL node ID of the review thread to resolve (from github_get_review_threads)',
-      ),
+      .describe('Thread node ID from github_get_review_threads'),
   },
   async (params) => resolveThread(params),
 );
@@ -500,15 +449,13 @@ server.tool(
 // --- github_resolve_threads ---
 server.tool(
   'github_resolve_threads',
-  'Batch-resolve multiple review threads in batched GraphQL calls (groups of 50). Much faster than calling github_resolve_thread individually during PR sweeps. Get thread IDs from github_get_review_threads.',
+  'Batch-resolve review threads (groups of 50).',
   {
     threadIds: z
       .array(z.string())
       .min(1)
       .max(100)
-      .describe(
-        'Array of GraphQL node IDs of review threads to resolve (from github_get_review_threads)',
-      ),
+      .describe('Thread node IDs from github_get_review_threads'),
   },
   async (params) => resolveThreads(params),
 );
@@ -516,9 +463,9 @@ server.tool(
 // --- github_view_pr ---
 server.tool(
   'github_view_pr',
-  'View detailed information about a specific pull request including title, body, state, checks, reviews, and diff stats.',
+  'View PR details: title, body, state, checks, reviews, diff stats.',
   {
-    number: z.coerce.number().int().positive().describe('PR number to view'),
+    number: z.coerce.number().int().positive().describe('PR number'),
   },
   async (params) => viewPR(params),
 );

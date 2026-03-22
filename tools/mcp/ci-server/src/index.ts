@@ -16,70 +16,52 @@ const server = new McpServer({
 
 server.tool(
   'ci_auto_fix',
-  'Analyze CI failure logs and classify the failure type. Returns the failure category ' +
-    '(formatting, stale_branch, codegen, type_error, test_failure, lint, flaky, infrastructure, unknown), ' +
-    'confidence level, evidence lines, and a structured recommendation for how to fix it. ' +
-    'Use this before manual debugging to attempt automated triage.',
+  'Classify a CI failure into a category (formatting, stale_branch, codegen, type_error, test_failure, lint, flaky, infrastructure, unknown) with confidence, evidence, and fix recommendation.',
   {
-    runId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('GitHub Actions run database ID to analyze'),
+    runId: z.coerce.number().int().positive().describe('Run ID to analyze'),
     jobId: z.coerce
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Optional job database ID to analyze instead of the whole run'),
+      .describe('Job ID to analyze'),
     attempt: z.coerce
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Specific attempt number for the run'),
+      .describe('Attempt number'),
   },
   async (params) => autoFix(params),
 );
 
 server.tool(
   'ci_get_logs',
-  'Fetch GitHub Actions logs for a run or specific job. Defaults to failed-step logs for faster CI triage.',
+  'Fetch CI logs for a run or job. Defaults to failed-step logs only.',
   {
-    runId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('GitHub Actions run database ID'),
-    jobId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('Optional job database ID within the run'),
+    runId: z.coerce.number().int().positive().describe('Run ID'),
+    jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
     failedOnly: z
       .boolean()
       .default(true)
-      .describe('Return only failed-step logs when true (default: true)'),
+      .describe('Failed steps only (default: true)'),
     attempt: z.coerce
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Specific attempt number for the run'),
+      .describe('Attempt number'),
     maxLines: z.coerce
       .number()
       .int()
       .positive()
       .optional()
-      .describe('If provided, returns only the last N lines of log output'),
+      .describe('Return only last N lines'),
     errorSummary: z
       .boolean()
       .default(false)
       .describe(
-        'When true, returns only error/failure lines with surrounding context instead of full logs. ' +
-          'Extracts TS errors, FAIL lines, Nx "Failed tasks" sections, and other error indicators. ' +
-          'Keeps output under ~200 lines for agent consumption.',
+        'Extract only error/failure lines with context (~200 lines max).',
       ),
   },
   async (params) => getLogs(params),
@@ -87,174 +69,121 @@ server.tool(
 
 server.tool(
   'ci_list_runs',
-  'List recent GitHub Actions workflow runs with optional filters for branch, workflow, status, event, commit, and user.',
+  'List recent CI runs with optional filters.',
   {
-    branch: z
-      .string()
-      .optional()
-      .describe(
-        'Branch name to filter by, e.g. LS-1255/ci-server-for-ci-failure-triage',
-      ),
-    workflow: z
-      .string()
-      .optional()
-      .describe('Workflow file or name, e.g. ci-orchestrator.yml'),
-    status: z
-      .string()
-      .optional()
-      .describe(
-        'Workflow run status or conclusion, e.g. failure, in_progress, success',
-      ),
-    event: z
-      .string()
-      .optional()
-      .describe('GitHub event name, e.g. pull_request or push'),
-    commit: z.string().optional().describe('Commit SHA to filter by'),
-    user: z
-      .string()
-      .optional()
-      .describe('GitHub username that triggered the run'),
+    branch: z.string().optional().describe('Branch name filter'),
+    workflow: z.string().optional().describe('Workflow file or name'),
+    status: z.string().optional().describe('Run status or conclusion'),
+    event: z.string().optional().describe('Trigger event name'),
+    commit: z.string().optional().describe('Commit SHA filter'),
+    user: z.string().optional().describe('GitHub username filter'),
     limit: z.coerce
       .number()
       .int()
       .positive()
       .max(25)
       .default(10)
-      .describe('Maximum number of runs to return (default: 10, max: 25)'),
+      .describe('Max results (default: 10, max: 25)'),
   },
   async (params) => listRuns(params),
 );
 
 server.tool(
   'ci_rerun',
-  'Rerun failed jobs, a specific job, or an entire GitHub Actions workflow run.',
+  'Rerun failed jobs, a specific job, or an entire CI run.',
   {
-    runId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('GitHub Actions run database ID'),
+    runId: z.coerce.number().int().positive().describe('Run ID'),
     failedOnly: z
       .boolean()
       .default(true)
-      .describe(
-        'When true, rerun only failed jobs unless jobId is provided (default: true)',
-      ),
+      .describe('Rerun only failed jobs unless jobId set (default: true)'),
     jobId: z.coerce
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Optional job database ID to rerun instead of the whole run'),
-    debug: z
-      .boolean()
-      .default(false)
-      .describe('Enable debug logging for the rerun request'),
+      .describe('Specific job ID to rerun'),
+    debug: z.boolean().default(false).describe('Enable debug logging'),
   },
   async (params) => rerun(params),
 );
 
 server.tool(
   'ci_search_logs',
-  'Search GitHub Actions logs for error evidence with optional regex matching and surrounding context lines.',
+  'Search CI logs by pattern with optional regex and context lines.',
   {
-    runId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('GitHub Actions run database ID'),
-    pattern: z
-      .string()
-      .describe('String or regex pattern to search for in the logs'),
-    jobId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('Optional job database ID within the run'),
+    runId: z.coerce.number().int().positive().describe('Run ID'),
+    pattern: z.string().describe('Search string or regex pattern'),
+    jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
     failedOnly: z
       .boolean()
       .default(true)
-      .describe('Search only failed-step logs when true (default: true)'),
+      .describe('Failed steps only (default: true)'),
     attempt: z.coerce
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Specific attempt number for the run'),
-    isRegex: z
-      .boolean()
-      .default(false)
-      .describe('Interpret pattern as a regular expression'),
-    caseSensitive: z
-      .boolean()
-      .default(false)
-      .describe('Use case-sensitive matching'),
+      .describe('Attempt number'),
+    isRegex: z.boolean().default(false).describe('Treat pattern as regex'),
+    caseSensitive: z.boolean().default(false).describe('Case-sensitive match'),
     contextBefore: z.coerce
       .number()
       .int()
       .min(0)
       .max(20)
       .default(3)
-      .describe('Number of lines of context before each match'),
+      .describe('Lines before each match'),
     contextAfter: z.coerce
       .number()
       .int()
       .min(0)
       .max(20)
       .default(3)
-      .describe('Number of lines of context after each match'),
+      .describe('Lines after each match'),
     limitMatches: z.coerce
       .number()
       .int()
       .positive()
       .max(30)
       .default(10)
-      .describe('Maximum matches to return (default: 10, max: 30)'),
+      .describe('Max matches to return'),
   },
   async (params) => searchLogs(params),
 );
 
 server.tool(
   'ci_view_run',
-  'View a GitHub Actions workflow run summary, including jobs and conclusions for triage.',
+  'View a CI run summary with jobs and conclusions.',
   {
-    runId: z.coerce
-      .number()
-      .int()
-      .positive()
-      .describe('GitHub Actions run database ID'),
+    runId: z.coerce.number().int().positive().describe('Run ID'),
     attempt: z.coerce
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Specific attempt number for the run'),
+      .describe('Attempt number'),
     includeJobs: z
       .boolean()
       .default(true)
-      .describe('Include job details in the response (default: true)'),
+      .describe('Include jobs (default: true)'),
   },
   async (params) => viewRun(params),
 );
 
 server.tool(
   'ci_workflow_info',
-  'Query GitHub Actions workflow definitions. Lists all workflows or returns details for a specific workflow by filename or ID. Optionally includes GitHub App installation permissions.',
+  'List workflows or get details for a specific workflow. Optionally includes App installation permissions.',
   {
     workflow: z
       .union([z.string(), z.number().int()])
       .transform(String)
       .optional()
-      .describe(
-        'Workflow filename (e.g. "copilot-auto-approve.yml") or numeric ID. If omitted, lists all workflows.',
-      ),
+      .describe('Workflow filename or numeric ID; omit to list all'),
     includePermissions: z
       .boolean()
       .default(false)
-      .describe(
-        'When true, also fetches GitHub App installation permissions for the repository (default: false)',
-      ),
+      .describe('Include GitHub App installation permissions (default: false)'),
   },
   async (params) => workflowInfo(params),
 );

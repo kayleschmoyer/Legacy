@@ -26,24 +26,20 @@ const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:\\|\/)/;
 // --- nx_affected ---
 server.tool(
   'nx_affected',
-  'Show which projects are affected by current changes. Optionally filter to projects that have a specific target. Use before running builds/tests to scope work correctly.',
+  'Show affected projects. Optionally filter by target.',
   {
     target: z
       .string()
       .optional()
-      .describe(
-        'Only return affected projects that have this target (e.g., "test", "build").',
-      ),
+      .describe('Filter to projects with this target'),
     base: z
       .string()
       .default('origin/main')
-      .describe('Git ref to compare against (default: origin/main).'),
+      .describe('Base ref (default: origin/main)'),
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => affected(params),
 );
@@ -51,15 +47,13 @@ server.tool(
 // --- nx_check_package_health ---
 server.tool(
   'nx_check_package_health',
-  'Scan the workspace for package health issues: nested node_modules in lib/* (version duplication), wildcard dependency ranges in workspace packages, missing pnpm.overrides entries, and missing @types/ companions. Use after installing packages or to diagnose runtime crashes caused by duplicate package versions.',
+  'Scan for package issues: nested node_modules, wildcard ranges, missing overrides, missing @types/.',
   {
     worktreePath: z
       .string()
       .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => checkPackageHealth(params),
 );
@@ -67,23 +61,17 @@ server.tool(
 // --- nx_dep_graph ---
 server.tool(
   'nx_dep_graph',
-  'Query the Nx dependency graph for a project. Returns either what the project depends on ("dependencies") or what depends on it ("dependents"). Use to understand impact before making changes.',
+  'Query dependency graph: what a project depends on or what depends on it.',
   {
-    project: z
-      .string()
-      .describe('Nx project name to query (e.g., "scoring", "db-client").'),
+    project: z.string().describe('Project name'),
     direction: z
       .enum(['dependencies', 'dependents'])
       .default('dependencies')
-      .describe(
-        'Direction: "dependencies" = what this project depends on, "dependents" = what depends on this project.',
-      ),
+      .describe('"dependencies" or "dependents"'),
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => depGraph(params),
 );
@@ -91,34 +79,23 @@ server.tool(
 // --- nx_install_package ---
 server.tool(
   'nx_install_package',
-  'Install an npm package safely in the pnpm monorepo. Enforces junction-aware safety: refuses to install if node_modules is a junction, scans for nested node_modules duplicates in lib/*, checks if @types/ companion is needed. All packages are installed at the workspace root (-w flag).',
+  'Install an npm package at workspace root. Refuses if node_modules is a junction. Checks for @types/ companion.',
   {
     name: z
       .string()
       .regex(NPM_NAME_REGEX, 'Invalid npm package name')
-      .describe(
-        'Package name to install (e.g., "lodash", "@tanstack/react-query").',
-      ),
+      .describe('Package name'),
     version: z
       .string()
       .regex(VERSION_REGEX, 'Invalid version or dist-tag')
       .optional()
-      .describe(
-        'Specific version to install (e.g., "4.17.21"). Omit for latest.',
-      ),
-    dev: z
-      .boolean()
-      .default(false)
-      .describe(
-        'If true, install as a devDependency (-D flag). Use for build/test tools, @types/ packages, etc.',
-      ),
+      .describe('Version (default: latest)'),
+    dev: z.boolean().default(false).describe('Install as devDependency'),
     worktreePath: z
       .string()
       .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => installPackage(params),
 );
@@ -128,40 +105,22 @@ server.tool(
 // ALLOWED_TARGETS in tools/run-target.ts (the canonical enforcement source).
 server.tool(
   'nx_run',
-  'Run an Nx target on a specific project. Allowed targets: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook. Use for single-project operations.',
+  'Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook.',
   {
-    project: z
-      .string()
-      .describe('Nx project name (e.g., "web", "db", "scoring").'),
-    target: z
-      .string()
-      .describe(
-        'Target to run (e.g., "build", "test", "typecheck", "lint", "codegen").',
-      ),
-    configuration: z
-      .string()
-      .optional()
-      .describe(
-        'Named configuration to use (e.g., "production"). Omit for defaults.',
-      ),
-    noCache: z
-      .boolean()
-      .default(false)
-      .describe(
-        'If true, bypasses the Nx cache (--skip-nx-cache). Use when cache may be stale.',
-      ),
+    project: z.string().describe('Project name'),
+    target: z.string().describe('Target to run'),
+    configuration: z.string().optional().describe('Named configuration'),
+    noCache: z.boolean().default(false).describe('Bypass Nx cache'),
     args: z
       .union([z.string(), z.array(z.string())])
       .optional()
       .describe(
-        'Extra flags passed through to the underlying tool after "--" (e.g., ["-u"] for Jest snapshot updates, ["--grep=pattern"] for test filtering). Prefer passing as an array of strings; a single string is accepted for backwards compatibility but will be split on whitespace.',
+        'Extra flags after "--" (e.g. ["-u"] for snapshots). Array preferred; string split on whitespace.',
       ),
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => runTarget(params),
 );
@@ -171,29 +130,18 @@ server.tool(
 // ALLOWED_TARGETS in tools/run-affected.ts (the canonical enforcement source).
 server.tool(
   'nx_run_affected',
-  'Run an Nx target on all affected projects. Allowed targets: build, test, lint, typecheck, codegen. This is the equivalent of `pnpm exec nx affected -t <target> --base=origin/main`.',
+  'Run an Nx target on all affected projects. Allowed: build, test, lint, typecheck, codegen.',
   {
-    target: z
-      .string()
-      .describe(
-        'Target to run on affected projects (e.g., "build", "test", "typecheck").',
-      ),
+    target: z.string().describe('Target to run on affected projects'),
     base: z
       .string()
       .default('origin/main')
-      .describe('Git ref to compare against (default: origin/main).'),
-    fix: z
-      .boolean()
-      .default(false)
-      .describe(
-        'If true and target is "lint", passes --fix to auto-fix lint errors.',
-      ),
+      .describe('Base ref (default: origin/main)'),
+    fix: z.boolean().default(false).describe('Pass --fix for lint target'),
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => runAffected(params),
 );
@@ -201,17 +149,13 @@ server.tool(
 // --- nx_show_project ---
 server.tool(
   'nx_show_project',
-  'Inspect a single Nx project: its root path, targets (with executors and dependsOn), tags, and project type. Use to understand what targets are available before running them.',
+  'Inspect a project: root, targets, tags, type.',
   {
-    project: z
-      .string()
-      .describe('Nx project name (e.g., "web", "db", "scoring").'),
+    project: z.string().describe('Project name'),
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => showProject(params),
 );
@@ -219,32 +163,21 @@ server.tool(
 // --- nx_show_projects ---
 server.tool(
   'nx_show_projects',
-  'List Nx projects in the workspace. Optionally filter by affected status, target availability, or substring tag match. Use to discover which projects exist before running targets.',
+  'List Nx projects. Filter by affected, target, or tag.',
   {
     affected: z
       .boolean()
       .default(false)
-      .describe(
-        'If true, only return projects affected by current changes vs origin/main.',
-      ),
+      .describe('Only affected projects vs origin/main'),
     withTarget: z
       .string()
       .optional()
-      .describe(
-        'Only return projects that have this target (e.g., "build", "test", "codegen").',
-      ),
-    tag: z
-      .string()
-      .optional()
-      .describe(
-        'Nx tag filter passed to --tag (e.g., "scope:lib", "scope:lambda").',
-      ),
+      .describe('Filter to projects with this target'),
+    tag: z.string().optional().describe('Nx tag filter'),
     worktreePath: z
       .string()
       .optional()
-      .describe(
-        'Absolute path to a worktree. If omitted, uses the repo root where this server lives.',
-      ),
+      .describe('Worktree path (default: repo root)'),
   },
   async (params) => showProjects(params),
 );
