@@ -755,3 +755,493 @@ test.describe('Waiver Processing — confirm mutation @regression', () => {
     await expect.poll(() => mutationCalled, { timeout: 10000 }).toBe(true);
   });
 });
+
+// ── Sequential Game Selection — Multi-Round ──────────────────────────────────
+
+test.describe('Sequential game selection — multi-round @critical', () => {
+  test('clicking Select Game through all rounds updates button label and transitions to Advance', async ({
+    page,
+  }) => {
+    let selectCalls = 0;
+
+    // Round 1: selectedGamesCount = 0 → button says "Select Game 1 of 3"
+    await setupGraphQL(page, {
+      league: makeLeague({ draftStatus: 'completed', gamesPerMatchup: 3 }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 1,
+          selectedGamesCount: 0,
+          gamesPerMatchup: 3,
+        }),
+      ],
+      currentWeek: 1,
+      onAutoSelectGames: () => {
+        selectCalls++;
+        return { success: true };
+      },
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // Verify initial state
+    const selectBtn1 = page.getByRole('button', {
+      name: /select game 1 of 3/i,
+    });
+    await expect(selectBtn1).toBeVisible();
+
+    // Click and confirm game 1
+    await selectBtn1.click();
+    await page.getByRole('button', { name: /confirm/i }).click();
+    await expect.poll(() => selectCalls, { timeout: 10000 }).toBe(1);
+
+    // Re-setup with updated state: selectedGamesCount = 1
+    await page.unroute(isGraphQLEndpoint);
+    await setupGraphQL(page, {
+      league: makeLeague({ draftStatus: 'completed', gamesPerMatchup: 3 }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 1,
+          selectedGamesCount: 1,
+          gamesPerMatchup: 3,
+        }),
+      ],
+      currentWeek: 1,
+      onAutoSelectGames: () => {
+        selectCalls++;
+        return { success: true };
+      },
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // Verify button says "Select Game 2 of 3"
+    const selectBtn2 = page.getByRole('button', {
+      name: /select game 2 of 3/i,
+    });
+    await expect(selectBtn2).toBeVisible();
+
+    // Click and confirm game 2
+    await selectBtn2.click();
+    await page.getByRole('button', { name: /confirm/i }).click();
+    await expect.poll(() => selectCalls, { timeout: 10000 }).toBe(2);
+
+    // Re-setup with updated state: selectedGamesCount = 2
+    await page.unroute(isGraphQLEndpoint);
+    await setupGraphQL(page, {
+      league: makeLeague({ draftStatus: 'completed', gamesPerMatchup: 3 }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 1,
+          selectedGamesCount: 2,
+          gamesPerMatchup: 3,
+        }),
+      ],
+      currentWeek: 1,
+      onAutoSelectGames: () => {
+        selectCalls++;
+        return { success: true };
+      },
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // Verify button says "Select Game 3 of 3"
+    const selectBtn3 = page.getByRole('button', {
+      name: /select game 3 of 3/i,
+    });
+    await expect(selectBtn3).toBeVisible();
+
+    // Click and confirm game 3
+    await selectBtn3.click();
+    await page.getByRole('button', { name: /confirm/i }).click();
+    await expect.poll(() => selectCalls, { timeout: 10000 }).toBe(3);
+
+    // Re-setup with all games selected: selectedGamesCount = 3
+    await page.unroute(isGraphQLEndpoint);
+    await setupGraphQL(page, {
+      league: makeLeague({ draftStatus: 'completed', gamesPerMatchup: 3 }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 1,
+          selectedGamesCount: 3,
+          gamesPerMatchup: 3,
+        }),
+      ],
+      currentWeek: 1,
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // After all games selected, "Advance League Week" should appear instead
+    await expect(
+      page.getByRole('button', { name: /advance league week/i }),
+    ).toBeVisible();
+
+    // "Select Game" button should no longer be present
+    await expect(
+      page.getByRole('button', { name: /select game/i }),
+    ).not.toBeVisible();
+  });
+});
+
+// ── Advance Blocked When Games Incomplete ────────────────────────────────────
+
+test.describe('Advance blocked when games incomplete @critical', () => {
+  test('Advance League Week button is NOT visible when games remain unselected', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, {
+      league: makeLeague({ draftStatus: 'completed', gamesPerMatchup: 5 }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 1,
+          selectedGamesCount: 2,
+          gamesPerMatchup: 5,
+        }),
+      ],
+      currentWeek: 1,
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // "Advance League Week" should NOT be visible with incomplete games
+    await expect(
+      page.getByRole('button', { name: /advance league week/i }),
+    ).not.toBeVisible();
+
+    // "Select Game 3 of 5" should be visible instead
+    await expect(
+      page.getByRole('button', { name: /select game 3 of 5/i }),
+    ).toBeVisible();
+  });
+
+  test('shows game selection button for first incomplete game when some games selected', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, {
+      league: makeLeague({ draftStatus: 'completed', gamesPerMatchup: 5 }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 1,
+          selectedGamesCount: 4,
+          gamesPerMatchup: 5,
+        }),
+      ],
+      currentWeek: 1,
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // Should show "Select Game 5 of 5" — the last remaining game
+    await expect(
+      page.getByRole('button', { name: /select game 5 of 5/i }),
+    ).toBeVisible();
+
+    // Advance should still not be visible
+    await expect(
+      page.getByRole('button', { name: /advance league week/i }),
+    ).not.toBeVisible();
+  });
+});
+
+// ── Advance Week Flow — UI Refresh ───────────────────────────────────────────
+
+test.describe('Advance week flow — UI refresh @critical', () => {
+  test('advancing from week 1 to week 2 refreshes UI to show new week state', async ({
+    page,
+  }) => {
+    let advanceCalled = false;
+
+    // Setup at week 1, all games selected
+    await setupGraphQL(page, {
+      league: makeLeague({
+        draftStatus: 'completed',
+        gamesPerMatchup: 3,
+        totalMatchups: 10,
+      }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 1,
+          selectedGamesCount: 3,
+          gamesPerMatchup: 3,
+        }),
+      ],
+      currentWeek: 1,
+      onAutoAdvanceMatchups: () => {
+        advanceCalled = true;
+        return { success: true };
+      },
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // Verify we see "Advance League Week"
+    const advanceBtn = page.getByRole('button', {
+      name: /advance league week/i,
+    });
+    await expect(advanceBtn).toBeVisible();
+
+    // Verify current state shows week 1
+    await expect(page.getByText(/week 1/i).first()).toBeVisible();
+
+    // Click advance and confirm
+    await advanceBtn.click();
+    await page.getByRole('button', { name: /confirm/i }).click();
+    await expect.poll(() => advanceCalled, { timeout: 10000 }).toBe(true);
+
+    // Re-setup with week 2 state (new week, no games selected yet)
+    await page.unroute(isGraphQLEndpoint);
+    await setupGraphQL(page, {
+      league: makeLeague({
+        draftStatus: 'completed',
+        gamesPerMatchup: 3,
+        totalMatchups: 10,
+      }),
+      matchups: [
+        makeMatchup({
+          id: 2,
+          weekNumber: 2,
+          selectedGamesCount: 0,
+          gamesPerMatchup: 3,
+        }),
+      ],
+      currentWeek: 2,
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // After advance, UI should show week 2 and game selection for the new week
+    await expect(page.getByText(/week 2/i).first()).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /select game 1 of 3/i }),
+    ).toBeVisible();
+  });
+});
+
+// ── Error Handling — Mutation Failure ─────────────────────────────────────────
+
+test.describe('Error handling — mutation failure @regression', () => {
+  test('shows error message when autoSelectGames mutation returns GraphQL error', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, {
+      league: makeLeague({ draftStatus: 'completed', gamesPerMatchup: 5 }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 1,
+          selectedGamesCount: 0,
+          gamesPerMatchup: 5,
+        }),
+      ],
+      currentWeek: 1,
+    });
+
+    // Override the autoSelectGames route to return an error
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+      if (postData.includes('autoselectgames')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: null,
+            errors: [
+              {
+                message: 'Game selection failed: no eligible games available',
+                locations: [{ line: 1, column: 1 }],
+                path: ['autoSelectGames'],
+              },
+            ],
+          }),
+        });
+      } else {
+        await route.fallback();
+      }
+    });
+
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // Click select game and confirm
+    const selectBtn = page.getByRole('button', { name: /select game 1/i });
+    await expect(selectBtn).toBeVisible();
+    await selectBtn.click();
+    await page.getByRole('button', { name: /confirm/i }).click();
+
+    // Error message should appear in the alert role
+    await expect(page.getByRole('alert').getByText(/error/i)).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
+  test('shows error message when autoAdvanceMatchups mutation returns GraphQL error', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, {
+      league: makeLeague({ draftStatus: 'completed', gamesPerMatchup: 5 }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 1,
+          selectedGamesCount: 5,
+          gamesPerMatchup: 5,
+        }),
+      ],
+      currentWeek: 1,
+    });
+
+    // Override the autoAdvanceMatchups route to return an error
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+      if (postData.includes('autoadvancematchups')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: null,
+            errors: [
+              {
+                message:
+                  'Advance failed: at least 2 teams required for matchups',
+                locations: [{ line: 1, column: 1 }],
+                path: ['autoAdvanceMatchups'],
+              },
+            ],
+          }),
+        });
+      } else {
+        await route.fallback();
+      }
+    });
+
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // Click advance and confirm
+    const advanceBtn = page.getByRole('button', {
+      name: /advance league week/i,
+    });
+    await expect(advanceBtn).toBeVisible();
+    await advanceBtn.click();
+    await page.getByRole('button', { name: /confirm/i }).click();
+
+    // Error message should appear
+    await expect(page.getByRole('alert').getByText(/error/i)).toBeVisible({
+      timeout: 10000,
+    });
+  });
+});
+
+// ── Final Week Advance — Season Completion ───────────────────────────────────
+
+test.describe('Final week advance — season completion @regression', () => {
+  test('shows "Season Complete" indicator when all weeks have been played', async ({
+    page,
+  }) => {
+    // Setup at final week (week 10 of 10), all games selected, no current matchup
+    // (season is complete when highestWeek >= totalMatchups and no active matchup)
+    await setupGraphQL(page, {
+      league: makeLeague({
+        draftStatus: 'completed',
+        gamesPerMatchup: 3,
+        totalMatchups: 10,
+        currentMatchup: null,
+      }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 10,
+          selectedGamesCount: 3,
+          gamesPerMatchup: 3,
+          status: 'completed',
+          // Use a different team so it's NOT the user's current matchup
+          team1Id: 3,
+          team2Id: 4,
+        }),
+      ],
+      currentWeek: null,
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // "Season Complete" text should appear
+    await expect(page.getByText(/season complete/i).first()).toBeVisible({
+      timeout: 10000,
+    });
+
+    // "Advance League Week" should NOT be visible when season is over
+    await expect(
+      page.getByRole('button', { name: /advance league week/i }),
+    ).not.toBeVisible();
+  });
+
+  test('advancing the final week transitions to season complete state', async ({
+    page,
+  }) => {
+    let advanceCalled = false;
+
+    // Setup at final week (week 10 of 10), all games selected
+    await setupGraphQL(page, {
+      league: makeLeague({
+        draftStatus: 'completed',
+        gamesPerMatchup: 3,
+        totalMatchups: 10,
+      }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 10,
+          selectedGamesCount: 3,
+          gamesPerMatchup: 3,
+        }),
+      ],
+      currentWeek: 10,
+      onAutoAdvanceMatchups: () => {
+        advanceCalled = true;
+        return { success: true };
+      },
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // Should see advance button on final week
+    const advanceBtn = page.getByRole('button', {
+      name: /advance league week/i,
+    });
+    await expect(advanceBtn).toBeVisible();
+    await advanceBtn.click();
+    await page.getByRole('button', { name: /confirm/i }).click();
+    await expect.poll(() => advanceCalled, { timeout: 10000 }).toBe(true);
+
+    // Re-setup with season complete state (no current week, no active matchup)
+    await page.unroute(isGraphQLEndpoint);
+    await setupGraphQL(page, {
+      league: makeLeague({
+        draftStatus: 'completed',
+        gamesPerMatchup: 3,
+        totalMatchups: 10,
+        currentMatchup: null,
+      }),
+      matchups: [
+        makeMatchup({
+          weekNumber: 10,
+          selectedGamesCount: 3,
+          gamesPerMatchup: 3,
+          status: 'completed',
+          team1Id: 3,
+          team2Id: 4,
+        }),
+      ],
+      currentWeek: null,
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await page.waitForLoadState('load');
+
+    // "Season Complete" should now be visible
+    await expect(page.getByText(/season complete/i).first()).toBeVisible({
+      timeout: 10000,
+    });
+
+    // "Start New Season" button should be available
+    await expect(
+      page.getByRole('button', { name: /start new season/i }),
+    ).toBeVisible();
+  });
+});
