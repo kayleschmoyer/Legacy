@@ -13,7 +13,7 @@
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
 	fix-windows-locks diagnose kill-stale \
-	branch-tree cleanup-merged-branches squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
+	branch-tree cleanup-merged-branches clean-merged squash-branch rebase-tree rebase-tree-auto rebase-tree-skip resolve-conflicts \
 	pre-commit pc quick-check format-commit \
 	wt-setup
 .DEFAULT_GOAL := help
@@ -645,6 +645,22 @@ ifdef DELETE
 	@./scripts/cleanup-merged-branches.sh --delete
 else
 	@./scripts/cleanup-merged-branches.sh
+endif
+endif
+
+clean-merged: ## Clean up worktrees whose PRs have been merged (use DRYRUN=1 for dry run)
+	@$(call echo_blue,Scanning for worktrees with merged PRs...)
+ifeq ($(DETECTED_OS),Windows)
+ifeq ($(DRYRUN),1)
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\clean-merged-worktrees.ps1" -DryRun
+else
+	@powershell -ExecutionPolicy Bypass -File ".\scripts\clean-merged-worktrees.ps1"
+endif
+else
+ifeq ($(DRYRUN),1)
+	@./scripts/clean-merged-worktrees.sh --dry-run
+else
+	@./scripts/clean-merged-worktrees.sh
 endif
 endif
 
