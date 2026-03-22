@@ -30,6 +30,7 @@ import {
  */
 export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
   // ── App shell (fires on every authenticated page) ─────────────────
+  getunreadnotificationcount: { data: { getUnreadNotificationCount: 0 } },
   getuserbyid: {
     data: {
       user: {

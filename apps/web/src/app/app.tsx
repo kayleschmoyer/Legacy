@@ -31,6 +31,7 @@ import { PlayersDropdown } from '../components/layout/PlayersDropdown';
 import { HelpDropdown } from '../components/layout/HelpDropdown';
 import { MyLeaguesDropdown } from '../components/layout/MyLeaguesDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
+import { NotificationDropdown } from '../components/layout/NotificationDropdown';
 import { BaseballScreen } from '../components/baseball';
 
 import {
@@ -64,6 +65,7 @@ import AdminRevenuePage from '../pages/admin/AdminRevenuePage';
 import ProfileSettingsPage from '../pages/profile/ProfileSettingsPage';
 import SubscriptionPage from '../pages/profile/SubscriptionPage';
 import PreferencesPage from '../pages/preferences/PreferencesPage';
+import NotificationsPage from '../pages/notifications/NotificationsPage';
 import { BRAND_GOLD } from '../constants/colors';
 import { NAV_Z_INDEX } from '../constants/dimensions';
 
@@ -305,6 +307,7 @@ function Navigation() {
           {/* ── Right section ── */}
           <XStack alignItems="center" gap="$3" flexShrink={0}>
             <BugReportButton />
+            <NotificationDropdown />
             <UserProfileDropdown />
 
             {/* Mobile hamburger */}
@@ -550,6 +553,7 @@ function App() {
           <Route path="/profile/settings" element={<ProfileSettingsPage />} />
           <Route path="/profile/subscription" element={<SubscriptionPage />} />
           <Route path="/preferences" element={<PreferencesPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route
             path="/games/season-draft"
             element={<SeasonDraftGamesPage />}

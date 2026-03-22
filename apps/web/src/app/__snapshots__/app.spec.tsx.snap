@@ -93,6 +93,9 @@ exports[`App FootballScreen should match complete football page layout snapshot 
           gap="$3"
         >
           <div>
+            Notification Dropdown
+          </div>
+          <div>
             User Profile Dropdown
           </div>
           <button
@@ -217,6 +220,9 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
           gap="$3"
         >
           <div>
+            Notification Dropdown
+          </div>
+          <div>
             User Profile Dropdown
           </div>
           <button
@@ -338,6 +344,9 @@ exports[`App Navigation should render navigation with correct links 1`] = `
           flexshrink="0"
           gap="$3"
         >
+          <div>
+            Notification Dropdown
+          </div>
           <div>
             User Profile Dropdown
           </div>
