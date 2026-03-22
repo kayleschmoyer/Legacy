@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   coverageDirectory: '../../coverage/lib/shared-components/mobile',
   displayName: 'shared-components:mobile',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
