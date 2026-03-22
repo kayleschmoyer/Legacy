@@ -17,6 +17,8 @@ Supports three modes:
 - **Targeted operation** — run a single operation (e.g., "rebase all conflicting PRs", "label clean PRs")
 - **Cloud agent sweep** — scan, triage, and take all API-only actions (label, re-run CI, resolve threads, request reviews); label unsettled PRs `requires-human-review` and report
 
+> **Scope note** — The batch PR triage tools (`github_pr_scan`, `github_pr_dashboard`, `github_pr_batch_status`, `github_resolve_threads`) are provided by the `legacy-sports-github` MCP server and are available to both local and cloud agents for API-only operations (scan, triage, label, resolve threads, request reviews). In this skill, "local-only" refers specifically to actions that require a git checkout/commit/push (e.g., rebases, code edits, CI-fix branches), which must be handled by a local agent or human developer.
+
 ## Environment Compatibility
 
 | Operation                          | Local Agent | Cloud Agent | Cloud Tool                                  |

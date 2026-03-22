@@ -88,6 +88,8 @@ For batch fixing across all open PRs:
 
 Orchestrate PR maintenance across all open PRs. Supports full sweep (local) and cloud-only (API actions).
 
+> **Local-only operations** — Any steps that modify the worktree, commit, or push (e.g., rebasing, applying fixes, updating branches) require a local agent. The `legacy-sports-github` MCP server and its GitHub tools (`github_pr_scan`, `github_pr_dashboard`, `github_pr_batch_status`, `github_resolve_threads`) are available to both local and cloud agents, but cloud agents are limited to API-only actions (scan, re-run CI, resolve meta threads, request Copilot reviews, reporting). For additional GitHub automation, cloud agents can also use Claude's native GitHub tools for individual PR operations.
+
 ### Quick Scan
 
 ```
