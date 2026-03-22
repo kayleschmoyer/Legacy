@@ -180,7 +180,7 @@ variable "github_runners_instance_types" {
 variable "github_runners_max_count" {
   description = "Maximum number of concurrent runner instances"
   type        = number
-  default     = 10
+  default     = 20
 }
 
 variable "github_app_id" {
