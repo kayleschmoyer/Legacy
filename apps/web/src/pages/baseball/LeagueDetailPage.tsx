@@ -118,6 +118,7 @@ import { DraftOrderControl } from '../../components/commissioner/DraftOrderContr
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
 import { LeagueBrandingControl } from '../../components/commissioner/LeagueBrandingControl';
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
+import { TiebreakerConfig } from '../../components/league/TiebreakerConfig';
 import { SeasonAwardsControl } from '../../components/commissioner/SeasonAwardsControl';
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
@@ -3217,6 +3218,20 @@ export function LeagueDetailPage(): React.JSX.Element {
             currentPlayoffEnabled={league.playoffEnabled ?? true}
             currentPlayoffFormat={league.playoffFormat ?? '4-team'}
             currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
+            onSuccess={showMatchupSuccess}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+          />
+        ),
+      },
+      {
+        id: 'tiebreaker-rules',
+        title: 'Tiebreaker Rules',
+        content: (
+          <TiebreakerConfig
+            leagueId={leagueId}
+            isCommissioner={isCommissioner}
             onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);

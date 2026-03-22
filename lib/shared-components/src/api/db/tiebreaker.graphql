@@ -1,0 +1,57 @@
+fragment TiebreakerRuleFields on TiebreakerRule {
+  id
+  leagueId
+  primaryMethod
+  secondaryMethod
+  tertiaryMethod
+  allowCommissionerOverride
+  config
+  createdAt
+  updatedAt
+}
+
+fragment TiebreakerHistoryFields on TiebreakerHistory {
+  id
+  matchupId
+  appliedMethod
+  wasCommissionerOverride
+  commissionerUserId
+  winnerId
+  reason
+  resolvedAt
+  createdAt
+  winner {
+    id
+    name
+  }
+}
+
+query GetTiebreakerRules($leagueId: Int!) {
+  getTiebreakerRules(leagueId: $leagueId) {
+    ...TiebreakerRuleFields
+  }
+}
+
+query GetTiebreakerHistory($leagueId: Int, $matchupId: Int) {
+  getTiebreakerHistory(leagueId: $leagueId, matchupId: $matchupId) {
+    ...TiebreakerHistoryFields
+  }
+}
+
+mutation CreateTiebreakerRules(
+  $leagueId: Int!
+  $primaryMethod: TiebreakerMethod!
+  $secondaryMethod: TiebreakerMethod
+  $tertiaryMethod: TiebreakerMethod
+  $allowCommissionerOverride: Boolean
+) {
+  createTiebreakerRules(
+    leagueId: $leagueId
+    primaryMethod: $primaryMethod
+    secondaryMethod: $secondaryMethod
+    tertiaryMethod: $tertiaryMethod
+    allowCommissionerOverride: $allowCommissionerOverride
+  ) {
+    ...TiebreakerRuleFields
+  }
+}

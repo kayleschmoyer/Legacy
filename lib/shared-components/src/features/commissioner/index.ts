@@ -5,3 +5,7 @@ export { CommissionerNoteControl } from './CommissionerNoteControl';
 export type { CommissionerNoteControlProps } from './CommissionerNoteControl';
 export { DeleteLeagueControl } from './DeleteLeagueControl';
 export type { DeleteLeagueControlProps } from './DeleteLeagueControl';
+export { TiebreakerConfig } from './TiebreakerConfig';
+export type { TiebreakerConfigProps } from './TiebreakerConfig';
+export { TiebreakerHistory } from './TiebreakerHistory';
+export type { TiebreakerHistoryProps } from './TiebreakerHistory';

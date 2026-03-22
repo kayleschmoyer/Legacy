@@ -4822,6 +4822,107 @@ export type TeamMemberFragment = {
   } | null;
 };
 
+export type TiebreakerRuleFieldsFragment = {
+  __typename?: 'TiebreakerRule';
+  id?: string | null;
+  leagueId?: number | null;
+  primaryMethod?: TiebreakerMethod | null;
+  secondaryMethod?: TiebreakerMethod | null;
+  tertiaryMethod?: TiebreakerMethod | null;
+  allowCommissionerOverride?: boolean | null;
+  config?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type TiebreakerHistoryFieldsFragment = {
+  __typename?: 'TiebreakerHistory';
+  id?: string | null;
+  matchupId?: number | null;
+  appliedMethod?: TiebreakerMethod | null;
+  wasCommissionerOverride?: boolean | null;
+  commissionerUserId?: number | null;
+  winnerId?: number | null;
+  reason?: string | null;
+  resolvedAt?: string | null;
+  createdAt?: string | null;
+  winner?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+  } | null;
+};
+
+export type GetTiebreakerRulesQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetTiebreakerRulesQuery = {
+  __typename?: 'Query';
+  getTiebreakerRules?: {
+    __typename?: 'TiebreakerRule';
+    id?: string | null;
+    leagueId?: number | null;
+    primaryMethod?: TiebreakerMethod | null;
+    secondaryMethod?: TiebreakerMethod | null;
+    tertiaryMethod?: TiebreakerMethod | null;
+    allowCommissionerOverride?: boolean | null;
+    config?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
+export type GetTiebreakerHistoryQueryVariables = Exact<{
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
+  matchupId?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetTiebreakerHistoryQuery = {
+  __typename?: 'Query';
+  getTiebreakerHistory?: Array<{
+    __typename?: 'TiebreakerHistory';
+    id?: string | null;
+    matchupId?: number | null;
+    appliedMethod?: TiebreakerMethod | null;
+    wasCommissionerOverride?: boolean | null;
+    commissionerUserId?: number | null;
+    winnerId?: number | null;
+    reason?: string | null;
+    resolvedAt?: string | null;
+    createdAt?: string | null;
+    winner?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type CreateTiebreakerRulesMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  primaryMethod: TiebreakerMethod;
+  secondaryMethod?: InputMaybe<TiebreakerMethod>;
+  tertiaryMethod?: InputMaybe<TiebreakerMethod>;
+  allowCommissionerOverride?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+export type CreateTiebreakerRulesMutation = {
+  __typename?: 'Mutation';
+  createTiebreakerRules?: {
+    __typename?: 'TiebreakerRule';
+    id?: string | null;
+    leagueId?: number | null;
+    primaryMethod?: TiebreakerMethod | null;
+    secondaryMethod?: TiebreakerMethod | null;
+    tertiaryMethod?: TiebreakerMethod | null;
+    allowCommissionerOverride?: boolean | null;
+    config?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
 export type TradeOfferPlayerFragment = {
   __typename?: 'TradeOfferPlayer';
   id?: number | null;
@@ -5490,6 +5591,36 @@ export const TeamMemberFragmentDoc = gql`
         games
       }
       seasonsPlayed
+    }
+  }
+`;
+export const TiebreakerRuleFieldsFragmentDoc = gql`
+  fragment TiebreakerRuleFields on TiebreakerRule {
+    id
+    leagueId
+    primaryMethod
+    secondaryMethod
+    tertiaryMethod
+    allowCommissionerOverride
+    config
+    createdAt
+    updatedAt
+  }
+`;
+export const TiebreakerHistoryFieldsFragmentDoc = gql`
+  fragment TiebreakerHistoryFields on TiebreakerHistory {
+    id
+    matchupId
+    appliedMethod
+    wasCommissionerOverride
+    commissionerUserId
+    winnerId
+    reason
+    resolvedAt
+    createdAt
+    winner {
+      id
+      name
     }
   }
 `;
@@ -8829,6 +8960,252 @@ export type StartSeasonDraftGameMutationResult =
 export type StartSeasonDraftGameMutationOptions = BaseMutationOptions<
   StartSeasonDraftGameMutation,
   StartSeasonDraftGameMutationVariables
+>;
+export const GetTiebreakerRules = gql`
+  query GetTiebreakerRules($leagueId: Int!) {
+    getTiebreakerRules(leagueId: $leagueId) {
+      ...TiebreakerRuleFields
+    }
+  }
+  ${TiebreakerRuleFieldsFragmentDoc}
+`;
+
+/**
+ * __useGetTiebreakerRulesQuery__
+ *
+ * To run a query within a React component, call `useGetTiebreakerRulesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTiebreakerRulesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTiebreakerRulesQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetTiebreakerRulesQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTiebreakerRulesQuery,
+    GetTiebreakerRulesQueryVariables
+  > &
+    (
+      | { variables: GetTiebreakerRulesQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetTiebreakerRulesQuery,
+    GetTiebreakerRulesQueryVariables
+  >(GetTiebreakerRules, options);
+}
+export function useGetTiebreakerRulesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTiebreakerRulesQuery,
+    GetTiebreakerRulesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetTiebreakerRulesQuery,
+    GetTiebreakerRulesQueryVariables
+  >(GetTiebreakerRules, options);
+}
+export function useGetTiebreakerRulesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTiebreakerRulesQuery,
+        GetTiebreakerRulesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTiebreakerRulesQuery,
+    GetTiebreakerRulesQueryVariables
+  >(
+    GetTiebreakerRules,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTiebreakerRulesQuery,
+          GetTiebreakerRulesQueryVariables
+        >,
+  );
+}
+export type GetTiebreakerRulesQueryHookResult = ReturnType<
+  typeof useGetTiebreakerRulesQuery
+>;
+export type GetTiebreakerRulesLazyQueryHookResult = ReturnType<
+  typeof useGetTiebreakerRulesLazyQuery
+>;
+export type GetTiebreakerRulesSuspenseQueryHookResult = ReturnType<
+  typeof useGetTiebreakerRulesSuspenseQuery
+>;
+export type GetTiebreakerRulesQueryResult = Apollo.QueryResult<
+  GetTiebreakerRulesQuery,
+  GetTiebreakerRulesQueryVariables
+>;
+export const GetTiebreakerHistory = gql`
+  query GetTiebreakerHistory($leagueId: Int, $matchupId: Int) {
+    getTiebreakerHistory(leagueId: $leagueId, matchupId: $matchupId) {
+      ...TiebreakerHistoryFields
+    }
+  }
+  ${TiebreakerHistoryFieldsFragmentDoc}
+`;
+
+/**
+ * __useGetTiebreakerHistoryQuery__
+ *
+ * To run a query within a React component, call `useGetTiebreakerHistoryQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTiebreakerHistoryQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTiebreakerHistoryQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      matchupId: // value for 'matchupId'
+ *   },
+ * });
+ */
+export function useGetTiebreakerHistoryQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetTiebreakerHistoryQuery,
+    GetTiebreakerHistoryQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetTiebreakerHistoryQuery,
+    GetTiebreakerHistoryQueryVariables
+  >(GetTiebreakerHistory, options);
+}
+export function useGetTiebreakerHistoryLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTiebreakerHistoryQuery,
+    GetTiebreakerHistoryQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetTiebreakerHistoryQuery,
+    GetTiebreakerHistoryQueryVariables
+  >(GetTiebreakerHistory, options);
+}
+export function useGetTiebreakerHistorySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTiebreakerHistoryQuery,
+        GetTiebreakerHistoryQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTiebreakerHistoryQuery,
+    GetTiebreakerHistoryQueryVariables
+  >(
+    GetTiebreakerHistory,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTiebreakerHistoryQuery,
+          GetTiebreakerHistoryQueryVariables
+        >,
+  );
+}
+export type GetTiebreakerHistoryQueryHookResult = ReturnType<
+  typeof useGetTiebreakerHistoryQuery
+>;
+export type GetTiebreakerHistoryLazyQueryHookResult = ReturnType<
+  typeof useGetTiebreakerHistoryLazyQuery
+>;
+export type GetTiebreakerHistorySuspenseQueryHookResult = ReturnType<
+  typeof useGetTiebreakerHistorySuspenseQuery
+>;
+export type GetTiebreakerHistoryQueryResult = Apollo.QueryResult<
+  GetTiebreakerHistoryQuery,
+  GetTiebreakerHistoryQueryVariables
+>;
+export const CreateTiebreakerRules = gql`
+  mutation CreateTiebreakerRules(
+    $leagueId: Int!
+    $primaryMethod: TiebreakerMethod!
+    $secondaryMethod: TiebreakerMethod
+    $tertiaryMethod: TiebreakerMethod
+    $allowCommissionerOverride: Boolean
+  ) {
+    createTiebreakerRules(
+      leagueId: $leagueId
+      primaryMethod: $primaryMethod
+      secondaryMethod: $secondaryMethod
+      tertiaryMethod: $tertiaryMethod
+      allowCommissionerOverride: $allowCommissionerOverride
+    ) {
+      ...TiebreakerRuleFields
+    }
+  }
+  ${TiebreakerRuleFieldsFragmentDoc}
+`;
+export type CreateTiebreakerRulesMutationFn = MutationFunction<
+  CreateTiebreakerRulesMutation,
+  CreateTiebreakerRulesMutationVariables
+>;
+
+/**
+ * __useCreateTiebreakerRulesMutation__
+ *
+ * To run a mutation, you first call `useCreateTiebreakerRulesMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateTiebreakerRulesMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createTiebreakerRulesMutation, { data, loading, error }] = useCreateTiebreakerRulesMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      primaryMethod: // value for 'primaryMethod'
+ *      secondaryMethod: // value for 'secondaryMethod'
+ *      tertiaryMethod: // value for 'tertiaryMethod'
+ *      allowCommissionerOverride: // value for 'allowCommissionerOverride'
+ *   },
+ * });
+ */
+export function useCreateTiebreakerRulesMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    CreateTiebreakerRulesMutation,
+    CreateTiebreakerRulesMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    CreateTiebreakerRulesMutation,
+    CreateTiebreakerRulesMutationVariables
+  >(CreateTiebreakerRules, options);
+}
+export type CreateTiebreakerRulesMutationHookResult = ReturnType<
+  typeof useCreateTiebreakerRulesMutation
+>;
+export type CreateTiebreakerRulesMutationResult =
+  Apollo.MutationResult<CreateTiebreakerRulesMutation>;
+export type CreateTiebreakerRulesMutationOptions = BaseMutationOptions<
+  CreateTiebreakerRulesMutation,
+  CreateTiebreakerRulesMutationVariables
 >;
 export const GetTeamTradeOffers = gql`
   query GetTeamTradeOffers($teamId: Int!, $status: String) {
