@@ -1,8 +1,8 @@
-import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
-import { join, isAbsolute, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
-import { randomBytes } from 'node:crypto';
-import { getRepoRoot, runGh, runGhJson } from '../gh.js';
+import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
+import { getRepoRoot, getRepoOwnerName } from '../auth.js';
+import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface CreatePRParams {
@@ -13,9 +13,26 @@ interface CreatePRParams {
   worktreePath?: string;
 }
 
-interface CreatedPR {
-  number: number | null;
-  url: string;
+interface GitHubPRResponse {
+  number: number;
+  html_url: string;
+}
+
+function getCurrentBranch(cwd: string): Promise<string> {
+  return new Promise((res, reject) => {
+    execFile(
+      'git',
+      ['rev-parse', '--abbrev-ref', 'HEAD'],
+      { cwd, timeout: 5_000 },
+      (err, stdout) => {
+        if (err) {
+          reject(new Error(`Failed to get current branch: ${err.message}`));
+        } else {
+          res(stdout.trim());
+        }
+      },
+    );
+  });
 }
 
 export async function createPR(params: CreatePRParams): Promise<ToolResult> {
@@ -45,68 +62,37 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
     cwd = resolved;
   }
 
-  // Write body to OS temp dir to avoid gitignore issues and untracked file noise
-  const suffix = randomBytes(4).toString('hex');
-  const tmpPath = join(tmpdir(), `tmp-pr-body-${suffix}.md`);
-  writeFileSync(tmpPath, params.body, 'utf8');
-
-  const args = [
-    'pr',
-    'create',
-    '--title',
-    params.title,
-    '--body-file',
-    tmpPath,
-    '--base',
-    params.base ?? 'main',
-  ];
-
-  if (params.draft) {
-    args.push('--draft');
-  }
-
   try {
-    const output = await runGh(args, cwd);
+    const [repo, head] = await Promise.all([
+      getRepoOwnerName(),
+      getCurrentBranch(cwd),
+    ]);
 
-    // Clean up temp file
-    try {
-      unlinkSync(tmpPath);
-    } catch {
-      // Ignore cleanup errors
-    }
+    const pr = await githubRest<GitHubPRResponse>({
+      method: 'POST',
+      path: `/repos/${repo.owner}/${repo.name}/pulls`,
+      body: {
+        title: params.title,
+        body: params.body,
+        head: `${repo.owner}:${head}`,
+        base: params.base ?? 'main',
+        draft: params.draft ?? false,
+      },
+    });
 
-    // gh pr create outputs the PR URL on success
-    const url = output.trim();
-
-    // Fetch the created PR number
-    let number: number | null = null;
-    try {
-      const pr = await runGhJson<{ number: number }>(
-        ['pr', 'view', '--json', 'number'],
-        cwd,
-      );
-      number = pr.number;
-    } catch {
-      // If we can't get the number, still return success with URL
-    }
-
-    const result: CreatedPR = { number, url };
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ success: true, ...result }, null, 2),
+          text: JSON.stringify(
+            { success: true, number: pr.number, url: pr.html_url },
+            null,
+            2,
+          ),
         },
       ],
     };
   } catch (error) {
-    // Clean up temp file on error too
-    try {
-      unlinkSync(tmpPath);
-    } catch {
-      // Ignore cleanup errors
-    }
-
     return {
       isError: true,
       content: [

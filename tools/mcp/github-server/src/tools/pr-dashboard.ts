@@ -1,6 +1,7 @@
-import { runGhJson, runGraphQL, getRepoOwnerName } from '../gh.js';
-import { summarizeCIStatus, deduplicateChecks } from '../types.js';
-import type { ToolResult } from '../types.js';
+import { getRepoOwnerName } from '../auth.js';
+import { githubGraphQL } from '../github-api.js';
+import { deduplicateChecks, summarizeCIStatus } from '../types.js';
+import type { CICheck, ToolResult } from '../types.js';
 
 interface PRDashboardParams {
   state?: string;
@@ -9,27 +10,46 @@ interface PRDashboardParams {
   limit?: number;
 }
 
-interface PRListItem {
+interface CheckRunNode {
+  __typename: 'CheckRun';
+  name: string;
+  status: string;
+  conclusion: string | null;
+}
+
+interface StatusContextNode {
+  __typename: 'StatusContext';
+  context: string;
+  state: string;
+}
+
+type StatusCheckNode = CheckRunNode | StatusContextNode;
+
+interface PRNode {
   number: number;
   title: string;
   state: string;
   headRefName: string;
   baseRefName: string;
-  author: { login: string };
+  author: { login: string } | null;
   createdAt: string;
   updatedAt: string;
   url: string;
-  labels: Array<{ name: string }>;
+  labels: { nodes: Array<{ name: string }> };
   isDraft: boolean;
   mergeable: string;
   reviewDecision: string | null;
-  statusCheckRollup: Array<{
-    name: string;
-    status: string;
-    conclusion: string | null;
-    startedAt: string | null;
-    completedAt: string | null;
-  }> | null;
+  commits: {
+    nodes: Array<{
+      commit: {
+        statusCheckRollup: {
+          contexts: {
+            nodes: StatusCheckNode[];
+          };
+        } | null;
+      };
+    }>;
+  };
 }
 
 interface ReviewThreadCounts {
@@ -40,36 +60,55 @@ interface ReviewThreadCounts {
   };
 }
 
-interface GraphQLBatchReviewThreadsResponse {
-  data: {
-    repository: {
-      [alias: string]: {
-        reviewThreads: {
-          totalCount: number;
-          pageInfo: { hasNextPage: boolean };
-          nodes: Array<{ isResolved: boolean }>;
-        };
+interface BatchReviewThreadsResponse {
+  repository: {
+    [alias: string]: {
+      reviewThreads: {
+        totalCount: number;
+        pageInfo: { hasNextPage: boolean };
+        nodes: Array<{ isResolved: boolean }>;
       };
     };
   };
 }
 
-const PR_FIELDS = [
-  'number',
-  'title',
-  'state',
-  'headRefName',
-  'baseRefName',
-  'author',
-  'createdAt',
-  'updatedAt',
-  'url',
-  'labels',
-  'isDraft',
-  'mergeable',
-  'reviewDecision',
-  'statusCheckRollup',
-];
+// GraphQL state enum values
+function mapState(state: string): string {
+  switch (state) {
+    case 'open':
+      return 'OPEN';
+    case 'closed':
+      return 'CLOSED';
+    case 'merged':
+      return 'MERGED';
+    case 'all':
+      return 'OPEN,CLOSED,MERGED';
+    default:
+      return 'OPEN';
+  }
+}
+
+function normalizeChecks(nodes: StatusCheckNode[]): CICheck[] {
+  return nodes.map((node) => {
+    if (node.__typename === 'CheckRun') {
+      return {
+        name: node.name,
+        status: node.status,
+        conclusion: node.conclusion,
+      };
+    }
+    return {
+      name: node.context,
+      status: node.state,
+      conclusion:
+        node.state === 'SUCCESS'
+          ? 'SUCCESS'
+          : node.state === 'PENDING'
+            ? null
+            : node.state,
+    };
+  });
+}
 
 function buildBatchReviewThreadsQuery(prNumbers: number[]): string {
   const fragments = prNumbers.map(
@@ -98,19 +137,15 @@ async function fetchReviewThreadCounts(
 ): Promise<ReviewThreadCounts> {
   const counts: ReviewThreadCounts = {};
 
-  // Batch PRs into groups for a single GraphQL query per batch
   const BATCH_SIZE = 30;
   for (let i = 0; i < prNumbers.length; i += BATCH_SIZE) {
     const batch = prNumbers.slice(i, i + BATCH_SIZE);
     try {
       const query = buildBatchReviewThreadsQuery(batch);
-      const result = await runGraphQL<GraphQLBatchReviewThreadsResponse>(
-        query,
-        {
-          owner,
-          repo,
-        },
-      );
+      const result = await githubGraphQL<BatchReviewThreadsResponse>(query, {
+        owner,
+        repo,
+      });
       for (const num of batch) {
         const alias = `pr_${num}`;
         const threadData = result.data.repository[alias];
@@ -140,29 +175,122 @@ export async function prDashboard(
   params: PRDashboardParams,
 ): Promise<ToolResult> {
   try {
-    // 1. List PRs
-    const args = [
-      'pr',
-      'list',
-      '--json',
-      PR_FIELDS.join(','),
-      '--limit',
-      String(params.limit ?? 30),
-    ];
+    const repo = await getRepoOwnerName();
+    const limit = params.limit ?? 30;
+    const statesStr = mapState(params.state ?? 'open');
 
-    if (params.state) {
-      args.push('--state', params.state);
-    }
+    // Build query with optional filters
+    const sanitizedLabel = params.label?.replace(/"/g, '\\"') ?? '';
+    const labelFilter = sanitizedLabel ? `, labels: ["${sanitizedLabel}"]` : '';
+
+    // If author filter is needed, use search query instead
+    let prNodes: PRNode[];
+
     if (params.author) {
-      args.push('--author', params.author);
+      const queryParts = [
+        `repo:${repo.owner}/${repo.name}`,
+        'is:pr',
+        `author:${params.author}`,
+      ];
+      const state = params.state ?? 'open';
+      if (state !== 'all') {
+        queryParts.push(`is:${state}`);
+      }
+      if (params.label) {
+        queryParts.push(`label:"${params.label.replace(/"/g, '\\"')}"`);
+      }
+
+      const searchQuery = `
+query($query: String!, $first: Int!) {
+  search(query: $query, type: ISSUE, first: $first) {
+    nodes {
+      ... on PullRequest {
+        number
+        title
+        state
+        headRefName
+        baseRefName
+        author { login }
+        createdAt
+        updatedAt
+        url
+        labels(first: 20) { nodes { name } }
+        isDraft
+        mergeable
+        reviewDecision
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                contexts(first: 100) {
+                  nodes {
+                    ... on CheckRun { __typename name status conclusion }
+                    ... on StatusContext { __typename context state }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
-    if (params.label) {
-      args.push('--label', params.label);
+  }
+}`;
+      const result = await githubGraphQL<{
+        search: { nodes: PRNode[] };
+      }>(searchQuery, {
+        query: queryParts.join(' '),
+        first: limit,
+      });
+      prNodes = result.data.search.nodes.filter((n) => n.number != null);
+    } else {
+      const query = `
+query($owner: String!, $repo: String!, $first: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(first: $first, states: [${statesStr}]${labelFilter}, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      nodes {
+        number
+        title
+        state
+        headRefName
+        baseRefName
+        author { login }
+        createdAt
+        updatedAt
+        url
+        labels(first: 20) { nodes { name } }
+        isDraft
+        mergeable
+        reviewDecision
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                contexts(first: 100) {
+                  nodes {
+                    ... on CheckRun { __typename name status conclusion }
+                    ... on StatusContext { __typename context state }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`;
+      const result = await githubGraphQL<{
+        repository: { pullRequests: { nodes: PRNode[] } };
+      }>(query, {
+        owner: repo.owner,
+        repo: repo.name,
+        first: limit,
+      });
+      prNodes = result.data.repository.pullRequests.nodes;
     }
 
-    const prs = await runGhJson<PRListItem[]>(args);
-
-    if (prs.length === 0) {
+    if (prNodes.length === 0) {
       return {
         content: [
           {
@@ -192,25 +320,23 @@ export async function prDashboard(
       };
     }
 
-    // 2. Fetch review thread counts via GraphQL
-    const repo = await getRepoOwnerName();
-    const prNumbers = prs.map((pr) => pr.number);
+    // Fetch review thread counts
+    const prNumbers = prNodes.map((pr) => pr.number);
     const threadCounts = await fetchReviewThreadCounts(
       repo.owner,
       repo.name,
       prNumbers,
     );
 
-    // 3. Build dashboard rows
-    const rows = prs.map((pr) => {
-      const dedupedChecks = pr.statusCheckRollup
-        ? deduplicateChecks(pr.statusCheckRollup)
-        : null;
-      const ci = summarizeCIStatus(dedupedChecks);
-      const hadStaleChecks =
-        pr.statusCheckRollup != null &&
-        dedupedChecks != null &&
-        pr.statusCheckRollup.length > dedupedChecks.length;
+    // Build dashboard rows
+    const rows = prNodes.map((pr) => {
+      const commitNode = pr.commits.nodes[0];
+      const checkNodes =
+        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
+      const rawChecks = normalizeChecks(checkNodes);
+      const checks = deduplicateChecks(rawChecks);
+      const hadStaleChecks = checks.length < rawChecks.length;
+      const ci = summarizeCIStatus(checks);
       const threads = threadCounts[pr.number] ?? {
         total: -1,
         unresolved: -1,
@@ -222,7 +348,7 @@ export async function prDashboard(
         title: pr.title,
         branch: pr.headRefName,
         base: pr.baseRefName,
-        author: pr.author.login,
+        author: pr.author?.login ?? 'unknown',
         isDraft: pr.isDraft,
         mergeable: pr.mergeable,
         ciStatus: ci,
@@ -231,13 +357,13 @@ export async function prDashboard(
         unresolvedThreads: threads.unresolved,
         totalThreads: threads.total,
         threadCountTruncated: threads.truncated,
-        labels: pr.labels.map((l) => l.name),
+        labels: pr.labels.nodes.map((l) => l.name),
         updatedAt: pr.updatedAt,
         url: pr.url,
       };
     });
 
-    // 4. Compute summary counts
+    // Compute summary counts
     const summary = {
       total: rows.length,
       conflicting: rows.filter((r) => r.mergeable === 'CONFLICTING').length,

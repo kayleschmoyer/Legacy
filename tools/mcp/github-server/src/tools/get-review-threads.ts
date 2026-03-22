@@ -1,4 +1,5 @@
-import { runGhJson, runGraphQL } from '../gh.js';
+import { getRepoOwnerName } from '../auth.js';
+import { githubGraphQL } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface GetReviewThreadsParams {
@@ -22,13 +23,11 @@ interface ReviewThread {
 }
 
 interface GraphQLResponse {
-  data: {
-    repository: {
-      pullRequest: {
-        reviewThreads: {
-          pageInfo: { hasNextPage: boolean };
-          nodes: ReviewThread[];
-        };
+  repository: {
+    pullRequest: {
+      reviewThreads: {
+        pageInfo: { hasNextPage: boolean };
+        nodes: ReviewThread[];
       };
     };
   };
@@ -60,21 +59,12 @@ query($owner: String!, $repo: String!, $number: Int!) {
   }
 }`;
 
-async function getRepoInfo(): Promise<{ owner: string; name: string }> {
-  return runGhJson<{ owner: { login: string }; name: string }>([
-    'repo',
-    'view',
-    '--json',
-    'owner,name',
-  ]).then((r) => ({ owner: r.owner.login, name: r.name }));
-}
-
 export async function getReviewThreads(
   params: GetReviewThreadsParams,
 ): Promise<ToolResult> {
   try {
-    const repo = await getRepoInfo();
-    const result = await runGraphQL<GraphQLResponse>(REVIEW_THREADS_QUERY, {
+    const repo = await getRepoOwnerName();
+    const result = await githubGraphQL<GraphQLResponse>(REVIEW_THREADS_QUERY, {
       owner: repo.owner,
       repo: repo.name,
       number: params.number,

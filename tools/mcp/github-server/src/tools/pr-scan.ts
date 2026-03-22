@@ -1,4 +1,5 @@
-import { runGh, runGhJson, runGraphQL, getRepoOwnerName } from '../gh.js';
+import { getRepoOwnerName } from '../auth.js';
+import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface PRScanParams {
@@ -6,17 +7,38 @@ interface PRScanParams {
   applyLabels?: boolean;
 }
 
-interface PRListItem {
+interface CheckRunNode {
+  __typename: 'CheckRun';
+  name: string;
+  status: string;
+  conclusion: string | null;
+}
+
+interface StatusContextNode {
+  __typename: 'StatusContext';
+  context: string;
+  state: string;
+}
+
+type StatusCheckNode = CheckRunNode | StatusContextNode;
+
+interface PRNode {
   number: number;
   title: string;
   headRefName: string;
   mergeable: string;
-  labels: Array<{ name: string }>;
-  statusCheckRollup: Array<{
-    name: string;
-    status: string;
-    conclusion: string | null;
-  }> | null;
+  labels: { nodes: Array<{ name: string }> };
+  commits: {
+    nodes: Array<{
+      commit: {
+        statusCheckRollup: {
+          contexts: {
+            nodes: StatusCheckNode[];
+          };
+        } | null;
+      };
+    }>;
+  };
 }
 
 interface ThreadDetail {
@@ -33,24 +55,22 @@ interface ThreadFetchResult {
 }
 
 interface BatchThreadsResponse {
-  data: {
-    repository: {
-      [alias: string]: {
-        reviewThreads: {
-          pageInfo: { hasNextPage: boolean; endCursor: string | null };
-          nodes: Array<{
-            id: string;
-            isResolved: boolean;
-            isOutdated: boolean;
-            comments: {
-              nodes: Array<{
-                path: string | null;
-                line: number | null;
-                body: string;
-              }>;
-            };
-          }>;
-        };
+  repository: {
+    [alias: string]: {
+      reviewThreads: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        nodes: Array<{
+          id: string;
+          isResolved: boolean;
+          isOutdated: boolean;
+          comments: {
+            nodes: Array<{
+              path: string | null;
+              line: number | null;
+              body: string;
+            }>;
+          };
+        }>;
       };
     };
   };
@@ -63,15 +83,6 @@ const FAILING_CONCLUSIONS = new Set([
   'TIMED_OUT',
 ]);
 const PENDING_STATUSES = new Set(['IN_PROGRESS', 'QUEUED', 'PENDING']);
-
-const PR_FIELDS = [
-  'number',
-  'title',
-  'headRefName',
-  'mergeable',
-  'statusCheckRollup',
-  'labels',
-];
 
 /**
  * Map CI check names to PR labels. Each entry is a regex tested against the
@@ -109,12 +120,38 @@ interface LabelAction {
   error?: string;
 }
 
+function normalizeCheckConclusion(node: StatusCheckNode): {
+  name: string;
+  conclusion: string | null;
+  status: string;
+} {
+  if (node.__typename === 'CheckRun') {
+    return {
+      name: node.name,
+      status: node.status,
+      conclusion: node.conclusion,
+    };
+  }
+  return {
+    name: node.context,
+    status: node.state,
+    conclusion:
+      node.state === 'SUCCESS'
+        ? 'SUCCESS'
+        : node.state === 'PENDING'
+          ? null
+          : node.state,
+  };
+}
+
 /**
- * Synchronize CI failure labels on scanned PRs:
+ * Synchronize CI failure labels on scanned PRs using REST API:
  * - ciFailing PRs get labels matching their failed checks (additive)
  * - clean PRs get stale CI labels removed
  */
 async function syncCILabels(
+  owner: string,
+  repo: string,
   ciFailing: Array<{ number: number; failedChecks: string[] }>,
   clean: Array<{ number: number }>,
   existingLabels: Map<number, string[]>,
@@ -125,22 +162,29 @@ async function syncCILabels(
     const desired = labelsForFailedChecks(pr.failedChecks);
     const current = existingLabels.get(pr.number) ?? [];
     const toAdd = desired.filter((l) => !current.includes(l));
-    // Remove CI labels that no longer apply (check passed/not failing)
     const toRemove = current.filter(
       (l) => ALL_CI_LABELS.includes(l) && !desired.includes(l),
     );
 
     if (toAdd.length === 0 && toRemove.length === 0) continue;
 
-    const args = ['pr', 'edit', String(pr.number)];
-    for (const l of toAdd) args.push('--add-label', l);
-    for (const l of toRemove) args.push('--remove-label', l);
-
     try {
-      await runGh(args);
+      const basePath = `/repos/${owner}/${repo}/issues/${pr.number}/labels`;
+      if (toAdd.length > 0) {
+        await githubRest({
+          method: 'POST',
+          path: basePath,
+          body: { labels: toAdd },
+        });
+      }
+      for (const label of toRemove) {
+        await githubRest({
+          method: 'DELETE',
+          path: `${basePath}/${encodeURIComponent(label)}`,
+        });
+      }
       actions.push({ prNumber: pr.number, added: toAdd, removed: toRemove });
     } catch (err) {
-      // Label failures are non-fatal — record intended changes + error and continue
       actions.push({
         prNumber: pr.number,
         added: toAdd,
@@ -155,14 +199,16 @@ async function syncCILabels(
     const toRemove = current.filter((l) => ALL_CI_LABELS.includes(l));
     if (toRemove.length === 0) continue;
 
-    const args = ['pr', 'edit', String(pr.number)];
-    for (const l of toRemove) args.push('--remove-label', l);
-
     try {
-      await runGh(args);
+      const basePath = `/repos/${owner}/${repo}/issues/${pr.number}/labels`;
+      for (const label of toRemove) {
+        await githubRest({
+          method: 'DELETE',
+          path: `${basePath}/${encodeURIComponent(label)}`,
+        });
+      }
       actions.push({ prNumber: pr.number, added: [], removed: toRemove });
     } catch (err) {
-      // non-fatal — record intended removals + error
       actions.push({
         prNumber: pr.number,
         added: [],
@@ -213,7 +259,7 @@ async function fetchUnresolvedThreadDetails(
   for (let i = 0; i < prNumbers.length; i += BATCH_SIZE) {
     const batch = prNumbers.slice(i, i + BATCH_SIZE);
     const query = buildBatchThreadDetailQuery(batch);
-    const response = await runGraphQL<BatchThreadsResponse>(query, {
+    const response = await githubGraphQL<BatchThreadsResponse>(query, {
       owner,
       repo,
     });
@@ -243,18 +289,58 @@ async function fetchUnresolvedThreadDetails(
   return result;
 }
 
+const LIST_OPEN_PRS_QUERY = `
+query($owner: String!, $repo: String!, $first: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(first: $first, states: [OPEN], orderBy: {field: UPDATED_AT, direction: DESC}) {
+      nodes {
+        number
+        title
+        headRefName
+        mergeable
+        labels(first: 20) { nodes { name } }
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                contexts(first: 100) {
+                  nodes {
+                    ... on CheckRun { __typename name status conclusion }
+                    ... on StatusContext { __typename context state }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+interface ListOpenPRsResponse {
+  repository: {
+    pullRequests: {
+      nodes: PRNode[];
+    };
+  };
+}
+
 export async function prScan(params: PRScanParams): Promise<ToolResult> {
   try {
-    const prs = await runGhJson<PRListItem[]>([
-      'pr',
-      'list',
-      '--state',
-      'open',
-      '--json',
-      PR_FIELDS.join(','),
-      '--limit',
-      String(params.limit ?? 200),
-    ]);
+    const repo = await getRepoOwnerName();
+    const limit = Math.min(params.limit ?? 100, 100);
+
+    const result = await githubGraphQL<ListOpenPRsResponse>(
+      LIST_OPEN_PRS_QUERY,
+      {
+        owner: repo.owner,
+        repo: repo.name,
+        first: limit,
+      },
+    );
+
+    const prs = result.data.repository.pullRequests.nodes;
 
     type BasePR = { number: number; title: string; headRefName: string };
     type CIFailingPR = BasePR & { failedChecks: string[] };
@@ -266,9 +352,6 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
     const conflicting: BasePR[] = [];
     const ciFailing: CIFailingPR[] = [];
     const ciPending: BasePR[] = [];
-
-    // ciPassingPRNumbers tracks PRs with no CI failures/pending so we can
-    // determine the 'clean' bucket after checking review threads.
     const ciPassingNumbers = new Set<number>();
 
     for (const pr of prs) {
@@ -282,11 +365,16 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
         conflicting.push(base);
       }
 
-      const checks = pr.statusCheckRollup;
-      if (!checks || checks.length === 0) {
+      const commitNode = pr.commits.nodes[0];
+      const checkNodes =
+        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
+
+      if (checkNodes.length === 0) {
         ciPending.push(base);
         continue;
       }
+
+      const checks = checkNodes.map(normalizeCheckConclusion);
 
       const failed = checks.filter(
         (c) => c.conclusion && FAILING_CONCLUSIONS.has(c.conclusion),
@@ -306,9 +394,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
       }
     }
 
-    // Fetch unresolved thread details for ALL PRs — a PR can appear in both
-    // 'conflicting' and 'reviews', matching scan-prs.ps1 behavior.
-    const repo = await getRepoOwnerName();
+    // Fetch unresolved thread details for ALL PRs
     const threadMap = await fetchUnresolvedThreadDetails(
       repo.owner,
       repo.name,
@@ -347,9 +433,15 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
     let labelActions: LabelAction[] = [];
     if (params.applyLabels !== false) {
       const existingLabels = new Map<number, string[]>(
-        prs.map((pr) => [pr.number, pr.labels.map((l) => l.name)]),
+        prs.map((pr) => [pr.number, pr.labels.nodes.map((l) => l.name)]),
       );
-      labelActions = await syncCILabels(ciFailing, clean, existingLabels);
+      labelActions = await syncCILabels(
+        repo.owner,
+        repo.name,
+        ciFailing,
+        clean,
+        existingLabels,
+      );
     }
 
     const output = {

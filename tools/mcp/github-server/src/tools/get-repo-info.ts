@@ -1,21 +1,21 @@
-import { runGhJson } from '../gh.js';
+import { getRepoOwnerName } from '../auth.js';
+import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
-interface RepoInfo {
+interface GitHubRepoResponse {
   owner: { login: string };
   name: string;
-  defaultBranchRef: { name: string };
-  url: string;
+  default_branch: string;
+  html_url: string;
 }
 
 export async function getRepoInfo(): Promise<ToolResult> {
   try {
-    const repo = await runGhJson<RepoInfo>([
-      'repo',
-      'view',
-      '--json',
-      'owner,name,defaultBranchRef,url',
-    ]);
+    const repo = await getRepoOwnerName();
+    const data = await githubRest<GitHubRepoResponse>({
+      method: 'GET',
+      path: `/repos/${repo.owner}/${repo.name}`,
+    });
 
     return {
       content: [
@@ -23,10 +23,10 @@ export async function getRepoInfo(): Promise<ToolResult> {
           type: 'text',
           text: JSON.stringify(
             {
-              owner: repo.owner.login,
-              name: repo.name,
-              defaultBranch: repo.defaultBranchRef.name,
-              url: repo.url,
+              owner: data.owner.login,
+              name: data.name,
+              defaultBranch: data.default_branch,
+              url: data.html_url,
             },
             null,
             2,

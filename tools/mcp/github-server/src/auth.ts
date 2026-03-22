@@ -43,7 +43,7 @@ async function readCachedToken(): Promise<string | null> {
 }
 
 async function writeCachedToken(token: string): Promise<void> {
-  await mkdir(CONFIG_DIR, { recursive: true });
+  await mkdir(CONFIG_DIR, { recursive: true, mode: 0o700 });
   const data: CachedTokenFile = { token, createdAt: new Date().toISOString() };
   await writeFile(TOKEN_PATH, JSON.stringify(data, null, 2), 'utf-8');
   // Restrict file permissions to owner-only (no-op on Windows, but safe to call)
@@ -109,7 +109,7 @@ interface DeviceTokenResponse {
 }
 
 async function deviceFlow(): Promise<string> {
-  // Step 1: Request device code (GitHub expects form-urlencoded, not JSON)
+  // Step 1: Request device code (form-encoded per GitHub OAuth spec)
   const codeRes = await fetch('https://github.com/login/device/code', {
     method: 'POST',
     headers: {

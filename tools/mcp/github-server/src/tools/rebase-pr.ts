@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { runGhJson, getRepoRoot } from '../gh.js';
+import { getRepoRoot, getRepoOwnerName } from '../auth.js';
+import { githubGraphQL } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface RebasePRParams {
@@ -12,6 +13,31 @@ interface PRInfo {
   headRepository: { owner: { login: string }; name: string };
   baseRepository: { owner: { login: string }; name: string };
 }
+
+interface PRGraphQLResponse {
+  repository: {
+    pullRequest: PRInfo;
+  };
+}
+
+const PR_QUERY = `
+  query ($owner: String!, $name: String!, $number: Int!) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        headRefName
+        baseRefName
+        headRepository {
+          owner { login }
+          name
+        }
+        baseRepository {
+          owner { login }
+          name
+        }
+      }
+    }
+  }
+`;
 
 const GIT_CMD = process.platform === 'win32' ? 'git.exe' : 'git';
 const MAX_BUFFER = 10 * 1024 * 1024;
@@ -56,16 +82,13 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
 
   try {
     // Get PR branch info including repo owners for fork detection
-    const pr = await runGhJson<PRInfo>(
-      [
-        'pr',
-        'view',
-        String(number),
-        '--json',
-        'headRefName,baseRefName,headRepository{owner{login},name},baseRepository{owner{login},name}',
-      ],
-      cwd,
-    );
+    const repo = await getRepoOwnerName();
+    const { data } = await githubGraphQL<PRGraphQLResponse>(PR_QUERY, {
+      owner: repo.owner,
+      name: repo.name,
+      number,
+    });
+    const pr = data.repository.pullRequest;
 
     const { headRefName, baseRefName, headRepository, baseRepository } = pr;
     log.push(`PR #${number}: ${headRefName} -> ${baseRefName}`);

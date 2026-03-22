@@ -1,4 +1,5 @@
-import { runGh } from '../gh.js';
+import { getRepoOwnerName } from '../auth.js';
+import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface ManageLabelsParams {
@@ -10,31 +11,7 @@ interface ManageLabelsParams {
 export async function manageLabels(
   params: ManageLabelsParams,
 ): Promise<ToolResult> {
-  const results: Array<{
-    action: string;
-    label: string;
-    success: boolean;
-    error?: string;
-  }> = [];
-
-  const editArgs = ['pr', 'edit', String(params.number)];
-  let hasEdits = false;
-
-  if (params.add?.length) {
-    for (const label of params.add) {
-      editArgs.push('--add-label', label);
-    }
-    hasEdits = true;
-  }
-
-  if (params.remove?.length) {
-    for (const label of params.remove) {
-      editArgs.push('--remove-label', label);
-    }
-    hasEdits = true;
-  }
-
-  if (!hasEdits) {
+  if (!params.add?.length && !params.remove?.length) {
     return {
       isError: true,
       content: [
@@ -46,16 +23,57 @@ export async function manageLabels(
     };
   }
 
+  const results: Array<{
+    action: string;
+    label: string;
+    success: boolean;
+    error?: string;
+  }> = [];
+
   try {
-    await runGh(editArgs);
+    const repo = await getRepoOwnerName();
+    const basePath = `/repos/${repo.owner}/${repo.name}/issues/${params.number}/labels`;
+
+    // Add labels (single request)
     if (params.add?.length) {
-      for (const label of params.add) {
-        results.push({ action: 'add', label, success: true });
+      try {
+        await githubRest({
+          method: 'POST',
+          path: basePath,
+          body: { labels: params.add },
+        });
+        for (const label of params.add) {
+          results.push({ action: 'add', label, success: true });
+        }
+      } catch (error) {
+        for (const label of params.add) {
+          results.push({
+            action: 'add',
+            label,
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     }
+
+    // Remove labels (one request per label)
     if (params.remove?.length) {
       for (const label of params.remove) {
-        results.push({ action: 'remove', label, success: true });
+        try {
+          await githubRest({
+            method: 'DELETE',
+            path: `${basePath}/${encodeURIComponent(label)}`,
+          });
+          results.push({ action: 'remove', label, success: true });
+        } catch (error) {
+          results.push({
+            action: 'remove',
+            label,
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     }
   } catch (error) {

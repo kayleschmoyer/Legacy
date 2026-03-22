@@ -98,14 +98,14 @@ interface GraphQLResponse<T> {
  */
 export async function githubGraphQL<T>(
   query: string,
-  variables: Record<string, string | number>,
+  variables: Record<string, unknown>,
 ): Promise<{ data: T }> {
   return doGraphQL<T>(query, variables, true);
 }
 
 async function doGraphQL<T>(
   query: string,
-  variables: Record<string, string | number>,
+  variables: Record<string, unknown>,
   canRetry: boolean,
 ): Promise<{ data: T }> {
   const headers = await buildHeaders();
@@ -118,6 +118,12 @@ async function doGraphQL<T>(
 
   if (response.status === 401 && canRetry) {
     await invalidateToken();
+    return doGraphQL<T>(query, variables, false);
+  }
+
+  // 502/503 — transient, retry once after 1s
+  if ((response.status === 502 || response.status === 503) && canRetry) {
+    await new Promise((r) => setTimeout(r, 1_000));
     return doGraphQL<T>(query, variables, false);
   }
 

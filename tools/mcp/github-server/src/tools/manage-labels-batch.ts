@@ -1,4 +1,5 @@
-import { runGh } from '../gh.js';
+import { getRepoOwnerName } from '../auth.js';
+import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface ManageLabelsBatchParams {
@@ -30,38 +31,67 @@ export async function manageLabelsBatch(
     error?: string;
   }> = [];
 
-  // Process PRs in parallel batches of 10 to avoid overwhelming gh CLI
-  const BATCH_SIZE = 10;
-  for (let i = 0; i < uniquePrs.length; i += BATCH_SIZE) {
-    const batch = uniquePrs.slice(i, i + BATCH_SIZE);
-    const promises = batch.map(async (prNumber) => {
-      const editArgs = ['pr', 'edit', String(prNumber)];
+  try {
+    const repo = await getRepoOwnerName();
 
-      if (params.add?.length) {
-        for (const label of params.add) {
-          editArgs.push('--add-label', label);
+    // Process PRs in parallel batches of 10 to avoid overwhelming the API
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < uniquePrs.length; i += BATCH_SIZE) {
+      const batch = uniquePrs.slice(i, i + BATCH_SIZE);
+      const promises = batch.map(async (prNumber) => {
+        const basePath = `/repos/${repo.owner}/${repo.name}/issues/${prNumber}/labels`;
+
+        try {
+          // Add labels (single request)
+          if (params.add?.length) {
+            await githubRest({
+              method: 'POST',
+              path: basePath,
+              body: { labels: params.add },
+            });
+          }
+
+          // Remove labels (one request per label)
+          if (params.remove?.length) {
+            for (const label of params.remove) {
+              try {
+                await githubRest({
+                  method: 'DELETE',
+                  path: `${basePath}/${encodeURIComponent(label)}`,
+                });
+              } catch (removeErr) {
+                // 404 = label not on PR, 422 = validation error (already removed) — safe to ignore
+                const msg = removeErr instanceof Error ? removeErr.message : '';
+                if (!msg.includes('(404)') && !msg.includes('(422)')) {
+                  throw removeErr;
+                }
+              }
+            }
+          }
+
+          return { prNumber, success: true };
+        } catch (error) {
+          return {
+            prNumber,
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
         }
-      }
-      if (params.remove?.length) {
-        for (const label of params.remove) {
-          editArgs.push('--remove-label', label);
-        }
-      }
+      });
 
-      try {
-        await runGh(editArgs);
-        return { prNumber, success: true };
-      } catch (error) {
-        return {
-          prNumber,
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    });
-
-    const batchResults = await Promise.all(promises);
-    results.push(...batchResults);
+      const batchResults = await Promise.all(promises);
+      results.push(...batchResults);
+    }
+  } catch (error) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `Failed to get repo info: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
   }
 
   const succeeded = results.filter((r) => r.success).length;

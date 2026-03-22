@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { runGh } from './gh.js';
+import { getToken } from './auth.js';
 import { listPRs } from './tools/list-prs.js';
 import { viewPR } from './tools/view-pr.js';
 import { createPR } from './tools/create-pr.js';
@@ -19,30 +19,11 @@ import { mergePR } from './tools/merge-pr.js';
 import { closePR } from './tools/close-pr.js';
 import { rebasePR } from './tools/rebase-pr.js';
 
-// Check gh CLI auth on startup (non-blocking warning)
-runGh(['auth', 'status']).catch((error: unknown) => {
-  const hasToken = Boolean(process.env.GH_TOKEN || process.env.GITHUB_TOKEN);
-  const hint = hasToken
-    ? 'GH_TOKEN/GITHUB_TOKEN is set but gh auth still failed — the token may be invalid or expired.'
-    : 'No GH_TOKEN or GITHUB_TOKEN env var found. Set one or run `gh auth login`.';
-
-  let diagnostic = '';
-  const err = error as NodeJS.ErrnoException | Error | undefined;
-
-  if (
-    err &&
-    typeof err === 'object' &&
-    'code' in err &&
-    (err as NodeJS.ErrnoException).code === 'ENOENT'
-  ) {
-    diagnostic =
-      ' Diagnostic: gh CLI was not found on PATH. Install from https://cli.github.com.';
-  } else if (err instanceof Error && err.message) {
-    diagnostic = ` Diagnostic: ${err.message}`;
-  }
-
+// Preflight auth — best-effort, non-blocking so server starts even if
+// device flow is needed (deferred until first API call).
+void getToken().catch((err) => {
   process.stderr.write(
-    `[legacy-sports-github] WARNING: gh CLI auth check failed. ${hint}${diagnostic}\n`,
+    `Auth preflight failed (will retry on first API call): ${err}\n`,
   );
 });
 
@@ -94,7 +75,7 @@ server.tool(
 // --- github_create_pr ---
 server.tool(
   'github_create_pr',
-  'Create a new pull request. Writes the body to a temp file to avoid PowerShell encoding issues. Title should include the Jira ticket key (e.g. "LS-1254 feat(scope): description").',
+  'Create a new pull request. Title should include the Jira ticket key (e.g. "LS-1254 feat(scope): description").',
   {
     title: z
       .string()
@@ -117,7 +98,7 @@ server.tool(
       })
       .optional()
       .describe(
-        'Absolute path to a worktree directory. If provided, runs gh from this directory instead of the repo root. Fixes "uncommitted changes" errors when the main repo has workspace file changes.',
+        'Absolute path to a worktree directory. If provided, determines the head branch from this directory instead of the repo root.',
       ),
   },
   async (params) => createPR(params),

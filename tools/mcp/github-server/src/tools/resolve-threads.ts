@@ -1,4 +1,4 @@
-import { runGraphQL } from '../gh.js';
+import { githubGraphQL } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface ResolveThreadsParams {
@@ -6,10 +6,8 @@ interface ResolveThreadsParams {
 }
 
 interface ResolveResponse {
-  data: {
-    [alias: string]: {
-      thread: { isResolved: boolean };
-    };
+  [alias: string]: {
+    thread: { isResolved: boolean };
   };
 }
 
@@ -61,7 +59,7 @@ export async function resolveThreads(
     const batch = uniqueIds.slice(i, i + BATCH_SIZE);
     try {
       const { query, variables } = buildBatchResolveMutation(batch);
-      const response = await runGraphQL<ResolveResponse>(query, variables);
+      const response = await githubGraphQL<ResolveResponse>(query, variables);
 
       for (let j = 0; j < batch.length; j++) {
         const alias = `t${j}`;

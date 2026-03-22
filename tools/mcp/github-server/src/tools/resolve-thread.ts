@@ -1,4 +1,4 @@
-import { runGraphQL } from '../gh.js';
+import { githubGraphQL } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface ResolveThreadParams {
@@ -6,10 +6,8 @@ interface ResolveThreadParams {
 }
 
 interface ResolveResponse {
-  data: {
-    resolveReviewThread: {
-      thread: { isResolved: boolean };
-    };
+  resolveReviewThread: {
+    thread: { isResolved: boolean };
   };
 }
 
@@ -24,7 +22,7 @@ export async function resolveThread(
   params: ResolveThreadParams,
 ): Promise<ToolResult> {
   try {
-    const result = await runGraphQL<ResolveResponse>(RESOLVE_MUTATION, {
+    const result = await githubGraphQL<ResolveResponse>(RESOLVE_MUTATION, {
       threadId: params.threadId,
     });
 
