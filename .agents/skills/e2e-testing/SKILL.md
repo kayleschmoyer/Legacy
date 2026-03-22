@@ -235,6 +235,31 @@ test.describe('Basic Smoke @smoke', () => {
 });
 ```
 
+## Mandatory Test Execution
+
+After writing or modifying test files, you **must** run the tests locally before committing. Never push untested test code.
+
+### Jest unit/integration tests
+
+After writing `.spec.ts`, `.spec.tsx`, `.test.ts`, or `.test.tsx` files:
+
+```bash
+pnpm exec nx run <project>:test --testPathPattern="NewSpecName"
+```
+
+### Playwright E2E tests
+
+After writing `.spec.ts` or `.integration.spec.ts` E2E files in `apps/web-e2e/src/`:
+
+1. Build the web app: `pnpm exec nx build web`
+2. Run the specific test: `pnpm exec nx e2e web-e2e -- --grep='test name' --config=apps/web-e2e/playwright.config.ts`
+
+### Rules
+
+- If tests fail, fix them in the same commit — never push broken tests
+- Never skip test execution to save time — broken tests that reach CI waste more time than running them locally
+- For bulk test writing (>5 files), run tests per-file as you write rather than batching at the end
+
 ## Test Tags
 
 | Tag           | Meaning                                          | CI Behavior               |
@@ -288,6 +313,6 @@ $env:PLAYWRIGHT_GREP='@critical|@smoke' ; pnpm exec nx e2e web-e2e
 pnpm exec nx e2e:ui web-e2e
 ```
 
-**Pre-commit rule:** If you changed any file under `apps/web-e2e/src/`, you **must** run affected E2E tests locally and confirm they pass before committing.
+**Pre-commit rule (MANDATORY):** If you wrote or changed **any** test file (`.spec.ts`, `.spec.tsx`, `.test.ts`, `.test.tsx`, `.integration.spec.ts`) **or any file under** `apps/web-e2e/src/`, you **must** run the relevant tests locally (including the Playwright E2E suite for `apps/web-e2e/src/` changes) and confirm they pass before committing. This applies to E2E tests under `apps/web-e2e/src/` as well as Jest tests in any project. Skipping local test execution is never acceptable — broken tests that reach CI waste far more time than running them locally.
 
 **Selector sync rule:** When a PR changes the login page, landing page, or auth guard, update all E2E selectors referencing those components in the same PR.
