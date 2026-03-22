@@ -7,6 +7,7 @@ import { listRuns } from './tools/list-runs.js';
 import { rerun } from './tools/rerun.js';
 import { searchLogs } from './tools/search-logs.js';
 import { viewRun } from './tools/view-run.js';
+import { workflowInfo } from './tools/workflow-info.js';
 
 const server = new McpServer({
   name: 'legacy-sports-ci',
@@ -235,6 +236,27 @@ server.tool(
       .describe('Include job details in the response (default: true)'),
   },
   async (params) => viewRun(params),
+);
+
+server.tool(
+  'ci_workflow_info',
+  'Query GitHub Actions workflow definitions. Lists all workflows or returns details for a specific workflow by filename or ID. Optionally includes GitHub App installation permissions.',
+  {
+    workflow: z
+      .union([z.string(), z.number().int()])
+      .transform(String)
+      .optional()
+      .describe(
+        'Workflow filename (e.g. "copilot-auto-approve.yml") or numeric ID. If omitted, lists all workflows.',
+      ),
+    includePermissions: z
+      .boolean()
+      .default(false)
+      .describe(
+        'When true, also fetches GitHub App installation permissions for the repository (default: false)',
+      ),
+  },
+  async (params) => workflowInfo(params),
 );
 
 const transport = new StdioServerTransport();
