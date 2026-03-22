@@ -19,6 +19,7 @@ import {
   initRollbar,
   withRollbar,
 } from '@legacy-sports/rollbar';
+import { notifyStripeEvent } from './discord';
 
 // Initialize Rollbar on cold start
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -681,6 +682,10 @@ const baseStripeWebhookHandler = async (
 
   let userId: number | null = null;
   let subscriptionId: string | null = null;
+  let customerId: string | null = null;
+  let subscriptionStatus: string | null = null;
+  let invoiceAmount: number | null = null;
+  let invoiceCurrency: string | null = null;
 
   try {
     switch (stripeEvent.type) {
@@ -691,6 +696,8 @@ const baseStripeWebhookHandler = async (
           typeof session.subscription === 'string'
             ? session.subscription
             : null;
+        customerId =
+          typeof session.customer === 'string' ? session.customer : null;
         break;
       }
 
@@ -707,6 +714,8 @@ const baseStripeWebhookHandler = async (
         const sub = stripeEvent.data.object;
         userId = await handleSubscriptionEvent(sub);
         subscriptionId = sub.id;
+        customerId = typeof sub.customer === 'string' ? sub.customer : null;
+        subscriptionStatus = sub.status;
         break;
       }
 
@@ -714,6 +723,8 @@ const baseStripeWebhookHandler = async (
         const sub = stripeEvent.data.object;
         userId = await updateSubscriptionStatus(sub.id, 'canceled');
         subscriptionId = sub.id;
+        customerId = typeof sub.customer === 'string' ? sub.customer : null;
+        subscriptionStatus = 'canceled';
         break;
       }
 
@@ -726,6 +737,10 @@ const baseStripeWebhookHandler = async (
           userId = await handlePaymentSucceeded(invoiceSubId);
           subscriptionId = invoiceSubId;
         }
+        customerId =
+          typeof invoice.customer === 'string' ? invoice.customer : null;
+        invoiceAmount = invoice.amount_paid ?? null;
+        invoiceCurrency = invoice.currency ?? null;
         break;
       }
 
@@ -738,6 +753,10 @@ const baseStripeWebhookHandler = async (
           userId = await handlePaymentFailed(invoiceSubId);
           subscriptionId = invoiceSubId;
         }
+        customerId =
+          typeof invoice.customer === 'string' ? invoice.customer : null;
+        invoiceAmount = invoice.amount_due ?? null;
+        invoiceCurrency = invoice.currency ?? null;
         break;
       }
 
@@ -790,6 +809,26 @@ const baseStripeWebhookHandler = async (
         subscriptionId,
       });
     }
+  }
+
+  // Discord notification — awaited with a timeout so the Lambda runtime
+  // doesn't freeze and drop the in-flight fetch.  Errors are swallowed to
+  // keep the webhook response unaffected.
+  try {
+    await Promise.race([
+      notifyStripeEvent({
+        eventType: stripeEvent.type,
+        customerId,
+        subscriptionId,
+        userId,
+        status: subscriptionStatus,
+        amount: invoiceAmount,
+        currency: invoiceCurrency,
+      }),
+      new Promise<void>((resolve) => setTimeout(resolve, 3_000)),
+    ]);
+  } catch {
+    // Intentionally swallowed — notifyStripeEvent already logs internally.
   }
 
   return { statusCode: 200, body: JSON.stringify({ received: true }) };
