@@ -12,7 +12,7 @@ import {
   setNotificationHandler,
 } from 'expo-notifications';
 import type { EventSubscription } from 'expo-modules-core';
-import * as Device from 'expo-device';
+import { isDevice } from 'expo-device';
 import { useRouter } from 'expo-router';
 import { LOGGER } from '@legacy-sports/logging';
 import { PermissionStatus } from 'expo-modules-core';
@@ -53,7 +53,7 @@ export function usePushNotifications(userId: number | null | undefined) {
     if (!userId) return;
 
     // Push notifications only work on physical devices
-    if (!Device.isDevice) {
+    if (!isDevice) {
       LOGGER.info('Skipping push registration on simulator/emulator');
       return;
     }

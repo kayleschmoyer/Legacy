@@ -223,13 +223,13 @@ clean-cache: ## Clear Nx cache
 reset: clean-cache ## Reset Nx cache (alias for clean-cache)
 
 # Code Quality
-lint: ## Run linting on all projects
+lint: ## Run linting on affected projects
 	@$(call echo_blue,Running linters...)
-	pnpm exec nx run-many -t lint
+	pnpm exec nx affected -t lint
 
-lint-fix: ## Run linting with auto-fix on all projects
+lint-fix: ## Run linting with auto-fix on affected projects
 	@$(call echo_blue,Running linters with auto-fix...)
-	pnpm exec nx run-many -t lint --fix
+	pnpm exec nx affected -t lint --fix
 
 lint-workflows: ## Lint GitHub Actions workflow files
 	@$(call echo_blue,Linting GitHub Actions workflows...)
@@ -269,9 +269,9 @@ else
 	fi
 endif
 
-typecheck: ## Run TypeScript type checking
+typecheck: ## Run TypeScript type checking on affected projects
 	@$(call echo_blue,Running type checking...)
-	pnpm exec nx run-many -t typecheck
+	pnpm exec nx affected -t typecheck
 
 validate: ## Validate package.json and workspace dependencies
 	@$(call echo_blue,Validating workspace...)

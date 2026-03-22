@@ -4,6 +4,7 @@
   "sourceRoot": "apps/cli/src",
   "projectType": "application",
   "tags": ["platform:node", "scope:app", "type:cli"],
+  "implicitDependencies": ["db"],
   "targets": {
     "codegen": {
       "executor": "nx:run-commands",

@@ -4,6 +4,7 @@
   "sourceRoot": "apps/web/src",
   "projectType": "application",
   "tags": ["platform:web", "scope:app", "type:frontend"],
+  "implicitDependencies": ["db"],
   "// targets": "to see all targets run: nx show project web --web",
   "targets": {
     "typecheck": {

@@ -6,7 +6,7 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Separator, Text, YStack } from 'tamagui';
 import { getExpoPushTokenAsync } from 'expo-notifications';
-import * as Device from 'expo-device';
+import { isDevice } from 'expo-device';
 import { LOGGER } from '@legacy-sports/logging';
 import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 
@@ -156,7 +156,7 @@ function CustomDrawerContent(
 
   const doLogout = async () => {
     // Best-effort: deactivate push token before clearing credentials
-    if (Device.isDevice) {
+    if (isDevice) {
       try {
         const tokenData = await getExpoPushTokenAsync();
         await disableDeviceToken({
