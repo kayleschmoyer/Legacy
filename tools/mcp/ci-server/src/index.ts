@@ -208,9 +208,9 @@ server.tool(
       .number()
       .int()
       .positive()
-      .max(100)
-      .default(20)
-      .describe('Maximum matches to return'),
+      .max(30)
+      .default(10)
+      .describe('Maximum matches to return (default: 10, max: 30)'),
   },
   async (params) => searchLogs(params),
 );

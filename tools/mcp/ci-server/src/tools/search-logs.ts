@@ -42,7 +42,7 @@ export async function searchLogs(
 ): Promise<ToolResult> {
   const contextBefore = params.contextBefore ?? 3;
   const contextAfter = params.contextAfter ?? 3;
-  const limitMatches = params.limitMatches ?? 20;
+  const limitMatches = params.limitMatches ?? 10;
 
   try {
     const rawLogs = await fetchRunLogs(params);
