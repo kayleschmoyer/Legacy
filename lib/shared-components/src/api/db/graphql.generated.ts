@@ -2732,6 +2732,8 @@ export type SeasonBatting = {
   awardSummary?: Maybe<Scalars['String']['output']>;
   baseOnBalls?: Maybe<Scalars['Int']['output']>;
   battingAverage?: Maybe<Scalars['Float']['output']>;
+  /** Baseball Reference WAR (bWAR) for this season */
+  bwar?: Maybe<Scalars['Float']['output']>;
   caughtStealing?: Maybe<Scalars['Int']['output']>;
   doubles?: Maybe<Scalars['Int']['output']>;
   games?: Maybe<Scalars['Int']['output']>;
@@ -2888,6 +2890,8 @@ export type SeasonPitching = {
   baseOnBalls?: Maybe<Scalars['Int']['output']>;
   basesOnBallsPerNine?: Maybe<Scalars['Float']['output']>;
   battersFaced?: Maybe<Scalars['Int']['output']>;
+  /** Baseball Reference WAR (bWAR) for this season */
+  bwar?: Maybe<Scalars['Float']['output']>;
   completeGames?: Maybe<Scalars['Int']['output']>;
   earnedRunAverage?: Maybe<Scalars['String']['output']>;
   earnedRunAveragePlus?: Maybe<Scalars['Float']['output']>;

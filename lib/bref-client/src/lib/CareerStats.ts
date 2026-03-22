@@ -53,6 +53,7 @@ const StatMapping: Record<
   B_SH: 'sh',
   B_SF: 'sf',
   B_IBB: 'ibb',
+  B_WAR: 'bwar',
 
   // Season/year field
   YEAR_ID: 'season',
@@ -103,6 +104,7 @@ const StatMapping: Record<
   P_BB_PER_NINE: 'basesOnBallsPerNine',
   P_SO_PER_NINE: 'strikeoutsPerNine',
   P_STRIKEOUTS_PER_BASE_ON_BALLS: 'strikeoutsPerBaseOnBalls',
+  P_WAR: 'bwar',
 
   // Legacy mappings (keeping for backwards compatibility)
   '2B': 'doubles',
@@ -171,6 +173,8 @@ const StatMapping: Record<
   TEAM_ID: 'team',
   W: 'w',
   WHIP: 'whip',
+  WAR_BAT: 'bwar',
+  WAR_PITCH: 'bwar',
   WIN_LOSS_PERC: 'winLossPerc',
   WP: 'wp',
 };

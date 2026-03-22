@@ -611,6 +611,7 @@ export const SeasonBattingRef = builder.objectRef<{
   sf: string | null;
   posSeason: string | null;
   awardSummary: string | null;
+  bwar: number | null;
   rowId: string;
 }>('SeasonBatting');
 
@@ -671,6 +672,10 @@ SeasonBattingRef.implement({
       nullable: true,
     }),
     awardSummary: t.exposeString('awardSummary', { nullable: true }),
+    bwar: t.exposeFloat('bwar', {
+      nullable: true,
+      description: 'Baseball Reference WAR (bWAR) for this season',
+    }),
   }),
 });
 
@@ -713,6 +718,7 @@ export const SeasonPitchingRef = builder.objectRef<{
   strikeoutsPerNine: number | null;
   strikeoutsPerBaseOnBalls: number | null;
   awardSummary: string | null;
+  bwar: number | null;
   outsRecorded: number | null;
 }>('SeasonPitching');
 
@@ -758,6 +764,10 @@ SeasonPitchingRef.implement({
       nullable: true,
     }),
     awardSummary: t.exposeString('awardSummary', { nullable: true }),
+    bwar: t.exposeFloat('bwar', {
+      nullable: true,
+      description: 'Baseball Reference WAR (bWAR) for this season',
+    }),
     outsRecorded: t.exposeInt('outsRecorded', { nullable: true }),
     // Computed statistics
     winPercentage: t.field({

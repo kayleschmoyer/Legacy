@@ -2489,6 +2489,11 @@ type SeasonBatting {
   awardSummary: String
   baseOnBalls: Int
   battingAverage: Float
+
+  """
+  Baseball Reference WAR (bWAR) for this season
+  """
+  bwar: Float
   caughtStealing: Int
   doubles: Int
   games: Int
@@ -2653,6 +2658,11 @@ type SeasonPitching {
   baseOnBalls: Int
   basesOnBallsPerNine: Float
   battersFaced: Int
+
+  """
+  Baseball Reference WAR (bWAR) for this season
+  """
+  bwar: Float
   completeGames: Int
   earnedRunAverage: String
   earnedRunAveragePlus: Float

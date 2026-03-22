@@ -2723,8 +2723,11 @@ export enum ScoringStatGroup {
 export type SeasonBatting = {
   __typename?: 'SeasonBatting';
   atBats?: Maybe<Scalars['Int']['output']>;
+  awardSummary?: Maybe<Scalars['String']['output']>;
   baseOnBalls?: Maybe<Scalars['Int']['output']>;
   battingAverage?: Maybe<Scalars['Float']['output']>;
+  /** Baseball Reference WAR (bWAR) for this season */
+  bwar?: Maybe<Scalars['Float']['output']>;
   caughtStealing?: Maybe<Scalars['Int']['output']>;
   doubles?: Maybe<Scalars['Int']['output']>;
   games?: Maybe<Scalars['Int']['output']>;
@@ -2735,6 +2738,8 @@ export type SeasonBatting = {
   intentionalBaseOnBalls?: Maybe<Scalars['Int']['output']>;
   league?: Maybe<Scalars['String']['output']>;
   onBasePercentage?: Maybe<Scalars['Float']['output']>;
+  onBasePlusSlugging?: Maybe<Scalars['Float']['output']>;
+  onBasePlusSluggingPlus?: Maybe<Scalars['Float']['output']>;
   plateAppearances?: Maybe<Scalars['Int']['output']>;
   playerId?: Maybe<Scalars['Int']['output']>;
   rbi?: Maybe<Scalars['Int']['output']>;
@@ -2879,6 +2884,8 @@ export type SeasonPitching = {
   baseOnBalls?: Maybe<Scalars['Int']['output']>;
   basesOnBallsPerNine?: Maybe<Scalars['Float']['output']>;
   battersFaced?: Maybe<Scalars['Int']['output']>;
+  /** Baseball Reference WAR (bWAR) for this season */
+  bwar?: Maybe<Scalars['Float']['output']>;
   completeGames?: Maybe<Scalars['Int']['output']>;
   earnedRunAverage?: Maybe<Scalars['String']['output']>;
   earnedRunAveragePlus?: Maybe<Scalars['Float']['output']>;

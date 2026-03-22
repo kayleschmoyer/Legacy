@@ -117,6 +117,7 @@ export const seasonBatting = pgTable(
     lgId: varchar('lg_id', { length: 50 }),
     team: varchar('team', { length: 50 }).notNull(),
     rowId: varchar('row_id', { length: 50 }).notNull(),
+    bwar: doublePrecision('bwar'),
   },
   (table) => {
     return {
@@ -198,6 +199,7 @@ export const seasonPitching = pgTable(
     awardSummary: text('award_summary'),
     team: varchar('team', { length: 50 }).notNull(),
     lgId: varchar('lg_id', { length: 50 }),
+    bwar: doublePrecision('bwar'),
     outsRecorded: integer('outs_recorded').generatedAlwaysAs(
       sql`((floor(ip) * (3)::double precision) + ((ip - floor(ip)) * (10)::double precision))`,
     ),
