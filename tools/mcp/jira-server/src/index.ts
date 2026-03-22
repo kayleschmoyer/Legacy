@@ -10,6 +10,7 @@ import { getComments } from './tools/get-comments.js';
 import { listChildren } from './tools/list-children.js';
 import { editTicket } from './tools/edit-ticket.js';
 import { linkIssues } from './tools/link-issues.js';
+import { search } from './tools/search.js';
 import { getAtlassianCredentials } from './netrc.js';
 
 // Validate credentials at startup so the server fails fast with a clear
@@ -196,6 +197,27 @@ server.tool(
       ),
   },
   async (params) => linkIssues(params),
+);
+
+// --- jira_search ---
+server.tool(
+  'jira_search',
+  'Search Jira issues using JQL. Returns key, summary, status, type, assignee, and priority for each match. Useful for querying sprint tickets, epic children, or any ad-hoc JQL.',
+  {
+    jql: z
+      .string()
+      .describe(
+        'JQL query string, e.g. "parent = LS-1455", "sprint in openSprints()", "status = \\"In Progress\\""',
+      ),
+    maxResults: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .default(50)
+      .describe('Maximum number of results (default: 50, max: 100)'),
+  },
+  async (params) => search(params),
 );
 
 // Start the server
