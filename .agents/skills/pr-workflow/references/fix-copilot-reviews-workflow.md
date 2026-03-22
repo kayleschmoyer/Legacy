@@ -174,19 +174,29 @@ After processing every PR, print a summary table:
 | #123 | feat(scoring): ... | Fixed 3 comments | pushed (bot will re-review) |
 | #124 | fix(ui): ...       | No comments      | skipped (bot handles it)    |
 
-## Common Copilot Review Patterns (Top 10)
+## Common Copilot Review Patterns (Top 20)
 
-| #   | Pattern                          | Quick Fix                                                |
-| --- | -------------------------------- | -------------------------------------------------------- |
-| 1   | Wrong `jest.doMock` module path  | Use `@legacy-sports/utils/node` + `requireActual` spread |
-| 2   | Broad `postData.includes()`      | Use quoted `'"op"'` or `extractOperationName()` helper   |
-| 3   | Header overclaims coverage       | Audit test names, trim header                            |
-| 4   | Missing UNAUTHENTICATED test     | Add `user: null` test                                    |
-| 5   | `route.fallback()` leaks         | Use `route.fulfill()`                                    |
-| 6   | `LOGGER.error({ error })`        | Pass Error as direct arg                                 |
-| 7–8 | Wrong mock structure/field names | Wrap in `{ data: { ... } }`, check `.graphql` files      |
-| 9   | Test name ≠ assertion            | Rename test                                              |
-| 10  | Process/scope comments           | Resolve thread directly — no code change                 |
+| #   | Pattern                          | Quick Fix                                                   |
+| --- | -------------------------------- | ----------------------------------------------------------- |
+| 1   | Wrong `jest.doMock` module path  | Use `@legacy-sports/utils/node` + `requireActual` spread    |
+| 2   | Broad `postData.includes()`      | Use quoted `'"op"'` or `extractOperationName()` helper      |
+| 3   | Header overclaims coverage       | Audit test names, trim header                               |
+| 4   | Missing UNAUTHENTICATED test     | Add `user: null` test                                       |
+| 5   | `route.fallback()` leaks         | Use `route.fulfill()`                                       |
+| 6   | `LOGGER.error({ error })`        | Pass Error as direct arg                                    |
+| 7–8 | Wrong mock structure/field names | Wrap in `{ data: { ... } }`, check `.graphql` files         |
+| 9   | Test name ≠ assertion            | Rename test                                                 |
+| 10  | Process/scope comments           | Resolve thread directly — no code change                    |
+| 11  | Silent error swallowing          | Every `catch` must re-throw, log, or return error context   |
+| 12  | Argument injection (`-` prefix)  | Reject refs/args starting with `-`, use `--` separator      |
+| 13  | Missing API pagination           | Paginate Jira (50 limit) and GitHub GraphQL (100 limit)     |
+| 14  | `shell: true` + user input       | Use `shell: false` + args array, validate if shell needed   |
+| 15  | Manual codegen edits             | Fix source `.graphql`/schema, run `make codegen`            |
+| 16  | Unexplained codegen diff         | Note in PR description why generated files changed          |
+| 17  | Success on partial failure       | Set `isError: true`, report `{ total, succeeded, failed }`  |
+| 18  | Nonexistent MCP tool in docs     | Verify tool exists in `tools/mcp/*/src/` before referencing |
+| 19  | Dev/prod ternary forgets staging | Use `{ dev, staging, prod }` map, not boolean ternary       |
+| 20  | Unbounded tool output            | Cap output size, report `truncated: true`                   |
 
 > Full pattern details + code examples: [common-review-patterns.md](common-review-patterns.md)
 

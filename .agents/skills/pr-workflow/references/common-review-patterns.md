@@ -82,3 +82,69 @@ route.fulfill({ json: { getLeagueById: null } });
 // Correct structure
 route.fulfill({ json: { data: { league: null } } });
 ```
+
+---
+
+## MCP Tool & Infrastructure Patterns (from 100-PR analysis, March 2026)
+
+These patterns appear frequently in PRs that add or modify MCP tools, Terraform, and platform infrastructure.
+
+### #11 — Silent error swallowing in catch blocks
+
+Empty `catch {}` or catch blocks that return success hide failures from agents and users.
+
+```typescript
+// Bad
+catch {}
+catch (e) { return { success: true }; }
+
+// Good
+catch (e) { return { content: [{ type: 'text', text: JSON.stringify({ success: false, error: e.message }) }], isError: true }; }
+```
+
+### #12 — Argument injection via refs/args starting with `-`
+
+User-supplied git refs or CLI args starting with `-` get interpreted as flags.
+
+```typescript
+// Bad — ref could be "--exec=malicious"
+const args = ['checkout', ref, '--', path];
+
+// Good
+if (ref.startsWith('-')) throw new Error('Invalid ref');
+const args = ['checkout', ref, '--', path];
+```
+
+### #13 — Missing pagination for Jira/GitHub API queries
+
+Jira defaults to 50 results, GitHub GraphQL to 100. Results silently truncate.
+
+### #14 — `shell: true` with user input enables injection
+
+Pass args as arrays with `shell: false`. Only use `shell: true` on Windows with validated input.
+
+### #15 — Codegen output manually edited
+
+Never edit `*.generated.*` files. Fix the source `.graphql` or schema and run `make codegen`.
+
+### #16 — PR description doesn't explain codegen diff
+
+When generated files change (from rebase/codegen), explain why in the PR description.
+
+### #17 — MCP tools return success on partial failure
+
+Batch operations that fail some items must set `isError: true` and report `{ total, succeeded, failed }`.
+
+### #18 — Docs reference nonexistent MCP tools
+
+Verify tool names exist in `tools/mcp/*/src/` before referencing in docs or skills.
+
+### #19 — Dev/prod ternary forgets staging
+
+Use `{ dev: X, staging: Y, prod: Z }[env]` instead of `env === 'dev' ? X : Y`.
+
+### #20 — Unbounded tool output
+
+Tools returning variable-length data (diffs, logs, file lists) must cap output and indicate truncation.
+
+> Full coding standards catalog: [../../coding-standards/references/standards-catalog.md](../../coding-standards/references/standards-catalog.md)
