@@ -126,32 +126,18 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 ## MCP Servers
 
-<<<<<<< HEAD
-| Server | Purpose |
+| Server                  | Purpose                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-db` | Database queries, migrations, schema generation |
-| `legacy-sports-jira` | Ticket CRUD, transitions, blocker checks |
-| `legacy-sports-ci` | CI log queries, workflow reruns |
-| `legacy-sports-github` | PR and review lifecycle (uses `gh` CLI) |
-| `legacy-sports-nx` | Nx project discovery, affected analysis, target execution |
-| `legacy-sports-make` | Makefile targets: validation, build, install, worktree setup |
-| `worktree` | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push |
-| `legacy-sports-aws` | CloudWatch log tailing, AWS SSO status checks |
-| `claude_ai_Stripe` | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`) |
-| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload |
-=======
-| Server | Purpose |
-| ---------------------- | ------------------------------------------------------------------------------------ |
-| `legacy-sports-db` | Database queries, migrations, schema generation |
-| `legacy-sports-jira` | Ticket CRUD, transitions, blocker checks |
-| `legacy-sports-ci` | CI log queries, workflow reruns |
-| `legacy-sports-github` | PR and review lifecycle (uses `gh` CLI); `github_auth_status` for passive auth check |
-| `legacy-sports-nx` | Nx project discovery, affected analysis, target execution |
-| `legacy-sports-make` | Makefile targets: validation, build, install, worktree setup |
-| `worktree` | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push |
-| `legacy-sports-aws` | CloudWatch log tailing, AWS SSO status checks |
-
-> > > > > > > 68d81e7f3 (feat(mcp): add github_auth_status tool for auth-aware routing)
+| `legacy-sports-db`      | Database queries, migrations, schema generation                                                               |
+| `legacy-sports-jira`    | Ticket CRUD, transitions, blocker checks                                                                      |
+| `legacy-sports-ci`      | CI log queries, workflow reruns                                                                               |
+| `legacy-sports-github`  | PR and review lifecycle (GitHub REST/GraphQL API)                                                             |
+| `legacy-sports-nx`      | Nx project discovery, affected analysis, target execution                                                     |
+| `legacy-sports-make`    | Makefile targets: validation, build, install, worktree setup                                                  |
+| `worktree`              | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                     |
+| `legacy-sports-aws`     | CloudWatch log tailing, AWS SSO status checks                                                                 |
+| `claude_ai_Stripe`      | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`) |
+| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload                                               |
 
 Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`, use our custom tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false`, fall back to Claude's built-in Atlassian tools (`mcp__claude_ai_Atlassian__*`). Last resort: `acli` CLI — never direct HTTP.
 
@@ -189,20 +175,23 @@ When running as a **cloud coding agent**:
 - **No worktrees/twig/acli** — work directly in the repo root. Use `git` for branches, MCP tools for Jira.
 - **No AWS access** — DB MCP server uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`.
 - **Linux** — `bash` shell, `/` paths. No junctions or file locks.
+- **Native integrations (Claude Code on the web)** — Claude Code provides built-in GitHub and Atlassian connectors that work without configuring secrets. Prefer these over custom MCP servers when available (see details below).
 
-**Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make <target>` → `pnpm --prefix lib/db-client run db:status` → `pnpm --prefix lib/db-client run db:up` → `make pc` → commit + push → `gh pr create` → Jira "In Review"
+**Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make <target>` → `pnpm --prefix lib/db-client run db:status` → `pnpm --prefix lib/db-client run db:up` → `make pc` → commit + push → `github_create_pr` (or native GitHub connector on Claude Code on the web) → Jira "In Review"
 
 **GitHub authentication for PR creation:**
 
-The `legacy-sports-github` MCP server has a **5-tier auth fallback chain** (see `tools/mcp/github-server/src/auth.ts`). It does NOT require the `gh` CLI — it calls the GitHub API directly with a Bearer token:
+The `legacy-sports-github` MCP server calls GitHub REST/GraphQL APIs directly (it does **not** require the `gh` CLI). It resolves a GitHub token in this order: `GH_TOKEN`/`GITHUB_TOKEN` env var, cached token file, `~/.netrc`, `gh auth token` (optional, 5s timeout), then interactive OAuth device flow as a last resort. Claude Code on the web also provides a native GitHub connector that requires no token configuration.
 
-1. `GH_TOKEN` or `GITHUB_TOKEN` env var
-2. Cached token file (`~/.config/legacy-sports-github/token.json`)
-3. `~/.netrc` password for `machine github.com`
-4. `gh auth token` CLI output (5s timeout, silent fallback)
-5. **Built-in OAuth device flow** (interactive — prompts via stderr)
+| Platform                   | How to authenticate                                                                                                                                                                      |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Claude Code on the web** | **Preferred**: use Claude's native GitHub connector (no secrets needed). Alternative: set `GH_TOKEN` or `GITHUB_TOKEN` in cloud environment settings (no `gh` CLI installation required) |
+| **Copilot Coding Agent**   | Automatically available via `${{ github.token }}`. Authenticated in `copilot-setup-steps.yml`. No native Claude integrations available                                                   |
+| **Local development**      | Already authenticated via `gh auth login`, `~/.netrc`, or env var — any token source works                                                                                               |
 
-For **local interactive sessions**, no token setup is needed — the device flow handles first-time auth automatically and caches the token for future sessions.
+If token resolution fails during the MCP server's startup preflight, it logs a diagnostic warning and defers authentication to the first API call (which may trigger the interactive device flow).
+
+For **interactive sessions** (local, Claude Code on the web), no token setup is needed — the device flow handles first-time auth automatically and caches the token for future sessions.
 
 For **cloud environments** (Claude Code on the web, Copilot), pre-configuring a token is recommended — the device flow may not surface stderr prompts reliably. How the token gets there depends on the platform:
 
@@ -229,12 +218,16 @@ For **cloud environments** (Claude Code on the web, Copilot), pre-configuring a 
 
 > **Note:** The `.mcp.json` and `.vscode/mcp.json` configs forward `GH_TOKEN` from the host environment. The `.github/copilot/mcp.json` forwards both `GH_TOKEN` (from the Agent Author app) and `GITHUB_TOKEN` (auto-provided by GitHub). The MCP server checks `GH_TOKEN` first, then `GITHUB_TOKEN` at runtime.
 
+**Jira authentication:**
+
+The `legacy-sports-jira` MCP server requires Jira API credentials — either `JIRA_EMAIL` + `JIRA_API_TOKEN` env vars or a `~/.netrc` entry for your Atlassian host. On **Claude Code on the web**, Claude's native Atlassian tools (`mcp__claude_ai_Atlassian__*`) are available without any credential configuration and are the preferred option. The existing Jira auth-aware routing rule applies: call `jira_auth_status` first — if `configured: false`, use `mcp__claude_ai_Atlassian__*` tools. On **Copilot Coding Agent**, native Claude integrations are not available, so `JIRA_EMAIL`/`JIRA_API_TOKEN` must be configured as repository secrets.
+
 **Available MCP servers in cloud:**
 
 - `legacy-sports-ci` — CI log queries, workflow reruns
 - `legacy-sports-db` — local Docker Postgres queries, migrations, schema generation
-- `legacy-sports-jira` — ticket CRUD, transitions, blocker checks (requires `JIRA_EMAIL` and `JIRA_API_TOKEN` secrets)
-- `legacy-sports-github` — PR and review lifecycle management (requires `GH_TOKEN` — see table above)
+- `legacy-sports-jira` — ticket CRUD, transitions, blocker checks (requires Jira API credentials via env vars or `.netrc`). On Claude Code on the web, Claude's native Atlassian tools (`mcp__claude_ai_Atlassian__*`) are an alternative that requires no secrets
+- `legacy-sports-github` — PR and review lifecycle management (requires a GitHub token via `GH_TOKEN`, `GITHUB_TOKEN`, `.netrc`, `gh auth token`, or device flow — see table above). On Claude Code on the web, Claude's native GitHub connector is an alternative that requires no secrets
 - `legacy-sports-nx` — Nx project discovery, affected analysis, and target execution
 
 **Unavailable in cloud (by design):**
