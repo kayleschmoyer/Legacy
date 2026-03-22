@@ -28,7 +28,7 @@ resource "aws_iam_role_policy_attachment" "rollbar_discord_lambda_basic" {
   role       = aws_iam_role.rollbar_discord_lambda.name
 }
 
-# Policy granting access to the Rollbar webhook secret and Discord webhook URL
+# Policy granting access to the Discord webhook URL secret
 resource "aws_iam_policy" "rollbar_discord_lambda_secrets" {
   name        = "${local.name_prefix}-rollbar-discord-lambda-secrets"
   description = "IAM policy for Rollbar Discord Lambda to access secrets in Secrets Manager"
@@ -43,7 +43,6 @@ resource "aws_iam_policy" "rollbar_discord_lambda_secrets" {
           "secretsmanager:DescribeSecret"
         ]
         Resource = [
-          aws_secretsmanager_secret.rollbar_webhook_secret.arn,
           aws_secretsmanager_secret.discord_webhook_url.arn
         ]
       }
@@ -86,10 +85,9 @@ resource "aws_lambda_function" "rollbar_discord" {
 
   environment {
     variables = {
-      ROLLBAR_WEBHOOK_SECRET_NAME         = aws_secretsmanager_secret.rollbar_webhook_secret.name
-      DISCORD_WEBHOOK_URL_SECRET_NAME     = aws_secretsmanager_secret.discord_webhook_url.name
-      NODE_ENV                            = var.environment
-      LOG_LEVEL                           = "info"
+      DISCORD_WEBHOOK_URL_SECRET_NAME = aws_secretsmanager_secret.discord_webhook_url.name
+      NODE_ENV                        = var.environment
+      LOG_LEVEL                       = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
       # Rollbar error tracking

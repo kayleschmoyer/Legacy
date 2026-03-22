@@ -1,37 +1,20 @@
-import { createHmac } from 'crypto';
-import { parseRollbarPayload, verifySignature } from './rollbar-webhook';
+import { parseRollbarPayload, verifyOrigin } from './rollbar-webhook';
 
-const TEST_SECRET = 'test-webhook-secret';
-
-function sign(body: string, secret: string): string {
-  return createHmac('sha256', secret).update(body).digest('hex');
-}
-
-describe('verifySignature', () => {
-  const body = '{"event_name":"new_item","data":{}}';
-
-  it('returns true for a valid signature', () => {
-    const sig = sign(body, TEST_SECRET);
-    expect(verifySignature(body, sig, TEST_SECRET)).toBe(true);
+describe('verifyOrigin', () => {
+  it('returns true for known Rollbar IP', () => {
+    expect(verifyOrigin('35.184.69.251')).toBe(true);
   });
 
-  it('returns false when signature is undefined', () => {
-    expect(verifySignature(body, undefined, TEST_SECRET)).toBe(false);
+  it('returns false for unknown IP', () => {
+    expect(verifyOrigin('1.2.3.4')).toBe(false);
   });
 
-  it('returns false for an invalid signature', () => {
-    expect(verifySignature(body, 'deadbeef', TEST_SECRET)).toBe(false);
+  it('returns false when sourceIp is undefined', () => {
+    expect(verifyOrigin(undefined)).toBe(false);
   });
 
-  it('returns false when body is tampered', () => {
-    const sig = sign(body, TEST_SECRET);
-    const tampered = body.replace('new_item', 'hacked');
-    expect(verifySignature(tampered, sig, TEST_SECRET)).toBe(false);
-  });
-
-  it('returns false when signed with wrong secret', () => {
-    const sig = sign(body, 'wrong-secret');
-    expect(verifySignature(body, sig, TEST_SECRET)).toBe(false);
+  it('returns false for empty string', () => {
+    expect(verifyOrigin('')).toBe(false);
   });
 });
 

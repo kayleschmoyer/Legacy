@@ -1,11 +1,8 @@
 import type { APIGatewayEvent, SNSEvent } from 'aws-lambda';
-import { createHmac } from 'crypto';
 
 // Mock dependencies before importing handler
 jest.mock('@legacy-sports/aws-utils', () => ({
   retrieveSecretParameterValue: jest.fn((name: string) => {
-    if (name === 'rollbar-webhook-secret')
-      return Promise.resolve('test-secret');
     if (name === 'discord-webhook-url')
       return Promise.resolve('https://discord.com/api/webhooks/test');
     return Promise.reject(new Error(`Unknown secret: ${name}`));
@@ -32,14 +29,11 @@ const mockFetch = jest.fn().mockResolvedValue({ ok: true, status: 204 });
 globalThis.fetch = mockFetch;
 
 // Set env vars before importing handler
-process.env['ROLLBAR_WEBHOOK_SECRET_NAME'] = 'rollbar-webhook-secret';
 process.env['DISCORD_WEBHOOK_URL_SECRET_NAME'] = 'discord-webhook-url';
 
 import { baseHandler } from './index';
 
-function sign(body: string): string {
-  return createHmac('sha256', 'test-secret').update(body).digest('hex');
-}
+const ROLLBAR_IP = '35.184.69.251';
 
 function makeApiGatewayEvent(
   overrides: Partial<APIGatewayEvent> = {},
@@ -55,7 +49,9 @@ function makeApiGatewayEvent(
     multiValueHeaders: {},
     multiValueQueryStringParameters: null,
     isBase64Encoded: false,
-    requestContext: {} as APIGatewayEvent['requestContext'],
+    requestContext: {
+      identity: { sourceIp: ROLLBAR_IP },
+    } as APIGatewayEvent['requestContext'],
     resource: '',
     ...overrides,
   };
@@ -120,12 +116,11 @@ describe('baseHandler', () => {
       },
     });
 
-    it('returns 200 for a valid webhook', async () => {
+    it('returns 200 for a valid webhook from Rollbar IP', async () => {
       const event = makeApiGatewayEvent({
         httpMethod: 'POST',
         path: '/rollbar-discord/webhook',
         body: rollbarBody,
-        headers: { 'X-Rollbar-Signature': sign(rollbarBody) },
       });
 
       const result = await baseHandler(event);
@@ -133,38 +128,39 @@ describe('baseHandler', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('returns 401 for invalid signature', async () => {
+    it('returns 403 for unknown source IP', async () => {
       const event = makeApiGatewayEvent({
         httpMethod: 'POST',
         path: '/rollbar-discord/webhook',
         body: rollbarBody,
-        headers: { 'X-Rollbar-Signature': 'badsig' },
+        requestContext: {
+          identity: { sourceIp: '1.2.3.4' },
+        } as APIGatewayEvent['requestContext'],
       });
 
       const result = await baseHandler(event);
-      expect(result).toEqual(expect.objectContaining({ statusCode: 401 }));
+      expect(result).toEqual(expect.objectContaining({ statusCode: 403 }));
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('returns 401 when signature header is missing', async () => {
+    it('returns 403 when source IP is missing', async () => {
       const event = makeApiGatewayEvent({
         httpMethod: 'POST',
         path: '/rollbar-discord/webhook',
-        body: rollbarBody,
-        headers: {},
+        requestContext: {
+          identity: {},
+        } as APIGatewayEvent['requestContext'],
       });
 
       const result = await baseHandler(event);
-      expect(result).toEqual(expect.objectContaining({ statusCode: 401 }));
+      expect(result).toEqual(expect.objectContaining({ statusCode: 403 }));
     });
 
     it('returns 400 for invalid payload', async () => {
-      const badBody = 'not json';
       const event = makeApiGatewayEvent({
         httpMethod: 'POST',
         path: '/rollbar-discord/webhook',
-        body: badBody,
-        headers: { 'X-Rollbar-Signature': sign(badBody) },
+        body: 'not json',
       });
 
       const result = await baseHandler(event);

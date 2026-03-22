@@ -1,31 +1,26 @@
-import { createHmac, timingSafeEqual } from 'crypto';
 import type { RollbarEvent } from './types';
 
 /**
- * Verify the HMAC-SHA256 signature from a Rollbar webhook request.
- * Returns true if valid, false otherwise.
+ * Known Rollbar outbound IP addresses used for webhook delivery.
+ * Override via ROLLBAR_OUTBOUND_IPS env var (comma-separated).
+ * @see https://docs.rollbar.com/docs/rollbar-ip-addresses
  */
-export function verifySignature(
-  body: string,
-  signature: string | undefined,
-  secret: string,
-): boolean {
-  if (!signature) {
+const DEFAULT_ROLLBAR_IPS = ['35.184.69.251'];
+const ROLLBAR_OUTBOUND_IPS = new Set(
+  process.env['ROLLBAR_OUTBOUND_IPS']
+    ? process.env['ROLLBAR_OUTBOUND_IPS'].split(',').map((ip) => ip.trim())
+    : DEFAULT_ROLLBAR_IPS,
+);
+
+/**
+ * Verify that the request originates from a known Rollbar IP address.
+ * Returns true if the source IP matches a known Rollbar outbound IP.
+ */
+export function verifyOrigin(sourceIp: string | undefined): boolean {
+  if (!sourceIp) {
     return false;
   }
-
-  const expected = createHmac('sha256', secret).update(body).digest('hex');
-
-  // Constant-time comparison to prevent timing attacks
-  try {
-    return timingSafeEqual(
-      Buffer.from(signature, 'hex'),
-      Buffer.from(expected, 'hex'),
-    );
-  } catch {
-    // Buffers different length → invalid
-    return false;
-  }
+  return ROLLBAR_OUTBOUND_IPS.has(sourceIp);
 }
 
 /**

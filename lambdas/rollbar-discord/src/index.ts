@@ -10,7 +10,7 @@ import {
   initRollbar,
   withRollbar,
 } from '@legacy-sports/rollbar';
-import { parseRollbarPayload, verifySignature } from './rollbar-webhook';
+import { parseRollbarPayload, verifyOrigin } from './rollbar-webhook';
 import { formatAlarmEmbed, formatRollbarEmbed, postToDiscord } from './discord';
 import type { CloudWatchAlarm } from './types';
 
@@ -29,22 +29,11 @@ function requireEnv(name: string): string {
   return value;
 }
 
-const ROLLBAR_WEBHOOK_SECRET_NAME = requireEnv('ROLLBAR_WEBHOOK_SECRET_NAME');
 const DISCORD_WEBHOOK_URL_SECRET_NAME = requireEnv(
   'DISCORD_WEBHOOK_URL_SECRET_NAME',
 );
 
-let rollbarSecretPromise: Promise<string> | null = null;
 let discordUrlPromise: Promise<string> | null = null;
-
-function getRollbarWebhookSecret(): Promise<string> {
-  if (!rollbarSecretPromise) {
-    rollbarSecretPromise = retrieveSecretParameterValue(
-      ROLLBAR_WEBHOOK_SECRET_NAME,
-    );
-  }
-  return rollbarSecretPromise;
-}
 
 function getDiscordWebhookUrl(): Promise<string> {
   if (!discordUrlPromise) {
@@ -124,20 +113,17 @@ export async function handleApiGatewayEvent(
 
   // Rollbar webhook
   if (method === 'POST' && path.endsWith('/webhook')) {
+    const sourceIp = event.requestContext?.identity?.sourceIp;
+    if (!verifyOrigin(sourceIp)) {
+      LOGGER.warn('Rollbar webhook rejected — unknown origin IP', { sourceIp });
+      return jsonResponse(403, { error: 'Forbidden' });
+    }
+
     const encodedBody = event.body ?? '';
     const body =
       event.isBase64Encoded && encodedBody
         ? Buffer.from(encodedBody, 'base64').toString('utf8')
         : encodedBody;
-    const signature =
-      event.headers?.['X-Rollbar-Signature'] ??
-      event.headers?.['x-rollbar-signature'];
-
-    const secret = await getRollbarWebhookSecret();
-    if (!verifySignature(body, signature, secret)) {
-      LOGGER.warn('Rollbar webhook signature verification failed');
-      return jsonResponse(401, { error: 'Invalid signature' });
-    }
 
     const payload = parseRollbarPayload(body);
     if (!payload) {
