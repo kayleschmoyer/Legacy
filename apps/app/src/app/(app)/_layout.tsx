@@ -42,6 +42,9 @@ import { usePushNotifications } from '../../features/notifications/hooks/usePush
 import { isPhysicalDevice } from '../../common/utilities/DeviceUtils';
 import Home from '.';
 
+/** Typed extraction — expo-device types may not resolve in all environments */
+const isPhysicalDevice = (Device as { isDevice: boolean }).isDevice;
+
 export type AppDrawerParamList = {
   index: undefined;
   view_game_logs: undefined;
