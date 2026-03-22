@@ -1,8 +1,8 @@
 import { jiraRequest } from '../jira-api.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
-const VALID_STATUSES = ['In Progress', 'In Review', 'Done'] as const;
-type ValidStatus = (typeof VALID_STATUSES)[number];
+export const VALID_STATUSES = ['In Progress', 'In Review', 'Done'] as const;
+export type ValidStatus = (typeof VALID_STATUSES)[number];
 
 interface TransitionParams {
   key: string;

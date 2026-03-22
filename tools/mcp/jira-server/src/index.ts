@@ -9,8 +9,9 @@ import { linkIssues } from './tools/link-issues.js';
 import { listChildren } from './tools/list-children.js';
 import { search } from './tools/search.js';
 import { setParent } from './tools/set-parent.js';
-import { transition } from './tools/transition.js';
+import { transition, VALID_STATUSES } from './tools/transition.js';
 import { view } from './tools/view.js';
+import { bulkTransition } from './tools/bulk-transition.js';
 import { tryGetAtlassianCredentials } from './netrc.js';
 
 // Check credentials at startup — warn if missing but don't exit.
@@ -243,6 +244,23 @@ server.tool(
     key: z.string().describe('Jira ticket key, e.g. LS-1137'),
   },
   async (params) => view(params),
+);
+
+// --- jira_bulk_transition ---
+server.tool(
+  'jira_bulk_transition',
+  'Transition multiple Jira tickets to a new status in one call. Returns per-key success/failure results. Use for batch operations like closing all subtasks of a done parent.',
+  {
+    keys: z
+      .array(z.string())
+      .min(1)
+      .max(50)
+      .describe(
+        'Array of Jira ticket keys to transition (e.g. ["LS-1410", "LS-1413"])',
+      ),
+    status: z.enum(VALID_STATUSES).describe('Target status for all tickets'),
+  },
+  async (params) => bulkTransition(params),
 );
 
 // Start the server
