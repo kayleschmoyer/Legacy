@@ -1,6 +1,7 @@
 export * from './models/ActivityLog';
 export * from './models/Badges';
 export * from './models/Chat';
+export * from './models/Dues';
 export * from './models/Enums';
 export * from './models/Leagues';
 export * from './models/Matchups';
