@@ -173,8 +173,8 @@ Set-Location D:\code\legacy-sports
 For each PR in `$scan.conflicting`:
 
 1. Enter the worktree (Step 2)
-2. **Fetch latest remote state so `origin/main` is up to date before rebasing**: from either the main repo or the worktree, run `git fetch origin`. Without this, `rebase origin/main` may use an outdated ref and GitHub will still show the PR as CONFLICTING.
-3. Rebase from the worktree: `git rebase origin/main` (or `.\scripts\rebase-pr.ps1 -Branch $branch`). If running from the main repo, use `git -C "$wtPath" rebase origin/main` instead.
+2. **Fetch latest remote state in the worktree**: `git -C $wt fetch origin` — worktrees have their own fetch state and may be stale even if the main repo fetched recently. Without this, `rebase origin/main` uses an outdated ref and GitHub will still show the PR as CONFLICTING.
+3. Rebase from the worktree: `git -C $wt rebase origin/main` (or `.\scripts\rebase-pr.ps1 -Branch $branch`)
 4. If conflicts arise → load `skills/rebase-conflicts/SKILL.md` and `skills/resolve-merge-conflicts/SKILL.md`
 5. After rebasing ALL PRs, batch-validate with parallel `make pc` (see Parallelization Strategy below)
 6. Push passing PRs: `git -C "$wtPath" push --force-with-lease origin HEAD`
