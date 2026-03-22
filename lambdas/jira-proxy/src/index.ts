@@ -387,7 +387,7 @@ export const baseHandler = async (
 
 /** Minimum query length to avoid overly broad Jira searches. */
 const MIN_SEARCH_QUERY_LENGTH = 3;
-/** Maximum allowed query length to prevent abuse. */
+/** Maximum query length — queries longer than this are silently truncated to prevent abuse. */
 const MAX_SEARCH_QUERY_LENGTH = 200;
 
 async function handleSearchBugs(
@@ -428,8 +428,9 @@ async function handleSearchBugs(
     );
   }
 
-  const query = typeof body['query'] === 'string' ? body['query'].trim() : '';
-  if (query.length < MIN_SEARCH_QUERY_LENGTH) {
+  const rawQuery =
+    typeof body['query'] === 'string' ? body['query'].trim() : '';
+  if (rawQuery.length < MIN_SEARCH_QUERY_LENGTH) {
     return jsonResponse(
       400,
       {
@@ -438,15 +439,7 @@ async function handleSearchBugs(
       event,
     );
   }
-  if (query.length > MAX_SEARCH_QUERY_LENGTH) {
-    return jsonResponse(
-      400,
-      {
-        error: `Query must be at most ${String(MAX_SEARCH_QUERY_LENGTH)} characters`,
-      },
-      event,
-    );
-  }
+  const query = rawQuery.slice(0, MAX_SEARCH_QUERY_LENGTH);
 
   try {
     const result = await searchJiraBugs(query, jiraProjectKey, jiraSecretName);

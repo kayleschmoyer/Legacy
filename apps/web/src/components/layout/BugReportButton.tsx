@@ -65,6 +65,8 @@ interface SimilarBug {
 
 /** Minimum characters before triggering a duplicate search. */
 const SEARCH_MIN_LENGTH = 10;
+/** Maximum query length sent to the backend search endpoint. */
+const SEARCH_MAX_LENGTH = 200;
 
 /**
  * A minimal "Report a Bug" button that opens a small dialog.
@@ -125,7 +127,7 @@ export const BugReportButton: React.FC = () => {
       },
       credentials: 'include',
       signal: controller.signal,
-      body: JSON.stringify({ query: trimmed }),
+      body: JSON.stringify({ query: trimmed.slice(0, SEARCH_MAX_LENGTH) }),
     })
       .then(async (res) => {
         if (!res.ok) {

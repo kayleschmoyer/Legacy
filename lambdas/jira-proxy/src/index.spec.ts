@@ -524,16 +524,20 @@ describe('Jira Proxy Handler', () => {
       expect(body.error).toContain('at least');
     });
 
-    it('returns 400 when query is too long', async () => {
+    it('truncates and succeeds when query exceeds max length', async () => {
+      mockSearchJiraBugs.mockResolvedValueOnce({ total: 0, issues: [] });
       const event = makeEvent({
         httpMethod: 'POST',
         path: '/jira/search',
         body: JSON.stringify({ query: 'a'.repeat(201) }),
       });
       const result = await baseHandler(event);
-      expect(result.statusCode).toBe(400);
-      const body = JSON.parse(result.body) as { error: string };
-      expect(body.error).toContain('at most');
+      expect(result.statusCode).toBe(200);
+      expect(mockSearchJiraBugs).toHaveBeenCalledWith(
+        'a'.repeat(200),
+        'LS',
+        'test-secret',
+      );
     });
 
     it('returns 400 when body is not JSON', async () => {
