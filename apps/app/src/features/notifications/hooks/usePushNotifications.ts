@@ -12,11 +12,11 @@ import {
   setNotificationHandler,
 } from 'expo-notifications';
 import type { EventSubscription } from 'expo-modules-core';
-import { isDevice } from 'expo-device';
 import { useRouter } from 'expo-router';
 import { LOGGER } from '@legacy-sports/logging';
 import { PermissionStatus } from 'expo-modules-core';
 import { useRegisterDeviceTokenMutation } from '../../../api/db/graphql.generated';
+import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
 
 // Configure how notifications appear when app is in foreground
 setNotificationHandler({
@@ -53,7 +53,7 @@ export function usePushNotifications(userId: number | null | undefined) {
     if (!userId) return;
 
     // Push notifications only work on physical devices
-    if (!isDevice) {
+    if (!isPhysicalDevice) {
       LOGGER.info('Skipping push registration on simulator/emulator');
       return;
     }
