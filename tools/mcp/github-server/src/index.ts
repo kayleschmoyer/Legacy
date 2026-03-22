@@ -14,6 +14,7 @@ import { prBatchStatus } from './tools/pr-batch-status.js';
 import { prDashboard } from './tools/pr-dashboard.js';
 import { prScan } from './tools/pr-scan.js';
 import { rebasePR } from './tools/rebase-pr.js';
+import { replyToThread } from './tools/reply-to-thread.js';
 import { requestReview } from './tools/request-review.js';
 import { resolveThread } from './tools/resolve-thread.js';
 import { resolveThreads } from './tools/resolve-threads.js';
@@ -134,6 +135,25 @@ server.tool(
       .describe('Maximum number of PRs to return (default: 20)'),
   },
   async (params) => listPRs(params),
+);
+
+// --- github_reply_to_thread ---
+server.tool(
+  'github_reply_to_thread',
+  'Post a reply comment on a PR review thread via GraphQL mutation. Use after reviewing feedback to respond before resolving. Get thread IDs from github_get_review_threads.',
+  {
+    threadId: z
+      .string()
+      .describe(
+        'GraphQL node ID of the review thread to reply to (from github_get_review_threads)',
+      ),
+    body: z
+      .string()
+      .trim()
+      .min(1, 'Reply body cannot be empty')
+      .describe('Markdown body of the reply comment'),
+  },
+  async (params) => replyToThread(params),
 );
 
 // --- github_manage_labels ---
