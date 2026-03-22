@@ -18,8 +18,14 @@ const ALLOWED_TARGETS = new Set([
   'format',
 ]);
 
-/** Shell metacharacters that must not appear in passthrough args (prevents injection via shell: true). */
-const SHELL_METACHAR_REGEX = /[;&|`$(){}]/;
+/**
+ * Shell metacharacters that must not appear in passthrough args.
+ * Defence-in-depth: runNx() uses shell:false so these cannot be interpreted,
+ * but we block them anyway to catch accidental misuse. Pipe `|` is intentionally
+ * allowed because it appears in Jest `--testPathPatterns` regex alternations and
+ * is safe with shell:false.
+ */
+const SHELL_METACHAR_REGEX = /[;&`$(){}]/;
 
 interface RunTargetParams {
   project: string;
@@ -63,7 +69,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             content: [
               {
                 type: 'text',
-                text: `Arg "${token}" contains shell metacharacters (;&|\`$(){}) which are not allowed. Pass each flag as a separate array element.`,
+                text: `Arg "${token}" contains shell metacharacters (;&\`$(){}) which are not allowed. Pass each flag as a separate array element.`,
               },
             ],
             isError: true,
