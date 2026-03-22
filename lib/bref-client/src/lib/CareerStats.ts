@@ -580,6 +580,8 @@ export async function getAllGameFieldingStats(
 
   const allRows = table.getElementsByTagName('tr');
   const results: GameFielding[] = [];
+  let skippedCount = 0;
+  const skippedSamples: string[] = [];
 
   for (const gameRow of allRows) {
     // Skip header rows and rows without game number
@@ -613,15 +615,29 @@ export async function getAllGameFieldingStats(
     const match = link?.match(GAME_IDENTIFIER_REGEX);
 
     if (!match?.groups?.[GAME_IDENTIFIER_GROUP]) {
-      throw new Error(
-        `Failed to parse game_identifier from fielding box score link: ${link ?? 'no link found'} (game ${gameNumber}, player ${player.brefId}, season ${season})`,
-      );
+      skippedCount++;
+      if (skippedSamples.length < 3) {
+        skippedSamples.push(`game ${gameNumber}: ${link ?? 'no link found'}`);
+      }
+      continue;
     }
     result.gameIdentifier = match.groups[GAME_IDENTIFIER_GROUP];
     result.season = season;
     result.gameNum = gameNumber;
 
     results.push(result);
+  }
+
+  if (skippedCount > 0) {
+    LOGGER.warn(
+      `Skipped ${skippedCount} fielding game row(s) — failed to parse game_identifier from box score link (player ${player.brefId}, season ${season}). Samples: ${skippedSamples.join('; ')}`,
+    );
+  }
+
+  if (results.length === 0 && skippedCount > 0) {
+    throw new Error(
+      `All ${skippedCount} fielding game rows were unparseable for player ${player.brefId} season ${season} position ${pos}`,
+    );
   }
 
   LOGGER.info(
@@ -655,6 +671,8 @@ export async function getAllGameBattingStats(
 
   const allRows = table.getElementsByTagName('tr');
   const results: GameBatting[] = [];
+  let skippedCount = 0;
+  const skippedSamples: string[] = [];
 
   for (const gameRow of allRows) {
     // Skip header rows and rows without game number
@@ -688,15 +706,29 @@ export async function getAllGameBattingStats(
     const match = link?.match(GAME_IDENTIFIER_REGEX);
 
     if (!match?.groups?.[GAME_IDENTIFIER_GROUP]) {
-      throw new Error(
-        `Failed to parse game_identifier from batting box score link: ${link ?? 'no link found'} (game ${gameNumber}, player ${player.brefId}, season ${season})`,
-      );
+      skippedCount++;
+      if (skippedSamples.length < 3) {
+        skippedSamples.push(`game ${gameNumber}: ${link ?? 'no link found'}`);
+      }
+      continue;
     }
     result.gameIdentifier = match.groups[GAME_IDENTIFIER_GROUP];
     result.season = season;
     result.gameNum = gameNumber;
 
     results.push(result);
+  }
+
+  if (skippedCount > 0) {
+    LOGGER.warn(
+      `Skipped ${skippedCount} batting game row(s) — failed to parse game_identifier from box score link (player ${player.brefId}, season ${season}). Samples: ${skippedSamples.join('; ')}`,
+    );
+  }
+
+  if (results.length === 0 && skippedCount > 0) {
+    throw new Error(
+      `All ${skippedCount} batting game rows were unparseable for player ${player.brefId} season ${season}`,
+    );
   }
 
   LOGGER.info(
@@ -844,6 +876,8 @@ export async function getAllGamePitchingStats(
 
   const allRows = table.getElementsByTagName('tr');
   const results: GamePitching[] = [];
+  let skippedCount = 0;
+  const skippedSamples: string[] = [];
 
   for (const gameRow of allRows) {
     // Skip header rows and rows without game number
@@ -879,9 +913,11 @@ export async function getAllGamePitchingStats(
     const match = link?.match(GAME_IDENTIFIER_REGEX);
 
     if (!match?.groups?.[GAME_IDENTIFIER_GROUP]) {
-      throw new Error(
-        `Failed to parse game_identifier from pitching box score link: ${link ?? 'no link found'} (game ${gameNumber}, player ${player.brefId}, season ${season})`,
-      );
+      skippedCount++;
+      if (skippedSamples.length < 3) {
+        skippedSamples.push(`game ${gameNumber}: ${link ?? 'no link found'}`);
+      }
+      continue;
     }
     result.gameIdentifier = match.groups[GAME_IDENTIFIER_GROUP];
     result.season = season;
@@ -938,6 +974,18 @@ export async function getAllGamePitchingStats(
     }
 
     results.push(result);
+  }
+
+  if (skippedCount > 0) {
+    LOGGER.warn(
+      `Skipped ${skippedCount} pitching game row(s) — failed to parse game_identifier from box score link (player ${player.brefId}, season ${season}). Samples: ${skippedSamples.join('; ')}`,
+    );
+  }
+
+  if (results.length === 0 && skippedCount > 0) {
+    throw new Error(
+      `All ${skippedCount} pitching game rows were unparseable for player ${player.brefId} season ${season}`,
+    );
   }
 
   LOGGER.info(
