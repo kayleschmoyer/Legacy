@@ -211,7 +211,9 @@ runs:
           lambda-code:
             - lambdas/**
           config:
-            - tools/**
+            - tools/eslint-config/**
+            - tools/vite-configs/**
+            - tools/scripts/**
             - nx.json
             - tsconfig*.json
           terraform:
