@@ -9,10 +9,11 @@ import {
   H1,
   Paragraph,
   Separator,
+  useAuth,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components';
-import { ScrollView, styled } from 'tamagui';
+import { ScrollView, Spinner, styled } from 'tamagui';
 import { PageMeta } from '../../components/PageMeta';
 import {
   BG_DARK,
@@ -22,6 +23,12 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { useThemeContext } from '../../context/ThemeContext';
+import {
+  GetUserNotificationPreferences,
+  type GetUserNotificationPreferencesQuery,
+  useGetUserNotificationPreferencesQuery,
+  useUpdateNotificationPreferencesMutation,
+} from '../../api/db/graphql.generated';
 
 /* ─── Storage key ─── */
 
@@ -322,9 +329,237 @@ function ChipGroup<T extends string>({
 
 /* ─── Main Component ─── */
 
+/* ─── Notification Preferences Sub-component ─── */
+
+function NotificationPreferencesSection({
+  cardStyle,
+  isDark,
+}: {
+  cardStyle: React.CSSProperties;
+  isDark: boolean;
+}) {
+  const { data, loading, error } = useGetUserNotificationPreferencesQuery();
+  const [updatePrefs] = useUpdateNotificationPreferencesMutation();
+
+  const prefs = data?.getUserNotificationPreferences;
+
+  type NotificationToggleField =
+    | 'matchupStartedEnabled'
+    | 'matchupEndedEnabled'
+    | 'matchupCloseGameEnabled'
+    | 'matchupReminderEnabled'
+    | 'pushEnabled'
+    | 'emailEnabled';
+
+  const handleToggle = useCallback(
+    (field: NotificationToggleField, value: boolean) => {
+      const optimisticResult = {
+        __typename: 'NotificationPreference' as const,
+        id: prefs?.id ?? 0,
+        userId: prefs?.userId ?? 0,
+        matchupStartedEnabled: prefs?.matchupStartedEnabled ?? true,
+        matchupEndedEnabled: prefs?.matchupEndedEnabled ?? true,
+        matchupCloseGameEnabled: prefs?.matchupCloseGameEnabled ?? true,
+        matchupReminderEnabled: prefs?.matchupReminderEnabled ?? true,
+        pushEnabled: prefs?.pushEnabled ?? true,
+        emailEnabled: prefs?.emailEnabled ?? false,
+        closeGameThreshold: prefs?.closeGameThreshold ?? 50,
+        createdAt: prefs?.createdAt ?? '',
+        updatedAt: new Date().toISOString(),
+        [field]: value,
+      };
+
+      void updatePrefs({
+        variables: { input: { [field]: value } },
+        optimisticResponse: {
+          __typename: 'Mutation',
+          updateNotificationPreferences: optimisticResult,
+        },
+        update(cache, { data: mutationData }) {
+          if (mutationData?.updateNotificationPreferences) {
+            cache.writeQuery<GetUserNotificationPreferencesQuery>({
+              query: GetUserNotificationPreferences,
+              data: {
+                __typename: 'Query',
+                getUserNotificationPreferences:
+                  mutationData.updateNotificationPreferences,
+              },
+            });
+          }
+        },
+      });
+    },
+    [updatePrefs, prefs],
+  );
+
+  if (loading) {
+    return (
+      <SectionCard style={cardStyle}>
+        <SectionHeader>
+          <SectionIconBox>
+            <Paragraph fontSize={16} lineHeight={18}>
+              <span role="img" aria-label="notifications">
+                🔔
+              </span>
+            </Paragraph>
+          </SectionIconBox>
+          <YStack flex={1}>
+            <Paragraph size="$4" color="$color" fontWeight="600">
+              Notifications
+            </Paragraph>
+            <Paragraph size="$2" color="$colorPress">
+              Push and email notification settings
+            </Paragraph>
+          </YStack>
+        </SectionHeader>
+        <SectionBody>
+          <XStack justifyContent="center" padding="$4">
+            <Spinner
+              size="small"
+              color={isDark ? BRAND_GOLD_LIGHT : BRAND_NAVY}
+            />
+          </XStack>
+        </SectionBody>
+      </SectionCard>
+    );
+  }
+
+  if (error && !loading) {
+    return (
+      <SectionCard style={cardStyle}>
+        <SectionHeader>
+          <SectionIconBox>
+            <Paragraph fontSize={16} lineHeight={18}>
+              <span role="img" aria-label="notifications">
+                🔔
+              </span>
+            </Paragraph>
+          </SectionIconBox>
+          <YStack flex={1}>
+            <Paragraph size="$4" color="$color" fontWeight="600">
+              Notifications
+            </Paragraph>
+            <Paragraph size="$2" color="$colorPress">
+              Push and email notification settings
+            </Paragraph>
+          </YStack>
+        </SectionHeader>
+        <SectionBody>
+          <Paragraph size="$4" fontWeight="600" color="$color">
+            Unable to load notification preferences
+          </Paragraph>
+          <Paragraph size="$3" color="$colorPress">
+            There was a problem fetching your notification settings. Please try
+            again later.
+          </Paragraph>
+        </SectionBody>
+      </SectionCard>
+    );
+  }
+
+  const pushEnabled = prefs?.pushEnabled ?? true;
+  const emailEnabled = prefs?.emailEnabled ?? false;
+  const matchupStartedEnabled = prefs?.matchupStartedEnabled ?? true;
+  const matchupEndedEnabled = prefs?.matchupEndedEnabled ?? true;
+  const matchupCloseGameEnabled = prefs?.matchupCloseGameEnabled ?? true;
+  const matchupReminderEnabled = prefs?.matchupReminderEnabled ?? true;
+
+  return (
+    <SectionCard style={cardStyle}>
+      <SectionHeader>
+        <SectionIconBox>
+          <Paragraph fontSize={16} lineHeight={18}>
+            <span role="img" aria-label="notifications">
+              🔔
+            </span>
+          </Paragraph>
+        </SectionIconBox>
+        <YStack flex={1}>
+          <Paragraph size="$4" color="$color" fontWeight="600">
+            Notifications
+          </Paragraph>
+          <Paragraph size="$2" color="$colorPress">
+            Push and email notification settings
+          </Paragraph>
+        </YStack>
+      </SectionHeader>
+
+      <SectionBody>
+        <Paragraph size="$3" color="$colorPress" fontWeight="600">
+          Delivery channels
+        </Paragraph>
+
+        <PrefToggle
+          value={pushEnabled}
+          onChange={(v) => handleToggle('pushEnabled', v)}
+          label="Push notifications"
+          description="Receive push notifications on your devices"
+        />
+
+        <Separator />
+
+        <PrefToggle
+          value={emailEnabled}
+          onChange={(v) => handleToggle('emailEnabled', v)}
+          label="Email notifications"
+          description="Receive notifications via email"
+        />
+
+        <Separator />
+
+        <Paragraph
+          size="$3"
+          color="$colorPress"
+          fontWeight="600"
+          paddingTop="$2"
+        >
+          Matchup alerts
+        </Paragraph>
+
+        <PrefToggle
+          value={matchupStartedEnabled}
+          onChange={(v) => handleToggle('matchupStartedEnabled', v)}
+          label="Matchup started"
+          description="Get notified when a new matchup period begins"
+        />
+
+        <Separator />
+
+        <PrefToggle
+          value={matchupEndedEnabled}
+          onChange={(v) => handleToggle('matchupEndedEnabled', v)}
+          label="Matchup ended"
+          description="Get notified when a matchup period ends with final results"
+        />
+
+        <Separator />
+
+        <PrefToggle
+          value={matchupCloseGameEnabled}
+          onChange={(v) => handleToggle('matchupCloseGameEnabled', v)}
+          label="Close game alerts"
+          description="Get notified when your matchup is within the close-game threshold"
+        />
+
+        <Separator />
+
+        <PrefToggle
+          value={matchupReminderEnabled}
+          onChange={(v) => handleToggle('matchupReminderEnabled', v)}
+          label="Matchup reminders"
+          description="Receive reminders about upcoming matchup deadlines"
+        />
+      </SectionBody>
+    </SectionCard>
+  );
+}
+
+/* ─── Main Component ─── */
+
 const PreferencesPage: React.FC = () => {
   const { themePreference, resolvedTheme, setThemePreference } =
     useThemeContext();
+  const { isAuthenticated } = useAuth();
   const isDark = resolvedTheme === 'dark';
   const pageBackgroundStyle = useMemo(
     () => getPageBackgroundStyle(isDark),
@@ -536,6 +771,14 @@ const PreferencesPage: React.FC = () => {
               />
             </SectionBody>
           </SectionCard>
+
+          {/* ── Notifications ── */}
+          {isAuthenticated && (
+            <NotificationPreferencesSection
+              cardStyle={cardStyle}
+              isDark={isDark}
+            />
+          )}
         </ContentContainer>
       </ScrollView>
     </PageContainer>
