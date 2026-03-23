@@ -1801,29 +1801,75 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               'rerere auto-resolved all conflicts. Continuing rebase...',
             );
 
+            // Compute gitDir once for rebase-in-progress checks
+            let gitDir: string;
+            try {
+              gitDir = run('git rev-parse --absolute-git-dir', cwd).trim();
+            } catch (gdErr: unknown) {
+              const e = gdErr as { message?: string };
+              log.push(
+                `Warning: could not determine git dir: ${e.message ?? 'unknown error'}`,
+                'Cannot auto-continue rebase.',
+              );
+              return {
+                content: [{ type: 'text', text: log.join('\n') }],
+                isError: true,
+              };
+            }
+
+            // Helper: check if rebase is still in progress (filesystem only)
+            const isRebaseInProgress = (): boolean => {
+              return (
+                existsSync(join(gitDir, 'rebase-merge')) ||
+                existsSync(join(gitDir, 'rebase-apply'))
+              );
+            };
+
+            // Helper: append standardized completion message and return response
+            const rebaseCompleteResponse = (
+              summary: string,
+            ): { content: { type: 'text'; text: string }[] } => {
+              log.push(summary);
+              log.push(
+                '',
+                'Rebase complete (rerere auto-resolved). Next steps:',
+                '1. worktree_stabilize — run post-rebase stabilization',
+                '2. worktree_run(command: "make pc") — validate',
+                '3. worktree_push — push the validated branch',
+              );
+              return {
+                content: [{ type: 'text', text: log.join('\n') }],
+              };
+            };
+
+            // rerere + staging may have already completed the rebase
+            if (!isRebaseInProgress()) {
+              return rebaseCompleteResponse(
+                'Rebase already completed (rerere resolved all conflicts).',
+              );
+            }
+
             // Auto-continue loop using shared helper
             const maxIterations = 50; // Safety limit
             let iterations = 0;
 
             while (iterations < maxIterations) {
               iterations++;
+
+              // Check if rebase completed between iterations
+              if (!isRebaseInProgress()) {
+                return rebaseCompleteResponse(
+                  `Rebase completed after ${iterations - 1} auto-continue step(s).`,
+                );
+              }
+
               try {
                 const step = rebaseContinueStep(cwd);
 
                 if (step.completed) {
-                  log.push(
+                  return rebaseCompleteResponse(
                     `Rebase completed after ${iterations} auto-continue step(s).`,
                   );
-                  log.push(
-                    '',
-                    'Rebase complete (rerere auto-resolved). Next steps:',
-                    '1. worktree_stabilize — run post-rebase stabilization',
-                    '2. worktree_run(command: "make pc") — validate',
-                    '3. worktree_push — push the validated branch',
-                  );
-                  return {
-                    content: [{ type: 'text', text: log.join('\n') }],
-                  };
                 }
 
                 if (step.conflicted.length > 0) {
@@ -1846,6 +1892,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   `Step ${iterations}: auto-continued (rerere resolved)`,
                 );
               } catch (continueErr: unknown) {
+                // Check if the rebase completed despite the error
+                if (!isRebaseInProgress()) {
+                  return rebaseCompleteResponse(
+                    `Rebase completed after ${iterations} auto-continue step(s).`,
+                  );
+                }
+
                 const ce = continueErr as {
                   stdout?: string;
                   stderr?: string;
