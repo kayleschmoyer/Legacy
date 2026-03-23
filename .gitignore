@@ -323,3 +323,6 @@ scratch/*
 
 # Claude Code local settings (machine-specific paths and overrides)
 .claude/settings.local.json
+
+# Claude Code built-in worktrees (ephemeral, not ticket-tracked)
+.claude/worktrees/
