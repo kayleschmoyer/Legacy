@@ -35,11 +35,14 @@ export function mockDraft(overrides: Partial<MockDraft> = {}): MockDraft {
 export interface MockDraftPick {
   __typename: 'DraftPick';
   id: number;
+  draftId: number;
   round: number;
-  pick: number;
+  pickNumber: number;
+  overallPick: number;
+  pickedAt: string | null;
   teamId: number;
   playerId: number | null;
-  playerName: string | null;
+  player: { id: number; firstName: string; lastName: string } | null;
 }
 
 export function mockDraftPick(
@@ -48,11 +51,14 @@ export function mockDraftPick(
   return {
     __typename: 'DraftPick',
     id: 1,
+    draftId: 1,
     round: 1,
-    pick: 1,
+    pickNumber: 1,
+    overallPick: 1,
+    pickedAt: null,
     teamId: 1,
     playerId: null,
-    playerName: null,
+    player: null,
     ...overrides,
   };
 }
@@ -62,8 +68,10 @@ export interface MockDraftPlayer {
   id: number;
   firstName: string;
   lastName: string;
-  position: string;
-  team: string;
+  brefId: string;
+  eligiblePositions: string[];
+  hitterAvgPointsPerGame: number | null;
+  pitchingAvgPointsPerGame: number | null;
 }
 
 export function mockDraftPlayer(
@@ -74,8 +82,10 @@ export function mockDraftPlayer(
     id: 100,
     firstName: 'Mike',
     lastName: 'Trout',
-    position: 'CF',
-    team: 'LAA',
+    brefId: `player${overrides.id ?? 100}`,
+    eligiblePositions: ['CF'],
+    hitterAvgPointsPerGame: 5.0,
+    pitchingAvgPointsPerGame: null,
     ...overrides,
   };
 }
@@ -89,16 +99,40 @@ export function getDraftResponse(draft?: Partial<MockDraft>) {
 export function getDraftPicksResponse(picks?: Partial<MockDraftPick>[]) {
   return {
     data: {
-      getDraftPicks: (picks ?? []).map((p) => mockDraftPick(p)),
+      getDraftPicks: (picks ?? []).map((p) =>
+        mockDraftPick({
+          ...p,
+          pickedAt:
+            p.pickedAt ?? (p.playerId ? new Date().toISOString() : null),
+        }),
+      ),
     },
   };
 }
 
 export function getCurrentDraftPickResponse(
-  pick: Partial<MockDraftPick> | null = null,
+  pick: Partial<{
+    draftId: number;
+    teamId: number;
+    round: number;
+    pickNumber: number;
+    overallPick: number;
+    isComplete: boolean;
+  }> | null = null,
 ) {
   return {
-    data: { getCurrentDraftPick: pick ? mockDraftPick(pick) : null },
+    data: {
+      getCurrentDraftPick: pick
+        ? {
+            draftId: pick.draftId ?? 1,
+            teamId: pick.teamId ?? 1,
+            round: pick.round ?? 1,
+            pickNumber: pick.pickNumber ?? 1,
+            overallPick: pick.overallPick ?? 1,
+            isComplete: pick.isComplete ?? false,
+          }
+        : null,
+    },
   };
 }
 
@@ -129,5 +163,12 @@ export function startDraftResponse(
 }
 
 export function makeDraftPickResponse(pick?: Partial<MockDraftPick>) {
-  return { data: { makeDraftPick: mockDraftPick(pick) } };
+  return {
+    data: {
+      makeDraftPick: mockDraftPick({
+        pickedAt: new Date().toISOString(),
+        ...pick,
+      }),
+    },
+  };
 }
