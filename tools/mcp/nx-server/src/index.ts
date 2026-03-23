@@ -20,8 +20,8 @@ const server = new McpServer({
 const NPM_NAME_REGEX = /^(@[a-z0-9\-._]+\/)?[a-z0-9\-._]+$/;
 // Semver-ish: digits.digits.digits with optional pre-release/build, or dist-tags like "latest", "next"
 const VERSION_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9.\-+_^~>=<!* ]*$/;
-// Absolute path: Windows (C:\...) or Unix (/...)
-const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:\\|\/)/;
+// Absolute path: Windows (C:\... or C:/...) or Unix (/...)
+const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:[/\\]|\/)/;
 
 // --- nx_affected ---
 server.tool(

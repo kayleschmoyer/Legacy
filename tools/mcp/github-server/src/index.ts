@@ -266,7 +266,7 @@ server.tool(
     draft: z.boolean().default(false).describe('Create as draft'),
     worktreePath: z
       .string()
-      .refine((p) => !p || /^([A-Za-z]:\\|\/)/.test(p), {
+      .refine((p) => !p || /^([A-Za-z]:[/\\]|\/)/.test(p), {
         message: 'worktreePath must be an absolute path',
       })
       .optional()

@@ -8,7 +8,8 @@ import { runTarget } from './tools/run-target.js';
 import { worktreeCreate } from './tools/worktree-create.js';
 import { wtSetup } from './tools/wt-setup.js';
 
-const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:\\|\/)/;
+// Absolute path: Windows (C:\... or C:/...) or Unix (/...)
+const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:[/\\]|\/)/;
 
 const server = new McpServer({
   name: 'legacy-sports-make',
