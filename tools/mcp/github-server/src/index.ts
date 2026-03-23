@@ -23,6 +23,7 @@ import { secretSet } from './tools/secret-set.js';
 import { requestReview } from './tools/request-review.js';
 import { resolveThread } from './tools/resolve-thread.js';
 import { resolveThreads } from './tools/resolve-threads.js';
+import { secretsCheck } from './tools/secrets-check.js';
 import { viewPR } from './tools/view-pr.js';
 
 /**
@@ -502,6 +503,22 @@ server.tool(
       .describe('Thread node IDs from github_get_review_threads'),
   },
   async (params) => resolveThreads(params),
+);
+
+// --- github_secrets_check ---
+server.tool(
+  'github_secrets_check',
+  'Check whether required repository secrets exist. Returns secret names (never values) and last updated timestamps. If specific names are provided, returns a boolean exists field for each.',
+  {
+    names: z
+      .array(z.string())
+      .min(1)
+      .optional()
+      .describe(
+        'Specific secret names to check for existence. If omitted, lists all secret names.',
+      ),
+  },
+  async (params) => secretsCheck(params),
 );
 
 // --- github_view_pr ---
