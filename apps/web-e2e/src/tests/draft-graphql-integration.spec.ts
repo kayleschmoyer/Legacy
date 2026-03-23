@@ -31,7 +31,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
    * Build a mock response for the given operation based on the POST body.
    * Returns a per-operation mock so the page can render correctly.
    */
-  function buildMockResponse(body: GraphQLRequest): GraphQLResponse {
+  function buildMockResponse(body: GraphQLRequest): GraphQLResponse | null {
     const op = (body.operationName ?? body.query ?? '').toLowerCase();
 
     if (
@@ -148,8 +148,9 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
       return { data: { leagueScoringProfile: null } };
     }
 
-    // Default fallback — return empty data to prevent unhandled operation errors
-    return { data: {} };
+    // Return null to signal the route handler should fall through to the
+    // baseline _apiIsolation fixture for app shell queries
+    return null;
   }
 
   /**
@@ -177,9 +178,16 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
         if (requestBody) {
           try {
             const body = JSON.parse(requestBody) as GraphQLRequest;
-            graphqlRequests.push(body);
-
             const mockResponse = buildMockResponse(body);
+
+            if (mockResponse === null) {
+              // Unknown operation — fall through to the baseline
+              // _apiIsolation fixture for app shell queries
+              await route.fallback();
+              return;
+            }
+
+            graphqlRequests.push(body);
             graphqlResponses.push(mockResponse);
 
             await route.fulfill({
@@ -188,24 +196,10 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
               body: JSON.stringify(mockResponse),
             });
           } catch {
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({
-                errors: [{ message: '[E2E] Failed to parse GraphQL request' }],
-                data: null,
-              }),
-            });
+            await route.fallback();
           }
         } else {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              errors: [{ message: '[E2E] GraphQL request missing POST body' }],
-              data: null,
-            }),
-          });
+          await route.fallback();
         }
       },
     );

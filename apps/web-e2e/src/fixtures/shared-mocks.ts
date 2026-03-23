@@ -102,6 +102,21 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
 
   // ── Invite code ───────────────────────────────────────────────────
   validateinvitecode: { data: { validateInviteCode: null } },
+
+  // ── Preferences ─────────────────────────────────────────────────
+  getusernotificationpreferences: {
+    data: { getUserNotificationPreferences: null },
+  },
+
+  // ── Players ─────────────────────────────────────────────────────
+  getallplayers: { data: { players: [] } },
+  getplayerswithstats: { data: { playersWithStats: [] } },
+  searchplayers: { data: { searchPlayers: [] } },
+  getallplayerseasonstats: { data: { allPlayerSeasonStats: null } },
+  getplayercareerarc: { data: { playerCareerArc: null } },
+
+  // ── Waiver / trade (league pages) ──────────────────────────────
+  getwaiverorder: { data: { waiverOrder: [] } },
 };
 
 // ---------------------------------------------------------------------------

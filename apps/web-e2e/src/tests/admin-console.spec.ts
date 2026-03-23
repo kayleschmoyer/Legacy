@@ -247,14 +247,18 @@ adminTest.describe('Admin Console — user search @regression', () => {
     await mockAdminGraphQL(page);
     await page.goto('/admin');
     await page.waitForLoadState('load');
-    await expect(page.getByText('alice')).toBeVisible();
+    await expect(
+      page.getByText('alice', { exact: true }).first(),
+    ).toBeVisible();
 
     // Type "bob" in search box
     await page.getByPlaceholder(/search by name, email, or id/i).fill('bob');
 
     // alice should be hidden; bob should remain
-    await expect(page.getByText('bob')).toBeVisible();
-    await expect(page.getByText('alice')).not.toBeVisible();
+    await expect(page.getByText('bob', { exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByText('alice', { exact: true }).first(),
+    ).not.toBeVisible();
   });
 
   adminTest(
@@ -263,7 +267,9 @@ adminTest.describe('Admin Console — user search @regression', () => {
       await mockAdminGraphQL(page);
       await page.goto('/admin');
       await page.waitForLoadState('load');
-      await expect(page.getByText('alice')).toBeVisible();
+      await expect(
+        page.getByText('alice', { exact: true }).first(),
+      ).toBeVisible();
 
       await page
         .getByPlaceholder(/search by name, email, or id/i)

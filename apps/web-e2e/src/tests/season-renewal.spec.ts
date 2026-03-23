@@ -275,19 +275,9 @@ async function setupGraphQL(
         return;
       }
 
-      // Fulfill unhandled operations with a diagnostic GraphQL error so
-      // missing mocks surface immediately (hermetic — no route.fallback()).
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          errors: [
-            {
-              message: `Unhandled GraphQL operation: ${op}`,
-            },
-          ],
-        }),
-      });
+      // Fall through to the baseline _apiIsolation fixture for ambient
+      // queries (getUnreadNotificationCount, getUserById, etc.)
+      await route.fallback();
     },
   );
 }

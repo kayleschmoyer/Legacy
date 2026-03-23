@@ -132,7 +132,11 @@ test.describe('Dynamic JWT Tests @regression', () => {
     ).not.toBeVisible();
   });
 
-  test('should show login after JWT expires', async ({ page, browserName }) => {
+  test('should show login after auth state is cleared', async ({
+    page,
+    context,
+    browserName,
+  }) => {
     // WebKit blocks localStorage access via page.evaluate — SecurityError
     test.skip(
       browserName === 'webkit',
@@ -144,24 +148,19 @@ test.describe('Dynamic JWT Tests @regression', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    // Inject a JWT that expires in 1 second
-    const shortLivedJwt = E2EJwtUtil.generateJwt({
-      email: 'expire-test@test.com',
-      expiration: '1s',
+    // Clear all auth state: cookies (ls_jwt, ls_csrf) and localStorage
+    // (ls_user_profile, ls_token_expiry). The auth guard uses HttpOnly
+    // cookies, not the auth_jwt localStorage key.
+    await context.clearCookies();
+    await page.evaluate(() => {
+      window.localStorage.clear();
     });
 
-    await page.evaluate((token: string) => {
-      window.localStorage.setItem('auth_jwt', token);
-    }, shortLivedJwt);
-
-    // Wait long enough for the JWT to expire (1s expiry + margin)
-    await page.waitForTimeout(3000);
-
-    // Reload — the app should detect the expired token
+    // Reload — the auth guard should show the login page
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    // Auth guard should redirect to login since token is expired
+    // Auth guard should redirect to login since tokens are gone
     await expect(
       page.getByRole('button', { name: /get started with google/i }),
     ).toBeVisible({

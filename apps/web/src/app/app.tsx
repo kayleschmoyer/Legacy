@@ -307,7 +307,10 @@ function Navigation() {
 
           {/* ── Right section ── */}
           <XStack alignItems="center" gap="$3" flexShrink={0}>
-            <BugReportButton />
+            {/* Hide bug-report on narrow viewports to keep hamburger in viewport */}
+            <XStack display="none" $gtMd={{ display: 'flex' }}>
+              <BugReportButton />
+            </XStack>
             <NotificationDropdown />
             <UserProfileDropdown />
 

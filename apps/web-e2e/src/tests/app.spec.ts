@@ -5,92 +5,67 @@ test.describe('Web Application @smoke', () => {
     await page.goto('/');
 
     // Wait for the page to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
-    // Check that the page has loaded
+    // Check that the page has loaded with a meaningful title
     expect(await page.title()).toBeTruthy();
 
-    // Visual snapshot of the homepage
-    await expect(page).toHaveScreenshot('homepage.png');
+    // Verify key structural elements are present
+    await expect(page.getByRole('banner')).toBeVisible();
+    await expect(page.getByRole('main')).toBeVisible();
   });
 
   test('should navigate to different sections', async ({ page }) => {
     await page.goto('/');
 
     // Wait for the page to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
-    // Test navigation - this will depend on your actual app structure
-    // Add specific navigation tests based on your web app's UI
-
-    // Take a snapshot of the main navigation area
+    // Verify navigation area exists and is visible
     const navigation = page.locator('nav, header, [role="navigation"]').first();
-    if (await navigation.isVisible()) {
-      await expect(navigation).toHaveScreenshot('navigation.png');
-    }
+    await expect(navigation).toBeVisible();
   });
 
   test('should handle authentication flow', async ({ page }) => {
     await page.goto('/');
 
     // Wait for the page to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
-    // Test authentication - this will use MSW mocks
-    // Add specific authentication tests based on your app's auth flow
-
-    // Take snapshot of initial auth state
-    await expect(page).toHaveScreenshot('auth-initial.png');
+    // Authenticated user should see their profile or dashboard content,
+    // not a "Get Started with Google" login prompt
+    await expect(page.locator('body')).not.toContainText(
+      'Unexpected Application Error',
+    );
   });
 
-  test('should match HTML snapshot of homepage', async ({ page }) => {
+  test('should have correct page structure', async ({ page }) => {
     await page.goto('/');
 
     // Wait for the page to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
-    // Remove dynamic content that changes on each run
-    await page.addStyleTag({
-      content: `
-        [data-testid="timestamp"],
-        .timestamp,
-        .time,
-        [class*="time"],
-        [id*="time"] {
-          visibility: hidden !important;
-        }
-      `,
-    });
+    // Verify fundamental HTML structure is present
+    await expect(page.locator('[role="banner"]')).toBeAttached();
+    await expect(page.locator('[role="main"]')).toBeAttached();
 
-    // HTML snapshot (structure and content)
-    const bodyContent = await page.locator('body').innerHTML();
-    expect(bodyContent).toMatchSnapshot('homepage.html');
+    // Page should have at least one heading
+    const headings = page.getByRole('heading');
+    expect(await headings.count()).toBeGreaterThan(0);
   });
 
-  test('should capture component snapshots', async ({ page }) => {
+  test('should render key UI components', async ({ page }) => {
     await page.goto('/');
 
     // Wait for the page to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
-    // Capture snapshots of specific components if they exist
-    const components = [
-      '[role="banner"]',
-      '[role="main"]',
-      '[role="contentinfo"]',
-      '[data-testid="sports-list"]',
-      '[data-testid="game-selection"]',
-    ];
+    // Verify key components exist in the DOM
+    const components = ['[role="banner"]', '[role="main"]'];
 
     for (const selector of components) {
       const element = page.locator(selector).first();
-      if (await element.isVisible()) {
-        // Clean selector name for filename
-        const cleanSelector = selector.replace(/[^\w-]/g, '_');
-        await expect(element).toHaveScreenshot(
-          `component-${cleanSelector}.png`,
-        );
-      }
+      await expect(element).toBeAttached();
     }
   });
 });

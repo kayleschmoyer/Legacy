@@ -144,11 +144,7 @@ async function mockMatchupGraphQL(page: import('@playwright/test').Page) {
           body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
         });
       } else {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: {} }),
-        });
+        await route.fallback();
       }
     },
   );
@@ -291,11 +287,7 @@ test.describe('Matchup Detail – error state @regression', () => {
         });
       } else {
         // Stub all other operations so the test isolates the error path
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: {} }),
-        });
+        await route.fallback();
       }
     });
 

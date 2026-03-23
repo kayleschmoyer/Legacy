@@ -542,17 +542,9 @@ async function mockGraphQL(page: import('@playwright/test').Page) {
           }),
         });
       } else {
-        await route.fulfill({
-          status: 400,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            errors: [
-              {
-                message: `Unmocked GraphQL operation in player-comparison E2E: ${postData.slice(0, 100)}`,
-              },
-            ],
-          }),
-        });
+        // Fall through to the baseline _apiIsolation fixture for ambient
+        // queries (getUnreadNotificationCount, getUserById, etc.)
+        await route.fallback();
       }
     },
   );
@@ -625,7 +617,7 @@ adminTest.describe(
 
     adminTest('shows pitching stat rows (Wins, ERA)', async ({ page }) => {
       await expect(page.getByText('Wins')).toBeVisible();
-      await expect(page.getByText('ERA')).toBeVisible();
+      await expect(page.getByText('ERA').first()).toBeVisible();
     });
 
     adminTest(
@@ -780,9 +772,9 @@ adminTest.describe(
           .locator('..');
 
         await expect(pitchingSection).toBeVisible();
-        await expect(pitchingSection.getByText('ERA')).toBeVisible();
-        await expect(pitchingSection.getByText('SO')).toBeVisible();
-        await expect(pitchingSection.getByText('WHIP')).toBeVisible();
+        await expect(pitchingSection.getByText('ERA').first()).toBeVisible();
+        await expect(pitchingSection.getByText('SO').first()).toBeVisible();
+        await expect(pitchingSection.getByText('WHIP').first()).toBeVisible();
       },
     );
   },

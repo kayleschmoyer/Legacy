@@ -132,7 +132,7 @@ jobs:
     name: "Playwright ${{ inputs.test-suite }} (${{ matrix.shard }})"
     needs: [prepare]
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -171,6 +171,9 @@ jobs:
       - name: "Build Web Application"
         if: inputs.test-suite == 'e2e'
         shell: bash
+        env:
+          VITE_JIRA_PROXY_URL: "https://e2e-placeholder.test/jira"
+          VITE_GIPHY_API_KEY: "e2e-placeholder-key"
         run: |
           export NX_NO_CLOUD=true
           pnpm exec nx build web

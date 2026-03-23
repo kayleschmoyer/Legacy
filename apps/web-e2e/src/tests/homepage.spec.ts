@@ -37,8 +37,9 @@ test.describe('Homepage @smoke', () => {
   });
 
   test('displays the Baseball sport card', async ({ page }) => {
-    // Sports grid card with "Baseball" label
-    await expect(page.getByText('Baseball')).toBeVisible();
+    // Sports grid card with "Baseball" label — use .first() to avoid strict
+    // mode violation when multiple elements contain the word "Baseball"
+    await expect(page.getByText('Baseball').first()).toBeVisible();
   });
 
   test('Create League quick-action navigates to league creation', async ({

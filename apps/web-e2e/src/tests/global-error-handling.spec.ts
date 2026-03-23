@@ -128,7 +128,7 @@ test.describe('GraphQL error states on pages @regression', () => {
     await expect(
       page
         .getByRole('alert')
-        .or(page.getByText(/error|failed|unavailable/i))
+        .or(page.getByText(/error|failed|unavailable/i).first())
         .first(),
     ).toBeVisible();
   });
@@ -154,7 +154,8 @@ test.describe('GraphQL error states on pages @regression', () => {
     await expect(
       page
         .getByRole('alert')
-        .or(page.getByText(/error|failed|something went wrong/i).first()),
+        .or(page.getByText(/error|failed|something went wrong/i).first())
+        .first(),
     ).toBeVisible();
   });
 
@@ -179,7 +180,8 @@ test.describe('GraphQL error states on pages @regression', () => {
     await expect(
       page
         .getByRole('alert')
-        .or(page.getByText(/error|failed|unable to load/i).first()),
+        .or(page.getByText(/error|failed|unable to load/i).first())
+        .first(),
     ).toBeVisible();
   });
 });
@@ -207,7 +209,8 @@ test.describe('Network error handling @regression', () => {
     await expect(
       page
         .getByRole('alert')
-        .or(page.getByText(/error|failed|went wrong/i).first()),
+        .or(page.getByText(/error|failed|went wrong/i).first())
+        .first(),
     ).toBeVisible();
   });
 });

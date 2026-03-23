@@ -212,12 +212,9 @@ async function setupCommissionerGraphQL(
           body: JSON.stringify({ data: { userLeagues: [league] } }),
         });
       } else {
-        // Default mock — return empty data for any unhandled GraphQL operations
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: {} }),
-        });
+        // Fall through to the baseline _apiIsolation fixture for ambient
+        // queries (getUnreadNotificationCount, getUserById, etc.)
+        await route.fallback();
       }
     },
   );
@@ -255,9 +252,11 @@ test.describe('Draft Order Control @regression', () => {
   });
 
   test('shows Draft Pick Order heading @smoke', async ({ page }) => {
-    // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText
+    // Target the heading inside the expanded card, not the accordion trigger button
     await expect(
-      page.getByText('Draft Pick Order', { exact: true }),
+      page
+        .locator('[data-state="open"]')
+        .getByText('Draft Pick Order', { exact: true }),
     ).toBeVisible();
   });
 
@@ -288,7 +287,7 @@ test.describe('Draft Order Control @regression', () => {
     page,
   }) => {
     await expect(
-      page.getByText(/drag to reorder|randomize the pick order/i),
+      page.getByText(/drag to reorder|randomize the pick order/i).first(),
     ).toBeVisible();
   });
 });
@@ -303,9 +302,11 @@ test.describe('Draft Settings Control @regression', () => {
   });
 
   test('shows Draft Settings heading @smoke', async ({ page }) => {
-    // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText
+    // Target the heading inside the expanded card, not the accordion trigger button
     await expect(
-      page.getByText('Draft Settings', { exact: true }),
+      page
+        .locator('[data-state="open"]')
+        .getByText('Draft Settings', { exact: true }),
     ).toBeVisible();
   });
 

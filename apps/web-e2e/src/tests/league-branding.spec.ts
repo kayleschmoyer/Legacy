@@ -239,7 +239,7 @@ test.describe('League Branding — non-commissioner @regression', () => {
     });
 
     await page.goto('/baseball/league/1');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // The Commissioner tab should not be visible for non-commissioners
     await expect(

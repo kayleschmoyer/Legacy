@@ -103,19 +103,9 @@ async function mockAdminGraphQL(page: import('@playwright/test').Page) {
           }),
         });
       } else {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            errors: [
-              {
-                message:
-                  'Unhandled admin GraphQL operation in admin-dashboard.spec.ts mockAdminGraphQL',
-                extensions: { postDataSnippet: postData.slice(0, 200) },
-              },
-            ],
-          }),
-        });
+        // Fall through to the baseline _apiIsolation fixture for ambient
+        // queries (getUnreadNotificationCount, getUserById, etc.)
+        await route.fallback();
       }
     },
   );

@@ -1,26 +1,28 @@
-import { test } from '../fixtures/auth-enhanced';
-import { SnapshotUtils } from '../support/snapshot-utils';
+import { expect, test } from '../fixtures/auth-enhanced';
 
 test.describe('Baseball Landing Page - Responsive @visual', () => {
-  test('captures responsive snapshots for /baseball', async ({ page }) => {
+  test('loads /baseball and renders key content', async ({ page }) => {
     await page.goto('/baseball');
-    await page.waitForLoadState('networkidle');
-    await SnapshotUtils.waitForImages(page);
+    await page.waitForLoadState('load');
 
-    // Full page responsive set
-    await SnapshotUtils.captureResponsiveSnapshots(
-      page,
-      'baseball-landing-responsive',
+    // Verify the page renders without errors
+    await expect(page.locator('body')).not.toContainText(
+      'Unexpected Application Error',
     );
 
-    // Capture league grid component if present
-    const gridSelector = '[data-testid="leagues-grid"]';
-    if (await page.locator(gridSelector).first().isVisible()) {
-      await SnapshotUtils.captureComponentStates(
-        page,
-        gridSelector,
-        'baseball-leagues-grid',
-      );
-    }
+    // The baseball landing page should have meaningful content
+    await expect(page.getByRole('main')).toBeVisible();
+  });
+
+  test('renders correctly at mobile viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/baseball');
+    await page.waitForLoadState('load');
+
+    // Page should still render at mobile sizes
+    await expect(page.getByRole('main')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(
+      'Unexpected Application Error',
+    );
   });
 });

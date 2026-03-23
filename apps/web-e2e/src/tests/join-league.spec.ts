@@ -415,7 +415,8 @@ test.describe('Join League — keyboard submission @regression', () => {
     await lp.teamNameInput.fill('Keyboard Team');
 
     // Wait for server validation to pass and button to become enabled
-    await expect(lp.joinButton).toBeEnabled();
+    // (the validation query fires asynchronously when the invite code changes)
+    await expect(lp.joinButton).toBeEnabled({ timeout: 10000 });
 
     // Submit via keyboard — exercises the form onSubmit handler,
     // not the button onPress handler

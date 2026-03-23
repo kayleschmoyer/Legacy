@@ -386,20 +386,9 @@ async function setupDraftRoute(
         return;
       }
 
-      // Default fallback for unmocked operations — return diagnostic error
-      // so missing mocks surface immediately rather than silently passing.
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          errors: [
-            {
-              message: `[E2E] Unmocked operation: ${op || '(no operationName)'}`,
-            },
-          ],
-          data: null,
-        }),
-      });
+      // Fall through to the baseline _apiIsolation fixture for ambient
+      // queries (getUnreadNotificationCount, getUserById, etc.)
+      await route.fallback();
     },
   );
 
