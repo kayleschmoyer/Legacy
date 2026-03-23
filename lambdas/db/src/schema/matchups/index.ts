@@ -23,5 +23,8 @@ import './discord-score-alerts';
 // Discord lineup lock reminders (EventBridge hourly trigger)
 import './discord-reminders';
 
+// Discord weekly recaps (EventBridge weekly trigger)
+import './discord-weekly-recaps';
+
 // Re-export types that other schema modules may need
 export { MatchupPlayerGameRef } from './types';

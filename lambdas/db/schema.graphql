@@ -1600,6 +1600,11 @@ type Mutation {
   Check all active leagues for in-progress matchups and post score updates to Discord. Highlights close matchups within a point threshold. Triggered periodically by EventBridge.
   """
   sendDiscordScoreAlerts(leagueId: Int): SendDiscordScoreAlertsResult
+
+  """
+  Post weekly recaps (results, standings, top scorer) to Discord for all active leagues. Triggered weekly by EventBridge after matchup advancement.
+  """
+  sendDiscordWeeklyRecaps(leagueId: Int): SendDiscordWeeklyRecapsResult
   sendLeagueMessage(
     gifUrl: String
     leagueId: Int!
@@ -2813,6 +2818,15 @@ type SendDiscordScoreAlertsResult {
   closeMatchupsFound: Int
   errors: [String!]
   leaguesChecked: Int
+}
+
+"""
+Result of the weekly Discord recap post across all active leagues
+"""
+type SendDiscordWeeklyRecapsResult {
+  errors: [String!]
+  leaguesChecked: Int
+  recapsSent: Int
 }
 
 input SetTeamLockInput {

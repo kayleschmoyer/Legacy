@@ -265,3 +265,48 @@ resource "aws_lambda_permission" "discord_lineup_reminders_eventbridge" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.discord_lineup_reminders.arn
 }
+
+# ── Discord Weekly Recaps ──────────────────────────────────────────────────
+# Posts weekly recap (results, standings, top scorer) to league Discord channels.
+# Runs Sunday at 10am Eastern (15:00 UTC) — after autoAdvanceMatchups (8am UTC)
+# has advanced the week, so currentWeek-1 contains the just-completed week.
+# Note: 15:00 UTC = 10am EST / 11am EDT. EventBridge uses UTC; adjust if
+# DST precision is needed (same pattern as other schedules in this file).
+
+resource "aws_cloudwatch_event_rule" "discord_weekly_recaps" {
+  name                = "${local.name_prefix}-discord-weekly-recaps"
+  description         = "Post weekly Discord recaps every Sunday at 10am EST"
+  schedule_expression = "cron(0 15 ? * SUN *)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "discord_weekly_recaps" {
+  rule      = aws_cloudwatch_event_rule.discord_weekly_recaps.name
+  target_id = "discord-weekly-recaps"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { sendDiscordWeeklyRecaps { leaguesChecked recapsSent errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "discord_weekly_recaps_eventbridge" {
+  statement_id  = "AllowEventBridgeDiscordWeeklyRecaps"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.discord_weekly_recaps.arn
+}
