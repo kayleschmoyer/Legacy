@@ -186,7 +186,11 @@ export function SeasonRenewalControl({
 
             <XStack gap="$3" justifyContent="flex-end">
               <Dialog.Close displayWhenAdapted asChild>
-                <Button theme="alt2" disabled={loading}>
+                <Button
+                  theme="alt2"
+                  disabled={loading}
+                  accessibilityLabel="Cancel"
+                >
                   Cancel
                 </Button>
               </Dialog.Close>

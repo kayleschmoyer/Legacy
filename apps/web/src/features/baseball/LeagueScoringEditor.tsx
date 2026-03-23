@@ -785,6 +785,10 @@ export function LeagueScoringEditor(
                 >
                   {/* Group header — clickable to collapse */}
                   <XStack
+                    data-testid={`scoring-group-header-${group}`}
+                    role="button"
+                    aria-expanded={isExpanded}
+                    aria-label={`${copy.title} scoring group`}
                     paddingHorizontal="$4"
                     paddingVertical="$3"
                     alignItems="center"
@@ -844,13 +848,24 @@ export function LeagueScoringEditor(
 
                   {/* Stat rows — smooth height collapse via CSS grid */}
                   <YStack
+                    data-testid={`scoring-group-grid-${group}`}
                     style={{
                       display: 'grid',
                       gridTemplateRows: isExpanded ? '1fr' : '0fr',
                       transition: 'grid-template-rows 0.3s ease-out',
                     }}
                   >
-                    <YStack overflow="hidden" style={{ minHeight: 0 }}>
+                    <YStack
+                      overflow="hidden"
+                      aria-hidden={!isExpanded}
+                      style={{
+                        minHeight: 0,
+                        visibility: isExpanded ? 'visible' : 'hidden',
+                        transition: isExpanded
+                          ? 'visibility 0s'
+                          : 'visibility 0s 0.3s',
+                      }}
+                    >
                       <YStack paddingBottom="$2">
                         <Separator borderColor="$surfacePanelBorder" />
                         <YStack paddingTop="$1">

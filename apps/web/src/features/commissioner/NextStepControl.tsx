@@ -621,7 +621,9 @@ export function NextStepControl({
 
             <XStack gap="$3" justifyContent="flex-end">
               <Dialog.Close displayWhenAdapted asChild>
-                <Button theme="alt2">Cancel</Button>
+                <Button theme="alt2" accessibilityLabel="Cancel">
+                  Cancel
+                </Button>
               </Dialog.Close>
               <Button
                 backgroundColor={BRAND_NAVY_LIGHT}
@@ -715,7 +717,11 @@ export function NextStepControl({
 
             <XStack gap="$3" justifyContent="flex-end">
               <Dialog.Close displayWhenAdapted asChild>
-                <Button theme="alt2" disabled={renewalLoading}>
+                <Button
+                  theme="alt2"
+                  disabled={renewalLoading}
+                  accessibilityLabel="Cancel"
+                >
                   Cancel
                 </Button>
               </Dialog.Close>
