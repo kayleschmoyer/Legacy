@@ -95,9 +95,13 @@ function getWorktrees(): WorktreeInfo[] {
     // Skip the main repo entry
     if (!wtPath || resolve(wtPath) === resolve(MAIN_REPO)) continue;
 
-    // Extract Jira key from branch name (e.g. "LS-1136/mcp-worktree-server")
-    const keyMatch = branch?.match(/^(LS-\d+)/);
-    const key = keyMatch?.[1] ?? wtPath.split(/[\\/]/).pop() ?? wtPath;
+    // Extract Jira key from branch name (e.g. "LS-1136/mcp-worktree-server"),
+    // falling back to directory name (e.g. "LS-1136-mcp-worktree-server").
+    // During a rebase, HEAD is detached so branch may be null — the directory
+    // name fallback ensures ticket-key lookup still works.
+    const dirName = wtPath.split(/[\\/]/).pop() ?? wtPath;
+    const keyMatch = branch?.match(/^(LS-\d+)/) ?? dirName.match(/^(LS-\d+)/);
+    const key = keyMatch?.[1] ?? dirName;
 
     const nmPath = join(wtPath, 'node_modules');
     const junctioned = isJunction(nmPath);
