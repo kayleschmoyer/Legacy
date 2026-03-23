@@ -85,9 +85,9 @@ resource "aws_lambda_function" "rollbar_discord" {
 
   environment {
     variables = {
-      DISCORD_WEBHOOK_URL_SECRET_NAME = aws_secretsmanager_secret.discord_webhook_url.name
-      NODE_ENV                        = var.environment
-      LOG_LEVEL                       = "info"
+      DISCORD_WEBHOOK_URL_SECRET_NAME     = aws_secretsmanager_secret.discord_webhook_url.name
+      NODE_ENV                            = var.environment
+      LOG_LEVEL                           = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
 
       # Rollbar error tracking

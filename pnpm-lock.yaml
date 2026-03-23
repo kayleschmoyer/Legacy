@@ -883,6 +883,46 @@ importers:
         specifier: '*'
         version: 4.21.0
 
+  lambdas/discord-bot:
+    dependencies:
+      '@legacy-sports/aws-utils':
+        specifier: workspace:*
+        version: link:../../lib/aws-utils
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../../lib/logging
+      '@legacy-sports/rollbar':
+        specifier: workspace:*
+        version: link:../../lib/rollbar
+      '@legacy-sports/utils':
+        specifier: workspace:*
+        version: link:../../lib/utils
+      aws-lambda:
+        specifier: '*'
+        version: 1.0.7
+    devDependencies:
+      '@types/aws-lambda':
+        specifier: '*'
+        version: 8.10.161
+      '@types/node':
+        specifier: '*'
+        version: 24.10.0
+      express:
+        specifier: '*'
+        version: 4.21.2
+      jest:
+        specifier: '*'
+        version: 30.3.0(@types/node@24.10.0)(babel-plugin-macros@3.1.0)(esbuild-register@3.6.0(esbuild@0.27.2))(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.18))(@types/node@24.10.0)(typescript@5.9.3))
+      tsx:
+        specifier: '*'
+        version: 4.21.0
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vite:
+        specifier: '*'
+        version: 6.4.1(@types/node@24.10.0)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+
   lambdas/draft-processor:
     dependencies:
       '@legacy-sports/db-client':

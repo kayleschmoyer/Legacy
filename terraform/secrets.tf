@@ -59,6 +59,13 @@ variable "discord_user_signup_webhook_url" {
   default     = ""
 }
 
+variable "discord_bot_public_key" {
+  description = "Discord application public key for interaction signature verification"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # =============================================================================
 # GENERATED SECRETS
 # =============================================================================

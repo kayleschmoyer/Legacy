@@ -110,6 +110,22 @@ resource "aws_ssm_parameter" "stripe_webhook_lambda_version" {
   })
 }
 
+resource "aws_ssm_parameter" "discord_bot_lambda_version" {
+  name        = "/legacy-sports/${var.environment}/lambda/discord-bot/version"
+  description = "Current version of the Discord Bot Lambda function"
+  type        = "String"
+  value       = "initial"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  tags = merge(local.common_tags, {
+    Component = "lambda-versioning"
+    Function  = "discord-bot"
+  })
+}
+
 resource "aws_ssm_parameter" "rollbar_discord_lambda_version" {
   name        = "/legacy-sports/${var.environment}/lambda/rollbar-discord/version"
   description = "Current version of the Rollbar Discord Lambda function"
@@ -170,6 +186,7 @@ output "lambda_version_parameters" {
     game_selection  = aws_ssm_parameter.game_selection_lambda_version.name
     websocket       = aws_ssm_parameter.websocket_lambda_version.name
     jira_proxy      = aws_ssm_parameter.jira_proxy_lambda_version.name
+    discord_bot     = aws_ssm_parameter.discord_bot_lambda_version.name
     rollbar_discord = aws_ssm_parameter.rollbar_discord_lambda_version.name
   }
 }
