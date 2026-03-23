@@ -9,10 +9,8 @@
       "Bash(gh api graphql:*)",
       "Bash(powershell -Command \".\\\\scripts\\\\scan-prs.ps1\")",
       "Bash(pwsh -Command \".\\\\scripts\\\\scan-prs.ps1\")",
-      "mcp__claude_ai_Atlassian__getAccessibleAtlassianResources",
-      "mcp__claude_ai_Atlassian__getVisibleJiraProjects",
       "Skill(update-config)",
-      "mcp__claude_ai_Atlassian__searchJiraIssuesUsingJql"
+      "mcp__claude_ai_Atlassian__*"
     ]
   },
   "hooks": {
