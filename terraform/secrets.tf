@@ -59,6 +59,13 @@ variable "discord_user_signup_webhook_url" {
   default     = ""
 }
 
+variable "discord_stripe_webhook_url" {
+  description = "Discord webhook URL for Stripe event notifications (stripe-webhook Lambda)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "discord_client_id" {
   description = "Discord OAuth application client ID"
   type        = string

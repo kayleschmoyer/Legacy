@@ -168,6 +168,9 @@ resource "aws_lambda_function" "stripe_webhook" {
       DB_PORT                             = "5432"
       DB_NAME                             = "legacy_sports"
 
+      # Discord notifications for Stripe events
+      DISCORD_STRIPE_WEBHOOK_URL = var.discord_stripe_webhook_url
+
       # Rollbar error tracking
       ROLLBAR_ACCESS_TOKEN = var.rollbar_access_token
     }
