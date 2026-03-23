@@ -116,6 +116,9 @@ export const leagues = pgTable(
     auctionMinBid: integer('auction_min_bid').notNull().default(1),
     /** Discord webhook URL for league notifications (draft picks, scores, trades, etc.) */
     discordWebhookUrl: text('discord_webhook_url'),
+    discordGuildId: varchar('discord_guild_id', { length: 32 }),
+    discordChannelId: varchar('discord_channel_id', { length: 32 }),
+    discordCategoryId: varchar('discord_category_id', { length: 32 }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

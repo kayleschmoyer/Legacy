@@ -26,6 +26,7 @@ import './season-awards';
 import './dues';
 import './analytics';
 import './subscriptions';
+import './discord-channels';
 
 // Export the final schema
 export const schema = builder.toSchema();

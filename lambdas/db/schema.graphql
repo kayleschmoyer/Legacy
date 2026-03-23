@@ -512,6 +512,16 @@ type DirectMessage {
 }
 
 """
+Result of a Discord channel mutation for a league
+"""
+type DiscordChannelMutationResult {
+  channelId: String
+  channelName: String
+  error: String
+  success: Boolean
+}
+
+"""
 A draft event for a league
 """
 type Draft {
@@ -1259,6 +1269,11 @@ type Mutation {
   advancePlayoffBracket(bracketId: Int!): PlayoffBracket
 
   """
+  Delete the Discord channel for a league. Called when a league is deactivated or frozen.
+  """
+  archiveDiscordChannel(leagueId: Int!): DiscordChannelMutationResult
+
+  """
   Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge.
   """
   autoAdvanceMatchups(
@@ -1346,6 +1361,15 @@ type Mutation {
     priceId: String!
     successUrl: String!
   ): CheckoutSessionResult
+
+  """
+  Create a Discord text channel for a league in the specified guild. Requires commissioner access and the bot to be invited to the guild.
+  """
+  createDiscordChannel(
+    categoryId: String
+    guildId: String!
+    leagueId: Int!
+  ): DiscordChannelMutationResult
   createLeague(maxRosterSize: Int, name: String!): League
   createLeagueAndTeams(
     input: CreateLeagueAndTeamsInput!

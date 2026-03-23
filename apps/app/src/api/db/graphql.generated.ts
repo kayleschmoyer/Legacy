@@ -477,6 +477,15 @@ export type DirectMessage = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+/** Result of a Discord channel mutation for a league */
+export type DiscordChannelMutationResult = {
+  __typename?: 'DiscordChannelMutationResult';
+  channelId?: Maybe<Scalars['String']['output']>;
+  channelName?: Maybe<Scalars['String']['output']>;
+  error?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+};
+
 /** A draft event for a league */
 export type Draft = {
   __typename?: 'Draft';
@@ -1117,6 +1126,8 @@ export type Mutation = {
   /** Add a player to the end of the current user's draft queue. No-ops if already queued. */
   addToDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   advancePlayoffBracket?: Maybe<PlayoffBracket>;
+  /** Delete the Discord channel for a league. Called when a league is deactivated or frozen. */
+  archiveDiscordChannel?: Maybe<DiscordChannelMutationResult>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
   /** Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback. */
@@ -1146,6 +1157,8 @@ export type Mutation = {
   createBillingPortalSession?: Maybe<BillingPortalSessionResult>;
   /** Create a Stripe Checkout Session for a subscription plan. If the user already has an active subscription a Billing Portal URL is returned instead so they can manage their plan. */
   createCheckoutSession?: Maybe<CheckoutSessionResult>;
+  /** Create a Discord text channel for a league in the specified guild. Requires commissioner access and the bot to be invited to the guild. */
+  createDiscordChannel?: Maybe<DiscordChannelMutationResult>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
@@ -1295,6 +1308,10 @@ export type MutationAdvancePlayoffBracketArgs = {
   bracketId: Scalars['Int']['input'];
 };
 
+export type MutationArchiveDiscordChannelArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
 export type MutationAutoAdvanceMatchupsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -1367,6 +1384,12 @@ export type MutationCreateCheckoutSessionArgs = {
   cancelUrl: Scalars['String']['input'];
   priceId: Scalars['String']['input'];
   successUrl: Scalars['String']['input'];
+};
+
+export type MutationCreateDiscordChannelArgs = {
+  categoryId?: InputMaybe<Scalars['String']['input']>;
+  guildId: Scalars['String']['input'];
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationCreateLeagueArgs = {
