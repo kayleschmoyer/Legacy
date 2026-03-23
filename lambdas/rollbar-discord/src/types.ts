@@ -62,6 +62,19 @@ export interface CloudWatchAlarm {
   };
 }
 
+/** AWS Budget notification nested inside an SNS message. */
+export interface BudgetNotification {
+  accountId: string;
+  budgetName: string;
+  budgetType: string;
+  budgetLimit: string;
+  actualSpend: string;
+  forecastedSpend?: string;
+  thresholdPercentage: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 /** Discord embed object sent via webhook. */
 export interface DiscordEmbed {
   title: string;

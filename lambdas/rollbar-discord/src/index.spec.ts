@@ -217,4 +217,40 @@ describe('baseHandler', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });
+
+  describe('SNS — Budget Notification', () => {
+    it('posts budget embed to Discord', async () => {
+      const budgetNotification = {
+        accountId: '123456789012',
+        budgetName: 'legacy-sports-dev-monthly-budget',
+        budgetType: 'COST',
+        budgetLimit: '$100.00',
+        actualSpend: '$82.50',
+        forecastedSpend: '$110.00',
+        thresholdPercentage: '80',
+        startDate: '2026-03-01',
+        endDate: '2026-03-31',
+      };
+
+      const event = makeSnsEvent(JSON.stringify(budgetNotification));
+      await baseHandler(event);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('https://discord.com/api/webhooks/test');
+      const body = JSON.parse(opts.body as string) as {
+        embeds: Array<{ title: string; footer: { text: string } }>;
+      };
+      expect(body.embeds[0].title).toBe(
+        'Budget Alert: legacy-sports-dev-monthly-budget',
+      );
+      expect(body.embeds[0].footer.text).toBe('AWS Budgets');
+    });
+
+    it('skips unrecognized SNS message types', async () => {
+      const event = makeSnsEvent(JSON.stringify({ someUnknownField: 'value' }));
+      await baseHandler(event);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
 });

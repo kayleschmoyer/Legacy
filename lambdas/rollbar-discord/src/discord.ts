@@ -1,5 +1,10 @@
 import { LOGGER } from '@legacy-sports/logging';
-import type { CloudWatchAlarm, DiscordEmbed, RollbarEvent } from './types';
+import type {
+  BudgetNotification,
+  CloudWatchAlarm,
+  DiscordEmbed,
+  RollbarEvent,
+} from './types';
 
 // Discord embed color constants
 const COLOR_ERROR = 0xed4245; // Red
@@ -140,6 +145,58 @@ export function formatAlarmEmbed(alarm: CloudWatchAlarm): DiscordEmbed {
     fields,
     timestamp: alarm.StateChangeTime,
     footer: { text: 'CloudWatch Alarm' },
+  };
+}
+
+/**
+ * Format an AWS Budget notification (from SNS) into a Discord embed.
+ */
+export function formatBudgetEmbed(
+  notification: BudgetNotification,
+): DiscordEmbed {
+  const threshold = parseFloat(notification.thresholdPercentage);
+  const color = threshold >= 100 ? COLOR_ERROR : COLOR_WARNING;
+  const emoji = threshold >= 100 ? '\u{1F6A8}' : '\u26A0\uFE0F';
+
+  const fields: DiscordEmbed['fields'] = [
+    {
+      name: 'Threshold',
+      value: `${emoji} ${notification.thresholdPercentage}%`,
+      inline: true,
+    },
+    { name: 'Budget Limit', value: notification.budgetLimit, inline: true },
+    { name: 'Actual Spend', value: notification.actualSpend, inline: true },
+  ];
+
+  if (notification.forecastedSpend) {
+    fields.push({
+      name: 'Forecasted Spend',
+      value: notification.forecastedSpend,
+      inline: true,
+    });
+  }
+
+  if (notification.startDate && notification.endDate) {
+    fields.push({
+      name: 'Period',
+      value: `${notification.startDate} — ${notification.endDate}`,
+      inline: false,
+    });
+  }
+
+  fields.push({
+    name: 'Account',
+    value: notification.accountId,
+    inline: true,
+  });
+
+  return {
+    title: `Budget Alert: ${notification.budgetName}`,
+    description: `${notification.budgetType} budget **${notification.budgetName}** has exceeded **${notification.thresholdPercentage}%** of the budgeted amount.`,
+    color,
+    fields,
+    timestamp: new Date().toISOString(),
+    footer: { text: 'AWS Budgets' },
   };
 }
 

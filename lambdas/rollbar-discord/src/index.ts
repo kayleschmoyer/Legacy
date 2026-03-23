@@ -11,8 +11,13 @@ import {
   withRollbar,
 } from '@legacy-sports/rollbar';
 import { parseRollbarPayload, verifyOrigin } from './rollbar-webhook';
-import { formatAlarmEmbed, formatRollbarEmbed, postToDiscord } from './discord';
-import type { CloudWatchAlarm } from './types';
+import {
+  formatAlarmEmbed,
+  formatBudgetEmbed,
+  formatRollbarEmbed,
+  postToDiscord,
+} from './discord';
+import type { BudgetNotification, CloudWatchAlarm } from './types';
 
 // Initialize Rollbar on cold start so withRollbar can capture handler errors.
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -63,35 +68,59 @@ function isApiGatewayEvent(
   return !('Records' in event);
 }
 
-// ─── SNS handler (CloudWatch Alarms) ────────────────────────────────────────
+// ─── SNS handler (CloudWatch Alarms + Budget Notifications) ─────────────────
+
+function isBudgetNotification(parsed: unknown): parsed is BudgetNotification {
+  if (parsed === null || typeof parsed !== 'object') return false;
+  const obj = parsed as Record<string, unknown>;
+  return (
+    typeof obj['budgetName'] === 'string' &&
+    typeof obj['actualSpend'] === 'string' &&
+    typeof obj['budgetLimit'] === 'string' &&
+    typeof obj['thresholdPercentage'] === 'string' &&
+    typeof obj['accountId'] === 'string'
+  );
+}
+
+function isCloudWatchAlarm(parsed: unknown): parsed is CloudWatchAlarm {
+  if (parsed === null || typeof parsed !== 'object') return false;
+  const obj = parsed as Record<string, unknown>;
+  return (
+    typeof obj['AlarmName'] === 'string' &&
+    typeof obj['NewStateValue'] === 'string'
+  );
+}
 
 async function handleSnsEvent(event: SNSEvent): Promise<void> {
   const discordUrl = await getDiscordWebhookUrl();
 
   for (const record of event.Records) {
     const message = record.Sns.Message;
-    let alarm: CloudWatchAlarm;
+    let parsed: unknown;
     try {
-      alarm = JSON.parse(message) as CloudWatchAlarm;
+      parsed = JSON.parse(message) as unknown;
     } catch {
-      LOGGER.warn('Failed to parse SNS message as CloudWatch Alarm', {
-        message,
-      });
+      LOGGER.warn('Failed to parse SNS message as JSON', { message });
       continue;
     }
 
-    if (!alarm.AlarmName || !alarm.NewStateValue) {
-      LOGGER.warn('SNS message is not a valid CloudWatch Alarm', { message });
-      continue;
-    }
-
-    const embed = formatAlarmEmbed(alarm);
     try {
-      await postToDiscord(discordUrl, embed);
-      LOGGER.info(`Posted alarm "${alarm.AlarmName}" to Discord`);
+      if (isBudgetNotification(parsed)) {
+        const embed = formatBudgetEmbed(parsed);
+        await postToDiscord(discordUrl, embed);
+        LOGGER.info(`Posted budget alert "${parsed.budgetName}" to Discord`);
+      } else if (isCloudWatchAlarm(parsed)) {
+        const embed = formatAlarmEmbed(parsed);
+        await postToDiscord(discordUrl, embed);
+        LOGGER.info(`Posted alarm "${parsed.AlarmName}" to Discord`);
+      } else {
+        LOGGER.warn('SNS message is not a recognized notification type', {
+          message,
+        });
+      }
     } catch (error) {
-      LOGGER.error('Failed to post CloudWatch alarm to Discord', {
-        alarmName: alarm.AlarmName,
+      LOGGER.error('Failed to post SNS notification to Discord', {
+        message,
         error,
       });
     }

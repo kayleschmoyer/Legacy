@@ -1,5 +1,14 @@
-import { formatAlarmEmbed, formatRollbarEmbed, postToDiscord } from './discord';
-import type { CloudWatchAlarm, RollbarEvent } from './types';
+import {
+  formatAlarmEmbed,
+  formatBudgetEmbed,
+  formatRollbarEmbed,
+  postToDiscord,
+} from './discord';
+import type {
+  BudgetNotification,
+  CloudWatchAlarm,
+  RollbarEvent,
+} from './types';
 
 describe('formatRollbarEmbed', () => {
   it('formats a new_item event with item data', () => {
@@ -137,6 +146,70 @@ describe('formatAlarmEmbed', () => {
     const embed = formatAlarmEmbed(insuffAlarm);
 
     expect(embed.color).toBe(0xfee75c);
+  });
+});
+
+describe('formatBudgetEmbed', () => {
+  const baseNotification: BudgetNotification = {
+    accountId: '123456789012',
+    budgetName: 'legacy-sports-dev-monthly-budget',
+    budgetType: 'COST',
+    budgetLimit: '$100.00',
+    actualSpend: '$82.50',
+    forecastedSpend: '$110.00',
+    thresholdPercentage: '80',
+    startDate: '2026-03-01',
+    endDate: '2026-03-31',
+  };
+
+  it('formats 80% threshold with warning color', () => {
+    const embed = formatBudgetEmbed(baseNotification);
+
+    expect(embed.title).toBe('Budget Alert: legacy-sports-dev-monthly-budget');
+    expect(embed.color).toBe(0xfee75c); // yellow/warning
+    expect(embed.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'Threshold',
+          value: '\u26A0\uFE0F 80%',
+        }),
+        expect.objectContaining({ name: 'Budget Limit', value: '$100.00' }),
+        expect.objectContaining({ name: 'Actual Spend', value: '$82.50' }),
+        expect.objectContaining({
+          name: 'Forecasted Spend',
+          value: '$110.00',
+        }),
+        expect.objectContaining({
+          name: 'Period',
+          value: '2026-03-01 — 2026-03-31',
+        }),
+        expect.objectContaining({ name: 'Account', value: '123456789012' }),
+      ]),
+    );
+    expect(embed.footer).toEqual({ text: 'AWS Budgets' });
+  });
+
+  it('formats 100% threshold with error color', () => {
+    const notification = { ...baseNotification, thresholdPercentage: '100' };
+    const embed = formatBudgetEmbed(notification);
+
+    expect(embed.color).toBe(0xed4245); // red/error
+  });
+
+  it('omits forecasted spend when not provided', () => {
+    const { forecastedSpend: _, ...notification } = baseNotification;
+    const embed = formatBudgetEmbed(notification);
+
+    const fieldNames = embed.fields?.map((f) => f.name) ?? [];
+    expect(fieldNames).not.toContain('Forecasted Spend');
+  });
+
+  it('omits period when dates are not provided', () => {
+    const { startDate: _s, endDate: _e, ...notification } = baseNotification;
+    const embed = formatBudgetEmbed(notification);
+
+    const fieldNames = embed.fields?.map((f) => f.name) ?? [];
+    expect(fieldNames).not.toContain('Period');
   });
 });
 

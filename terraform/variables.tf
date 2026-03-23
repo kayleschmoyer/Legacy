@@ -165,6 +165,12 @@ variable "api_gateway_throttle_burst_limit" {
   default     = 200
 }
 
+variable "monthly_budget_amount" {
+  description = "Monthly AWS budget limit in USD (default $200). Budget alerts fire at 50%, 80%, and 100% ACTUAL thresholds plus an 80% FORECASTED threshold."
+  type        = number
+  default     = 200
+}
+
 # ── Per-environment retention maps ──────────────────────────────────────────────
 # Explicit maps so staging gets its own values instead of falling through to the
 # prod branch of a ternary.
