@@ -7,10 +7,16 @@ export enum EnvironmentVariable {
   DB_HOST = 'DB_HOST',
 }
 
+export enum DiscordEnv {
+  DISCORD_CLIENT_ID = 'DISCORD_CLIENT_ID',
+  DISCORD_REDIRECT_URI = 'DISCORD_REDIRECT_URI',
+}
+
 export enum Secret {
   JWT_SECRET = 'JWT_SECRET',
   COOKIE_SECRET = 'COOKIE_SECRET',
   GOOGLE_OAUTH_CLIENT_SECRET = 'GOOGLE_OAUTH_CLIENT_SECRET',
+  DISCORD_CLIENT_SECRET = 'DISCORD_CLIENT_SECRET',
 }
 
 export const SECRET_CONFIG = Object.freeze<Record<Secret, SecretConfiguration>>(
@@ -26,6 +32,10 @@ export const SECRET_CONFIG = Object.freeze<Record<Secret, SecretConfiguration>>(
     [Secret.GOOGLE_OAUTH_CLIENT_SECRET]: {
       localEnvVar: 'GOOGLE_OAUTH_CLIENT_SECRET',
       secretPathEnvVar: 'GOOGLE_OAUTH_CLIENT_SECRET_PATH',
+    },
+    [Secret.DISCORD_CLIENT_SECRET]: {
+      localEnvVar: 'DISCORD_CLIENT_SECRET',
+      secretPathEnvVar: 'DISCORD_CLIENT_SECRET_PATH',
     },
   },
 );

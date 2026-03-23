@@ -44,14 +44,18 @@ resource "aws_iam_policy" "oauth_proxy_lambda_secrets" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
-        Resource = [
-          # OAuth secrets
-          aws_secretsmanager_secret.google_oauth_client_secret.arn,
-          aws_secretsmanager_secret.jwt_secret.arn,
-          aws_secretsmanager_secret.oauth_proxy_cookie_secret.arn,
-          # Database secrets for private user management
-          aws_secretsmanager_secret.database_credentials.arn
-        ]
+        Resource = concat(
+          [
+            # OAuth secrets
+            aws_secretsmanager_secret.google_oauth_client_secret.arn,
+            aws_secretsmanager_secret.jwt_secret.arn,
+            aws_secretsmanager_secret.oauth_proxy_cookie_secret.arn,
+            # Database secrets for private user management
+            aws_secretsmanager_secret.database_credentials.arn,
+          ],
+          # Discord OAuth secret (only when configured)
+          var.discord_client_secret != "" ? [aws_secretsmanager_secret.discord_client_secret[0].arn] : []
+        )
       }
     ]
   })
@@ -222,6 +226,11 @@ resource "aws_lambda_function" "oauth_proxy" {
 
       # Discord new-user signup notification webhook (optional — empty string disables)
       DISCORD_USER_SIGNUP_WEBHOOK_URL = var.discord_user_signup_webhook_url
+
+      # Discord OAuth configuration (optional — omit to disable Discord login)
+      DISCORD_CLIENT_ID          = var.discord_client_id
+      DISCORD_CLIENT_SECRET_PATH = var.discord_client_secret != "" ? aws_secretsmanager_secret.discord_client_secret[0].name : ""
+      DISCORD_REDIRECT_URI       = var.discord_redirect_uri
     }
   }
 

@@ -26,6 +26,11 @@ import {
   handleDeviceToken,
   handleDeviceVerify,
 } from './handlers/DeviceFlow';
+import {
+  handleDiscordAuth,
+  handleDiscordLink,
+  handleDiscordUnlink,
+} from './handlers/Discord';
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -233,6 +238,9 @@ const baseOAuthHandler = async (
               '/oauth/device/token (CLI device flow)',
               '/oauth/device/verify (CLI device flow)',
               '/oauth/device/complete-local (CLI device flow with local auth)',
+              '/oauth/discord (Discord OAuth login)',
+              '/oauth/discord/link (link Discord to existing account)',
+              '/oauth/discord/unlink (unlink Discord from account)',
             ],
             security:
               'New users are automatically created on first OAuth login with default access level',
@@ -351,6 +359,30 @@ const baseOAuthHandler = async (
       case '/dev/oauth/device/complete-local':
         if (event.httpMethod === 'POST') {
           const result = await handleDeviceCompleteLocal(event);
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/discord':
+      case '/dev/oauth/discord':
+        if (event.httpMethod === 'POST') {
+          const result = await handleDiscordAuth(event);
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/discord/link':
+      case '/dev/oauth/discord/link':
+        if (event.httpMethod === 'POST') {
+          const result = await handleDiscordLink(event);
+          return cors(result);
+        }
+        break;
+
+      case '/oauth/discord/unlink':
+      case '/dev/oauth/discord/unlink':
+        if (event.httpMethod === 'POST') {
+          const result = await handleDiscordUnlink(event);
           return cors(result);
         }
         break;

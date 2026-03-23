@@ -22,6 +22,9 @@ export const UserRef = builder.objectRef<{
   accessLevel?: string | null;
   avatarUrl?: string | null;
   subscriptionTier?: string | null;
+  discordId?: string | null;
+  discordUsername?: string | null;
+  discordAvatar?: string | null;
 }>('User');
 
 UserRef.implement({
@@ -32,6 +35,9 @@ UserRef.implement({
     accessLevel: t.exposeString('accessLevel', { nullable: true }),
     avatarUrl: t.exposeString('avatarUrl', { nullable: true }),
     subscriptionTier: t.exposeString('subscriptionTier', { nullable: true }),
+    discordId: t.exposeString('discordId', { nullable: true }),
+    discordUsername: t.exposeString('discordUsername', { nullable: true }),
+    discordAvatar: t.exposeString('discordAvatar', { nullable: true }),
   }),
 });
 
@@ -70,6 +76,9 @@ builder.queryField('users', (t) =>
         username: u.username,
         accessLevel: u.accessLevel,
         avatarUrl: u.avatarUrl ?? null,
+        discordId: u.discordId ?? null,
+        discordUsername: u.discordUsername ?? null,
+        discordAvatar: u.discordAvatar ?? null,
       }));
     },
   }),
@@ -115,6 +124,9 @@ builder.queryField('user', (t) =>
         username: user.username,
         accessLevel: user.accessLevel,
         avatarUrl: user.avatarUrl ?? null,
+        discordId: user.discordId ?? null,
+        discordUsername: user.discordUsername ?? null,
+        discordAvatar: user.discordAvatar ?? null,
       };
     },
   }),
@@ -146,6 +158,9 @@ builder.queryField('userByEmail', (t) =>
         username: foundUser.username,
         accessLevel: foundUser.accessLevel,
         avatarUrl: foundUser.avatarUrl ?? null,
+        discordId: foundUser.discordId ?? null,
+        discordUsername: foundUser.discordUsername ?? null,
+        discordAvatar: foundUser.discordAvatar ?? null,
       };
     },
   }),
@@ -175,6 +190,9 @@ builder.queryField('searchUsers', (t) =>
         username: user.username,
         accessLevel: user.accessLevel,
         avatarUrl: user.avatarUrl ?? null,
+        discordId: user.discordId ?? null,
+        discordUsername: user.discordUsername ?? null,
+        discordAvatar: user.discordAvatar ?? null,
       }));
     },
   }),
@@ -211,6 +229,9 @@ builder.mutationField('updateUserRole', (t) =>
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
+        discordId: updated.discordId ?? null,
+        discordUsername: updated.discordUsername ?? null,
+        discordAvatar: updated.discordAvatar ?? null,
       };
     },
   }),
@@ -253,6 +274,9 @@ builder.mutationField('updateUsername', (t) =>
           username: updated.username,
           accessLevel: updated.accessLevel,
           avatarUrl: updated.avatarUrl ?? null,
+          discordId: updated.discordId ?? null,
+          discordUsername: updated.discordUsername ?? null,
+          discordAvatar: updated.discordAvatar ?? null,
         };
       } catch (error: unknown) {
         // Check for Postgres unique constraint violation (code 23505)
@@ -300,6 +324,9 @@ builder.mutationField('updateUserAvatar', (t) =>
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
+        discordId: updated.discordId ?? null,
+        discordUsername: updated.discordUsername ?? null,
+        discordAvatar: updated.discordAvatar ?? null,
       };
     },
   }),

@@ -3323,6 +3323,9 @@ export type User = {
   __typename?: 'User';
   accessLevel?: Maybe<Scalars['String']['output']>;
   avatarUrl?: Maybe<Scalars['String']['output']>;
+  discordAvatar?: Maybe<Scalars['String']['output']>;
+  discordId?: Maybe<Scalars['String']['output']>;
+  discordUsername?: Maybe<Scalars['String']['output']>;
   email?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   subscriptionTier?: Maybe<Scalars['String']['output']>;

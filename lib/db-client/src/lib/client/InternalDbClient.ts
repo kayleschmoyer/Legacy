@@ -47,3 +47,51 @@ export async function getUserById(
     .where(() => eq(Schema.usersInAppInternal.id, id))
     .then(TakeUniqueOrNull);
 }
+
+export async function getUserByDiscordId(
+  db: InternalDb,
+  discordId: string,
+): Promise<InternalUser | null> {
+  return await db
+    .select()
+    .from(Schema.usersInAppInternal)
+    .where(() => eq(Schema.usersInAppInternal.discordId, discordId))
+    .then(TakeUniqueOrNull);
+}
+
+export async function linkDiscordAccount(
+  db: InternalDb,
+  userId: number,
+  discordId: string,
+  discordUsername: string,
+  discordAvatar: string | null,
+): Promise<InternalUser> {
+  return await db
+    .update(Schema.usersInAppInternal)
+    .set({
+      discordId,
+      discordUsername,
+      discordAvatar,
+      updatedAt: new Date(),
+    })
+    .where(eq(Schema.usersInAppInternal.id, userId))
+    .returning()
+    .then(TakeUniqueOrThrow);
+}
+
+export async function unlinkDiscordAccount(
+  db: InternalDb,
+  userId: number,
+): Promise<InternalUser> {
+  return await db
+    .update(Schema.usersInAppInternal)
+    .set({
+      discordId: null,
+      discordUsername: null,
+      discordAvatar: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(Schema.usersInAppInternal.id, userId))
+    .returning()
+    .then(TakeUniqueOrThrow);
+}

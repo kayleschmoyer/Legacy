@@ -59,6 +59,32 @@ variable "discord_user_signup_webhook_url" {
   default     = ""
 }
 
+variable "discord_client_id" {
+  description = "Discord OAuth application client ID"
+  type        = string
+  default     = ""
+}
+
+variable "discord_client_secret" {
+  description = "Discord OAuth application client secret"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "discord_redirect_uri" {
+  description = "Discord OAuth redirect URI (e.g. https://legacy-fantasy.com/auth/discord/callback)"
+  type        = string
+  default     = ""
+}
+
+variable "rollbar_webhook_secret" {
+  description = "Rollbar webhook signing secret for HMAC-SHA256 signature verification"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # =============================================================================
 # GENERATED SECRETS
 # =============================================================================
@@ -198,6 +224,33 @@ resource "aws_secretsmanager_secret_version" "jira_credentials" {
   secret_string = var.jira_credentials
 }
 
+# Rollbar webhook signing secret for the Rollbar Discord notification Lambda
+resource "aws_secretsmanager_secret" "rollbar_webhook_secret" {
+  name        = "${var.environment}/rollbar-webhook-secret"
+  description = "Rollbar webhook signing secret for HMAC-SHA256 signature verification"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "rollbar_webhook_secret" {
+  secret_id     = aws_secretsmanager_secret.rollbar_webhook_secret.id
+  secret_string = var.rollbar_webhook_secret
+}
+
+# Discord OAuth client secret for Discord login/account linking
+resource "aws_secretsmanager_secret" "discord_client_secret" {
+  count       = var.discord_client_secret != "" ? 1 : 0
+  name        = "${var.environment}/discord-client-secret"
+  description = "Discord OAuth client secret for login and account linking"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "discord_client_secret" {
+  count         = var.discord_client_secret != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.discord_client_secret[0].id
+  secret_string = var.discord_client_secret
+}
 # Discord webhook URL for the Rollbar Discord notification Lambda
 resource "aws_secretsmanager_secret" "discord_webhook_url" {
   name        = "${var.environment}/discord-webhook-url"
