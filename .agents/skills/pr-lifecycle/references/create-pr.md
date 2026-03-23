@@ -55,6 +55,7 @@ Example: `LS-1234 feat(auth): add OAuth2 PKCE flow`
 2. **Mark ready for review**: `github_mark_pr_ready(number: <PR#>)` (or `gh pr ready <PR#>`) — this signals to sweep/review agents that the PR is available
 3. Transition Jira: `jira_transition(key: "LS-####", status: "In Review")`
 4. Copilot review is requested automatically by CI workflow
+5. **MCP gap audit** (mandatory): review Bash commands from this session, classify gaps (`missing-tool`, `missing-feature`, `missing-awareness`), check for existing tickets under LS-1455, and file new tickets for untracked gaps. Also audit MCP tool overflows. Follow the [audit workflow](../../mcp-gaps/references/audit-workflow.md) directly.
 
 ## Guardrails
 

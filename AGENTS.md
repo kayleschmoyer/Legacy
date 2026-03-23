@@ -48,7 +48,7 @@ This file provides guidance to AI coding agents working with code in this reposi
     - 12a. **Create draft PR**: `github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)` (or `gh pr create --draft --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` then `bash scripts/cleanup-pr-body.sh`)
     - 12b. **Mark ready for review**: after PR creation succeeds, `github_mark_pr_ready(number: <PR#>)` (or `gh pr ready <PR#>`) — this signals to sweep/review agents that the PR is available.
     - 12c. **Jira "In Review"**: transition the ticket after marking the PR ready.
-    - 12d. **MCP gap audit (REQUIRED)**: review all Bash commands from this session, identify any that should be MCP tools, and file tickets under LS-1455 for gaps not already tracked. See `skills/mcp-gaps/SKILL.md`.
+    - 12d. **MCP gap audit (REQUIRED)**: follow the audit workflow in `skills/mcp-gaps/SKILL.md` to review Bash commands from this session, classify gaps, check for existing LS-1455 tickets, and file new ones. Also audit MCP tool overflows. This step is mandatory — it is how we continuously improve the agentic environment.
 13. Cleanup: `twig worktree clean` then `git branch -d LS-####/description` then Jira "Done" — **NEVER use `git worktree remove` directly** (see Rules)
 
 ## Command Patterns — Avoid `cd` Compound Commands
