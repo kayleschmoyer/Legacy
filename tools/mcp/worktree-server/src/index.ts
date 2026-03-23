@@ -4,7 +4,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { execFileSync, execSync } from 'node:child_process';
+import { execFile, execFileSync, execSync } from 'node:child_process';
 import {
   existsSync,
   lstatSync,
@@ -615,10 +615,46 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         required: ['files'],
       },
     },
+    {
+      name: 'worktree_run_all',
+      description:
+        'Run a make target across all active worktrees and report pass/fail per worktree. ' +
+        'Useful for batch validation (e.g. format:write, lint, typecheck, pc) across all in-flight branches.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          command: {
+            type: 'string',
+            description:
+              'Make target to run (e.g. "format:write", "lint", "lint-fix", "typecheck", "pc", "build", "test", "codegen", "format:check").',
+          },
+          filter: {
+            type: 'string',
+            description:
+              'Filter worktrees by ticket prefix (e.g. "LS-16"). Matches against key or branch.',
+          },
+          parallel: {
+            type: 'boolean',
+            description:
+              'Run in parallel vs sequential. Default: false (sequential).',
+          },
+          maxConcurrency: {
+            type: 'number',
+            description: 'Max parallel workers when parallel=true. Default: 4.',
+          },
+          timeoutSeconds: {
+            type: 'number',
+            description:
+              'Override per-target timeout in seconds. Defaults: pc=600, install/build/test/codegen=900, others=300.',
+          },
+        },
+        required: ['command'],
+      },
+    },
   ],
 }));
 
-server.setRequestHandler(CallToolRequestSchema, (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   switch (name) {
@@ -2783,6 +2819,209 @@ server.setRequestHandler(CallToolRequestSchema, (request) => {
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_run_all
+    // -----------------------------------------------------------------------
+    case 'worktree_run_all': {
+      const {
+        command,
+        filter,
+        parallel = false,
+        maxConcurrency = 4,
+        timeoutSeconds,
+      } = args as {
+        command: string;
+        filter?: string;
+        parallel?: boolean;
+        maxConcurrency?: number;
+        timeoutSeconds?: number;
+      };
+
+      // Whitelist of allowed make targets
+      const ALLOWED_TARGETS = new Set([
+        'format:write',
+        'format:check',
+        'lint',
+        'lint-fix',
+        'typecheck',
+        'pc',
+        'build',
+        'test',
+        'codegen',
+        'install',
+      ]);
+
+      if (!ALLOWED_TARGETS.has(command)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Refused: "${command}" is not an allowed target.\n` +
+                `Allowed targets: ${[...ALLOWED_TARGETS].join(', ')}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      let worktrees = getWorktrees();
+      if (worktrees.length === 0) {
+        return {
+          content: [{ type: 'text', text: 'No active worktrees found.' }],
+        };
+      }
+
+      // Apply filter
+      if (filter) {
+        worktrees = worktrees.filter(
+          (w) =>
+            w.key.includes(filter) ||
+            (w.branch !== null && w.branch.includes(filter)),
+        );
+        if (worktrees.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `No worktrees match filter "${filter}".`,
+              },
+            ],
+          };
+        }
+      }
+
+      // Per-target timeout defaults (in seconds), overridable via timeoutSeconds
+      const TARGET_TIMEOUT_DEFAULTS: Record<string, number> = {
+        pc: 600,
+        install: 900,
+        build: 900,
+        test: 900,
+        codegen: 900,
+      };
+      const DEFAULT_TIMEOUT_S = 300;
+      const resolvedTimeoutMs =
+        (timeoutSeconds ??
+          TARGET_TIMEOUT_DEFAULTS[command] ??
+          DEFAULT_TIMEOUT_S) * 1000;
+
+      interface RunResult {
+        key: string;
+        path: string;
+        branch: string | null;
+        passed: boolean;
+        stdout: string;
+        stderr: string;
+        durationMs: number;
+      }
+
+      const runInWorktree = (wt: WorktreeInfo): Promise<RunResult> => {
+        const start = Date.now();
+        return new Promise<RunResult>((res) => {
+          execFile(
+            'make',
+            [command],
+            {
+              cwd: wt.path,
+              encoding: 'utf-8',
+              timeout: resolvedTimeoutMs,
+              maxBuffer: 10 * 1024 * 1024,
+              env: { ...process.env },
+              shell:
+                process.platform === 'win32' ? 'powershell.exe' : undefined,
+            },
+            (error, stdout, stderr) => {
+              const durationMs = Date.now() - start;
+              const MAX_OUTPUT = 2000;
+              const trimOutput = (s: string): string =>
+                s.length > MAX_OUTPUT
+                  ? `…(truncated)\n${s.slice(-MAX_OUTPUT)}`
+                  : s;
+
+              // Append ExecException details when the process fails
+              let stderrOut = stderr ?? '';
+              if (error) {
+                const details: string[] = [];
+                if (error.message) details.push(`message: ${error.message}`);
+                if (error.code !== undefined)
+                  details.push(`code: ${String(error.code)}`);
+                if (error.signal) details.push(`signal: ${error.signal}`);
+                if (details.length > 0) {
+                  stderrOut += `\n[ExecException] ${details.join(', ')}`;
+                }
+              }
+
+              res({
+                key: wt.key,
+                path: wt.path,
+                branch: wt.branch,
+                passed: error === null,
+                stdout: trimOutput(stdout ?? ''),
+                stderr: trimOutput(stderrOut),
+                durationMs,
+              });
+            },
+          );
+        });
+      };
+
+      let results: RunResult[];
+      if (parallel) {
+        // Semaphore-based concurrency limiter
+        const limit = Math.max(1, maxConcurrency);
+        let active = 0;
+        let idx = 0;
+        results = new Array<RunResult>(worktrees.length);
+        await new Promise<void>((resolveAll) => {
+          const next = (): void => {
+            if (idx >= worktrees.length && active === 0) {
+              resolveAll();
+              return;
+            }
+            while (active < limit && idx < worktrees.length) {
+              const i = idx++;
+              active++;
+              void runInWorktree(worktrees[i]).then((result) => {
+                results[i] = result;
+                active--;
+                next();
+              });
+            }
+          };
+          next();
+        });
+      } else {
+        results = [];
+        for (const wt of worktrees) {
+          results.push(await runInWorktree(wt));
+        }
+      }
+
+      const passed = results.filter((r) => r.passed).length;
+      const failed = results.filter((r) => !r.passed).length;
+
+      const summary = {
+        command: `make ${command}`,
+        mode: parallel ? 'parallel' : 'sequential',
+        total: results.length,
+        passed,
+        failed,
+        results: results.map((r) => ({
+          key: r.key,
+          branch: r.branch,
+          passed: r.passed,
+          durationMs: r.durationMs,
+          stdout: r.stdout,
+          stderr: r.stderr,
+        })),
+      };
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+        isError: failed > 0,
+      };
     }
 
     default:
