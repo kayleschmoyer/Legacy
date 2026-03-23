@@ -26,8 +26,8 @@ const GH_AUTH_TOKEN_TIMEOUT_MS = 5_000;
 
 /**
  * Passive auth check — reuses the non-interactive token resolution from auth.ts
- * (env vars → cached file → .netrc → gh CLI). Does NOT trigger interactive
- * OAuth device flow.
+ * (env vars → cached file → GitHub App → .netrc → gh CLI). Does NOT trigger
+ * interactive OAuth device flow.
  */
 async function tryGetGitHubAuth(): Promise<{
   token: string;
@@ -131,7 +131,7 @@ server.tool(
                 source: null,
                 user: null,
                 fallback:
-                  'No GitHub token found. Set GH_TOKEN or GITHUB_TOKEN env var, or run `gh auth login` to authenticate the gh CLI.',
+                  'No GitHub token found. Set GH_TOKEN or GITHUB_TOKEN env var, AGENT_AUTHOR_APP_PRIVATE_KEY for GitHub App auth, or run `gh auth login`.',
               },
               null,
               2,

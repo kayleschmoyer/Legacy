@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { createSign } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { chmod, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -14,7 +16,18 @@ const TOKEN_PATH = join(CONFIG_DIR, 'token.json');
 const OAUTH_CLIENT_ID = 'Ov23liYQljVEXzJsFCl5';
 const OAUTH_SCOPE = 'repo';
 
+/**
+ * GitHub App defaults — Agent Author app.
+ * Overridable via GITHUB_APP_ID / GITHUB_INSTALLATION_ID env vars.
+ */
+const DEFAULT_APP_ID = '3158619';
+const DEFAULT_INSTALLATION_ID = '118260223';
+
+/** Buffer before expiry when we regenerate the app token (5 minutes). */
+const APP_TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+
 let cachedToken: string | null = null;
+let cachedTokenSource: TokenSource | null = null;
 let cachedRepo: { owner: string; name: string } | null = null;
 
 /** Resolve the repository root from this script's location (tools/mcp/github-server/src/). */
@@ -30,21 +43,43 @@ export function getRepoRoot(): string {
 interface CachedTokenFile {
   token: string;
   createdAt: string;
+  /** ISO date string — if set, the token is treated as expired after this time. */
+  expiresAt?: string;
 }
 
 async function readCachedToken(): Promise<string | null> {
   try {
     const raw = await readFile(TOKEN_PATH, 'utf-8');
     const data = JSON.parse(raw) as CachedTokenFile;
-    return data.token ?? null;
+    if (!data.token) return null;
+
+    // Check expiry with buffer — regenerate early to avoid mid-request failures
+    if (data.expiresAt) {
+      const expiresAt = new Date(data.expiresAt).getTime();
+      if (Number.isNaN(expiresAt)) {
+        return null;
+      }
+      if (Date.now() >= expiresAt - APP_TOKEN_EXPIRY_BUFFER_MS) {
+        return null;
+      }
+    }
+
+    return data.token;
   } catch {
     return null;
   }
 }
 
-async function writeCachedToken(token: string): Promise<void> {
+async function writeCachedToken(
+  token: string,
+  expiresAt?: string,
+): Promise<void> {
   await mkdir(CONFIG_DIR, { recursive: true, mode: 0o700 });
-  const data: CachedTokenFile = { token, createdAt: new Date().toISOString() };
+  const data: CachedTokenFile = {
+    token,
+    createdAt: new Date().toISOString(),
+    ...(expiresAt ? { expiresAt } : {}),
+  };
   await writeFile(TOKEN_PATH, JSON.stringify(data, null, 2), 'utf-8');
   // Restrict file permissions to owner-only (no-op on Windows, but safe to call)
   if (process.platform !== 'win32') {
@@ -154,6 +189,110 @@ function tryGhAuthToken(): Promise<string | null> {
       },
     );
   });
+}
+
+// ---------------------------------------------------------------------------
+// GitHub App token generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the GitHub App private key from the AGENT_AUTHOR_APP_PRIVATE_KEY env var.
+ * Accepts PEM content directly or a file path. Returns null if not configured.
+ */
+function getAppPrivateKey(): string | null {
+  const raw = process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'];
+  if (!raw) return null;
+
+  // If it looks like a file path and the file exists, read it
+  if (!raw.includes('-----BEGIN') && existsSync(raw)) {
+    return readFileSync(raw, 'utf-8');
+  }
+
+  // Otherwise treat as PEM content (cloud env vars often store PEMs with literal \n)
+  return raw.replace(/\\n/g, '\n');
+}
+
+/** Base64url encode a string (no padding). */
+function base64url(str: string): string {
+  return Buffer.from(str).toString('base64url');
+}
+
+/**
+ * Create a JWT signed with the GitHub App's private key.
+ * GitHub requires RS256 (RSA + SHA-256).
+ */
+function createAppJWT(privateKey: string, appId: string): string {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iat: now - 60, // clock skew tolerance
+    exp: now + 600, // 10 minutes (GitHub max)
+    iss: appId,
+  };
+
+  const segments = [
+    base64url(JSON.stringify(header)),
+    base64url(JSON.stringify(payload)),
+  ];
+  const signingInput = segments.join('.');
+
+  const sign = createSign('RSA-SHA256');
+  sign.update(signingInput);
+  const signature = sign.sign(privateKey, 'base64url');
+
+  return `${signingInput}.${signature}`;
+}
+
+/**
+ * Generate a short-lived GitHub App installation token from AGENT_AUTHOR_APP_PRIVATE_KEY.
+ * Returns the token and its expiry time, or null if the env var is not set.
+ * Throws on API/signing errors so callers can fall through to other methods.
+ */
+async function generateGitHubAppToken(): Promise<{
+  token: string;
+  expiresAt: string;
+} | null> {
+  const privateKey = getAppPrivateKey();
+  if (!privateKey) return null;
+
+  const appId = process.env['GITHUB_APP_ID'] || DEFAULT_APP_ID;
+  const installationId =
+    process.env['GITHUB_INSTALLATION_ID'] || DEFAULT_INSTALLATION_ID;
+
+  const jwt = createAppJWT(privateKey, appId);
+
+  const res = await fetch(
+    `https://api.github.com/app/installations/${installationId}/access_tokens`,
+    {
+      method: 'POST',
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    },
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(
+      `GitHub App token exchange failed (${res.status}): ${body}`,
+    );
+  }
+
+  const data = (await res.json()) as { token?: string; expires_at?: string };
+  if (!data.token) {
+    throw new Error(
+      `No token in GitHub App response: ${JSON.stringify(data).slice(0, 200)}`,
+    );
+  }
+
+  // GitHub returns expires_at as ISO 8601 (typically 1 hour from now)
+  const expiresAt =
+    data.expires_at || new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+  return { token: data.token, expiresAt };
 }
 
 // ---------------------------------------------------------------------------
@@ -355,6 +494,7 @@ async function validateToken(token: string): Promise<boolean> {
 /** Source of the resolved GitHub token. */
 export type TokenSource =
   | 'env'
+  | 'github-app'
   | 'cached-file'
   | 'netrc'
   | 'gh-cli'
@@ -362,8 +502,9 @@ export type TokenSource =
 
 /**
  * Non-interactive token resolution — tries all passive sources (env, cached
- * file, .netrc, gh CLI) but does NOT trigger the interactive device flow.
- * Returns the token and its source, or null if no valid token is found.
+ * file, GitHub App, .netrc, gh CLI) but does NOT trigger the interactive
+ * device flow. Returns the token and its source, or null if no valid token
+ * is found.
  *
  * This is used by `github_auth_status` to report auth state without side effects.
  */
@@ -371,33 +512,53 @@ export async function tryResolveToken(): Promise<{
   token: string;
   source: TokenSource;
 } | null> {
-  if (cachedToken) return { token: cachedToken, source: 'env' };
+  if (cachedToken && cachedTokenSource)
+    return { token: cachedToken, source: cachedTokenSource };
 
   // 1. Environment variables
   const envToken = process.env['GH_TOKEN'] || process.env['GITHUB_TOKEN'];
   if (envToken) {
     cachedToken = envToken;
+    cachedTokenSource = 'env';
     return { token: envToken, source: 'env' };
   }
 
-  // 2. Cached token file
+  // 2. Cached token file (respects expiry for GitHub App tokens)
   const fileToken = await readCachedToken();
   if (fileToken) {
     cachedToken = fileToken;
+    cachedTokenSource = 'cached-file';
     return { token: fileToken, source: 'cached-file' };
   }
 
-  // 3. .netrc file
+  // 3. GitHub App token (AGENT_AUTHOR_APP_PRIVATE_KEY env var)
+  try {
+    const appResult = await generateGitHubAppToken();
+    if (appResult) {
+      cachedToken = appResult.token;
+      cachedTokenSource = 'github-app';
+      await writeCachedToken(appResult.token, appResult.expiresAt);
+      return { token: appResult.token, source: 'github-app' };
+    }
+  } catch (err) {
+    process.stderr.write(
+      `Warning: GitHub App token generation failed: ${err instanceof Error ? err.message : err}\n`,
+    );
+  }
+
+  // 4. .netrc file
   const netrcToken = await readNetrcToken();
   if (netrcToken) {
     cachedToken = netrcToken;
+    cachedTokenSource = 'netrc';
     return { token: netrcToken, source: 'netrc' };
   }
 
-  // 4. gh auth token
+  // 5. gh auth token
   const ghToken = await tryGhAuthToken();
   if (ghToken) {
     cachedToken = ghToken;
+    cachedTokenSource = 'gh-cli';
     return { token: ghToken, source: 'gh-cli' };
   }
 
@@ -407,10 +568,11 @@ export async function tryResolveToken(): Promise<{
 /**
  * Get a valid GitHub token. Resolution order:
  * 1. GH_TOKEN or GITHUB_TOKEN env var
- * 2. Cached token from ~/.config/legacy-sports-github/token.json
- * 3. ~/.netrc or ~/_netrc (password for machine github.com)
- * 4. `gh auth token` shell command (5s timeout, silent fallback)
- * 5. GitHub OAuth device flow (interactive via stderr)
+ * 2. Cached token from ~/.config/legacy-sports-github/token.json (expiry-aware)
+ * 3. GitHub App installation token (AGENT_AUTHOR_APP_PRIVATE_KEY env var)
+ * 4. ~/.netrc or ~/_netrc (password for machine github.com)
+ * 5. `gh auth token` shell command (5s timeout, silent fallback)
+ * 6. GitHub OAuth device flow (interactive via stderr)
  *
  * On first use, validates the token with GET /user. If invalid, invalidates
  * the cache and re-resolves.
@@ -430,7 +592,7 @@ export async function getToken(): Promise<string> {
     );
   }
 
-  // 2. Cached token file
+  // 2. Cached token file (respects expiry for GitHub App tokens)
   const fileToken = await readCachedToken();
   if (fileToken) {
     if (await validateToken(fileToken)) {
@@ -440,7 +602,26 @@ export async function getToken(): Promise<string> {
     await invalidateCachedToken();
   }
 
-  // 3. .netrc file
+  // 3. GitHub App token (AGENT_AUTHOR_APP_PRIVATE_KEY env var)
+  try {
+    const appResult = await generateGitHubAppToken();
+    if (appResult) {
+      if (await validateToken(appResult.token)) {
+        cachedToken = appResult.token;
+        await writeCachedToken(appResult.token, appResult.expiresAt);
+        return appResult.token;
+      }
+      process.stderr.write(
+        'Warning: Generated GitHub App token failed validation. Trying other methods.\n',
+      );
+    }
+  } catch (err) {
+    process.stderr.write(
+      `Warning: GitHub App token generation failed: ${err instanceof Error ? err.message : err}. Trying other methods.\n`,
+    );
+  }
+
+  // 4. .netrc file
   const netrcToken = await readNetrcToken();
   if (netrcToken) {
     if (await validateToken(netrcToken)) {
@@ -451,7 +632,7 @@ export async function getToken(): Promise<string> {
     }
   }
 
-  // 4. gh auth token
+  // 5. gh auth token
   const ghToken = await tryGhAuthToken();
   if (ghToken) {
     if (await validateToken(ghToken)) {
@@ -462,7 +643,7 @@ export async function getToken(): Promise<string> {
     }
   }
 
-  // 5. Device flow
+  // 6. Device flow
   const deviceToken = await deviceFlow();
   cachedToken = deviceToken;
   await writeCachedToken(deviceToken);

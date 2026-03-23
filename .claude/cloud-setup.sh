@@ -35,54 +35,31 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Generate GitHub App token (if private key is available)
+# 2. Authenticate gh CLI (if a token is already available)
 # ---------------------------------------------------------------------------
-# The Agent Author GitHub App (ID 3158619) provides scoped, short-lived
-# tokens for PR creation. Set AGENT_AUTHOR_APP_PRIVATE_KEY in Claude Code
-# cloud environment settings (Settings > Environment) to enable this.
-#
-# The token is exported as GH_TOKEN so the legacy-sports-github MCP server
-# and gh CLI both pick it up automatically.
-if [ -n "${AGENT_AUTHOR_APP_PRIVATE_KEY:-}" ]; then
-  echo "Generating GitHub App installation token..."
-  GEN_STDERR=$(mktemp)
-  if APP_TOKEN=$(node scripts/generate-github-app-token.mjs 2>"$GEN_STDERR"); then
-    export GH_TOKEN="$APP_TOKEN"
-    if [ -n "${GITHUB_ENV:-}" ]; then
-      echo "GH_TOKEN=$GH_TOKEN" >> "$GITHUB_ENV" 2>/dev/null || true
-    fi
-    echo "GitHub App token: generated (expires in 1 hour)"
-  else
-    echo "WARNING: GitHub App token generation failed; falling back to env var or device flow"
-    cat "$GEN_STDERR" 2>/dev/null || true
-  fi
-  rm -f "$GEN_STDERR"
-fi
-
-# ---------------------------------------------------------------------------
-# 3. Authenticate gh CLI
-# ---------------------------------------------------------------------------
-# Uses GH_TOKEN (from step 2 or pre-set env var) to authenticate the gh CLI.
-# The MCP server also handles its own auth via the 5-tier fallback chain
-# (see tools/mcp/github-server/src/auth.ts).
+# The legacy-sports-github MCP server handles GitHub App token generation
+# natively when AGENT_AUTHOR_APP_PRIVATE_KEY is set (see auth.ts). This
+# step only authenticates the gh CLI for ad-hoc use outside the MCP server.
 if [ -n "${GH_TOKEN:-}" ]; then
   if echo "$GH_TOKEN" | gh auth login --with-token 2>/dev/null; then
     echo "gh auth: authenticated via GH_TOKEN"
   else
-    echo "gh auth: WARNING — failed to authenticate via GH_TOKEN; MCP server/device flow will be used instead"
+    echo "gh auth: WARNING — failed to authenticate via GH_TOKEN; MCP server will handle auth natively"
   fi
 elif [ -n "${GITHUB_TOKEN:-}" ]; then
   if echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null; then
     echo "gh auth: authenticated via GITHUB_TOKEN"
   else
-    echo "gh auth: WARNING — failed to authenticate via GITHUB_TOKEN; MCP server/device flow will be used instead"
+    echo "gh auth: WARNING — failed to authenticate via GITHUB_TOKEN; MCP server will handle auth natively"
   fi
+elif [ -n "${AGENT_AUTHOR_APP_PRIVATE_KEY:-}" ]; then
+  echo "gh auth: AGENT_AUTHOR_APP_PRIVATE_KEY is set — MCP server will generate GitHub App tokens on demand"
 else
   echo "gh auth: no token set — MCP server will use device flow on first use"
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Install Git LFS (for dev-seed.dump)
+# 3. Install Git LFS (for dev-seed.dump)
 # ---------------------------------------------------------------------------
 if ! command -v git-lfs &>/dev/null && ! git lfs version &>/dev/null 2>&1; then
   echo "Installing Git LFS..."
@@ -92,7 +69,7 @@ git lfs install --skip-smudge >/dev/null 2>&1 || true
 echo "Git LFS: $(git lfs version 2>/dev/null | head -1 || echo 'installed')"
 
 # ---------------------------------------------------------------------------
-# 5. Install Node.js dependencies
+# 4. Install Node.js dependencies
 # ---------------------------------------------------------------------------
 # Required for `make pc` (lint, typecheck, test, build) on code changes.
 # Uses corepack to activate the correct pnpm version, then installs deps.

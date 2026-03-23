@@ -182,7 +182,7 @@ When running as a **cloud coding agent**:
 
 **GitHub authentication for PR creation:**
 
-The `legacy-sports-github` MCP server calls GitHub REST/GraphQL APIs directly (it does **not** require the `gh` CLI). It resolves a GitHub token in this order: `GH_TOKEN`/`GITHUB_TOKEN` env var, cached token file, `~/.netrc`, `gh auth token` (optional, 5s timeout), then interactive OAuth device flow as a last resort. Claude Code on the web also provides a native GitHub connector that requires no token configuration.
+The `legacy-sports-github` MCP server calls GitHub REST/GraphQL APIs directly (it does **not** require the `gh` CLI). It resolves a GitHub token in this order: `GH_TOKEN`/`GITHUB_TOKEN` env var, cached token file (expiry-aware), GitHub App installation token (if `AGENT_AUTHOR_APP_PRIVATE_KEY` is set — generates and caches a 1-hour token on demand), `~/.netrc`, `gh auth token` (optional, 5s timeout), then interactive OAuth device flow as a last resort. Claude Code on the web also provides a native GitHub connector that requires no token configuration.
 
 | Platform                   | How to authenticate                                                                                                                                                                      |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -196,11 +196,11 @@ For **interactive sessions** (local, Claude Code on the web), no token setup is 
 
 For **cloud environments** (Claude Code on the web, Copilot), pre-configuring a token is recommended — the device flow may not surface stderr prompts reliably. How the token gets there depends on the platform:
 
-| Platform                   | Token source                            | Config file                | Setup                                                                                                                           |
-| -------------------------- | --------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Local development**      | `gh auth login` or device flow          | `.mcp.json`                | No env var needed — fallback chain handles it                                                                                   |
-| **Claude Code on the web** | Agent Author app token (auto-generated) | `.mcp.json`                | Set `AGENT_AUTHOR_APP_PRIVATE_KEY` in env settings + paste `.claude/cloud-setup.sh` as setup script. Auto-generates `GH_TOKEN`. |
-| **Copilot Coding Agent**   | Agent Author app token (auto-generated) | `.github/copilot/mcp.json` | `copilot-setup-steps.yml` generates a 1-hour installation token from the Agent Author GitHub App (ID `3158619`)                 |
+| Platform                   | Token source                            | Config file                | Setup                                                                                                                                  |
+| -------------------------- | --------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Local development**      | `gh auth login` or device flow          | `.mcp.json`                | No env var needed — fallback chain handles it                                                                                          |
+| **Claude Code on the web** | Agent Author app token (auto-generated) | `.mcp.json`                | Set `AGENT_AUTHOR_APP_PRIVATE_KEY` in env settings. The MCP server generates and caches tokens natively (no setup script step needed). |
+| **Copilot Coding Agent**   | Agent Author app token (auto-generated) | `.github/copilot/mcp.json` | Copilot generates a 1-hour installation token from the Agent Author GitHub App (ID `3158619`) and writes it to this config             |
 
 **Token options (for `GH_TOKEN` in Claude Code cloud settings):**
 

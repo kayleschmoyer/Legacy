@@ -33,10 +33,11 @@
       "type": "stdio",
       "command": "node",
       "args": ["--import", "tsx", "tools/mcp/github-server/src/index.ts"],
-      "_comment": "GH_TOKEN is set by copilot-setup-steps.yml from the Agent Author app; falls back to GITHUB_TOKEN at runtime",
+      "_comment": "GH_TOKEN is set by copilot-setup-steps.yml from the Agent Author app; falls back to GITHUB_TOKEN or native GitHub App generation at runtime",
       "env": {
         "GH_TOKEN": "${GH_TOKEN}",
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+        "AGENT_AUTHOR_APP_PRIVATE_KEY": "${AGENT_AUTHOR_APP_PRIVATE_KEY}"
       }
     },
     "legacy-sports-nx": {

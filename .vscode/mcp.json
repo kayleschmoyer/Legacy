@@ -35,7 +35,8 @@
       "command": "node",
       "args": ["--import", "tsx", "tools/mcp/github-server/src/index.ts"],
       "env": {
-        "GH_TOKEN": "${env:GH_TOKEN}"
+        "GH_TOKEN": "${env:GH_TOKEN}",
+        "AGENT_AUTHOR_APP_PRIVATE_KEY": "${env:AGENT_AUTHOR_APP_PRIVATE_KEY}"
       }
     },
     "legacy-sports-nx": {

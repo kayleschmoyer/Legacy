@@ -29,7 +29,8 @@
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/github-server/src/index.ts"],
       "env": {
-        "GH_TOKEN": "${GH_TOKEN}"
+        "GH_TOKEN": "${GH_TOKEN}",
+        "AGENT_AUTHOR_APP_PRIVATE_KEY": "${AGENT_AUTHOR_APP_PRIVATE_KEY}"
       }
     },
     "legacy-sports-nx": {
