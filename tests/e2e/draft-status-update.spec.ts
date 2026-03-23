@@ -1,4 +1,4 @@
-﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { E2EAuth, E2EJwtUtil } from '../../apps/web-e2e/src/utils/jwt';
 
 /**
@@ -8,10 +8,18 @@ import { E2EAuth, E2EJwtUtil } from '../../apps/web-e2e/src/utils/jwt';
  * from 'not-started' to 'queued' and that the change persists across GraphQL queries.
  *
  * Uses CLI-generated JWTs for authentication and direct GraphQL API calls.
+ *
+ * Prerequisites:
+ *   1. Start the GraphQL server: `make dev-graphql` (or `make dev` for all services)
+ *   2. Ensure the database is migrated: `pnpm --prefix lib/db-client run db:up`
+ *   3. Optionally set GRAPHQL_ENDPOINT env var (defaults to http://localhost:5000/graphql)
  */
 
 const GRAPHQL_ENDPOINT =
-  process.env.GRAPHQL_ENDPOINT || 'http://localhost:3001/graphql';
+  process.env.GRAPHQL_ENDPOINT || 'http://localhost:5000/graphql';
+
+const GRAPHQL_START_HINT =
+  'Start the GraphQL server with: make dev-graphql (or make dev for all services)';
 
 // Test timeout extended for database operations
 test.setTimeout(60000);
@@ -23,17 +31,16 @@ test.describe('Draft Status Update Verification', () => {
   let isGraphQLAvailable = false;
 
   test.beforeAll(async () => {
-    console.log('ðŸ”§ Setting up test authentication...');
+    console.log('🔧 Setting up test authentication...');
 
     // Generate JWTs for testing
     adminJwt = E2EAuth.generateAdminJwt('1h');
     userJwt = E2EAuth.generateUserJwt('1h');
 
-    console.log('âœ… Generated test JWTs');
-    console.log('   Admin JWT:', adminJwt.substring(0, 30) + '...');
-    console.log('   User JWT:', userJwt.substring(0, 30) + '...');
+    console.log('✅ Admin JWT generated for E2E tests');
+    console.log('✅ User JWT generated for E2E tests');
 
-    // Check if GraphQL endpoint is available
+    // Pre-test validation: check if GraphQL endpoint is available
     try {
       const response = await fetch(GRAPHQL_ENDPOINT, {
         method: 'POST',
@@ -45,15 +52,16 @@ test.describe('Draft Status Update Verification', () => {
       });
       isGraphQLAvailable = response.ok;
       if (isGraphQLAvailable) {
-        console.log('âœ… GraphQL server is available at', GRAPHQL_ENDPOINT);
+        console.log('✅ GraphQL server is available at', GRAPHQL_ENDPOINT);
       } else {
         console.log(
-          'âš ï¸  GraphQL server returned non-OK status:',
-          response.status,
+          `⚠️  GraphQL server returned non-OK status: ${response.status}`,
         );
+        console.log(`   ${GRAPHQL_START_HINT}`);
       }
     } catch (error) {
-      console.log('âš ï¸  GraphQL server not available:', GRAPHQL_ENDPOINT);
+      console.log('⚠️  GraphQL server not available at', GRAPHQL_ENDPOINT);
+      console.log(`   ${GRAPHQL_START_HINT}`);
       console.log(
         '   Error:',
         error instanceof Error ? error.message : String(error),
@@ -69,9 +77,7 @@ test.describe('Draft Status Update Verification', () => {
     variables: any = {},
     jwt: string = userJwt,
   ): Promise<any> {
-    console.log(
-      `ðŸ“¡ Making GraphQL request with JWT: ${jwt.substring(0, 20)}...`,
-    );
+    console.log('📡 Making authenticated GraphQL request');
 
     const response = await fetch(GRAPHQL_ENDPOINT, {
       method: 'POST',
@@ -92,7 +98,7 @@ test.describe('Draft Status Update Verification', () => {
     const result = await response.json();
 
     if (result.errors) {
-      console.error('âŒ GraphQL errors:', result.errors);
+      console.error('❌ GraphQL errors:', result.errors);
       throw new Error(`GraphQL error: ${result.errors[0].message}`);
     }
 
@@ -119,7 +125,7 @@ test.describe('Draft Status Update Verification', () => {
       maxRosterSize: 25,
     };
 
-    console.log('ðŸŸï¸  Creating test league...');
+    console.log('🏟️  Creating test league...');
     const result = await makeGraphQLRequest(
       createLeagueMutation,
       { input: leagueInput },
@@ -127,7 +133,7 @@ test.describe('Draft Status Update Verification', () => {
     );
 
     const league = result.data.createLeague;
-    console.log('âœ… Created test league:', league);
+    console.log('✅ Created test league:', league);
 
     return league.id;
   }
@@ -148,11 +154,11 @@ test.describe('Draft Status Update Verification', () => {
       }
     `;
 
-    console.log(`ðŸ” Fetching league ${leagueId} details...`);
+    console.log(`🔍 Fetching league ${leagueId} details...`);
     const result = await makeGraphQLRequest(query, { id: leagueId }, jwt);
 
     const league = result.data.league;
-    console.log(`ðŸ“Š League ${leagueId} status:`, {
+    console.log(`📊 League ${leagueId} status:`, {
       id: league.id,
       name: league.name,
       draftStatus: league.draftStatus,
@@ -182,30 +188,24 @@ test.describe('Draft Status Update Verification', () => {
       permissionLevel: 'commissioner',
     };
 
-    console.log(`ðŸ‘¥ Adding user ${userId} to league ${leagueId}...`);
+    console.log(`👥 Adding user ${userId} to league ${leagueId}...`);
     const result = await makeGraphQLRequest(
       addMemberMutation,
       { input: memberInput },
       adminJwt,
     );
 
-    console.log('âœ… Added user to league:', result.data.addLeagueMember);
+    console.log('✅ Added user to league:', result.data.addLeagueMember);
     return result.data.addLeagueMember;
   }
 
   test('should update league draft status from not-started to queued when starting draft', async () => {
-    // SKIP-REASON: GraphQL server must be running for E2E tests
-    // TODO: Document how to start GraphQL server in test setup (LS-64)
-    if (!isGraphQLAvailable) {
-      console.log(
-        'âš ï¸  Skipping test - GraphQL server not available:',
-        GRAPHQL_ENDPOINT,
-      );
-      test.skip();
-      return;
-    }
+    test.skip(
+      !isGraphQLAvailable,
+      `GraphQL server at ${GRAPHQL_ENDPOINT} is unreachable or returned a non-OK response. ${GRAPHQL_START_HINT}`,
+    );
 
-    console.log('\nðŸš€ TEST: Draft Status Update Verification');
+    console.log('\n🚀 TEST: Draft Status Update Verification');
     console.log('=====================================');
 
     // Step 1: Create a test league
@@ -218,7 +218,7 @@ test.describe('Draft Status Update Verification', () => {
     // Step 3: Verify initial draft status is 'not-started'
     const initialLeague = await getLeagueDetails(testLeagueId);
     expect(initialLeague.draftStatus).toBe('not-started');
-    console.log('âœ… Initial draft status confirmed: not-started');
+    console.log('✅ Initial draft status confirmed: not-started');
 
     // Step 4: Start the draft
     const startDraftMutation = `
@@ -232,7 +232,7 @@ test.describe('Draft Status Update Verification', () => {
       }
     `;
 
-    console.log('ðŸŽ¯ Starting draft...');
+    console.log('🎯 Starting draft...');
     const draftResult = await makeGraphQLRequest(startDraftMutation, {
       leagueId: testLeagueId,
       draftMode: 'automated',
@@ -241,15 +241,15 @@ test.describe('Draft Status Update Verification', () => {
     });
 
     const draftedLeague = draftResult.data.startDraft;
-    console.log('ðŸ“Š Draft mutation response:', draftedLeague);
+    console.log('📊 Draft mutation response:', draftedLeague);
 
     // Step 5: Verify the mutation response shows updated status
     expect(draftedLeague.id).toBe(testLeagueId);
     expect(draftedLeague.draftStatus).toBe('queued');
-    console.log('âœ… Draft mutation returned correct status: queued');
+    console.log('✅ Draft mutation returned correct status: queued');
 
     // Step 6: CRITICAL TEST - Query the league again to verify persistence
-    console.log('ðŸ” Verifying draft status persistence...');
+    console.log('🔍 Verifying draft status persistence...');
 
     // Add a small delay to ensure any async operations complete
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -258,10 +258,10 @@ test.describe('Draft Status Update Verification', () => {
 
     // This is the key assertion - the status should persist
     expect(persistedLeague.draftStatus).toBe('queued');
-    console.log('âœ… Draft status persisted correctly: queued');
+    console.log('✅ Draft status persisted correctly: queued');
 
     // Step 7: Additional verification with multiple queries
-    console.log('ðŸ”„ Testing multiple consecutive queries...');
+    console.log('🔄 Testing multiple consecutive queries...');
 
     for (let i = 1; i <= 3; i++) {
       await new Promise((resolve) => setTimeout(resolve, 500)); // Small delay between queries
@@ -269,23 +269,20 @@ test.describe('Draft Status Update Verification', () => {
       const verificationLeague = await getLeagueDetails(testLeagueId);
       expect(verificationLeague.draftStatus).toBe('queued');
 
-      console.log(`   âœ… Query ${i}/3: Draft status still queued`);
+      console.log(`   ✅ Query ${i}/3: Draft status still queued`);
     }
 
-    console.log('\nðŸŽ‰ ALL TESTS PASSED!');
+    console.log('\n🎉 ALL TESTS PASSED!');
     console.log('Draft status update and persistence verified successfully.');
   });
 
   test('should handle draft start with different user permissions', async () => {
-    // SKIP-REASON: GraphQL server must be running for E2E tests
-    // TODO: Add environment setup documentation for local GraphQL server (LS-64)
-    if (!isGraphQLAvailable) {
-      console.log('âš ï¸  Skipping test - GraphQL server not available');
-      test.skip();
-      return;
-    }
+    test.skip(
+      !isGraphQLAvailable,
+      `GraphQL server at ${GRAPHQL_ENDPOINT} is unreachable or returned a non-OK response. ${GRAPHQL_START_HINT}`,
+    );
 
-    console.log('\nðŸ” TEST: Draft Start Permission Testing');
+    console.log('\n🔑 TEST: Draft Start Permission Testing');
     console.log('======================================');
 
     // Create a fresh league for this test
@@ -308,7 +305,7 @@ test.describe('Draft Status Update Verification', () => {
       }
     `;
 
-    console.log('ðŸ‘‘ Testing admin draft start...');
+    console.log('👑 Testing admin draft start...');
     const adminDraftResult = await makeGraphQLRequest(
       startDraftMutation,
       {
@@ -321,7 +318,7 @@ test.describe('Draft Status Update Verification', () => {
     );
 
     expect(adminDraftResult.data.startDraft.draftStatus).toBe('queued');
-    console.log('âœ… Admin successfully started draft');
+    console.log('✅ Admin successfully started draft');
 
     // Verify persistence
     const finalLeague = await getLeagueDetails(
@@ -329,19 +326,16 @@ test.describe('Draft Status Update Verification', () => {
       adminJwt,
     );
     expect(finalLeague.draftStatus).toBe('queued');
-    console.log('âœ… Admin draft status change persisted');
+    console.log('✅ Admin draft status change persisted');
   });
 
   test('should validate draft type parameter', async () => {
-    // SKIP-REASON: GraphQL server must be running for E2E tests
-    // TODO: Add pre-test validation to check GraphQL availability before running suite (LS-64)
-    if (!isGraphQLAvailable) {
-      console.log('âš ï¸  Skipping test - GraphQL server not available');
-      test.skip();
-      return;
-    }
+    test.skip(
+      !isGraphQLAvailable,
+      `GraphQL server at ${GRAPHQL_ENDPOINT} is unreachable or returned a non-OK response. ${GRAPHQL_START_HINT}`,
+    );
 
-    console.log('\nðŸ“‹ TEST: Draft Type Validation');
+    console.log('\n📋 TEST: Draft Type Validation');
     console.log('==============================');
 
     // Create a test league
@@ -361,7 +355,7 @@ test.describe('Draft Status Update Verification', () => {
     const validSelectionMethods = ['random', 'standard', 'auction'];
 
     for (const selectionMethod of validSelectionMethods) {
-      console.log(`âœ… Testing valid draft type: ${selectionMethod}`);
+      console.log(`✅ Testing valid draft type: ${selectionMethod}`);
 
       // Reset league status (in a real system, you'd have a reset mutation)
       // For this test, we'll just verify the mutation accepts the type
@@ -373,18 +367,18 @@ test.describe('Draft Status Update Verification', () => {
         });
 
         expect(result.data.startDraft.draftStatus).toBe('queued');
-        console.log(`   âœ… ${selectionMethod} accepted and processed`);
+        console.log(`   ✅ ${selectionMethod} accepted and processed`);
 
         // Only test the first valid type to avoid status conflicts
         break;
       } catch (error) {
-        console.error(`   âŒ ${selectionMethod} failed:`, error);
+        console.error(`   ❌ ${selectionMethod} failed:`, error);
         throw error;
       }
     }
 
     // Test invalid draft type
-    console.log('ðŸš« Testing invalid draft type...');
+    console.log('🚫 Testing invalid draft type...');
 
     try {
       await makeGraphQLRequest(startDraftMutation, {
@@ -396,27 +390,27 @@ test.describe('Draft Status Update Verification', () => {
       expect(false).toBe(true); // Force failure
     } catch (error) {
       // This is expected - invalid draft type should be rejected
-      console.log('   âœ… Invalid draft type correctly rejected');
+      console.log('   ✅ Invalid draft type correctly rejected');
       expect(error.message).toContain('Invalid draft type');
     }
   });
 
   // Cleanup function (optional)
   test.afterAll(async () => {
-    console.log('\nðŸ§¹ Cleaning up test data...');
+    console.log('\n🧹 Cleaning up test data...');
 
     if (testLeagueId && adminJwt) {
       try {
         // In a real system, you might have a cleanup mutation
         // For now, just log the league ID for manual cleanup if needed
         console.log(
-          `ðŸ—‘ï¸  Test league created: ${testLeagueId} (cleanup may be needed)`,
+          `🗑️  Test league created: ${testLeagueId} (cleanup may be needed)`,
         );
       } catch (error) {
-        console.warn('âš ï¸  Could not clean up test league:', error);
+        console.warn('⚠️  Could not clean up test league:', error);
       }
     }
 
-    console.log('âœ… Test cleanup completed');
+    console.log('✅ Test cleanup completed');
   });
 });

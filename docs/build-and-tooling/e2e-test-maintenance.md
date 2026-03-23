@@ -79,9 +79,47 @@ if (skipCondition) {
 
 ## Test Environment Setup
 
+### Starting the GraphQL Server
+
+Some E2E tests (e.g., `tests/e2e/draft-status-update.spec.ts`) make direct GraphQL API calls and require a running server. The server runs at `http://localhost:5000/graphql` by default.
+
+#### Quick Start
+
+```bash
+# Option 1: Start only the GraphQL server (fastest)
+make dev-graphql
+
+# Option 2: Start all dev services (GraphQL + OAuth proxy + other lambdas)
+make dev
+
+# Verify the server is running
+curl -s -X POST http://localhost:5000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"{ __typename }"}' | head -c 50
+# Expected: {"data":{"__typename":"Query"}}
+```
+
+#### Prerequisites
+
+1. **Database must be running and migrated**:
+   ```bash
+   pnpm --prefix lib/db-client run db:status
+   pnpm --prefix lib/db-client run db:up
+   ```
+2. **Environment variables**: Ensure `.env` is present in the repo root (copied from `.env.example` or from a worktree setup).
+3. **JWT_SECRET**: Should be set in `.env` to match the running server's secret; otherwise tests will receive 401 errors. The E2E JWT helpers fall back to a built-in dev secret if `JWT_SECRET` is unset, which works when the server also uses the dev default.
+
+#### Configuring the Endpoint
+
+Tests default to `http://localhost:5000/graphql`. Override with:
+
+```bash
+GRAPHQL_ENDPOINT=http://localhost:5000/graphql pnpm exec playwright test tests/e2e/draft-status-update.spec.ts
+```
+
 ### GraphQL Endpoint Availability
 
-Many E2E tests require a running GraphQL server. Best practices:
+Tests that require the GraphQL server should validate availability before running. Use Playwright's built-in `test.skip(condition, reason)` for clear skip reporting:
 
 1. **Check availability in `beforeAll`**:
 
@@ -102,16 +140,17 @@ Many E2E tests require a running GraphQL server. Best practices:
    });
    ```
 
-2. **Use shared availability flag**:
+2. **Use `test.skip(condition, reason)` as the primary skip pattern** (preferred over manual `if`/`return`):
    ```typescript
    test('my test', async () => {
-     if (!isGraphQLAvailable) {
-       test.skip();
-       return;
-     }
+     test.skip(
+       !isGraphQLAvailable,
+       'GraphQL server not available. Start with: make dev-graphql',
+     );
      // ... test implementation
    });
    ```
+   Add a `SKIP-REASON` / `TODO` comment above the `test.skip()` call only when the skip is tied to a Jira ticket or requires a specific follow-up action to re-enable.
 
 ### Test Data Management
 
@@ -204,15 +243,10 @@ Add to your CI workflow:
 - name: Check for skipped tests
   run: |
     pnpm exec playwright test --reporter=json > test-results.json
-    $skippedCount = (Get-Content test-results.json | ConvertFrom-Json).suites | 
-      ForEach-Object { $_.specs } | 
-      Where-Object { $_.tests.results.status -eq 'skipped' } | 
-      Measure-Object | 
-      Select-Object -ExpandProperty Count
-
-    if ($skippedCount -gt 0) {
-      Write-Warning "⚠️  $skippedCount test(s) were skipped - review skip reasons"
-    }
+    SKIPPED=$(jq '[.suites[].specs[].tests[].results[] | select(.status == "skipped")] | length' test-results.json)
+    if [ "$SKIPPED" -gt 0 ]; then
+      echo "::warning::$SKIPPED test(s) were skipped — review skip reasons"
+    fi
 ```
 
 ## Test Maintenance Workflow
@@ -254,7 +288,7 @@ Add to your CI workflow:
 
 Search for skipped tests in the codebase:
 
-```powershell
+```bash
 # Find all test.skip() calls
 grep -r "test.skip()" tests/ apps/
 
@@ -277,5 +311,5 @@ For questions about E2E test maintenance, check:
 
 ---
 
-**Last Updated**: January 21, 2026  
-**Related Ticket**: LS-59 - Re-enable or document skipped tests
+**Last Updated**: March 22, 2026
+**Related Tickets**: LS-59 - Re-enable or document skipped tests, LS-64 - Document GraphQL server setup
