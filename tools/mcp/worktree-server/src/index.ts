@@ -306,6 +306,37 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_resolve_conflict',
+      description:
+        'List conflicted files or resolve them with per-file strategies. Without resolutions, returns conflict details.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          resolutions: {
+            type: 'array' as const,
+            items: {
+              type: 'object' as const,
+              properties: {
+                file: { type: 'string', description: 'File path' },
+                strategy: {
+                  type: 'string',
+                  enum: ['theirs', 'ours'],
+                  description: 'Resolution strategy',
+                },
+              },
+              required: ['file', 'strategy'],
+            },
+            description:
+              'Per-file resolution strategies. Omit to list conflicted files.',
+          },
+          worktree: {
+            type: 'string',
+            description: 'Ticket key (default: active)',
+          },
+        },
+      },
+    },
+    {
       name: 'worktree_commit',
       description:
         'Stage and commit. Refuses main. Refuses .env/credentials. Supports amend. Auto-appends Co-Authored-By.',
@@ -753,6 +784,151 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_resolve_conflict
+    // -----------------------------------------------------------------------
+    case 'worktree_resolve_conflict': {
+      const { resolutions, worktree: wtKey } = args as {
+        resolutions?: Array<{
+          file: string;
+          strategy: 'theirs' | 'ours';
+        }>;
+        worktree?: string;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      // List conflicted files
+      let conflictedFiles: string[];
+      try {
+        conflictedFiles = run('git diff --name-only --diff-filter=U', cwd)
+          .trim()
+          .split('\n')
+          .filter(Boolean);
+      } catch (err: unknown) {
+        const e = err as {
+          stdout?: string;
+          stderr?: string;
+          status?: number;
+          message?: string;
+        };
+        const output =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to detect conflicted files (exit code ${e.status ?? 'unknown'}):\n${output}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // If no resolutions provided, return the list of conflicts
+      if (!resolutions || resolutions.length === 0) {
+        if (conflictedFiles.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  { conflictedFiles: [], message: 'No conflicts found.' },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  conflictedFiles,
+                  message: `${conflictedFiles.length} conflicted file(s). Provide resolutions to resolve them.`,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+
+      // Apply resolutions
+      const resolved: string[] = [];
+      const errors: Array<{ file: string; error: string }> = [];
+
+      for (const { file, strategy } of resolutions) {
+        try {
+          runGit(['checkout', `--${strategy}`, '--', file], cwd);
+          runGit(['add', '--', file], cwd);
+          resolved.push(file);
+        } catch (err: unknown) {
+          const e = err as {
+            stdout?: string;
+            stderr?: string;
+            status?: number;
+            message?: string;
+          };
+          const output =
+            [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+            e.message ||
+            String(err);
+          errors.push({
+            file,
+            error: `exit code ${e.status ?? 'unknown'}: ${output}`,
+          });
+        }
+      }
+
+      // Check remaining conflicts
+      let remaining: string[];
+      try {
+        remaining = run('git diff --name-only --diff-filter=U', cwd)
+          .trim()
+          .split('\n')
+          .filter(Boolean);
+      } catch {
+        remaining = [];
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                resolved,
+                errors: errors.length > 0 ? errors : undefined,
+                remainingConflicts: remaining,
+                message:
+                  remaining.length === 0
+                    ? `All conflicts resolved (${resolved.length} file(s)). Ready for worktree_rebase_continue.`
+                    : `Resolved ${resolved.length} file(s), ${remaining.length} conflict(s) remaining.`,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+        ...(errors.length > 0 ? { isError: true } : {}),
+      };
     }
 
     // -----------------------------------------------------------------------
