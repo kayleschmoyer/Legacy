@@ -19,6 +19,10 @@ name: "🎯 Jira Branch Sync"
 #
 # Epics with the Jira label "pinned-status" are excluded from automatic
 # status transitions — they remain at whatever status was set manually.
+#
+# Authentication: Uses Atlassian OAuth 2.0 (client credentials grant).
+# The JIRA_CREDENTIALS secret must be a JSON object:
+#   {"client_id":"...","client_secret":"...","cloud_id":"..."}
 
 on:
   push:
@@ -118,50 +122,95 @@ jobs:
           fi
 
       # -----------------------------------------------------------------------
+      # 4b. Obtain Jira OAuth access token
+      # -----------------------------------------------------------------------
+      - name: Authenticate with Jira (OAuth 2.0)
+        id: auth
+        if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
+        env:
+          JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
+        run: |
+          # Validate that JIRA_CREDENTIALS is set and is valid JSON before parsing.
+          if [[ -z "$JIRA_CREDENTIALS" ]]; then
+            echo "❌ JIRA_CREDENTIALS secret is not set."
+            echo "   Expected a JSON object: {\"client_id\":\"...\",\"client_secret\":\"...\",\"cloud_id\":\"...\"}"
+            exit 1
+          fi
+
+          if ! echo "$JIRA_CREDENTIALS" | jq empty 2>/dev/null; then
+            echo "❌ JIRA_CREDENTIALS is not valid JSON."
+            echo "   Expected format: {\"client_id\":\"...\",\"client_secret\":\"...\",\"cloud_id\":\"...\"}"
+            echo "   Update the JIRA_CREDENTIALS repository secret with the correct JSON format."
+            exit 1
+          fi
+
+          CLIENT_ID=$(echo "$JIRA_CREDENTIALS" | jq -r '.client_id')
+          CLIENT_SECRET=$(echo "$JIRA_CREDENTIALS" | jq -r '.client_secret')
+          CLOUD_ID=$(echo "$JIRA_CREDENTIALS" | jq -r '.cloud_id')
+
+          if [[ -z "$CLIENT_ID" || "$CLIENT_ID" == "null" ]] || \
+             [[ -z "$CLIENT_SECRET" || "$CLIENT_SECRET" == "null" ]] || \
+             [[ -z "$CLOUD_ID" || "$CLOUD_ID" == "null" ]]; then
+            echo "❌ JIRA_CREDENTIALS JSON is missing required fields."
+            echo "   Required: client_id, client_secret, cloud_id"
+            echo "   Got keys: $(echo "$JIRA_CREDENTIALS" | jq -r 'keys | join(", ")')"
+            exit 1
+          fi
+
+          # Mask secrets
+          echo "::add-mask::$CLIENT_SECRET"
+          echo "::add-mask::$CLIENT_ID"
+
+          # Exchange client credentials for an access token (use jq for JSON-safe encoding)
+          TOKEN_REQUEST_JSON=$(jq -n \
+            --arg client_id "$CLIENT_ID" \
+            --arg client_secret "$CLIENT_SECRET" \
+            '{grant_type:"client_credentials",client_id:$client_id,client_secret:$client_secret}')
+
+          TOKEN_RESPONSE=$(curl -sf \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --data "$TOKEN_REQUEST_JSON" \
+            "https://auth.atlassian.com/oauth/token" \
+            2>&1) || {
+            echo "❌ Failed to obtain OAuth access token from Atlassian."
+            echo "   Check that client_id and client_secret are valid."
+            echo "Response: $TOKEN_RESPONSE"
+            exit 1
+          }
+
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+
+          if [[ -z "$ACCESS_TOKEN" || "$ACCESS_TOKEN" == "null" ]]; then
+            echo "❌ OAuth token response did not contain an access_token."
+            echo "   Response keys: $(echo "$TOKEN_RESPONSE" | jq -r 'keys | join(", ")')"
+            exit 1
+          fi
+
+          echo "::add-mask::$ACCESS_TOKEN"
+          echo "✅ OAuth access token obtained"
+
+          # Export to GITHUB_ENV for subsequent steps
+          JIRA_API_BASE="https://api.atlassian.com/ex/jira/$CLOUD_ID"
+          {
+            echo "JIRA_ACCESS_TOKEN=$ACCESS_TOKEN"
+            echo "JIRA_API_BASE=$JIRA_API_BASE"
+          } >> "$GITHUB_ENV"
+
+      # -----------------------------------------------------------------------
       # 5. Fetch available transitions and find the ID for our target
       # -----------------------------------------------------------------------
       - name: Get available transitions
         id: transitions
         if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
         env:
-          JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
           TICKET: ${{ steps.ticket.outputs.key }}
           TARGET: ${{ steps.target.outputs.transition }}
         run: |
-          # Validate that JIRA_CREDENTIALS is set and is valid JSON before parsing.
-          if [[ -z "$JIRA_CREDENTIALS" ]]; then
-            echo "❌ JIRA_CREDENTIALS secret is not set."
-            echo "   Expected a JSON object: {\"email\":\"...\",\"api_token\":\"...\",\"base_url\":\"...\"}"
-            exit 1
-          fi
-
-          if ! echo "$JIRA_CREDENTIALS" | jq empty 2>/dev/null; then
-            echo "❌ JIRA_CREDENTIALS is not valid JSON."
-            echo "   Expected format: {\"email\":\"you@example.com\",\"api_token\":\"<token>\",\"base_url\":\"https://your-org.atlassian.net\"}"
-            echo "   Update the JIRA_CREDENTIALS repository secret with the correct JSON format."
-            exit 1
-          fi
-
-          JIRA_EMAIL=$(echo "$JIRA_CREDENTIALS" | jq -r '.email')
-          JIRA_API_TOKEN=$(echo "$JIRA_CREDENTIALS" | jq -r '.api_token')
-          JIRA_BASE_URL=$(echo "$JIRA_CREDENTIALS" | jq -r '.base_url')
-
-          if [[ -z "$JIRA_EMAIL" || "$JIRA_EMAIL" == "null" ]] || \
-             [[ -z "$JIRA_API_TOKEN" || "$JIRA_API_TOKEN" == "null" ]] || \
-             [[ -z "$JIRA_BASE_URL" || "$JIRA_BASE_URL" == "null" ]]; then
-            echo "❌ JIRA_CREDENTIALS JSON is missing required fields."
-            echo "   Required: email, api_token, base_url"
-            echo "   Got keys: $(echo "$JIRA_CREDENTIALS" | jq -r 'keys | join(", ")')"
-            exit 1
-          fi
-
-          # Mask the token so it never appears in logs
-          echo "::add-mask::$JIRA_API_TOKEN"
-
           RESPONSE=$(curl -sf \
-            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
             --header "Accept: application/json" \
-            "$JIRA_BASE_URL/rest/api/3/issue/$TICKET/transitions" \
+            "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions" \
             2>&1) || {
             echo "❌ Failed to fetch transitions for $TICKET (curl exit $?)"
             echo "Response: $RESPONSE"
@@ -180,16 +229,6 @@ jobs:
             echo "Found transition ID $TRANSITION_ID for '$TARGET'"
           fi
 
-          # Pass masked credentials forward via output so the next step
-          # does not re-parse the secret (avoids a second mask needed).
-          # We write them as env-file entries, not GITHUB_OUTPUT, to keep
-          # them out of the step summary.
-          {
-            echo "JIRA_EMAIL=$JIRA_EMAIL"
-            echo "JIRA_API_TOKEN=$JIRA_API_TOKEN"
-            echo "JIRA_BASE_URL=$JIRA_BASE_URL"
-          } >> "$GITHUB_ENV"
-
       # -----------------------------------------------------------------------
       # 6. Apply the transition
       # -----------------------------------------------------------------------
@@ -203,11 +242,11 @@ jobs:
         run: |
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             --request POST \
-            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
             --header "Content-Type: application/json" \
             --header "Accept: application/json" \
             --data "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" \
-            "$JIRA_BASE_URL/rest/api/3/issue/$TICKET/transitions")
+            "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions")
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -n -1)
@@ -231,9 +270,9 @@ jobs:
           TICKET: ${{ steps.ticket.outputs.key }}
         run: |
           RESPONSE=$(curl -sf \
-            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
             --header "Accept: application/json" \
-            "$JIRA_BASE_URL/rest/api/3/issue/$TICKET?fields=parent" \
+            "$JIRA_API_BASE/rest/api/3/issue/$TICKET?fields=parent" \
             2>&1) || {
             echo "⚠️  Could not fetch ticket $TICKET details — skipping epic sync."
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -265,9 +304,9 @@ jobs:
           EPIC_KEY: ${{ steps.epic.outputs.key }}
         run: |
           RESPONSE=$(curl -sf \
-            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
             --header "Accept: application/json" \
-            "$JIRA_BASE_URL/rest/api/3/issue/$EPIC_KEY?fields=labels" \
+            "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY?fields=labels" \
             2>&1) || {
             echo "⚠️  Could not fetch labels for $EPIC_KEY — proceeding with sync."
             echo "pinned=false" >> "$GITHUB_OUTPUT"
@@ -301,9 +340,9 @@ jobs:
 
           while true; do
             RESPONSE=$(curl -sf \
-              --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+              --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
               --header "Accept: application/json" \
-              "$JIRA_BASE_URL/rest/api/3/search?jql=$ENCODED_JQL&fields=status&maxResults=$PAGE_SIZE&startAt=$START_AT" \
+              "$JIRA_API_BASE/rest/api/3/search?jql=$ENCODED_JQL&fields=status&maxResults=$PAGE_SIZE&startAt=$START_AT" \
               2>&1) || {
               echo "⚠️  Could not fetch children of $EPIC_KEY — skipping epic sync."
               echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -391,9 +430,9 @@ jobs:
           TARGET: ${{ steps.epic-status.outputs.transition }}
         run: |
           RESPONSE=$(curl -sf \
-            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
             --header "Accept: application/json" \
-            "$JIRA_BASE_URL/rest/api/3/issue/$EPIC_KEY?fields=status" \
+            "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY?fields=status" \
             2>&1) || {
             echo "⚠️  Could not fetch epic $EPIC_KEY status — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -421,9 +460,9 @@ jobs:
         run: |
           # Fetch available transitions for the epic
           RESPONSE=$(curl -sf \
-            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
             --header "Accept: application/json" \
-            "$JIRA_BASE_URL/rest/api/3/issue/$EPIC_KEY/transitions" \
+            "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions" \
             2>&1) || {
             echo "⚠️  Could not fetch transitions for $EPIC_KEY — skipping."
             exit 0
@@ -440,11 +479,11 @@ jobs:
 
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             --request POST \
-            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
             --header "Content-Type: application/json" \
             --header "Accept: application/json" \
             --data "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" \
-            "$JIRA_BASE_URL/rest/api/3/issue/$EPIC_KEY/transitions")
+            "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions")
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 
