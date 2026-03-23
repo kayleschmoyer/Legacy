@@ -30,6 +30,53 @@ if [ "${SKIP_PREPUSH_LINT:-0}" = "1" ]; then
   exit 0
 fi
 
+# ---------------------------------------------------------------------------
+# Check 1: Conflict markers — reject if any tracked file contains <<<<<<<,
+# =======, or >>>>>>> (7-char markers). Fast (<1s) and catches unresolved
+# conflicts from silent rerere failures that other tools might miss.
+# ---------------------------------------------------------------------------
+printf "pre-push: checking for conflict markers...\n"
+conflict_files=$(git grep -l -E '^(<{7}|={7}|>{7})' -- ':(exclude)**/*.md' ':(exclude).github/hooks/*' 2>/dev/null || true)
+if [ -n "$conflict_files" ]; then
+  printf "\nERROR: Unresolved conflict markers found in:\n"
+  printf "%s\n" "$conflict_files" | sed 's/^/  /'
+  printf "\nResolve these conflicts before pushing.\n"
+  printf "To bypass: git push --no-verify\n"
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Check 2: Terraform validate — when terraform files changed, run
+# terraform init -backend=false && terraform validate to catch undeclared
+# variables and syntax errors before CI (~5s).
+# ---------------------------------------------------------------------------
+# Prefer diffing against the upstream tracking branch to catch all unpushed
+# Terraform changes, falling back to HEAD~1 if no upstream is configured.
+tf_base_ref='HEAD~1'
+if git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
+  tf_base_ref='@{upstream}'
+fi
+tf_changed=$(git diff --name-only "$tf_base_ref"...HEAD -- 'terraform/' 2>/dev/null || true)
+if [ -n "$tf_changed" ] && command -v terraform >/dev/null 2>&1; then
+  printf "pre-push: validating terraform...\n"
+  if [ -d "terraform" ]; then
+    tf_init_out=$(terraform -chdir=terraform init -backend=false -input=false 2>&1)
+    tf_init_status=$?
+    if [ $tf_init_status -ne 0 ]; then
+      printf >&2 "\nWARNING: terraform init failed (exit %d) — skipping validate. Output:\n%s\n" "$tf_init_status" "$tf_init_out"
+    else
+      tf_validate_out=$(terraform -chdir=terraform validate 2>&1)
+      tf_validate_status=$?
+      if [ $tf_validate_status -ne 0 ]; then
+        printf "\nERROR: terraform validate failed:\n%s\n" "$tf_validate_out"
+        printf "\nFix the terraform errors before pushing.\n"
+        printf "To bypass: git push --no-verify\n"
+        exit 1
+      fi
+    fi
+  fi
+fi
+
 printf "pre-push: running code formatter...\n"
 
 # Snapshot working-tree state BEFORE formatting
