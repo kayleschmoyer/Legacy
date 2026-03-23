@@ -226,7 +226,12 @@ For **cloud environments** (Claude Code on the web, Copilot), pre-configuring a 
 
 **Jira authentication:**
 
-The `legacy-sports-jira` MCP server requires Jira API credentials — either `JIRA_EMAIL` + `JIRA_API_TOKEN` env vars or a `~/.netrc` entry for your Atlassian host. On **Claude Code on the web**, Claude's native Atlassian tools (`mcp__claude_ai_Atlassian__*`) are available without any credential configuration and are the preferred option. The existing Jira auth-aware routing rule applies: call `jira_auth_status` first — if `configured: false`, use `mcp__claude_ai_Atlassian__*` tools. On **Copilot Coding Agent**, native Claude integrations are not available, so `JIRA_EMAIL`/`JIRA_API_TOKEN` must be configured as repository secrets.
+The `legacy-sports-jira` MCP server supports two authentication methods (resolved in order):
+
+1. **OAuth 2.0 service account** (preferred): `JIRA_CLIENT_ID` + `JIRA_CLIENT_SECRET` + `JIRA_CLOUD_ID` env vars. Optionally set `JIRA_SITE_URL` (defaults to `https://bkrupa.atlassian.net`). Uses `client_credentials` grant with token caching (~60 min).
+2. **Basic Auth** (legacy): `JIRA_EMAIL` + `JIRA_API_TOKEN` env vars or `~/.netrc` entry.
+
+On **Claude Code on the web**, Claude's native Atlassian tools (`mcp__claude_ai_Atlassian__*`) are available without any credential configuration and are the preferred option. The existing Jira auth-aware routing rule applies: call `jira_auth_status` first — if `configured: false`, use `mcp__claude_ai_Atlassian__*` tools. On **Copilot Coding Agent**, native Claude integrations are not available, so Jira credentials must be configured as repository secrets.
 
 **Available MCP servers in cloud:**
 

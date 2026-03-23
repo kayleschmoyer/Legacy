@@ -13,16 +13,20 @@ import { setParent } from './tools/set-parent.js';
 import { transition, VALID_STATUSES } from './tools/transition.js';
 import { view } from './tools/view.js';
 import { bulkTransition } from './tools/bulk-transition.js';
-import { tryGetAtlassianCredentials } from './netrc.js';
+import { tryGetJiraCredentials } from './netrc.js';
 
 // Check credentials at startup — warn if missing but don't exit.
 // The jira_auth_status tool lets agents decide whether to use this server
 // or fall back to Claude's built-in Atlassian integration.
-const startupCreds = await tryGetAtlassianCredentials();
+const startupCreds = await tryGetJiraCredentials();
 if (!startupCreds) {
   process.stderr.write(
     '[legacy-sports-jira] No Jira credentials found. Tools requiring direct API access will fail. ' +
       'Agent should call jira_auth_status and fall back to built-in Atlassian tools.\n',
+  );
+} else {
+  process.stderr.write(
+    `[legacy-sports-jira] Auth: ${startupCreds.type === 'oauth' ? 'OAuth 2.0 (service account)' : 'Basic Auth'}\n`,
   );
 }
 
@@ -37,13 +41,24 @@ server.tool(
   'Check if Jira API credentials are configured. Call first in any Jira workflow. If false, use mcp__claude_ai_Atlassian__* instead.',
   {},
   async () => {
-    const creds = await tryGetAtlassianCredentials();
-    const emailFromEnv = process.env['JIRA_EMAIL'];
-    const tokenFromEnv = process.env['JIRA_API_TOKEN'];
-    const source =
-      creds === null ? null : emailFromEnv && tokenFromEnv ? 'env' : 'netrc';
+    const creds = await tryGetJiraCredentials();
+
+    let source: string | null = null;
+    let authMethod: string | null = null;
+    if (creds) {
+      authMethod = creds.type;
+      if (creds.type === 'oauth') {
+        source = 'env (OAuth 2.0)';
+      } else {
+        const emailFromEnv = process.env['JIRA_EMAIL'];
+        const tokenFromEnv = process.env['JIRA_API_TOKEN'];
+        source = emailFromEnv && tokenFromEnv ? 'env' : 'netrc';
+      }
+    }
+
     const result = {
       configured: creds !== null,
+      authMethod,
       source,
       fallback: creds
         ? null

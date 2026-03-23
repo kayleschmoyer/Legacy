@@ -1,6 +1,10 @@
-import { getAtlassianCredentials, basicAuthHeader } from './netrc.js';
-
-const JIRA_BASE = 'https://bkrupa.atlassian.net';
+import {
+  getJiraCredentials,
+  basicAuthHeader,
+  JIRA_SITE_URL_DEFAULT,
+  type JiraCredentials,
+} from './netrc.js';
+import { getAccessToken } from './oauth.js';
 
 interface JiraRequestOptions {
   method: 'GET' | 'PUT' | 'POST' | 'DELETE';
@@ -9,12 +13,56 @@ interface JiraRequestOptions {
   query?: Record<string, string>;
 }
 
+/**
+ * Resolve the base URL for API calls based on credential type.
+ *
+ * - OAuth 2.0: https://api.atlassian.com/ex/jira/{cloudId}
+ * - Basic Auth: https://bkrupa.atlassian.net (direct site URL)
+ */
+function getApiBaseUrl(creds: JiraCredentials): string {
+  if (creds.type === 'oauth') {
+    return `https://api.atlassian.com/ex/jira/${creds.cloudId}`;
+  }
+  return JIRA_SITE_URL_DEFAULT;
+}
+
+/**
+ * Build the Authorization header for the given credential type.
+ */
+async function getAuthHeader(creds: JiraCredentials): Promise<string> {
+  if (creds.type === 'oauth') {
+    const token = await getAccessToken(creds.clientId, creds.clientSecret);
+    return `Bearer ${token}`;
+  }
+  return basicAuthHeader(creds);
+}
+
+/**
+ * Get the site URL for building human-readable browse links.
+ * Browse links always use the direct site URL, not the API gateway.
+ */
+export function getSiteUrl(creds: JiraCredentials): string {
+  if (creds.type === 'oauth') {
+    return creds.siteUrl;
+  }
+  return JIRA_SITE_URL_DEFAULT;
+}
+
+/** Get the Jira site URL for browse links. Resolves credentials to determine the URL. */
+export async function getJiraSiteUrl(): Promise<string> {
+  const creds = await getJiraCredentials();
+  return getSiteUrl(creds);
+}
+
 /** Make an authenticated Jira REST API request. */
 export async function jiraRequest<T = unknown>(
   opts: JiraRequestOptions,
 ): Promise<T> {
-  const creds = await getAtlassianCredentials();
-  let url = `${JIRA_BASE}${opts.path}`;
+  const creds = await getJiraCredentials();
+  const baseUrl = getApiBaseUrl(creds);
+  const authHeader = await getAuthHeader(creds);
+
+  let url = `${baseUrl}${opts.path}`;
 
   if (opts.query) {
     const params = new URLSearchParams(opts.query);
@@ -24,7 +72,7 @@ export async function jiraRequest<T = unknown>(
   const response = await fetch(url, {
     method: opts.method,
     headers: {
-      Authorization: basicAuthHeader(creds),
+      Authorization: authHeader,
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },

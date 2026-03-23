@@ -1,4 +1,5 @@
-import { jiraRequest } from '../jira-api.js';
+import { jiraRequest, getSiteUrl } from '../jira-api.js';
+import { getJiraCredentials } from '../netrc.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getActiveSprintId } from './get-active-sprint.js';
 
@@ -31,6 +32,11 @@ export async function createTicket(
   params: CreateTicketParams,
 ): Promise<CallToolResult> {
   const { summary, type = 'Task', description, parent, sprint } = params;
+
+  // Resolve credentials once upfront to avoid redundant lookups for the
+  // browse URL later.
+  const creds = await getJiraCredentials();
+  const siteUrl = getSiteUrl(creds);
 
   const fields: Record<string, unknown> = {
     project: { key: 'LS' },
@@ -113,7 +119,7 @@ export async function createTicket(
     const response: CreateTicketResponse = {
       success: true,
       key: result.key,
-      url: `https://bkrupa.atlassian.net/browse/${result.key}`,
+      url: `${siteUrl}/browse/${result.key}`,
     };
     if (sprintId) {
       response.sprintId = sprintId;

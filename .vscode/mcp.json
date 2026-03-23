@@ -16,6 +16,10 @@
       "command": "node",
       "args": ["--import", "tsx", "tools/mcp/jira-server/src/index.ts"],
       "env": {
+        "JIRA_CLIENT_ID": "${env:JIRA_CLIENT_ID}",
+        "JIRA_CLIENT_SECRET": "${env:JIRA_CLIENT_SECRET}",
+        "JIRA_CLOUD_ID": "${env:JIRA_CLOUD_ID}",
+        "JIRA_SITE_URL": "${env:JIRA_SITE_URL}",
         "JIRA_EMAIL": "${env:JIRA_EMAIL}",
         "JIRA_API_TOKEN": "${env:JIRA_API_TOKEN}"
       }

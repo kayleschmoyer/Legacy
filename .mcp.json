@@ -13,6 +13,10 @@
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/jira-server/src/index.ts"],
       "env": {
+        "JIRA_CLIENT_ID": "${JIRA_CLIENT_ID}",
+        "JIRA_CLIENT_SECRET": "${JIRA_CLIENT_SECRET}",
+        "JIRA_CLOUD_ID": "${JIRA_CLOUD_ID}",
+        "JIRA_SITE_URL": "${JIRA_SITE_URL}",
         "JIRA_EMAIL": "${JIRA_EMAIL}",
         "JIRA_API_TOKEN": "${JIRA_API_TOKEN}"
       }
