@@ -13,7 +13,7 @@ export interface CICheck {
   startedAt?: string | null;
 }
 
-const FAILING_CONCLUSIONS = new Set([
+export const FAILED_CONCLUSIONS = new Set([
   'FAILURE',
   'ERROR',
   'CANCELLED',
@@ -49,7 +49,7 @@ export function deduplicateChecks(checks: CICheck[]): CICheck[] {
 
 /**
  * Summarize CI status from a list of checks.
- * Aligned with pr-scan's FAILING_CONCLUSIONS / PENDING_STATUSES sets.
+ * Aligned with FAILED_CONCLUSIONS / PENDING_STATUSES sets.
  *
  * Returns: 'none' | 'pass' | 'fail' | 'pending'
  */
@@ -58,7 +58,7 @@ export function summarizeCIStatus(checks: CICheck[] | null): string {
 
   const conclusions = checks.map((c) => c.conclusion ?? c.status);
 
-  if (conclusions.some((c) => FAILING_CONCLUSIONS.has(c))) return 'fail';
+  if (conclusions.some((c) => FAILED_CONCLUSIONS.has(c))) return 'fail';
   if (conclusions.some((c) => PENDING_STATUSES.has(c))) return 'pending';
   // Everything remaining is SUCCESS, SKIPPED, NEUTRAL, or similar non-failing
   return 'pass';

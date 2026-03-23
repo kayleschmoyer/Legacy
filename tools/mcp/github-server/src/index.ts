@@ -392,6 +392,12 @@ server.tool(
       .min(1)
       .max(50)
       .describe('PR numbers'),
+    compact: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, unresolvedThreads) to reduce token usage',
+      ),
   },
   async (params) => prBatchStatus(params),
 );
@@ -434,6 +440,12 @@ server.tool(
       .boolean()
       .default(true)
       .describe('Sync CI failure labels (default: true)'),
+    compact: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Return a compact view with essential fields (number, branch, failedChecks, threadCount), plus threadsTruncated for review buckets and labelActions when labels are applied, to reduce token usage',
+      ),
   },
   async (params) => prScan(params),
 );

@@ -1,10 +1,11 @@
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
-import { summarizeCIStatus } from '../types.js';
+import { FAILED_CONCLUSIONS, summarizeCIStatus } from '../types.js';
 import type { ToolResult } from '../types.js';
 
 interface PRBatchStatusParams {
   prNumbers: number[];
+  compact?: boolean;
 }
 
 interface CheckRunNode {
@@ -182,6 +183,23 @@ export async function prBatchStatus(
         (t) => !t.isResolved,
       ).length;
       const threadCountTruncated = pr.reviewThreads.pageInfo.hasNextPage;
+
+      // Compact mode: omit verbose fields (ciJobs, reviews, labels, url)
+      if (params.compact) {
+        const failedJobs = ciJobs
+          .filter((j) => j.conclusion && FAILED_CONCLUSIONS.has(j.conclusion))
+          .map((j) => j.name);
+
+        return {
+          number: pr.number,
+          branch: pr.headRefName,
+          mergeable: pr.mergeable,
+          ciSummary,
+          ...(failedJobs.length > 0 ? { failedJobs } : {}),
+          unresolvedThreads,
+          ...(threadCountTruncated ? { threadCountTruncated: true } : {}),
+        };
+      }
 
       const reviews = pr.reviews.nodes.map((r) => ({
         author: r.author?.login ?? 'unknown',

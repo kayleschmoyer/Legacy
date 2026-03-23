@@ -1,10 +1,12 @@
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
+import { FAILED_CONCLUSIONS } from '../types.js';
 import type { ToolResult } from '../types.js';
 
 interface PRScanParams {
   limit?: number;
   applyLabels?: boolean;
+  compact?: boolean;
 }
 
 interface CheckRunNode {
@@ -76,12 +78,6 @@ interface BatchThreadsResponse {
   };
 }
 
-const FAILING_CONCLUSIONS = new Set([
-  'FAILURE',
-  'ERROR',
-  'CANCELLED',
-  'TIMED_OUT',
-]);
 const PENDING_STATUSES = new Set(['IN_PROGRESS', 'QUEUED', 'PENDING']);
 
 /**
@@ -377,7 +373,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
       const checks = checkNodes.map(normalizeCheckConclusion);
 
       const failed = checks.filter(
-        (c) => c.conclusion && FAILING_CONCLUSIONS.has(c.conclusion),
+        (c) => c.conclusion && FAILED_CONCLUSIONS.has(c.conclusion),
       );
       const pending = checks.filter(
         (c) =>
@@ -442,6 +438,41 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
         clean,
         existingLabels,
       );
+    }
+
+    // Compact mode: return only essential fields to reduce token usage
+    if (params.compact) {
+      const compactOutput = {
+        scannedAt: new Date().toISOString(),
+        totalOpen: prs.length,
+        conflicting: conflicting.map((p) => ({
+          number: p.number,
+          branch: p.headRefName,
+        })),
+        reviews: reviews.map((p) => ({
+          number: p.number,
+          branch: p.headRefName,
+          threadCount: p.threads.length,
+          ...(p.threadsTruncated ? { threadsTruncated: true } : {}),
+        })),
+        ciFailing: ciFailing.map((p) => ({
+          number: p.number,
+          branch: p.headRefName,
+          failedChecks: p.failedChecks,
+        })),
+        ciPending: ciPending.map((p) => ({
+          number: p.number,
+          branch: p.headRefName,
+        })),
+        clean: clean.map((p) => ({
+          number: p.number,
+          branch: p.headRefName,
+        })),
+        ...(labelActions.length > 0 ? { labelActions } : {}),
+      };
+      return {
+        content: [{ type: 'text', text: JSON.stringify(compactOutput) }],
+      };
     }
 
     const output = {
