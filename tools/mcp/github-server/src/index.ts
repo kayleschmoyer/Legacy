@@ -19,6 +19,7 @@ import { prDashboard } from './tools/pr-dashboard.js';
 import { prScan } from './tools/pr-scan.js';
 import { rebasePR } from './tools/rebase-pr.js';
 import { replyToThread } from './tools/reply-to-thread.js';
+import { retriggerCheck } from './tools/retrigger-check.js';
 import { secretList } from './tools/secret-list.js';
 import { secretSet } from './tools/secret-set.js';
 import { requestReview } from './tools/request-review.js';
@@ -579,6 +580,28 @@ server.tool(
       .describe('Path to file containing secret value'),
   },
   async (params) => secretSet(params),
+);
+
+// --- github_retrigger_check ---
+server.tool(
+  'github_retrigger_check',
+  'Re-request failed status checks on a PR. Eliminates need for empty commits to clear stale failures.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+    checkName: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe('Specific check name to re-request (retriggers all matching)'),
+    allFailed: z
+      .boolean()
+      .default(false)
+      .describe(
+        'When true, retrigger all failed checks. When false (default), retrigger only the named check or all failed checks if no checkName given.',
+      ),
+  },
+  async (params) => retriggerCheck(params),
 );
 
 // Start the server
