@@ -1603,6 +1603,11 @@ type Mutation {
     messageText: String!
     toUserId: Int!
   ): DirectMessage
+
+  """
+  Check all active leagues for in-progress matchups and post score updates to Discord. Highlights close matchups within a point threshold. Triggered periodically by EventBridge.
+  """
+  sendDiscordScoreAlerts(leagueId: Int): SendDiscordScoreAlertsResult
   sendLeagueMessage(
     gifUrl: String
     leagueId: Int!
@@ -2797,6 +2802,16 @@ type SeasonResults {
   season: Int
   standings: [TeamStanding!]
   totalMatchups: Int
+}
+
+"""
+Result of the Discord matchup score alert check across all active leagues
+"""
+type SendDiscordScoreAlertsResult {
+  alertsSent: Int
+  closeMatchupsFound: Int
+  errors: [String!]
+  leaguesChecked: Int
 }
 
 input SetTeamLockInput {

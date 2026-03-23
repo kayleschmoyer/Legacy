@@ -1240,6 +1240,8 @@ export type Mutation = {
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
   sendDirectMessage?: Maybe<DirectMessage>;
+  /** Check all active leagues for in-progress matchups and post score updates to Discord. Highlights close matchups within a point threshold. Triggered periodically by EventBridge. */
+  sendDiscordScoreAlerts?: Maybe<SendDiscordScoreAlertsResult>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   /** Select up to 3 leagues to keep active after a subscription downgrade. Leagues not included in the list will be tier-frozen (read-only). Only callable on the free tier — all leagues are automatically active on premium. */
@@ -1641,6 +1643,10 @@ export type MutationSendDirectMessageArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
   messageText: Scalars['String']['input'];
   toUserId: Scalars['Int']['input'];
+};
+
+export type MutationSendDiscordScoreAlertsArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationSendLeagueMessageArgs = {
@@ -3021,6 +3027,15 @@ export type SeasonResults = {
   season?: Maybe<Scalars['Int']['output']>;
   standings?: Maybe<Array<TeamStanding>>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of the Discord matchup score alert check across all active leagues */
+export type SendDiscordScoreAlertsResult = {
+  __typename?: 'SendDiscordScoreAlertsResult';
+  alertsSent?: Maybe<Scalars['Int']['output']>;
+  closeMatchupsFound?: Maybe<Scalars['Int']['output']>;
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  leaguesChecked?: Maybe<Scalars['Int']['output']>;
 };
 
 export type SetTeamLockInput = {

@@ -179,3 +179,46 @@ resource "aws_lambda_permission" "auto_process_draft_picks_eventbridge" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.auto_process_draft_picks.arn
 }
+
+# ── Discord Score Alerts ───────────────────────────────────────────────────
+# Posts matchup score summaries and close-game alerts to league Discord channels.
+# Runs every 4 hours during active seasons. Short-circuits quickly when no
+# leagues have active matchups with webhooks configured.
+
+resource "aws_cloudwatch_event_rule" "discord_score_alerts" {
+  name                = "${local.name_prefix}-discord-score-alerts"
+  description         = "Post matchup score updates to Discord every 4 hours"
+  schedule_expression = "rate(4 hours)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "discord_score_alerts" {
+  rule      = aws_cloudwatch_event_rule.discord_score_alerts.name
+  target_id = "discord-score-alerts"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { sendDiscordScoreAlerts { leaguesChecked alertsSent closeMatchupsFound errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "discord_score_alerts_eventbridge" {
+  statement_id  = "AllowEventBridgeDiscordScoreAlerts"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.discord_score_alerts.arn
+}

@@ -17,5 +17,8 @@ import './mutations';
 // Scheduled/system mutations (EventBridge cron triggers)
 import './scheduled-mutations';
 
+// Discord score alerts (EventBridge periodic trigger)
+import './discord-score-alerts';
+
 // Re-export types that other schema modules may need
 export { MatchupPlayerGameRef } from './types';
