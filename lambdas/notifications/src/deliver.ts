@@ -1,4 +1,5 @@
 import { Expo, ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
+import webpush from 'web-push';
 import { LOGGER } from '@legacy-sports/logging';
 import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
@@ -6,6 +7,16 @@ import type { NotificationEvent, SendResult } from './types';
 
 const expo = new Expo({ useFcmV1: true });
 const dbService = createDatabaseService(getDbOptions());
+
+// Configure VAPID for Web Push (keys from environment)
+const VAPID_PUBLIC_KEY = process.env['VAPID_PUBLIC_KEY'] ?? '';
+const VAPID_PRIVATE_KEY = process.env['VAPID_PRIVATE_KEY'] ?? '';
+const VAPID_SUBJECT =
+  process.env['VAPID_SUBJECT'] ?? 'mailto:push@legacysports.app';
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
 
 /**
  * Delivers a single notification event:
@@ -57,11 +68,16 @@ export async function deliverNotification(
     };
   }
 
-  // 3. Build Expo push messages (skip non-Expo tokens)
+  // 3. Separate web push tokens from Expo tokens
+  const webTokens: typeof activeTokens = [];
   const messages: ExpoPushMessage[] = [];
   const expoTokens: string[] = [];
 
   for (const token of activeTokens) {
+    if (token.platform === 'web') {
+      webTokens.push(token);
+      continue;
+    }
     if (!Expo.isExpoPushToken(token.deviceToken)) {
       LOGGER.warn('Skipping non-Expo push token', {
         userId,
@@ -79,39 +95,85 @@ export async function deliverNotification(
     });
   }
 
-  // 4. Send in chunks (Expo recommends ≤100 per request)
-  const chunks = expo.chunkPushNotifications(messages);
-  const tickets: ExpoPushTicket[] = [];
-
-  for (const chunk of chunks) {
-    const chunkTickets = await expo.sendPushNotificationsAsync(chunk);
-    tickets.push(...chunkTickets);
-  }
-
-  // 5. Count results and deactivate invalid tokens
   let tokensSent = 0;
   let tokensFailed = 0;
+  const vapidConfigured = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+  const webTokensAttempted = vapidConfigured ? webTokens.length : 0;
+  const totalAttempted = expoTokens.length + webTokensAttempted;
 
-  await Promise.all(
-    tickets.map(async (ticket, index) => {
-      const token = expoTokens[index];
-      if (ticket.status === 'ok') {
-        tokensSent++;
-      } else {
-        tokensFailed++;
-        LOGGER.warn('Expo push ticket error', {
-          userId,
-          details: ticket.details,
-          message: ticket.message,
-        });
-        // Deactivate DeviceNotRegistered tokens so we stop sending to them
-        if (ticket.details?.error === 'DeviceNotRegistered' && token) {
-          await dbService.notifications.disableDeviceToken(userId, token);
-          LOGGER.info('Deactivated stale device token', { userId });
+  if (webTokens.length > 0 && !vapidConfigured) {
+    LOGGER.warn('Skipping web push: VAPID keys not configured', {
+      userId,
+      skippedWebTokens: webTokens.length,
+    });
+  }
+
+  // 4a. Send Expo push notifications
+  if (messages.length > 0) {
+    const chunks = expo.chunkPushNotifications(messages);
+    const tickets: ExpoPushTicket[] = [];
+
+    for (const chunk of chunks) {
+      const chunkTickets = await expo.sendPushNotificationsAsync(chunk);
+      tickets.push(...chunkTickets);
+    }
+
+    await Promise.all(
+      tickets.map(async (ticket, index) => {
+        const token = expoTokens[index];
+        if (ticket.status === 'ok') {
+          tokensSent++;
+        } else {
+          tokensFailed++;
+          LOGGER.warn('Expo push ticket error', {
+            userId,
+            details: ticket.details,
+            message: ticket.message,
+          });
+          if (ticket.details?.error === 'DeviceNotRegistered' && token) {
+            await dbService.notifications.disableDeviceToken(userId, token);
+            LOGGER.info('Deactivated stale device token', { userId });
+          }
         }
-      }
-    }),
-  );
+      }),
+    );
+  }
+
+  // 4b. Send Web Push notifications (VAPID)
+  if (webTokens.length > 0 && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+    const webPayload = JSON.stringify({ title, body, data, notificationType });
+
+    await Promise.all(
+      webTokens.map(async (token) => {
+        try {
+          const subscription = JSON.parse(
+            token.deviceToken,
+          ) as webpush.PushSubscription;
+          await webpush.sendNotification(subscription, webPayload);
+          tokensSent++;
+        } catch (error) {
+          tokensFailed++;
+          const statusCode =
+            error instanceof webpush.WebPushError ? error.statusCode : 0;
+          LOGGER.warn('Web Push delivery error', {
+            userId,
+            statusCode,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // 410 Gone or 404 = subscription expired/invalid
+          if (statusCode === 410 || statusCode === 404) {
+            await dbService.notifications.disableDeviceToken(
+              userId,
+              token.deviceToken,
+            );
+            LOGGER.info('Deactivated expired web push subscription', {
+              userId,
+            });
+          }
+        }
+      }),
+    );
+  }
 
   // 6. Log notification to history
   const historyId = await dbService.notifications.logNotificationHistory(
@@ -125,7 +187,7 @@ export async function deliverNotification(
   LOGGER.info('Notification delivery complete', {
     userId,
     notificationType,
-    tokensAttempted: expoTokens.length,
+    tokensAttempted: totalAttempted,
     tokensSent,
     tokensFailed,
     historyId,
@@ -133,7 +195,7 @@ export async function deliverNotification(
 
   return {
     userId,
-    tokensAttempted: expoTokens.length,
+    tokensAttempted: totalAttempted,
     tokensSent,
     tokensFailed,
     historyId,

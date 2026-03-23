@@ -58,6 +58,7 @@ import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
 import { useRouteAnnouncer } from '../hooks/useRouteAnnouncer';
 import { useAnalyticsIdentify } from '../hooks/useAnalyticsIdentify';
+import { useWebPushRegistration } from '../hooks/useWebPushRegistration';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { AdminPage } from '../pages/admin/AdminPage';
@@ -455,6 +456,8 @@ function App() {
   useRouteAnnouncer();
   // Identify the authenticated user in analytics with real subscription tier
   useAnalyticsIdentify();
+  // Register service worker and Web Push subscription for authenticated users
+  useWebPushRegistration();
 
   const { pathname } = useLocation();
 

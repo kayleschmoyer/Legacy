@@ -8,7 +8,8 @@
     "mocks/**",
     "src/mocks/**/*.js",
     "src/__mocks__/**/*.js",
-    "**/test-setup.ts"
+    "**/test-setup.ts",
+    "public/**"
   ],
   "parserOptions": {
     "project": ["tsconfig.*?.json"]

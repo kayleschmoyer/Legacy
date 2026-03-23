@@ -163,6 +163,10 @@ jest.mock('../hooks/usePageTracking', () => ({
   usePageTracking: () => null,
 }));
 
+jest.mock('../hooks/useWebPushRegistration', () => ({
+  useWebPushRegistration: () => null,
+}));
+
 describe('App', () => {
   beforeEach(() => {
     // Clear any timers between tests

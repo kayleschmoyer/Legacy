@@ -27,6 +27,8 @@ export interface EnvironmentConfig {
   readonly stripeMonthlyPriceId: string;
   /** Stripe price ID for annual Premium subscription. */
   readonly stripeAnnualPriceId: string;
+  /** VAPID public key for Web Push subscription (base64url-encoded). */
+  readonly vapidPublicKey: string;
 }
 
 /**
@@ -73,6 +75,7 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
     (import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID as string) || '',
   stripeAnnualPriceId:
     (import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID as string) || '',
+  vapidPublicKey: (import.meta.env.VITE_VAPID_PUBLIC_KEY as string) || '',
 });
 
 /**
