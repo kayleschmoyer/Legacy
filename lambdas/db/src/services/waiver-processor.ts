@@ -11,6 +11,10 @@ import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import {
+  getDiscordWebhookUrls,
+  notifyDiscordWaiverClaim,
+} from './discord-league';
 
 import { insertActivityLog } from './activity-log';
 import { assertCapSpace, computeTeamPayroll } from './cap-service';
@@ -722,6 +726,10 @@ export class WaiverClaimProcessor {
       .where(inArray(PublicSchema.teams.id, allTeamIds));
     const teamNameMap = new Map(teamRows.map((t) => [t.id, t.name]));
 
+    // Batch-prefetch Discord webhook URLs to avoid N+1 queries
+    const allLeagueIds = [...succeededLeagueIds];
+    const webhookUrlMap = await getDiscordWebhookUrls(db, allLeagueIds);
+
     const notifyService = notificationService;
 
     for (const sc of succeededClaims) {
@@ -785,6 +793,21 @@ export class WaiverClaimProcessor {
           teamId: sc.teamId,
           playerId: sc.playerId,
           error: chatErr instanceof Error ? chatErr.message : String(chatErr),
+        });
+      }
+
+      // Discord notification is isolated from chat insert — failures here
+      // do not affect chat persistence or vice versa.
+      const webhookUrl = webhookUrlMap.get(sc.leagueId);
+      if (webhookUrl) {
+        void notifyDiscordWaiverClaim(db, {
+          leagueId: sc.leagueId,
+          teamName,
+          playerName,
+          dropName,
+          waiverType: sc.waiverType,
+          faabBid: sc.faabBid ?? null,
+          webhookUrl,
         });
       }
     }

@@ -836,6 +836,21 @@ export type LeagueChatMessage = {
   userId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Per-league dues configuration set by the commissioner */
+export type LeagueDuesSettings = {
+  __typename?: 'LeagueDuesSettings';
+  /** Dues amount in cents (e.g. 5000 = $50.00) */
+  amountCents?: Maybe<Scalars['Int']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  enabled?: Maybe<Scalars['Boolean']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Day of week for reminders (0=Sunday, 6=Saturday) */
+  reminderDayOfWeek?: Maybe<Scalars['Int']['output']>;
+  reminderEnabled?: Maybe<Scalars['Boolean']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
 /** A member of a league */
 export type LeagueMember = {
   __typename?: 'LeagueMember';
@@ -843,6 +858,20 @@ export type LeagueMember = {
   permissionLevel?: Maybe<Scalars['String']['output']>;
   team?: Maybe<Team>;
   teamId?: Maybe<Scalars['Int']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+  username?: Maybe<Scalars['String']['output']>;
+};
+
+/** Payment status for a single league member */
+export type LeagueMemberPaymentStatus = {
+  __typename?: 'LeagueMemberPaymentStatus';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  markedBy?: Maybe<Scalars['Int']['output']>;
+  paid?: Maybe<Scalars['Boolean']['output']>;
+  paidAt?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
   username?: Maybe<Scalars['String']['output']>;
 };
@@ -1153,6 +1182,10 @@ export type Mutation = {
   /** Make a draft pick in a Season Draft Game */
   makeSeasonDraftPick?: Maybe<Scalars['Boolean']['output']>;
   markAllNotificationsAsRead?: Maybe<Scalars['Boolean']['output']>;
+  /** Mark a league member as paid. Commissioner/GM access required. */
+  markMemberPaid?: Maybe<LeagueMemberPaymentStatus>;
+  /** Mark a league member as unpaid. Commissioner/GM access required. */
+  markMemberUnpaid?: Maybe<LeagueMemberPaymentStatus>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
   nominatePlayer?: Maybe<AuctionState>;
   pauseDraft?: Maybe<Draft>;
@@ -1213,6 +1246,8 @@ export type Mutation = {
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
+  /** Create or update dues settings for a league. Commissioner/GM access required. */
+  updateDuesSettings?: Maybe<LeagueDuesSettings>;
   updateLeagueAnnouncement?: Maybe<LeagueChatMessage>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
@@ -1466,6 +1501,16 @@ export type MutationMakeSeasonDraftPickArgs = {
   team?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type MutationMarkMemberPaidArgs = {
+  leagueId: Scalars['Int']['input'];
+  userId: Scalars['Int']['input'];
+};
+
+export type MutationMarkMemberUnpaidArgs = {
+  leagueId: Scalars['Int']['input'];
+  userId: Scalars['Int']['input'];
+};
+
 export type MutationMarkNotificationAsReadArgs = {
   notificationId: Scalars['Int']['input'];
 };
@@ -1655,6 +1700,10 @@ export type MutationUpdateCommissionerNoteArgs = {
 
 export type MutationUpdateDraftSettingsArgs = {
   input: UpdateDraftSettingsInput;
+};
+
+export type MutationUpdateDuesSettingsArgs = {
+  input: UpdateDuesSettingsInput;
 };
 
 export type MutationUpdateLeagueAnnouncementArgs = {
@@ -2085,6 +2134,10 @@ export type Query = {
   league?: Maybe<League>;
   /** Paginated activity timeline for a league, newest first. Optionally filter by one or more event types. */
   leagueActivity?: Maybe<Array<LeagueActivityEvent>>;
+  /** Get dues settings for a league. Requires league membership. */
+  leagueDuesSettings?: Maybe<LeagueDuesSettings>;
+  /** Get payment status for all league members. Requires league membership. */
+  leagueDuesStatus?: Maybe<Array<LeagueMemberPaymentStatus>>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
   /** Return all season awards for a league, optionally filtered by season */
@@ -2410,6 +2463,14 @@ export type QueryLeagueActivityArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type QueryLeagueDuesSettingsArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type QueryLeagueDuesStatusArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
 export type QueryLeaguePositionsArgs = {
   leagueId: Scalars['Int']['input'];
 };
@@ -2726,6 +2787,8 @@ export type SeasonBatting = {
   awardSummary?: Maybe<Scalars['String']['output']>;
   baseOnBalls?: Maybe<Scalars['Int']['output']>;
   battingAverage?: Maybe<Scalars['Float']['output']>;
+  /** Baseball Reference WAR (bWAR) for this season */
+  bwar?: Maybe<Scalars['Float']['output']>;
   caughtStealing?: Maybe<Scalars['Int']['output']>;
   doubles?: Maybe<Scalars['Int']['output']>;
   games?: Maybe<Scalars['Int']['output']>;
@@ -2882,6 +2945,8 @@ export type SeasonPitching = {
   baseOnBalls?: Maybe<Scalars['Int']['output']>;
   basesOnBallsPerNine?: Maybe<Scalars['Float']['output']>;
   battersFaced?: Maybe<Scalars['Int']['output']>;
+  /** Baseball Reference WAR (bWAR) for this season */
+  bwar?: Maybe<Scalars['Float']['output']>;
   completeGames?: Maybe<Scalars['Int']['output']>;
   earnedRunAverage?: Maybe<Scalars['String']['output']>;
   earnedRunAveragePlus?: Maybe<Scalars['Float']['output']>;
@@ -3151,6 +3216,14 @@ export type UpdateDraftSettingsPayload = {
   playerPool?: Maybe<Scalars['String']['output']>;
   scheduledAt?: Maybe<Scalars['String']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
+};
+
+export type UpdateDuesSettingsInput = {
+  amountCents: Scalars['Int']['input'];
+  enabled: Scalars['Boolean']['input'];
+  leagueId: Scalars['Int']['input'];
+  reminderDayOfWeek?: InputMaybe<Scalars['Int']['input']>;
+  reminderEnabled: Scalars['Boolean']['input'];
 };
 
 export type UpdateLeagueScoringMultiplierInput = {

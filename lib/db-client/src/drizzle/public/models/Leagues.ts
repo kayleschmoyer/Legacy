@@ -114,6 +114,7 @@ export const leagues = pgTable(
     salaryDecayPct: integer('salary_decay_pct').notNull().default(25),
     auctionBudget: integer('auction_budget').notNull().default(260),
     auctionMinBid: integer('auction_min_bid').notNull().default(1),
+    discordWebhookUrl: text('discord_webhook_url'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
