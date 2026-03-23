@@ -75,6 +75,7 @@ export async function jiraRequest<T = unknown>(
       Authorization: authHeader,
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      'Accept-Language': 'en',
     },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });

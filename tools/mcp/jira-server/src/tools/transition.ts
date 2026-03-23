@@ -1,4 +1,6 @@
 import { jiraRequest } from '../jira-api.js';
+import { searchJqlAll } from '../jql-search.js';
+import { matchesStatus } from '../locale.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 export const VALID_STATUSES = ['In Progress', 'In Review', 'Done'] as const;
@@ -10,15 +12,9 @@ interface TransitionParams {
   cascade?: boolean;
 }
 
-interface JiraSearchResponse {
-  total: number;
-  issues: Array<{
-    key: string;
-    fields: {
-      summary: string;
-      status: { name: string };
-    };
-  }>;
+interface SubtaskFields {
+  summary: string;
+  status: { name: string };
 }
 
 interface JiraTransition {
@@ -60,9 +56,7 @@ export async function transition(
     });
 
     const match = transitions.find(
-      (t) =>
-        t.name.toLowerCase() === status.toLowerCase() ||
-        t.to.name.toLowerCase() === status.toLowerCase(),
+      (t) => matchesStatus(t.name, status) || matchesStatus(t.to.name, status),
     );
 
     if (!match) {
@@ -87,26 +81,11 @@ export async function transition(
 
     if (status === 'Done') {
       try {
-        // Paginate through all open subtasks
-        const allIssues: JiraSearchResponse['issues'] = [];
-        let startAt = 0;
-        const pageSize = 50;
-        let total: number;
-        do {
-          const page = await jiraRequest<JiraSearchResponse>({
-            method: 'POST',
-            path: '/rest/api/3/search/jql',
-            body: {
-              jql: `parent = ${JSON.stringify(key)} AND status != "Done"`,
-              fields: ['summary', 'status'],
-              maxResults: pageSize,
-              startAt,
-            },
-          });
-          allIssues.push(...page.issues);
-          total = page.total;
-          startAt += pageSize;
-        } while (startAt < total);
+        const allIssues = await searchJqlAll<SubtaskFields>({
+          jql: `parent = ${JSON.stringify(key)} AND status != "Done"`,
+          fields: ['summary', 'status'],
+          maxResults: 50,
+        });
 
         if (allIssues.length > 0) {
           const openKeys = allIssues.map(
@@ -125,8 +104,8 @@ export async function transition(
                 );
                 const doneTransition = childTransitions.transitions.find(
                   (t) =>
-                    t.name.toLowerCase() === 'done' ||
-                    t.to.name.toLowerCase() === 'done',
+                    matchesStatus(t.name, 'Done') ||
+                    matchesStatus(t.to.name, 'Done'),
                 );
                 if (doneTransition) {
                   await jiraRequest({

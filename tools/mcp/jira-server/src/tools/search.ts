@@ -1,4 +1,4 @@
-import { jiraRequest } from '../jira-api.js';
+import { searchJql } from '../jql-search.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface SearchParams {
@@ -6,18 +6,12 @@ interface SearchParams {
   maxResults?: number;
 }
 
-interface JiraSearchResponse {
-  total: number;
-  issues: Array<{
-    key: string;
-    fields: {
-      summary: string;
-      status: { name: string };
-      issuetype: { name: string };
-      assignee: { displayName: string; emailAddress?: string } | null;
-      priority: { name: string } | null;
-    };
-  }>;
+interface SearchFields {
+  summary: string;
+  status: { name: string };
+  issuetype: { name: string };
+  assignee: { displayName: string; emailAddress?: string } | null;
+  priority: { name: string } | null;
 }
 
 const DEFAULT_FIELDS = [
@@ -34,14 +28,10 @@ export async function search(params: SearchParams): Promise<CallToolResult> {
   const maxResults = Math.max(1, Math.min(100, Math.floor(rawMax)));
 
   try {
-    const result = await jiraRequest<JiraSearchResponse>({
-      method: 'POST',
-      path: '/rest/api/3/search/jql',
-      body: {
-        jql,
-        fields: DEFAULT_FIELDS,
-        maxResults,
-      },
+    const result = await searchJql<SearchFields>({
+      jql,
+      fields: DEFAULT_FIELDS,
+      maxResults,
     });
 
     const issues = result.issues.map((issue) => ({
@@ -57,11 +47,7 @@ export async function search(params: SearchParams): Promise<CallToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            { total: result.total, returned: issues.length, issues },
-            null,
-            2,
-          ),
+          text: JSON.stringify({ returned: issues.length, issues }, null, 2),
         },
       ],
     };

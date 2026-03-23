@@ -1,4 +1,4 @@
-import { jiraRequest } from '../jira-api.js';
+import { searchJqlAll } from '../jql-search.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface ListChildrenParams {
@@ -6,18 +6,12 @@ interface ListChildrenParams {
   status?: string;
 }
 
-interface JiraSearchResponse {
-  total: number;
-  issues: Array<{
-    key: string;
-    fields: {
-      summary: string;
-      status: { name: string };
-      issuetype: { name: string };
-      priority: { name: string } | null;
-      created: string;
-    };
-  }>;
+interface ChildFields {
+  summary: string;
+  status: { name: string };
+  issuetype: { name: string };
+  priority: { name: string } | null;
+  created: string;
 }
 
 const JIRA_KEY_RE = /^[A-Z][A-Z0-9_]+-\d+$/;
@@ -49,29 +43,10 @@ export async function listChildren(
       jql = `parent = ${quotedKey} AND status = ${quotedStatus} ORDER BY created DESC`;
     }
 
-    // Paginate through all results using the v3 search/jql endpoint (POST).
-    // The old GET /rest/api/3/search was removed by Atlassian (410 Gone).
-    const PAGE_SIZE = 100;
-    let startAt = 0;
-    const allIssues: JiraSearchResponse['issues'] = [];
-
-    let hasMore = true;
-    while (hasMore) {
-      const result = await jiraRequest<JiraSearchResponse>({
-        method: 'POST',
-        path: '/rest/api/3/search/jql',
-        body: {
-          jql,
-          fields: ['summary', 'status', 'issuetype', 'priority', 'created'],
-          maxResults: PAGE_SIZE,
-          startAt,
-        },
-      });
-
-      allIssues.push(...result.issues);
-      startAt += result.issues.length;
-      hasMore = allIssues.length < result.total && result.issues.length > 0;
-    }
+    const allIssues = await searchJqlAll<ChildFields>({
+      jql,
+      fields: ['summary', 'status', 'issuetype', 'priority', 'created'],
+    });
 
     const children = allIssues.map((issue) => ({
       key: issue.key,

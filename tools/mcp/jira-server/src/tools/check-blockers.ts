@@ -1,4 +1,5 @@
 import { jiraRequest } from '../jira-api.js';
+import { matchesStatus } from '../locale.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface CheckBlockersParams {
@@ -67,9 +68,9 @@ export async function checkBlockers(
       const status = link.inwardIssue!.fields.status.name;
 
       let reason: string;
-      if (status === 'Done') {
+      if (matchesStatus(status, 'Done')) {
         reason = 'Resolved — no longer blocking';
-      } else if (status === 'In Review') {
+      } else if (matchesStatus(status, 'In Review')) {
         reason = 'In Review — use its branch as parent';
       } else {
         reason = `Status is "${status}" — must reach at least "In Review" before proceeding`;
@@ -80,9 +81,13 @@ export async function checkBlockers(
 
     // Determine recommendation based on blocker statuses
     const unresolvedBlockers = blockers.filter(
-      (b) => b.status !== 'Done' && b.status !== 'In Review',
+      (b) =>
+        !matchesStatus(b.status, 'Done') &&
+        !matchesStatus(b.status, 'In Review'),
     );
-    const inReviewBlockers = blockers.filter((b) => b.status === 'In Review');
+    const inReviewBlockers = blockers.filter((b) =>
+      matchesStatus(b.status, 'In Review'),
+    );
 
     let canProceed: boolean;
     let recommendation: string;

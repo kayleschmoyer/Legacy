@@ -1,4 +1,5 @@
 import { jiraRequest } from '../jira-api.js';
+import { matchesStatus } from '../locale.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { VALID_STATUSES, type ValidStatus } from './transition.js';
 
@@ -74,8 +75,7 @@ export async function bulkTransition(
 
       const match = transitions.find(
         (t) =>
-          t.name.toLowerCase() === status.toLowerCase() ||
-          t.to.name.toLowerCase() === status.toLowerCase(),
+          matchesStatus(t.name, status) || matchesStatus(t.to.name, status),
       );
 
       if (!match) {
