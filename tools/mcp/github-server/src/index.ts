@@ -22,6 +22,16 @@ import { resolveThread } from './tools/resolve-thread.js';
 import { resolveThreads } from './tools/resolve-threads.js';
 import { viewPR } from './tools/view-pr.js';
 
+/**
+ * Shared Zod schema for label arrays. Accepts a single string or an array of
+ * strings (MCP callers sometimes send a bare string instead of a one-element
+ * array). Each label must be non-empty after trimming.
+ */
+const labelList = z.preprocess(
+  (val) => (typeof val === 'string' ? [val] : val),
+  z.array(z.string().trim().min(1, 'Label name must be non-empty')),
+);
+
 const GH_AUTH_TOKEN_TIMEOUT_MS = 5_000;
 
 /**
@@ -312,8 +322,8 @@ server.tool(
   'Add or remove labels on a PR.',
   {
     number: z.coerce.number().int().positive().describe('PR number'),
-    add: z.array(z.string()).optional().describe('Labels to add'),
-    remove: z.array(z.string()).optional().describe('Labels to remove'),
+    add: labelList.optional().describe('Labels to add'),
+    remove: labelList.optional().describe('Labels to remove'),
   },
   async (params) => manageLabels(params),
 );
@@ -328,8 +338,8 @@ server.tool(
       .min(1)
       .max(100)
       .describe('PR numbers'),
-    add: z.array(z.string()).optional().describe('Labels to add'),
-    remove: z.array(z.string()).optional().describe('Labels to remove'),
+    add: labelList.optional().describe('Labels to add'),
+    remove: labelList.optional().describe('Labels to remove'),
   },
   async (params) => manageLabelsBatch(params),
 );
