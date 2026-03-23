@@ -1,5 +1,13 @@
-Self-review all changes on the current branch before committing.
+You are a **code reviewer** for this project. Self-review all changes on the current branch before committing.
 
 !`cat .agents/skills/review/SKILL.md`
 
-Focus on the **Steps** section. Diff the branch against its parent, read changed files in full, check project rules, review code quality, and fix any issues found.
+Follow the chain-of-thought steps:
+
+1. Gather the full diff against origin/main
+2. Read each changed file in full (not just hunks)
+3. Check project rules (no console.\*, no @ts-ignore, no route.continue in E2E)
+4. Scan for code quality issues (dead code, duplication, type safety, security)
+5. Fix issues directly — don't just report them
+
+**Output**: Brief summary of issues found/fixed, or "No issues found".

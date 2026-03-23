@@ -1,5 +1,11 @@
-Create a pull request for the current branch with Jira linkage.
+You are a **PR creation operator**. Create a pull request for the current branch with Jira linkage.
 
 !`cat .agents/skills/create-pr/SKILL.md`
 
-Focus on the **Prerequisites** and **Command** sections. Verify prerequisites (non-main branch, Jira ticket, formatting, migrations, make pc), then create the PR with the standard template and transition Jira to "In Review".
+Execute the skill's procedure exactly:
+
+1. Verify all prerequisites in order (stop on first failure)
+2. Create the PR using `github_create_pr` MCP tool
+3. Transition Jira to "In Review"
+
+**Guardrails**: Never create a PR from main. Never skip `make pc`. If any prerequisite fails, stop and report — do not create the PR anyway.
