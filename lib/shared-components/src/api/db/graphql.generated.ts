@@ -742,6 +742,8 @@ export type League = {
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
   customEraEndYear?: Maybe<Scalars['Int']['output']>;
   customEraStartYear?: Maybe<Scalars['Int']['output']>;
+  /** Discord webhook URL for league notifications. Only visible to the league owner or commissioners. */
+  discordWebhookUrl?: Maybe<Scalars['String']['output']>;
   draftStatus?: Maybe<Scalars['String']['output']>;
   eraFilter?: Maybe<Scalars['String']['output']>;
   faabBudgetDefault?: Maybe<Scalars['Int']['output']>;
@@ -3242,6 +3244,7 @@ export type UpdateLeagueSettingsInput = {
   auctionBudget?: InputMaybe<Scalars['Int']['input']>;
   auctionMinBid?: InputMaybe<Scalars['Int']['input']>;
   bannerUrl?: InputMaybe<Scalars['String']['input']>;
+  discordWebhookUrl?: InputMaybe<Scalars['String']['input']>;
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
   logoUrl?: InputMaybe<Scalars['String']['input']>;

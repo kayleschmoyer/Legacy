@@ -101,6 +101,7 @@ export const League = builder.objectRef<{
   hofOnly?: boolean;
   customEraStartYear?: number | null;
   customEraEndYear?: number | null;
+  discordWebhookUrl?: string | null;
   userMembership?: {
     leagueId: number;
     userId: number;
@@ -156,6 +157,25 @@ League.implement({
         'the owner re-selects this league as one of their active free-tier leagues.',
     }),
     seasonNumber: t.exposeInt('seasonNumber', { nullable: true }),
+    discordWebhookUrl: t.string({
+      nullable: true,
+      description:
+        'Discord webhook URL for league notifications. ' +
+        'Only visible to the league owner or commissioners.',
+      resolve: (parent, _args, context) => {
+        if (!context.user) return null;
+        // Only the league owner or a commissioner can see the webhook URL
+        const userId = context.user.id;
+        const isOwner = parent.owner === userId;
+        if (!isOwner) {
+          const membership = parent.userMembership;
+          if (!membership || membership.permissionLevel !== 'commissioner') {
+            return null;
+          }
+        }
+        return parent.discordWebhookUrl ?? null;
+      },
+    }),
     currentWeekNumber: t.int({
       nullable: true,
       description: 'The current active week number for the league',

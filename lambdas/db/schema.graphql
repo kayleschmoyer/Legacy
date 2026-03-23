@@ -802,6 +802,11 @@ type League {
   currentWeekNumber: Int
   customEraEndYear: Int
   customEraStartYear: Int
+
+  """
+  Discord webhook URL for league notifications. Only visible to the league owner or commissioners.
+  """
+  discordWebhookUrl: String
   draftStatus: String
   eraFilter: String
   faabBudgetDefault: Int
@@ -3034,6 +3039,7 @@ input UpdateLeagueSettingsInput {
   auctionBudget: Int
   auctionMinBid: Int
   bannerUrl: String
+  discordWebhookUrl: String
   gamesPerMatchup: Int
   leagueId: Int!
   logoUrl: String
