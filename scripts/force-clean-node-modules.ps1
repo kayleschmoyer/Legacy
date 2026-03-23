@@ -35,10 +35,15 @@ if ($workspaceProcs) {
 # Step 1b: Kill node processes holding native addon (.node) file locks
 # These processes may not have the workspace path in their CommandLine but still
 # lock native binaries (e.g. bufferutil.node, utf-8-validate.node) inside node_modules.
+# Also scan node_modules_DELETE_ME_* folders — processes that loaded addons before a
+# rename still hold file handles under the original path.
 Write-Host "`nStep 1b: Releasing native addon file locks..." -ForegroundColor Cyan
-$nmEsc = [regex]::Escape((Join-Path $workspaceRoot 'node_modules'))
+$addonPatterns = @([regex]::Escape((Join-Path $workspaceRoot 'node_modules')))
+Get-ChildItem -Path $workspaceRoot -Directory -Filter 'node_modules_DELETE_ME_*' -ErrorAction SilentlyContinue |
+    ForEach-Object { $addonPatterns += [regex]::Escape($_.FullName) }
+$addonRegex = '(' + ($addonPatterns -join '|') + ').*\.node$'
 $addonProcs = Get-Process node -ErrorAction SilentlyContinue | Where-Object {
-    try { ($_.Modules | Where-Object { $_.FileName -match ($nmEsc + '.*\.node$') }).Count -gt 0 } catch { $false }
+    try { ($_.Modules | Where-Object { $_.FileName -match $addonRegex }).Count -gt 0 } catch { $false }
 }
 if ($addonProcs) {
     $addonProcs | ForEach-Object {
@@ -105,7 +110,7 @@ if (Test-Path $nodeModulesPath) {
 }
 
 # Step 5: Remove .nx cache
-Write-Host "`nStep 6: Removing Nx cache..." -ForegroundColor Cyan
+Write-Host "`nStep 5: Removing Nx cache..." -ForegroundColor Cyan
 $nxCachePath = Join-Path $workspaceRoot ".nx"
 if (Test-Path $nxCachePath) {
     try {
@@ -116,6 +121,20 @@ if (Test-Path $nxCachePath) {
     }
 } else {
     Write-Host "   .nx cache already removed" -ForegroundColor Green
+}
+
+# Step 6: Clean up any leftover node_modules_DELETE_ME_* folders from previous runs
+$leftovers = Get-ChildItem -Path $workspaceRoot -Directory -Filter "node_modules_DELETE_ME_*" -ErrorAction SilentlyContinue
+if ($leftovers) {
+    Write-Host "`nStep 6: Cleaning up leftover node_modules_DELETE_ME_* folders..." -ForegroundColor Cyan
+    foreach ($leftover in $leftovers) {
+        try {
+            Remove-Item -Path $leftover.FullName -Recurse -Force -ErrorAction Stop
+            Write-Host "   Removed $($leftover.Name)" -ForegroundColor Green
+        } catch {
+            Write-Host "   Could not remove $($leftover.Name) (still locked — retry after reboot)" -ForegroundColor Yellow
+        }
+    }
 }
 
 Write-Host "`n=== Clean Complete ===" -ForegroundColor Green

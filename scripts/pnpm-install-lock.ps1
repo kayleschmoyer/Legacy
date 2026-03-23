@@ -21,6 +21,9 @@ param(
     [switch]$ForceClean,
 
     [Parameter()]
+    [switch]$SkipJunctionCheck,
+
+    [Parameter()]
     [string]$RepoRoot
 )
 
@@ -162,22 +165,30 @@ if (Test-Path $nmPath) {
     }
 
     if ($junctions.Count -gt 0) {
-        Write-Host ""
-        Write-Host "  ============================================================" -ForegroundColor Red
-        Write-Host "  BLOCKED: worktrees have junctions to this node_modules" -ForegroundColor Red
-        Write-Host "  ============================================================" -ForegroundColor Red
-        Write-Host ""
-        Write-Host "  Running pnpm install here would silently mutate the shared" -ForegroundColor Yellow
-        Write-Host "  node_modules and break these junctioned worktrees:" -ForegroundColor Yellow
-        foreach ($j in $junctions) {
-            Write-Host "    - $j" -ForegroundColor Yellow
+        if ($SkipJunctionCheck) {
+            Write-Host ""
+            Write-Host "  WARNING: $($junctions.Count) worktrees have junctions to this node_modules" -ForegroundColor Yellow
+            Write-Host "  Proceeding anyway (SKIP_JUNCTION_CHECK=1)" -ForegroundColor Yellow
+            Write-Host ""
+        } else {
+            Write-Host ""
+            Write-Host "  ============================================================" -ForegroundColor Red
+            Write-Host "  BLOCKED: worktrees have junctions to this node_modules" -ForegroundColor Red
+            Write-Host "  ============================================================" -ForegroundColor Red
+            Write-Host ""
+            Write-Host "  Running pnpm install here would silently mutate the shared" -ForegroundColor Yellow
+            Write-Host "  node_modules and break these junctioned worktrees:" -ForegroundColor Yellow
+            foreach ($j in $junctions) {
+                Write-Host "    - $j" -ForegroundColor Yellow
+            }
+            Write-Host ""
+            Write-Host "  What to do instead:" -ForegroundColor Cyan
+            Write-Host "    - Clean up idle worktrees first:  twig worktree clean" -ForegroundColor White
+            Write-Host "    - Or remove their junctions:  cd <worktree> && cmd /c `"rmdir node_modules`"" -ForegroundColor White
+            Write-Host "    - Or force it:  make install SKIP_JUNCTION_CHECK=1" -ForegroundColor White
+            Write-Host ""
+            exit 1
         }
-        Write-Host ""
-        Write-Host "  What to do instead:" -ForegroundColor Cyan
-        Write-Host "    - Clean up idle worktrees first:  twig worktree clean" -ForegroundColor White
-        Write-Host "    - Or remove their junctions:  cd <worktree> && cmd /c `"rmdir node_modules`"" -ForegroundColor White
-        Write-Host ""
-        exit 1
     }
 }
 
