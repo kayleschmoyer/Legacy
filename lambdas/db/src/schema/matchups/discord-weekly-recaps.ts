@@ -49,20 +49,30 @@ interface DiscordEmbed {
   footer?: { text: string };
 }
 
+/**
+ * Validate that a URL is a legitimate Discord webhook endpoint.
+ * Only allows HTTPS to `discord.com` or its subdomains (e.g. `canary.discord.com`).
+ */
+export function isValidDiscordUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === 'https:' &&
+      (parsed.hostname === 'discord.com' ||
+        parsed.hostname.endsWith('.discord.com'))
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function postToDiscord(
   webhookUrl: string,
   embeds: DiscordEmbed[],
 ): Promise<boolean> {
   // SSRF validation: only allow HTTPS requests to Discord webhook hosts
-  const parsed = new URL(webhookUrl);
-  if (
-    parsed.protocol !== 'https:' ||
-    !parsed.hostname.endsWith('discord.com')
-  ) {
-    LOGGER.warn('Blocked non-Discord webhook URL', {
-      host: parsed.hostname,
-      protocol: parsed.protocol,
-    });
+  if (!isValidDiscordUrl(webhookUrl)) {
+    LOGGER.warn('Blocked non-Discord webhook URL', { webhookUrl });
     return false;
   }
 

@@ -104,7 +104,7 @@ async function computeLockTime(
  * otherwise hours (always rounding up so the user is never surprised by an
  * under-estimate).
  */
-function formatTimeUntilLock(lockTime: Date, now: Date): string {
+export function formatTimeUntilLock(lockTime: Date, now: Date): string {
   const diffMs = lockTime.getTime() - now.getTime();
   const diffMinutes = diffMs / (1000 * 60);
 
