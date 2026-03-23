@@ -76,7 +76,8 @@ function extractErrorSummary(allLines: string[]): string[] {
 }
 
 export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
-  const maxLines = params.maxLines ?? 0;
+  const defaultLimit = params.errorSummary ? 10_000 : 500;
+  const maxLines = params.maxLines ?? defaultLimit;
 
   try {
     const streamLimit = maxLines > 0 ? maxLines : 10_000;

@@ -55,8 +55,11 @@ server.tool(
       .number()
       .int()
       .positive()
+      .max(5000)
       .optional()
-      .describe('Return only last N lines'),
+      .describe(
+        'Maximum lines of log output to return (max: 5000). Defaults to 500 when errorSummary is false. When errorSummary is true, fetches up to 10000 lines for broader error extraction.',
+      ),
     errorSummary: z
       .boolean()
       .default(false)
