@@ -2,8 +2,8 @@
 # =============================================================================
 # Claude Code on the Web — Cloud Environment Setup Script
 # =============================================================================
-# Paste this script into the "Setup script" field in Claude Code's cloud
-# environment settings UI (Settings → Environment → Setup script).
+# Referenced from the cloud environment setup script UI via:
+#   source "$HOME/legacy-sports/.claude/cloud-setup.sh"
 #
 # This runs ONCE when a new cloud session is created (not on resume).
 # It installs tools that aren't in the default Ubuntu 24.04 image.
@@ -14,7 +14,16 @@
 
 set -euo pipefail
 
-echo "=== Legacy Sports cloud setup ==="
+# ---------------------------------------------------------------------------
+# 0. Navigate to repo root (cloud env starts in /home/user, not the repo)
+# ---------------------------------------------------------------------------
+REPO_DIR="$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")"
+if [ ! -d "$REPO_DIR/.git" ] || [ ! -f "$REPO_DIR/package.json" ]; then
+  echo "ERROR: repo root not found at $REPO_DIR (expected .git/ and package.json)"
+  exit 1
+fi
+cd "$REPO_DIR"
+echo "=== Legacy Sports cloud setup (repo: $REPO_DIR) ==="
 
 # ---------------------------------------------------------------------------
 # 1. Install GitHub CLI (gh)
