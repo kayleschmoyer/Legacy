@@ -1231,6 +1231,8 @@ export type Mutation = {
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
   sendDirectMessage?: Maybe<DirectMessage>;
+  /** Check all active leagues for upcoming matchup locks and send Discord reminders. Triggered hourly by EventBridge. */
+  sendDiscordLineupReminders?: Maybe<SendDiscordLineupRemindersResult>;
   /** Check all active leagues for in-progress matchups and post score updates to Discord. Highlights close matchups within a point threshold. Triggered periodically by EventBridge. */
   sendDiscordScoreAlerts?: Maybe<SendDiscordScoreAlertsResult>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
@@ -1628,6 +1630,10 @@ export type MutationSendDirectMessageArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
   messageText: Scalars['String']['input'];
   toUserId: Scalars['Int']['input'];
+};
+
+export type MutationSendDiscordLineupRemindersArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationSendDiscordScoreAlertsArgs = {
@@ -3012,6 +3018,14 @@ export type SeasonResults = {
   season?: Maybe<Scalars['Int']['output']>;
   standings?: Maybe<Array<TeamStanding>>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of the Discord lineup lock reminder check across all active leagues */
+export type SendDiscordLineupRemindersResult = {
+  __typename?: 'SendDiscordLineupRemindersResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  leaguesChecked?: Maybe<Scalars['Int']['output']>;
+  remindersSent?: Maybe<Scalars['Int']['output']>;
 };
 
 /** Result of the Discord matchup score alert check across all active leagues */

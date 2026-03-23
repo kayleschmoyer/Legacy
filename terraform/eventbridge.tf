@@ -222,3 +222,46 @@ resource "aws_lambda_permission" "discord_score_alerts_eventbridge" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.discord_score_alerts.arn
 }
+
+# ── Discord Lineup Lock Reminders ──────────────────────────────────────────
+# Runs hourly. Checks all active leagues with Discord webhooks for
+# upcoming matchup locks within their configured reminder window,
+# and posts a reminder to the league's Discord channel.
+
+resource "aws_cloudwatch_event_rule" "discord_lineup_reminders" {
+  name                = "${local.name_prefix}-discord-lineup-reminders"
+  description         = "Send Discord lineup lock reminders hourly"
+  schedule_expression = "rate(1 hour)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "discord_lineup_reminders" {
+  rule      = aws_cloudwatch_event_rule.discord_lineup_reminders.name
+  target_id = "discord-lineup-reminders"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { sendDiscordLineupReminders { leaguesChecked remindersSent errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "discord_lineup_reminders_eventbridge" {
+  statement_id  = "AllowEventBridgeDiscordLineupReminders"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.discord_lineup_reminders.arn
+}

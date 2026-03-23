@@ -18,9 +18,9 @@ import { LOGGER } from '@legacy-sports/logging';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { and, eq, inArray } from 'drizzle-orm';
 
-import { builder, type Context } from '../builder';
+import { assertAuthorized } from './system-auth';
+import { builder } from '../builder';
 import { PlayoffService } from '../../services/playoff-service';
-import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -71,68 +71,8 @@ builder.objectType(AutoAdvanceMatchupsResult, {
   }),
 });
 
-// ── Authorization Helper ─────────────────────────────────────────────────────
-
-/**
- * Verify that the caller is authorized to trigger system mutations.
- *
- * Access rules:
- *  - System API key (EventBridge / admin CLI) → allowed for ALL leagues.
- *  - Authenticated admin user → allowed for ALL leagues.
- *  - League commissioner / General Manager → allowed only when a specific `leagueId` is
- *    provided (single-league scope).
- *  - Anyone else → rejected.
- */
-export async function assertAuthorized(
-  context: Context,
-  leagueId: number | null | undefined,
-): Promise<void> {
-  // System requests (EventBridge) can always operate on all leagues
-  if (context.isSystemRequest) {
-    return;
-  }
-
-  // Admin users can always operate on all leagues
-  if (context.user?.isAdmin) {
-    return;
-  }
-
-  // For non-admin authenticated users, a specific leagueId is required
-  if (!context.user) {
-    throw AuthenticationError('System mutations require authentication');
-  }
-
-  if (!leagueId) {
-    throw ForbiddenError(
-      'Only admins or system processes can trigger mutations for all leagues. Provide a leagueId to operate on your own league.',
-    );
-  }
-
-  // Check the user is a commissioner or owner of the specified league
-  const [membership] = await context.db
-    .select({
-      permissionLevel: PublicSchema.leagueMembers.permissionLevel,
-    })
-    .from(PublicSchema.leagueMembers)
-    .where(
-      and(
-        eq(PublicSchema.leagueMembers.leagueId, leagueId),
-        eq(PublicSchema.leagueMembers.userId, context.user.id),
-      ),
-    )
-    .limit(1);
-
-  if (
-    !membership ||
-    (membership.permissionLevel !== 'general_manager' &&
-      membership.permissionLevel !== 'assistant_manager' &&
-      membership.permissionLevel !== 'commissioner')
-  ) {
-    throw ForbiddenError(
-      'Only the league General Manager or commissioner can trigger this mutation for their league.',
-    );
-  }
-}
+// Re-export from the shared module so existing consumers keep working.
+export { assertAuthorized } from './system-auth';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 // getSelectedGamesCountBatch is imported from

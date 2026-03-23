@@ -115,6 +115,12 @@ export const leagues = pgTable(
     auctionBudget: integer('auction_budget').notNull().default(260),
     auctionMinBid: integer('auction_min_bid').notNull().default(1),
     discordWebhookUrl: text('discord_webhook_url'),
+    /** Hours before matchup lock to send Discord lineup reminder (default: 3) */
+    discordReminderHours: integer('discord_reminder_hours')
+      .notNull()
+      .default(3),
+    /** Last matchup ID for which a Discord lineup reminder was sent (dedupe). */
+    discordLastReminderMatchupId: integer('discord_last_reminder_matchup_id'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

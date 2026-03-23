@@ -20,5 +20,8 @@ import './scheduled-mutations';
 // Discord score alerts (EventBridge periodic trigger)
 import './discord-score-alerts';
 
+// Discord lineup lock reminders (EventBridge hourly trigger)
+import './discord-reminders';
+
 // Re-export types that other schema modules may need
 export { MatchupPlayerGameRef } from './types';

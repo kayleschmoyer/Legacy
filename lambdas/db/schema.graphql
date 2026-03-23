@@ -1592,6 +1592,11 @@ type Mutation {
   ): DirectMessage
 
   """
+  Check all active leagues for upcoming matchup locks and send Discord reminders. Triggered hourly by EventBridge.
+  """
+  sendDiscordLineupReminders(leagueId: Int): SendDiscordLineupRemindersResult
+
+  """
   Check all active leagues for in-progress matchups and post score updates to Discord. Highlights close matchups within a point threshold. Triggered periodically by EventBridge.
   """
   sendDiscordScoreAlerts(leagueId: Int): SendDiscordScoreAlertsResult
@@ -2789,6 +2794,15 @@ type SeasonResults {
   season: Int
   standings: [TeamStanding!]
   totalMatchups: Int
+}
+
+"""
+Result of the Discord lineup lock reminder check across all active leagues
+"""
+type SendDiscordLineupRemindersResult {
+  errors: [String!]
+  leaguesChecked: Int
+  remindersSent: Int
 }
 
 """
