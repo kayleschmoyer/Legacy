@@ -50,10 +50,6 @@ import {
   sql,
 } from 'drizzle-orm';
 import { z } from 'zod';
-import {
-  notifyDiscordDraftCompleted,
-  notifyDiscordDraftStarted,
-} from './discord';
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -1459,17 +1455,6 @@ async function processDraftMessage(
       'draft processing started',
     );
 
-    // Step 1.5: Get league name for Discord notifications
-    const leagueRow = await runWithPublicClient(getDbOptions(), async (db) => {
-      const rows = await db
-        .select({ name: PublicSchema.leagues.name })
-        .from(PublicSchema.leagues)
-        .where(eq(PublicSchema.leagues.id, leagueId))
-        .limit(1);
-      return rows[0] ?? null;
-    });
-    const leagueName = leagueRow?.name ?? `League #${leagueId}`;
-
     // Step 2: Verify league exists and user has access
     addBreadcrumb('Verifying user access', { leagueId, requestedBy });
 
@@ -1486,20 +1471,6 @@ async function processDraftMessage(
       selectionMethod,
       leagueId,
     });
-
-    // Fire-and-forget Discord draft start notification (after validation)
-    void notifyDiscordDraftStarted(leagueId, leagueName, selectionMethod).catch(
-      (discordError) => {
-        LOGGER.error('Failed to send Discord draft start notification', {
-          error:
-            discordError instanceof Error
-              ? discordError.message
-              : String(discordError),
-          leagueId,
-          selectionMethod,
-        });
-      },
-    );
 
     // Step 3: Process based on selection method
     addBreadcrumb('Processing draft by selection method', { selectionMethod });
@@ -1540,42 +1511,7 @@ async function processDraftMessage(
       leagueId,
     });
 
-    // Step 4: Send WebSocket + Discord notifications
-    // Get total picks for the Discord message
-    const totalPicks = await runWithPublicClient(getDbOptions(), async (db) => {
-      const result = await db
-        .select({
-          count: sql<number>`count(${PublicSchema.draftPicks.id})`.mapWith(
-            Number,
-          ),
-        })
-        .from(PublicSchema.drafts)
-        .leftJoin(
-          PublicSchema.draftPicks,
-          eq(PublicSchema.drafts.id, PublicSchema.draftPicks.draftId),
-        )
-        .where(eq(PublicSchema.drafts.leagueId, leagueId));
-      return result[0]?.count ?? 0;
-    });
-
-    // Fire-and-forget Discord draft completion notification
-    void notifyDiscordDraftCompleted(
-      leagueId,
-      leagueName,
-      selectionMethod,
-      totalPicks,
-    ).catch((discordError) => {
-      LOGGER.error('Failed to send Discord draft completion notification', {
-        error:
-          discordError instanceof Error
-            ? discordError.message
-            : String(discordError),
-        leagueId,
-        selectionMethod,
-        totalPicks,
-      });
-    });
-
+    // Step 4: Send WebSocket notification
     try {
       if (notificationService) {
         await notificationService.notifyDraftCompleted(

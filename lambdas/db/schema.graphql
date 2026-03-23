@@ -512,16 +512,6 @@ type DirectMessage {
 }
 
 """
-Result of a Discord channel mutation for a league
-"""
-type DiscordChannelMutationResult {
-  channelId: String
-  channelName: String
-  error: String
-  success: Boolean
-}
-
-"""
 A draft event for a league
 """
 type Draft {
@@ -812,11 +802,6 @@ type League {
   currentWeekNumber: Int
   customEraEndYear: Int
   customEraStartYear: Int
-
-  """
-  Discord webhook URL for league notifications. Only visible to the league owner or commissioners.
-  """
-  discordWebhookUrl: String
   draftStatus: String
   eraFilter: String
   faabBudgetDefault: Int
@@ -1241,6 +1226,17 @@ type MatchupStatusCounts {
 }
 
 """
+Result of merging two user accounts
+"""
+type MergeAccountsResult {
+  errors: [String!]
+  sourceUserId: Int
+  success: Boolean
+  tablesUpdated: [String!]
+  targetUserId: Int
+}
+
+"""
 Identifiers for a newly created mock draft session
 """
 type MockDraftInit {
@@ -1267,11 +1263,6 @@ type Mutation {
   """
   addToDraftQueue(draftId: Int!, playerId: Int!): [DraftQueueEntry!]
   advancePlayoffBracket(bracketId: Int!): PlayoffBracket
-
-  """
-  Delete the Discord channel for a league. Called when a league is deactivated or frozen.
-  """
-  archiveDiscordChannel(leagueId: Int!): DiscordChannelMutationResult
 
   """
   Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge.
@@ -1361,15 +1352,6 @@ type Mutation {
     priceId: String!
     successUrl: String!
   ): CheckoutSessionResult
-
-  """
-  Create a Discord text channel for a league in the specified guild. Requires commissioner access and the bot to be invited to the guild.
-  """
-  createDiscordChannel(
-    categoryId: String
-    guildId: String!
-    leagueId: Int!
-  ): DiscordChannelMutationResult
   createLeague(maxRosterSize: Int, name: String!): League
   createLeagueAndTeams(
     input: CreateLeagueAndTeamsInput!
@@ -1512,6 +1494,11 @@ type Mutation {
   """
   markMemberUnpaid(leagueId: Int!, userId: Int!): LeagueMemberPaymentStatus
   markNotificationAsRead(notificationId: Int!): Boolean
+
+  """
+  Merge a source user account into the authenticated (target) user account. Transfers all leagues, rosters, messages, and settings. The source account is deactivated. Requires admin access.
+  """
+  mergeAccounts(sourceUserId: Int!): MergeAccountsResult
   nominatePlayer(draftId: Int!, playerId: Int!): AuctionState
   pauseDraft(leagueId: Int!): Draft
   placeBid(amount: Int!, draftId: Int!): AuctionState
@@ -3078,7 +3065,6 @@ input UpdateLeagueSettingsInput {
   auctionBudget: Int
   auctionMinBid: Int
   bannerUrl: String
-  discordWebhookUrl: String
   gamesPerMatchup: Int
   leagueId: Int!
   logoUrl: String

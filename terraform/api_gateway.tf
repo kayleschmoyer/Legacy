@@ -70,10 +70,6 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_method.rollbar_discord_any.id,
       aws_api_gateway_integration.rollbar_discord_root_any.id,
       aws_api_gateway_integration.rollbar_discord_any.id,
-      # Discord Bot resources
-      aws_api_gateway_resource.discord_bot.id,
-      aws_api_gateway_method.discord_bot_any.id,
-      aws_api_gateway_integration.discord_bot.id,
     ]))
   }
 
@@ -100,8 +96,6 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_method.rollbar_discord_any,
     aws_api_gateway_integration.rollbar_discord_root_any,
     aws_api_gateway_integration.rollbar_discord_any,
-    aws_api_gateway_method.discord_bot_any,
-    aws_api_gateway_integration.discord_bot,
   ]
 }
 

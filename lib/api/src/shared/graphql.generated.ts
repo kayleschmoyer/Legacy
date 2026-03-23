@@ -477,15 +477,6 @@ export type DirectMessage = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
-/** Result of a Discord channel mutation for a league */
-export type DiscordChannelMutationResult = {
-  __typename?: 'DiscordChannelMutationResult';
-  channelId?: Maybe<Scalars['String']['output']>;
-  channelName?: Maybe<Scalars['String']['output']>;
-  error?: Maybe<Scalars['String']['output']>;
-  success?: Maybe<Scalars['Boolean']['output']>;
-};
-
 /** A draft event for a league */
 export type Draft = {
   __typename?: 'Draft';
@@ -1106,6 +1097,16 @@ export type MatchupStatusCounts = {
   total?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Result of merging two user accounts */
+export type MergeAccountsResult = {
+  __typename?: 'MergeAccountsResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  sourceUserId?: Maybe<Scalars['Int']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+  tablesUpdated?: Maybe<Array<Scalars['String']['output']>>;
+  targetUserId?: Maybe<Scalars['Int']['output']>;
+};
+
 /** Identifiers for a newly created mock draft session */
 export type MockDraftInit = {
   __typename?: 'MockDraftInit';
@@ -1124,8 +1125,6 @@ export type Mutation = {
   /** Add a player to the end of the current user's draft queue. No-ops if already queued. */
   addToDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   advancePlayoffBracket?: Maybe<PlayoffBracket>;
-  /** Delete the Discord channel for a league. Called when a league is deactivated or frozen. */
-  archiveDiscordChannel?: Maybe<DiscordChannelMutationResult>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
   /** Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback. */
@@ -1155,8 +1154,6 @@ export type Mutation = {
   createBillingPortalSession?: Maybe<BillingPortalSessionResult>;
   /** Create a Stripe Checkout Session for a subscription plan. If the user already has an active subscription a Billing Portal URL is returned instead so they can manage their plan. */
   createCheckoutSession?: Maybe<CheckoutSessionResult>;
-  /** Create a Discord text channel for a league in the specified guild. Requires commissioner access and the bot to be invited to the guild. */
-  createDiscordChannel?: Maybe<DiscordChannelMutationResult>;
   createLeague?: Maybe<League>;
   createLeagueAndTeams?: Maybe<CreateLeagueAndTeamsPayload>;
   createMatchup?: Maybe<Matchup>;
@@ -1200,6 +1197,8 @@ export type Mutation = {
   /** Mark a league member as unpaid. Commissioner/GM access required. */
   markMemberUnpaid?: Maybe<LeagueMemberPaymentStatus>;
   markNotificationAsRead?: Maybe<Scalars['Boolean']['output']>;
+  /** Merge a source user account into the authenticated (target) user account. Transfers all leagues, rosters, messages, and settings. The source account is deactivated. Requires admin access. */
+  mergeAccounts?: Maybe<MergeAccountsResult>;
   nominatePlayer?: Maybe<AuctionState>;
   pauseDraft?: Maybe<Draft>;
   placeBid?: Maybe<AuctionState>;
@@ -1232,6 +1231,8 @@ export type Mutation = {
   /** Revoke a previously granted consent */
   revokeConsent?: Maybe<UserConsent>;
   sendDirectMessage?: Maybe<DirectMessage>;
+  /** Check all active leagues for in-progress matchups and post score updates to Discord. Highlights close matchups within a point threshold. Triggered periodically by EventBridge. */
+  sendDiscordScoreAlerts?: Maybe<SendDiscordScoreAlertsResult>;
   sendLeagueMessage?: Maybe<LeagueChatMessage>;
   sendMatchupMessage?: Maybe<MatchupMessage>;
   /** Select up to 3 leagues to keep active after a subscription downgrade. Leagues not included in the list will be tier-frozen (read-only). Only callable on the free tier — all leagues are automatically active on premium. */
@@ -1306,10 +1307,6 @@ export type MutationAdvancePlayoffBracketArgs = {
   bracketId: Scalars['Int']['input'];
 };
 
-export type MutationArchiveDiscordChannelArgs = {
-  leagueId: Scalars['Int']['input'];
-};
-
 export type MutationAutoAdvanceMatchupsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -1382,12 +1379,6 @@ export type MutationCreateCheckoutSessionArgs = {
   cancelUrl: Scalars['String']['input'];
   priceId: Scalars['String']['input'];
   successUrl: Scalars['String']['input'];
-};
-
-export type MutationCreateDiscordChannelArgs = {
-  categoryId?: InputMaybe<Scalars['String']['input']>;
-  guildId: Scalars['String']['input'];
-  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationCreateLeagueArgs = {
@@ -1538,6 +1529,10 @@ export type MutationMarkNotificationAsReadArgs = {
   notificationId: Scalars['Int']['input'];
 };
 
+export type MutationMergeAccountsArgs = {
+  sourceUserId: Scalars['Int']['input'];
+};
+
 export type MutationNominatePlayerArgs = {
   draftId: Scalars['Int']['input'];
   playerId: Scalars['Int']['input'];
@@ -1633,6 +1628,10 @@ export type MutationSendDirectMessageArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
   messageText: Scalars['String']['input'];
   toUserId: Scalars['Int']['input'];
+};
+
+export type MutationSendDiscordScoreAlertsArgs = {
+  leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationSendLeagueMessageArgs = {
@@ -3013,6 +3012,15 @@ export type SeasonResults = {
   season?: Maybe<Scalars['Int']['output']>;
   standings?: Maybe<Array<TeamStanding>>;
   totalMatchups?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Result of the Discord matchup score alert check across all active leagues */
+export type SendDiscordScoreAlertsResult = {
+  __typename?: 'SendDiscordScoreAlertsResult';
+  alertsSent?: Maybe<Scalars['Int']['output']>;
+  closeMatchupsFound?: Maybe<Scalars['Int']['output']>;
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  leaguesChecked?: Maybe<Scalars['Int']['output']>;
 };
 
 export type SetTeamLockInput = {

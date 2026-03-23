@@ -1106,8 +1106,6 @@ const UpdateLeagueSettingsInput = builder.inputType(
       salaryDecayPct: t.int({ required: false }),
       auctionBudget: t.int({ required: false }),
       auctionMinBid: t.int({ required: false }),
-      // ── Discord integration (LS-1677) ──────────────────────────────────
-      discordWebhookUrl: t.string({ required: false }),
     }),
   },
 );
@@ -1150,7 +1148,6 @@ builder.mutationField('updateLeagueSettings', (t) =>
         salaryDecayPct,
         auctionBudget,
         auctionMinBid,
-        discordWebhookUrl,
       } = args.input;
       const userId = context.user.id;
 
@@ -1201,7 +1198,6 @@ builder.mutationField('updateLeagueSettings', (t) =>
         salaryDecayPct?: number;
         auctionBudget?: number;
         auctionMinBid?: number;
-        discordWebhookUrl?: string | null;
       } = {};
 
       if (spStartsPerMatchup !== null && spStartsPerMatchup !== undefined) {
@@ -1464,38 +1460,6 @@ builder.mutationField('updateLeagueSettings', (t) =>
           );
         }
         leagueUpdate.secondaryColor = secondaryColor ?? null;
-      }
-
-      // Discord webhook URL — commissioner-only, validated
-      if (discordWebhookUrl !== undefined) {
-        const memberPermission = membership[0].permissionLevel;
-        if (
-          memberPermission !== 'commissioner' &&
-          memberPermission !== 'general_manager'
-        ) {
-          throw ForbiddenError(
-            'Only commissioners can configure Discord webhook settings',
-          );
-        }
-
-        if (discordWebhookUrl !== null) {
-          // Validate the URL is a genuine Discord webhook to prevent SSRF
-          const DISCORD_WEBHOOK_PATTERN =
-            /^https:\/\/(discord\.com|discordapp\.com)\/api\/webhooks\/\d+\/.+$/;
-          if (!DISCORD_WEBHOOK_PATTERN.test(discordWebhookUrl)) {
-            throw new Error(
-              'Invalid Discord webhook URL. Must be a valid Discord webhook URL ' +
-                '(https://discord.com/api/webhooks/...).',
-            );
-          }
-        }
-
-        leagueUpdate.discordWebhookUrl = discordWebhookUrl ?? null;
-        changeDescriptions.push(
-          discordWebhookUrl
-            ? 'Discord notifications enabled'
-            : 'Discord notifications disabled',
-        );
       }
 
       if (Object.keys(leagueUpdate).length === 0) {
