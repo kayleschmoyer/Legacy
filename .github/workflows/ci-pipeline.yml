@@ -129,6 +129,7 @@ jobs:
       NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
     outputs:
       result: ${{ steps.check-results.outputs.result }}
+      migration-immutability-result: ${{ steps.quality.outputs.migration-immutability-result }}
       formatting-result: ${{ steps.quality.outputs.formatting-result }}
       formatting-failed-projects: ${{ steps.quality.outputs.formatting-failed-projects }}
       lint-result: ${{ steps.quality.outputs.lint-result }}
@@ -465,6 +466,7 @@ jobs:
           run-id: ${{ github.run_id }}
           quality-gates-subsections: |
             {
+              "migration-immutability": "${{ needs.quality-gates.outputs.migration-immutability-result }}",
               "formatting": "${{ needs.quality-gates.outputs.formatting-result }}",
               "lint":        "${{ needs.quality-gates.outputs.lint-result }}",
               "typecheck":   "${{ needs.quality-gates.outputs.typecheck-result }}",
@@ -511,6 +513,7 @@ jobs:
 
             // Map CI stage results to label names
             const labelMap = {
+              'CI: Migration Immutability': '${{ needs.quality-gates.outputs.migration-immutability-result }}',
               'CI: Formatting': '${{ needs.quality-gates.outputs.formatting-result }}',
               'CI: Lint Failure': '${{ needs.quality-gates.outputs.lint-result }}',
               'CI: Type Error': '${{ needs.quality-gates.outputs.typecheck-result }}',
@@ -524,7 +527,7 @@ jobs:
             const labelsToRemove = [];
 
             // Track whether any quality-gate subsection reported failure
-            const qgLabels = ['CI: Formatting', 'CI: Lint Failure', 'CI: Type Error', 'CI: Test Failure'];
+            const qgLabels = ['CI: Migration Immutability', 'CI: Formatting', 'CI: Lint Failure', 'CI: Type Error', 'CI: Test Failure'];
             let anyQgSubsectionFailed = false;
 
             for (const [label, result] of Object.entries(labelMap)) {

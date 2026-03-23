@@ -27,6 +27,9 @@ outputs:
   result:
     description: "Overall quality gates result (success/failure)"
     value: ${{ steps.check-results.outputs.result }}
+  migration-immutability-result:
+    description: "Migration immutability check result"
+    value: ${{ steps.migration-immutability.outputs.result }}
   formatting-result:
     description: "Code formatting check result"
     value: ${{ steps.formatting.outputs.result }}
@@ -134,18 +137,24 @@ runs:
         echo "::endgroup::"
 
     - name: "🔒 Migration Immutability Check"
+      id: migration-immutability
       shell: bash
       run: |
         echo "::group::🔒 Migration Immutability Check"
         echo "Verifying no previously-landed migration files have been modified or deleted..."
 
-        node scripts/check-migration-immutability.js --branch
+        if node scripts/check-migration-immutability.js --branch; then
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "result=failure" >> $GITHUB_OUTPUT
+          echo "::error::Migration immutability check failed. Previously-landed migrations must not be modified or deleted — create a new migration instead."
+        fi
 
         echo "::endgroup::"
 
     - name: "🎨 Code Formatting Check"
       id: formatting
-      if: inputs.skip-formatting != 'true'
+      if: "!cancelled() && inputs.skip-formatting != 'true'"
       shell: bash
       run: |
         echo "::group::🎨 Code Formatting Validation"
@@ -210,6 +219,7 @@ runs:
 
     - name: "⚡ Run Quality Gates"
       id: run-tasks
+      if: "!cancelled()"
       shell: bash
       run: |
         echo "::group::⚡ Quality Gates (lint · typecheck · test)"
@@ -289,6 +299,7 @@ runs:
         echo "::group::📊 Quality Gates Summary"
 
         # Collect all results
+        MIGRATION_RESULT="${{ steps.migration-immutability.outputs.result || 'skipped' }}"
         FORMATTING_RESULT="${{ steps.formatting.outputs.result || 'skipped' }}"
         LINT_RESULT="${{ steps.run-tasks.outputs.lint-result }}"
         TYPECHECK_RESULT="${{ steps.run-tasks.outputs.typecheck-result }}"
@@ -296,7 +307,7 @@ runs:
 
         # Determine overall result
         OVERALL_RESULT="success"
-        if [ "$FORMATTING_RESULT" = "failure" ] || [ "$LINT_RESULT" = "failure" ] || [ "$TYPECHECK_RESULT" = "failure" ] || [ "$TEST_RESULT" = "failure" ]; then
+        if [ "$MIGRATION_RESULT" = "failure" ] || [ "$FORMATTING_RESULT" = "failure" ] || [ "$LINT_RESULT" = "failure" ] || [ "$TYPECHECK_RESULT" = "failure" ] || [ "$TEST_RESULT" = "failure" ]; then
           OVERALL_RESULT="failure"
         fi
 
@@ -312,6 +323,11 @@ runs:
           elif [ "$1" = "failure" ]; then echo "$3"
           else echo "${4:-$3}"; fi
         }
+
+        MIG_S=$(qg_cell "$MIGRATION_RESULT" "✅ Passed" "❌ Failed" "⏭️ Skipped")
+        MIG_D=$(qg_cell "$MIGRATION_RESULT" "No immutability violations" \
+          "Previously-landed migration modified or deleted" "Migration check skipped")
+        echo "| Migration Immutability | $MIG_S | $MIG_D |" >> $GITHUB_STEP_SUMMARY
 
         FMT_S=$(qg_cell "$FORMATTING_RESULT" "✅ Passed" "❌ Failed" "⏭️ Skipped")
         FMT_D=$(qg_cell "$FORMATTING_RESULT" "All files properly formatted" \
