@@ -19,7 +19,7 @@ Run a structured review of all branch changes before committing/pushing. Catches
 
 ### Phase 2: Create PR with Jira Linkage
 
-Verify prerequisites (`make pc`, migrations, branch pushed), create the PR with standard template, transition Jira to "In Review", and clean up temp files.
+Verify prerequisites (`make pc`, migrations, branch pushed), create the PR **as a draft** with standard template, mark it ready for review, then transition Jira to "In Review". The draft→ready flow prevents sweep/review agents from racing with the creating agent.
 
 > Details: [references/create-pr.md](references/create-pr.md)
 
@@ -43,16 +43,19 @@ Orchestrate maintenance across all open PRs: scan, rebase conflicts, fix reviews
 4. **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.
 5. **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
 6. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
+7. **Always create PRs as drafts** -- use `draft: true` in `github_create_pr` or `--draft` in `gh pr create`. Mark ready with `github_mark_pr_ready` after creation. This prevents sweep/review agents from racing with the creating agent.
 
 ## Quick Commands
 
 ```
-# MCP (preferred)
-github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, worktreePath: <path>)
+# MCP (preferred) — always create as draft, then mark ready
+github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)
+github_mark_pr_ready(number: <PR#>)
 
 # CLI fallback
-gh pr create --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
+gh pr create --draft --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
 bash scripts/cleanup-pr-body.sh
+gh pr ready <PR#>
 ```
 
 ## Reference Documents

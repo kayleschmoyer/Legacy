@@ -44,8 +44,11 @@ This file provides guidance to AI coding agents working with code in this reposi
 11. Validate: `make pc` — must pass before pushing or opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
     - 11b. **Self-review (BEFORE first push)**: run the `/review` skill (or follow the self-review steps in `skills/pr-lifecycle/SKILL.md`) to catch project-rule violations and code quality issues that `make pc` does not check. This significantly reduces Copilot review rounds.
     - 11c. **Push only after `make pc` passes**: `git push --force-with-lease origin HEAD` — pushing before validating is the #1 cause of post-rebase CI failures.
-12. **Ship (REQUIRED — do NOT stop before this step)**: `gh pr create --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` then `bash scripts/cleanup-pr-body.sh` then Jira "In Review" (see `skills/pr-lifecycle/SKILL.md`)
-    - 12b. **MCP gap audit (REQUIRED)**: review all Bash commands from this session, identify any that should be MCP tools, and file tickets under LS-1455 for gaps not already tracked. See `skills/mcp-gaps/SKILL.md`.
+12. **Ship (REQUIRED — do NOT stop before this step)**: Create PR as **draft** first, then mark ready after validation. This prevents sweep/review agents from racing with the creating agent.
+    - 12a. **Create draft PR**: `github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)` (or `gh pr create --draft --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` then `bash scripts/cleanup-pr-body.sh`)
+    - 12b. **Mark ready for review**: after PR creation succeeds, `github_mark_pr_ready(number: <PR#>)` (or `gh pr ready <PR#>`) — this signals to sweep/review agents that the PR is available.
+    - 12c. **Jira "In Review"**: transition the ticket after marking the PR ready.
+    - 12d. **MCP gap audit (REQUIRED)**: review all Bash commands from this session, identify any that should be MCP tools, and file tickets under LS-1455 for gaps not already tracked. See `skills/mcp-gaps/SKILL.md`.
 13. Cleanup: `twig worktree clean` then `git branch -d LS-####/description` then Jira "Done" — **NEVER use `git worktree remove` directly** (see Rules)
 
 ## Command Patterns — Avoid `cd` Compound Commands
@@ -152,7 +155,7 @@ Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`
 
 **Git operations in worktrees — MCP first**: use `worktree_commit` instead of `git add`/`git commit` via Bash — it handles staging and committing in one operation and refuses to stage likely credential/secret files (e.g., `.env`, `credentials.*`, `*.pem`, `*.key`). Use `worktree_push` (supports `setUpstream`) instead of `git push`, `worktree_rebase` instead of `git fetch && twig rebase`, and `worktree_run` for other git commands. These tools auto-resolve the worktree directory, refuse dangerous operations (pushing `main`, pushing during rebase), and require no manual `cd` or `-C` flags.
 
-**GitHub PR operations — MCP first**: use `github_create_pr` instead of `gh pr create` via Bash, `github_resolve_thread` instead of `gh api graphql` mutations, `github_get_review_threads` instead of raw GraphQL queries, and `github_manage_labels` instead of `gh pr edit --add-label`. These tools handle temp file body encoding, GraphQL thread IDs, and structured output.
+**GitHub PR operations — MCP first**: use `github_create_pr` (with `draft: true`) instead of `gh pr create` via Bash, `github_mark_pr_ready` instead of `gh pr ready`, `github_resolve_thread` instead of `gh api graphql` mutations, `github_get_review_threads` instead of raw GraphQL queries, and `github_manage_labels` instead of `gh pr edit --add-label`. These tools handle temp file body encoding, GraphQL thread IDs, and structured output.
 
 **GitHub auth-aware routing**: call `github_auth_status` at the start of any GitHub workflow. If `configured: true`, use our custom GitHub MCP tools. If `configured: false`, fall back to `gh` CLI commands directly (which may have their own authentication via `gh auth login`).
 
@@ -180,7 +183,7 @@ When running as a **cloud coding agent**:
 - **Linux** — `bash` shell, `/` paths. No junctions or file locks.
 - **Native integrations (Claude Code on the web)** — Claude Code provides built-in GitHub and Atlassian connectors that work without configuring secrets. Prefer these over custom MCP servers when available (see details below).
 
-**Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make <target>` → `pnpm --prefix lib/db-client run db:status` → `pnpm --prefix lib/db-client run db:up` → `make pc` → commit + push → `github_create_pr` (or native GitHub connector on Claude Code on the web) → Jira "In Review"
+**Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make <target>` → `pnpm --prefix lib/db-client run db:status` → `pnpm --prefix lib/db-client run db:up` → `make pc` → commit + push → `github_create_pr(draft: true)` → `github_mark_pr_ready` → Jira "In Review"
 
 **GitHub authentication for PR creation:**
 

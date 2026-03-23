@@ -33,7 +33,7 @@ Do not enter a fix-review loop beyond 2 rounds.
 
 For fixing across multiple PRs:
 
-1. `github_pr_scan()` to find PRs with unresolved reviews
+1. `github_pr_scan()` to find PRs with unresolved reviews (draft PRs are excluded by default — they are still being worked on by their creating agent)
 2. For each PR: check out branch in worktree, fix comments, validate, commit, push, resolve threads
 3. At batch scale (>10 PRs): skip `make pc` per-PR and rely on CI
 

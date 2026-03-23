@@ -16,12 +16,13 @@ You are a **PR creation operator**. Your job is to verify prerequisites, create 
 
 ## Command
 
-Use `github_create_pr` MCP tool (preferred) or `gh pr create`:
+Use `github_create_pr` MCP tool (preferred) or `gh pr create`. **Always create as draft** to prevent sweep/review agents from racing with the creating agent:
 
 ```
 github_create_pr(
   title: "LS-#### type(scope): Brief description",
   body: <PR body markdown>,
+  draft: true,
   worktreePath: <worktree path>
 )
 ```
@@ -51,8 +52,9 @@ Example: `LS-1234 feat(auth): add OAuth2 PKCE flow`
 ## After PR Creation
 
 1. Clean up temp body file: `bash scripts/cleanup-pr-body.sh`
-2. Transition Jira: `jira_transition(key: "LS-####", status: "In Review")`
-3. Copilot review is requested automatically by CI workflow
+2. **Mark ready for review**: `github_mark_pr_ready(number: <PR#>)` (or `gh pr ready <PR#>`) — this signals to sweep/review agents that the PR is available
+3. Transition Jira: `jira_transition(key: "LS-####", status: "In Review")`
+4. Copilot review is requested automatically by CI workflow
 
 ## Guardrails
 

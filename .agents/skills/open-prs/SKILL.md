@@ -93,6 +93,7 @@ This skill delegates to specialized sub-skills for each operation category. Load
 
 ### Both Environments
 
+- **Skip draft PRs** — draft PRs are still being worked on by their creating agent. The `github_pr_scan` and `github_pr_dashboard` tools exclude drafts by default (`excludeDrafts: true`). Never fix, rebase, label, or review a draft PR — wait for the creating agent to mark it ready via `github_mark_pr_ready`.
 - **Remove `@me` filter** — use `--limit 200` to catch all open PRs, not just yours
 - **Resolve review threads after fixing** — leaving threads unresolved is incomplete work
 - **Proactively label clean PRs** — when a PR has no unresolved review threads, add `merge-when-ready` immediately via `github_manage_labels(number: <PR#>, add: ["merge-when-ready"])`. Failing CI will automatically remove the label, so there is no risk in labeling early. The `copilot-auto-approve` bot also adds this label, but the agent should not wait for it.

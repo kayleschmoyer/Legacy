@@ -7,6 +7,7 @@ interface PRScanParams {
   limit?: number;
   applyLabels?: boolean;
   compact?: boolean;
+  excludeDrafts?: boolean;
 }
 
 interface CheckRunNode {
@@ -28,6 +29,7 @@ interface PRNode {
   number: number;
   title: string;
   headRefName: string;
+  isDraft: boolean;
   mergeable: string;
   labels: { nodes: Array<{ name: string }> };
   commits: {
@@ -293,6 +295,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
         number
         title
         headRefName
+        isDraft
         mergeable
         labels(first: 20) { nodes { name } }
         commits(last: 1) {
@@ -336,7 +339,12 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
       },
     );
 
-    const prs = result.data.repository.pullRequests.nodes;
+    const allPrs = result.data.repository.pullRequests.nodes;
+    const excludeDrafts = params.excludeDrafts ?? true;
+    const draftsExcluded = excludeDrafts
+      ? allPrs.filter((pr) => pr.isDraft).length
+      : 0;
+    const prs = excludeDrafts ? allPrs.filter((pr) => !pr.isDraft) : allPrs;
 
     type BasePR = { number: number; title: string; headRefName: string };
     type CIFailingPR = BasePR & { failedChecks: string[] };
@@ -445,6 +453,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
       const compactOutput = {
         scannedAt: new Date().toISOString(),
         totalOpen: prs.length,
+        ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
         conflicting: conflicting.map((p) => ({
           number: p.number,
           branch: p.headRefName,
@@ -478,6 +487,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
     const output = {
       scannedAt: new Date().toISOString(),
       totalOpen: prs.length,
+      ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
       conflicting,
       reviews,
       ciFailing,

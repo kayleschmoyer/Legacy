@@ -8,6 +8,7 @@ interface PRDashboardParams {
   author?: string;
   label?: string;
   limit?: number;
+  excludeDrafts?: boolean;
 }
 
 interface CheckRunNode {
@@ -290,6 +291,15 @@ query($owner: String!, $repo: String!, $first: Int!) {
       prNodes = result.data.repository.pullRequests.nodes;
     }
 
+    // Filter out draft PRs when excludeDrafts is enabled (default: true)
+    const excludeDrafts = params.excludeDrafts ?? true;
+    const draftsExcluded = excludeDrafts
+      ? prNodes.filter((pr) => pr.isDraft).length
+      : 0;
+    if (excludeDrafts) {
+      prNodes = prNodes.filter((pr) => !pr.isDraft);
+    }
+
     if (prNodes.length === 0) {
       return {
         content: [
@@ -308,6 +318,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
                   approved: 0,
                   withStaleChecks: 0,
                 },
+                ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
                 recommendBatchStatus: false,
                 prs: [],
                 message: 'No PRs found matching filters.',
@@ -388,6 +399,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
           text: JSON.stringify(
             {
               summary,
+              ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
               recommendBatchStatus,
               ...(recommendBatchStatus
                 ? {

@@ -11,6 +11,7 @@ import { getRepoInfo } from './tools/get-repo-info.js';
 import { getReviewThreads } from './tools/get-review-threads.js';
 import { listPRs } from './tools/list-prs.js';
 import { manageLabels } from './tools/manage-labels.js';
+import { markPRReady } from './tools/mark-pr-ready.js';
 import { manageLabelsBatch } from './tools/manage-labels-batch.js';
 import { mergePR } from './tools/merge-pr.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
@@ -383,6 +384,16 @@ server.tool(
   async (params) => mergePR(params),
 );
 
+// --- github_mark_pr_ready ---
+server.tool(
+  'github_mark_pr_ready',
+  'Convert a draft PR to ready for review. Use after validation passes to signal the PR is ready for sweep/review agents.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+  },
+  async (params) => markPRReady(params),
+);
+
 // --- github_pr_batch_status ---
 server.tool(
   'github_pr_batch_status',
@@ -421,6 +432,12 @@ server.tool(
       .max(100)
       .default(30)
       .describe('Max results (default: 30)'),
+    excludeDrafts: z
+      .boolean()
+      .default(true)
+      .describe(
+        'Exclude draft PRs from dashboard results (default: true). Draft PRs are being worked on by their creating agent.',
+      ),
   },
   async (params) => prDashboard(params),
 );
@@ -446,6 +463,12 @@ server.tool(
       .default(false)
       .describe(
         'Return a compact view with essential fields (number, branch, failedChecks, threadCount), plus threadsTruncated for review buckets and labelActions when labels are applied, to reduce token usage',
+      ),
+    excludeDrafts: z
+      .boolean()
+      .default(true)
+      .describe(
+        'Exclude draft PRs from scan results (default: true). Draft PRs are being worked on by their creating agent and should not be swept.',
       ),
   },
   async (params) => prScan(params),
