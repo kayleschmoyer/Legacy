@@ -257,3 +257,158 @@ describe('getDiscordWebhookUrls', () => {
     expect(result.get(3)).toBe('https://discord.com/api/webhooks/999/tok');
   });
 });
+
+// ── notifyDiscordTradeEvent integration ───────────────────────────────────────
+
+describe('notifyDiscordTradeEvent', () => {
+  const WEBHOOK_URL = 'https://discord.com/api/webhooks/123/abc-token';
+
+  let fetchSpy: jest.SpyInstance;
+  let mockDb: Record<string, jest.Mock>;
+
+  beforeEach(() => {
+    fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('', { status: 200 }));
+
+    // Fluent Drizzle mock — each chain method returns `this` so
+    // `db.select().from().where().limit()` resolves via the `then` override.
+    mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      // Default resolution: empty array (individual tests override via `then`)
+      then: jest.fn((resolve) => resolve([])),
+    };
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    jest.restoreAllMocks();
+  });
+
+  function buildContext(webhookUrl: string | null) {
+    // We need the DB to return different results for different queries.
+    // Track call count to distinguish the sequential queries in notifyDiscordTradeEvent:
+    //   1. getLeagueDiscordWebhookUrl  → [{ discordWebhookUrl }]
+    //   2. getTradePlayerNames (tradeOfferPlayers) → player rows
+    //   3. getTradePlayerNames (players) → player details
+    //   4. getTradePlayerNames (tradeOffers) → proposing team id
+    let callCount = 0;
+    mockDb.then = jest.fn((resolve) => {
+      callCount++;
+      switch (callCount) {
+        case 1: // getLeagueDiscordWebhookUrl
+          return resolve([{ discordWebhookUrl: webhookUrl }]);
+        case 2: // tradeOfferPlayers
+          return resolve([
+            { playerId: 10, fromTeamId: 1 },
+            { playerId: 20, fromTeamId: 2 },
+          ]);
+        case 3: // players lookup
+          return resolve([
+            { id: 10, firstName: 'Aaron', lastName: 'Judge' },
+            { id: 20, firstName: 'Mike', lastName: 'Trout' },
+          ]);
+        case 4: // tradeOffers (proposingTeamId)
+          return resolve([{ proposingTeamId: 1 }]);
+        default:
+          return resolve([]);
+      }
+    });
+
+    return {
+      db: mockDb,
+      user: { id: 1, username: 'testuser' },
+      notificationService: null,
+    };
+  }
+
+  it('calls fetch with Discord webhook when league has a configured URL', async () => {
+    const { notifyDiscordTradeEvent } = await import('./discord-league');
+    const context = buildContext(WEBHOOK_URL);
+
+    await notifyDiscordTradeEvent(
+      'proposed',
+      {
+        leagueId: 1,
+        tradeId: 42,
+        proposingTeamName: 'Team A',
+        receivingTeamName: 'Team B',
+      },
+      context as never,
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(WEBHOOK_URL);
+    expect(options.method).toBe('POST');
+    expect(options.redirect).toBe('error');
+
+    const body = JSON.parse(options.body as string) as {
+      embeds: Array<{ title: string; fields: Array<{ value: string }> }>;
+    };
+    expect(body.embeds[0].title).toBe('Trade Proposed');
+    // Verify all players were resolved (not fallback names)
+    expect(body.embeds[0].fields[0].value).toBe('Aaron Judge');
+    expect(body.embeds[0].fields[1].value).toBe('Mike Trout');
+  });
+
+  it('does not call fetch when no webhook URL is configured', async () => {
+    const { notifyDiscordTradeEvent } = await import('./discord-league');
+    const context = buildContext(null);
+
+    await notifyDiscordTradeEvent(
+      'accepted',
+      {
+        leagueId: 1,
+        tradeId: 42,
+        proposingTeamName: 'Team A',
+        receivingTeamName: 'Team B',
+      },
+      context as never,
+    );
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not call fetch when webhook URL is not a valid Discord host', async () => {
+    const { notifyDiscordTradeEvent } = await import('./discord-league');
+    const context = buildContext('https://evil.com/steal-data');
+
+    await notifyDiscordTradeEvent(
+      'accepted',
+      {
+        leagueId: 1,
+        tradeId: 42,
+        proposingTeamName: 'Team A',
+        receivingTeamName: 'Team B',
+      },
+      context as never,
+    );
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when fetch fails (fire-and-forget)', async () => {
+    fetchSpy.mockRejectedValueOnce(new Error('network failure'));
+    const { notifyDiscordTradeEvent } = await import('./discord-league');
+    const context = buildContext(WEBHOOK_URL);
+
+    // Should not throw
+    await expect(
+      notifyDiscordTradeEvent(
+        'rejected',
+        {
+          leagueId: 1,
+          tradeId: 42,
+          proposingTeamName: 'Team A',
+          receivingTeamName: 'Team B',
+        },
+        context as never,
+      ),
+    ).resolves.toBeUndefined();
+  });
+});

@@ -20,6 +20,7 @@ import {
 } from '../../services/cap-service';
 import { builder, type Context } from '../builder';
 import { insertActivityLog } from '../../services/activity-log';
+import { notifyDiscordTradeEvent } from '../../services/discord-league';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
 
 // ── Helper: fetch and enrich a single trade ────────────────────────────────
@@ -231,6 +232,13 @@ async function postTradeSystemMessage(
         receivingTeamName,
       },
     });
+
+    // Fire-and-forget Discord notification
+    void notifyDiscordTradeEvent(
+      action,
+      { leagueId, tradeId, proposingTeamName, receivingTeamName },
+      context,
+    );
   } catch (err) {
     LOGGER.warn('postTradeSystemMessage failed (non-fatal)', { err });
   }

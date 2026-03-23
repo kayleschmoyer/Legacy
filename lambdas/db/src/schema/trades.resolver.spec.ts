@@ -101,6 +101,8 @@ describe('Trades Resolver', () => {
           salaryCapEnabled: 'salaryCapEnabled',
           salaryCap: 'salaryCap',
           minSalary: 'minSalary',
+          discordWebhookUrl: 'discordWebhookUrl',
+          leaguePhase: 'leaguePhase',
         },
         leagueMessages: {
           id: 'id',
@@ -151,6 +153,12 @@ describe('Trades Resolver', () => {
     // Mock activity-log service
     jest.doMock('../services/activity-log', () => ({
       insertActivityLog: jest.fn().mockResolvedValue(undefined),
+    }));
+
+    // Mock discord-league service
+    jest.doMock('../services/discord-league', () => ({
+      notifyDiscordTradeEvent: jest.fn().mockResolvedValue(undefined),
+      isValidDiscordWebhookUrl: jest.fn().mockReturnValue(true),
     }));
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
