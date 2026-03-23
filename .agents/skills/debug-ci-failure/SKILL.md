@@ -380,14 +380,19 @@ Then push (force-with-lease is required after a rebase):
 
 ```powershell
 git add -A ; git commit -m "fix(scope): resolve CI failure"
-git push origin HEAD --force-with-lease
 ```
 
-Then verify the fix passes locally before waiting on GitHub CI:
+> **⚠️ CRITICAL: Run `make pc` before pushing.** After fixing a CI failure, always run `make pc` to verify the fix before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time. Minimum alternative: `make format && make lint-fix && make typecheck`.
 
 ```powershell
 # Run all pre-commit checks locally to confirm the fix
 make pc
+```
+
+Then push the validated fix:
+
+```powershell
+git push origin HEAD --force-with-lease
 ```
 
 ### 7. If the failure is flaky / transient

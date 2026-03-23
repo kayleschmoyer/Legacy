@@ -18,6 +18,8 @@ This skill covers the complete PR lifecycle: creation, self-review, review fixin
 3. Pending migrations applied (`db_migrate` or `pnpm --prefix lib/db-client run db:up`)
 4. `make pc` passes
 
+> **⚠️ CRITICAL: Run `make pc` before pushing.** Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time. Minimum alternative: `make format && make lint-fix && make typecheck`.
+
 ### Command
 
 Always use `--body-file` for the PR body (avoid inlining `--body` in any shell; PowerShell is especially problematic):

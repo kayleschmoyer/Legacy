@@ -60,6 +60,8 @@ After resolving each file: `git add <file>`, then continue with `git rebase --co
 
 > Do NOT push until `make pc` passes. This is the #1 cause of post-rebase CI failures.
 
+> **⚠️ CRITICAL: Run `make pc` before pushing.** Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time. Minimum alternative: `make format && make lint-fix && make typecheck` to catch the most common format, lint, and type issues locally. CI checks formatting against the merged state with main, and only the full `make pc` run will catch test and other regressions introduced by the rebase.
+
 ```powershell
 make install
 pnpm exec nx run db:print-schema

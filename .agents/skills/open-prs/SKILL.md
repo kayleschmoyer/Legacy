@@ -104,7 +104,7 @@ This skill delegates to specialized sub-skills for each operation category. Load
 
 - **One worktree per PR** — never mix fixes for different PRs in the same worktree
 - **All file edits happen in the worktree**, never in `D:\code\legacy-sports`
-- **Always `make pc` before pushing** — do not push broken code
+- **Always `make pc` before pushing** — do not push broken code. **Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time.**
 - **Dirty-tree guard before push** — after `make pc` passes, check `worktree_status` (or `git status --porcelain`). If the working tree is dirty (formatting auto-amend may leave changes on Windows), commit with `style: apply formatting` and re-run `make pc` before pushing.
 - **Always `--force-with-lease`** when pushing rebased branches
 
@@ -310,7 +310,7 @@ REPEAT (max 10 passes):
     - On unfixable review → label requires-human-review → add to settled
   Pass 3: Fix unsettled PRs with failing CI
     - On unfixable CI failure → label requires-human-review → add to settled
-  Validate all changed PRs: make pc in each worktree
+  Validate all changed PRs: make pc in each worktree (NEVER skip — see callout below)
   Push passing PRs
 
   Mark clean PRs (no conflicts, CI pass, no threads) → add to settled
@@ -318,6 +318,8 @@ REPEAT (max 10 passes):
 
   IF all PRs in settled → EXIT
 ```
+
+> **⚠️ CRITICAL: Run `make pc` before pushing.** Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time. Minimum alternative: `make format && make lint-fix && make typecheck`. When dispatching sub-agents, always include "Run `make -C $wt pc` before committing" in the agent prompt.
 
 **Key differences from a simple pass counter:**
 

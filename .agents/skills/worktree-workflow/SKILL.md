@@ -279,6 +279,8 @@ If it throws an error, fix the migration SQL, re-commit, push, and re-run `db:up
 
 ### Step 7: Pre-PR Validation
 
+> **⚠️ CRITICAL: Run `make pc` before pushing.** Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time. Minimum alternative: `make format && make lint-fix && make typecheck`.
+
 Run the full validation suite before opening the PR. Fix any failures and push again before continuing.
 
 ```powershell

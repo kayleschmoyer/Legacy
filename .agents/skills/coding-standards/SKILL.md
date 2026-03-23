@@ -34,6 +34,12 @@ Standards derived from analysis of Copilot code review across 100 merged PRs. Th
 | **Regex**    | Anchor patterns: `\.tf$`, `(/\|$)` after prefix, `\b` for words | 3     |
 | **Reuse**    | Search for existing utils before writing duplicate logic        | 4     |
 
+### Validation Before Push
+
+> **⚠️ CRITICAL: Run `make pc` before pushing.** Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time. Minimum alternative: `make format && make lint-fix && make typecheck`.
+
+All code must pass `make pc` before being pushed. This runs formatting, linting, type checking, and tests — the same gates CI enforces. Pushing without validation is the #1 cause of avoidable CI failures.
+
 ## Detailed Standards
 
 > Full catalog with code examples: [references/standards-catalog.md](references/standards-catalog.md)
