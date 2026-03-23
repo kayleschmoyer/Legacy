@@ -17,6 +17,8 @@ import { prDashboard } from './tools/pr-dashboard.js';
 import { prScan } from './tools/pr-scan.js';
 import { rebasePR } from './tools/rebase-pr.js';
 import { replyToThread } from './tools/reply-to-thread.js';
+import { secretList } from './tools/secret-list.js';
+import { secretSet } from './tools/secret-set.js';
 import { requestReview } from './tools/request-review.js';
 import { resolveThread } from './tools/resolve-thread.js';
 import { resolveThreads } from './tools/resolve-threads.js';
@@ -478,6 +480,33 @@ server.tool(
     number: z.coerce.number().int().positive().describe('PR number'),
   },
   async (params) => viewPR(params),
+);
+
+// --- github_secret_list ---
+server.tool(
+  'github_secret_list',
+  'List GitHub Actions secret names (not values) for the repository.',
+  {},
+  async () => secretList(),
+);
+
+// --- github_secret_set ---
+server.tool(
+  'github_secret_set',
+  'Set a GitHub Actions secret. Reads value from file to avoid passing secrets through the tool interface.',
+  {
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .describe('Secret name (e.g. "AGENT_AUTHOR_APP_PRIVATE_KEY")'),
+    value: z.string().optional().describe('Secret value (prefer valueFile)'),
+    valueFile: z
+      .string()
+      .optional()
+      .describe('Path to file containing secret value'),
+  },
+  async (params) => secretSet(params),
 );
 
 // Start the server
