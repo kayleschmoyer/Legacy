@@ -5,6 +5,7 @@ import { getToken, tryResolveToken } from './auth.js';
 import type { TokenSource } from './auth.js';
 import type { ToolResult } from './types.js';
 import { closePR } from './tools/close-pr.js';
+import { createLabel } from './tools/create-label.js';
 import { createPR } from './tools/create-pr.js';
 import { getRepoInfo } from './tools/get-repo-info.js';
 import { getReviewThreads } from './tools/get-review-threads.js';
@@ -231,6 +232,25 @@ server.tool(
     comment: z.string().trim().min(1).optional().describe('Closing comment'),
   },
   async (params) => closePR(params),
+);
+
+// --- github_create_label ---
+server.tool(
+  'github_create_label',
+  'Create a label on the repository. Returns success if label already exists.',
+  {
+    name: z.string().trim().min(1).describe('Label name'),
+    color: z
+      .string()
+      .regex(
+        /^#?[0-9a-fA-F]{6}$/,
+        'Must be 6 hex chars, optionally prefixed with #',
+      )
+      .optional()
+      .describe('Hex color code (e.g. "ff0000" or "#ff0000")'),
+    description: z.string().optional().describe('Label description'),
+  },
+  async (params) => createLabel(params),
 );
 
 // --- github_create_pr ---
