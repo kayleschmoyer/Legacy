@@ -110,7 +110,6 @@ const BASE_CORS_HEADERS = {
   'Access-Control-Allow-Headers':
     'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-CSRF-Token',
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Credentials': 'true',
   // Security headers
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',

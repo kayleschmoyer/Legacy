@@ -12,17 +12,13 @@
  * - attachFilesToJiraIssue: verified via fetch calls after issue creation
  */
 
-jest.mock('@aws-sdk/client-secrets-manager', () => ({
-  SecretsManagerClient: jest.fn().mockImplementation(() => ({
-    send: jest.fn().mockResolvedValue({
-      SecretString: JSON.stringify({
-        api_token: 'test-token',
-        email: 'admin@example.com',
-        base_url: 'https://test.atlassian.net',
-      }),
-    }),
-  })),
-  GetSecretValueCommand: jest.fn(),
+jest.mock('./oauth', () => ({
+  getAccessToken: jest.fn().mockResolvedValue('test-access-token'),
+  getApiBaseUrl: jest
+    .fn()
+    .mockResolvedValue('https://api.atlassian.com/ex/jira/test-cloud-id'),
+  getSiteUrl: jest.fn().mockResolvedValue('https://test.atlassian.net'),
+  _resetCache: jest.fn(),
 }));
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -36,14 +32,22 @@ jest.mock('@legacy-sports/logging', () => ({
 
 import { createJiraBug } from './JiraClient';
 
+const API_BASE = 'https://api.atlassian.com/ex/jira/test-cloud-id';
+
 type FetchCall = [string, RequestInit];
+
+/** Narrow T | undefined → T, failing the test if undefined. */
+function defined<T>(val: T | undefined): T {
+  if (val === undefined) throw new Error('Expected value to be defined');
+  return val;
+}
 
 function makeCreateIssueResponse(): Response {
   return new Response(
     JSON.stringify({
       id: '10001',
       key: 'LS-1',
-      self: 'https://test.atlassian.net/rest/api/3/issue/10001',
+      self: `${API_BASE}/rest/api/3/issue/10001`,
     }),
     { status: 201, headers: { 'Content-Type': 'application/json' } },
   );
@@ -83,7 +87,7 @@ describe('textToAdf (tested via createJiraBug description field)', () => {
     const createCall = findCreateIssueFetchCall(calls);
     expect(createCall).toBeDefined();
 
-    const body = JSON.parse(createCall![1].body as string) as {
+    const body = JSON.parse(defined(createCall)[1].body as string) as {
       fields: {
         description: {
           type: string;
@@ -116,7 +120,7 @@ describe('textToAdf (tested via createJiraBug description field)', () => {
 
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const createCall = findCreateIssueFetchCall(calls);
-    const body = JSON.parse(createCall![1].body as string) as {
+    const body = JSON.parse(defined(createCall)[1].body as string) as {
       fields: { description: { content: unknown[] } };
     };
 
@@ -165,7 +169,7 @@ describe('buildDescription (tested via createJiraBug metadata fields)', () => {
 
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const createCall = findCreateIssueFetchCall(calls);
-    const bodyStr = createCall![1].body as string;
+    const bodyStr = defined(createCall)[1].body as string;
 
     // The description ADF should contain metadata
     expect(bodyStr).toContain('App Version: 1.2.3');
@@ -187,7 +191,7 @@ describe('buildDescription (tested via createJiraBug metadata fields)', () => {
 
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const createCall = findCreateIssueFetchCall(calls);
-    const bodyStr = createCall![1].body as string;
+    const bodyStr = defined(createCall)[1].body as string;
 
     expect(bodyStr).not.toContain('--- Metadata ---');
   });
@@ -203,7 +207,7 @@ describe('buildDescription (tested via createJiraBug metadata fields)', () => {
 
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const createCall = findCreateIssueFetchCall(calls);
-    const bodyStr = createCall![1].body as string;
+    const bodyStr = defined(createCall)[1].body as string;
 
     expect(bodyStr).toContain('App Version: 2.0.0');
   });
@@ -248,7 +252,9 @@ describe('sanitizeFilename (tested via attachment uploads)', () => {
     expect(attachCall).toBeDefined();
     // The FormData body should use the sanitized name
     // We verify the fetch was called with the attachment endpoint
-    expect(attachCall![0]).toContain('/rest/api/3/issue/LS-1/attachments');
+    expect(defined(attachCall)[0]).toContain(
+      '/rest/api/3/issue/LS-1/attachments',
+    );
   });
 });
 
@@ -291,10 +297,11 @@ describe('attachFilesToJiraIssue (tested via createJiraBug with attachments)', (
       (url as string).includes('/attachments'),
     );
     expect(attachCall).toBeDefined();
-    const attachInit = attachCall![1] as RequestInit;
+    const attachInit = defined(attachCall)[1] as RequestInit;
     expect(attachInit.method).toBe('POST');
     const headers = attachInit.headers as Record<string, string>;
     expect(headers['X-Atlassian-Token']).toBe('no-check');
+    expect(headers['Authorization']).toBe('Bearer test-access-token');
   });
 
   it('does not throw when attachment upload fails', async () => {

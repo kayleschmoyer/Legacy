@@ -1,24 +1,24 @@
 import { createJiraBug, searchJiraBugs } from './JiraClient';
 
-jest.mock('@aws-sdk/client-secrets-manager', () => ({
-  SecretsManagerClient: jest.fn().mockImplementation(() => ({
-    send: jest.fn().mockResolvedValue({
-      SecretString: JSON.stringify({
-        api_token: 'test-token',
-        email: 'admin@example.com',
-        base_url: 'https://test.atlassian.net',
-      }),
-    }),
-  })),
-  GetSecretValueCommand: jest.fn(),
+jest.mock('./oauth', () => ({
+  getAccessToken: jest.fn().mockResolvedValue('test-access-token'),
+  getApiBaseUrl: jest
+    .fn()
+    .mockResolvedValue('https://api.atlassian.com/ex/jira/test-cloud-id'),
+  getSiteUrl: jest.fn().mockResolvedValue('https://test.atlassian.net'),
+  _resetCache: jest.fn(),
 }));
 
-const BASE_URL = 'https://test.atlassian.net';
-const EXPECTED_AUTH = Buffer.from('admin@example.com:test-token').toString(
-  'base64',
-);
+const API_BASE = 'https://api.atlassian.com/ex/jira/test-cloud-id';
+const SITE_URL = 'https://test.atlassian.net';
 
 type FetchCall = [string, RequestInit];
+
+/** Narrow T | undefined → T, failing the test if undefined. */
+function defined<T>(val: T | undefined): T {
+  if (val === undefined) throw new Error('Expected value to be defined');
+  return val;
+}
 
 function makeUserSearchResponse(
   users: Array<{ accountId: string; emailAddress: string }>,
@@ -34,7 +34,7 @@ function makeCreateIssueResponse(): Response {
     JSON.stringify({
       id: '10001',
       key: 'LS-1',
-      self: `${BASE_URL}/rest/api/3/issue/10001`,
+      self: `${API_BASE}/rest/api/3/issue/10001`,
     }),
     { status: 201, headers: { 'Content-Type': 'application/json' } },
   );
@@ -77,7 +77,7 @@ describe('createJiraBug — reporter resolution', () => {
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const createCall = findCreateIssueFetchCall(calls);
     expect(createCall).toBeDefined();
-    const body = JSON.parse(createCall![1].body as string) as {
+    const body = JSON.parse(defined(createCall)[1].body as string) as {
       fields: { reporter?: { id: string } };
     };
     expect(body.fields.reporter).toEqual({ id: 'abc123' });
@@ -97,7 +97,7 @@ describe('createJiraBug — reporter resolution', () => {
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const createCall = findCreateIssueFetchCall(calls);
     expect(createCall).toBeDefined();
-    const body = JSON.parse(createCall![1].body as string) as {
+    const body = JSON.parse(defined(createCall)[1].body as string) as {
       fields: { reporter?: { id: string } };
     };
     expect(body.fields.reporter).toBeUndefined();
@@ -122,7 +122,6 @@ describe('createJiraBug — reporter resolution', () => {
       .mockResolvedValueOnce(new Response('Forbidden', { status: 403 }))
       .mockResolvedValueOnce(makeCreateIssueResponse());
 
-    // Should not throw — reporter simply won't be set
     const result = await createJiraBug(
       { summary: 'Test bug', reporterEmail: 'user@example.com' },
       'LS',
@@ -132,13 +131,13 @@ describe('createJiraBug — reporter resolution', () => {
 
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const createCall = findCreateIssueFetchCall(calls);
-    const body = JSON.parse(createCall![1].body as string) as {
+    const body = JSON.parse(defined(createCall)[1].body as string) as {
       fields: { reporter?: { id: string } };
     };
     expect(body.fields.reporter).toBeUndefined();
   });
 
-  it('uses the user search API with the correct email query and auth header', async () => {
+  it('uses Bearer auth and cloud API URL for user search', async () => {
     fetchSpy
       .mockResolvedValueOnce(makeUserSearchResponse([]))
       .mockResolvedValueOnce(makeCreateIssueResponse());
@@ -152,11 +151,24 @@ describe('createJiraBug — reporter resolution', () => {
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const searchCall = calls.find(([url]) => url.includes('/user/search'));
     expect(searchCall).toBeDefined();
-    expect(searchCall![0]).toContain(
+    expect(defined(searchCall)[0]).toContain(API_BASE);
+    expect(defined(searchCall)[0]).toContain(
       encodeURIComponent('reporter@example.com'),
     );
-    const headers = searchCall![1].headers as Record<string, string>;
-    expect(headers['Authorization']).toBe(`Basic ${EXPECTED_AUTH}`);
+    const headers = defined(searchCall)[1].headers as Record<string, string>;
+    expect(headers['Authorization']).toBe('Bearer test-access-token');
+  });
+
+  it('builds browse URL using site_url, not cloud API URL', async () => {
+    fetchSpy.mockResolvedValueOnce(makeCreateIssueResponse());
+
+    const result = await createJiraBug(
+      { summary: 'Test bug' },
+      'LS',
+      'jira-secret',
+    );
+
+    expect(result.issueUrl).toBe(`${SITE_URL}/browse/LS-1`);
   });
 });
 
@@ -165,6 +177,11 @@ describe('createJiraBug — epic parent field', () => {
 
   beforeEach(() => {
     fetchSpy = jest.spyOn(global, 'fetch') as jest.MockedFunction<typeof fetch>;
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    jest.clearAllMocks();
   });
 
   it('sets parent field when epicKey is provided', async () => {
@@ -180,7 +197,7 @@ describe('createJiraBug — epic parent field', () => {
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const createCall = findCreateIssueFetchCall(calls);
     expect(createCall).toBeDefined();
-    const body = JSON.parse(createCall![1].body as string) as {
+    const body = JSON.parse(defined(createCall)[1].body as string) as {
       fields: { parent?: { key: string } };
     };
     expect(body.fields.parent).toEqual({ key: 'LS-1322' });
@@ -194,7 +211,7 @@ describe('createJiraBug — epic parent field', () => {
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const createCall = findCreateIssueFetchCall(calls);
     expect(createCall).toBeDefined();
-    const body = JSON.parse(createCall![1].body as string) as {
+    const body = JSON.parse(defined(createCall)[1].body as string) as {
       fields: { parent?: { key: string } };
     };
     expect(body.fields.parent).toBeUndefined();
@@ -231,7 +248,10 @@ describe('searchJiraBugs', () => {
       makeSearchResponse([
         {
           key: 'LS-50',
-          fields: { summary: 'Login page broken', status: { name: 'To Do' } },
+          fields: {
+            summary: 'Login page broken',
+            status: { name: 'To Do' },
+          },
         },
         {
           key: 'LS-51',
@@ -249,6 +269,7 @@ describe('searchJiraBugs', () => {
     expect(result.issues[0].issueKey).toBe('LS-50');
     expect(result.issues[0].summary).toBe('Login page broken');
     expect(result.issues[0].status).toBe('To Do');
+    expect(result.issues[0].issueUrl).toBe(`${SITE_URL}/browse/LS-50`);
     expect(result.issues[1].issueKey).toBe('LS-51');
     expect(result.total).toBe(2);
   });
@@ -281,5 +302,16 @@ describe('searchJiraBugs', () => {
     const calls = fetchSpy.mock.calls as unknown as FetchCall[];
     const url = calls[0][0];
     expect(url).toContain('maxResults=10');
+  });
+
+  it('uses Bearer auth and cloud API URL', async () => {
+    fetchSpy.mockResolvedValueOnce(makeSearchResponse([], 0));
+
+    await searchJiraBugs('test', 'LS', 'jira-secret');
+
+    const calls = fetchSpy.mock.calls as unknown as FetchCall[];
+    expect(calls[0][0]).toContain(API_BASE);
+    const headers = calls[0][1].headers as Record<string, string>;
+    expect(headers['Authorization']).toBe('Bearer test-access-token');
   });
 });

@@ -1,14 +1,5 @@
-import {
-  GetSecretValueCommand,
-  SecretsManagerClient,
-} from '@aws-sdk/client-secrets-manager';
 import { LOGGER } from '@legacy-sports/logging';
-
-interface JiraCredentials {
-  api_token: string;
-  email: string;
-  base_url: string;
-}
+import { getAccessToken, getApiBaseUrl, getSiteUrl } from './oauth';
 
 interface JiraIssueFields {
   summary: string;
@@ -71,35 +62,6 @@ export interface SearchResult {
 export interface SearchBugsResult {
   issues: SearchResult[];
   total: number;
-}
-
-let cachedCredentials: JiraCredentials | null = null;
-
-async function getJiraCredentials(
-  secretName: string,
-): Promise<JiraCredentials> {
-  if (cachedCredentials) {
-    return cachedCredentials;
-  }
-
-  const client = new SecretsManagerClient({ region: 'us-east-1' });
-  const command = new GetSecretValueCommand({ SecretId: secretName });
-  const response = await client.send(command);
-
-  if (!response.SecretString) {
-    throw new Error(`Secret ${secretName} has no string value`);
-  }
-
-  const credentials = JSON.parse(response.SecretString) as JiraCredentials;
-
-  if (!credentials.api_token || !credentials.email || !credentials.base_url) {
-    throw new Error(
-      `Secret ${secretName} is missing required fields: api_token, email, base_url`,
-    );
-  }
-
-  cachedCredentials = credentials;
-  return credentials;
 }
 
 /**
@@ -170,11 +132,9 @@ function sanitizeFilename(name: string): string {
 async function attachFilesToJiraIssue(
   issueKey: string,
   attachments: AttachmentInput[],
-  credentials: JiraCredentials,
+  accessToken: string,
+  apiBaseUrl: string,
 ): Promise<void> {
-  const { api_token, email, base_url } = credentials;
-  const authHeader = Buffer.from(`${email}:${api_token}`).toString('base64');
-
   for (const attachment of attachments) {
     try {
       const buffer = Buffer.from(attachment.data, 'base64');
@@ -183,11 +143,11 @@ async function attachFilesToJiraIssue(
       formData.append('file', blob, sanitizeFilename(attachment.name));
 
       const response = await fetch(
-        `${base_url}/rest/api/3/issue/${issueKey}/attachments`,
+        `${apiBaseUrl}/rest/api/3/issue/${issueKey}/attachments`,
         {
           method: 'POST',
           headers: {
-            Authorization: `Basic ${authHeader}`,
+            Authorization: `Bearer ${accessToken}`,
             // Required by Jira to allow programmatic attachment uploads
             'X-Atlassian-Token': 'no-check',
             Accept: 'application/json',
@@ -218,14 +178,14 @@ async function attachFilesToJiraIssue(
  */
 async function findJiraUserAccountId(
   email: string,
-  authHeader: string,
-  baseUrl: string,
+  accessToken: string,
+  apiBaseUrl: string,
 ): Promise<string | null> {
   try {
-    const url = `${baseUrl}/rest/api/3/user/search?query=${encodeURIComponent(email)}`;
+    const url = `${apiBaseUrl}/rest/api/3/user/search?query=${encodeURIComponent(email)}`;
     const response = await fetch(url, {
       headers: {
-        Authorization: `Basic ${authHeader}`,
+        Authorization: `Bearer ${accessToken}`,
         Accept: 'application/json',
       },
     });
@@ -257,10 +217,9 @@ export async function createJiraBug(
   secretName: string,
   epicKey?: string,
 ): Promise<CreateIssueResult> {
-  const credentials = await getJiraCredentials(secretName);
-  const { api_token, email, base_url } = credentials;
-
-  const authHeader = Buffer.from(`${email}:${api_token}`).toString('base64');
+  const accessToken = await getAccessToken(secretName);
+  const apiBaseUrl = await getApiBaseUrl(secretName);
+  const siteUrl = await getSiteUrl(secretName);
 
   const fields: JiraIssueFields = {
     project: { key: projectKey },
@@ -283,30 +242,30 @@ export async function createJiraBug(
   }
 
   // Attempt to set the reporter to the actual user who filed the bug.
-  // Falls back gracefully (reporter = API token owner) if email is absent or
+  // Falls back gracefully (reporter = service account) if email is absent or
   // the user has no Jira account.
   if (input.reporterEmail) {
     const accountId = await findJiraUserAccountId(
       input.reporterEmail,
-      authHeader,
-      base_url,
+      accessToken,
+      apiBaseUrl,
     );
     if (accountId) {
       fields.reporter = { id: accountId };
       LOGGER.info(`Setting Jira reporter to accountId ${accountId}`);
     } else {
       LOGGER.info(
-        `No Jira account found for ${input.reporterEmail}; reporter will default to API token owner`,
+        `No Jira account found for ${input.reporterEmail}; reporter will default to service account`,
       );
     }
   }
 
   LOGGER.info(`Creating Jira bug in project ${projectKey}: ${input.summary}`);
 
-  const response = await fetch(`${base_url}/rest/api/3/issue`, {
+  const response = await fetch(`${apiBaseUrl}/rest/api/3/issue`, {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${authHeader}`,
+      Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
@@ -328,12 +287,17 @@ export async function createJiraBug(
   };
 
   const issueKey = data.key;
-  const issueUrl = `${base_url}/browse/${issueKey}`;
+  const issueUrl = `${siteUrl}/browse/${issueKey}`;
 
   LOGGER.info(`Created Jira issue: ${issueKey}`);
 
   if (input.attachments && input.attachments.length > 0) {
-    await attachFilesToJiraIssue(issueKey, input.attachments, credentials);
+    await attachFilesToJiraIssue(
+      issueKey,
+      input.attachments,
+      accessToken,
+      apiBaseUrl,
+    );
   }
 
   return { issueKey, issueUrl };
@@ -350,9 +314,9 @@ export async function searchJiraBugs(
   secretName: string,
   maxResults = 5,
 ): Promise<SearchBugsResult> {
-  const credentials = await getJiraCredentials(secretName);
-  const { api_token, email, base_url } = credentials;
-  const authHeader = Buffer.from(`${email}:${api_token}`).toString('base64');
+  const accessToken = await getAccessToken(secretName);
+  const apiBaseUrl = await getApiBaseUrl(secretName);
+  const siteUrl = await getSiteUrl(secretName);
 
   const cap = Math.min(Math.max(maxResults, 1), 10);
 
@@ -367,10 +331,10 @@ export async function searchJiraBugs(
   });
 
   const response = await fetch(
-    `${base_url}/rest/api/3/search?${params.toString()}`,
+    `${apiBaseUrl}/rest/api/3/search?${params.toString()}`,
     {
       headers: {
-        Authorization: `Basic ${authHeader}`,
+        Authorization: `Bearer ${accessToken}`,
         Accept: 'application/json',
       },
     },
@@ -394,7 +358,7 @@ export async function searchJiraBugs(
     total: data.total,
     issues: data.issues.map((issue) => ({
       issueKey: issue.key,
-      issueUrl: `${base_url}/browse/${issue.key}`,
+      issueUrl: `${siteUrl}/browse/${issue.key}`,
       summary: issue.fields.summary,
       status: issue.fields.status.name,
     })),
