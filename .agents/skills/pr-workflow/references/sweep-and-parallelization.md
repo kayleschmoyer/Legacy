@@ -94,6 +94,26 @@ foreach ($job in $jobs) {
 
 **Concurrency limit**: `$maxParallel = 3` avoids disk I/O saturation.
 
+### Early CI Failure Detection
+
+After pushing a rebased/fixed branch, don't wait for the entire CI run to complete. Individual jobs within a run complete independently — Build Validation can fail at minute 4 while Quality Gates doesn't finish until minute 10. Poll per-job status to detect failures early:
+
+```
+After pushing branch:
+  1. Get in-progress run: ci_list_runs(branch: branchName, commit: headSha, status: "in_progress", limit: 1)
+  2. Poll with ci_view_run(runId, includeJobs: true) every ~60s
+  3. As soon as ANY job shows conclusion: "failure":
+     → Identify the failing job's jobId from ci_view_run(..., includeJobs: true)
+     → Fetch logs: ci_get_logs(runId, jobId, errorSummary: true)
+     → Begin fixing immediately — don't wait for full run
+  4. If all critical jobs pass (Quality Gates + Build Validation):
+     → Mark PR as "CI pending E2E" and move to next PR
+```
+
+**Impact**: Detect failures ~5-8 min earlier per PR. Particularly valuable when multiple PRs have the same root cause — fix one, apply to all.
+
+**Tools available**: `ci_view_run` already returns per-job status and completion timestamps. No new MCP tools needed.
+
 ### Why NOT Sub-Agents for Rebases
 
 - **Cascade invalidation**: Merging PR A changes `main`, invalidating PR B's rebase
