@@ -249,7 +249,7 @@ export function matchupByIdResponse(matchup?: Partial<MockMatchup> | null) {
 export function matchupsForLeagueResponse(matchups?: Partial<MockMatchup>[]) {
   return {
     data: {
-      matchupsForLeague: (matchups ?? []).map((m) => mockMatchup(m)),
+      getMatchupsForLeague: (matchups ?? []).map((m) => mockMatchup(m)),
     },
   };
 }

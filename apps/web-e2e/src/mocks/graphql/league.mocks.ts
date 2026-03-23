@@ -5,6 +5,15 @@
  *         createLeagueAndTeams, updateLeagueSettings, leagueScoringProfile.
  */
 
+export interface MockLeagueMember {
+  __typename: 'LeagueMember';
+  leagueId: number;
+  userId: number;
+  teamId: number;
+  permissionLevel: string;
+  username: string;
+}
+
 export interface MockLeague {
   __typename: 'League';
   id: number;
@@ -14,6 +23,7 @@ export interface MockLeague {
   maxRosterSize: number;
   draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
   currentMatchup: number | null;
+  currentWeekNumber: number | null;
   numberOfTeams: number;
   playerPool: string;
   draftMode: 'live' | 'slow';
@@ -29,6 +39,38 @@ export interface MockLeague {
   bannerUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  inviteCode: string | null;
+  leaguePhase: string | null;
+  weekAdvanceStatus: string | null;
+  waiverType: string | null;
+  faabBudgetDefault: number | null;
+  spStartsPerMatchup: number | null;
+  gamesPerMatchup: number;
+  minCareerGames: number;
+  minCareerSeasons: number;
+  totalMatchups: number | null;
+  playoffEnabled: boolean;
+  playoffFormat: string | null;
+  playoffMultiWeek: boolean;
+  lmNotes: string | null;
+  isMockDraft: boolean;
+  previousLeagueId: number | null;
+  frozenAt: string | null;
+  seasonNumber: number;
+  salaryCapEnabled: boolean;
+  salaryCap: number | null;
+  salaryFloor: number | null;
+  luxuryTaxThreshold: number | null;
+  minSalary: number | null;
+  salaryEscalationPct: number | null;
+  salaryDecayPct: number | null;
+  auctionBudget: number | null;
+  auctionMinBid: number | null;
+  eraFilter: string | null;
+  hofOnly: boolean;
+  customEraStartYear: number | null;
+  customEraEndYear: number | null;
+  userMembership: MockLeagueMember | null;
 }
 
 export function mockLeague(overrides: Partial<MockLeague> = {}): MockLeague {
@@ -41,6 +83,7 @@ export function mockLeague(overrides: Partial<MockLeague> = {}): MockLeague {
     maxRosterSize: 25,
     draftStatus: 'not-started',
     currentMatchup: null,
+    currentWeekNumber: null,
     numberOfTeams: 10,
     playerPool: 'all',
     draftMode: 'live',
@@ -56,6 +99,45 @@ export function mockLeague(overrides: Partial<MockLeague> = {}): MockLeague {
     bannerUrl: null,
     primaryColor: null,
     secondaryColor: null,
+    inviteCode: 'TEST1234',
+    leaguePhase: null,
+    weekAdvanceStatus: null,
+    waiverType: null,
+    faabBudgetDefault: null,
+    spStartsPerMatchup: null,
+    gamesPerMatchup: 1,
+    minCareerGames: 50,
+    minCareerSeasons: 3,
+    totalMatchups: null,
+    playoffEnabled: false,
+    playoffFormat: null,
+    playoffMultiWeek: false,
+    lmNotes: null,
+    isMockDraft: false,
+    previousLeagueId: null,
+    frozenAt: null,
+    seasonNumber: 1,
+    salaryCapEnabled: false,
+    salaryCap: null,
+    salaryFloor: null,
+    luxuryTaxThreshold: null,
+    minSalary: null,
+    salaryEscalationPct: null,
+    salaryDecayPct: null,
+    auctionBudget: null,
+    auctionMinBid: null,
+    eraFilter: null,
+    hofOnly: false,
+    customEraStartYear: null,
+    customEraEndYear: null,
+    userMembership: {
+      __typename: 'LeagueMember',
+      leagueId: 1,
+      userId: 1,
+      teamId: 1,
+      permissionLevel: 'owner',
+      username: 'testuser',
+    },
     ...overrides,
   };
 }

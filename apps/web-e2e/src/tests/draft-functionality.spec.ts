@@ -1,4 +1,6 @@
 import { expect, test } from '../fixtures/auth';
+import { mockDraft } from '../mocks/graphql/draft.mocks';
+import { leagueByIdResponse } from '../mocks/graphql/league.mocks';
 
 /**
  * E2E Tests for Draft Status Functionality in Web App
@@ -12,14 +14,60 @@ import { expect, test } from '../fixtures/auth';
  * 2. User clicks "Start Draft" button
  * 3. Draft status updates to "queued" immediately
  * 4. Status persists on page refresh (critical test for the bug we fixed)
+ *
+ * Prerequisites (handled by auth fixture + shared baseline mocks):
+ * - GetLeagueById returns league with draftStatus: 'not-started', owner: 1
+ * - InitializeDraft mutation returns draftStatus: 'queued'
+ * - Authenticated user is id: 1 (matches league owner)
  */
 
 test.describe('Draft Status Web UI Tests @critical', () => {
   // Test league ID - using the same one from our GraphQL E2E tests
   const testLeagueId = 1;
-  const leagueUrl = `/baseball/league/${testLeagueId}`;
+  // Navigate to the commissioner tab where the Start Draft button lives
+  const leagueUrl = `/baseball/league/${testLeagueId}/commissioner`;
 
   test.beforeEach(async ({ page }) => {
+    // Track draft status so GetLeagueById returns the updated value after
+    // the InitializeDraft mutation fires.  This route is registered during
+    // the test body, so it takes priority (LIFO) over the _apiIsolation
+    // baseline and the auth fixture's page-level routes.
+    let draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed' =
+      'not-started';
+
+    await page.route(
+      (url) => url.toString().includes('/graphql'),
+      (route) => {
+        const postData = route.request().postData()?.toLowerCase() ?? '';
+
+        if (postData.includes('initializedraft')) {
+          draftStatus = 'queued';
+          void route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              data: {
+                initializeDraft: mockDraft({
+                  status: 'queued',
+                  leagueId: testLeagueId,
+                }),
+              },
+            }),
+          });
+        } else if (postData.includes('getleaguebyid')) {
+          // Return league with current (possibly mutated) draftStatus
+          void route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(leagueByIdResponse({ draftStatus })),
+          });
+        } else {
+          // Let other operations fall through to baseline/auth fixtures
+          void route.fallback();
+        }
+      },
+    );
+
     // Navigate to the league page before each test
     await page.goto(leagueUrl);
     await page.waitForLoadState('networkidle');
@@ -62,27 +110,26 @@ test.describe('Draft Status Web UI Tests @critical', () => {
     // Wait for league data to load (the component renders <h1 id="league-title">)
     await page.getByTestId('league-title').waitFor({ timeout: 15000 });
 
-    // Find the start draft button
+    // Find the start draft button — baseline mocks guarantee draftStatus: 'not-started'
+    // and authenticated user matches league owner, so button should be visible
     const startDraftButton = page
       .locator('button')
       .filter({ hasText: /start.*draft/i })
       .first();
 
-    // Check if button is available and enabled
-    // SKIP-REASON: UI state - League already drafted or user lacks permissions
-    // TODO: Add test data setup to ensure repeatable 'not-started' league state (LS-63)
-    if (
-      !(await startDraftButton.isVisible()) ||
-      (await startDraftButton.isDisabled())
-    ) {
-      console.log(
-        '⚠️  Start draft button not available - league may already be drafted or user lacks permissions',
-      );
-      test.skip();
-    }
+    await startDraftButton.waitFor({ state: 'visible', timeout: 5000 });
+    expect(await startDraftButton.isDisabled()).toBe(false);
 
-    // Click the start draft button
+    // Click the start draft button (opens confirmation dialog)
     await startDraftButton.click();
+
+    // Click the "Confirm" button in the confirmation dialog
+    const confirmButton = page
+      .locator('button')
+      .filter({ hasText: /^Confirm$/i })
+      .first();
+    await confirmButton.waitFor({ state: 'visible', timeout: 5000 });
+    await confirmButton.click();
 
     // Wait for the mutation to complete and UI to update
     await page.waitForTimeout(1000);
@@ -123,41 +170,25 @@ test.describe('Draft Status Web UI Tests @critical', () => {
     // Wait for league data to load (the component renders <h1 id="league-title">)
     await page.getByTestId('league-title').waitFor({ timeout: 15000 });
 
-    // Find and click start draft button (if available)
+    // Find and click start draft button — mocks guarantee it's available
     const startDraftButton = page
       .locator('button')
       .filter({ hasText: /start.*draft/i })
       .first();
 
-    // SKIP-REASON: UI state - Testing persistence requires either starting a draft or having one already queued
-    // TODO: Ensure test data provides consistent starting state
-    if (
-      !(await startDraftButton.isVisible()) ||
-      (await startDraftButton.isDisabled())
-    ) {
-      console.log(
-        '⚠️  Start draft button not available - checking if draft is already queued',
-      );
+    await startDraftButton.waitFor({ state: 'visible', timeout: 5000 });
 
-      // Check if draft is already in progress/queued
-      const queuedButton = page
-        .locator('button')
-        .filter({ hasText: /queued|progress/i })
-        .first();
-      if (await queuedButton.isVisible()) {
-        console.log(
-          '✅ Draft already in queued/progress state - testing persistence',
-        );
-      } else {
-        // SKIP-REASON: UI state - No draft button available and no queued draft exists in test data
-        // TODO: Provide consistent test data with either available draft button or pre-queued draft (LS-63)
-        test.skip();
-      }
-    } else {
-      // Start the draft
-      await startDraftButton.click();
-      await page.waitForTimeout(1000);
-    }
+    // Start the draft (opens confirmation dialog)
+    await startDraftButton.click();
+
+    // Click the "Confirm" button in the confirmation dialog
+    const confirmButton = page
+      .locator('button')
+      .filter({ hasText: /^Confirm$/i })
+      .first();
+    await confirmButton.waitFor({ state: 'visible', timeout: 5000 });
+    await confirmButton.click();
+    await page.waitForTimeout(1000);
 
     // Capture the draft status after starting
     let preRefreshStatus = '';
@@ -226,42 +257,26 @@ test.describe('Draft Status Web UI Tests @critical', () => {
 
     await page.getByTestId('league-title').waitFor({ timeout: 15000 });
 
+    // Mocks guarantee the button is available
     const startDraftButton = page
       .locator('button')
       .filter({ hasText: /start.*draft/i })
       .first();
 
-    // SKIP-REASON: UI state - Need available draft button to test rapid interactions
-    // TODO: Implement test fixture to reset league state before test (LS-63)
-    if (
-      !(await startDraftButton.isVisible()) ||
-      (await startDraftButton.isDisabled())
-    ) {
-      console.log(
-        '⚠️  Start draft button not available for rapid interaction test',
-      );
-      test.skip();
-    }
+    await startDraftButton.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Try rapid clicking (should be handled gracefully by the UI)
+    // Click Start Draft to open the confirmation dialog
     await startDraftButton.click();
 
-    // Wait a short time and try clicking again (should be disabled or show different state)
-    await page.waitForTimeout(500);
-
-    const updatedButton = page
+    // Click Confirm in the dialog to fire the mutation
+    const confirmButton = page
       .locator('button')
-      .filter({ hasText: /start.*draft/i })
+      .filter({ hasText: /^Confirm$/i })
       .first();
-    if (
-      (await updatedButton.isVisible()) &&
-      !(await updatedButton.isDisabled())
-    ) {
-      // If button is still clickable, try clicking again
-      await updatedButton.click();
-    }
+    await confirmButton.waitFor({ state: 'visible', timeout: 5000 });
+    await confirmButton.click();
 
-    // Wait for UI to settle
+    // Wait for mutation and UI to settle
     await page.waitForTimeout(1000);
 
     // Verify UI is in a consistent state (not broken by rapid interactions)
@@ -296,6 +311,15 @@ test.describe('Draft Status Web UI Tests @critical', () => {
       !(await startDraftButton.isDisabled())
     ) {
       await startDraftButton.click();
+
+      // Click Confirm in the dialog to fire the mutation
+      const confirmButton = page
+        .locator('button')
+        .filter({ hasText: /^Confirm$/i })
+        .first();
+      if (await confirmButton.isVisible()) {
+        await confirmButton.click();
+      }
 
       // Wait for any alerts to appear
       await page.waitForTimeout(2000);

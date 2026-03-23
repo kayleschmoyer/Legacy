@@ -1,7 +1,11 @@
 import { test as base, expect } from './auth-enhanced';
 
-import { startDraftResponse, userLeaguesResponse } from '../mocks/graphql';
-import { updateLeagueBrandingResponse } from '../mocks/graphql/league.mocks';
+import { userLeaguesResponse } from '../mocks/graphql';
+import { mockDraft } from '../mocks/graphql/draft.mocks';
+import {
+  leagueByIdResponse,
+  updateLeagueBrandingResponse,
+} from '../mocks/graphql/league.mocks';
 
 /**
  * Auth fixture for tests that need an authenticated user with league data.
@@ -10,7 +14,8 @@ import { updateLeagueBrandingResponse } from '../mocks/graphql/league.mocks';
  * This layer adds:
  *   1. OAuth login endpoint mock
  *   2. Authenticated-user overrides (GetUserLeagues returns a league)
- *   3. Mutation mocks for StartDraft and UpdateLeagueBranding
+ *   3. Mutation mocks for InitializeDraft and UpdateLeagueBranding
+ *   4. Stateful GetLeagueById mock — draftStatus flips to 'queued' after InitializeDraft
  *
  * For unmocked operations, route.fallback() passes to the _apiIsolation
  * baseline. If the baseline doesn't have the operation either, the test
@@ -18,6 +23,11 @@ import { updateLeagueBrandingResponse } from '../mocks/graphql/league.mocks';
  */
 export const test = base.extend({
   page: async ({ page }, use) => {
+    // Track draft status so GetLeagueById returns the updated value after
+    // the StartDraft mutation is received.
+    let draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed' =
+      'not-started';
+
     // Mock OAuth login endpoint
     await page.route('**/oauth/login', (route) => {
       void route.fulfill({
@@ -60,11 +70,28 @@ export const test = base.extend({
             contentType: 'application/json',
             body: JSON.stringify(userLeaguesResponse()),
           });
-        } else if (postData.includes('startdraft')) {
+        } else if (postData.includes('initializedraft')) {
+          // Flip stateful draftStatus so subsequent GetLeagueById calls
+          // return the updated value (critical for persistence tests).
+          draftStatus = 'queued';
           void route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify(startDraftResponse({ draftStatus: 'queued' })),
+            body: JSON.stringify({
+              data: {
+                initializeDraft: mockDraft({
+                  status: 'queued',
+                  leagueId: 1,
+                }),
+              },
+            }),
+          });
+        } else if (postData.includes('getleaguebyid')) {
+          // Return league with current (possibly mutated) draftStatus
+          void route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(leagueByIdResponse({ draftStatus })),
           });
         } else if (postData.includes('updateleaguebranding')) {
           void route.fulfill({

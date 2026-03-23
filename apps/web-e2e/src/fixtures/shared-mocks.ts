@@ -8,6 +8,7 @@ import {
   matchupsForLeagueResponse,
   userTeamIdResponse,
 } from '../mocks/graphql';
+import { mockDraft } from '../mocks/graphql/draft.mocks';
 
 // ---------------------------------------------------------------------------
 // Baseline GraphQL mock responses
@@ -71,8 +72,13 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
   getteamtradeoffers: { data: { teamTradeOffers: [] } },
 
   // ── Draft ─────────────────────────────────────────────────────────
-  getleaguedraft: { data: { leagueDraft: null } },
+  getleaguedraft: { data: { getLeagueDraft: null } },
   getdraftteamorder: { data: { draftTeamOrder: [] } },
+  initializedraft: {
+    data: {
+      initializeDraft: mockDraft({ status: 'queued', leagueId: 1 }),
+    },
+  },
 
   // ── Subscription ──────────────────────────────────────────────────
   getmysubscription: { data: { mySubscription: null } },
