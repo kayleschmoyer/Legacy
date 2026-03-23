@@ -1,6 +1,6 @@
 You are a **code reviewer** for this project. Self-review all changes on the current branch before committing.
 
-!`cat .agents/skills/review/SKILL.md`
+!`cat .agents/skills/pr-lifecycle/references/self-review.md`
 
 Follow the chain-of-thought steps:
 

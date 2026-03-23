@@ -9,7 +9,7 @@ description: 'Implement Jira tickets using git worktrees for parallel developmen
 
 Git worktrees let you check out multiple branches simultaneously in separate directories — one directory per ticket. The main repo stays on `main` and is used only for creating new worktrees. Each ticket gets its own folder. All worktrees are available in the multi-root VS Code workspace.
 
-> **Co-load required:** When running shell commands (`make`, `nx`, `git`) inside a worktree, load and use the [mcp-worktree skill](../mcp-worktree/SKILL.md) (`worktree_set` / `worktree_run`) instead of the bash tool. This prevents the most common failure mode — running commands in the main repo instead of the active worktree.
+> **MCP-first:** When running shell commands (`make`, `nx`, `git`) inside a worktree, use worktree MCP tools (`worktree_set` / `worktree_run`) instead of the bash tool. This prevents the most common failure mode — running commands in the main repo instead of the active worktree.
 
 ## Worktree Directory Structure
 
@@ -86,7 +86,7 @@ Junctioned worktrees share the main repo's `node_modules`. Key rules:
 
 Before creating the worktree, **inspect the Jira ticket** for "blocked-by" linked issues. Query the status of each blocker to decide how to proceed:
 
-Use the `jira_check_blockers` MCP tool (primary) or load the [mcp-jira skill](../mcp-jira/SKILL.md) for full details:
+Use the `jira_check_blockers` MCP tool (primary):
 
 ```
 jira_check_blockers(key: "LS-####")
@@ -220,6 +220,10 @@ code legacy-sports.code-workspace
 
 All commands run from within the worktree directory (`cd $wt`). Write code, add tests, update docs.
 
+### Step 5a: Service Validation (Optional)
+
+If you changed backend code (resolvers, migrations, Lambda logic), validate against real local services before committing. See [references/service-validation.md](references/service-validation.md) for the decision tree and procedures.
+
 ### Step 5b: Self-Review Changes
 
 Before committing, run a self-review of all changes on the branch. This catches project-rule violations and code-quality issues that `make pc` does not cover.
@@ -298,7 +302,7 @@ make pc
 ### Step 7c: User Testing (Optional)
 
 If you want to test the UI live against running dev servers before opening a PR,
-see the [user-testing skill](../user-testing/SKILL.md). This checks the branch out in the
+see [references/user-testing.md](references/user-testing.md). This checks the branch out in the
 main repo where dev servers run, lets you verify visually, then returns main to `main`.
 
 ### Step 7b: Run Affected E2E Tests
@@ -370,6 +374,8 @@ twig worktree list  # verify
 > 📎 **Dependent branch trees** (stacked branches, cascade rebase, skip-commits): see [references/branch-tree-management.md](references/branch-tree-management.md)
 
 > 📎 **Common workflow mistakes & recovery** (wrong parent, duplicate branches, partial implementation): see [references/workflow-common-mistakes.md](references/workflow-common-mistakes.md)
+
+> 📎 **Client bug triage** (specialized entry point: pick up bugs from LS-1322 epic): see [references/client-bug-triage.md](references/client-bug-triage.md)
 
 ## Quick Reference
 

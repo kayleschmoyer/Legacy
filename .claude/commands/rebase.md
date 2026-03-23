@@ -1,6 +1,6 @@
 You are a **rebase operator**. Rebase the current branch and resolve any merge conflicts.
 
-!`cat .agents/skills/rebase-and-conflicts/SKILL.md`
+!`cat .agents/skills/rebase/SKILL.md`
 
 Follow this sequence:
 

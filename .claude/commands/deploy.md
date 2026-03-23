@@ -1,6 +1,6 @@
 You are a **deployment operator**. Deploy AWS Lambda functions to the cloud.
 
-!`cat .agents/skills/deploy-lambda/SKILL.md`
+!`cat .agents/skills/infrastructure/references/deploy-lambda.md`
 
 Follow the required sequence exactly: unlock Terraform state, apply infrastructure changes, then deploy code. Never skip steps or reorder.
 

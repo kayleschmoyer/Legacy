@@ -1,6 +1,6 @@
 You are an **E2E test engineer**. Write, run, or debug Playwright E2E tests.
 
-!`cat .agents/skills/e2e-testing/SKILL.md`
+!`cat .agents/skills/testing/references/e2e-testing.md`
 
 When writing tests:
 

@@ -12,7 +12,7 @@ MCP server configuration is maintained in multiple files to support different AI
 | `.github/copilot/mcp.json` | GitHub Copilot (agent mode) | `servers`     | `${VAR}`       |
 | `.mcp.json`                | CLI-based agents            | `mcpServers`  | `${VAR}`       |
 
-**Keep all files in sync.** When adding or removing a server, update all config files. The `create-mcp-server` skill (`.agents/skills/create-mcp-server/SKILL.md`) documents the full registration steps.
+**Keep all files in sync.** When adding or removing a server, update all config files. The `create` skill (`.agents/skills/create/SKILL.md`) documents the full registration steps.
 
 ### Config Differences
 
@@ -32,7 +32,7 @@ GitHub Actions workflow run triage for CI failures and flaky-job diagnosis:
 - **ci_search_logs** — Search logs with context lines to extract concrete evidence
 - **ci_rerun** — Rerun failed jobs, a specific job, or an entire run
 
-See `.github/skills/debug-ci-failure/SKILL.md` and `.github/skills/github-actions-logs/SKILL.md` for the debugging workflow this server supports.
+See `.agents/skills/debugging/SKILL.md` and `.agents/skills/infrastructure/SKILL.md` for the debugging and log-reading workflows this server supports.
 
 ### jira-server
 
@@ -47,7 +47,7 @@ Wraps Jira operations with guardrails using the Jira REST API (with env var / ne
 - **jira_set_parent** — Set parent epic via Jira REST API
 - **jira_get_comments** — Fetch all comments on a ticket with author and plain-text body
 
-See `.agents/skills/mcp-jira/SKILL.md` for usage.
+See AGENTS.md for Jira auth-aware routing and MCP-first usage patterns.
 
 ### db-server
 
@@ -63,7 +63,7 @@ Database operations with built-in safety guardrails:
 - **db_codegen** — Run GraphQL codegen via Nx affected (optional print-schema first)
 - **db_restore_dev_seed** — Restore `resources/dev-seed.dump` into local DB (destructive, explicit confirmation required)
 
-See `.agents/skills/database/SKILL.md` for usage.
+See `.agents/skills/repo-tooling/SKILL.md` for usage.
 
 ### worktree-server
 
@@ -88,7 +88,7 @@ AWS CloudWatch logs and SSO authentication health:
 - **aws_logs_tail** — Fetch recent CloudWatch logs for a Lambda function (wraps `aws logs tail`; auto-sets `AWS_PAGER=""` and `PYTHONIOENCODING=utf-8`)
 - **aws_sso_status** — Check AWS SSO authentication status via `aws sts get-caller-identity`; returns caller identity or a structured remedy on failure
 
-See `.github/skills/cloudwatch-logs/SKILL.md` and `.github/skills/aws-sso-login/SKILL.md` for context.
+See `.agents/skills/infrastructure/SKILL.md` for context.
 
 ### github-server
 
@@ -105,7 +105,7 @@ Pull request and review lifecycle management:
 - **github_manage_labels** — Add or remove labels (e.g. `merge-when-ready`)
 - **github_get_repo_info** — Get repo owner, name, default branch, and URL
 
-See `.agents/skills/pr-workflow/SKILL.md` for the workflows this server supports.
+See `.agents/skills/pr-lifecycle/SKILL.md` for the workflows this server supports.
 
 ### nx-server
 
@@ -144,7 +144,7 @@ Agent-driven browser debugging and screenshot capture:
 - **browser_screenshot_upload** — Upload PNG to GitHub draft release for PR body embedding
 - **browser_cleanup** — Close browser and kill all tracked dev servers
 
-See `.agents/skills/agent-screenshots/SKILL.md` for the end-to-end screenshot workflow.
+See `.agents/skills/pr-lifecycle/references/agent-screenshots.md` for the end-to-end screenshot workflow.
 
 ## Cloud vs Local Availability
 

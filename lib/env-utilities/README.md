@@ -4,5 +4,5 @@ Environment variable loading, validation, and type-safe access. A Tier 1 depende
 
 ## Related
 
-- [Sync Env Skill](../../.agents/skills/sync-env/SKILL.md)
-- [Config Standards Skill](../../.agents/skills/config-standards/SKILL.md)
+- [Sync Env Skill](../../.agents/skills/infrastructure/SKILL.md)
+- [Config Standards Skill](../../.agents/skills/standards/SKILL.md)

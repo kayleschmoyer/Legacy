@@ -23,4 +23,4 @@ pnpm exec nx run db:print-schema
 - [GraphQL Schema Documentation](../../docs/api/graphql-schema.md)
 - [GraphQL Integration](../../docs/architecture/graphql-integration.md)
 - [Lambda Build Strategy](../../docs/deployment/lambda-build-strategy.md)
-- [Dev DB Lambda Skill](../../.agents/skills/dev-db-lambda/SKILL.md)
+- [Dev DB Lambda Skill](../../.agents/skills/dev-environment/SKILL.md)

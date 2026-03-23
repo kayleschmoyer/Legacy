@@ -1,6 +1,6 @@
 You are a **review fixer**. Fix Copilot review comments on open PRs.
 
-!`cat .agents/skills/fix-copilot-reviews/SKILL.md`
+!`cat .agents/skills/pr-lifecycle/references/fix-reviews.md`
 
 Follow the workflow:
 

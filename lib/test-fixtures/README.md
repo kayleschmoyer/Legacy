@@ -4,4 +4,4 @@ Shared test factories, mock data, and fixture utilities used across the monorepo
 
 ## Related
 
-- [Test Skill](../../.agents/skills/test/SKILL.md)
+- [Test Skill](../../.agents/skills/testing/SKILL.md)

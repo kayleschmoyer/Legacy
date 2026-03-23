@@ -4,5 +4,4 @@ Shared Tamagui theme configuration, tokens, and design system settings used by b
 
 ## Related
 
-- [UI Standards Skill](../../.agents/skills/ui-standards/SKILL.md)
-- [UI Brand Colors Skill](../../.agents/skills/ui-brand-colors/SKILL.md)
+- [UI Skill](../../.agents/skills/ui/SKILL.md)

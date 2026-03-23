@@ -67,12 +67,12 @@ This skill delegates to specialized sub-skills for each operation category. Load
 
 | Operation               | Sub-Skill                                 | When to Load                                 | Cloud? |
 | ----------------------- | ----------------------------------------- | -------------------------------------------- | :----: |
-| Rebase conflicting PRs  | `skills/rebase-conflicts/SKILL.md`        | PR has merge conflicts                       |   ❌   |
+| Rebase conflicting PRs  | `skills/rebase/SKILL.md`                  | PR has merge conflicts                       |   ❌   |
 | Resolve merge conflicts | `skills/resolve-merge-conflicts/SKILL.md` | Rebase produces conflicts needing manual fix |   ❌   |
-| Fix review comments     | `skills/fix-copilot-reviews/SKILL.md`     | PR has unresolved Copilot review threads     |   ❌   |
-| Debug CI failures       | `skills/debug-ci-failure/SKILL.md`        | PR has failing CI checks                     |   ❌   |
+| Fix review comments     | `skills/pr-lifecycle/SKILL.md`            | PR has unresolved Copilot review threads     |   ❌   |
+| Debug CI failures       | `skills/debugging/SKILL.md`               | PR has failing CI checks                     |   ❌   |
 | Enter a worktree        | `skills/worktree-workflow/SKILL.md`       | Need to create or access a PR's worktree     |   ❌   |
-| Create a PR             | `skills/create-pr/SKILL.md`               | Need to open a new PR after fixes            |   ❌   |
+| Create a PR             | `skills/pr-lifecycle/SKILL.md`            | Need to open a new PR after fixes            |   ❌   |
 
 ## Prerequisites
 
@@ -182,7 +182,7 @@ For each PR in `$scan.conflicting`:
 1. Enter the worktree (Step 2)
 2. **Fetch latest remote state in the worktree**: `git -C $wt fetch origin` — worktrees have their own fetch state and may be stale even if the main repo fetched recently. Without this, `rebase origin/main` uses an outdated ref and GitHub will still show the PR as CONFLICTING.
 3. Rebase from the worktree: `git -C $wt rebase origin/main` (or `.\scripts\rebase-pr.ps1 -Branch $branch`)
-4. If conflicts arise → load `skills/rebase-conflicts/SKILL.md` and `skills/resolve-merge-conflicts/SKILL.md`
+4. If conflicts arise → load `skills/rebase/SKILL.md` and `skills/resolve-merge-conflicts/SKILL.md`
 5. After rebasing ALL PRs, batch-validate with parallel `make pc` (see Parallelization Strategy below)
 6. **Dirty-tree guard**: after `make pc` passes, run `git status --porcelain` in each worktree. If dirty (e.g., `tsconfig.base.json` reformatted), commit with `style: apply formatting after rebase` and re-run `make pc`.
 7. Push passing PRs: `git -C "$wtPath" push --force-with-lease origin HEAD`
@@ -191,7 +191,7 @@ For each PR in `$scan.conflicting`:
 
 If a rebase fails irrecoverably: `git rebase --abort`, label the PR `requires-human-review` via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])`, comment with the failure reason, and move on. The PR is now **settled**.
 
-> **Full step-by-step rebase instructions** are in `skills/rebase-conflicts/SKILL.md`. Do not duplicate them here — load the skill.
+> **Full step-by-step rebase instructions** are in `skills/rebase/SKILL.md`. Do not duplicate them here — load the skill.
 
 ---
 
@@ -200,7 +200,7 @@ If a rebase fails irrecoverably: `git rebase --abort`, label the PR `requires-hu
 For each PR in `$scan.reviews`:
 
 1. Enter the worktree (Step 2)
-2. **Load `skills/fix-copilot-reviews/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
+2. **Load `skills/pr-lifecycle/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
 3. After pushing, re-check for new threads (Copilot re-reviews on push)
 4. If a review comment cannot be fixed (too complex, requires architectural decision, outside agent capability), label the PR `requires-human-review` via `github_manage_labels(number: <PR#>, add: ["requires-human-review"])` and comment explaining which threads could not be resolved and why. The PR is now **settled**.
 
@@ -226,11 +226,11 @@ Before diving into manual debugging, use existing CI MCP tools to diagnose the f
 | `stale_branch`   | Rebase onto main via `worktree_rebase`, then re-run CI                    |
 | `codegen`        | Run `make codegen` in the worktree, commit and push                       |
 | `type_error`     | Check if error exists on main — if not, rebase (stale); if so, manual fix |
-| `test_failure`   | Load `skills/debug-ci-failure/SKILL.md` for investigation                 |
+| `test_failure`   | Load `skills/debugging/SKILL.md` for investigation                        |
 | `lint`           | Run `pnpm exec nx affected -t lint --fix`, commit and push                |
 | `flaky`          | Re-run CI: `ci_rerun(runId: <id>, failedOnly: true)` — no code change     |
 | `infrastructure` | Re-run CI — timeout or GitHub Actions infra issue                         |
-| `unknown`        | Load `skills/debug-ci-failure/SKILL.md` for manual investigation          |
+| `unknown`        | Load `skills/debugging/SKILL.md` for manual investigation                 |
 
 ### 3b. Stale Branch Detection
 
@@ -254,7 +254,7 @@ During triage, clean up stale `ci-failure-*` labels. The `github_pr_scan` tool a
 If automated classification returns `unknown` or the auto-fix doesn't resolve the issue:
 
 1. Enter the worktree (Step 2)
-2. **Load `skills/debug-ci-failure/SKILL.md`** — it contains the full diagnostic playbook
+2. **Load `skills/debugging/SKILL.md`** — it contains the full diagnostic playbook
 3. Apply the fix based on error category
 4. Validate: `make pc`
 5. Commit and push
@@ -498,10 +498,10 @@ For a full cloud sweep, run steps 1–8 in order. Unlike the local sweep, there 
 
 ## Troubleshooting
 
-| Problem                                      | Fix                                                                                    |
-| -------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Rebase aborts repeatedly on same commit      | `git rebase --skip` if commit already applied; load `skills/rebase-conflicts/SKILL.md` |
-| Copilot keeps re-reviewing with same comment | After 2 cycles on the same thread, resolve it and move on                              |
-| CI failure is flaky (passes on re-run)       | Re-trigger: `gh run rerun $runId --failed` — do not change code                        |
-| Too many PRs to process in one session       | Prioritize: conflicts → CI → reviews                                                   |
-| `make pc` fails after rebase stabilization   | Load `skills/rebase-conflicts/SKILL.md` for post-rebase steps                          |
+| Problem                                      | Fix                                                                          |
+| -------------------------------------------- | ---------------------------------------------------------------------------- |
+| Rebase aborts repeatedly on same commit      | `git rebase --skip` if commit already applied; load `skills/rebase/SKILL.md` |
+| Copilot keeps re-reviewing with same comment | After 2 cycles on the same thread, resolve it and move on                    |
+| CI failure is flaky (passes on re-run)       | Re-trigger: `gh run rerun $runId --failed` — do not change code              |
+| Too many PRs to process in one session       | Prioritize: conflicts → CI → reviews                                         |
+| `make pc` fails after rebase stabilization   | Load `skills/rebase/SKILL.md` for post-rebase steps                          |

@@ -1,6 +1,6 @@
 You are a **PR creation operator**. Create a pull request for the current branch with Jira linkage.
 
-!`cat .agents/skills/create-pr/SKILL.md`
+!`cat .agents/skills/pr-lifecycle/references/create-pr.md`
 
 Execute the skill's procedure exactly:
 

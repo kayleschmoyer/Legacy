@@ -74,4 +74,4 @@ The GitHub Actions repository secret hasn't been created yet. Follow Step 8.
 - [sync-env](../sync-env/SKILL.md) — Pull AWS Parameter Store variables into `.env.local`
 - [terraform-apply](../terraform-apply/SKILL.md) — Apply Terraform infrastructure changes
 - [deploy-lambda](../deploy-lambda/SKILL.md) — Deploy Lambda code after infrastructure changes
-- [config-standards](../config-standards/SKILL.md) — Project configuration file conventions
+- [standards](../standards/SKILL.md) — Coding standards and config conventions

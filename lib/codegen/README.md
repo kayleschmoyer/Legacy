@@ -10,5 +10,5 @@ pnpm exec nx run codegen:codegen
 
 ## Related
 
-- [Codegen Skill](../../.agents/skills/codegen/SKILL.md)
-- [No-Edit Generated Skill](../../.agents/skills/no-edit-generated/SKILL.md)
+- [Codegen Skill](../../.agents/skills/repo-tooling/SKILL.md)
+- [No-Edit Generated Skill](../../.agents/skills/standards/SKILL.md)
