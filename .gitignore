@@ -313,6 +313,9 @@ playwright-report/
 test-results/
 logs/
 
+# Playwright snapshot baselines (visual regression moved to Storybook/Chromatic)
+**/*.spec.ts-snapshots/
+
 # Ad-hoc output scratch directory (lint results, CI logs, debug dumps, etc.)
 scratch/*
 !scratch/.gitkeep
