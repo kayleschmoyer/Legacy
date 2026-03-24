@@ -65,6 +65,7 @@ make pc
 6. **Tag test suites** (`@critical`, `@smoke`, `@regression`, `@slow`) for CI filtering. `@visual` is deprecated. See [references/test-tagging-guide.md](references/test-tagging-guide.md).
 7. **Selector sync rule** -- when a PR changes login/landing page UI, update E2E selectors in the same PR.
 8. **Kill background servers when done** -- stale processes hold native `.node` addons. Use `make kill-stale`.
+9. **Prefer Glob/Grep for file discovery and counting** -- when exploring test file structure (finding spec files, counting baselines, listing snapshot dirs), use the Glob and Grep tools instead of `find`/`wc`. `ls` is fine for quick one-off orientation when there's no equivalent tool or when tool output would be noisier.
 
 ## File Naming Convention
 
