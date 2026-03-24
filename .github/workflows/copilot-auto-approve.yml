@@ -48,10 +48,19 @@ jobs:
             });
             core.info(`Auto-passed bot-review for dependabot PR #${context.payload.pull_request.number}`);
 
+      - name: Generate bot token
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        id: bot-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: 3142924
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
       - name: Request Copilot review
         if: github.event.pull_request.user.login != 'dependabot[bot]'
         uses: actions/github-script@v8
         with:
+          github-token: ${{ steps.bot-token.outputs.token }}
           script: |
             try {
               await github.rest.pulls.requestReviewers({
