@@ -21,6 +21,7 @@ import { rebasePR } from './tools/rebase-pr.js';
 import { replyToThread } from './tools/reply-to-thread.js';
 import { retriggerCheck } from './tools/retrigger-check.js';
 import { secretList } from './tools/secret-list.js';
+import { setCommitStatus } from './tools/set-commit-status.js';
 import { secretSet } from './tools/secret-set.js';
 import { requestReview } from './tools/request-review.js';
 import { resolveThread } from './tools/resolve-thread.js';
@@ -602,6 +603,29 @@ server.tool(
       ),
   },
   async (params) => retriggerCheck(params),
+);
+
+// --- github_set_commit_status ---
+server.tool(
+  'github_set_commit_status',
+  'Set a commit status on a PR. Auto-resolves head SHA from PR number. Use to update stale bot-review or custom statuses.',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+    context: z
+      .string()
+      .trim()
+      .min(1)
+      .describe('Status context name (e.g. "bot-review")'),
+    state: z
+      .enum(['success', 'failure', 'pending', 'error'])
+      .describe('Status state'),
+    description: z
+      .string()
+      .trim()
+      .optional()
+      .describe('Human-readable description'),
+  },
+  async (params) => setCommitStatus(params),
 );
 
 // Start the server

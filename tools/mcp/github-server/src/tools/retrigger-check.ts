@@ -1,5 +1,6 @@
 import { getRepoOwnerName } from '../auth.js';
-import { githubGraphQL, githubRest } from '../github-api.js';
+import { githubRest } from '../github-api.js';
+import { resolveHeadShaFromPrNumber } from '../pr-utils.js';
 import { FAILED_CONCLUSIONS } from '../types.js';
 import type { ToolResult } from '../types.js';
 
@@ -7,18 +8,6 @@ interface RetriggerCheckParams {
   number: number;
   checkName?: string;
   allFailed?: boolean;
-}
-
-interface PRCommitResponse {
-  repository: {
-    pullRequest: {
-      commits: {
-        nodes: Array<{
-          commit: { oid: string };
-        }>;
-      };
-    } | null;
-  };
 }
 
 interface CheckRun {
@@ -33,32 +22,14 @@ interface CheckRunsResponse {
   check_runs: CheckRun[];
 }
 
-const PR_HEAD_COMMIT_QUERY = `
-query($owner: String!, $repo: String!, $number: Int!) {
-  repository(owner: $owner, name: $repo) {
-    pullRequest(number: $number) {
-      commits(last: 1) {
-        nodes {
-          commit { oid }
-        }
-      }
-    }
-  }
-}`;
-
 export async function retriggerCheck(
   params: RetriggerCheckParams,
 ): Promise<ToolResult> {
   const repo = await getRepoOwnerName();
 
   // 1. Get head commit SHA
-  const prResponse = await githubGraphQL<PRCommitResponse>(
-    PR_HEAD_COMMIT_QUERY,
-    { owner: repo.owner, repo: repo.name, number: params.number },
-  );
-
-  const commits = prResponse.data.repository.pullRequest?.commits.nodes;
-  if (!commits?.length) {
+  const sha = await resolveHeadShaFromPrNumber(params.number);
+  if (!sha) {
     return {
       isError: true,
       content: [
@@ -69,8 +40,6 @@ export async function retriggerCheck(
       ],
     };
   }
-
-  const sha = commits[0].commit.oid;
 
   // 2. List check runs for the commit (paginated)
   const baseQuery: Record<string, string> = { per_page: '100' };
