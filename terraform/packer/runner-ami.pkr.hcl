@@ -82,7 +82,7 @@ build {
       "export DEBIAN_FRONTEND=noninteractive",
       "sudo apt-get update -qq",
       "sudo apt-get upgrade -y -qq",
-      "sudo apt-get install -y -qq curl jq unzip git build-essential libssl-dev",
+      "sudo apt-get install -y -qq curl jq zip unzip git build-essential libssl-dev",
       "echo 'umask 0022' | sudo tee -a /etc/profile",
       "sudo sed -i 's/^UMASK.*/UMASK\t\t022/' /etc/login.defs",
     ]
