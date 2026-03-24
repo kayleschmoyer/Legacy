@@ -759,9 +759,11 @@ test.describe('Waiver Processing — confirm mutation @regression', () => {
 // ── Sequential Game Selection — Multi-Round ──────────────────────────────────
 
 test.describe('Sequential game selection — multi-round @critical', () => {
+  // 4 full page navigations + GraphQL mock cycles need more than the default 20s on slow CI runners
   test('clicking Select Game through all rounds updates button label and transitions to Advance', async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     let selectCalls = 0;
 
     // Round 1: selectedGamesCount = 0 → button says "Select Game 1 of 3"
