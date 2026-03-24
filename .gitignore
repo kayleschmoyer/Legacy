@@ -305,6 +305,8 @@ terraform/*.zip
 .terraform.lock.hcl
 terraform.tfvars
 *.tfvars
+# Non-sensitive runner config — checked in for CI reproducibility (LS-1665)
+!terraform/runners.auto.tfvars
 
 # Tamagui generated files
 **/.tamagui/

@@ -74,6 +74,27 @@ jobs:
           fi
           echo "✅ All required secrets are configured"
 
+          # Runner secrets are only required when runners are enabled in tfvars
+          if grep -q 'enable_github_runners\s*=\s*true' terraform/runners.auto.tfvars 2>/dev/null; then
+            RUNNER_MISSING=()
+            if [ -z "${{ secrets.RUNNER_GITHUB_APP_ID }}" ]; then
+              RUNNER_MISSING+=("RUNNER_GITHUB_APP_ID")
+            fi
+            if [ -z "${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}" ]; then
+              RUNNER_MISSING+=("RUNNER_GITHUB_APP_KEY_BASE64")
+            fi
+            if [ -z "${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}" ]; then
+              RUNNER_MISSING+=("RUNNER_GITHUB_APP_WEBHOOK_SECRET")
+            fi
+            if [ ${#RUNNER_MISSING[@]} -gt 0 ]; then
+              echo "::error::Runner secrets required (enable_github_runners=true): ${RUNNER_MISSING[*]}"
+              exit 1
+            fi
+            echo "✅ All runner secrets are configured"
+          else
+            echo "ℹ️ Runners disabled — skipping runner secret validation"
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
@@ -166,6 +187,9 @@ jobs:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
           TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+          TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
         run: |
           set -o pipefail
           echo "📋 Planning Terraform changes..."
@@ -224,6 +248,9 @@ jobs:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
           TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+          TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
         run: |
           echo "🚀 Applying Terraform changes..."
 

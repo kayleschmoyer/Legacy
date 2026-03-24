@@ -13,6 +13,9 @@ build/
 # Sensitive files
 terraform.tfvars
 secrets.auto.tfvars
+
+# Non-sensitive runner config — checked in for CI reproducibility (LS-1665)
+!runners.auto.tfvars
 *.pem
 *.key
 
