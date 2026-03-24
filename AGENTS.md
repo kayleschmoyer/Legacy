@@ -19,7 +19,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 - **Prefer `.graphql` + codegen over inline `gql`** — for new code in `apps/web` and `lib/shared-components`, define queries in `.graphql` files and import generated hooks from `graphql.generated.ts`. Legacy inline `gql` usage exists in the codebase and generated files necessarily contain `gql` strings.
 - **Never manually remove worktrees**: always `twig worktree clean` — never `git worktree remove` or manual deletion (destroys junctions).
 - **Kill background servers when done** — stop all `isBackground=true` processes before workflow ends. Run `make kill-stale` to find stale node processes holding addon locks. Call `browser_cleanup` to close any Playwright browsers and dev servers started by the browser MCP server.
-- **Jira — auth-aware routing**: call `jira_auth_status` at the start of any Jira workflow. If `configured: true`, use `jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent` for all Jira operations. If `configured: false`, fall back to Claude's built-in Atlassian tools (`mcp__claude_ai_Atlassian__*`). Last resort: `acli` CLI — never direct HTTP.
+- **Jira — auth-aware routing**: call `jira_auth_status` at the start of any Jira workflow. If `configured: true`, use `jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`, `jira_set_parent` for all Jira operations. If `configured: false` (or API calls fail), use Claude's native Atlassian plugin (`mcp__claude_ai_Atlassian__*`) — this is the **preferred** option on Claude Code on the web as it requires no credentials. Use cloud ID `fb294606-6c8f-4b52-9a41-11fe45b77528` (site: `bkrupa.atlassian.net`). Last resort: `acli` CLI — never direct HTTP.
 - **Resolve PR review threads**: after fixing review comments, resolve each thread via GraphQL `resolveReviewThread` mutation. See `skills/pr-lifecycle/SKILL.md`.
 
 ## Workflow
@@ -132,20 +132,21 @@ Detailed how-to docs live in `.agents/skills/<name>/SKILL.md`. The `description`
 
 ## MCP Servers
 
-| Server                  | Purpose                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-db`      | Database queries, migrations, schema generation                                                               |
-| `legacy-sports-jira`    | Ticket CRUD, transitions, blocker checks                                                                      |
-| `legacy-sports-ci`      | CI log queries, workflow reruns                                                                               |
-| `legacy-sports-github`  | PR and review lifecycle (GitHub REST/GraphQL API)                                                             |
-| `legacy-sports-nx`      | Nx project discovery, affected analysis, target execution                                                     |
-| `legacy-sports-make`    | Makefile targets: validation, build, install, worktree setup                                                  |
-| `worktree`              | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                     |
-| `legacy-sports-aws`     | CloudWatch log tailing, AWS SSO status checks                                                                 |
-| `claude_ai_Stripe`      | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`) |
-| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload                                               |
+| Server                  | Purpose                                                                                                                                                                                         |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-db`      | Database queries, migrations, schema generation                                                                                                                                                 |
+| `legacy-sports-jira`    | Ticket CRUD, transitions, blocker checks                                                                                                                                                        |
+| `legacy-sports-ci`      | CI log queries, workflow reruns                                                                                                                                                                 |
+| `legacy-sports-github`  | PR and review lifecycle (GitHub REST/GraphQL API)                                                                                                                                               |
+| `legacy-sports-nx`      | Nx project discovery, affected analysis, target execution                                                                                                                                       |
+| `legacy-sports-make`    | Makefile targets: validation, build, install, worktree setup                                                                                                                                    |
+| `worktree`              | Worktree lifecycle: list, set active, run, guard, rebase, stabilize, push                                                                                                                       |
+| `legacy-sports-aws`     | CloudWatch log tailing, AWS SSO status checks                                                                                                                                                   |
+| `claude_ai_Stripe`      | Claude Code built-in Stripe integration (Claude Code only; not configured via this repo's `.vscode/mcp.json`)                                                                                   |
+| `claude_ai_Atlassian`   | Claude Code built-in Atlassian plugin — Jira + Confluence via OAuth 2.1 (no credentials needed). Cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`. Preferred for Jira on Claude Code on the web |
+| `legacy-sports-browser` | Dev server lifecycle, headless screenshots, GitHub image upload                                                                                                                                 |
 
-Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`, use our custom tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false`, fall back to Claude's built-in Atlassian tools (`mcp__claude_ai_Atlassian__*`). Last resort: `acli` CLI — never direct HTTP.
+Call `jira_auth_status` at the start of any Jira workflow. If `configured: true` and API calls succeed, use our custom tools (`jira_view`, `jira_create_ticket`, `jira_transition`, `jira_check_blockers`). If `configured: false` or API calls fail, use Claude's native Atlassian plugin (`mcp__claude_ai_Atlassian__*`) with cloud ID `fb294606-6c8f-4b52-9a41-11fe45b77528`. The native plugin uses OAuth 2.1 via the [Atlassian Plugin](https://claude.com/plugins/atlassian) and requires no credential configuration on Claude Code on the web. Last resort: `acli` CLI — never direct HTTP.
 
 > **MCP-first principle**: the shell commands shown elsewhere in this document (Workflow, Commands sections) are **fallbacks** for when MCP servers are unavailable. When MCP tools are available, always prefer them over the equivalent shell commands listed below.
 
@@ -182,7 +183,7 @@ Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`
 **Claude built-in integrations**: Claude Code provides native integrations that work without local credentials. Use these when working on related code:
 
 - **Stripe** (`mcp__claude_ai_Stripe__*`): Full Stripe API access — create/list customers, products, prices, invoices, subscriptions, payment links, refunds, coupons, and disputes. Use when working on `lambdas/stripe-webhook`, `lambdas/apple-iap`, or any billing/payment code. Search Stripe docs with `search_stripe_documentation`.
-- **Atlassian** (`mcp__claude_ai_Atlassian__*`): Jira + Confluence access — used as fallback when local Jira credentials are unavailable (see Jira MCP server prerequisites: `JIRA_EMAIL`/`JIRA_API_TOKEN` and troubleshooting docs in this repo).
+- **Atlassian** (`mcp__claude_ai_Atlassian__*`): Full Jira + Confluence access via the [Atlassian Plugin](https://claude.com/plugins/atlassian) (OAuth 2.1, no credentials needed). Site: `bkrupa.atlassian.net`, cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`. Provides JQL search, issue CRUD, transitions, comments, worklogs, and Confluence page management. **Preferred** on Claude Code on the web; use as fallback when the custom `legacy-sports-jira` MCP server is unavailable or its API calls fail. Tools require the `cloudId` parameter — always pass the cloud ID above.
 
 **Browser operations — MCP first**: use `browser_dev_start` to start a dev server, `browser_navigate` + `browser_screenshot` to capture UI state, and `browser_screenshot_upload` to get GitHub-hosted image URLs for PR bodies. Always call `browser_cleanup` before ending a workflow. See `.agents/skills/pr-lifecycle/references/agent-screenshots.md` for the full workflow.
 
@@ -245,7 +246,20 @@ The `legacy-sports-jira` MCP server supports two authentication methods (resolve
 1. **OAuth 2.0 service account** (preferred): `JIRA_CLIENT_ID` + `JIRA_CLIENT_SECRET` + `JIRA_CLOUD_ID` env vars. Optionally set `JIRA_SITE_URL` (defaults to `https://bkrupa.atlassian.net`). Uses `client_credentials` grant with token caching (~60 min). Required OAuth scopes: `read:jira-work`, `write:jira-work` (Jira platform only — Jira Software/Agile scopes are not needed). See `tools/mcp/README.md` for details.
 2. **Basic Auth** (legacy): `JIRA_EMAIL` + `JIRA_API_TOKEN` env vars or `~/.netrc` entry.
 
-On **Claude Code on the web**, Claude's native Atlassian tools (`mcp__claude_ai_Atlassian__*`) are available without any credential configuration and are the preferred option. The existing Jira auth-aware routing rule applies: call `jira_auth_status` first — if `configured: false`, use `mcp__claude_ai_Atlassian__*` tools. On **Copilot Coding Agent**, native Claude integrations are not available, so Jira credentials must be configured as repository secrets.
+On **Claude Code on the web**, Claude's native Atlassian plugin (`mcp__claude_ai_Atlassian__*`) is available without any credential configuration and is the **preferred** option. It connects to `bkrupa.atlassian.net` (cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`) via OAuth 2.1 with `read:jira-work` + `write:jira-work` scopes. The auth-aware routing rule applies: call `jira_auth_status` first — if `configured: false` or API calls fail, use the native plugin tools (pass `cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528"` to all calls). On **Copilot Coding Agent**, native Claude integrations are not available, so Jira credentials must be configured as repository secrets.
+
+**Jira tool mapping** (native Atlassian plugin equivalents):
+
+| Custom MCP tool      | Native plugin equivalent                                             |
+| -------------------- | -------------------------------------------------------------------- |
+| `jira_view`          | `getJiraIssue`                                                       |
+| `jira_search`        | `searchJiraIssuesUsingJql`                                           |
+| `jira_create_ticket` | `createJiraIssue`                                                    |
+| `jira_edit_ticket`   | `editJiraIssue`                                                      |
+| `jira_transition`    | `transitionJiraIssue` (call `getTransitionsForJiraIssue` first)      |
+| `jira_get_comments`  | No direct equivalent — use `getJiraIssue` with `comment` field       |
+| `jira_link_issues`   | No native equivalent (use custom `legacy-sports-jira` MCP or `acli`) |
+| `jira_list_children` | `searchJiraIssuesUsingJql` with `parent = LS-####`                   |
 
 **Available MCP servers in cloud:**
 
