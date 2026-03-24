@@ -40,12 +40,29 @@ See `.agents/skills/debugging/SKILL.md` and `.agents/skills/infrastructure/SKILL
 
 Wraps Jira operations with guardrails using the Jira REST API (with env var / netrc credential support):
 
-- **jira_create_ticket** — Create tickets via REST API
+- **jira_create_ticket** — Create tickets via REST API (supports `sprint: "current"`)
+- **jira_edit_ticket** — Update ticket fields including sprint assignment
+- **jira_delete_ticket** — Close tickets by transitioning to "Won't Do" with a comment
 - **jira_transition** — Transition ticket status with validation
 - **jira_view** — Structured ticket details (summary, status, type, priority, description, assignee, reporter, labels, timestamps, blockers)
 - **jira_check_blockers** — Automates the 3-way dependency check
 - **jira_set_parent** — Set parent epic via Jira REST API
 - **jira_get_comments** — Fetch all comments on a ticket with author and plain-text body
+
+#### OAuth 2.0 Setup
+
+The server supports OAuth 2.0 service account authentication (`client_credentials` grant). When creating an OAuth credential in the [Atlassian Developer Console](https://developer.atlassian.com/console/myapps):
+
+**Required scopes** (only Jira platform scopes — Jira Software/Agile scopes are NOT needed):
+
+| Scope             | Purpose                                                     |
+| ----------------- | ----------------------------------------------------------- |
+| `read:jira-work`  | Read issues, search via JQL, fetch transitions and comments |
+| `write:jira-work` | Create/update/transition issues, add comments, link issues  |
+
+> **Note:** The server intentionally avoids the Jira Agile REST API (`/rest/agile/1.0/...`) because it requires Jira Software scopes (`read:board-scope:jira-software`, `read:sprint:jira-software`, `write:sprint:jira-software`) which are unavailable on the Atlassian Free plan. Sprint discovery uses JQL `openSprints()` and sprint assignment uses the `customfield_10020` field via the platform API instead.
+
+> **Note:** The server does not use the `DELETE /rest/api/3/issue` endpoint because the User role lacks delete permission. The `jira_delete_ticket` tool transitions tickets to "Won't Do" with a comment instead.
 
 See AGENTS.md for Jira auth-aware routing and MCP-first usage patterns.
 
@@ -150,14 +167,14 @@ See `.agents/skills/pr-lifecycle/references/agent-screenshots.md` for the end-to
 
 Some servers depend on infrastructure that is unavailable in the GitHub Copilot cloud agent environment. Use this table when deciding which servers you can call:
 
-| Server ID               | Local (Windows dev) | Cloud agent (Copilot) | Notes                                                                                                                                     |
-| ----------------------- | :-----------------: | :-------------------: | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-ci`      |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                    |
-| `legacy-sports-db`      |         ✅          |          ✅           | Cloud uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`                                                                  |
-| `legacy-sports-jira`    |         ✅          |  ✅ (needs secrets)   | Requires `JIRA_EMAIL` + `JIRA_API_TOKEN` env vars / GitHub secrets                                                                        |
-| `legacy-sports-github`  |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                    |
-| `legacy-sports-nx`      |         ✅          |          ✅           | Uses `pnpm exec nx`; available after `pnpm install`                                                                                       |
-| `worktree`              |         ✅          |          ❌           | Cloud agents work directly in a branch checkout — no worktrees needed                                                                     |
-| `legacy-sports-make`    |         ✅          |          ✅           | Uses `make` CLI; worktree-create/wt-setup are Windows-only                                                                                |
-| `legacy-sports-aws`     |         ✅          |          ❌           | No AWS SSO or OIDC credentials in cloud; no CloudWatch access — use GitHub Actions/CI logs via `legacy-sports-ci` (`ci_get_logs`) instead |
-| `legacy-sports-browser` |         ✅          |          ✅           | Requires Playwright browsers installed; cloud needs `npx playwright install chromium` in setup steps                                      |
+| Server ID               | Local (Windows dev) | Cloud agent (Copilot) | Notes                                                                                                                                                      |
+| ----------------------- | :-----------------: | :-------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-ci`      |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                                     |
+| `legacy-sports-db`      |         ✅          |          ✅           | Cloud uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`                                                                                   |
+| `legacy-sports-jira`    |         ✅          |  ✅ (needs secrets)   | OAuth 2.0: `JIRA_CLIENT_ID` + `JIRA_CLIENT_SECRET` + `JIRA_CLOUD_ID`. Legacy: `JIRA_EMAIL` + `JIRA_API_TOKEN`. Scopes: `read:jira-work`, `write:jira-work` |
+| `legacy-sports-github`  |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                                     |
+| `legacy-sports-nx`      |         ✅          |          ✅           | Uses `pnpm exec nx`; available after `pnpm install`                                                                                                        |
+| `worktree`              |         ✅          |          ❌           | Cloud agents work directly in a branch checkout — no worktrees needed                                                                                      |
+| `legacy-sports-make`    |         ✅          |          ✅           | Uses `make` CLI; worktree-create/wt-setup are Windows-only                                                                                                 |
+| `legacy-sports-aws`     |         ✅          |          ❌           | No AWS SSO or OIDC credentials in cloud; no CloudWatch access — use GitHub Actions/CI logs via `legacy-sports-ci` (`ci_get_logs`) instead                  |
+| `legacy-sports-browser` |         ✅          |          ✅           | Requires Playwright browsers installed; cloud needs `npx playwright install chromium` in setup steps                                                       |

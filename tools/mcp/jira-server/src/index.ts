@@ -113,6 +113,11 @@ server.tool(
       .enum(['Task', 'Bug', 'Story'])
       .optional()
       .describe('Change issue type'),
+    sprint: z
+      .string()
+      .regex(/^(?:current|\d+)$/)
+      .optional()
+      .describe('"current" for active sprint, or numeric sprint ID'),
   },
   async (params) => editTicket(params),
 );
@@ -255,13 +260,17 @@ server.tool(
 // --- jira_delete_ticket ---
 server.tool(
   'jira_delete_ticket',
-  'Delete a Jira ticket. Use with caution — this is irreversible.',
+  'Close a Jira ticket by transitioning to "Won\'t Do" (or "Done") with a comment. Use when a ticket is a duplicate or no longer needed.',
   {
-    key: z.string().describe('Jira ticket key to delete, e.g. LS-1528'),
+    key: z.string().describe('Jira ticket key to close, e.g. LS-1528'),
     confirm: z
       .literal(true)
+      .describe('Must be set to true to confirm closure.'),
+    reason: z
+      .string()
+      .optional()
       .describe(
-        'Must be set to true to confirm deletion. This operation is irreversible.',
+        'Reason for closing. Defaults to "Closed via automation — duplicate or no longer needed."',
       ),
   },
   async (params) => deleteTicket(params),

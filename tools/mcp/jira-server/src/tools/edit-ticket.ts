@@ -1,4 +1,5 @@
 import { jiraRequest } from '../jira-api.js';
+import { getActiveSprintId } from './get-active-sprint.js';
 import type { ToolResult } from '../types.js';
 
 interface EditTicketParams {
@@ -6,6 +7,7 @@ interface EditTicketParams {
   summary?: string;
   description?: string;
   type?: string;
+  sprint?: string;
 }
 
 /**
@@ -14,7 +16,7 @@ interface EditTicketParams {
 export async function editTicket(
   params: EditTicketParams,
 ): Promise<ToolResult> {
-  const { key, summary, description, type } = params;
+  const { key, summary, description, type, sprint } = params;
 
   const fields: Record<string, unknown> = {};
   const updatedFields: string[] = [];
@@ -42,6 +44,48 @@ export async function editTicket(
     fields.issuetype = { name: type };
     updatedFields.push('type');
   }
+  if (sprint !== undefined) {
+    let sprintId: number | null = null;
+    if (sprint === 'current') {
+      sprintId = await getActiveSprintId();
+      if (!sprintId) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                error: 'No active sprint found.',
+              }),
+            },
+          ],
+        };
+      }
+    } else {
+      sprintId = parseInt(sprint, 10);
+      if (
+        !Number.isInteger(sprintId) ||
+        sprintId <= 0 ||
+        sprintId.toString() !== sprint
+      ) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                error: `Invalid sprint value "${sprint}". Use "current" or a positive integer sprint ID.`,
+              }),
+            },
+          ],
+        };
+      }
+    }
+    fields.customfield_10020 = sprintId;
+    updatedFields.push('sprint');
+  }
 
   if (updatedFields.length === 0) {
     return {
@@ -52,7 +96,7 @@ export async function editTicket(
           text: JSON.stringify({
             success: false,
             error:
-              'At least one field must be provided (summary, description, or type)',
+              'At least one field must be provided (summary, description, type, or sprint)',
           }),
         },
       ],

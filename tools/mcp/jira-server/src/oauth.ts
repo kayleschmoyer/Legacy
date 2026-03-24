@@ -42,6 +42,7 @@ async function requestAccessToken(
       grant_type: 'client_credentials',
       client_id: clientId,
       client_secret: clientSecret,
+      scope: 'read:jira-work write:jira-work',
     }),
   });
 

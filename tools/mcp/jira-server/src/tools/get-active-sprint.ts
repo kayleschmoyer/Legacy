@@ -1,54 +1,63 @@
-import { jiraRequest } from '../jira-api.js';
+import { searchJql } from '../jql-search.js';
 
-interface Sprint {
+/**
+ * Sprint field value shape returned by Jira's REST API v3.
+ * The `sprint` field (customfield_10020) returns an array of sprint objects.
+ */
+interface SprintFieldValue {
   id: number;
   name: string;
   state: string;
 }
 
-interface BoardSprintsResponse {
-  values: Sprint[];
-}
-
-interface BoardSearchResponse {
-  values: Array<{ id: number; name: string }>;
+interface SprintSearchFields {
+  /** The API may return a single object or an array of sprint objects. */
+  sprint: SprintFieldValue | SprintFieldValue[] | null;
+  /** Some Jira instances return sprint in customfield_10020 instead. */
+  customfield_10020?: SprintFieldValue[] | null;
 }
 
 /**
- * Find the active sprint for the LS project board.
+ * Find the active sprint for the LS project using the platform API (JQL search).
  *
- * Discovery order:
- * 1. Search for boards belonging to the LS project (any type)
- * 2. Query the first board's sprints filtered to state=active
- * 3. Return the first (and typically only) active sprint ID
+ * Strategy: search for any LS issue currently in an active sprint, then extract
+ * the sprint ID from its sprint field. This avoids the Agile REST API which
+ * requires Jira Software OAuth scopes that may not be available.
  *
  * Returns `null` if no active sprint is found.
  */
 export async function getActiveSprintId(): Promise<number | null> {
-  // Find the LS project board — omit type filter so team-managed ("simple")
-  // boards are included alongside scrum boards.
-  const boards = await jiraRequest<BoardSearchResponse>({
-    method: 'GET',
-    path: '/rest/agile/1.0/board',
-    query: { projectKeyOrId: 'LS' },
+  const result = await searchJql<SprintSearchFields>({
+    jql: 'project = LS AND sprint in openSprints() ORDER BY created DESC',
+    fields: ['sprint', 'customfield_10020'],
+    maxResults: 1,
   });
 
-  if (!boards.values.length) {
+  if (!result.issues.length) {
     return null;
   }
 
-  const boardId = boards.values[0].id;
+  const fields = result.issues[0].fields;
 
-  // Get the active sprint on that board
-  const sprints = await jiraRequest<BoardSprintsResponse>({
-    method: 'GET',
-    path: `/rest/agile/1.0/board/${boardId}/sprint`,
-    query: { state: 'active' },
-  });
-
-  if (!sprints.values.length) {
-    return null;
+  // Try the `sprint` field first, then fall back to customfield_10020.
+  // The API may return a single object or an array — normalise to array.
+  if (fields.sprint) {
+    const sprintArr = Array.isArray(fields.sprint)
+      ? fields.sprint
+      : [fields.sprint];
+    const active = sprintArr.find((s) => s.state === 'active');
+    if (active) {
+      return active.id;
+    }
   }
 
-  return sprints.values[0].id;
+  const sprints = fields.customfield_10020;
+  if (sprints?.length) {
+    const active = sprints.find((s) => s.state === 'active');
+    if (active) {
+      return active.id;
+    }
+  }
+
+  return null;
 }

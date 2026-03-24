@@ -96,15 +96,16 @@ export async function createTicket(
       body: { fields },
     });
 
-    // Assign to sprint post-creation via the Agile API — the Create Issue
-    // REST endpoint does not support the sprint field directly.
+    // Assign to sprint post-creation via the platform API — set the sprint
+    // custom field (customfield_10020) on the issue. This avoids the Agile
+    // REST API which requires Jira Software OAuth scopes.
     let sprintWarning: string | undefined;
     if (sprintId) {
       try {
         await jiraRequest({
-          method: 'POST',
-          path: `/rest/agile/1.0/sprint/${sprintId}/issue`,
-          body: { issues: [result.key] },
+          method: 'PUT',
+          path: `/rest/api/3/issue/${result.key}`,
+          body: { fields: { customfield_10020: sprintId } },
         });
       } catch (sprintError) {
         const sprintMessage =
