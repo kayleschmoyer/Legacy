@@ -103,5 +103,99 @@ module "github_runners" {
     echo "Using pre-baked Ubuntu AMI - Node.js, pnpm, Playwright already installed"
   EOT
 
+  # ── IAM hardening (LS-1653) ────────────────────────────────────────────────
+  # Permissions boundary prevents the runner role from exceeding least-privilege,
+  # regardless of what the module's default policy grants.
+  role_permissions_boundary = var.enable_github_runners ? aws_iam_policy.runner_permissions_boundary[0].arn : null
+
+  tags = local.common_tags
+}
+
+# =============================================================================
+# Runner IAM Permissions Boundary (LS-1653)
+# =============================================================================
+# Limits what the runner EC2 instances can do, even if the module grants broader
+# permissions. Runners only need:
+#   - SSM core (for module health checks and debugging via Session Manager)
+#   - CloudWatch Logs (for future log shipping — LS-1667)
+#   - S3 read (for runner binary bucket managed by the module)
+#   - EC2 Describe (e.g. DescribeInstances, DescribeTags) for runner lifecycle
+#     and tagging logic used by the module (read-only, no EC2 mutations)
+#   - EC2 instance metadata (retrieved via IMDS; does not require IAM)
+#
+# Runners do NOT run AWS CLI commands for deployments — that's handled by the
+# GitHub Actions OIDC role (github-actions-oidc.tf). This boundary ensures a
+# compromised runner cannot escalate to infrastructure-level operations.
+# =============================================================================
+resource "aws_iam_policy" "runner_permissions_boundary" {
+  count       = var.enable_github_runners ? 1 : 0
+  name        = "${local.name_prefix}-runner-permissions-boundary"
+  description = "Permissions boundary for self-hosted GitHub Actions runner instances"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # SSM core — required by the module for instance registration and health
+      {
+        Sid    = "SSMCore"
+        Effect = "Allow"
+        Action = [
+          "ssm:UpdateInstanceInformation",
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel",
+          "ec2messages:AcknowledgeMessage",
+          "ec2messages:DeleteMessage",
+          "ec2messages:FailMessage",
+          "ec2messages:GetEndpoint",
+          "ec2messages:GetMessages",
+          "ec2messages:SendReply"
+        ]
+        Resource = "*"
+      },
+      # CloudWatch Logs — for runner log shipping (LS-1667)
+      {
+        Sid    = "CloudWatchLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/github-runners/*:*"
+        ]
+      },
+      # S3 read — runner binary bucket (managed by the module)
+      {
+        Sid    = "S3RunnerBinaries"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::${local.name_prefix}-runner-*",
+          "arn:aws:s3:::${local.name_prefix}-runner-*/*"
+        ]
+      },
+      # EC2 describe — needed for instance metadata and spot interruption checks
+      {
+        Sid    = "EC2Describe"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeTags"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
   tags = local.common_tags
 }
