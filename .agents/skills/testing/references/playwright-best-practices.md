@@ -134,34 +134,21 @@ export class ExamplePage {
 - Use `expect` inside helper methods only for preconditions (e.g., `expectLoaded`)
 - Name the file `<domain>.page.ts`
 
-## Snapshot Testing
+## Snapshot Testing (Deprecated)
 
-### Visual snapshots
+Visual snapshot tests tagged `@visual` still exist in `apps/web-e2e/src/tests/` but are being phased out. No dedicated CI workflow or Nx target exists for updating baselines. Until these tests and their baselines are fully removed:
 
-```typescript
-import { SnapshotUtils } from '../support/snapshot-utils';
+- **Run `@visual` tests locally:**
+  ```powershell
+  pnpm exec nx e2e web-e2e -- --grep='@visual'
+  ```
+- **Update snapshot baselines** (when a legitimate UI change causes a diff):
+  ```powershell
+  pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts --update-snapshots --grep='@visual'
+  ```
+- **Do not add new `@visual` snapshot tests.** New visual assertions should use standard `toBeVisible()` / `toHaveScreenshot()` expectations without baseline files.
 
-test('page matches snapshot @visual', async ({ page }) => {
-  await page.goto('/about');
-  await SnapshotUtils.preparePage(page);
-  await expect(page).toHaveScreenshot('about-page.png', {
-    maxDiffPixelRatio: 0.01,
-  });
-});
-```
-
-### Responsive snapshots
-
-```typescript
-await SnapshotUtils.captureResponsiveSnapshots(page, 'feature-name');
-// Captures at mobile (375×667), tablet (768×1024), desktop (1920×1080)
-```
-
-### Update snapshots
-
-```powershell
-pnpm exec nx e2e:update-snapshots web-e2e
-```
+> **Tracking:** Snapshot spec removal is tracked under the LS-1779 ticket. Once all `@visual` specs are deleted, remove this section.
 
 ## Tamagui / Custom Component Pitfalls
 

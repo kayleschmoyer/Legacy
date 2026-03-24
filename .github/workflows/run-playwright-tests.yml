@@ -90,11 +90,6 @@ on:
           - "2"
           - "3"
           - "4"
-      update-snapshots:
-        description: "Update visual snapshots instead of comparing"
-        required: false
-        default: false
-        type: boolean
       headed:
         description: "Run in headed mode (useful for debugging via trace)"
         required: false
@@ -261,11 +256,6 @@ jobs:
           # Workers and retries
           PLAYWRIGHT_ARGS+=( "--workers=${{ inputs.workers }}" )
           PLAYWRIGHT_ARGS+=( "--retries=${{ inputs.retries }}" )
-
-          # Snapshot update
-          if [ "${{ inputs.update-snapshots }}" == "true" ]; then
-            PLAYWRIGHT_ARGS+=( "--update-snapshots" )
-          fi
 
           # Headed mode
           if [ "${{ inputs.headed }}" == "true" ]; then

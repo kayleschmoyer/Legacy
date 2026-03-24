@@ -45,20 +45,6 @@
         "cwd": "{projectRoot}"
       }
     },
-    "e2e:update-snapshots": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "playwright test --update-snapshots",
-        "cwd": "{projectRoot}"
-      }
-    },
-    "e2e:snapshots": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "playwright test --grep='snapshot|visual|html'",
-        "cwd": "{projectRoot}"
-      }
-    },
     "test": {
       "executor": "nx:run-commands",
       "options": {

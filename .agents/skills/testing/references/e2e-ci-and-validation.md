@@ -4,16 +4,19 @@
 
 ## Nx Targets
 
-| Target                 | Command                                           |
-| ---------------------- | ------------------------------------------------- |
-| `e2e`                  | Run all Playwright tests                          |
-| `e2e:ui`               | Interactive UI mode (pick & debug tests visually) |
-| `e2e:headed`           | Run with visible browser                          |
-| `e2e:debug`            | Run with Playwright Inspector                     |
-| `e2e:update-snapshots` | Refresh all snapshot baselines                    |
-| `e2e:snapshots`        | Run only snapshot/visual tests                    |
-| `typecheck`            | TypeScript check (no emit)                        |
-| `lint`                 | ESLint                                            |
+| Target       | Command                                           |
+| ------------ | ------------------------------------------------- |
+| `e2e`        | Run all Playwright tests                          |
+| `e2e:ui`     | Interactive UI mode (pick & debug tests visually) |
+| `e2e:headed` | Run with visible browser                          |
+| `e2e:debug`  | Run with Playwright Inspector                     |
+| `typecheck`  | TypeScript check (no emit)                        |
+| `lint`       | ESLint                                            |
+
+> **`@visual` snapshot tests** still exist but have no dedicated Nx target. Run them with
+> `pnpm exec nx e2e web-e2e -- --grep='@visual'` and update baselines with
+> `pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts --update-snapshots --grep='@visual'`.
+> These tests are deprecated and tracked for removal under LS-1779.
 
 ### Run commands
 
