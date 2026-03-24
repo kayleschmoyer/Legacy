@@ -686,6 +686,26 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         required: ['command'],
       },
     },
+    {
+      name: 'worktree_clean',
+      description:
+        'Remove a worktree safely (junction-aware). Uses `twig worktree remove` to avoid ' +
+        'destroying shared junctions. Clears active worktree if it was the one removed.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description: 'Ticket key (default: active)',
+          },
+          prune: {
+            type: 'boolean',
+            description:
+              'Also run `twig worktree clean` to prune stale references (default: true)',
+          },
+        },
+      },
+    },
   ],
 }));
 
@@ -3254,6 +3274,136 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
         isError: failed > 0,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_clean
+    // -----------------------------------------------------------------------
+    case 'worktree_clean': {
+      const { worktree: wtKey, prune = true } = args as {
+        worktree?: string;
+        prune?: boolean;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const targetPath = target.path;
+
+      // Find the branch name for this worktree
+      const worktrees = getWorktrees();
+      const wt = worktrees.find((w) => {
+        const a = resolve(w.path);
+        const b = resolve(targetPath);
+        return process.platform === 'win32'
+          ? a.toLowerCase() === b.toLowerCase()
+          : a === b;
+      });
+      if (!wt?.branch) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Cannot determine branch for worktree at ${targetPath}. HEAD may be detached (e.g. during a rebase). Resolve or abort the rebase and ensure HEAD is attached to a branch, then retry.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const branch = wt.branch;
+      const results: string[] = [];
+
+      // Use twig worktree remove for junction-safe removal
+      try {
+        const removeOutput = execFileSync(
+          'twig',
+          ['worktree', 'remove', '--', branch],
+          {
+            cwd: MAIN_REPO,
+            encoding: 'utf-8',
+            timeout: 30_000,
+            maxBuffer: 10 * 1024 * 1024,
+          },
+        );
+        results.push(`Removed worktree: ${branch}`);
+        if (removeOutput.trim()) {
+          results.push(removeOutput.trim());
+        }
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? (err as { stderr?: string }).stderr || err.message
+            : String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: false,
+                  branch,
+                  path: targetPath,
+                  error: `twig worktree remove failed: ${msg.trim()}`,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Clear active worktree if it was the one removed
+      if (activeWorktree && resolve(activeWorktree) === resolve(targetPath)) {
+        activeWorktree = null;
+        results.push('Cleared active worktree.');
+      }
+
+      // Optionally prune stale references
+      if (prune) {
+        try {
+          execFileSync('twig', ['worktree', 'clean'], {
+            cwd: MAIN_REPO,
+            encoding: 'utf-8',
+            timeout: 15_000,
+            maxBuffer: 10 * 1024 * 1024,
+          });
+          results.push('Pruned stale worktree references.');
+        } catch (pruneErr) {
+          const pruneMsg =
+            pruneErr instanceof Error
+              ? (pruneErr as { stderr?: string }).stderr || pruneErr.message
+              : String(pruneErr);
+          results.push(
+            `Warning: twig worktree clean failed (non-fatal). Error: ${pruneMsg.trim()}`,
+          );
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                success: true,
+                branch,
+                path: targetPath,
+                details: results,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
       };
     }
 
