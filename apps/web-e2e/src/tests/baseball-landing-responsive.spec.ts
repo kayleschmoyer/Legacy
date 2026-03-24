@@ -1,6 +1,6 @@
 import { expect, test } from '../fixtures/auth-enhanced';
 
-test.describe('Baseball Landing Page - Responsive @visual', () => {
+test.describe('Baseball Landing Page - Responsive @regression', () => {
   test('loads /baseball and renders key content', async ({ page }) => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
