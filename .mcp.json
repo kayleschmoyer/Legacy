@@ -13,12 +13,12 @@
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/jira-server/src/index.ts"],
       "env": {
-        "JIRA_CLIENT_ID": "${JIRA_CLIENT_ID}",
-        "JIRA_CLIENT_SECRET": "${JIRA_CLIENT_SECRET}",
-        "JIRA_CLOUD_ID": "${JIRA_CLOUD_ID}",
-        "JIRA_SITE_URL": "${JIRA_SITE_URL}",
-        "JIRA_EMAIL": "${JIRA_EMAIL}",
-        "JIRA_API_TOKEN": "${JIRA_API_TOKEN}"
+        "JIRA_CLIENT_ID": "${JIRA_CLIENT_ID:-}",
+        "JIRA_CLIENT_SECRET": "${JIRA_CLIENT_SECRET:-}",
+        "JIRA_CLOUD_ID": "${JIRA_CLOUD_ID:-}",
+        "JIRA_SITE_URL": "${JIRA_SITE_URL:-}",
+        "JIRA_EMAIL": "${JIRA_EMAIL:-}",
+        "JIRA_API_TOKEN": "${JIRA_API_TOKEN:-}"
       }
     },
     "worktree": {
@@ -33,8 +33,8 @@
       "command": "pnpm",
       "args": ["exec", "tsx", "tools/mcp/github-server/src/index.ts"],
       "env": {
-        "GH_TOKEN": "${GH_TOKEN}",
-        "AGENT_AUTHOR_APP_PRIVATE_KEY": "${AGENT_AUTHOR_APP_PRIVATE_KEY}"
+        "GH_TOKEN": "${GH_TOKEN:-}",
+        "AGENT_AUTHOR_APP_PRIVATE_KEY": "${AGENT_AUTHOR_APP_PRIVATE_KEY:-}"
       }
     },
     "legacy-sports-nx": {
