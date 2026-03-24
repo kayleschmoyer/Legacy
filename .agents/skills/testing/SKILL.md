@@ -59,10 +59,10 @@ make pc
 
 1. **Always run new/modified tests before committing** -- never push untested test code. For bulk test writing (>5 files), run tests per-file as you write rather than batching at the end.
 2. **Hermetic E2E -- no `route.continue()`** -- there is no backend in CI. Use `route.fulfill()` for explicit responses and `route.fallback()` to cascade to baseline mocks.
-3. **Assert behavior, not existence** -- use web-first assertions (`await expect(locator).toBeVisible()`) over manual checks.
+3. **Assert behavior, not pixels** -- use web-first assertions (`await expect(locator).toBeVisible()`) over manual checks. Never use `toHaveScreenshot()` or `toMatchSnapshot()` in E2E tests -- visual regression belongs in Storybook/Chromatic.
 4. **Never use `waitForTimeout()`** -- use condition-based waits. Never use `waitForLoadState('networkidle')` -- wait for specific elements.
 5. **No `@ts-ignore` or `eslint-disable`** in tests -- fix root causes.
-6. **Tag test suites** (`@critical`, `@smoke`, `@regression`, `@visual`, `@slow`) for CI filtering. See [references/test-tagging-guide.md](references/test-tagging-guide.md).
+6. **Tag test suites** (`@critical`, `@smoke`, `@regression`, `@slow`) for CI filtering. `@visual` is deprecated. See [references/test-tagging-guide.md](references/test-tagging-guide.md).
 7. **Selector sync rule** -- when a PR changes login/landing page UI, update E2E selectors in the same PR.
 8. **Kill background servers when done** -- stale processes hold native `.node` addons. Use `make kill-stale`.
 

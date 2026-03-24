@@ -40,7 +40,7 @@ await page.waitForLoadState('networkidle');
 // ✅ CORRECT: wait for a specific element
 await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
-// ✅ OK when you just need DOM ready (e.g., before a snapshot)
+// ✅ OK when you just need DOM ready (e.g., before asserting on content)
 await page.waitForLoadState('domcontentloaded');
 ```
 
@@ -134,21 +134,38 @@ export class ExamplePage {
 - Use `expect` inside helper methods only for preconditions (e.g., `expectLoaded`)
 - Name the file `<domain>.page.ts`
 
-## Snapshot Testing (Deprecated)
+## Assert Behavior, Not Pixels
 
-Visual snapshot tests tagged `@visual` still exist in `apps/web-e2e/src/tests/` but are being phased out. No dedicated CI workflow or Nx target exists for updating baselines. Until these tests and their baselines are fully removed:
+E2E tests must use **behavioral assertions** — never `toHaveScreenshot()` or `toMatchSnapshot()`. Visual regression testing belongs in component isolation (Storybook/Chromatic).
 
-- **Run `@visual` tests locally:**
-  ```powershell
-  pnpm exec nx e2e web-e2e -- --grep='@visual'
-  ```
-- **Update snapshot baselines** (when a legitimate UI change causes a diff):
-  ```powershell
-  pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts --update-snapshots --grep='@visual'
-  ```
-- **Do not add new `@visual` snapshot tests.** New visual assertions should use standard `toBeVisible()` / `toHaveScreenshot()` expectations without baseline files.
+```typescript
+// ❌ WRONG: visual snapshot
+await expect(page).toHaveScreenshot('search-results.png');
 
-> **Tracking:** Snapshot spec removal is tracked under the LS-1779 ticket. Once all `@visual` specs are deleted, remove this section.
+// ✅ CORRECT: behavioral assertion
+await expect(page.getByTestId('search-results')).toBeVisible();
+await expect(page.getByText('3 results found')).toBeVisible();
+
+// ✅ Verify state changes via attributes/text, not screenshots
+const battingTab = page.getByRole('tab', { name: /batting/i });
+await battingTab.click();
+await expect(battingTab).toHaveAttribute('data-state', 'active');
+
+// ✅ Verify responsive layout via element visibility
+await page.setViewportSize({ width: 375, height: 667 });
+await expect(page.getByRole('button', { name: /menu/i })).toBeVisible();
+await expect(page.getByRole('navigation')).not.toBeVisible();
+```
+
+### What to assert instead of screenshots
+
+| Instead of…                            | Assert…                                                           |
+| -------------------------------------- | ----------------------------------------------------------------- |
+| Full-page screenshot                   | Key headings, navigation elements, and content containers visible |
+| Component screenshot                   | Component text, attributes, and interaction states                |
+| Loading state screenshot               | Loading indicator visible, then content visible after load        |
+| Error state screenshot                 | Error message text or `[role="alert"]` visible                    |
+| Responsive screenshot at N breakpoints | Elements show/hide at each viewport size                          |
 
 ## Tamagui / Custom Component Pitfalls
 

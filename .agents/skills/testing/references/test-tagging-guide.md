@@ -66,9 +66,11 @@ Examples:
 
 Rule of thumb: if the test was written _after_ a bug was found in production, tag it `@regression`. Also use `@regression` for anything that is too slow or too niche to run on every PR.
 
-## `@visual` — Screenshot/snapshot tests
+## `@visual` — DEPRECATED
 
-Visual tests capture the pixel layout of a page or component. They are brittle across OS/DPI and are not run in normal CI. Always pair with a corresponding `@critical` or `@smoke` test that validates the same page functionally.
+Visual snapshot tests have been removed from the E2E suite (LS-1777). E2E tests should assert **behavior, not pixels** — element visibility, text content, navigation, interactions. Visual regression testing belongs in **component isolation** (Storybook/Chromatic), not in E2E.
+
+Do not create new `@visual` tests. If you need to verify layout, write behavioral assertions (e.g., `toBeVisible()`, `toHaveCSS()`, `toHaveAttribute()`) instead of `toHaveScreenshot()`.
 
 ## `@slow` — Any test > 10 seconds
 
