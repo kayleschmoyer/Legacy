@@ -46,9 +46,27 @@ permissions:
   pull-requests: write # Required for adding failure labels
 
 jobs:
+  # LS-1652: Restrict self-hosted runners to PR authors with write permission
+  check-runner-access:
+    name: "Resolve Runner Label"
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      runner-label: ${{ steps.resolve.outputs.runner-label }}
+      is-self-hosted: ${{ steps.resolve.outputs.is-self-hosted }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/actions/resolve-runner-label
+      - name: "Resolve Runner Label"
+        id: resolve
+        uses: ./.github/actions/resolve-runner-label
+
   check:
     name: "Verify All Migrations Applied"
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    needs: [check-runner-access]
+    runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 10
 
     steps:
@@ -125,9 +143,9 @@ jobs:
       - name: "Detect runner environment"
         id: runner-env
         run: |
-          if [ -n "${{ vars.CI_RUNNER_LABEL }}" ]; then
+          if [ "${{ needs.check-runner-access.outputs.is-self-hosted }}" = "true" ]; then
             echo "is_self_hosted=true" >> "$GITHUB_OUTPUT"
-            echo "ℹ️  Self-hosted runner (label: ${{ vars.CI_RUNNER_LABEL }}) — using VPC private network"
+            echo "ℹ️  Self-hosted runner — using VPC private network"
           else
             echo "is_self_hosted=false" >> "$GITHUB_OUTPUT"
             echo "ℹ️  GitHub-hosted runner — will open temporary SG rule"

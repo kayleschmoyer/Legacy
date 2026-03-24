@@ -69,6 +69,7 @@ jobs:
     outputs:
       run-security: ${{ steps.scope.outputs.run-security }}
       security-scan-type: ${{ steps.scope.outputs.security-scan-type }}
+      runner-label: ${{ steps.runner-access.outputs.runner-label }}
 
     steps:
       - name: "🚀 Checkout Repository"
@@ -176,6 +177,13 @@ jobs:
           echo "run-security=$run_security" >> "$GITHUB_OUTPUT"
           echo "security-scan-type=$scan_type" >> "$GITHUB_OUTPUT"
 
+      # LS-1652: Only allow self-hosted runners for PR authors with write permission.
+      # External contributors (read-only) are routed to GitHub-hosted runners to prevent
+      # untrusted code from executing on our infrastructure.
+      - name: "🔒 Resolve Runner Label"
+        id: runner-access
+        uses: ./.github/actions/resolve-runner-label
+
   ci-pipeline:
     name: "🚀 CI Pipeline"
     needs: [determine-scope]
@@ -191,6 +199,7 @@ jobs:
       e2e-test-patterns: ${{ github.event.schedule == '0 3 * * *' && '' || '@critical' }}
       e2e-exclude-patterns: ${{ github.event.schedule == '0 3 * * *' && '' || '@slow' }}
       e2e-shard-total: ${{ github.event.schedule == '0 3 * * *' && 3 || 2 }}
+      runner-label: ${{ needs.determine-scope.outputs.runner-label }}
     secrets: inherit
 
   security-scanning:

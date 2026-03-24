@@ -40,9 +40,26 @@ env:
   STORYBOOK_URL: https://bkrupa.github.io/legacy-sports-deploys/storybook/
 
 jobs:
+  # LS-1652: Restrict self-hosted runners to PR authors with write permission
+  check-runner-access:
+    name: "Resolve Runner Label"
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      runner-label: ${{ steps.resolve.outputs.runner-label }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/actions/resolve-runner-label
+      - name: "Resolve Runner Label"
+        id: resolve
+        uses: ./.github/actions/resolve-runner-label
+
   build-and-deploy:
     name: Build & Deploy Storybook
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    needs: [check-runner-access]
+    runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 15
 
     steps:

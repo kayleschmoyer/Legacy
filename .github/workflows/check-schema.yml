@@ -39,11 +39,30 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # LS-1652: Restrict self-hosted runners to PR authors with write permission
+  # ---------------------------------------------------------------------------
+  check-runner-access:
+    name: "Resolve Runner Label"
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      runner-label: ${{ steps.resolve.outputs.runner-label }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/actions/resolve-runner-label
+      - name: "Resolve Runner Label"
+        id: resolve
+        uses: ./.github/actions/resolve-runner-label
+
+  # ---------------------------------------------------------------------------
   # Schema drift check + codegen compatibility (single runner, one print-schema)
   # ---------------------------------------------------------------------------
   check-schema-and-codegen:
     name: "GraphQL Schema & Codegen"
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    needs: [check-runner-access]
+    runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 15
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
 

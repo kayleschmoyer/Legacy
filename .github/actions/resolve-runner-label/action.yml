@@ -1,0 +1,54 @@
+# LS-1652: Reusable composite action to resolve the CI runner label.
+# Restricts self-hosted runners to PR authors with write/maintain/admin permission.
+# External contributors (read-only) are routed to GitHub-hosted runners.
+name: "Resolve Runner Label"
+description: "Determines whether to use self-hosted or GitHub-hosted runners based on PR author permissions"
+
+outputs:
+  runner-label:
+    description: "The runner label to use (self-hosted label or 'ubuntu-latest')"
+    value: ${{ steps.resolve.outputs.runner-label }}
+  is-self-hosted:
+    description: "Whether the resolved runner is self-hosted ('true' or 'false')"
+    value: ${{ steps.resolve.outputs.is-self-hosted }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Resolve Runner Label"
+      id: resolve
+      uses: actions/github-script@v8
+      with:
+        script: |
+          const label = '${{ vars.CI_RUNNER_LABEL }}' || '';
+          if (!label) {
+            core.setOutput('runner-label', 'ubuntu-latest');
+            core.setOutput('is-self-hosted', 'false');
+            core.info('No CI_RUNNER_LABEL configured — using ubuntu-latest');
+            return;
+          }
+
+          // Non-PR events (schedule, workflow_dispatch, merge_group) are trusted
+          if (context.eventName !== 'pull_request') {
+            core.setOutput('runner-label', label);
+            core.setOutput('is-self-hosted', 'true');
+            core.info(`Non-PR event (${context.eventName}) — using self-hosted runner`);
+            return;
+          }
+
+          // Use the PR author (not context.actor, which can be a merge bot or re-runner)
+          const prAuthor = context.payload.pull_request?.user?.login || context.actor;
+          try {
+            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner, repo: context.repo.repo, username: prAuthor,
+            });
+            const permission = data.permission;
+            const allowed = permission === 'admin' || permission === 'maintain' || permission === 'write';
+            core.setOutput('runner-label', allowed ? label : 'ubuntu-latest');
+            core.setOutput('is-self-hosted', allowed ? 'true' : 'false');
+            if (!allowed) core.warning(`PR author "${prAuthor}" has ${permission} permission — using GitHub-hosted runner`);
+          } catch (err) {
+            core.setOutput('runner-label', 'ubuntu-latest');
+            core.setOutput('is-self-hosted', 'false');
+            core.warning(`Permission check failed for "${prAuthor}": ${err.message} — using GitHub-hosted runner`);
+          }
