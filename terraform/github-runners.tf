@@ -103,6 +103,68 @@ module "github_runners" {
     echo "Using pre-baked Ubuntu AMI - Node.js, pnpm, Playwright already installed"
   EOT
 
+  # ── VPC egress restrictions (LS-1654) ──────────────────────────────────────
+  # Replace the module's default "all outbound" rule with least-privilege egress.
+  # Runners need: HTTPS (GitHub API, npm, S3), DNS, PostgreSQL (VPC RDS for
+  # migration checks), and EC2 instance metadata (spot interruption notices).
+  runner_egress_rules = [
+    {
+      cidr_blocks      = ["0.0.0.0/0"]
+      ipv6_cidr_blocks = ["::/0"]
+      prefix_list_ids  = null
+      from_port        = 443
+      protocol         = "tcp"
+      security_groups  = null
+      self             = false
+      to_port          = 443
+      description      = "HTTPS — GitHub API, npm registry, S3, VPC endpoints"
+    },
+    {
+      cidr_blocks      = [var.vpc_cidr]
+      ipv6_cidr_blocks = []
+      prefix_list_ids  = null
+      from_port        = 53
+      protocol         = "udp"
+      security_groups  = null
+      self             = false
+      to_port          = 53
+      description      = "DNS (UDP) — VPC DNS resolver"
+    },
+    {
+      cidr_blocks      = [var.vpc_cidr]
+      ipv6_cidr_blocks = []
+      prefix_list_ids  = null
+      from_port        = 53
+      protocol         = "tcp"
+      security_groups  = null
+      self             = false
+      to_port          = 53
+      description      = "DNS (TCP) — VPC DNS resolver"
+    },
+    {
+      cidr_blocks      = aws_subnet.private_database[*].cidr_block
+      ipv6_cidr_blocks = []
+      prefix_list_ids  = null
+      from_port        = 5432
+      protocol         = "tcp"
+      security_groups  = null
+      self             = false
+      to_port          = 5432
+      description      = "PostgreSQL — RDS in database subnets (migration checks)"
+    },
+    {
+      cidr_blocks      = ["169.254.169.254/32"]
+      ipv6_cidr_blocks = []
+      prefix_list_ids  = null
+      from_port        = 80
+      protocol         = "tcp"
+      security_groups  = null
+      self             = false
+      to_port          = 80
+      description      = "EC2 instance metadata — spot interruption notices and IMDSv2 token service"
+    },
+  ]
+
   # ── IAM hardening (LS-1653) ────────────────────────────────────────────────
   # Permissions boundary prevents the runner role from exceeding least-privilege,
   # regardless of what the module's default policy grants.
