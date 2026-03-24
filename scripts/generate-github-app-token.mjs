@@ -10,6 +10,7 @@
  * Optional env vars (defaults match the Agent Author app):
  *   GITHUB_APP_ID           — GitHub App ID (default: 3158619)
  *   GITHUB_INSTALLATION_ID  — Installation ID (default: 118260223)
+ *   DELETE_PEM_AFTER_READ   — Set to "true" to delete the PEM file after reading (opt-in)
  *
  * Output: prints the installation token to stdout.
  *
@@ -18,7 +19,7 @@
  */
 
 import { createSign } from 'node:crypto';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, unlinkSync } from 'node:fs';
 
 const APP_ID = process.env.GITHUB_APP_ID || '3158619';
 const INSTALLATION_ID = process.env.GITHUB_INSTALLATION_ID || '118260223';
@@ -36,9 +37,40 @@ function getPrivateKey() {
     );
   }
 
-  // If it looks like a file path and the file exists, read it
+  // If it looks like a file path and the file exists, read it.
+  // Set DELETE_PEM_AFTER_READ=true to auto-delete the PEM after reading (e.g., in CI/setup scripts).
   if (!raw.includes('-----BEGIN') && existsSync(raw)) {
-    return readFileSync(raw, 'utf-8');
+    let stat;
+    try {
+      stat = statSync(raw);
+    } catch (err) {
+      throw new Error(
+        `Cannot stat AGENT_AUTHOR_APP_PRIVATE_KEY path "${raw}": ${err.message}`,
+      );
+    }
+    if (!stat.isFile()) {
+      process.stderr.write(
+        `Error: AGENT_AUTHOR_APP_PRIVATE_KEY path "${raw}" is not a regular file\n`,
+      );
+      process.exit(1);
+    }
+
+    const pem = readFileSync(raw, 'utf-8');
+
+    if (process.env.DELETE_PEM_AFTER_READ === 'true') {
+      try {
+        unlinkSync(raw);
+        process.stderr.write(`Deleted PEM file: ${raw}\n`);
+      } catch {
+        process.stderr.write(`Warning: could not delete PEM file: ${raw}\n`);
+      }
+    } else {
+      process.stderr.write(
+        `Warning: PEM file "${raw}" was read but not deleted. ` +
+          `Set DELETE_PEM_AFTER_READ=true to auto-delete after reading.\n`,
+      );
+    }
+    return pem;
   }
 
   // Otherwise treat as PEM content (may need newline restoration)

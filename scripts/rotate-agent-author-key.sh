@@ -36,9 +36,17 @@ if ! openssl pkey -in "$PEM_FILE" -noout 2>/dev/null; then
   exit 1
 fi
 
+# Ensure PEM is deleted on any exit (including early failures)
+trap 'rm -f "$PEM_FILE"' EXIT
+
 echo "Updating GitHub Actions secret: AGENT_AUTHOR_APP_PRIVATE_KEY"
 gh secret set AGENT_AUTHOR_APP_PRIVATE_KEY < "$PEM_FILE"
 echo "GitHub secret updated."
+
+# LS-1670: Also base64-encode and set the Terraform runner secret
+echo "Updating GitHub Actions secret: RUNNER_GITHUB_APP_KEY_BASE64"
+base64 < "$PEM_FILE" | tr -d '\n' | gh secret set RUNNER_GITHUB_APP_KEY_BASE64
+echo "Terraform runner secret updated."
 
 # Optionally write the \n-escaped PEM to a temp file for easy copy-paste
 read -r -p "Write escaped PEM to a temp file for copy-paste? [y/N] " write_env
@@ -50,6 +58,10 @@ if [[ ! "$write_env" =~ ^[Yy]$ ]]; then
   echo "  2. Set AGENT_AUTHOR_APP_PRIVATE_KEY to the \\n-escaped PEM contents"
   echo "  3. Delete the old key from GitHub App settings:"
   echo "     GitHub → Settings → Developer settings → GitHub Apps → legacy-sports-code-bot"
+  echo ""
+  echo "🗑️  Deleting local PEM file: $PEM_FILE"
+  rm -f "$PEM_FILE"
+  echo "✅ PEM file deleted. The key now exists only in GitHub Secrets."
   exit 0
 fi
 
@@ -73,3 +85,9 @@ echo "     GitHub → Settings → Developer settings → GitHub Apps → legacy
 echo ""
 echo "The env file will be cleaned up on next reboot, or delete manually:"
 echo "  rm $ENV_FILE"
+
+# LS-1670: Delete the original PEM file to prevent credential leakage
+echo ""
+echo "🗑️  Deleting local PEM file: $PEM_FILE"
+rm -f "$PEM_FILE"
+echo "✅ PEM file deleted. The key now exists only in GitHub Secrets."
