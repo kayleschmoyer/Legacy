@@ -237,3 +237,71 @@ jobs:
             Visit the live application at:
             - Production: https://legacy-fantasy.com
             - GitHub Pages: ${{ needs.build-and-deploy.outputs.deployment_url }}
+
+  # TODO: Mobile release notifications — the deleted discord-release-summary.yml
+  # also handled android-v* and ios-v* tags. build-android-app.yml and
+  # build-ios-app.yml do not currently have Discord release notifications.
+  # Add similar notify-release jobs to those workflows when mobile releases
+  # are published regularly.
+  notify-release:
+    name: Discord Release Summary
+    runs-on: ubuntu-latest
+    needs: [setup, create-release]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Post Release Summary
+        shell: bash
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+          VERSION: ${{ needs.setup.outputs.version }}
+          BUILD_NUMBER: ${{ needs.setup.outputs.build_number }}
+          COMMIT_SHA: ${{ needs.setup.outputs.commit_sha }}
+          RELEASE_TAG: web-v${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
+        run: |
+          # Skip if webhook URL is not configured
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::warning::DISCORD_RELEASE_WEBHOOK_URL not set — skipping notification"
+            exit 0
+          fi
+
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${RELEASE_TAG}"
+
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          PAYLOAD=$(jq -n \
+            --arg title "🌐 Web Release v${VERSION}-${BUILD_NUMBER}" \
+            --arg desc "A new Web release has been published. [View on GitHub](${RELEASE_URL})" \
+            --arg version "${VERSION}-${BUILD_NUMBER}" \
+            --arg commit "$COMMIT_SHA" \
+            --arg actor "${{ github.actor }}" \
+            --arg timestamp "$TIMESTAMP" \
+            '{
+              embeds: [{
+                title: $title,
+                description: $desc,
+                color: 5793266,
+                fields: [
+                  { name: "Version", value: $version, inline: true },
+                  { name: "Platform", value: "Web", inline: true },
+                  { name: "Commit", value: $commit, inline: true }
+                ],
+                timestamp: $timestamp,
+                footer: { text: ("Released by " + $actor + " • Legacy Sports") }
+              }]
+            }')
+
+          HTTP_CODE=$(curl --connect-timeout 5 --max-time 15 --retry 3 --retry-all-errors \
+            -s -o /tmp/discord-response.txt -w "%{http_code}" \
+            -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Discord release summary sent for ${RELEASE_TAG} (http=$HTTP_CODE)"
+          else
+            RESPONSE=$(cat /tmp/discord-response.txt 2>/dev/null || echo "(empty)")
+            echo "::warning::Discord release summary failed (http=$HTTP_CODE): $RESPONSE"
+          fi
+
+          rm -f /tmp/discord-response.txt
