@@ -481,6 +481,8 @@ export const teamMembers = pgTable(
     onTradeBlock: boolean('on_trade_block').notNull().default(false),
     /** Current salary cap hit for this player on this team. Null in non-salary-cap leagues. (LS-634) */
     salary: integer('salary'),
+    /** Free-text asking price shown on the trade block. Null when not listed or no price set. (LS-1814) */
+    askingPrice: text('asking_price'),
   },
   (table) => {
     return {

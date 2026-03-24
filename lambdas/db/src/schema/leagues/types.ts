@@ -398,6 +398,8 @@ export const TeamMember = builder.objectRef<{
   onTradeBlock: boolean;
   /** Current salary cap hit. Null in non-salary-cap leagues. (LS-634) */
   salary?: number | null;
+  /** Free-text asking price shown on the trade block. (LS-1814) */
+  askingPrice?: string | null;
 }>('TeamMember');
 
 TeamMember.implement({
@@ -415,6 +417,13 @@ TeamMember.implement({
         'Current salary cap hit for this roster slot. Null in non-salary-cap leagues.',
       resolve: (parent) =>
         (parent as { salary?: number | null }).salary ?? null,
+    }),
+    askingPrice: t.string({
+      nullable: true,
+      description:
+        'Free-text asking price displayed on the trade block listing. Null when not set.',
+      resolve: (parent) =>
+        (parent as { askingPrice?: string | null }).askingPrice ?? null,
     }),
     player: t.field({
       type: 'Player',

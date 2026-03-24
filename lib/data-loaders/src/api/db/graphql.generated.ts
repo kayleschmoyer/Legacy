@@ -1678,6 +1678,7 @@ export type MutationSetTeamLockArgs = {
 };
 
 export type MutationSetTradeBlockArgs = {
+  askingPrice?: InputMaybe<Scalars['String']['input']>;
   onTradeBlock: Scalars['Boolean']['input'];
   teamMemberId: Scalars['Int']['input'];
 };
@@ -3123,6 +3124,8 @@ export type Team = {
 /** A member of a team */
 export type TeamMember = {
   __typename?: 'TeamMember';
+  /** Free-text asking price displayed on the trade block listing. Null when not set. */
+  askingPrice?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   onTradeBlock?: Maybe<Scalars['Boolean']['output']>;

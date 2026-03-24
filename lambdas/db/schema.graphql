@@ -1641,7 +1641,11 @@ type Mutation {
   """
   Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this.
   """
-  setTradeBlock(onTradeBlock: Boolean!, teamMemberId: Int!): TeamMember
+  setTradeBlock(
+    askingPrice: String
+    onTradeBlock: Boolean!
+    teamMemberId: Int!
+  ): TeamMember
   startDraft(
     draftMode: String
     draftOrder: String
@@ -2909,6 +2913,10 @@ type Team {
 A member of a team
 """
 type TeamMember {
+  """
+  Free-text asking price displayed on the trade block listing. Null when not set.
+  """
+  askingPrice: String
   id: Int
   leagueId: Int
   onTradeBlock: Boolean

@@ -1,5 +1,13 @@
-mutation SetTradeBlock($teamMemberId: Int!, $onTradeBlock: Boolean!) {
-  setTradeBlock(teamMemberId: $teamMemberId, onTradeBlock: $onTradeBlock) {
+mutation SetTradeBlock(
+  $teamMemberId: Int!
+  $onTradeBlock: Boolean!
+  $askingPrice: String
+) {
+  setTradeBlock(
+    teamMemberId: $teamMemberId
+    onTradeBlock: $onTradeBlock
+    askingPrice: $askingPrice
+  ) {
     ...TeamMember
   }
 }

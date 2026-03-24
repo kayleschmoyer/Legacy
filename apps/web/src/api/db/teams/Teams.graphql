@@ -24,6 +24,8 @@ fragment TeamMember on TeamMember {
   onTradeBlock
   # Salary cap (LS-646)
   salary
+  # Asking price on trade block (LS-1814)
+  askingPrice
   player {
     id
     firstName
@@ -151,8 +153,16 @@ mutation RemoveAssistantManager($teamId: Int!, $userId: Int!) {
   removeAssistantManager(teamId: $teamId, userId: $userId)
 }
 
-mutation SetTradeBlock($teamMemberId: Int!, $onTradeBlock: Boolean!) {
-  setTradeBlock(teamMemberId: $teamMemberId, onTradeBlock: $onTradeBlock) {
+mutation SetTradeBlock(
+  $teamMemberId: Int!
+  $onTradeBlock: Boolean!
+  $askingPrice: String
+) {
+  setTradeBlock(
+    teamMemberId: $teamMemberId
+    onTradeBlock: $onTradeBlock
+    askingPrice: $askingPrice
+  ) {
     ...TeamMember
   }
 }

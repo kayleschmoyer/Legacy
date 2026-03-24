@@ -79,6 +79,7 @@ function makeTradeBlockEntry(
   teamId: number,
   firstName: string,
   lastName: string,
+  askingPrice: string | null = null,
 ) {
   return {
     __typename: 'TeamMember',
@@ -86,6 +87,7 @@ function makeTradeBlockEntry(
     teamId,
     playerId: id * 100,
     onTradeBlock: true,
+    askingPrice,
     player: {
       __typename: 'Player',
       firstName,
@@ -97,9 +99,9 @@ function makeTradeBlockEntry(
 const MOCK_TRADE_BLOCK_EMPTY: never[] = [];
 
 const MOCK_TRADE_BLOCK_WITH_PLAYERS = [
-  makeTradeBlockEntry(1, 1, 'Mike', 'Johnson'), // user's team (teamId=1)
-  makeTradeBlockEntry(2, 2, 'Chris', 'Davis'), // other team
-  makeTradeBlockEntry(3, 2, 'Jake', 'Smith'), // other team
+  makeTradeBlockEntry(1, 1, 'Mike', 'Johnson', '2nd round pick'), // user's team (teamId=1)
+  makeTradeBlockEntry(2, 2, 'Chris', 'Davis', 'Top 10 pitcher'), // other team with price
+  makeTradeBlockEntry(3, 2, 'Jake', 'Smith'), // other team, no price
 ];
 
 const MOCK_TRADE_BLOCK_MANY = [
@@ -340,6 +342,98 @@ test.describe('Trade Block Management @regression', () => {
 
     // Now 6th player should be visible
     await expect(page.getByText('Ryan Brown')).toBeVisible();
+  });
+
+  test('should display asking price when set', async ({ page }) => {
+    await setupGraphQL(page, {
+      tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
+    });
+    await page.goto('/baseball/league/1');
+
+    await expect(page.getByText('Asking: 2nd round pick')).toBeVisible();
+    await expect(page.getByText('Asking: Top 10 pitcher')).toBeVisible();
+  });
+
+  test('should show Set Price button for own team players', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, {
+      tradeBlock: [makeTradeBlockEntry(1, 1, 'Mike', 'Johnson')],
+    });
+    await page.goto('/baseball/league/1');
+
+    await expect(page.getByRole('button', { name: 'Set Price' })).toBeVisible();
+  });
+
+  test('should show Edit Price button when price is already set', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, {
+      tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
+    });
+    await page.goto('/baseball/league/1');
+
+    // Mike Johnson (own team) has an asking price, so button should say "Edit Price"
+    await expect(
+      page.getByRole('button', { name: 'Edit Price' }),
+    ).toBeVisible();
+  });
+
+  test('should send askingPrice when user sets a price via Set Price flow', async ({
+    page,
+  }) => {
+    // Start with an own-team player that has no price
+    const ownPlayer = makeTradeBlockEntry(1, 1, 'Mike', 'Johnson');
+
+    // Track mutation calls
+    const mutationCalls: Record<string, unknown>[] = [];
+
+    await setupGraphQL(page, {
+      tradeBlock: [ownPlayer],
+      onSetTradeBlock: () => {
+        return {
+          __typename: 'TeamMember',
+          ...ownPlayer,
+          askingPrice: '1st round pick',
+        };
+      },
+    });
+
+    // Additionally intercept to capture variables
+    await page.route(
+      (url) => isGraphQLEndpoint(url),
+      async (route, request) => {
+        const body = request.postDataJSON() as {
+          operationName?: string;
+          variables?: Record<string, unknown>;
+        };
+        if (body.operationName === 'SetTradeBlock') {
+          mutationCalls.push(body.variables ?? {});
+        }
+        await route.fallback();
+      },
+    );
+
+    await page.goto('/baseball/league/1');
+
+    // Click "Set Price" button
+    await page.getByRole('button', { name: 'Set Price' }).click();
+
+    // Fill in the asking price input
+    const priceInput = page.getByRole('textbox');
+    await priceInput.fill('1st round pick');
+
+    // Click Save
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    // Verify the mutation was called with askingPrice
+    expect(mutationCalls.length).toBeGreaterThanOrEqual(1);
+    const lastCall = mutationCalls[mutationCalls.length - 1];
+    expect(lastCall).toMatchObject({
+      teamMemberId: 1,
+      onTradeBlock: true,
+      askingPrice: '1st round pick',
+    });
   });
 
   test('should display error state when query fails', async ({ page }) => {

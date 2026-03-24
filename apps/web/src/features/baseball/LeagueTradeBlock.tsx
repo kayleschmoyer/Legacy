@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
-import { Card, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Card, Input, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Button } from '@legacy-sports/shared-components';
-import { ArrowLeftRight, ChevronDown, ChevronUp } from '@tamagui/lucide-icons';
+import {
+  ArrowLeftRight,
+  ChevronDown,
+  ChevronUp,
+  DollarSign,
+} from '@tamagui/lucide-icons';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -37,6 +42,9 @@ export function LeagueTradeBlock({
   const [setTradeBlock, { loading: mutating }] = useSetTradeBlockMutation({
     refetchQueries: ['GetLeagueTradeBlock'],
   });
+
+  const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
+  const [priceInput, setPriceInput] = useState('');
 
   const players = data?.leagueTradeBlock ?? [];
   const displayList = expanded ? players : players.slice(0, 5);
@@ -199,47 +207,128 @@ export function LeagueTradeBlock({
                     >
                       {playerName}
                     </Text>
+                    {member.askingPrice ? (
+                      <XStack alignItems="center" gap="$1" marginTop="$0.5">
+                        <DollarSign size={10} color="$textMuted" />
+                        <Text
+                          fontSize="$1"
+                          color="$textMuted"
+                          numberOfLines={1}
+                          testID={`asking-price-${memberId}`}
+                        >
+                          Asking: {member.askingPrice}
+                        </Text>
+                      </XStack>
+                    ) : null}
                   </YStack>
                 </XStack>
 
                 {isOwnTeam && memberId != null ? (
-                  <Button
-                    size="$2"
-                    backgroundColor="$red3"
-                    borderColor="$red7"
-                    borderWidth={1}
-                    borderRadius="$2"
-                    paddingHorizontal="$2"
-                    disabled={mutating}
-                    onPress={() =>
-                      void setTradeBlock({
-                        variables: {
-                          teamMemberId: memberId,
-                          onTradeBlock: false,
-                        },
-                      })
-                    }
-                  >
-                    <Text fontSize="$1" fontWeight="600" color="$red11">
-                      Remove
-                    </Text>
-                  </Button>
-                ) : (
-                  <XStack
-                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
-                    borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.4)}
-                    borderWidth={1}
-                    borderRadius="$2"
-                    paddingHorizontal="$2"
-                    paddingVertical="$0.5"
-                  >
-                    <Text
-                      fontSize="$1"
-                      fontWeight="600"
-                      color={BRAND_GOLD_LIGHT}
+                  <XStack alignItems="center" gap="$2">
+                    {editingPriceId === memberId ? (
+                      <XStack alignItems="center" gap="$1">
+                        <Input
+                          size="$2"
+                          width={120}
+                          placeholder="Asking price"
+                          value={priceInput}
+                          onChangeText={setPriceInput}
+                          borderColor="$outlineSubtle"
+                          testID="asking-price-input"
+                        />
+                        <Button
+                          size="$2"
+                          backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                          borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.4)}
+                          borderWidth={1}
+                          borderRadius="$2"
+                          paddingHorizontal="$2"
+                          disabled={mutating}
+                          onPress={() => {
+                            void setTradeBlock({
+                              variables: {
+                                teamMemberId: memberId,
+                                onTradeBlock: true,
+                                askingPrice: priceInput || null,
+                              },
+                            });
+                            setEditingPriceId(null);
+                            setPriceInput('');
+                          }}
+                        >
+                          <Text
+                            fontSize="$1"
+                            fontWeight="600"
+                            color={BRAND_GOLD_LIGHT}
+                          >
+                            Save
+                          </Text>
+                        </Button>
+                      </XStack>
+                    ) : (
+                      <Button
+                        size="$2"
+                        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+                        borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.3)}
+                        borderWidth={1}
+                        borderRadius="$2"
+                        paddingHorizontal="$2"
+                        disabled={mutating}
+                        onPress={() => {
+                          setEditingPriceId(memberId);
+                          setPriceInput(member.askingPrice ?? '');
+                        }}
+                        testID="set-price-button"
+                      >
+                        <Text
+                          fontSize="$1"
+                          fontWeight="600"
+                          color={BRAND_GOLD_LIGHT}
+                        >
+                          {member.askingPrice ? 'Edit Price' : 'Set Price'}
+                        </Text>
+                      </Button>
+                    )}
+                    <Button
+                      size="$2"
+                      backgroundColor="$red3"
+                      borderColor="$red7"
+                      borderWidth={1}
+                      borderRadius="$2"
+                      paddingHorizontal="$2"
+                      disabled={mutating}
+                      onPress={() =>
+                        void setTradeBlock({
+                          variables: {
+                            teamMemberId: memberId,
+                            onTradeBlock: false,
+                          },
+                        })
+                      }
                     >
-                      AVAILABLE
-                    </Text>
+                      <Text fontSize="$1" fontWeight="600" color="$red11">
+                        Remove
+                      </Text>
+                    </Button>
+                  </XStack>
+                ) : (
+                  <XStack alignItems="center" gap="$2">
+                    <XStack
+                      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                      borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.4)}
+                      borderWidth={1}
+                      borderRadius="$2"
+                      paddingHorizontal="$2"
+                      paddingVertical="$0.5"
+                    >
+                      <Text
+                        fontSize="$1"
+                        fontWeight="600"
+                        color={BRAND_GOLD_LIGHT}
+                      >
+                        AVAILABLE
+                      </Text>
+                    </XStack>
                   </XStack>
                 )}
               </XStack>

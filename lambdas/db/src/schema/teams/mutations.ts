@@ -1013,16 +1013,30 @@ builder.mutationField('setTradeBlock', (t) =>
     args: {
       teamMemberId: t.arg.int({ required: true }),
       onTradeBlock: t.arg.boolean({ required: true }),
+      askingPrice: t.arg.string({ required: false }),
     },
     resolve: authorized(
       { teamMembers: (args) => [args.teamMemberId] },
       async (_parent, args, _context) => {
-        const { teamMemberId, onTradeBlock } = args;
+        const { teamMemberId, onTradeBlock, askingPrice } = args;
         const db = _context.db;
+
+        const setFields: {
+          onTradeBlock: boolean;
+          askingPrice?: string | null;
+        } = { onTradeBlock };
+        if (!onTradeBlock) {
+          // Removing from trade block always clears asking price
+          setFields.askingPrice = null;
+        } else if (askingPrice !== undefined) {
+          // Only update asking price when explicitly provided
+          setFields.askingPrice = askingPrice ?? null;
+        }
+        // When onTradeBlock is true and askingPrice is undefined, preserve existing value
 
         const updated = await db
           .update(PublicSchema.teamMembers)
-          .set({ onTradeBlock })
+          .set(setFields)
           .where(eq(PublicSchema.teamMembers.id, teamMemberId))
           .returning({
             id: PublicSchema.teamMembers.id,
@@ -1031,15 +1045,23 @@ builder.mutationField('setTradeBlock', (t) =>
             playerId: PublicSchema.teamMembers.playerId,
             positionId: PublicSchema.teamMembers.positionId,
             onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+            askingPrice: PublicSchema.teamMembers.askingPrice,
           });
 
         if (updated.length === 0) {
           throw new Error('Team member not found');
         }
 
+        const MAX_LOG_PREVIEW = 120;
+        const pricePreview =
+          askingPrice && askingPrice.length > MAX_LOG_PREVIEW
+            ? `${askingPrice.slice(0, MAX_LOG_PREVIEW)}…`
+            : (askingPrice ?? null);
+
         LOGGER.info('Updated trade block status', {
           teamMemberId,
           onTradeBlock,
+          askingPrice: onTradeBlock ? pricePreview : null,
         });
 
         return updated[0];

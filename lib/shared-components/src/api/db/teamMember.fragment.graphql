@@ -6,6 +6,7 @@ fragment TeamMember on TeamMember {
   leagueId
   onTradeBlock
   salary
+  askingPrice
   player {
     id
     firstName

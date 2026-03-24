@@ -1678,6 +1678,7 @@ export type MutationSetTeamLockArgs = {
 };
 
 export type MutationSetTradeBlockArgs = {
+  askingPrice?: InputMaybe<Scalars['String']['input']>;
   onTradeBlock: Scalars['Boolean']['input'];
   teamMemberId: Scalars['Int']['input'];
 };
@@ -3123,6 +3124,8 @@ export type Team = {
 /** A member of a team */
 export type TeamMember = {
   __typename?: 'TeamMember';
+  /** Free-text asking price displayed on the trade block listing. Null when not set. */
+  askingPrice?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   onTradeBlock?: Maybe<Scalars['Boolean']['output']>;
@@ -7315,6 +7318,7 @@ export type TeamMemberFragment = {
   leagueId?: number | null;
   onTradeBlock?: boolean | null;
   salary?: number | null;
+  askingPrice?: string | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -7345,6 +7349,7 @@ export type GetTeamMembersQuery = {
     leagueId?: number | null;
     onTradeBlock?: boolean | null;
     salary?: number | null;
+    askingPrice?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7402,6 +7407,7 @@ export type UpdateTeamMemberPositionMutation = {
     leagueId?: number | null;
     onTradeBlock?: boolean | null;
     salary?: number | null;
+    askingPrice?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7436,6 +7442,7 @@ export type SwapTeamMemberPositionsMutation = {
     leagueId?: number | null;
     onTradeBlock?: boolean | null;
     salary?: number | null;
+    askingPrice?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7574,6 +7581,7 @@ export type RemoveAssistantManagerMutation = {
 export type SetTradeBlockMutationVariables = Exact<{
   teamMemberId: Scalars['Int']['input'];
   onTradeBlock: Scalars['Boolean']['input'];
+  askingPrice?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type SetTradeBlockMutation = {
@@ -7587,6 +7595,7 @@ export type SetTradeBlockMutation = {
     leagueId?: number | null;
     onTradeBlock?: boolean | null;
     salary?: number | null;
+    askingPrice?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7618,6 +7627,7 @@ export type GetLeagueTradeBlockQuery = {
     leagueId?: number | null;
     onTradeBlock?: boolean | null;
     salary?: number | null;
+    askingPrice?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -8504,6 +8514,7 @@ export const TeamMemberFragmentDoc = gql`
     leagueId
     onTradeBlock
     salary
+    askingPrice
     player {
       id
       firstName
@@ -18186,8 +18197,16 @@ export type RemoveAssistantManagerMutationOptions = BaseMutationOptions<
   RemoveAssistantManagerMutationVariables
 >;
 export const SetTradeBlock = gql`
-  mutation SetTradeBlock($teamMemberId: Int!, $onTradeBlock: Boolean!) {
-    setTradeBlock(teamMemberId: $teamMemberId, onTradeBlock: $onTradeBlock) {
+  mutation SetTradeBlock(
+    $teamMemberId: Int!
+    $onTradeBlock: Boolean!
+    $askingPrice: String
+  ) {
+    setTradeBlock(
+      teamMemberId: $teamMemberId
+      onTradeBlock: $onTradeBlock
+      askingPrice: $askingPrice
+    ) {
       ...TeamMember
     }
   }
@@ -18213,6 +18232,7 @@ export type SetTradeBlockMutationFn = MutationFunction<
  *   variables: {
  *      teamMemberId: // value for 'teamMemberId'
  *      onTradeBlock: // value for 'onTradeBlock'
+ *      askingPrice: // value for 'askingPrice'
  *   },
  * });
  */
