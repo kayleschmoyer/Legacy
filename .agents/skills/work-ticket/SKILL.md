@@ -48,9 +48,10 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 3. **Worktree**: `make worktree TICKET=#### DESC=description` (use `PARENT=` if blocker is In Review)
 4. **Setup**: `make wt-setup WT=$wt`
 5. **Implement**: read the ticket description, investigate the codebase, write code + tests
-6. **Self-review**: run the [self-review phase](../review/SKILL.md) to catch rule violations
+   - **Bug tickets**: follow the [bug verification workflow](../debugging/SKILL.md#verification-by-bug-type) — reproduce the bug **before** writing any fix, then verify the fix resolves the reported behavior **after**. Include before/after evidence in the PR body under a `## Verification` section (appended after the standard template). `make pc` passing is necessary but not sufficient for bugs. The `## Verification` section is not part of the standard PR template -- add it manually for bug-fix PRs.
+6. **Self-review**: run the [self-review phase](../pr-lifecycle/references/self-review.md) to catch rule violations
 7. **Validate**: migrations (`db:status` + `db:up`), then `make pc`
-8. **Ship**: commit, push, [create PR](../create-pr/SKILL.md), transition Jira to "In Review"
+8. **Ship**: commit, push, [create PR](../pr-lifecycle/references/create-pr.md), transition Jira to "In Review"
 
 > After shipping, if this ticket is a child of a parent being processed in Parent Mode, return to the parent loop.
 
@@ -134,3 +135,4 @@ These rules apply to both leaf and parent tickets:
 - **Stacked dependencies** — if child B depends on child A, create child B's worktree with `PARENT=LS-A/branch-name` so it branches from A's branch
 - **Clean up worktrees** — after each child PR is created, clean the worktree before starting the next (`twig worktree clean`)
 - **Session cap** — 5 tickets per session prevents context degradation; inform the user of remaining tickets so they can invoke again
+- **Bug fixes require proof** — for Bug-type tickets, code changes alone are not sufficient. You must reproduce the broken behavior before fixing, and verify the fix resolves it after. See the [verification-by-bug-type table](../debugging/SKILL.md#verification-by-bug-type) for the specific method per bug category (UI screenshots, failing tests, integration tests, or query results)

@@ -19,9 +19,25 @@ Unified debugging skill for the Legacy Sports monorepo. Covers CI failures, dist
 ## Core Methodology
 
 1. **Gather evidence** — read logs, error messages, stack traces. Never guess at the problem.
-2. **Identify the root cause** — trace the failure to its origin. Upstream issues cause downstream symptoms.
-3. **Fix the code** — address the defect that produced the bad state. Data recovery is a separate step, not the fix.
-4. **Verify the fix** — reproduce locally, run `make pc`, confirm the failure no longer occurs.
+2. **Reproduce the bug** — observe the broken behavior before writing any fix. If you can't show it's broken, you can't prove it's fixed. See [Verification by Bug Type](#verification-by-bug-type) for how to reproduce each category.
+3. **Identify the root cause** — trace the failure to its origin. Upstream issues cause downstream symptoms.
+4. **Fix the code** — address the defect that produced the bad state. Data recovery is a separate step, not the fix.
+5. **Verify the fix** — re-run the exact reproduction scenario from step 2 and confirm the broken behavior is gone. This is not optional — `make pc` passing is necessary but not sufficient. You must demonstrate the specific reported behavior is resolved.
+
+## Verification by Bug Type
+
+Every bug fix requires verification that matches the bug's category. Choose the method based on where the bug manifests:
+
+| Bug category                                  | Reproduce (before fix)                                                                                                                                                                               | Verify (after fix)                                                                                                                                                                                                                                               |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **UI / visual**                               | `browser_dev_start` → `browser_navigate` → `browser_screenshot(name: "bug-before")`                                                                                                                  | Same navigation → `browser_screenshot(name: "bug-after")` → confirm broken behavior is gone. Upload both to PR body.                                                                                                                                             |
+| **Resolver / logic**                          | Write a failing test that exercises the broken code path (unit or DB integration test in `lambdas/db/**/*.integration.spec.ts`)                                                                      | Run the test — it must pass after the fix. The test stays as regression coverage.                                                                                                                                                                                |
+| **Distributed system** (Lambda / SQS / async) | Write or extend a Playwright integration test (`apps/web-e2e/src/integration/tests/`) that triggers the flow and asserts the broken state, OR use `aws_logs_tail` to capture the error in CloudWatch | Run the integration test — the flow must complete successfully. For async flows, use `expect.poll()` or `waitForStatsLoaded` helpers to confirm end-state. If reproduction used `aws_logs_tail`, re-check CloudWatch logs to confirm the error no longer occurs. |
+| **Data / query**                              | Use `db_query` to demonstrate the incorrect data or query result                                                                                                                                     | Re-run the same query after the fix — results must be correct.                                                                                                                                                                                                   |
+
+**Mixed bugs** (e.g., UI caused by a resolver issue) require verification at the layer where the user experiences the bug — if the user sees a broken UI, screenshot verification is required even if the root cause is in a resolver.
+
+> **If reproduction is not possible** (environment-specific, requires production data, mobile-only): document why in the PR body under a `## Verification` section (appended after the standard PR body template from [create-pr.md](../pr-lifecycle/references/create-pr.md)), explain what alternative evidence you gathered (logs, code analysis), and add a regression test that covers the code path even if it can't reproduce the exact user scenario. The `## Verification` section is recommended for bug-fix PRs but is not part of the standard PR template -- add it manually when needed.
 
 ## Critical Rules
 
