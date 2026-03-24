@@ -32,7 +32,24 @@ jobs:
       !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
+      - name: Auto-pass bot-review for dependabot PRs
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const sha = context.payload.pull_request.head.sha;
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state: 'success',
+              context: 'bot-review',
+              description: 'Copilot review skipped for dependabot PRs',
+            });
+            core.info(`Auto-passed bot-review for dependabot PR #${context.payload.pull_request.number}`);
+
       - name: Request Copilot review
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         uses: actions/github-script@v8
         with:
           script: |
@@ -50,6 +67,7 @@ jobs:
             }
 
       - name: Set bot-review status
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         uses: actions/github-script@v8
         with:
           script: |
@@ -188,7 +206,8 @@ jobs:
     # already completed — without this, auto-approve would never re-fire.
     if: >-
       github.event_name == 'pull_request_review' &&
-      !github.event.pull_request.draft
+      !github.event.pull_request.draft &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Generate bot token
