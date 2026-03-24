@@ -70,7 +70,6 @@ export default defineConfig({
    * OSes; sub-pixel font differences are absorbed by maxDiffPixelRatio. */
   snapshotPathTemplate: '{snapshotDir}/{arg}-{projectName}{ext}',
 
-  /* Configure snapshot settings */
   expect: {
     /* Give React 18's non-blocking createRoot().render() time to commit the
      * initial paint + re-render after mocked GraphQL responses arrive.
@@ -82,7 +81,6 @@ export default defineConfig({
       maxDiffPixelRatio: 0.01,
       animations: 'disabled',
     },
-    /* Maximum difference in pixels for visual comparisons */
     toMatchSnapshot: {
       threshold: 0.2,
     },
