@@ -19,6 +19,7 @@ import {
   Text,
   H2 as TH2,
 } from 'tamagui';
+import { formatDisplayName } from '../../lib/formatDisplayName';
 import { OnboardingTutorial } from '../../components/onboarding';
 import {
   BrandIcon,
@@ -363,7 +364,7 @@ export function HomePage(): React.JSX.Element {
 
   const leagues = leagueData?.userLeagues ?? [];
   const hasLeagues = leagues.length > 0;
-  const userName = auth?.user?.username || 'Manager';
+  const userName = formatDisplayName(auth?.user?.username || 'Manager');
 
   const upcomingDrafts = leagues.filter((l) =>
     l.draftStatus

@@ -23,6 +23,7 @@ import {
   Paragraph as TParagraph,
 } from 'tamagui';
 import type { League } from './LeagueCard';
+import { formatDisplayName } from '../../lib/formatDisplayName';
 import { PageMeta } from '../PageMeta';
 import {
   DEFAULT_NUM_DIVISIONS,
@@ -676,7 +677,7 @@ export function BaseballLandingPage() {
           : maxWeek,
       1,
     ) || 1;
-  const userName = auth?.user?.username || 'Manager';
+  const userName = formatDisplayName(auth?.user?.username || 'Manager');
   const hasLeagues = leaguesCount > 0;
   const safeCurrentWeek = currentWeek > 0 ? currentWeek : 1;
   const currentYear = new Date().getFullYear();

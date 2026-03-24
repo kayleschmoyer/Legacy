@@ -21,6 +21,7 @@ import {
   Shield,
   User,
 } from '@tamagui/lucide-icons';
+import { formatDisplayName } from '../../lib/formatDisplayName';
 
 const UserMenuButton = styled(Button, {
   backgroundColor: 'transparent',
@@ -114,7 +115,7 @@ export const UserProfileDropdown: React.FC = () => {
   }, [isOpen]);
 
   // Extract user data from auth context (with fallback values)
-  const userName = auth?.user?.username || '';
+  const userName = formatDisplayName(auth?.user?.username || '');
   const userEmail = auth?.user?.email || '';
   const userImage = auth?.user?.picture || null;
 

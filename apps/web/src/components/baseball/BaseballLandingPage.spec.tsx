@@ -11,6 +11,13 @@ jest.mock('@tamagui/lucide-icons', () => ({
   AlertTriangle: (props: any) => <span data-testid="alert-icon" {...props} />,
 }));
 
+// Default auth state — individual tests can override via mockUseAuth.mockReturnValue(...)
+const mockUseAuth = jest.fn(() => ({
+  isAuthenticated: true,
+  isLoading: false,
+  user: { id: '1', username: 'testuser' },
+}));
+
 // Mock shared-components to lightweight HTML equivalents
 jest.mock('@legacy-sports/shared-components', () => ({
   Button: ({ children, onPress, ...rest }: any) => (
@@ -27,11 +34,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
   HolographicCard: ({ children, ...rest }: any) => (
     <div {...rest}>{children}</div>
   ),
-  useAuth: () => ({
-    isAuthenticated: true,
-    isLoading: false,
-    user: { id: '1', username: 'testuser' },
-  }),
+  useAuth: () => mockUseAuth(),
 }));
 
 // Mock Tamagui styled components to div/input
@@ -115,6 +118,13 @@ jest.mock('../../api/db/graphql.generated', () => ({
 
 describe('BaseballLandingPage', () => {
   beforeEach(() => {
+    // Reset auth mock to default state
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      user: { id: '1', username: 'testuser' },
+    });
+
     const {
       useGetUserLeaguesQuery,
       useCreateLeagueAndTeamsMutation,
@@ -401,5 +411,61 @@ describe('BaseballLandingPage', () => {
         }),
       },
     });
+  });
+
+  it('strips email domain from username in welcome text', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      user: { id: '1', username: 'schmoyer21@gmail.com' },
+    });
+
+    const {
+      useGetUserLeaguesQuery,
+    }: any = require('../../api/db/graphql.generated');
+    useGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [{ id: 1, name: 'Test League' }],
+      },
+      loading: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    // Should show only the local part of the email
+    expect(screen.getByText(/Welcome back, schmoyer21/)).toBeInTheDocument();
+    // Should NOT contain the full email address
+    expect(screen.queryByText(/schmoyer21@gmail\.com/)).not.toBeInTheDocument();
+  });
+
+  it('preserves non-email usernames without truncation', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      user: { id: '1', username: 'john_doe' },
+    });
+
+    const {
+      useGetUserLeaguesQuery,
+    }: any = require('../../api/db/graphql.generated');
+    useGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [{ id: 1, name: 'Test League' }],
+      },
+      loading: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <BaseballLandingPage />
+      </MemoryRouter>,
+    );
+
+    // Non-email username should be displayed as-is
+    expect(screen.getByText(/Welcome back, john_doe/)).toBeInTheDocument();
   });
 });
