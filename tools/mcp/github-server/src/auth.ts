@@ -406,7 +406,10 @@ async function validateToken(token: string): Promise<boolean> {
 
   try {
     // Try GET /user first (works for PATs, OAuth tokens, and gh CLI tokens)
-    const res = await fetch('https://api.github.com/user', { headers });
+    const res = await fetch('https://api.github.com/user', {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
 
     if (res.ok) return true;
     if (res.status === 401) return false;
@@ -438,7 +441,7 @@ async function validateToken(token: string): Promise<boolean> {
         const { owner, name } = await getRepoOwnerName();
         const repoRes = await fetch(
           `https://api.github.com/repos/${owner}/${name}`,
-          { headers },
+          { headers, signal: AbortSignal.timeout(5_000) },
         );
         if (repoRes.ok) return true;
         if (repoRes.status === 401) return false;
@@ -478,10 +481,14 @@ async function validateToken(token: string): Promise<boolean> {
     }
 
     return false;
-  } catch {
-    // Network errors — don't invalidate token, assume it might be valid
+  } catch (err) {
+    // Network or timeout errors — don't invalidate token, assume it might be valid
+    const reason =
+      err instanceof DOMException && err.name === 'TimeoutError'
+        ? 'timeout'
+        : 'network error';
     process.stderr.write(
-      'Warning: Network error during token validation; assuming token is valid.\n',
+      `Warning: ${reason} during token validation; assuming token is valid.\n`,
     );
     return true;
   }
@@ -515,23 +522,40 @@ export async function tryResolveToken(): Promise<{
   if (cachedToken && cachedTokenSource)
     return { token: cachedToken, source: cachedTokenSource };
 
-  // 1. Environment variables
-  const envToken = process.env['GH_TOKEN'] || process.env['GITHUB_TOKEN'];
+  // 1. Environment variables (skip empty/whitespace — LS-1822)
+  const envToken = (
+    process.env['GH_TOKEN'] ||
+    process.env['GITHUB_TOKEN'] ||
+    ''
+  ).trim();
   if (envToken) {
-    cachedToken = envToken;
-    cachedTokenSource = 'env';
-    return { token: envToken, source: 'env' };
+    if (await validateToken(envToken)) {
+      cachedToken = envToken;
+      cachedTokenSource = 'env';
+      return { token: envToken, source: 'env' };
+    }
+    process.stderr.write(
+      'Warning: GH_TOKEN/GITHUB_TOKEN is set but invalid — trying other sources.\n',
+    );
   }
 
   // 2. Cached token file (respects expiry for GitHub App tokens)
   const fileToken = await readCachedToken();
   if (fileToken) {
-    cachedToken = fileToken;
-    cachedTokenSource = 'cached-file';
-    return { token: fileToken, source: 'cached-file' };
+    if (await validateToken(fileToken)) {
+      cachedToken = fileToken;
+      cachedTokenSource = 'cached-file';
+      return { token: fileToken, source: 'cached-file' };
+    }
+    // Don't delete the cached token file here — tryResolveToken is a read-only
+    // probe. Cache invalidation is the caller's responsibility (e.g. getToken
+    // or invalidateToken on 401).
   }
 
   // 3. GitHub App token (AGENT_AUTHOR_APP_PRIVATE_KEY env var)
+  //    Skip validation for freshly-generated app tokens — they are created from
+  //    a valid private key + installation exchange and would fail GET /user (403)
+  //    because app installation tokens represent an app, not a user.
   try {
     const appResult = await generateGitHubAppToken();
     if (appResult) {
@@ -549,17 +573,21 @@ export async function tryResolveToken(): Promise<{
   // 4. .netrc file
   const netrcToken = await readNetrcToken();
   if (netrcToken) {
-    cachedToken = netrcToken;
-    cachedTokenSource = 'netrc';
-    return { token: netrcToken, source: 'netrc' };
+    if (await validateToken(netrcToken)) {
+      cachedToken = netrcToken;
+      cachedTokenSource = 'netrc';
+      return { token: netrcToken, source: 'netrc' };
+    }
   }
 
   // 5. gh auth token
   const ghToken = await tryGhAuthToken();
   if (ghToken) {
-    cachedToken = ghToken;
-    cachedTokenSource = 'gh-cli';
-    return { token: ghToken, source: 'gh-cli' };
+    if (await validateToken(ghToken)) {
+      cachedToken = ghToken;
+      cachedTokenSource = 'gh-cli';
+      return { token: ghToken, source: 'gh-cli' };
+    }
   }
 
   return null;
@@ -580,8 +608,12 @@ export async function tryResolveToken(): Promise<{
 export async function getToken(): Promise<string> {
   if (cachedToken) return cachedToken;
 
-  // 1. Environment variables
-  const envToken = process.env['GH_TOKEN'] || process.env['GITHUB_TOKEN'];
+  // 1. Environment variables (skip empty/whitespace — LS-1822)
+  const envToken = (
+    process.env['GH_TOKEN'] ||
+    process.env['GITHUB_TOKEN'] ||
+    ''
+  ).trim();
   if (envToken) {
     if (await validateToken(envToken)) {
       cachedToken = envToken;
