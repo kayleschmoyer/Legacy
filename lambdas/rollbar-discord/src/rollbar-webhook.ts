@@ -1,26 +1,27 @@
+import { timingSafeEqual } from 'crypto';
 import type { RollbarEvent } from './types';
 
 /**
- * Known Rollbar outbound IP addresses used for webhook delivery.
- * Override via ROLLBAR_OUTBOUND_IPS env var (comma-separated).
- * @see https://docs.rollbar.com/docs/rollbar-ip-addresses
+ * Verify a webhook request by comparing the `auth` query-parameter token
+ * against the stored webhook secret.  Uses constant-time comparison to
+ * prevent timing side-channel attacks.
+ *
+ * @see https://docs.rollbar.com/docs/webhooks — Rollbar recommends passing
+ * an auth token in the webhook URL query string.
  */
-const DEFAULT_ROLLBAR_IPS = ['35.184.69.251'];
-const ROLLBAR_OUTBOUND_IPS = new Set(
-  process.env['ROLLBAR_OUTBOUND_IPS']
-    ? process.env['ROLLBAR_OUTBOUND_IPS'].split(',').map((ip) => ip.trim())
-    : DEFAULT_ROLLBAR_IPS,
-);
-
-/**
- * Verify that the request originates from a known Rollbar IP address.
- * Returns true if the source IP matches a known Rollbar outbound IP.
- */
-export function verifyOrigin(sourceIp: string | undefined): boolean {
-  if (!sourceIp) {
+export function verifyWebhookToken(
+  token: string | undefined,
+  secret: string,
+): boolean {
+  if (!token || !secret) {
     return false;
   }
-  return ROLLBAR_OUTBOUND_IPS.has(sourceIp);
+  const tokenBuf = Buffer.from(token);
+  const secretBuf = Buffer.from(secret);
+  if (tokenBuf.length !== secretBuf.length) {
+    return false;
+  }
+  return timingSafeEqual(tokenBuf, secretBuf);
 }
 
 /**

@@ -1,20 +1,31 @@
-import { parseRollbarPayload, verifyOrigin } from './rollbar-webhook';
+import { parseRollbarPayload, verifyWebhookToken } from './rollbar-webhook';
 
-describe('verifyOrigin', () => {
-  it('returns true for known Rollbar IP', () => {
-    expect(verifyOrigin('35.184.69.251')).toBe(true);
+describe('verifyWebhookToken', () => {
+  const secret = 'test-webhook-secret-123';
+
+  it('returns true when token matches secret', () => {
+    expect(verifyWebhookToken(secret, secret)).toBe(true);
   });
 
-  it('returns false for unknown IP', () => {
-    expect(verifyOrigin('1.2.3.4')).toBe(false);
+  it('returns false when token does not match', () => {
+    const wrongTokenSameLength = 'x'.repeat(secret.length);
+    expect(verifyWebhookToken(wrongTokenSameLength, secret)).toBe(false);
   });
 
-  it('returns false when sourceIp is undefined', () => {
-    expect(verifyOrigin(undefined)).toBe(false);
+  it('returns false when token is undefined', () => {
+    expect(verifyWebhookToken(undefined, secret)).toBe(false);
   });
 
-  it('returns false for empty string', () => {
-    expect(verifyOrigin('')).toBe(false);
+  it('returns false when token is empty string', () => {
+    expect(verifyWebhookToken('', secret)).toBe(false);
+  });
+
+  it('returns false when secret is empty string', () => {
+    expect(verifyWebhookToken('some-token', '')).toBe(false);
+  });
+
+  it('returns false when token and secret have different lengths', () => {
+    expect(verifyWebhookToken('short', 'much-longer-secret')).toBe(false);
   });
 });
 

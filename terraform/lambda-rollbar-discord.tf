@@ -43,7 +43,8 @@ resource "aws_iam_policy" "rollbar_discord_lambda_secrets" {
           "secretsmanager:DescribeSecret"
         ]
         Resource = [
-          aws_secretsmanager_secret.discord_webhook_url.arn
+          aws_secretsmanager_secret.discord_webhook_url.arn,
+          aws_secretsmanager_secret.rollbar_webhook_secret.arn
         ]
       }
     ]
@@ -86,6 +87,7 @@ resource "aws_lambda_function" "rollbar_discord" {
   environment {
     variables = {
       DISCORD_WEBHOOK_URL_SECRET_NAME     = aws_secretsmanager_secret.discord_webhook_url.name
+      ROLLBAR_WEBHOOK_SECRET_SECRET_NAME  = aws_secretsmanager_secret.rollbar_webhook_secret.name
       NODE_ENV                            = var.environment
       LOG_LEVEL                           = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"

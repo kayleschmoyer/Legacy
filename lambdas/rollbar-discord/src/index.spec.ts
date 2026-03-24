@@ -5,6 +5,8 @@ jest.mock('@legacy-sports/aws-utils', () => ({
   retrieveSecretParameterValue: jest.fn((name: string) => {
     if (name === 'discord-webhook-url')
       return Promise.resolve('https://discord.com/api/webhooks/test');
+    if (name === 'rollbar-webhook-secret')
+      return Promise.resolve('test-rollbar-webhook-secret');
     return Promise.reject(new Error(`Unknown secret: ${name}`));
   }),
 }));
@@ -30,10 +32,11 @@ globalThis.fetch = mockFetch;
 
 // Set env vars before importing handler
 process.env['DISCORD_WEBHOOK_URL_SECRET_NAME'] = 'discord-webhook-url';
+process.env['ROLLBAR_WEBHOOK_SECRET_SECRET_NAME'] = 'rollbar-webhook-secret';
 
 import { baseHandler } from './index';
 
-const ROLLBAR_IP = '35.184.69.251';
+const VALID_AUTH_TOKEN = 'test-rollbar-webhook-secret';
 
 function makeApiGatewayEvent(
   overrides: Partial<APIGatewayEvent> = {},
@@ -43,14 +46,14 @@ function makeApiGatewayEvent(
     path: '/rollbar-discord/health',
     headers: {},
     body: null,
-    queryStringParameters: null,
+    queryStringParameters: { auth: VALID_AUTH_TOKEN },
     pathParameters: null,
     stageVariables: null,
     multiValueHeaders: {},
     multiValueQueryStringParameters: null,
     isBase64Encoded: false,
     requestContext: {
-      identity: { sourceIp: ROLLBAR_IP },
+      identity: {},
     } as APIGatewayEvent['requestContext'],
     resource: '',
     ...overrides,
@@ -116,7 +119,7 @@ describe('baseHandler', () => {
       },
     });
 
-    it('returns 200 for a valid webhook from Rollbar IP', async () => {
+    it('returns 200 for a valid webhook with correct auth token', async () => {
       const event = makeApiGatewayEvent({
         httpMethod: 'POST',
         path: '/rollbar-discord/webhook',
@@ -128,14 +131,12 @@ describe('baseHandler', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('returns 403 for unknown source IP', async () => {
+    it('returns 403 for invalid auth token', async () => {
       const event = makeApiGatewayEvent({
         httpMethod: 'POST',
         path: '/rollbar-discord/webhook',
         body: rollbarBody,
-        requestContext: {
-          identity: { sourceIp: '1.2.3.4' },
-        } as APIGatewayEvent['requestContext'],
+        queryStringParameters: { auth: 'wrong-token-value-xxxxxx' },
       });
 
       const result = await baseHandler(event);
@@ -143,13 +144,12 @@ describe('baseHandler', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('returns 403 when source IP is missing', async () => {
+    it('returns 403 when auth token is missing', async () => {
       const event = makeApiGatewayEvent({
         httpMethod: 'POST',
         path: '/rollbar-discord/webhook',
-        requestContext: {
-          identity: {},
-        } as APIGatewayEvent['requestContext'],
+        body: rollbarBody,
+        queryStringParameters: null,
       });
 
       const result = await baseHandler(event);
