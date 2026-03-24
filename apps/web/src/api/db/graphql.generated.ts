@@ -1244,6 +1244,8 @@ export type Mutation = {
   setDraftOrder?: Maybe<Draft>;
   /** Replace the current user's draft queue for a draft. The order of playerIds defines pick priority (index 0 = first pick). Pass an empty array to clear. */
   setDraftQueue?: Maybe<Array<DraftQueueEntry>>;
+  /** Set or clear a custom nickname for a player on your roster. Pass null or empty string to remove the nickname. */
+  setNickname?: Maybe<TeamMember>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
@@ -1671,6 +1673,11 @@ export type MutationSetDraftOrderArgs = {
 export type MutationSetDraftQueueArgs = {
   draftId: Scalars['Int']['input'];
   playerIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationSetNicknameArgs = {
+  nickname?: InputMaybe<Scalars['String']['input']>;
+  teamMemberId: Scalars['Int']['input'];
 };
 
 export type MutationSetTeamLockArgs = {
@@ -3128,6 +3135,8 @@ export type TeamMember = {
   askingPrice?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Optional custom nickname for this player on this roster. (LS-1813) */
+  nickname?: Maybe<Scalars['String']['output']>;
   onTradeBlock?: Maybe<Scalars['Boolean']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
@@ -7319,6 +7328,7 @@ export type TeamMemberFragment = {
   onTradeBlock?: boolean | null;
   salary?: number | null;
   askingPrice?: string | null;
+  nickname?: string | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -7350,6 +7360,7 @@ export type GetTeamMembersQuery = {
     onTradeBlock?: boolean | null;
     salary?: number | null;
     askingPrice?: string | null;
+    nickname?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7408,6 +7419,7 @@ export type UpdateTeamMemberPositionMutation = {
     onTradeBlock?: boolean | null;
     salary?: number | null;
     askingPrice?: string | null;
+    nickname?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7443,6 +7455,7 @@ export type SwapTeamMemberPositionsMutation = {
     onTradeBlock?: boolean | null;
     salary?: number | null;
     askingPrice?: string | null;
+    nickname?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7596,6 +7609,41 @@ export type SetTradeBlockMutation = {
     onTradeBlock?: boolean | null;
     salary?: number | null;
     askingPrice?: string | null;
+    nickname?: string | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      brefId?: string | null;
+      eligiblePositions?: Array<string> | null;
+      seasonsPlayed?: number | null;
+      careerBatting?: {
+        __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
+    } | null;
+  } | null;
+};
+
+export type SetNicknameMutationVariables = Exact<{
+  teamMemberId: Scalars['Int']['input'];
+  nickname?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type SetNicknameMutation = {
+  __typename?: 'Mutation';
+  setNickname?: {
+    __typename?: 'TeamMember';
+    id?: number | null;
+    playerId?: number | null;
+    positionId?: number | null;
+    teamId?: number | null;
+    leagueId?: number | null;
+    onTradeBlock?: boolean | null;
+    salary?: number | null;
+    askingPrice?: string | null;
+    nickname?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7628,6 +7676,7 @@ export type GetLeagueTradeBlockQuery = {
     onTradeBlock?: boolean | null;
     salary?: number | null;
     askingPrice?: string | null;
+    nickname?: string | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -8515,6 +8564,7 @@ export const TeamMemberFragmentDoc = gql`
     onTradeBlock
     salary
     askingPrice
+    nickname
     player {
       id
       firstName
@@ -18256,6 +18306,58 @@ export type SetTradeBlockMutationResult =
 export type SetTradeBlockMutationOptions = BaseMutationOptions<
   SetTradeBlockMutation,
   SetTradeBlockMutationVariables
+>;
+export const SetNickname = gql`
+  mutation SetNickname($teamMemberId: Int!, $nickname: String) {
+    setNickname(teamMemberId: $teamMemberId, nickname: $nickname) {
+      ...TeamMember
+    }
+  }
+  ${TeamMemberFragmentDoc}
+`;
+export type SetNicknameMutationFn = MutationFunction<
+  SetNicknameMutation,
+  SetNicknameMutationVariables
+>;
+
+/**
+ * __useSetNicknameMutation__
+ *
+ * To run a mutation, you first call `useSetNicknameMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetNicknameMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setNicknameMutation, { data, loading, error }] = useSetNicknameMutation({
+ *   variables: {
+ *      teamMemberId: // value for 'teamMemberId'
+ *      nickname: // value for 'nickname'
+ *   },
+ * });
+ */
+export function useSetNicknameMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SetNicknameMutation,
+    SetNicknameMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<SetNicknameMutation, SetNicknameMutationVariables>(
+    SetNickname,
+    options,
+  );
+}
+export type SetNicknameMutationHookResult = ReturnType<
+  typeof useSetNicknameMutation
+>;
+export type SetNicknameMutationResult =
+  Apollo.MutationResult<SetNicknameMutation>;
+export type SetNicknameMutationOptions = BaseMutationOptions<
+  SetNicknameMutation,
+  SetNicknameMutationVariables
 >;
 export const GetLeagueTradeBlock = gql`
   query GetLeagueTradeBlock($leagueId: Int!) {

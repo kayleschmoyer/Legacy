@@ -1634,6 +1634,11 @@ type Mutation {
   setDraftQueue(draftId: Int!, playerIds: [Int!]!): [DraftQueueEntry!]
 
   """
+  Set or clear a custom nickname for a player on your roster. Pass null or empty string to remove the nickname.
+  """
+  setNickname(nickname: String, teamMemberId: Int!): TeamMember
+
+  """
   Commissioner: lock or unlock a team to prevent/allow roster moves.
   """
   setTeamLock(input: SetTeamLockInput!): CommissionerActionResult
@@ -2919,6 +2924,11 @@ type TeamMember {
   askingPrice: String
   id: Int
   leagueId: Int
+
+  """
+  Optional custom nickname for this player on this roster. (LS-1813)
+  """
+  nickname: String
   onTradeBlock: Boolean
   player: Player
   playerId: Int

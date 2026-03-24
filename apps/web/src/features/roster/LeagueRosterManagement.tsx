@@ -14,7 +14,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components';
 import { H4, styled, Text } from 'tamagui';
-import { AlertTriangle, Info, Lock } from '@tamagui/lucide-icons';
+import { AlertTriangle, Edit3, Info, Lock } from '@tamagui/lucide-icons';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
@@ -55,6 +55,7 @@ const getPlayerName = (
   teamMember: TeamMemberFragment | null | undefined,
 ): string => {
   if (!teamMember?.player) return 'Empty';
+  if (teamMember.nickname) return teamMember.nickname;
   const { firstName, lastName } = teamMember.player;
   return `${firstName || ''} ${lastName || ''}`.trim() || 'Empty';
 };
@@ -285,6 +286,7 @@ interface RosterRowProps {
   minCareerGames?: number;
   minCareerSeasons?: number;
   onViewDetails?: (player: TeamMemberFragment) => void;
+  onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
 }
 
 function RosterRow({
@@ -300,6 +302,7 @@ function RosterRow({
   minCareerGames,
   minCareerSeasons,
   onViewDetails,
+  onSetNickname,
 }: RosterRowProps): React.JSX.Element {
   const isLocked = Boolean(matchupData?.isLocked);
   const posType = position.positionType ?? '';
@@ -460,34 +463,65 @@ function RosterRow({
 
       {/* Player Name & Eligibility */}
       <YStack flex={1} minWidth={0} gap="$1">
-        {hasPlayer && assignedPlayer && onViewDetails ? (
-          <Text
-            fontSize="$3"
-            fontWeight="700"
-            color="$color12"
-            numberOfLines={1}
-            cursor="pointer"
-            hoverStyle={{
-              color: BRAND_NAVY_LIGHT,
-              textDecorationLine: 'underline',
-            }}
-            animation="quick"
-            onPress={(e: { stopPropagation: () => void }) => {
-              e.stopPropagation();
-              onViewDetails(assignedPlayer);
-            }}
-            aria-label={`View ${getPlayerName(assignedPlayer)} details`}
-          >
-            {getPlayerName(assignedPlayer)}
-          </Text>
-        ) : (
-          <Text
-            fontSize="$3"
-            fontWeight="700"
-            color="$color12"
-            numberOfLines={1}
-          >
-            {hasPlayer ? getPlayerName(assignedPlayer) : positionLabel}
+        <XStack alignItems="center" gap="$1.5">
+          {hasPlayer && assignedPlayer && onViewDetails ? (
+            <Text
+              fontSize="$3"
+              fontWeight="700"
+              color="$color12"
+              numberOfLines={1}
+              cursor="pointer"
+              hoverStyle={{
+                color: BRAND_NAVY_LIGHT,
+                textDecorationLine: 'underline',
+              }}
+              animation="quick"
+              onPress={(e: { stopPropagation: () => void }) => {
+                e.stopPropagation();
+                onViewDetails(assignedPlayer);
+              }}
+              aria-label={`View ${getPlayerName(assignedPlayer)} details`}
+            >
+              {getPlayerName(assignedPlayer)}
+            </Text>
+          ) : (
+            <Text
+              fontSize="$3"
+              fontWeight="700"
+              color="$color12"
+              numberOfLines={1}
+            >
+              {hasPlayer ? getPlayerName(assignedPlayer) : positionLabel}
+            </Text>
+          )}
+          {hasPlayer &&
+            assignedPlayer &&
+            assignedPlayer.id != null &&
+            onSetNickname && (
+              <XStack
+                cursor="pointer"
+                opacity={0.5}
+                hoverStyle={{ opacity: 1 }}
+                onPress={(e: { stopPropagation: () => void }) => {
+                  e.stopPropagation();
+                  const current = assignedPlayer.nickname ?? '';
+                  const result = window.prompt(
+                    'Set nickname (leave blank to remove):',
+                    current,
+                  );
+                  if (result !== null && assignedPlayer.id != null) {
+                    onSetNickname(assignedPlayer.id, result.trim() || null);
+                  }
+                }}
+                aria-label="Edit nickname"
+              >
+                <Edit3 size={12} color="$gray10" />
+              </XStack>
+            )}
+        </XStack>
+        {hasPlayer && assignedPlayer?.nickname && assignedPlayer.player && (
+          <Text fontSize="$1" color="$gray9" numberOfLines={1}>
+            {assignedPlayer.player.firstName} {assignedPlayer.player.lastName}
           </Text>
         )}
         {hasPlayer && eligible.length > 0 && (
@@ -653,6 +687,7 @@ interface RosterSectionProps {
   minCareerGames?: number;
   minCareerSeasons?: number;
   onViewDetails?: (player: TeamMemberFragment) => void;
+  onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
 }
 
 function RosterSection({
@@ -668,6 +703,7 @@ function RosterSection({
   minCareerGames,
   minCareerSeasons,
   onViewDetails,
+  onSetNickname,
 }: RosterSectionProps): React.JSX.Element | null {
   if (positions.length === 0) return null;
 
@@ -749,6 +785,7 @@ function RosterSection({
             minCareerGames={minCareerGames}
             minCareerSeasons={minCareerSeasons}
             onViewDetails={onViewDetails}
+            onSetNickname={onSetNickname}
           />
         );
       })}
@@ -766,6 +803,7 @@ interface BenchPlayerCardProps {
   recentlyMoved: boolean;
   matchupData?: PlayerMatchupData;
   onViewDetails?: (player: TeamMemberFragment) => void;
+  onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
 }
 
 function BenchPlayerCard({
@@ -776,6 +814,7 @@ function BenchPlayerCard({
   recentlyMoved,
   matchupData,
   onViewDetails,
+  onSetNickname,
 }: BenchPlayerCardProps): React.JSX.Element {
   const isLocked = Boolean(matchupData?.isLocked);
   const eligible = getEligiblePositions(player);
@@ -824,34 +863,62 @@ function BenchPlayerCard({
     >
       {/* Player info */}
       <YStack flex={1} minWidth={0} gap="$0.5">
-        {onViewDetails ? (
-          <Text
-            fontSize="$3"
-            fontWeight="600"
-            color="$color12"
-            numberOfLines={1}
-            cursor="pointer"
-            hoverStyle={{
-              color: BRAND_NAVY_LIGHT,
-              textDecorationLine: 'underline',
-            }}
-            animation="quick"
-            onPress={(e: { stopPropagation: () => void }) => {
-              e.stopPropagation();
-              onViewDetails(player);
-            }}
-            aria-label={`View ${getPlayerName(player)} details`}
-          >
-            {getPlayerName(player)}
-          </Text>
-        ) : (
-          <Text
-            fontSize="$3"
-            fontWeight="600"
-            color="$color12"
-            numberOfLines={1}
-          >
-            {getPlayerName(player)}
+        <XStack alignItems="center" gap="$1.5">
+          {onViewDetails ? (
+            <Text
+              fontSize="$3"
+              fontWeight="600"
+              color="$color12"
+              numberOfLines={1}
+              cursor="pointer"
+              hoverStyle={{
+                color: BRAND_NAVY_LIGHT,
+                textDecorationLine: 'underline',
+              }}
+              animation="quick"
+              onPress={(e: { stopPropagation: () => void }) => {
+                e.stopPropagation();
+                onViewDetails(player);
+              }}
+              aria-label={`View ${getPlayerName(player)} details`}
+            >
+              {getPlayerName(player)}
+            </Text>
+          ) : (
+            <Text
+              fontSize="$3"
+              fontWeight="600"
+              color="$color12"
+              numberOfLines={1}
+            >
+              {getPlayerName(player)}
+            </Text>
+          )}
+          {onSetNickname && player.id != null && (
+            <XStack
+              cursor="pointer"
+              opacity={0.5}
+              hoverStyle={{ opacity: 1 }}
+              onPress={(e: { stopPropagation: () => void }) => {
+                e.stopPropagation();
+                const current = player.nickname ?? '';
+                const result = window.prompt(
+                  'Set nickname (leave blank to remove):',
+                  current,
+                );
+                if (result !== null && player.id != null) {
+                  onSetNickname(player.id, result.trim() || null);
+                }
+              }}
+              aria-label="Edit nickname"
+            >
+              <Edit3 size={12} color="$gray10" />
+            </XStack>
+          )}
+        </XStack>
+        {player.nickname && player.player && (
+          <Text fontSize="$1" color="$gray9" numberOfLines={1}>
+            {player.player.firstName} {player.player.lastName}
           </Text>
         )}
         {eligible.length > 0 && (
@@ -985,6 +1052,7 @@ interface BenchPanelProps {
   recentlyMovedIds: ReadonlySet<number>;
   playerMatchupData?: ReadonlyMap<number, PlayerMatchupData>;
   onViewDetails?: (player: TeamMemberFragment) => void;
+  onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
 }
 
 function BenchPanel({
@@ -1000,6 +1068,7 @@ function BenchPanel({
   recentlyMovedIds,
   playerMatchupData,
   onViewDetails,
+  onSetNickname,
 }: BenchPanelProps): React.JSX.Element {
   const isFromLineup = Boolean(selectedPlayer?.positionId);
   const selectedPlayerLocked = Boolean(
@@ -1104,6 +1173,7 @@ function BenchPanel({
                     : undefined
                 }
                 onViewDetails={onViewDetails}
+                onSetNickname={onSetNickname}
               />
               {index < players.length - 1 && (
                 <Separator borderColor="$outlineSubtle" marginVertical={0} />
@@ -1246,6 +1316,8 @@ export interface LeagueRosterManagementProps {
   minCareerGames?: number;
   /** Minimum distinct MLB seasons a player must have to occupy a starting slot */
   minCareerSeasons?: number;
+  /** Callback to set or clear a player nickname. (LS-1813) */
+  onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
 }
 
 export function LeagueRosterManagement({
@@ -1261,6 +1333,7 @@ export function LeagueRosterManagement({
   teamName,
   minCareerGames,
   minCareerSeasons,
+  onSetNickname,
 }: LeagueRosterManagementProps): React.JSX.Element {
   const [selectedPlayer, setSelectedPlayer] =
     useState<TeamMemberFragment | null>(null);
@@ -1607,6 +1680,7 @@ export function LeagueRosterManagement({
                 minCareerGames={minCareerGames}
                 minCareerSeasons={minCareerSeasons}
                 onViewDetails={handleViewDetails}
+                onSetNickname={readOnly ? undefined : onSetNickname}
               />
 
               <RosterSection
@@ -1622,6 +1696,7 @@ export function LeagueRosterManagement({
                 minCareerGames={minCareerGames}
                 minCareerSeasons={minCareerSeasons}
                 onViewDetails={handleViewDetails}
+                onSetNickname={readOnly ? undefined : onSetNickname}
               />
 
               <RosterSection
@@ -1637,6 +1712,7 @@ export function LeagueRosterManagement({
                 minCareerGames={minCareerGames}
                 minCareerSeasons={minCareerSeasons}
                 onViewDetails={handleViewDetails}
+                onSetNickname={readOnly ? undefined : onSetNickname}
               />
 
               <RosterSection
@@ -1652,6 +1728,7 @@ export function LeagueRosterManagement({
                 minCareerGames={minCareerGames}
                 minCareerSeasons={minCareerSeasons}
                 onViewDetails={handleViewDetails}
+                onSetNickname={readOnly ? undefined : onSetNickname}
               />
             </YStack>
           </YStack>
@@ -1681,6 +1758,7 @@ export function LeagueRosterManagement({
               recentlyMovedIds={recentlyMovedIds}
               playerMatchupData={playerMatchupData}
               onViewDetails={handleViewDetails}
+              onSetNickname={readOnly ? undefined : onSetNickname}
             />
 
             <BenchPanel
@@ -1704,6 +1782,7 @@ export function LeagueRosterManagement({
               recentlyMovedIds={recentlyMovedIds}
               playerMatchupData={playerMatchupData}
               onViewDetails={handleViewDetails}
+              onSetNickname={readOnly ? undefined : onSetNickname}
             />
           </YStack>
         </XStack>

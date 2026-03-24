@@ -483,6 +483,8 @@ export const teamMembers = pgTable(
     salary: integer('salary'),
     /** Free-text asking price shown on the trade block. Null when not listed or no price set. (LS-1814) */
     askingPrice: text('asking_price'),
+    /** Optional custom nickname for this player on this roster. (LS-1813) */
+    nickname: varchar('nickname', { length: 50 }),
   },
   (table) => {
     return {

@@ -81,6 +81,7 @@ import {
   useGetUserTeamIdLazyQuery,
   useJoinPublicLeagueMutation,
   useRenameTeamMutation,
+  useSetNicknameMutation,
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
@@ -972,6 +973,7 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
   const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
+  const [setNickname] = useSetNicknameMutation();
 
   const [renameTeamMutation, { loading: renaming }] = useRenameTeamMutation();
   const [updateTeamBranding, { loading: teamBrandingLoading }] =
@@ -1485,6 +1487,19 @@ export function LeagueDetailPage(): React.JSX.Element {
       }
     },
     [swapTeamMemberPositions, positions, dispatch, displayedMatchupIdNum],
+  );
+
+  const handleSetNickname = useCallback(
+    async (teamMemberId: number, nickname: string | null) => {
+      try {
+        await setNickname({
+          variables: { teamMemberId, nickname },
+        });
+      } catch (error) {
+        LOGGER.error('Error setting nickname:', String(error));
+      }
+    },
+    [setNickname],
   );
 
   const inviteUrl = useMemo(() => {
@@ -2646,6 +2661,11 @@ export function LeagueDetailPage(): React.JSX.Element {
             isViewingHistoricalRosterWeek
               ? undefined
               : (league.minCareerSeasons ?? 3)
+          }
+          onSetNickname={
+            rosterIsReadOnly
+              ? undefined
+              : (id, nick) => void handleSetNickname(id, nick)
           }
         />
       </YStack>

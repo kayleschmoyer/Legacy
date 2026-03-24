@@ -400,6 +400,8 @@ export const TeamMember = builder.objectRef<{
   salary?: number | null;
   /** Free-text asking price shown on the trade block. (LS-1814) */
   askingPrice?: string | null;
+  /** Optional custom nickname for this player on this roster. (LS-1813) */
+  nickname?: string | null;
 }>('TeamMember');
 
 TeamMember.implement({
@@ -424,6 +426,13 @@ TeamMember.implement({
         'Free-text asking price displayed on the trade block listing. Null when not set.',
       resolve: (parent) =>
         (parent as { askingPrice?: string | null }).askingPrice ?? null,
+    }),
+    nickname: t.string({
+      nullable: true,
+      description:
+        'Optional custom nickname for this player on this roster. (LS-1813)',
+      resolve: (parent) =>
+        (parent as { nickname?: string | null }).nickname ?? null,
     }),
     player: t.field({
       type: 'Player',

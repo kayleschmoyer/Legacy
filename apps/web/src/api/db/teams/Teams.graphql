@@ -26,6 +26,8 @@ fragment TeamMember on TeamMember {
   salary
   # Asking price on trade block (LS-1814)
   askingPrice
+  # Player nickname (LS-1813)
+  nickname
   player {
     id
     firstName
@@ -163,6 +165,12 @@ mutation SetTradeBlock(
     onTradeBlock: $onTradeBlock
     askingPrice: $askingPrice
   ) {
+    ...TeamMember
+  }
+}
+
+mutation SetNickname($teamMemberId: Int!, $nickname: String) {
+  setNickname(teamMemberId: $teamMemberId, nickname: $nickname) {
     ...TeamMember
   }
 }

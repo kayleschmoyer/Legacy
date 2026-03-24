@@ -1069,3 +1069,58 @@ builder.mutationField('setTradeBlock', (t) =>
     ),
   }),
 );
+
+// ── setNickname (LS-1813) ────────────────────────────────────────────────────
+
+builder.mutationField('setNickname', (t) =>
+  t.field({
+    type: TeamMember,
+    description:
+      'Set or clear a custom nickname for a player on your roster. Pass null or empty string to remove the nickname.',
+    args: {
+      teamMemberId: t.arg.int({ required: true }),
+      nickname: t.arg.string({ required: false }),
+    },
+    resolve: authorized(
+      { teamMembers: (args) => [args.teamMemberId] },
+      async (_parent, args, _context) => {
+        const { teamMemberId, nickname } = args;
+        const db = _context.db;
+
+        // undefined = arg not provided → no-op on nickname
+        // null or empty string = explicitly clear nickname
+        const nicknameProvided = nickname !== undefined;
+        const normalizedNickname =
+          nickname && nickname.trim().length > 0
+            ? nickname.trim().slice(0, 50)
+            : null;
+
+        const updated = await db
+          .update(PublicSchema.teamMembers)
+          .set(nicknameProvided ? { nickname: normalizedNickname } : {})
+          .where(eq(PublicSchema.teamMembers.id, teamMemberId))
+          .returning({
+            id: PublicSchema.teamMembers.id,
+            teamId: PublicSchema.teamMembers.teamId,
+            leagueId: PublicSchema.teamMembers.leagueId,
+            playerId: PublicSchema.teamMembers.playerId,
+            positionId: PublicSchema.teamMembers.positionId,
+            onTradeBlock: PublicSchema.teamMembers.onTradeBlock,
+            nickname: PublicSchema.teamMembers.nickname,
+            salary: PublicSchema.teamMembers.salary,
+          });
+
+        if (updated.length === 0) {
+          throw new Error('Team member not found');
+        }
+
+        LOGGER.info('Updated player nickname', {
+          teamMemberId,
+          nickname: normalizedNickname,
+        });
+
+        return updated[0];
+      },
+    ),
+  }),
+);

@@ -15,16 +15,20 @@ interface PlayerLike {
 
 interface TeamMemberLike {
   player?: PlayerLike | null;
+  /** Optional custom nickname for this player on this roster. (LS-1813) */
+  nickname?: string | null;
 }
 
 /**
- * Format a player's full name from a team-member object.
+ * Format a player's display name from a team-member object.
+ * Returns the nickname if set, otherwise the full name.
  * Returns "Unknown Player" if the player data is missing.
  */
 export function getPlayerName(
   teamMember: TeamMemberLike | null | undefined,
 ): string {
   if (!teamMember?.player) return 'Unknown Player';
+  if (teamMember.nickname) return teamMember.nickname;
 
   const { firstName, lastName } = teamMember.player;
   return `${firstName || ''} ${lastName || ''}`.trim() || 'Unknown Player';

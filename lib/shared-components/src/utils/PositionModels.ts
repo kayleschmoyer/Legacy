@@ -64,6 +64,8 @@ export interface TeamMember {
   positionId?: number | null;
   player?: Player;
   isActive?: boolean;
+  /** Optional custom nickname for this player on this roster. (LS-1813) */
+  nickname?: string | null;
 }
 
 export interface TeamMemberWithPositions extends TeamMember {

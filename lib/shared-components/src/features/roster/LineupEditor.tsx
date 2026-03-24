@@ -326,7 +326,8 @@ function LineupEditor(props: LineupEditorProps) {
                 marginBottom="$1"
               >
                 {teamMember?.player
-                  ? `${teamMember.player.firstName} ${teamMember.player.lastName}`
+                  ? teamMember.nickname ||
+                    `${teamMember.player.firstName} ${teamMember.player.lastName}`
                   : 'Empty'}
               </Text>
               {teamMember?.player?.eligiblePositions && (
@@ -407,7 +408,8 @@ function LineupEditor(props: LineupEditorProps) {
             <Text color="$gray12" fontSize="$4" fontWeight="600">
               Selected:{' '}
               {selectedPlayer.player
-                ? `${selectedPlayer.player.firstName} ${selectedPlayer.player.lastName}`
+                ? selectedPlayer.nickname ||
+                  `${selectedPlayer.player.firstName} ${selectedPlayer.player.lastName}`
                 : 'Unknown'}
               {selectedPositionMapping && (
                 <Text color="$yellow10">
