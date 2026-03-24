@@ -93,10 +93,11 @@ const HITTING_STAT_COLUMNS: {
   },
   {
     key: 'offensiveWAR',
-    label: 'lWAR',
+    label: 'oWAR',
     sortKey: 'careerOffensiveWAR',
     width: 56,
-    description: 'Offensive WAR (batting + baserunning + positional)',
+    description:
+      'Offensive WAR (batting + baserunning + positional adjustment)',
     isBold: true,
   },
 ];
@@ -221,10 +222,10 @@ const PITCHER_SCORING_COLUMNS: {
   },
   {
     key: 'avgPointsPerGame',
-    label: 'PPG',
+    label: 'PROJ',
     sortKey: 'pitchingAvgPointsPerGame',
     width: 60,
-    description: 'Pitching Points Per Game',
+    description: 'Projected Pitching Points This Week',
     isBold: true,
   },
   {
@@ -1027,7 +1028,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
                           ? s.hitterAvgPointsPerGame * gamesPerMatchup
                           : null
                         : s?.pitchingAvgPointsPerGame != null
-                          ? s.pitchingAvgPointsPerGame
+                          ? s.pitchingAvgPointsPerGame * gamesPerMatchup
                           : null;
                     return (
                       <>

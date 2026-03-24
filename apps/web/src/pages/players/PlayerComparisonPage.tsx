@@ -702,7 +702,7 @@ export function PlayerComparisonPage() {
       ['Stolen Bases', false, (p) => p.careerBatting?.stolenBases],
       ['Walks', false, (p) => p.careerBatting?.baseOnBalls],
       ['Total Bases', false, (p) => p.careerBatting?.totalBases],
-      ['lWAR', false, (p) => p.careerBatting?.offensiveWAR],
+      ['oWAR', false, (p) => p.careerBatting?.offensiveWAR],
       ['Avg Seasons AVG', false, (p) => p.averageSeasonBatting?.battingAverage],
       [
         'Avg Seasons OBP',

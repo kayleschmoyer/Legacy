@@ -274,7 +274,7 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
   },
   {
     key: 'offensiveWAR',
-    label: 'lWAR',
+    label: 'oWAR',
     sortable: true,
     width: '70px',
     align: 'center',
