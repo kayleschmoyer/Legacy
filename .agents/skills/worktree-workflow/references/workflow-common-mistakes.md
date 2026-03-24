@@ -162,7 +162,7 @@ git push origin HEAD
 
 All work must go through PR review, even for documentation. **This is the #1 agent failure mode**: agents write code, run `make pc`, and stop — thinking the task is done. Your work is **not complete** until:
 
-1. `gh pr create` has been run and the PR URL is visible
+1. A PR has been created (via `github_create_pr` MCP tool) and the PR URL is visible
 2. Jira has been moved to "In Review"
 
 If you find yourself about to end your turn after `make pc`: **STOP and keep going.**

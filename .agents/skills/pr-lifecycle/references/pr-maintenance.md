@@ -22,6 +22,15 @@ This skill covers the complete PR lifecycle: creation, self-review, review fixin
 
 ### Command
 
+Use the `github_create_pr` MCP tool (**always preferred**):
+
+```
+github_create_pr(title: "LS-#### type(scope): description", body: <markdown>, draft: true, worktreePath: <path>)
+```
+
+<details>
+<summary>CLI fallback (only when MCP server is unavailable)</summary>
+
 Always use `--body-file` for the PR body (avoid inlining `--body` in any shell; PowerShell is especially problematic):
 
 ```bash
@@ -29,13 +38,13 @@ Always use `--body-file` for the PR body (avoid inlining `--body` in any shell; 
 # File: .github/tmp-pr-body.md
 
 # Create PR
-gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+gh pr create --draft --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
 # Clean up
 bash scripts/cleanup-pr-body.sh
 ```
 
-Or use the `github_create_pr` MCP tool (preferred).
+</details>
 
 ### PR Title Format
 

@@ -46,13 +46,13 @@ IF unsettled PRs remain after max passes:
 
 Each PR lives in its own junctioned worktree. The shared `node_modules` is **read-only** during `make pc`, so parallel validation is safe.
 
-| Phase                  | Parallelizable?       | Reason                                                               |
-| ---------------------- | --------------------- | -------------------------------------------------------------------- |
-| Rebase (Pass 1)        | **No — sequential**   | Merging PR A shifts `main`, invalidating PR B's rebase               |
-| `make pc` validation   | **Yes — `Start-Job`** | Each worktree reads shared `node_modules`, writes only local outputs |
-| CI wait/polling        | **Yes — batch poll**  | Just polling `gh pr checks` — no contention                          |
-| Review fixes (Pass 2)  | **No — sequential**   | Each fix requires reading context, reasoning, editing                |
-| CI code fixes (Pass 3) | **No — sequential**   | Sub-agents lack tool permissions; process each PR sequentially       |
+| Phase                  | Parallelizable?       | Reason                                                                |
+| ---------------------- | --------------------- | --------------------------------------------------------------------- |
+| Rebase (Pass 1)        | **No — sequential**   | Merging PR A shifts `main`, invalidating PR B's rebase                |
+| `make pc` validation   | **Yes — `Start-Job`** | Each worktree reads shared `node_modules`, writes only local outputs  |
+| CI wait/polling        | **Yes — batch poll**  | Just polling `ci_view_run` / `github_pr_batch_status` — no contention |
+| Review fixes (Pass 2)  | **No — sequential**   | Each fix requires reading context, reasoning, editing                 |
+| CI code fixes (Pass 3) | **No — sequential**   | Sub-agents lack tool permissions; process each PR sequentially        |
 
 ### Parallel `make pc` Pattern
 

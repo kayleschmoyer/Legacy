@@ -7,7 +7,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 ## Critical Rules
 
 - **NEVER commit to main** — create a worktree first: `make worktree TICKET=#### DESC=description`
-- **Drive to PR** — work is NOT complete until `gh pr create` runs and Jira moves to "In Review". Passing `make pc` is a checkpoint, not the finish line. After validation passes, you **must** continue to: commit, push, `gh pr create`, Jira "In Review". Stopping after code changes or after `make pc` without opening a PR is the single most common agent failure mode.
+- **Drive to PR** — work is NOT complete until the PR is created and Jira moves to "In Review". Passing `make pc` is a checkpoint, not the finish line. After validation passes, you **must** continue to: commit, push, create PR (via `github_create_pr` MCP tool), Jira "In Review". Stopping after code changes or after `make pc` without opening a PR is the single most common agent failure mode.
 - **One ticket = one worktree = one PR** — never add unrelated changes to an existing branch or worktree. If a new task arises while working on a ticket (e.g., the user asks you to fix something unrelated), create a **separate Jira ticket and worktree** for it. Do not `git stash` changes into another worktree or tack extra commits onto an in-flight branch — each PR must map to exactly one Jira ticket.
 - **Worktree-first**: always create a worktree for ticket work — never edit code in the main repo (`D:\code\legacy-sports`). After creating the worktree, all file edits and terminal commands must use the worktree path.
 - **Built-in `isolation: "worktree"` for throwaway tasks only**: Claude Code's Agent tool supports `isolation: "worktree"` which creates ephemeral worktrees in `.claude/worktrees/`. Use this **only** for disposable exploration — code research, architecture spikes, parallel file searches — where no Jira ticket, dependency setup, or PR is needed. These worktrees lack junction optimization, twig dependency tracking, and git hooks (pre-commit security checks installed via `make setup-hooks`). All ticket-based work **must** use the custom worktree workflow (`make worktree` + `make wt-setup` + worktree MCP server).
@@ -37,16 +37,16 @@ This file provides guidance to AI coding agents working with code in this reposi
 6. **All remaining work happens at the worktree path (`$wt`), NOT `D:\code\legacy-sports`.** Every file edit, terminal command, and git operation must target `$wt`.
 7. Code: `make <target>` (e.g. `make test`, `make build`, `make typecheck`, `make lint-fix`). For project-specific targets: `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly (exception: `lib/db-client` migration scripts — see step 10).
    - 7b. **Test new test files (MANDATORY)**: if you wrote or modified any test file (`.spec.ts`, `.spec.tsx`, `.test.ts`, `.test.tsx`, `.integration.spec.ts`), run those tests locally and confirm they pass **before committing**. For Jest: `pnpm exec nx run <project>:test --testPathPattern="SpecName"`. For Playwright E2E: `pnpm exec nx build web` then `pnpm exec nx e2e web-e2e -- --grep='test name' --config=apps/web-e2e/playwright.config.ts`. Never push untested test code. See `.agents/skills/testing/SKILL.md`.
-8. Commit: `git commit -m "type(scope): msg"` then `git push origin HEAD`
+8. Commit: `worktree_commit(message: "type(scope): msg")` then `worktree_push()` (shell fallback: `git commit` / `git push`)
 9. Rebase onto parent: `git fetch origin ; twig rebase` — keeps branch current with its parent (main or a stacked branch)
    - 9b. **Post-rebase stabilization (BEFORE push)**: `make install ; pnpm exec nx run db:print-schema ; pnpm exec nx affected -t codegen --base=origin/main` — main may have changed deps, schema, or formatting. **Do NOT push until `make pc` passes** (see `skills/rebase/SKILL.md` Step 4).
 10. **Migrations (BEFORE make pc)**: run `pnpm --prefix lib/db-client run db:status` and `pnpm --prefix lib/db-client run db:up` — **always do this even if you think no migrations were added.** Confirm `Applied N new migrations` or `No new migrations to apply`. (See `skills/repo-tooling/SKILL.md`.) _Note: `pnpm run` is allowed here because these are `lib/db-client` package scripts with no Nx target equivalent._
 11. Validate: `make pc` — must pass before pushing or opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
     - 11b. **Self-review (BEFORE first push)**: run the `/review` skill (or follow the self-review steps in `skills/pr-lifecycle/SKILL.md`) to catch project-rule violations and code quality issues that `make pc` does not check. This significantly reduces Copilot review rounds.
-    - 11c. **Push only after `make pc` passes**: `git push --force-with-lease origin HEAD` — pushing before validating is the #1 cause of post-rebase CI failures.
+    - 11c. **Push only after `make pc` passes**: `worktree_push()` (shell fallback: `git push --force-with-lease origin HEAD`) — pushing before validating is the #1 cause of post-rebase CI failures.
 12. **Ship (REQUIRED — do NOT stop before this step)**: Create PR as **draft** first, then mark ready after validation. This prevents sweep/review agents from racing with the creating agent.
-    - 12a. **Create draft PR**: `github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)` (or `gh pr create --draft --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` then `bash scripts/cleanup-pr-body.sh`)
-    - 12b. **Mark ready for review**: after PR creation succeeds, `github_mark_pr_ready(number: <PR#>)` (or `gh pr ready <PR#>`) — this signals to sweep/review agents that the PR is available.
+    - 12a. **Create draft PR**: `github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)`. Shell fallback (only if MCP unavailable): `gh pr create --draft --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` then `bash scripts/cleanup-pr-body.sh`.
+    - 12b. **Mark ready for review**: after PR creation succeeds, `github_mark_pr_ready(number: <PR#>)`. Shell fallback: `gh pr ready <PR#>`. This signals to sweep/review agents that the PR is available.
     - 12c. **Jira "In Review"**: transition the ticket after marking the PR ready.
     - 12d. **MCP gap audit (REQUIRED)**: follow the audit workflow in `skills/mcp-gaps/SKILL.md` to review Bash commands from this session, classify gaps, check for existing LS-1455 tickets, and file new ones. Also audit MCP tool overflows. This step is mandatory — it is how we continuously improve the agentic environment.
 13. Cleanup: `twig worktree clean` then `git branch -d LS-####/description` then Jira "Done" — **NEVER use `git worktree remove` directly** (see Rules)
@@ -155,7 +155,21 @@ Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`
 
 **Git operations in worktrees — MCP first**: use `worktree_commit` instead of `git add`/`git commit` via Bash — it handles staging and committing in one operation and refuses to stage likely credential/secret files (e.g., `.env`, `credentials.*`, `*.pem`, `*.key`). Use `worktree_push` (supports `setUpstream`) instead of `git push`, `worktree_rebase` instead of `git fetch && twig rebase`, and `worktree_run` for other git commands. These tools auto-resolve the worktree directory, refuse dangerous operations (pushing `main`, pushing during rebase), and require no manual `cd` or `-C` flags.
 
-**GitHub PR operations — MCP first**: use `github_create_pr` (with `draft: true`) instead of `gh pr create` via Bash, `github_mark_pr_ready` instead of `gh pr ready`, `github_resolve_thread` instead of `gh api graphql` mutations, `github_get_review_threads` instead of raw GraphQL queries, and `github_manage_labels` instead of `gh pr edit --add-label`. These tools handle temp file body encoding, GraphQL thread IDs, and structured output.
+**GitHub PR operations — MCP first**: use the MCP tools listed below instead of `gh` CLI. These tools handle temp file body encoding, GraphQL thread IDs, and structured output. Fall back to `gh` CLI **only** when the MCP server is unavailable.
+
+| `gh` CLI command                  | MCP tool (use this)                                |
+| --------------------------------- | -------------------------------------------------- |
+| `gh pr create`                    | `github_create_pr` (with `draft: true`)            |
+| `gh pr ready`                     | `github_mark_pr_ready`                             |
+| `gh pr edit --add-label`          | `github_manage_labels`                             |
+| `gh api graphql` (resolve thread) | `github_resolve_thread` / `github_resolve_threads` |
+| `gh api` (review threads)         | `github_get_review_threads`                        |
+| `gh pr view`                      | `github_view_pr`                                   |
+| `gh pr list`                      | `github_list_prs` / `github_pr_dashboard`          |
+| `gh run list`                     | `ci_list_runs`                                     |
+| `gh run view`                     | `ci_view_run`                                      |
+| `gh run rerun`                    | `ci_rerun`                                         |
+| `gh pr edit --body-file`          | No MCP equivalent — `gh` CLI is correct here       |
 
 **GitHub auth-aware routing**: call `github_auth_status` at the start of any GitHub workflow. If `configured: true`, use our custom GitHub MCP tools. If `configured: false`, fall back to `gh` CLI commands directly (which may have their own authentication via `gh auth login`).
 

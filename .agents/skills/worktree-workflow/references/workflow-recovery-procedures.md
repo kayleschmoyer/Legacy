@@ -14,8 +14,9 @@ git add .
 git commit -m "feat(scope): description (LS-1234)"
 git push origin HEAD
 
-# 4. Create PR (see create-pr skill for full template)
-gh pr create --title "LS-1234 feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+# 4. Create PR via MCP (preferred) — see create-pr skill for full template
+github_create_pr(title: "LS-1234 feat(scope): description", body: <markdown>, draft: true)
+# Shell fallback: gh pr create --draft --title "LS-1234 feat(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 ```
 
 ## If You Pushed to Main by Mistake
@@ -40,7 +41,9 @@ git cherry-pick $originalCommit
 
 # 4. Push and open a PR
 git push origin HEAD
-gh pr create --title "LS-1234 fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+# Create PR via MCP (preferred):
+github_create_pr(title: "LS-1234 fix(scope): description", body: <markdown>, draft: true)
+# Shell fallback: gh pr create --draft --title "LS-1234 fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 ```
 
 > **Why revert instead of force-push?** `git revert` adds a new commit and never

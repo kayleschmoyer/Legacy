@@ -331,12 +331,23 @@ If tests fail:
 
 ### Step 8: Create Pull Request
 
-See the [pr-workflow skill](../pr-workflow/SKILL.md) for the full PR template workflow. For a quick PR:
+See the [pr-workflow skill](../pr-workflow/SKILL.md) for the full PR template workflow. Use the MCP tool (preferred):
+
+```
+github_create_pr(title: "LS-#### type(scope): description", body: <markdown>, draft: true, worktreePath: <path>)
+github_mark_pr_ready(number: <PR#>)
+```
+
+<details>
+<summary>CLI fallback (only when MCP server is unavailable)</summary>
 
 ```bash
-gh pr create --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
+gh pr create --draft --title "LS-#### type(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 bash scripts/cleanup-pr-body.sh
+gh pr ready <PR#>
 ```
+
+</details>
 
 ### Step 9: Update Jira to In Review
 
@@ -402,10 +413,11 @@ worktree_push(worktree: "LS-####", setUpstream: true)
 pnpm --prefix $wt/lib/db-client run db:up
 make -C $wt pc
 
-# 6. PR + Jira (DO NOT stop at make pc)
-gh pr create --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
-bash scripts/cleanup-pr-body.sh "$wt"
-jira_transition(key: "LS-####", status: "In Review")  # MCP tool — primary
+# 6. PR + Jira (DO NOT stop at make pc) — MCP tools primary
+github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: $wt)
+github_mark_pr_ready(number: <PR#>)
+jira_transition(key: "LS-####", status: "In Review")
+# Shell fallback (only if MCP unavailable): gh pr create --draft --title "..." --body-file ".github/tmp-pr-body.md" --base main
 
 # 7. Cleanup after merge
 cd "D:\code\legacy-sports"

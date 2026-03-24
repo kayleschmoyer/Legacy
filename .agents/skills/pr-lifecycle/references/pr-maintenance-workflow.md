@@ -273,6 +273,6 @@ Produce a summary report with:
 | -------------------------------------------- | ---------------------------------------------------------------------------- |
 | Rebase aborts repeatedly on same commit      | `git rebase --skip` if commit already applied; load `skills/rebase/SKILL.md` |
 | Copilot keeps re-reviewing with same comment | After 2 cycles on the same thread, resolve it and move on                    |
-| CI failure is flaky (passes on re-run)       | Re-trigger: `gh run rerun $runId --failed` — do not change code              |
+| CI failure is flaky (passes on re-run)       | Re-trigger: `ci_rerun(runId: <id>, failedOnly: true)` — do not change code   |
 | Too many PRs to process in one session       | Prioritize: conflicts → CI → reviews                                         |
 | `make pc` fails after rebase stabilization   | Load `skills/rebase/SKILL.md` for post-rebase steps                          |

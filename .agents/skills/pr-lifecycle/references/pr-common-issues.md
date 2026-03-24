@@ -31,7 +31,7 @@ twig github setup
 
 ### Issue: PR body has broken formatting
 
-**Solution**: Use the `create_file` tool to write a correct `.github/tmp-pr-body.md`, then update the existing PR body with `gh pr edit` — **do not close and recreate**:
+**Solution**: Use the `create_file` tool to write a correct `.github/tmp-pr-body.md`, then update the existing PR body with `gh pr edit` (no MCP equivalent exists for editing PR body) — **do not close and recreate**:
 
 ```powershell
 # 1. Use create_file tool to write the correct markdown to .github/tmp-pr-body.md

@@ -43,7 +43,7 @@ Orchestrate maintenance across all open PRs: scan, rebase conflicts, fix reviews
 4. **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.
 5. **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
 6. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
-7. **Always create PRs as drafts** -- use `draft: true` in `github_create_pr` or `--draft` in `gh pr create`. Mark ready with `github_mark_pr_ready` after creation. This prevents sweep/review agents from racing with the creating agent.
+7. **Always create PRs as drafts** -- use `draft: true` in `github_create_pr` MCP tool. Mark ready with `github_mark_pr_ready` after creation. This prevents sweep/review agents from racing with the creating agent.
 
 ## Quick Commands
 
@@ -51,12 +51,18 @@ Orchestrate maintenance across all open PRs: scan, rebase conflicts, fix reviews
 # MCP (preferred) — always create as draft, then mark ready
 github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)
 github_mark_pr_ready(number: <PR#>)
+```
 
-# CLI fallback
+<details>
+<summary>CLI fallback (only when MCP server is unavailable)</summary>
+
+```bash
 gh pr create --draft --title "LS-#### type(scope): msg" --body-file ".github/tmp-pr-body.md" --base main
 bash scripts/cleanup-pr-body.sh
 gh pr ready <PR#>
 ```
+
+</details>
 
 ## Reference Documents
 
