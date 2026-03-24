@@ -538,6 +538,30 @@ const CompactActions = styled(XStack, {
   flexWrap: 'wrap',
 });
 
+const CompactPrimaryButton = styled(Button, {
+  borderRadius: '$5',
+  height: '$4',
+  fontSize: '$2',
+  fontWeight: '700',
+  paddingHorizontal: '$4',
+  color: '$color1',
+  backgroundColor: BRAND_NAVY_LIGHT,
+  borderColor: 'transparent',
+  animation: 'quick',
+  hoverStyle: {
+    backgroundColor: BRAND_NAVY,
+    transform: 'translateY(-1px)',
+    shadowColor: withAlpha(BRAND_NAVY, 0.5),
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  pressStyle: {
+    backgroundColor: BRAND_NAVY_DARK,
+    scale: 0.98,
+  },
+});
+
 const CompactButton = styled(Button, {
   borderRadius: '$5',
   height: '$4',
@@ -928,12 +952,12 @@ export function BaseballLandingPage() {
         <CompactWelcome>Welcome back, {userName}</CompactWelcome>
       </CompactHeroLeft>
       <CompactActions>
-        <CompactButton
+        <CompactPrimaryButton
           onPress={handleCreateLeague}
           accessibilityLabel="Create a new baseball league"
         >
           <Text fontWeight="700">+ Create</Text>
-        </CompactButton>
+        </CompactPrimaryButton>
         <CompactButton
           onPress={handleJoinLeague}
           accessibilityLabel="Join an existing baseball league"
