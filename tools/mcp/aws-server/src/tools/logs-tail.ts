@@ -14,6 +14,7 @@ export const LAMBDA_FUNCTIONS = [
   'websocket',
   'apple-iap',
   'stripe-webhook',
+  'rollbar-discord',
 ] as const;
 
 export type LambdaFunction = (typeof LAMBDA_FUNCTIONS)[number];

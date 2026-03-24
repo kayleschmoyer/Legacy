@@ -35,7 +35,7 @@
 
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet('graphql', 'db', 'oauth-proxy', 'notifications', 'stats', 'stats-lambda', 'game-selection', 'draft-processor')]
+    [ValidateSet('graphql', 'db', 'oauth-proxy', 'notifications', 'stats', 'stats-lambda', 'game-selection', 'draft-processor', 'websocket', 'apple-iap', 'stripe-webhook', 'rollbar-discord')]
     [string]$Function,
     
     [string]$Since = "1h",
