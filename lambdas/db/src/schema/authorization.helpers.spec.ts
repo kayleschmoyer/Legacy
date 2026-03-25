@@ -77,6 +77,7 @@ import {
   isTeamGeneralManager,
   type LeagueMembership,
   requireAuth,
+  requireNotImpersonating,
   verifyCommissionerAccess,
   verifyLeagueMembership,
   verifyTeamEditAccess,
@@ -122,6 +123,33 @@ describe('requireAuth', () => {
   it('returns the user when context.user is present', () => {
     const result = requireAuth(makeContext(USER));
     expect(result).toEqual(USER);
+  });
+});
+
+// ── requireNotImpersonating ───────────────────────────────────────────────────
+
+describe('requireNotImpersonating', () => {
+  it('does not throw when user is not impersonating', () => {
+    expect(() => requireNotImpersonating(makeContext(USER))).not.toThrow();
+  });
+
+  it('does not throw when user is null (handled by requireAuth separately)', () => {
+    expect(() => requireNotImpersonating(makeContext(null))).not.toThrow();
+  });
+
+  it('throws FORBIDDEN when user has impersonatedBy set', () => {
+    const impersonatedUser = {
+      ...USER,
+      impersonatedBy: { id: 99, username: 'admin' },
+    };
+    expect(() =>
+      requireNotImpersonating(makeContext(impersonatedUser)),
+    ).toThrow(
+      expect.objectContaining({
+        extensions: { code: 'FORBIDDEN' },
+        message: 'This action is not allowed while impersonating a user.',
+      }),
+    );
   });
 });
 
@@ -647,6 +675,31 @@ describe('authorized() wrapper', () => {
       resolve({}, { memberIds: [1] }, makeContext(USER, db)),
     ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('throws FORBIDDEN when noImpersonation is set and user is impersonating', async () => {
+    const handler = jest.fn();
+    const resolve = authorized({ noImpersonation: true }, handler);
+
+    const impersonatedUser = {
+      ...USER,
+      impersonatedBy: { id: 99, username: 'admin' },
+    };
+    await expect(
+      resolve({}, {}, makeContext(impersonatedUser)),
+    ).rejects.toMatchObject({
+      extensions: { code: 'FORBIDDEN' },
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('allows the handler when noImpersonation is set and user is not impersonating', async () => {
+    const handler = jest.fn().mockResolvedValue('ok');
+    const resolve = authorized({ noImpersonation: true }, handler);
+
+    const result = await resolve({}, {}, makeContext(USER));
+    expect(result).toBe('ok');
+    expect(handler).toHaveBeenCalled();
   });
 
   it('enforces checkPlayersNotLocked when checkLocked and teamMembers are both set', async () => {

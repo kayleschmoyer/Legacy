@@ -15,7 +15,11 @@ import {
   ForbiddenError,
   UserInputError,
 } from './graphql-errors';
-import { getSubscriptionTier, requireAuth } from './authorization';
+import {
+  getSubscriptionTier,
+  requireAuth,
+  requireNotImpersonating,
+} from './authorization';
 import { getStripeClient } from '../server/stripe';
 
 // Number of trial days to apply on new subscriptions, or undefined if no trial.
@@ -255,6 +259,7 @@ builder.mutationField('createCheckoutSession', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) throw AuthenticationError();
+      requireNotImpersonating(context);
 
       const { id: userId, email } = context.user;
       const stripe = await getStripeClient();
@@ -326,6 +331,7 @@ builder.mutationField('createBillingPortalSession', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) throw AuthenticationError();
+      requireNotImpersonating(context);
 
       const subscription = await getSubscriptionForUser(context.user.id);
       if (!subscription) {
@@ -386,6 +392,7 @@ builder.mutationField('setActiveLeagues', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) throw AuthenticationError();
+      requireNotImpersonating(context);
 
       const { id: userId } = context.user;
 
@@ -504,6 +511,7 @@ builder.mutationField('verifyApplePurchase', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) throw AuthenticationError();
+      requireNotImpersonating(context);
 
       const userId = context.user.id;
 
@@ -619,6 +627,7 @@ builder.mutationField('restoreApplePurchases', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) throw AuthenticationError();
+      requireNotImpersonating(context);
 
       const userId = context.user.id;
 
@@ -814,6 +823,7 @@ builder.mutationField('verifyGooglePurchase', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) throw AuthenticationError();
+      requireNotImpersonating(context);
 
       const userId = context.user.id;
       const { purchaseToken, productId } = args;
@@ -912,6 +922,7 @@ builder.mutationField('restoreGooglePurchases', (t) =>
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) throw AuthenticationError();
+      requireNotImpersonating(context);
 
       const userId = context.user.id;
       const { purchaseToken, productId } = args;

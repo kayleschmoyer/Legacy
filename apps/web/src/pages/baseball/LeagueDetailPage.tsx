@@ -57,9 +57,9 @@ import {
   computeScoring,
   type SeasonStats,
 } from '@legacy-sports/scoring';
+import { LeagueScoringSummary } from '@legacy-sports/shared-components';
 import { PageMeta } from '../../components/PageMeta';
 import { LeagueActivityFeed } from '../../features/baseball/LeagueActivityFeed';
-import { LeagueScoringSummary } from '@legacy-sports/shared-components';
 import { LeagueScoringEditor } from '../../features/baseball/LeagueScoringEditor';
 import { LeagueTradeBlock } from '../../features/baseball/LeagueTradeBlock';
 import { TradingCenter } from '../../features/baseball/TradingCenter';

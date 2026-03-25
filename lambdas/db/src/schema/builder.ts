@@ -21,6 +21,11 @@ export interface Context {
     email?: string | null;
     username?: string | null;
     isAdmin?: boolean;
+    impersonatedBy?: {
+      id: number;
+      email?: string;
+      username: string;
+    };
   } | null;
   loaders: Loaders; // DataLoaders for batching queries
   db: GenericDatabase<typeof PublicSchema>; // Shared database connection for this request

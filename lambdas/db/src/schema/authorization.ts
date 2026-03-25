@@ -55,6 +55,11 @@ export interface AuthenticatedUser {
   email?: string | null;
   username?: string | null;
   isAdmin?: boolean;
+  impersonatedBy?: {
+    id: number;
+    email?: string;
+    username: string;
+  };
 }
 
 /** A user's membership record within a specific league. */
@@ -118,6 +123,15 @@ export interface AuthConfig<TArgs> {
    * @default false
    */
   checkLocked?: boolean;
+
+  /**
+   * When `true`, the wrapper will call {@link requireNotImpersonating} to
+   * block the mutation during admin impersonation sessions.  Use this for
+   * any mutation with financial or subscription consequences.
+   *
+   * @default false
+   */
+  noImpersonation?: boolean;
 }
 
 /**
@@ -202,6 +216,21 @@ export function requireAuth(context: Context): AuthenticatedUser {
     throw AuthenticationError();
   }
   return context.user as AuthenticatedUser;
+}
+
+/**
+ * Throws {@link ForbiddenError} when the current session is an admin
+ * impersonation.  Call this before any mutation that has financial or
+ * subscription consequences for the impersonated user.
+ *
+ * @throws ForbiddenError when `context.user.impersonatedBy` is set.
+ */
+export function requireNotImpersonating(context: Context): void {
+  if (context.user?.impersonatedBy) {
+    throw ForbiddenError(
+      'This action is not allowed while impersonating a user.',
+    );
+  }
 }
 
 /**
@@ -502,29 +531,34 @@ export function authorized<TArgs, TResult>(
     const user = requireAuth(context);
     const db = context.db;
 
-    // 2. Premium subscription check
+    // 2. Impersonation check
+    if (config.noImpersonation) {
+      requireNotImpersonating(context);
+    }
+
+    // 3. Premium subscription check
     if (config.premium) {
       await requirePremium(context);
     }
 
-    // 3. League membership check
+    // 4. League membership check
     if (config.memberOf) {
       const leagueId = config.memberOf(args);
       await verifyLeagueMembership(db, leagueId, user.id);
     }
 
-    // 4. Commissioner / owner check
+    // 5. Commissioner / owner check
     if (config.commissionerOf) {
       const leagueId = config.commissionerOf(args);
       await verifyCommissionerAccess(db, leagueId, user.id);
     }
 
-    // 5. Team edit access check (team owner OR commissioner)
+    // 6. Team edit access check (team owner OR commissioner)
     if (config.teamMembers) {
       const memberIds = config.teamMembers(args);
       await verifyTeamEditAccess(db, user.id, memberIds);
 
-      // 6. Player lock check (only meaningful when team members are specified)
+      // 7. Player lock check (only meaningful when team members are specified)
       if (config.checkLocked) {
         await checkPlayersNotLocked(db, memberIds);
       }
