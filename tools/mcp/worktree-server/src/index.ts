@@ -1933,6 +1933,63 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           status?: number;
         };
         const output = [e.stdout, e.stderr].filter(Boolean).join('\n');
+
+        // Pre-push hook may auto-amend the commit (e.g. formatting fixes) and
+        // abort the push with "Push aborted — run 'git push' again". The
+        // amended commit is already created, so a single retry is safe.
+        const hookAmended =
+          /push aborted/i.test(output) &&
+          /amended commit|auto-amending/i.test(output);
+
+        if (hookAmended) {
+          try {
+            const retryOut = run(cmd, cwd, { timeout: 30_000 });
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: [
+                    `[cwd: ${cwd}]`,
+                    `$ ${cmd}  (initial push — hook amended commit)`,
+                    `Exit code: ${e.status ?? 'unknown'}`,
+                    output,
+                    ``,
+                    `Pre-push hook amended the commit; retrying push...`,
+                    ``,
+                    `$ ${cmd}  (retry)`,
+                    retryOut.trim(),
+                  ].join('\n'),
+                },
+              ],
+            };
+          } catch (retryErr: unknown) {
+            const r = retryErr as {
+              stdout?: string;
+              stderr?: string;
+              status?: number;
+            };
+            const retryOutput = [r.stdout, r.stderr].filter(Boolean).join('\n');
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: [
+                    `[cwd: ${cwd}]`,
+                    `$ ${cmd}  (initial push — hook amended commit)`,
+                    `Exit code: ${e.status ?? 'unknown'}`,
+                    output,
+                    ``,
+                    `$ ${cmd}  (retry)`,
+                    `Exit code: ${r.status ?? 'unknown'}`,
+                    retryOutput,
+                  ].join('\n'),
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
+
         return {
           content: [
             {
