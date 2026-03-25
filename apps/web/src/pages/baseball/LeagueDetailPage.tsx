@@ -636,6 +636,10 @@ export function LeagueDetailPage(): React.JSX.Element {
     void refetchTeamMembersRef.current?.();
     // Refetch the current week so it reflects the newly drafted rosters.
     void refetchCurrentWeekRef.current?.();
+    // Refetch matchups — the server creates all matchups during draft completion,
+    // so the commissioner tab's NextStepControl needs fresh data to transition
+    // from "Start Draft" to the game-selection / week-advance controls.
+    void refetchMatchupsRef.current?.();
   }, [backgroundRefetch]);
 
   const handleDraftStarted = useCallback(() => {
@@ -807,6 +811,12 @@ export function LeagueDetailPage(): React.JSX.Element {
       userTeamId
     ) {
       void refetchTeamMembersRef.current?.();
+      // Also refetch matchups and current week so the catch-up path is
+      // consistent with the WebSocket DRAFT_COMPLETED handler — matchups
+      // are created during draft completion and the commissioner tab needs
+      // fresh data to transition from "Start Draft" to week-advance controls.
+      void refetchMatchupsRef.current?.();
+      void refetchCurrentWeekRef.current?.();
     }
   }, [draftStatus, userTeamId]);
 
