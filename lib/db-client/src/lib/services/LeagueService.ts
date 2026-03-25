@@ -243,7 +243,11 @@ export class LeagueService {
 
       // 2. Create teams — assign each team to a division (round-robin across divisions)
       // e.g. 4 teams / 3 divisions → div 1 gets 2, div 2 gets 1, div 3 gets 1
-      const teamNames = [`${ownerUsername}'s Team`, ...DEFAULT_TEAM_NAMES];
+      // Strip email domain if the username looks like an email address
+      const displayName = /^[^@]+@[^@]+\.[^@]+$/.test(ownerUsername)
+        ? ownerUsername.split('@')[0]
+        : ownerUsername;
+      const teamNames = [`${displayName}'s Team`, ...DEFAULT_TEAM_NAMES];
       const teamsToCreate = Math.min(numberOfTeams, teamNames.length);
       const teamData = teamNames
         .slice(0, teamsToCreate)
