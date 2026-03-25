@@ -23,6 +23,20 @@ function isGraphQLEndpoint(url: URL): boolean {
   );
 }
 
+/** Expand a collapsible section by clicking its toggle header */
+async function expandSection(
+  page: import('@playwright/test').Page,
+  sectionId: string,
+) {
+  const toggle = page.getByTestId(`section-toggle-${sectionId}`);
+  await expect(toggle).toBeVisible();
+  const expanded = await toggle.getAttribute('aria-expanded');
+  if (expanded !== 'true') {
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  }
+}
+
 test.describe('League Creation @critical', () => {
   test('should navigate to league creation page from homepage', async ({
     page,
@@ -115,10 +129,11 @@ test.describe('League Creation @critical', () => {
     const leagueName = `Test League ${Date.now()}`;
     await page.getByPlaceholder('Enter your league name').fill(leagueName);
 
-    // Select number of teams
+    // Select number of teams (in Basic Settings, expanded by default)
     await page.getByRole('button', { name: '12', exact: true }).click();
 
-    // Select draft type
+    // Expand Draft Settings section and select draft type
+    await expandSection(page, 'draft');
     await page.getByRole('button', { name: /automated draft/i }).click();
 
     // Submit form
@@ -220,6 +235,9 @@ test.describe('League Creation @critical', () => {
       ).toBeVisible();
     }
 
+    // Expand Draft Settings to test draft mode options
+    await expandSection(page, 'draft');
+
     // Test draft mode options
     await expect(
       page.getByRole('button', { name: /live draft/i }),
@@ -295,7 +313,8 @@ test.describe('League Creation @critical', () => {
     // Change team count
     await page.getByRole('button', { name: '8', exact: true }).click();
 
-    // Change draft type
+    // Expand Draft Settings and change draft type
+    await expandSection(page, 'draft');
     await page.getByRole('button', { name: /automated draft/i }).click();
 
     // Verify league name is still there
@@ -318,15 +337,18 @@ test.describe('League Creation @critical', () => {
     // Wait for page to render
     await expect(page.getByPlaceholder('Enter your league name')).toBeVisible();
 
+    // Expand Draft Settings to access the date picker
+    await expandSection(page, 'draft');
+
     // Verify the Draft Date & Time label is visible
     await expect(page.getByText('Draft Date & Time')).toBeVisible();
 
-    // DateTimePicker renders as a button (useNativeInput=false) showing the date
-    // The default date is 1 week in the future, displayed like "Feb 26, 2026, 4:21 PM"
-    // Find the date picker button by looking for a button with a date-like pattern
+    // DateTimePicker renders as a button (useNativeInput=false) showing the
+    // placeholder when no value is set. The default draftDate is undefined, so
+    // the button displays the placeholder text.
     const datePickerButton = page
       .locator('button')
-      .filter({ hasText: /\d{4}/ });
+      .filter({ hasText: /select draft date and time/i });
     await expect(datePickerButton.first()).toBeVisible();
   });
 

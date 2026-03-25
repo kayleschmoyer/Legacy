@@ -1,6 +1,17 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, H1, H2, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
+import {
+  Card,
+  H1,
+  H2,
+  Input,
+  ScrollView,
+  styled,
+  Text,
+  XStack,
+  YStack,
+} from 'tamagui';
+import { ChevronDown } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import {
@@ -120,6 +131,91 @@ const WAIVER_TYPE_OPTIONS = [
 // FAAB budget options
 const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500];
 
+// ── Collapsible Section ─────────────────────────────────────────────────────
+
+const SectionHeaderRow = styled(XStack, {
+  paddingHorizontal: '$4',
+  paddingVertical: '$3',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  backgroundColor: '$color1',
+  borderRadius: '$4',
+  borderWidth: 1,
+  borderColor: '$borderColor',
+  cursor: 'pointer' as never,
+  hoverStyle: {
+    backgroundColor: '$color2',
+  },
+});
+
+interface CollapsibleSectionProps {
+  /** Unique identifier for accessibility attributes */
+  id: string;
+  /** Section heading displayed in the toggle bar */
+  title: string;
+  /** Whether the section body is visible */
+  open: boolean;
+  /** Called when the toggle bar is pressed */
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+function CollapsibleSection({
+  id,
+  title,
+  open,
+  onToggle,
+  children,
+}: CollapsibleSectionProps): React.JSX.Element {
+  const regionId = `create-league-section-${id}`;
+  return (
+    <YStack>
+      <SectionHeaderRow
+        data-testid={`section-toggle-${id}`}
+        onPress={onToggle}
+        role="button"
+        aria-expanded={open}
+        aria-controls={regionId}
+        borderBottomLeftRadius={open ? 0 : '$4'}
+        borderBottomRightRadius={open ? 0 : '$4'}
+        borderBottomWidth={open ? 0 : 1}
+      >
+        <Text fontWeight="700" fontSize="$4" color="$color">
+          {title}
+        </Text>
+        <span
+          aria-hidden="true"
+          style={{
+            display: 'inline-flex',
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease',
+          }}
+        >
+          <ChevronDown size={16} color="$colorPress" />
+        </span>
+      </SectionHeaderRow>
+      {open && (
+        <YStack
+          id={regionId}
+          role="region"
+          aria-label={title}
+          borderLeftWidth={1}
+          borderRightWidth={1}
+          borderBottomWidth={1}
+          borderColor="$borderColor"
+          borderBottomLeftRadius="$4"
+          borderBottomRightRadius="$4"
+          backgroundColor="$color1"
+          padding="$4"
+          space="$5"
+        >
+          {children}
+        </YStack>
+      )}
+    </YStack>
+  );
+}
+
 export function LeagueCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -156,6 +252,22 @@ export function LeagueCreatePage(): React.JSX.Element {
       auctionMinBid: 1,
     };
   });
+
+  // Collapsible section state — "basic" is open by default
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    () => new Set(['basic']),
+  );
+  const toggleSection = useCallback((id: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
 
   const [createLeagueAndTeams, { loading }] = useCreateLeagueAndTeamsMutation({
     update: (cache, { data }) => {
@@ -399,1184 +511,1249 @@ export function LeagueCreatePage(): React.JSX.Element {
               void handleSubmit(e);
             }}
           >
-            <YStack padding="$4" space="$5">
-              {/* League Name */}
-              <YStack space="$2">
-                <Text
-                  size="$4"
-                  fontWeight="600"
-                  color="$gray12"
-                  nativeID="label-league-name"
-                >
-                  League Name *
-                </Text>
-                <Input
-                  size="$4"
-                  placeholder="Enter your league name"
-                  value={formData.leagueName}
-                  onChangeText={(text: string) =>
-                    handleInputChange('leagueName', text)
-                  }
-                  borderColor="$borderColor"
-                  backgroundColor="$color1"
-                  disabled={loading}
-                  aria-labelledby="label-league-name"
-                  aria-required="true"
-                />
-              </YStack>
+            <YStack padding="$4" space="$4">
+              {/* ── Basic Settings (expanded by default) ── */}
+              <CollapsibleSection
+                id="basic"
+                title="Basic Settings"
+                open={openSections.has('basic')}
+                onToggle={() => toggleSection('basic')}
+              >
+                {/* League Name */}
+                <YStack space="$2">
+                  <Text
+                    size="$4"
+                    fontWeight="600"
+                    color="$gray12"
+                    nativeID="label-league-name"
+                  >
+                    League Name *
+                  </Text>
+                  <Input
+                    size="$4"
+                    placeholder="Enter your league name"
+                    value={formData.leagueName}
+                    onChangeText={(text: string) =>
+                      handleInputChange('leagueName', text)
+                    }
+                    borderColor="$borderColor"
+                    backgroundColor="$color1"
+                    disabled={loading}
+                    aria-labelledby="label-league-name"
+                    aria-required="true"
+                  />
+                </YStack>
 
-              {/* Number of Teams */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Number of Teams *
-                </Text>
-                <XStack
-                  space="$2"
-                  flexWrap="wrap"
-                  data-testid="team-count-select"
-                >
-                  {TEAM_COUNT_OPTIONS.map((count) => (
-                    <Button
-                      key={count}
-                      size="$3"
-                      variant={
-                        formData.numberOfTeams === count
-                          ? 'primary'
-                          : 'outlined'
-                      }
-                      onPress={() => {
-                        handleInputChange('numberOfTeams', count);
-                      }}
-                      disabled={loading}
-                      minWidth="$5"
-                      backgroundColor={
-                        formData.numberOfTeams === count
-                          ? '$brandNavyLight'
-                          : '$color2'
-                      }
-                      borderColor={
-                        formData.numberOfTeams === count
-                          ? '$brandNavyLight'
-                          : '$borderColor'
-                      }
-                      borderWidth={formData.numberOfTeams === count ? 2 : 1}
-                      hoverStyle={{
-                        backgroundColor:
-                          formData.numberOfTeams === count
-                            ? '$brandNavy'
-                            : '$color3',
-                        borderColor:
-                          formData.numberOfTeams === count
-                            ? '$brandNavy'
-                            : '$borderColorHover',
-                      }}
-                      pressStyle={{
-                        scale: 0.95,
-                        backgroundColor:
-                          formData.numberOfTeams === count
-                            ? '$brandNavyDark'
-                            : '$color4',
-                      }}
-                    >
-                      <Text
-                        color={
-                          formData.numberOfTeams === count
-                            ? '$brandGold'
-                            : '$color'
-                        }
-                        fontWeight={
-                          formData.numberOfTeams === count ? '600' : '400'
-                        }
-                      >
-                        {count}
-                      </Text>
-                    </Button>
-                  ))}
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  Select between 4-16 teams for your league
-                </Text>
-              </YStack>
-
-              {/* Number of Divisions */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Number of Divisions
-                </Text>
-                <XStack space="$2" flexWrap="wrap">
-                  {DIVISION_COUNT_OPTIONS.map((count) => (
-                    <Button
-                      key={count}
-                      size="$3"
-                      variant={
-                        formData.numberOfDivisions === count
-                          ? 'primary'
-                          : 'outlined'
-                      }
-                      onPress={() => {
-                        handleInputChange('numberOfDivisions', count);
-                      }}
-                      disabled={loading}
-                      minWidth="$5"
-                      backgroundColor={
-                        formData.numberOfDivisions === count
-                          ? '$brandNavyLight'
-                          : '$color2'
-                      }
-                      borderColor={
-                        formData.numberOfDivisions === count
-                          ? '$brandNavyLight'
-                          : '$borderColor'
-                      }
-                      borderWidth={formData.numberOfDivisions === count ? 2 : 1}
-                      hoverStyle={{
-                        backgroundColor:
-                          formData.numberOfDivisions === count
-                            ? '$brandNavy'
-                            : '$color3',
-                        borderColor:
-                          formData.numberOfDivisions === count
-                            ? '$brandNavy'
-                            : '$borderColorHover',
-                      }}
-                      pressStyle={{
-                        scale: 0.95,
-                        backgroundColor:
-                          formData.numberOfDivisions === count
-                            ? '$brandNavyDark'
-                            : '$color4',
-                      }}
-                    >
-                      <Text
-                        color={
-                          formData.numberOfDivisions === count
-                            ? '$brandGold'
-                            : '$color'
-                        }
-                        fontWeight={
-                          formData.numberOfDivisions === count ? '600' : '400'
-                        }
-                      >
-                        {count}
-                      </Text>
-                    </Button>
-                  ))}
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  How many divisions to split your teams into
-                </Text>
-              </YStack>
-
-              {/* Scheduling Strategy */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Scheduling Strategy
-                </Text>
-                <XStack space="$3">
-                  {SCHEDULING_STRATEGY_OPTIONS.map((option) => (
-                    <Button
-                      key={option.value}
-                      size="$3"
-                      variant={
-                        formData.schedulingStrategy === option.value
-                          ? 'primary'
-                          : 'outlined'
-                      }
-                      onPress={() => {
-                        handleInputChange('schedulingStrategy', option.value);
-                      }}
-                      disabled={loading}
-                      flex={1}
-                      backgroundColor={
-                        formData.schedulingStrategy === option.value
-                          ? '$brandNavyLight'
-                          : '$color2'
-                      }
-                      borderColor={
-                        formData.schedulingStrategy === option.value
-                          ? '$brandNavyLight'
-                          : '$borderColor'
-                      }
-                      borderWidth={
-                        formData.schedulingStrategy === option.value ? 2 : 1
-                      }
-                      hoverStyle={{
-                        backgroundColor:
-                          formData.schedulingStrategy === option.value
-                            ? '$brandNavy'
-                            : '$color3',
-                        borderColor:
-                          formData.schedulingStrategy === option.value
-                            ? '$brandNavy'
-                            : '$borderColorHover',
-                      }}
-                      pressStyle={{
-                        scale: 0.95,
-                        backgroundColor:
-                          formData.schedulingStrategy === option.value
-                            ? '$brandNavyDark'
-                            : '$color4',
-                      }}
-                    >
-                      <Text
-                        color={
-                          formData.schedulingStrategy === option.value
-                            ? '$brandGold'
-                            : '$color'
-                        }
-                        fontWeight={
-                          formData.schedulingStrategy === option.value
-                            ? '600'
-                            : '400'
-                        }
-                      >
-                        {option.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  Divisional schedules prioritize in-division matchups;
-                  round-robin ensures all teams play each other
-                </Text>
-              </YStack>
-
-              {/* Roster Size */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Roster Size *
-                </Text>
-                <XStack space="$2" flexWrap="wrap">
-                  {ROSTER_SIZE_OPTIONS.map((size) => (
-                    <Button
-                      key={size}
-                      size="$3"
-                      variant={
-                        formData.maxRosterSize === size ? 'primary' : 'outlined'
-                      }
-                      onPress={() => {
-                        handleInputChange('maxRosterSize', size);
-                      }}
-                      disabled={loading}
-                      minWidth="$5"
-                      backgroundColor={
-                        formData.maxRosterSize === size
-                          ? '$brandNavyLight'
-                          : '$color2'
-                      }
-                      borderColor={
-                        formData.maxRosterSize === size
-                          ? '$brandNavyLight'
-                          : '$borderColor'
-                      }
-                      borderWidth={formData.maxRosterSize === size ? 2 : 1}
-                      hoverStyle={{
-                        backgroundColor:
-                          formData.maxRosterSize === size
-                            ? '$brandNavy'
-                            : '$color3',
-                        borderColor:
-                          formData.maxRosterSize === size
-                            ? '$brandNavy'
-                            : '$borderColorHover',
-                      }}
-                      pressStyle={{
-                        scale: 0.95,
-                        backgroundColor:
-                          formData.maxRosterSize === size
-                            ? '$brandNavyDark'
-                            : '$color4',
-                      }}
-                    >
-                      <Text
-                        color={
-                          formData.maxRosterSize === size
-                            ? '$brandGold'
-                            : '$color'
-                        }
-                        fontWeight={
-                          formData.maxRosterSize === size ? '600' : '400'
-                        }
-                      >
-                        {size}
-                      </Text>
-                    </Button>
-                  ))}
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  Number of players each team can have (15-50 recommended)
-                </Text>
-              </YStack>
-
-              {/* Player Pool */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Player Pool *
-                </Text>
-                <XStack space="$3">
-                  {PLAYER_POOL_OPTIONS.map((option) => (
-                    <Button
-                      key={option.value}
-                      size="$3"
-                      variant={
-                        formData.playerPool === option.value
-                          ? 'primary'
-                          : 'outlined'
-                      }
-                      onPress={() => {
-                        handleInputChange('playerPool', option.value);
-                      }}
-                      disabled={loading}
-                      flex={1}
-                      backgroundColor={
-                        formData.playerPool === option.value
-                          ? '$brandNavyLight'
-                          : '$color2'
-                      }
-                      borderColor={
-                        formData.playerPool === option.value
-                          ? '$brandNavyLight'
-                          : '$borderColor'
-                      }
-                      borderWidth={formData.playerPool === option.value ? 2 : 1}
-                      hoverStyle={{
-                        backgroundColor:
-                          formData.playerPool === option.value
-                            ? '$brandNavy'
-                            : '$color3',
-                        borderColor:
-                          formData.playerPool === option.value
-                            ? '$brandNavy'
-                            : '$borderColorHover',
-                      }}
-                      pressStyle={{
-                        scale: 0.95,
-                        backgroundColor:
-                          formData.playerPool === option.value
-                            ? '$brandNavyDark'
-                            : '$color4',
-                      }}
-                    >
-                      <Text
-                        color={
-                          formData.playerPool === option.value
-                            ? '$brandGold'
-                            : '$color'
-                        }
-                        fontWeight={
-                          formData.playerPool === option.value ? '600' : '400'
-                        }
-                      >
-                        {option.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  Which players can be drafted in this league
-                </Text>
-              </YStack>
-
-              {/* Era Filter — Era-Based Leagues (LS-295) */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Historical Era Filter
-                </Text>
-                <Text size="$2" color="$gray10">
-                  Restrict your league's player pool to a specific baseball era
-                  — a unique differentiator no live-stats platform can offer.
-                </Text>
-                <XStack space="$2" flexWrap="wrap">
-                  {ERA_FILTER_OPTIONS.map((option) => {
-                    const isFreeOption =
-                      option.value === 'all' || option.value === 'modern';
-                    const isLocked =
-                      (!isPremium || premiumLoading) && !isFreeOption;
-                    return (
+                {/* Number of Teams */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Number of Teams *
+                  </Text>
+                  <XStack
+                    space="$2"
+                    flexWrap="wrap"
+                    data-testid="team-count-select"
+                  >
+                    {TEAM_COUNT_OPTIONS.map((count) => (
                       <Button
-                        key={option.value}
+                        key={count}
                         size="$3"
+                        variant={
+                          formData.numberOfTeams === count
+                            ? 'primary'
+                            : 'outlined'
+                        }
                         onPress={() => {
-                          if (isLocked) {
-                            trackPremiumFeatureClick(
-                              'Historical Era Selection',
-                            );
-                            setShowEraUpgradeModal(true);
-                            return;
-                          }
-                          handleInputChange('eraFilter', option.value);
+                          handleInputChange('numberOfTeams', count);
                         }}
                         disabled={loading}
+                        minWidth="$5"
                         backgroundColor={
-                          formData.eraFilter === option.value
-                            ? '$orange8'
-                            : isLocked
-                              ? '$color1'
-                              : '$color2'
+                          formData.numberOfTeams === count
+                            ? '$brandNavyLight'
+                            : '$color2'
                         }
                         borderColor={
-                          formData.eraFilter === option.value
-                            ? '$orange8'
+                          formData.numberOfTeams === count
+                            ? '$brandNavyLight'
                             : '$borderColor'
                         }
-                        borderWidth={
-                          formData.eraFilter === option.value ? 2 : 1
-                        }
-                        opacity={isLocked ? 0.55 : 1}
+                        borderWidth={formData.numberOfTeams === count ? 2 : 1}
                         hoverStyle={{
                           backgroundColor:
-                            formData.eraFilter === option.value
-                              ? '$orange9'
+                            formData.numberOfTeams === count
+                              ? '$brandNavy'
                               : '$color3',
+                          borderColor:
+                            formData.numberOfTeams === count
+                              ? '$brandNavy'
+                              : '$borderColorHover',
                         }}
-                        pressStyle={{ scale: 0.95 }}
+                        pressStyle={{
+                          scale: 0.95,
+                          backgroundColor:
+                            formData.numberOfTeams === count
+                              ? '$brandNavyDark'
+                              : '$color4',
+                        }}
                       >
                         <Text
                           color={
-                            formData.eraFilter === option.value
-                              ? '$orange12'
+                            formData.numberOfTeams === count
+                              ? '$brandGold'
                               : '$color'
                           }
                           fontWeight={
-                            formData.eraFilter === option.value ? '600' : '400'
+                            formData.numberOfTeams === count ? '600' : '400'
                           }
-                          fontSize="$2"
                         >
-                          {option.label}
-                          {isLocked ? ' (Premium)' : ''}
+                          {count}
                         </Text>
                       </Button>
-                    );
-                  })}
-                </XStack>
-                {!isPremium && (
-                  <Text size="$2" color="$brandGoldLight">
-                    Other historical eras are available on Premium. Modern
-                    (2006+) is included free.
-                  </Text>
-                )}
-
-                {/* Custom era year range */}
-                {formData.eraFilter === 'custom' && (
-                  <XStack space="$3" alignItems="center" flexWrap="wrap">
-                    <YStack flex={1} space="$1">
-                      <Text fontSize="$2" color="$gray10">
-                        Start Year
-                      </Text>
-                      <Input
-                        size="$3"
-                        placeholder="e.g. 1940"
-                        value={
-                          formData.customEraStartYear !== undefined
-                            ? String(formData.customEraStartYear)
-                            : ''
-                        }
-                        onChangeText={(text: string) => {
-                          const year = parseInt(text, 10);
-                          handleInputChange(
-                            'customEraStartYear',
-                            isNaN(year) ? undefined : year,
-                          );
-                        }}
-                        keyboardType="numeric"
-                        disabled={loading}
-                        borderColor="$orange8"
-                      />
-                    </YStack>
-                    <Text color="$gray10" marginTop="$4">
-                      –
-                    </Text>
-                    <YStack flex={1} space="$1">
-                      <Text fontSize="$2" color="$gray10">
-                        End Year
-                      </Text>
-                      <Input
-                        size="$3"
-                        placeholder="e.g. 1960"
-                        value={
-                          formData.customEraEndYear !== undefined
-                            ? String(formData.customEraEndYear)
-                            : ''
-                        }
-                        onChangeText={(text: string) => {
-                          const year = parseInt(text, 10);
-                          handleInputChange(
-                            'customEraEndYear',
-                            isNaN(year) ? undefined : year,
-                          );
-                        }}
-                        keyboardType="numeric"
-                        disabled={loading}
-                        borderColor="$orange8"
-                      />
-                    </YStack>
+                    ))}
                   </XStack>
-                )}
-              </YStack>
-
-              {/* Hall of Fame Only Toggle */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Hall of Fame Draft Mode
-                </Text>
-                <XStack space="$3" alignItems="center">
-                  <Button
-                    size="$3"
-                    onPress={() => {
-                      handleInputChange('hofOnly', !formData.hofOnly);
-                    }}
-                    disabled={loading}
-                    flex={1}
-                    backgroundColor={formData.hofOnly ? '$yellow8' : '$color2'}
-                    borderColor={formData.hofOnly ? '$yellow8' : '$borderColor'}
-                    borderWidth={formData.hofOnly ? 2 : 1}
-                    hoverStyle={{
-                      backgroundColor: formData.hofOnly
-                        ? '$yellow9'
-                        : '$color3',
-                    }}
-                    pressStyle={{ scale: 0.95 }}
-                  >
-                    <Text
-                      color={formData.hofOnly ? '$yellow12' : '$color'}
-                      fontWeight={formData.hofOnly ? '600' : '400'}
-                    >
-                      {formData.hofOnly
-                        ? '🏆 Hall of Famers Only — ON'
-                        : '🏆 Hall of Famers Only — OFF'}
-                    </Text>
-                  </Button>
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  Restrict the draft pool to Baseball Hall of Fame inductees
-                  only. Creates a prestigious, high-stakes draft experience.
-                </Text>
-              </YStack>
-
-              {/* Draft Mode */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Draft Mode
-                </Text>
-                <XStack space="$3">
-                  {DRAFT_MODE_OPTIONS.map((option) => (
-                    <Button
-                      key={option.value}
-                      size="$3"
-                      variant={
-                        formData.draftMode === option.value
-                          ? 'primary'
-                          : 'outlined'
-                      }
-                      onPress={() => {
-                        handleInputChange('draftMode', option.value);
-                      }}
-                      disabled={loading}
-                      flex={1}
-                      backgroundColor={
-                        formData.draftMode === option.value
-                          ? '$brandNavyLight'
-                          : '$color2'
-                      }
-                      borderColor={
-                        formData.draftMode === option.value
-                          ? '$brandNavyLight'
-                          : '$borderColor'
-                      }
-                      borderWidth={formData.draftMode === option.value ? 2 : 1}
-                      hoverStyle={{
-                        backgroundColor:
-                          formData.draftMode === option.value
-                            ? '$brandNavy'
-                            : '$color3',
-                        borderColor:
-                          formData.draftMode === option.value
-                            ? '$brandNavy'
-                            : '$borderColorHover',
-                      }}
-                      pressStyle={{
-                        scale: 0.95,
-                        backgroundColor:
-                          formData.draftMode === option.value
-                            ? '$brandNavyDark'
-                            : '$color4',
-                      }}
-                    >
-                      <Text
-                        color={
-                          formData.draftMode === option.value
-                            ? '$brandGold'
-                            : '$color'
-                        }
-                        fontWeight={
-                          formData.draftMode === option.value ? '600' : '400'
-                        }
-                      >
-                        {option.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  Live drafts require all managers online; automated drafts run
-                  on a schedule
-                </Text>
-              </YStack>
-
-              {/* Selection Method */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Selection Method
-                </Text>
-                <XStack space="$3">
-                  {SELECTION_METHOD_OPTIONS.map((option) => (
-                    <Button
-                      key={option.value}
-                      size="$3"
-                      variant={
-                        formData.selectionMethod === option.value
-                          ? 'primary'
-                          : 'outlined'
-                      }
-                      onPress={() => {
-                        handleInputChange('selectionMethod', option.value);
-                      }}
-                      disabled={loading || formData.draftMode === 'automated'}
-                      flex={1}
-                      backgroundColor={
-                        formData.selectionMethod === option.value
-                          ? '$brandNavyLight'
-                          : '$color2'
-                      }
-                      borderColor={
-                        formData.selectionMethod === option.value
-                          ? '$brandNavyLight'
-                          : '$borderColor'
-                      }
-                      borderWidth={
-                        formData.selectionMethod === option.value ? 2 : 1
-                      }
-                      hoverStyle={{
-                        backgroundColor:
-                          formData.selectionMethod === option.value
-                            ? '$brandNavy'
-                            : '$color3',
-                        borderColor:
-                          formData.selectionMethod === option.value
-                            ? '$brandNavy'
-                            : '$borderColorHover',
-                      }}
-                      pressStyle={{
-                        scale: 0.95,
-                        backgroundColor:
-                          formData.selectionMethod === option.value
-                            ? '$brandNavyDark'
-                            : '$color4',
-                      }}
-                    >
-                      <Text
-                        color={
-                          formData.selectionMethod === option.value
-                            ? '$brandGold'
-                            : '$color'
-                        }
-                        fontWeight={
-                          formData.selectionMethod === option.value
-                            ? '600'
-                            : '400'
-                        }
-                      >
-                        {option.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  {formData.draftMode === 'automated'
-                    ? "Automated drafts use random player assignment. Switch to 'Live Draft' to choose a different method."
-                    : 'Standard picks in order, auction bidding, or random assignment'}
-                </Text>
-              </YStack>
-
-              {/* Draft Order */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Draft Order
-                </Text>
-                <XStack space="$3">
-                  {DRAFT_ORDER_OPTIONS.map((option) => (
-                    <Button
-                      key={option.value}
-                      size="$3"
-                      variant={
-                        formData.draftOrder === option.value
-                          ? 'primary'
-                          : 'outlined'
-                      }
-                      onPress={() => {
-                        handleInputChange('draftOrder', option.value);
-                      }}
-                      disabled={loading}
-                      flex={1}
-                      backgroundColor={
-                        formData.draftOrder === option.value
-                          ? '$brandNavyLight'
-                          : '$color2'
-                      }
-                      borderColor={
-                        formData.draftOrder === option.value
-                          ? '$brandNavyLight'
-                          : '$borderColor'
-                      }
-                      borderWidth={formData.draftOrder === option.value ? 2 : 1}
-                      hoverStyle={{
-                        backgroundColor:
-                          formData.draftOrder === option.value
-                            ? '$brandNavy'
-                            : '$color3',
-                        borderColor:
-                          formData.draftOrder === option.value
-                            ? '$brandNavy'
-                            : '$borderColorHover',
-                      }}
-                      pressStyle={{
-                        scale: 0.95,
-                        backgroundColor:
-                          formData.draftOrder === option.value
-                            ? '$brandNavyDark'
-                            : '$color4',
-                      }}
-                    >
-                      <Text
-                        color={
-                          formData.draftOrder === option.value
-                            ? '$brandGold'
-                            : '$color'
-                        }
-                        fontWeight={
-                          formData.draftOrder === option.value ? '600' : '400'
-                        }
-                      >
-                        {option.label}
-                      </Text>
-                    </Button>
-                  ))}
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  Snake order reverses each round; linear order stays the same
-                </Text>
-              </YStack>
-
-              {/* Waiver Type */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Waiver System
-                </Text>
-                <XStack space="$3">
-                  {WAIVER_TYPE_OPTIONS.map((option) => (
-                    <Button
-                      key={option.value}
-                      size="$3"
-                      variant={
-                        formData.waiverType === option.value
-                          ? 'primary'
-                          : 'outlined'
-                      }
-                      onPress={() => {
-                        if (
-                          option.value === 'faab' &&
-                          (!isPremium || premiumLoading)
-                        ) {
-                          trackPremiumFeatureClick('FAAB Waiver Settings');
-                          setShowWaiverUpgradeModal(true);
-                          handleInputChange('waiverType', 'standard');
-                          return;
-                        }
-                        handleInputChange('waiverType', option.value);
-                      }}
-                      disabled={loading}
-                      flex={1}
-                      backgroundColor={
-                        formData.waiverType === option.value
-                          ? '$purple8'
-                          : '$color2'
-                      }
-                      borderColor={
-                        formData.waiverType === option.value
-                          ? '$purple8'
-                          : '$borderColor'
-                      }
-                      borderWidth={formData.waiverType === option.value ? 2 : 1}
-                      hoverStyle={{
-                        backgroundColor:
-                          formData.waiverType === option.value
-                            ? '$purple9'
-                            : '$color3',
-                        borderColor:
-                          formData.waiverType === option.value
-                            ? '$purple9'
-                            : '$borderColorHover',
-                      }}
-                      pressStyle={{
-                        scale: 0.95,
-                        backgroundColor:
-                          formData.waiverType === option.value
-                            ? '$purple7'
-                            : '$color4',
-                      }}
-                    >
-                      <Text
-                        color={
-                          formData.waiverType === option.value
-                            ? '$purple12'
-                            : '$color'
-                        }
-                        fontWeight={
-                          formData.waiverType === option.value ? '600' : '400'
-                        }
-                      >
-                        {option.label}
-                        {!isPremium && option.value === 'faab'
-                          ? ' (Premium)'
-                          : ''}
-                      </Text>
-                    </Button>
-                  ))}
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  {formData.waiverType === 'faab'
-                    ? 'Teams bid from a budget to claim free agents — highest bid wins'
-                    : 'Teams have a priority order — lower-ranked teams get first pick'}
-                </Text>
-                {!isPremium && (
-                  <Text size="$2" color="$brandGoldLight">
-                    FAAB is available on Premium. Tap FAAB to view upgrade
-                    options.
+                  <Text size="$2" color="$gray10">
+                    Select between 4-16 teams for your league
                   </Text>
-                )}
-              </YStack>
+                </YStack>
 
-              {/* FAAB Budget (only when FAAB selected) */}
-              {formData.waiverType === 'faab' && (
-                <PremiumGate
-                  isPremium={isPremium}
-                  featureName="FAAB Waiver Settings"
-                  featureDescription="Configure Free Agent Acquisition Budget (FAAB) bidding — the most competitive waiver system for serious leagues."
-                >
-                  <YStack space="$2">
-                    <Text size="$4" fontWeight="600" color="$gray12">
-                      FAAB Budget Per Team
-                    </Text>
-                    <XStack space="$2" flexWrap="wrap">
-                      {FAAB_BUDGET_OPTIONS.map((amount) => (
-                        <Button
-                          key={amount}
-                          size="$3"
-                          variant={
-                            formData.faabBudgetDefault === amount
-                              ? 'primary'
-                              : 'outlined'
+                {/* Number of Divisions */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Number of Divisions
+                  </Text>
+                  <XStack space="$2" flexWrap="wrap">
+                    {DIVISION_COUNT_OPTIONS.map((count) => (
+                      <Button
+                        key={count}
+                        size="$3"
+                        variant={
+                          formData.numberOfDivisions === count
+                            ? 'primary'
+                            : 'outlined'
+                        }
+                        onPress={() => {
+                          handleInputChange('numberOfDivisions', count);
+                        }}
+                        disabled={loading}
+                        minWidth="$5"
+                        backgroundColor={
+                          formData.numberOfDivisions === count
+                            ? '$brandNavyLight'
+                            : '$color2'
+                        }
+                        borderColor={
+                          formData.numberOfDivisions === count
+                            ? '$brandNavyLight'
+                            : '$borderColor'
+                        }
+                        borderWidth={
+                          formData.numberOfDivisions === count ? 2 : 1
+                        }
+                        hoverStyle={{
+                          backgroundColor:
+                            formData.numberOfDivisions === count
+                              ? '$brandNavy'
+                              : '$color3',
+                          borderColor:
+                            formData.numberOfDivisions === count
+                              ? '$brandNavy'
+                              : '$borderColorHover',
+                        }}
+                        pressStyle={{
+                          scale: 0.95,
+                          backgroundColor:
+                            formData.numberOfDivisions === count
+                              ? '$brandNavyDark'
+                              : '$color4',
+                        }}
+                      >
+                        <Text
+                          color={
+                            formData.numberOfDivisions === count
+                              ? '$brandGold'
+                              : '$color'
                           }
+                          fontWeight={
+                            formData.numberOfDivisions === count ? '600' : '400'
+                          }
+                        >
+                          {count}
+                        </Text>
+                      </Button>
+                    ))}
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    How many divisions to split your teams into
+                  </Text>
+                </YStack>
+
+                {/* League Visibility — inside Basic Settings */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    League Visibility
+                  </Text>
+                  <XStack space="$3">
+                    <Button
+                      size="$3"
+                      variant={!formData.isPublic ? 'primary' : 'outlined'}
+                      onPress={() => handleInputChange('isPublic', false)}
+                      disabled={loading}
+                      flex={1}
+                      backgroundColor={
+                        !formData.isPublic ? '$brandNavyLight' : '$color2'
+                      }
+                      borderColor={
+                        !formData.isPublic ? '$brandNavyLight' : '$borderColor'
+                      }
+                      borderWidth={!formData.isPublic ? 2 : 1}
+                      hoverStyle={{
+                        backgroundColor: !formData.isPublic
+                          ? '$brandNavy'
+                          : '$color3',
+                        borderColor: !formData.isPublic
+                          ? '$brandNavy'
+                          : '$borderColorHover',
+                      }}
+                      pressStyle={{ scale: 0.95 }}
+                    >
+                      <Text
+                        color={!formData.isPublic ? '$brandGold' : '$color'}
+                        fontWeight={!formData.isPublic ? '600' : '400'}
+                      >
+                        <span role="img" aria-label="private">
+                          🔒
+                        </span>{' '}
+                        Private
+                      </Text>
+                    </Button>
+                    <Button
+                      size="$3"
+                      variant={formData.isPublic ? 'primary' : 'outlined'}
+                      onPress={() => handleInputChange('isPublic', true)}
+                      disabled={loading}
+                      flex={1}
+                      backgroundColor={
+                        formData.isPublic ? '$brandNavyLight' : '$color2'
+                      }
+                      borderColor={
+                        formData.isPublic ? '$brandNavyLight' : '$borderColor'
+                      }
+                      borderWidth={formData.isPublic ? 2 : 1}
+                      hoverStyle={{
+                        backgroundColor: formData.isPublic
+                          ? '$brandNavy'
+                          : '$color3',
+                        borderColor: formData.isPublic
+                          ? '$brandNavy'
+                          : '$borderColorHover',
+                      }}
+                      pressStyle={{ scale: 0.95 }}
+                    >
+                      <Text
+                        color={formData.isPublic ? '$brandGold' : '$color'}
+                        fontWeight={formData.isPublic ? '600' : '400'}
+                      >
+                        <span role="img" aria-label="public">
+                          🌐
+                        </span>{' '}
+                        Public
+                      </Text>
+                    </Button>
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    {formData.isPublic
+                      ? 'Anyone can browse and join this league without an invite code'
+                      : 'Only people with your invite code can join this league'}
+                  </Text>
+                </YStack>
+              </CollapsibleSection>
+
+              {/* ── Roster & Schedule (collapsed by default) ── */}
+              <CollapsibleSection
+                id="roster-schedule"
+                title="Roster & Schedule"
+                open={openSections.has('roster-schedule')}
+                onToggle={() => toggleSection('roster-schedule')}
+              >
+                {/* Scheduling Strategy */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Scheduling Strategy
+                  </Text>
+                  <XStack space="$3">
+                    {SCHEDULING_STRATEGY_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        size="$3"
+                        variant={
+                          formData.schedulingStrategy === option.value
+                            ? 'primary'
+                            : 'outlined'
+                        }
+                        onPress={() => {
+                          handleInputChange('schedulingStrategy', option.value);
+                        }}
+                        disabled={loading}
+                        flex={1}
+                        backgroundColor={
+                          formData.schedulingStrategy === option.value
+                            ? '$brandNavyLight'
+                            : '$color2'
+                        }
+                        borderColor={
+                          formData.schedulingStrategy === option.value
+                            ? '$brandNavyLight'
+                            : '$borderColor'
+                        }
+                        borderWidth={
+                          formData.schedulingStrategy === option.value ? 2 : 1
+                        }
+                        hoverStyle={{
+                          backgroundColor:
+                            formData.schedulingStrategy === option.value
+                              ? '$brandNavy'
+                              : '$color3',
+                          borderColor:
+                            formData.schedulingStrategy === option.value
+                              ? '$brandNavy'
+                              : '$borderColorHover',
+                        }}
+                        pressStyle={{
+                          scale: 0.95,
+                          backgroundColor:
+                            formData.schedulingStrategy === option.value
+                              ? '$brandNavyDark'
+                              : '$color4',
+                        }}
+                      >
+                        <Text
+                          color={
+                            formData.schedulingStrategy === option.value
+                              ? '$brandGold'
+                              : '$color'
+                          }
+                          fontWeight={
+                            formData.schedulingStrategy === option.value
+                              ? '600'
+                              : '400'
+                          }
+                        >
+                          {option.label}
+                        </Text>
+                      </Button>
+                    ))}
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    Divisional schedules prioritize in-division matchups;
+                    round-robin ensures all teams play each other
+                  </Text>
+                </YStack>
+
+                {/* Roster Size */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Roster Size *
+                  </Text>
+                  <XStack space="$2" flexWrap="wrap">
+                    {ROSTER_SIZE_OPTIONS.map((size) => (
+                      <Button
+                        key={size}
+                        size="$3"
+                        variant={
+                          formData.maxRosterSize === size
+                            ? 'primary'
+                            : 'outlined'
+                        }
+                        onPress={() => {
+                          handleInputChange('maxRosterSize', size);
+                        }}
+                        disabled={loading}
+                        minWidth="$5"
+                        backgroundColor={
+                          formData.maxRosterSize === size
+                            ? '$brandNavyLight'
+                            : '$color2'
+                        }
+                        borderColor={
+                          formData.maxRosterSize === size
+                            ? '$brandNavyLight'
+                            : '$borderColor'
+                        }
+                        borderWidth={formData.maxRosterSize === size ? 2 : 1}
+                        hoverStyle={{
+                          backgroundColor:
+                            formData.maxRosterSize === size
+                              ? '$brandNavy'
+                              : '$color3',
+                          borderColor:
+                            formData.maxRosterSize === size
+                              ? '$brandNavy'
+                              : '$borderColorHover',
+                        }}
+                        pressStyle={{
+                          scale: 0.95,
+                          backgroundColor:
+                            formData.maxRosterSize === size
+                              ? '$brandNavyDark'
+                              : '$color4',
+                        }}
+                      >
+                        <Text
+                          color={
+                            formData.maxRosterSize === size
+                              ? '$brandGold'
+                              : '$color'
+                          }
+                          fontWeight={
+                            formData.maxRosterSize === size ? '600' : '400'
+                          }
+                        >
+                          {size}
+                        </Text>
+                      </Button>
+                    ))}
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    Number of players each team can have (15-50 recommended)
+                  </Text>
+                </YStack>
+
+                {/* Player Pool */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Player Pool *
+                  </Text>
+                  <XStack space="$3">
+                    {PLAYER_POOL_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        size="$3"
+                        variant={
+                          formData.playerPool === option.value
+                            ? 'primary'
+                            : 'outlined'
+                        }
+                        onPress={() => {
+                          handleInputChange('playerPool', option.value);
+                        }}
+                        disabled={loading}
+                        flex={1}
+                        backgroundColor={
+                          formData.playerPool === option.value
+                            ? '$brandNavyLight'
+                            : '$color2'
+                        }
+                        borderColor={
+                          formData.playerPool === option.value
+                            ? '$brandNavyLight'
+                            : '$borderColor'
+                        }
+                        borderWidth={
+                          formData.playerPool === option.value ? 2 : 1
+                        }
+                        hoverStyle={{
+                          backgroundColor:
+                            formData.playerPool === option.value
+                              ? '$brandNavy'
+                              : '$color3',
+                          borderColor:
+                            formData.playerPool === option.value
+                              ? '$brandNavy'
+                              : '$borderColorHover',
+                        }}
+                        pressStyle={{
+                          scale: 0.95,
+                          backgroundColor:
+                            formData.playerPool === option.value
+                              ? '$brandNavyDark'
+                              : '$color4',
+                        }}
+                      >
+                        <Text
+                          color={
+                            formData.playerPool === option.value
+                              ? '$brandGold'
+                              : '$color'
+                          }
+                          fontWeight={
+                            formData.playerPool === option.value ? '600' : '400'
+                          }
+                        >
+                          {option.label}
+                        </Text>
+                      </Button>
+                    ))}
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    Which players can be drafted in this league
+                  </Text>
+                </YStack>
+              </CollapsibleSection>
+
+              {/* ── Era & History (collapsed by default) ── */}
+              <CollapsibleSection
+                id="era-history"
+                title="Era & History"
+                open={openSections.has('era-history')}
+                onToggle={() => toggleSection('era-history')}
+              >
+                {/* Era Filter — Era-Based Leagues (LS-295) */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Historical Era Filter
+                  </Text>
+                  <Text size="$2" color="$gray10">
+                    Restrict your league's player pool to a specific baseball
+                    era — a unique differentiator no live-stats platform can
+                    offer.
+                  </Text>
+                  <XStack space="$2" flexWrap="wrap">
+                    {ERA_FILTER_OPTIONS.map((option) => {
+                      const isFreeOption =
+                        option.value === 'all' || option.value === 'modern';
+                      const isLocked =
+                        (!isPremium || premiumLoading) && !isFreeOption;
+                      return (
+                        <Button
+                          key={option.value}
+                          size="$3"
                           onPress={() => {
-                            handleInputChange('faabBudgetDefault', amount);
+                            if (isLocked) {
+                              trackPremiumFeatureClick(
+                                'Historical Era Selection',
+                              );
+                              setShowEraUpgradeModal(true);
+                              return;
+                            }
+                            handleInputChange('eraFilter', option.value);
                           }}
                           disabled={loading}
-                          minWidth="$5"
                           backgroundColor={
-                            formData.faabBudgetDefault === amount
-                              ? '$purple8'
-                              : '$color2'
+                            formData.eraFilter === option.value
+                              ? '$orange8'
+                              : isLocked
+                                ? '$color1'
+                                : '$color2'
                           }
                           borderColor={
-                            formData.faabBudgetDefault === amount
-                              ? '$purple8'
+                            formData.eraFilter === option.value
+                              ? '$orange8'
                               : '$borderColor'
                           }
                           borderWidth={
-                            formData.faabBudgetDefault === amount ? 2 : 1
+                            formData.eraFilter === option.value ? 2 : 1
                           }
+                          opacity={isLocked ? 0.55 : 1}
                           hoverStyle={{
                             backgroundColor:
-                              formData.faabBudgetDefault === amount
-                                ? '$purple9'
+                              formData.eraFilter === option.value
+                                ? '$orange9'
                                 : '$color3',
-                            borderColor:
-                              formData.faabBudgetDefault === amount
-                                ? '$purple9'
-                                : '$borderColorHover',
                           }}
-                          pressStyle={{
-                            scale: 0.95,
-                            backgroundColor:
-                              formData.faabBudgetDefault === amount
-                                ? '$purple7'
-                                : '$color4',
-                          }}
+                          pressStyle={{ scale: 0.95 }}
                         >
                           <Text
                             color={
-                              formData.faabBudgetDefault === amount
-                                ? '$purple12'
+                              formData.eraFilter === option.value
+                                ? '$orange12'
                                 : '$color'
                             }
                             fontWeight={
-                              formData.faabBudgetDefault === amount
+                              formData.eraFilter === option.value
                                 ? '600'
                                 : '400'
                             }
+                            fontSize="$2"
                           >
-                            ${amount}
+                            {option.label}
+                            {isLocked ? ' (Premium)' : ''}
                           </Text>
                         </Button>
-                      ))}
-                    </XStack>
-                    <Text size="$2" color="$gray10">
-                      Each team starts with this budget to bid on free agents
-                      for the season
-                    </Text>
-                  </YStack>
-                </PremiumGate>
-              )}
-
-              {/* Salary Cap */}
-              <PremiumGate
-                isPremium={isPremium}
-                featureName="Salary Cap"
-                featureDescription="Track player salaries and enforce roster spending caps for a competitive salary cap league format."
-              >
-                <YStack space="$3">
-                  <Text size="$4" fontWeight="600" color="$gray12">
-                    Salary Cap
-                  </Text>
-                  <XStack
-                    alignItems="center"
-                    gap="$3"
-                    padding="$3"
-                    borderRadius="$4"
-                    borderWidth={1}
-                    borderColor={
-                      formData.salaryCapEnabled
-                        ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
-                        : '$borderColor'
-                    }
-                    backgroundColor={
-                      formData.salaryCapEnabled
-                        ? withAlpha(BRAND_NAVY_LIGHT, 0.08)
-                        : '$color1'
-                    }
-                    cursor="pointer"
-                    onPress={() =>
-                      handleInputChange(
-                        'salaryCapEnabled',
-                        !formData.salaryCapEnabled,
-                      )
-                    }
-                  >
-                    <YStack
-                      width={24}
-                      height={24}
-                      borderRadius={12}
-                      borderWidth={2}
-                      borderColor={
-                        formData.salaryCapEnabled
-                          ? '$brandNavyLight'
-                          : '$borderColor'
-                      }
-                      backgroundColor={
-                        formData.salaryCapEnabled
-                          ? '$brandNavyLight'
-                          : 'transparent'
-                      }
-                      alignItems="center"
-                      justifyContent="center"
-                    >
-                      {formData.salaryCapEnabled && (
-                        <Text fontSize={14} color="white" fontWeight="700">
-                          ✓
-                        </Text>
-                      )}
-                    </YStack>
-                    <YStack flex={1}>
-                      <Text fontWeight="600" color="$color12">
-                        Enable Salary Cap
-                      </Text>
-                      <Text size="$2" color="$gray10">
-                        Track player salaries and enforce roster spending limits
-                      </Text>
-                    </YStack>
+                      );
+                    })}
                   </XStack>
+                  {!isPremium && (
+                    <Text size="$2" color="$brandGoldLight">
+                      Other historical eras are available on Premium. Modern
+                      (2006+) is included free.
+                    </Text>
+                  )}
 
-                  {formData.salaryCapEnabled && (
+                  {/* Custom era year range */}
+                  {formData.eraFilter === 'custom' && (
+                    <XStack space="$3" alignItems="center" flexWrap="wrap">
+                      <YStack flex={1} space="$1">
+                        <Text fontSize="$2" color="$gray10">
+                          Start Year
+                        </Text>
+                        <Input
+                          size="$3"
+                          placeholder="e.g. 1940"
+                          value={
+                            formData.customEraStartYear !== undefined
+                              ? String(formData.customEraStartYear)
+                              : ''
+                          }
+                          onChangeText={(text: string) => {
+                            const year = parseInt(text, 10);
+                            handleInputChange(
+                              'customEraStartYear',
+                              isNaN(year) ? undefined : year,
+                            );
+                          }}
+                          keyboardType="numeric"
+                          disabled={loading}
+                          borderColor="$orange8"
+                        />
+                      </YStack>
+                      <Text color="$gray10" marginTop="$4">
+                        –
+                      </Text>
+                      <YStack flex={1} space="$1">
+                        <Text fontSize="$2" color="$gray10">
+                          End Year
+                        </Text>
+                        <Input
+                          size="$3"
+                          placeholder="e.g. 1960"
+                          value={
+                            formData.customEraEndYear !== undefined
+                              ? String(formData.customEraEndYear)
+                              : ''
+                          }
+                          onChangeText={(text: string) => {
+                            const year = parseInt(text, 10);
+                            handleInputChange(
+                              'customEraEndYear',
+                              isNaN(year) ? undefined : year,
+                            );
+                          }}
+                          keyboardType="numeric"
+                          disabled={loading}
+                          borderColor="$orange8"
+                        />
+                      </YStack>
+                    </XStack>
+                  )}
+                </YStack>
+
+                {/* Hall of Fame Only Toggle */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Hall of Fame Draft Mode
+                  </Text>
+                  <XStack space="$3" alignItems="center">
+                    <Button
+                      size="$3"
+                      onPress={() => {
+                        handleInputChange('hofOnly', !formData.hofOnly);
+                      }}
+                      disabled={loading}
+                      flex={1}
+                      backgroundColor={
+                        formData.hofOnly ? '$yellow8' : '$color2'
+                      }
+                      borderColor={
+                        formData.hofOnly ? '$yellow8' : '$borderColor'
+                      }
+                      borderWidth={formData.hofOnly ? 2 : 1}
+                      hoverStyle={{
+                        backgroundColor: formData.hofOnly
+                          ? '$yellow9'
+                          : '$color3',
+                      }}
+                      pressStyle={{ scale: 0.95 }}
+                    >
+                      <Text
+                        color={formData.hofOnly ? '$yellow12' : '$color'}
+                        fontWeight={formData.hofOnly ? '600' : '400'}
+                      >
+                        {formData.hofOnly
+                          ? '🏆 Hall of Famers Only — ON'
+                          : '🏆 Hall of Famers Only — OFF'}
+                      </Text>
+                    </Button>
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    Restrict the draft pool to Baseball Hall of Fame inductees
+                    only. Creates a prestigious, high-stakes draft experience.
+                  </Text>
+                </YStack>
+              </CollapsibleSection>
+
+              {/* ── Draft Settings (collapsed by default) ── */}
+              <CollapsibleSection
+                id="draft"
+                title="Draft Settings"
+                open={openSections.has('draft')}
+                onToggle={() => toggleSection('draft')}
+              >
+                {/* Draft Mode */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Draft Mode
+                  </Text>
+                  <XStack space="$3">
+                    {DRAFT_MODE_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        size="$3"
+                        variant={
+                          formData.draftMode === option.value
+                            ? 'primary'
+                            : 'outlined'
+                        }
+                        onPress={() => {
+                          handleInputChange('draftMode', option.value);
+                        }}
+                        disabled={loading}
+                        flex={1}
+                        backgroundColor={
+                          formData.draftMode === option.value
+                            ? '$brandNavyLight'
+                            : '$color2'
+                        }
+                        borderColor={
+                          formData.draftMode === option.value
+                            ? '$brandNavyLight'
+                            : '$borderColor'
+                        }
+                        borderWidth={
+                          formData.draftMode === option.value ? 2 : 1
+                        }
+                        hoverStyle={{
+                          backgroundColor:
+                            formData.draftMode === option.value
+                              ? '$brandNavy'
+                              : '$color3',
+                          borderColor:
+                            formData.draftMode === option.value
+                              ? '$brandNavy'
+                              : '$borderColorHover',
+                        }}
+                        pressStyle={{
+                          scale: 0.95,
+                          backgroundColor:
+                            formData.draftMode === option.value
+                              ? '$brandNavyDark'
+                              : '$color4',
+                        }}
+                      >
+                        <Text
+                          color={
+                            formData.draftMode === option.value
+                              ? '$brandGold'
+                              : '$color'
+                          }
+                          fontWeight={
+                            formData.draftMode === option.value ? '600' : '400'
+                          }
+                        >
+                          {option.label}
+                        </Text>
+                      </Button>
+                    ))}
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    Live drafts require all managers online; automated drafts
+                    run on a schedule
+                  </Text>
+                </YStack>
+
+                {/* Selection Method */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Selection Method
+                  </Text>
+                  <XStack space="$3">
+                    {SELECTION_METHOD_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        size="$3"
+                        variant={
+                          formData.selectionMethod === option.value
+                            ? 'primary'
+                            : 'outlined'
+                        }
+                        onPress={() => {
+                          handleInputChange('selectionMethod', option.value);
+                        }}
+                        disabled={loading || formData.draftMode === 'automated'}
+                        flex={1}
+                        backgroundColor={
+                          formData.selectionMethod === option.value
+                            ? '$brandNavyLight'
+                            : '$color2'
+                        }
+                        borderColor={
+                          formData.selectionMethod === option.value
+                            ? '$brandNavyLight'
+                            : '$borderColor'
+                        }
+                        borderWidth={
+                          formData.selectionMethod === option.value ? 2 : 1
+                        }
+                        hoverStyle={{
+                          backgroundColor:
+                            formData.selectionMethod === option.value
+                              ? '$brandNavy'
+                              : '$color3',
+                          borderColor:
+                            formData.selectionMethod === option.value
+                              ? '$brandNavy'
+                              : '$borderColorHover',
+                        }}
+                        pressStyle={{
+                          scale: 0.95,
+                          backgroundColor:
+                            formData.selectionMethod === option.value
+                              ? '$brandNavyDark'
+                              : '$color4',
+                        }}
+                      >
+                        <Text
+                          color={
+                            formData.selectionMethod === option.value
+                              ? '$brandGold'
+                              : '$color'
+                          }
+                          fontWeight={
+                            formData.selectionMethod === option.value
+                              ? '600'
+                              : '400'
+                          }
+                        >
+                          {option.label}
+                        </Text>
+                      </Button>
+                    ))}
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    {formData.draftMode === 'automated'
+                      ? "Automated drafts use random player assignment. Switch to 'Live Draft' to choose a different method."
+                      : 'Standard picks in order, auction bidding, or random assignment'}
+                  </Text>
+                </YStack>
+
+                {/* Draft Order */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Draft Order
+                  </Text>
+                  <XStack space="$3">
+                    {DRAFT_ORDER_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        size="$3"
+                        variant={
+                          formData.draftOrder === option.value
+                            ? 'primary'
+                            : 'outlined'
+                        }
+                        onPress={() => {
+                          handleInputChange('draftOrder', option.value);
+                        }}
+                        disabled={loading}
+                        flex={1}
+                        backgroundColor={
+                          formData.draftOrder === option.value
+                            ? '$brandNavyLight'
+                            : '$color2'
+                        }
+                        borderColor={
+                          formData.draftOrder === option.value
+                            ? '$brandNavyLight'
+                            : '$borderColor'
+                        }
+                        borderWidth={
+                          formData.draftOrder === option.value ? 2 : 1
+                        }
+                        hoverStyle={{
+                          backgroundColor:
+                            formData.draftOrder === option.value
+                              ? '$brandNavy'
+                              : '$color3',
+                          borderColor:
+                            formData.draftOrder === option.value
+                              ? '$brandNavy'
+                              : '$borderColorHover',
+                        }}
+                        pressStyle={{
+                          scale: 0.95,
+                          backgroundColor:
+                            formData.draftOrder === option.value
+                              ? '$brandNavyDark'
+                              : '$color4',
+                        }}
+                      >
+                        <Text
+                          color={
+                            formData.draftOrder === option.value
+                              ? '$brandGold'
+                              : '$color'
+                          }
+                          fontWeight={
+                            formData.draftOrder === option.value ? '600' : '400'
+                          }
+                        >
+                          {option.label}
+                        </Text>
+                      </Button>
+                    ))}
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    Snake order reverses each round; linear order stays the same
+                  </Text>
+                </YStack>
+
+                {/* Auction Settings (visible when auction selection method) */}
+                {formData.selectionMethod === 'auction' && (
+                  <YStack space="$3">
                     <YStack space="$2">
                       <Text size="$3" fontWeight="600" color="$gray12">
-                        Salary Cap Limit
+                        Auction Budget per Team
                       </Text>
                       <Input
-                        value={
-                          formData.salaryCap !== undefined
-                            ? String(formData.salaryCap)
-                            : ''
-                        }
+                        value={String(formData.auctionBudget)}
                         onChangeText={(text: string) => {
                           const n = parseInt(text, 10);
-                          handleInputChange('salaryCap', isNaN(n) ? 0 : n);
+                          handleInputChange(
+                            'auctionBudget',
+                            isNaN(n) ? 200 : n,
+                          );
                         }}
-                        placeholder="e.g. 50000000"
+                        placeholder="200"
                         keyboardType="numeric"
                         disabled={loading}
                       />
                       <Text size="$2" color="$gray10">
-                        Maximum total salary each team can spend on their roster
+                        Each team's total budget for the auction draft
                       </Text>
                     </YStack>
+                    <YStack space="$2">
+                      <Text size="$3" fontWeight="600" color="$gray12">
+                        Minimum Bid
+                      </Text>
+                      <Input
+                        value={String(formData.auctionMinBid)}
+                        onChangeText={(text: string) => {
+                          const n = parseInt(text, 10);
+                          handleInputChange('auctionMinBid', isNaN(n) ? 1 : n);
+                        }}
+                        placeholder="1"
+                        keyboardType="numeric"
+                        disabled={loading}
+                      />
+                      <Text size="$2" color="$gray10">
+                        Minimum amount a team can bid on any player
+                      </Text>
+                    </YStack>
+                  </YStack>
+                )}
+
+                {/* Draft Date and Time */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Draft Date & Time
+                  </Text>
+                  <DateTimePicker
+                    value={formData.draftDate}
+                    onChange={(date: Date) =>
+                      handleInputChange('draftDate', date)
+                    }
+                    onClear={() =>
+                      setFormData((prev) => ({ ...prev, draftDate: undefined }))
+                    }
+                    placeholder="Select draft date and time"
+                    disabled={loading}
+                    minDate={new Date()} // Can't select past dates
+                    useNativeInput={false} // Use custom picker popup on web
+                  />
+                  <Text size="$2" color="$gray10">
+                    Optional. You can set or change your draft date after
+                    creating the league.
+                  </Text>
+                </YStack>
+              </CollapsibleSection>
+
+              {/* ── Waiver & Budget (collapsed by default) ── */}
+              <CollapsibleSection
+                id="waiver-budget"
+                title="Waivers, Budget & Salary Cap"
+                open={openSections.has('waiver-budget')}
+                onToggle={() => toggleSection('waiver-budget')}
+              >
+                {/* Waiver Type */}
+                <YStack space="$2">
+                  <Text size="$4" fontWeight="600" color="$gray12">
+                    Waiver System
+                  </Text>
+                  <XStack space="$3">
+                    {WAIVER_TYPE_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        size="$3"
+                        variant={
+                          formData.waiverType === option.value
+                            ? 'primary'
+                            : 'outlined'
+                        }
+                        onPress={() => {
+                          if (
+                            option.value === 'faab' &&
+                            (!isPremium || premiumLoading)
+                          ) {
+                            trackPremiumFeatureClick('FAAB Waiver Settings');
+                            setShowWaiverUpgradeModal(true);
+                            handleInputChange('waiverType', 'standard');
+                            return;
+                          }
+                          handleInputChange('waiverType', option.value);
+                        }}
+                        disabled={loading}
+                        flex={1}
+                        backgroundColor={
+                          formData.waiverType === option.value
+                            ? '$purple8'
+                            : '$color2'
+                        }
+                        borderColor={
+                          formData.waiverType === option.value
+                            ? '$purple8'
+                            : '$borderColor'
+                        }
+                        borderWidth={
+                          formData.waiverType === option.value ? 2 : 1
+                        }
+                        hoverStyle={{
+                          backgroundColor:
+                            formData.waiverType === option.value
+                              ? '$purple9'
+                              : '$color3',
+                          borderColor:
+                            formData.waiverType === option.value
+                              ? '$purple9'
+                              : '$borderColorHover',
+                        }}
+                        pressStyle={{
+                          scale: 0.95,
+                          backgroundColor:
+                            formData.waiverType === option.value
+                              ? '$purple7'
+                              : '$color4',
+                        }}
+                      >
+                        <Text
+                          color={
+                            formData.waiverType === option.value
+                              ? '$purple12'
+                              : '$color'
+                          }
+                          fontWeight={
+                            formData.waiverType === option.value ? '600' : '400'
+                          }
+                        >
+                          {option.label}
+                          {!isPremium && option.value === 'faab'
+                            ? ' (Premium)'
+                            : ''}
+                        </Text>
+                      </Button>
+                    ))}
+                  </XStack>
+                  <Text size="$2" color="$gray10">
+                    {formData.waiverType === 'faab'
+                      ? 'Teams bid from a budget to claim free agents — highest bid wins'
+                      : 'Teams have a priority order — lower-ranked teams get first pick'}
+                  </Text>
+                  {!isPremium && (
+                    <Text size="$2" color="$brandGoldLight">
+                      FAAB is available on Premium. Tap FAAB to view upgrade
+                      options.
+                    </Text>
                   )}
                 </YStack>
-              </PremiumGate>
 
-              {formData.selectionMethod === 'auction' && (
-                <YStack space="$3">
-                  <YStack space="$2">
-                    <Text size="$3" fontWeight="600" color="$gray12">
-                      Auction Budget per Team
-                    </Text>
-                    <Input
-                      value={String(formData.auctionBudget)}
-                      onChangeText={(text: string) => {
-                        const n = parseInt(text, 10);
-                        handleInputChange('auctionBudget', isNaN(n) ? 200 : n);
-                      }}
-                      placeholder="200"
-                      keyboardType="numeric"
-                      disabled={loading}
-                    />
-                    <Text size="$2" color="$gray10">
-                      Each team's total budget for the auction draft
-                    </Text>
-                  </YStack>
-                  <YStack space="$2">
-                    <Text size="$3" fontWeight="600" color="$gray12">
-                      Minimum Bid
-                    </Text>
-                    <Input
-                      value={String(formData.auctionMinBid)}
-                      onChangeText={(text: string) => {
-                        const n = parseInt(text, 10);
-                        handleInputChange('auctionMinBid', isNaN(n) ? 1 : n);
-                      }}
-                      placeholder="1"
-                      keyboardType="numeric"
-                      disabled={loading}
-                    />
-                    <Text size="$2" color="$gray10">
-                      Minimum amount a team can bid on any player
-                    </Text>
-                  </YStack>
-                </YStack>
-              )}
-
-              {/* Draft Date and Time */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  Draft Date & Time
-                </Text>
-                <DateTimePicker
-                  value={formData.draftDate}
-                  onChange={(date: Date) =>
-                    handleInputChange('draftDate', date)
-                  }
-                  onClear={() =>
-                    setFormData((prev) => ({ ...prev, draftDate: undefined }))
-                  }
-                  placeholder="Select draft date and time"
-                  disabled={loading}
-                  minDate={new Date()} // Can't select past dates
-                  useNativeInput={false} // Use custom picker popup on web
-                />
-                <Text size="$2" color="$gray10">
-                  Optional. You can set or change your draft date after creating
-                  the league.
-                </Text>
-              </YStack>
-
-              {/* League Visibility */}
-              <YStack space="$2">
-                <Text size="$4" fontWeight="600" color="$gray12">
-                  League Visibility
-                </Text>
-                <XStack space="$3">
-                  <Button
-                    size="$3"
-                    variant={!formData.isPublic ? 'primary' : 'outlined'}
-                    onPress={() => handleInputChange('isPublic', false)}
-                    disabled={loading}
-                    flex={1}
-                    backgroundColor={
-                      !formData.isPublic ? '$brandNavyLight' : '$color2'
-                    }
-                    borderColor={
-                      !formData.isPublic ? '$brandNavyLight' : '$borderColor'
-                    }
-                    borderWidth={!formData.isPublic ? 2 : 1}
-                    hoverStyle={{
-                      backgroundColor: !formData.isPublic
-                        ? '$brandNavy'
-                        : '$color3',
-                      borderColor: !formData.isPublic
-                        ? '$brandNavy'
-                        : '$borderColorHover',
-                    }}
-                    pressStyle={{ scale: 0.95 }}
+                {/* FAAB Budget (only when FAAB selected) */}
+                {formData.waiverType === 'faab' && (
+                  <PremiumGate
+                    isPremium={isPremium}
+                    featureName="FAAB Waiver Settings"
+                    featureDescription="Configure Free Agent Acquisition Budget (FAAB) bidding — the most competitive waiver system for serious leagues."
                   >
-                    <Text
-                      color={!formData.isPublic ? '$brandGold' : '$color'}
-                      fontWeight={!formData.isPublic ? '600' : '400'}
-                    >
-                      <span role="img" aria-label="private">
-                        🔒
-                      </span>{' '}
-                      Private
+                    <YStack space="$2">
+                      <Text size="$4" fontWeight="600" color="$gray12">
+                        FAAB Budget Per Team
+                      </Text>
+                      <XStack space="$2" flexWrap="wrap">
+                        {FAAB_BUDGET_OPTIONS.map((amount) => (
+                          <Button
+                            key={amount}
+                            size="$3"
+                            variant={
+                              formData.faabBudgetDefault === amount
+                                ? 'primary'
+                                : 'outlined'
+                            }
+                            onPress={() => {
+                              handleInputChange('faabBudgetDefault', amount);
+                            }}
+                            disabled={loading}
+                            minWidth="$5"
+                            backgroundColor={
+                              formData.faabBudgetDefault === amount
+                                ? '$purple8'
+                                : '$color2'
+                            }
+                            borderColor={
+                              formData.faabBudgetDefault === amount
+                                ? '$purple8'
+                                : '$borderColor'
+                            }
+                            borderWidth={
+                              formData.faabBudgetDefault === amount ? 2 : 1
+                            }
+                            hoverStyle={{
+                              backgroundColor:
+                                formData.faabBudgetDefault === amount
+                                  ? '$purple9'
+                                  : '$color3',
+                              borderColor:
+                                formData.faabBudgetDefault === amount
+                                  ? '$purple9'
+                                  : '$borderColorHover',
+                            }}
+                            pressStyle={{
+                              scale: 0.95,
+                              backgroundColor:
+                                formData.faabBudgetDefault === amount
+                                  ? '$purple7'
+                                  : '$color4',
+                            }}
+                          >
+                            <Text
+                              color={
+                                formData.faabBudgetDefault === amount
+                                  ? '$purple12'
+                                  : '$color'
+                              }
+                              fontWeight={
+                                formData.faabBudgetDefault === amount
+                                  ? '600'
+                                  : '400'
+                              }
+                            >
+                              ${amount}
+                            </Text>
+                          </Button>
+                        ))}
+                      </XStack>
+                      <Text size="$2" color="$gray10">
+                        Each team starts with this budget to bid on free agents
+                        for the season
+                      </Text>
+                    </YStack>
+                  </PremiumGate>
+                )}
+
+                {/* Salary Cap */}
+                <PremiumGate
+                  isPremium={isPremium}
+                  featureName="Salary Cap"
+                  featureDescription="Track player salaries and enforce roster spending caps for a competitive salary cap league format."
+                >
+                  <YStack space="$3">
+                    <Text size="$4" fontWeight="600" color="$gray12">
+                      Salary Cap
                     </Text>
-                  </Button>
-                  <Button
-                    size="$3"
-                    variant={formData.isPublic ? 'primary' : 'outlined'}
-                    onPress={() => handleInputChange('isPublic', true)}
-                    disabled={loading}
-                    flex={1}
-                    backgroundColor={
-                      formData.isPublic ? '$brandNavyLight' : '$color2'
-                    }
-                    borderColor={
-                      formData.isPublic ? '$brandNavyLight' : '$borderColor'
-                    }
-                    borderWidth={formData.isPublic ? 2 : 1}
-                    hoverStyle={{
-                      backgroundColor: formData.isPublic
-                        ? '$brandNavy'
-                        : '$color3',
-                      borderColor: formData.isPublic
-                        ? '$brandNavy'
-                        : '$borderColorHover',
-                    }}
-                    pressStyle={{ scale: 0.95 }}
-                  >
-                    <Text
-                      color={formData.isPublic ? '$brandGold' : '$color'}
-                      fontWeight={formData.isPublic ? '600' : '400'}
+                    <XStack
+                      alignItems="center"
+                      gap="$3"
+                      padding="$3"
+                      borderRadius="$4"
+                      borderWidth={1}
+                      borderColor={
+                        formData.salaryCapEnabled
+                          ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
+                          : '$borderColor'
+                      }
+                      backgroundColor={
+                        formData.salaryCapEnabled
+                          ? withAlpha(BRAND_NAVY_LIGHT, 0.08)
+                          : '$color1'
+                      }
+                      cursor="pointer"
+                      onPress={() =>
+                        handleInputChange(
+                          'salaryCapEnabled',
+                          !formData.salaryCapEnabled,
+                        )
+                      }
                     >
-                      <span role="img" aria-label="public">
-                        🌐
-                      </span>{' '}
-                      Public
-                    </Text>
-                  </Button>
-                </XStack>
-                <Text size="$2" color="$gray10">
-                  {formData.isPublic
-                    ? 'Anyone can browse and join this league without an invite code'
-                    : 'Only people with your invite code can join this league'}
-                </Text>
-              </YStack>
+                      <YStack
+                        width={24}
+                        height={24}
+                        borderRadius={12}
+                        borderWidth={2}
+                        borderColor={
+                          formData.salaryCapEnabled
+                            ? '$brandNavyLight'
+                            : '$borderColor'
+                        }
+                        backgroundColor={
+                          formData.salaryCapEnabled
+                            ? '$brandNavyLight'
+                            : 'transparent'
+                        }
+                        alignItems="center"
+                        justifyContent="center"
+                      >
+                        {formData.salaryCapEnabled && (
+                          <Text fontSize={14} color="white" fontWeight="700">
+                            ✓
+                          </Text>
+                        )}
+                      </YStack>
+                      <YStack flex={1}>
+                        <Text fontWeight="600" color="$color12">
+                          Enable Salary Cap
+                        </Text>
+                        <Text size="$2" color="$gray10">
+                          Track player salaries and enforce roster spending
+                          limits
+                        </Text>
+                      </YStack>
+                    </XStack>
+
+                    {formData.salaryCapEnabled && (
+                      <YStack space="$2">
+                        <Text size="$3" fontWeight="600" color="$gray12">
+                          Salary Cap Limit
+                        </Text>
+                        <Input
+                          value={
+                            formData.salaryCap !== undefined
+                              ? String(formData.salaryCap)
+                              : ''
+                          }
+                          onChangeText={(text: string) => {
+                            const n = parseInt(text, 10);
+                            handleInputChange('salaryCap', isNaN(n) ? 0 : n);
+                          }}
+                          placeholder="e.g. 50000000"
+                          keyboardType="numeric"
+                          disabled={loading}
+                        />
+                        <Text size="$2" color="$gray10">
+                          Maximum total salary each team can spend on their
+                          roster
+                        </Text>
+                      </YStack>
+                    )}
+                  </YStack>
+                </PremiumGate>
+              </CollapsibleSection>
 
               {/* Inline error banner */}
               {formError && (

@@ -59,6 +59,21 @@ async function mockCreateLeagueSuccess(page: import('@playwright/test').Page) {
   });
 }
 
+/** Expand a collapsible section by clicking its toggle header */
+async function expandSection(
+  page: import('@playwright/test').Page,
+  sectionId: string,
+) {
+  const toggle = page.getByTestId(`section-toggle-${sectionId}`);
+  await expect(toggle).toBeVisible();
+  // Only expand if the section is currently collapsed
+  const expanded = await toggle.getAttribute('aria-expanded');
+  if (expanded !== 'true') {
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  }
+}
+
 test.describe('League Creation — Advanced Settings @regression', () => {
   // ─── Roster Size ──────────────────────────────────────────────────────────
 
@@ -67,6 +82,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
+
+    // Expand the Roster & Schedule section
+    await expandSection(page, 'roster-schedule');
 
     // All preset roster sizes should be visible
     for (const size of ['20', '22', '25', '30', '35', '40']) {
@@ -86,6 +104,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
+    // Expand the Roster & Schedule section
+    await expandSection(page, 'roster-schedule');
+
     // Click roster size 30
     await page.getByRole('button', { name: '30', exact: true }).click();
 
@@ -100,6 +121,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   test('should display all player pool options', async ({ page }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
+
+    // Expand the Roster & Schedule section
+    await expandSection(page, 'roster-schedule');
 
     await expect(page.getByRole('button', { name: 'All MLB' })).toBeVisible();
     await expect(
@@ -119,6 +143,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
+    // Expand the Roster & Schedule section
+    await expandSection(page, 'roster-schedule');
+
     await page.getByRole('button', { name: 'National League' }).click();
     await page.getByPlaceholder('Enter your league name').fill('NL League');
     await page.getByRole('button', { name: /create league/i }).click();
@@ -130,6 +157,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   test('should display all scheduling strategy options', async ({ page }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
+
+    // Expand the Roster & Schedule section
+    await expandSection(page, 'roster-schedule');
 
     await expect(
       page.getByRole('button', { name: 'Divisional' }),
@@ -166,6 +196,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
+    // Expand the Draft Settings section
+    await expandSection(page, 'draft');
+
     await expect(
       page.getByRole('button', { name: 'Live Draft' }),
     ).toBeVisible();
@@ -183,6 +216,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
+
+    // Expand the Draft Settings section
+    await expandSection(page, 'draft');
 
     // Switch to Automated Draft
     await page.getByRole('button', { name: 'Automated Draft' }).click();
@@ -205,6 +241,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
+    // Expand the Draft Settings section
+    await expandSection(page, 'draft');
+
     await page.getByRole('button', { name: 'Automated Draft' }).click();
     await page.getByRole('button', { name: 'Live Draft' }).click();
 
@@ -223,6 +262,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
+    // Expand the Draft Settings section
+    await expandSection(page, 'draft');
+
     await expect(
       page.getByRole('button', { name: 'Standard' }).first(),
     ).toBeVisible();
@@ -237,6 +279,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
+
+    // Expand the Draft Settings section
+    await expandSection(page, 'draft');
 
     // Auction budget section not visible until Auction selection method is chosen
     // Select Auction selection method
@@ -257,6 +302,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
+    // Expand the Draft Settings section
+    await expandSection(page, 'draft');
+
     await expect(page.getByRole('button', { name: 'Snake' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Linear' })).toBeVisible();
     await expect(
@@ -270,6 +318,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
+    // Expand the Waivers, Budget & Salary Cap section
+    await expandSection(page, 'waiver-budget');
+
     await expect(page.getByText('Waiver System')).toBeVisible();
     await expect(page.getByText('Teams have a priority order')).toBeVisible();
   });
@@ -279,6 +330,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('load');
+
+    // Expand the Waivers, Budget & Salary Cap section
+    await expandSection(page, 'waiver-budget');
 
     // Find the FAAB button anywhere on the page
     const faabButton = page.getByRole('button', { name: 'FAAB' });
@@ -294,6 +348,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   test('should toggle Hall of Fame Only mode text', async ({ page }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
+
+    // Expand the Era & History section
+    await expandSection(page, 'era-history');
 
     // Default state
     await expect(page.getByText('🏆 Hall of Famers Only — OFF')).toBeVisible();
@@ -314,6 +371,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
+    // Expand the Era & History section
+    await expandSection(page, 'era-history');
+
     await expect(page.getByText('Historical Era Filter')).toBeVisible();
     await expect(page.getByText('All Eras')).toBeVisible();
     await expect(page.getByText('Dead Ball (pre-1920)')).toBeVisible();
@@ -325,6 +385,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
+
+    // Expand the Era & History section
+    await expandSection(page, 'era-history');
 
     // Custom Era year inputs should not be visible initially
     await expect(page.getByPlaceholder('e.g. 1940')).not.toBeVisible();
@@ -345,6 +408,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
+
+    // Expand the Era & History section
+    await expandSection(page, 'era-history');
 
     await page.getByText('Custom Era').click();
     await expect(page.getByPlaceholder('e.g. 1940')).toBeVisible();
@@ -391,6 +457,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
 
+    // Expand the Waivers, Budget & Salary Cap section
+    await expandSection(page, 'waiver-budget');
+
     await expect(page.getByText('Enable Salary Cap')).toBeVisible();
     await expect(
       page.getByText(
@@ -404,6 +473,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     await page.goto('/baseball/league/create');
     await page.waitForLoadState('networkidle');
+
+    // Expand the Waivers, Budget & Salary Cap section
+    await expandSection(page, 'waiver-budget');
 
     // Cap limit input should not be visible initially
     await expect(page.getByPlaceholder('e.g. 50000000')).not.toBeVisible();
