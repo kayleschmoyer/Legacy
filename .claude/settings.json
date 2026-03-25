@@ -10,7 +10,7 @@
       "Bash(powershell -Command \".\\\\scripts\\\\scan-prs.ps1\")",
       "Bash(pwsh -Command \".\\\\scripts\\\\scan-prs.ps1\")",
       "Skill(update-config)",
-      "mcp__claude_ai_Atlassian__*"
+      "mcp__82d0c0eb-ec68-497e-bef5-b0faa209ebbb__*"
     ]
   },
   "hooks": {
