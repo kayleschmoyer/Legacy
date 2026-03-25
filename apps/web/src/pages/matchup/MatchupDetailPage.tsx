@@ -9,7 +9,7 @@ import { GamesRemaining } from '../../features/matchup/GamesRemaining';
 import { MatchupNavigationControls } from '../../features/matchup/MatchupNavigationControls';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
 import { MatchupRosterEditor } from '../../features/matchup/MatchupRosterEditor';
-import { MatchupRecapPanel } from '../../features/matchup/MatchupRecapPanel';
+import { MatchupRecapPanel } from '@legacy-sports/shared-components';
 import {
   MatchupStatus,
   useGetUserTeamIdQuery,
