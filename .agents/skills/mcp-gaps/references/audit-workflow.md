@@ -12,6 +12,7 @@ Review the conversation history for all `Bash` tool invocations. Ignore:
 
 - **Git commands** already covered by `worktree_*` MCP tools (e.g., `git -C $wt status` → `worktree_status`)
 - **One-off investigative commands** (e.g., `ls`, `cat` for quick orientation) — these are not worth tooling. **Exception**: commands used during CI failure triage that have **no MCP equivalent** (e.g., `git show origin/branch:path` for remote ref:path reads, `git ls-tree`) are almost always recurring patterns, not one-offs — do NOT dismiss them. Commands that _do_ have MCP equivalents (e.g., `git diff` → `worktree_diff`, `git log` → `worktree_log`, `git show` for local commits → `worktree_show`) should be classified as `missing-awareness` rather than ignored
+- **File listing/search via Bash** when a dedicated tool exists — `ls | tail`, `ls -1 | sort`, `find . -name "*.ts"` should use **Glob** (pattern matching, sorted by modification time). `ls` is fine for quick directory orientation, but when used to discover files by name/pattern or determine naming conventions (e.g., listing migrations to find the latest timestamp), Glob is the correct tool. Classify as `missing-awareness` if the agent used Bash instead
 - **Commands with no realistic MCP equivalent** (e.g., interactive editors, ad-hoc `python -c` scripts)
 
 Focus on commands that:
@@ -28,6 +29,7 @@ These commands look "investigative" but represent repeatable workflows every age
 - **Listing files on remote branches**: `git ls-tree -r --name-only origin/branch -- path/` — needed for checking file existence, finding related files. **No MCP equivalent exists** (ticket-worthy)
 - **Searching logs for error patterns**: `git log --grep="pattern"`, `git log --diff-filter=D -- path` — needed for investigating regressions. `worktree_log` covers standard log queries; **`--grep` and `--diff-filter` options may be a `missing-feature` gap** — check before filing
 - **Comparing branches**: `git diff origin/main...origin/branch -- path` — needed for understanding PR scope. `worktree_diff` covers this — if the agent used raw `git diff` instead, classify as `missing-awareness`
+- **Listing files by pattern**: `ls -1 path/*.ts | tail -5`, `ls -1 path/ | sort` — needed for discovering naming conventions, finding latest files. The **Glob** tool handles this natively (returns files sorted by modification time) — classify as `missing-awareness`
 
 ### 2. Classify each command
 
