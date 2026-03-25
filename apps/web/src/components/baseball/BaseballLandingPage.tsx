@@ -1666,11 +1666,14 @@ export function BaseballLandingPage() {
                   hoverStyle={{ opacity: 0.8 }}
                   onPress={() => {
                     handleDialogOpenChange(false);
-                    navigate('/baseball/league/create');
+                    const params = leagueName.trim()
+                      ? `?name=${encodeURIComponent(leagueName.trim())}`
+                      : '';
+                    navigate(`/baseball/league/create${params}`);
                   }}
                   role="link"
                 >
-                  Advanced settings
+                  Advanced settings &#8594;
                 </Text>
                 <XStack gap="$3">
                   {createError && (

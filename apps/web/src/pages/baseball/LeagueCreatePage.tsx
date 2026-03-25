@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, H1, H2, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   DEFAULT_NUM_DIVISIONS,
   DEFAULT_NUM_TEAMS,
+  MAX_LEAGUE_NAME_LENGTH,
 } from '../../constants/league';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
@@ -127,33 +128,39 @@ const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500];
 
 export function LeagueCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
   const [formError, setFormError] = useState<string | null>(null);
   const [showWaiverUpgradeModal, setShowWaiverUpgradeModal] =
     useState<boolean>(false);
   const [showEraUpgradeModal, setShowEraUpgradeModal] =
     useState<boolean>(false);
-  const [formData, setFormData] = useState<CreateLeagueFormData>({
-    leagueName: '',
-    numberOfTeams: DEFAULT_NUM_TEAMS,
-    numberOfDivisions: DEFAULT_NUM_DIVISIONS,
-    schedulingStrategy: 'divisional',
-    playerPool: 'all',
-    draftMode: 'live',
-    selectionMethod: 'standard',
-    draftOrder: 'snake',
-    maxRosterSize: 25,
-    draftDate: undefined,
-    waiverType: 'standard',
-    faabBudgetDefault: 100,
-    isPublic: false,
-    eraFilter: 'all',
-    hofOnly: false,
-    // Salary cap defaults (LS-646)
-    salaryCapEnabled: false,
-    salaryCap: undefined,
-    auctionBudget: 200,
-    auctionMinBid: 1,
+  const [formData, setFormData] = useState<CreateLeagueFormData>(() => {
+    const initialLeagueName = (searchParams.get('name') ?? '')
+      .trim()
+      .slice(0, MAX_LEAGUE_NAME_LENGTH);
+    return {
+      leagueName: initialLeagueName,
+      numberOfTeams: DEFAULT_NUM_TEAMS,
+      numberOfDivisions: DEFAULT_NUM_DIVISIONS,
+      schedulingStrategy: 'divisional',
+      playerPool: 'all',
+      draftMode: 'live',
+      selectionMethod: 'standard',
+      draftOrder: 'snake',
+      maxRosterSize: 25,
+      draftDate: undefined,
+      waiverType: 'standard',
+      faabBudgetDefault: 100,
+      isPublic: false,
+      eraFilter: 'all',
+      hofOnly: false,
+      // Salary cap defaults (LS-646)
+      salaryCapEnabled: false,
+      salaryCap: undefined,
+      auctionBudget: 200,
+      auctionMinBid: 1,
+    };
   });
 
   const [createLeagueAndTeams, { loading }] = useCreateLeagueAndTeamsMutation({
@@ -220,8 +227,8 @@ export function LeagueCreatePage(): React.JSX.Element {
       return 'League name must be at least 3 characters long';
     }
 
-    if (trimmedLeagueName.length > 50) {
-      return 'League name must be less than 50 characters';
+    if (trimmedLeagueName.length > MAX_LEAGUE_NAME_LENGTH) {
+      return `League name must be less than ${MAX_LEAGUE_NAME_LENGTH} characters`;
     }
 
     if (formData.numberOfTeams < 4 || formData.numberOfTeams > 16) {
