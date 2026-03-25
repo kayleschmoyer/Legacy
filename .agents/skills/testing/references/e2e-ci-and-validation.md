@@ -13,11 +13,6 @@
 | `typecheck`  | TypeScript check (no emit)                        |
 | `lint`       | ESLint                                            |
 
-> **`@visual` snapshot tests** still exist but have no dedicated Nx target. Run them with
-> `pnpm exec nx e2e web-e2e -- --grep='@visual'` and update baselines with
-> `pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts --update-snapshots --grep='@visual'`.
-> These tests are deprecated and tracked for removal under LS-1779.
-
 ### Run commands
 
 ```powershell

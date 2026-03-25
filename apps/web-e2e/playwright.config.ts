@@ -65,25 +65,11 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
 
-  /* OS-agnostic snapshot paths — one baseline per browser, no platform suffix.
-   * Playwright bundles its own browsers so rendering is near-identical across
-   * OSes; sub-pixel font differences are absorbed by maxDiffPixelRatio. */
-  snapshotPathTemplate: '{snapshotDir}/{arg}-{projectName}{ext}',
-
   expect: {
     /* Give React 18's non-blocking createRoot().render() time to commit the
      * initial paint + re-render after mocked GraphQL responses arrive.
      * Cold V8 JIT on CI can require 3–4s; 5s gives comfortable headroom. */
     timeout: 5000,
-    /* Threshold for visual comparisons */
-    toHaveScreenshot: {
-      threshold: 0.2,
-      maxDiffPixelRatio: 0.01,
-      animations: 'disabled',
-    },
-    toMatchSnapshot: {
-      threshold: 0.2,
-    },
   },
 
   /* Configure projects for major browsers */

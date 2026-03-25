@@ -2,14 +2,6 @@
 test-results/
 playwright-report/
 
-# Temporary snapshot files (keep actual snapshots in git)
-*.png-actual
-*.png-expected
-*.png-diff
-*.html-actual
-*.html-expected
-*.html-diff
-
 # Test artifacts
 .auth/
 coverage/

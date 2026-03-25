@@ -111,7 +111,6 @@ The tests are configured to:
 
 - Use `http://localhost:4200` as the base URL (web app)
 - Target league ID 1 at `/baseball/league/1`
-- Take screenshots for visual validation
 - Test across multiple browsers (Chrome, Firefox, Safari)
 - Include mobile viewport testing
 

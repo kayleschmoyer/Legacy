@@ -84,8 +84,7 @@ apps/web-e2e/
 │   │   ├── league.page.ts        # League detail, create, list
 │   │   ├── draft.page.ts         # Draft board UI
 │   │   └── players.page.ts       # Player stats, detail, comparison
-│   ├── support/
-│   │   └── snapshot-utils.ts     # Hide dynamic content for snapshots
+│   ├── support/                  # Test utilities
 │   ├── utils/
 │   │   └── jwt.ts                # E2EJwtUtil for generating test JWTs
 │   └── tests/                    # Test specs
