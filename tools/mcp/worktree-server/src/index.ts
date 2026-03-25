@@ -197,8 +197,12 @@ function getWorktrees(): WorktreeInfo[] {
  *    - If multiple worktrees share the same key, returns an error listing options
  */
 function resolveWorktreePath(
-  key: string,
+  key: string | undefined,
 ): { path: string } | { error: string } {
+  if (!key) {
+    return { error: 'Missing required key parameter.' };
+  }
+
   const worktrees = getWorktrees();
 
   // 1. Exact branch name match
