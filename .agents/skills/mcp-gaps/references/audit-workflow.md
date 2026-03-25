@@ -122,6 +122,28 @@ For each overflow, record:
 - **`bad-default`**: The tool returns too much data when no limiting parameter is specified (e.g., `ci_get_logs` without `maxLines` returns the full log). Create a ticket to change the server-side default.
 - **`missing-parameter`**: The tool has no way to limit output size — no pagination, no summary mode, no `maxResults` flag. Create a ticket to add the parameter.
 
+#### Known `missing-awareness` patterns
+
+These are **not tooling gaps** — the capability exists but agents commonly miss it. If you observe these during an audit, update the relevant skill doc rather than filing a ticket.
+
+| Pattern                                                                         | Correct usage                                                            | Why it matters                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `gh api graphql` used to resolve threads instead of MCP tool                    | Use `github_resolve_threads(threadIds: [...])`                           | Raw GraphQL calls bypass any repository-specific automation layered on top of the MCP tool. Using the MCP tool keeps thread resolution consistent and centralized.                                     |
+| `gh api .../requested_reviewers` loop to request Copilot review on multiple PRs | Use `github_request_review(number: <PR#>)` — requests Copilot by default | The MCP tool exists but only handles one PR at a time. If you need bulk requests, a loop over the MCP tool is correct — but file a `missing-feature` ticket for batch support if >10 PRs are involved. |
+| `gh pr checks` or `gh pr view --json mergeable` in a loop to check PR status    | Use `github_pr_batch_status(prNumbers: [...])`                           | Batched GraphQL call returns mergeable status, CI jobs, reviews, and unresolved threads for multiple PRs in one request. Eliminates N sequential API calls during sweeps.                              |
+| Falling back to `gh` CLI for all GitHub operations when MCP auth expires        | Run `github_auth_status` first; if expired, refresh with `gh auth login` | When the GitHub MCP server's token expires, agents often fall back to `gh` CLI for the entire session. Check auth early and refresh — don't silently downgrade to CLI for every operation.             |
+
+#### Known tooling gaps (file tickets under LS-1455)
+
+These are recurring patterns where an MCP tool is **missing or incomplete**. If you observe these during an audit, check for an existing LS-1455 ticket before filing a new one.
+
+| Pattern                                                                  | Gap type          | MCP server             | Notes                                                                                                                                                 |
+| ------------------------------------------------------------------------ | ----------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gh api repos/.../pulls/$pr/reviews` to check Copilot review status      | `missing-tool`    | `legacy-sports-github` | LS-1871 — No MCP tool for listing PR reviews or checking if Copilot has reviewed. Needed by sweep agents to determine which PRs need review requests. |
+| Looping `github_request_review` over 10+ PRs                             | `missing-feature` | `legacy-sports-github` | LS-1872 — `github_request_review` handles one PR at a time. Batch variant would eliminate N API roundtrips during sweeps.                             |
+| `worktree_push` fails on pre-push hook auto-amend, requires manual retry | `missing-feature` | `worktree`             | LS-1873 — Pre-push hook runs formatter, amends commit, aborts push. `worktree_push` should detect the abort pattern and auto-retry.                   |
+| `worktree_set` crashes → agent falls back to raw `git -C` via Bash       | bug               | `worktree`             | LS-1874 — `worktree_set(identifier)` throws `Cannot read properties of undefined`. Blocks all worktree MCP tools, forcing raw git fallback.           |
+
 #### Known high-frequency overflow patterns
 
 | Tool                       | Frequency | Root cause                            | Typical fix                         |

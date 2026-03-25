@@ -39,7 +39,7 @@ Orchestrate maintenance across all open PRs: scan, rebase conflicts, fix reviews
 
 1. **Always self-review before pushing** -- Phase 1 is not optional. It prevents CI failures and reduces Copilot review rounds.
 2. **2-round cap on Copilot fix iterations** -- Round 1: security/bugs/type safety. Round 2: remaining actionable comments. After round 2: resolve and move on.
-3. **Resolve threads after fixing** -- use `github_resolve_thread` or `github_resolve_threads` after pushing fixes. Add `merge-when-ready` label after all threads are resolved.
+3. **Resolve threads after fixing** -- use `github_resolve_thread` or `github_resolve_threads` after pushing fixes. `github_resolve_threads` accepts `threadIds` only. Add `merge-when-ready` label after all threads are resolved.
 4. **Never skip `make pc`** -- each CI failure costs 40-60 min. Minimum alternative: `make format && make lint-fix && make typecheck`.
 5. **Always use `--body-file` or MCP tool for PR body** -- never inline `--body` in any shell (PowerShell is especially problematic).
 6. **Never create a PR from `main`** -- branch name must contain a Jira ticket key.
