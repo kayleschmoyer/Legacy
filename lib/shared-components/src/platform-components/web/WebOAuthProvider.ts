@@ -40,6 +40,7 @@ interface GoogleIdConfiguration {
 // Extended configuration that includes newer GSI features
 interface ExtendedGoogleIdConfiguration extends GoogleIdConfiguration {
   use_fedcm_for_prompt?: boolean;
+  itp_support?: boolean;
 }
 
 interface CredentialResponse {
@@ -86,6 +87,19 @@ interface GsiButtonConfiguration {
   logo_alignment?: 'left' | 'center';
   width?: string | number;
   locale?: string;
+}
+
+/**
+ * Detect whether the current browser is a mobile browser.
+ * Mobile Chrome (Android) requires FedCM for One Tap — the legacy iframe-based
+ * prompt is not supported on mobile browsers. This detection prevents the
+ * FedCM-to-non-FedCM fallback retry that silently breaks One Tap on mobile.
+ */
+function isMobileBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent,
+  );
 }
 
 class OAuthErrorClass extends Error {
@@ -201,17 +215,25 @@ export class WebOAuthProvider implements OAuthProvider {
       return;
     }
 
-    // Determine whether to use FedCM: explicit parameter > previous failure > default
+    // Determine whether to use FedCM: explicit parameter > previous failure > default.
+    // On mobile Chrome (Android), FedCM is the only supported mechanism for One Tap —
+    // the legacy iframe-based prompt does not work on mobile browsers. Always enable
+    // FedCM on mobile to prevent silent failures.
     const isLocalhost =
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1';
-    const enableFedCm =
-      useFedCm !== undefined ? useFedCm : !isLocalhost && !this.fedcmFailed;
+    const isMobile = isMobileBrowser();
+    const enableFedCm = isMobile
+      ? true
+      : useFedCm !== undefined
+        ? useFedCm
+        : !isLocalhost && !this.fedcmFailed;
 
     try {
       const gsiConfig: ExtendedGoogleIdConfiguration = {
         client_id: this.config.googleClientId,
         use_fedcm_for_prompt: enableFedCm,
+        itp_support: true,
         callback: (response: CredentialResponse) => {
           // One Tap provides ID token - send it directly to OAuth proxy
           void this.handleOneTapResponse(response)
@@ -249,17 +271,21 @@ export class WebOAuthProvider implements OAuthProvider {
           if (momentType === 'dismissed' && dismissedReason) {
             LOGGER.warn('One Tap dismissed:', dismissedReason);
 
-            // Retry without FedCM when dismissed due to FedCM-specific failures.
-            // Exclude 'credential_returned' — it means the credential callback
-            // already fired (successful selection), so retrying would cause a
-            // redundant second prompt / duplicate login flow.
+            // On mobile browsers, FedCM is the only supported mechanism for
+            // One Tap — retrying without it causes a silent failure (the
+            // iframe-based prompt is not available on mobile). Skip the
+            // FedCM fallback retry entirely on mobile.
+            //
+            // On desktop, retry without FedCM for any dismissal reason except
+            // 'credential_returned' (credential callback already fired) and
+            // 'user_cancel' (explicit user dismissal — retrying would be
+            // intrusive).
             if (
+              !isMobile &&
               enableFedCm &&
               !this.fedcmFailed &&
               dismissedReason !== 'credential_returned' &&
-              (dismissedReason === 'cancel_called' ||
-                // Any other unexpected dismiss during FedCM warrants a retry
-                dismissedReason !== 'user_cancel')
+              dismissedReason !== 'user_cancel'
             ) {
               LOGGER.warn(
                 'FedCM dismissed One Tap, retrying without FedCM:',
