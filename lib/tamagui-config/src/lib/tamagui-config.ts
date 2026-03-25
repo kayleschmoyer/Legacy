@@ -61,6 +61,7 @@ const brandDark = {
   // Heritage brand accents
   brandNavy: '#1B3A5C', // deep baseball navy
   brandNavyLight: '#2C4A7C', // lighter navy for gradients
+  brandNavyDark: '#143050', // darker navy for press states
   brandSeamRed: '#C41E3A', // baseball seam red
   brandSeamRedLight: '#E63950', // lighter seam red for hover/glow
   brandGold: '#C5A55A', // aged gold — trophies, pennants, vintage borders
@@ -210,6 +211,7 @@ const brandLight = {
   // Heritage brand accents
   brandNavy: '#1B3A5C',
   brandNavyLight: '#2C4A7C',
+  brandNavyDark: '#143050',
   brandSeamRed: '#C41E3A',
   brandSeamRedLight: '#E63950',
   brandGold: '#A68B3E',

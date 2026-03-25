@@ -17,13 +17,7 @@ import {
   GetUserLeaguesQuery,
   useCreateLeagueAndTeamsMutation,
 } from '../../api/db/graphql.generated';
-import {
-  BRAND_GOLD,
-  BRAND_NAVY,
-  BRAND_NAVY_DARK,
-  BRAND_NAVY_LIGHT,
-  withAlpha,
-} from '../../constants/colors';
+import { BRAND_NAVY_LIGHT, withAlpha } from '../../constants/colors';
 import { trackPremiumFeatureClick } from '../../utils/analytics';
 
 // Now using codegen-generated hooks and types
@@ -457,37 +451,37 @@ export function LeagueCreatePage(): React.JSX.Element {
                       minWidth="$5"
                       backgroundColor={
                         formData.numberOfTeams === count
-                          ? BRAND_NAVY_LIGHT
+                          ? '$brandNavyLight'
                           : '$color2'
                       }
                       borderColor={
                         formData.numberOfTeams === count
-                          ? BRAND_NAVY_LIGHT
+                          ? '$brandNavyLight'
                           : '$borderColor'
                       }
                       borderWidth={formData.numberOfTeams === count ? 2 : 1}
                       hoverStyle={{
                         backgroundColor:
                           formData.numberOfTeams === count
-                            ? BRAND_NAVY
+                            ? '$brandNavy'
                             : '$color3',
                         borderColor:
                           formData.numberOfTeams === count
-                            ? BRAND_NAVY
+                            ? '$brandNavy'
                             : '$borderColorHover',
                       }}
                       pressStyle={{
                         scale: 0.95,
                         backgroundColor:
                           formData.numberOfTeams === count
-                            ? BRAND_NAVY_DARK
+                            ? '$brandNavyDark'
                             : '$color4',
                       }}
                     >
                       <Text
                         color={
                           formData.numberOfTeams === count
-                            ? BRAND_GOLD
+                            ? '$brandGold'
                             : '$color'
                         }
                         fontWeight={
@@ -526,37 +520,37 @@ export function LeagueCreatePage(): React.JSX.Element {
                       minWidth="$5"
                       backgroundColor={
                         formData.numberOfDivisions === count
-                          ? BRAND_NAVY_LIGHT
+                          ? '$brandNavyLight'
                           : '$color2'
                       }
                       borderColor={
                         formData.numberOfDivisions === count
-                          ? BRAND_NAVY_LIGHT
+                          ? '$brandNavyLight'
                           : '$borderColor'
                       }
                       borderWidth={formData.numberOfDivisions === count ? 2 : 1}
                       hoverStyle={{
                         backgroundColor:
                           formData.numberOfDivisions === count
-                            ? BRAND_NAVY
+                            ? '$brandNavy'
                             : '$color3',
                         borderColor:
                           formData.numberOfDivisions === count
-                            ? BRAND_NAVY
+                            ? '$brandNavy'
                             : '$borderColorHover',
                       }}
                       pressStyle={{
                         scale: 0.95,
                         backgroundColor:
                           formData.numberOfDivisions === count
-                            ? BRAND_NAVY_DARK
+                            ? '$brandNavyDark'
                             : '$color4',
                       }}
                     >
                       <Text
                         color={
                           formData.numberOfDivisions === count
-                            ? BRAND_GOLD
+                            ? '$brandGold'
                             : '$color'
                         }
                         fontWeight={
@@ -595,12 +589,12 @@ export function LeagueCreatePage(): React.JSX.Element {
                       flex={1}
                       backgroundColor={
                         formData.schedulingStrategy === option.value
-                          ? '$green8'
+                          ? '$brandNavyLight'
                           : '$color2'
                       }
                       borderColor={
                         formData.schedulingStrategy === option.value
-                          ? '$green8'
+                          ? '$brandNavyLight'
                           : '$borderColor'
                       }
                       borderWidth={
@@ -609,25 +603,25 @@ export function LeagueCreatePage(): React.JSX.Element {
                       hoverStyle={{
                         backgroundColor:
                           formData.schedulingStrategy === option.value
-                            ? '$green9'
+                            ? '$brandNavy'
                             : '$color3',
                         borderColor:
                           formData.schedulingStrategy === option.value
-                            ? '$green9'
+                            ? '$brandNavy'
                             : '$borderColorHover',
                       }}
                       pressStyle={{
                         scale: 0.95,
                         backgroundColor:
                           formData.schedulingStrategy === option.value
-                            ? '$green7'
+                            ? '$brandNavyDark'
                             : '$color4',
                       }}
                     >
                       <Text
                         color={
                           formData.schedulingStrategy === option.value
-                            ? '$green12'
+                            ? '$brandGold'
                             : '$color'
                         }
                         fontWeight={
@@ -667,37 +661,37 @@ export function LeagueCreatePage(): React.JSX.Element {
                       minWidth="$5"
                       backgroundColor={
                         formData.maxRosterSize === size
-                          ? BRAND_NAVY_LIGHT
+                          ? '$brandNavyLight'
                           : '$color2'
                       }
                       borderColor={
                         formData.maxRosterSize === size
-                          ? BRAND_NAVY_LIGHT
+                          ? '$brandNavyLight'
                           : '$borderColor'
                       }
                       borderWidth={formData.maxRosterSize === size ? 2 : 1}
                       hoverStyle={{
                         backgroundColor:
                           formData.maxRosterSize === size
-                            ? BRAND_NAVY
+                            ? '$brandNavy'
                             : '$color3',
                         borderColor:
                           formData.maxRosterSize === size
-                            ? BRAND_NAVY
+                            ? '$brandNavy'
                             : '$borderColorHover',
                       }}
                       pressStyle={{
                         scale: 0.95,
                         backgroundColor:
                           formData.maxRosterSize === size
-                            ? BRAND_NAVY_DARK
+                            ? '$brandNavyDark'
                             : '$color4',
                       }}
                     >
                       <Text
                         color={
                           formData.maxRosterSize === size
-                            ? BRAND_GOLD
+                            ? '$brandGold'
                             : '$color'
                         }
                         fontWeight={
@@ -736,37 +730,37 @@ export function LeagueCreatePage(): React.JSX.Element {
                       flex={1}
                       backgroundColor={
                         formData.playerPool === option.value
-                          ? '$green8'
+                          ? '$brandNavyLight'
                           : '$color2'
                       }
                       borderColor={
                         formData.playerPool === option.value
-                          ? '$green8'
+                          ? '$brandNavyLight'
                           : '$borderColor'
                       }
                       borderWidth={formData.playerPool === option.value ? 2 : 1}
                       hoverStyle={{
                         backgroundColor:
                           formData.playerPool === option.value
-                            ? '$green9'
+                            ? '$brandNavy'
                             : '$color3',
                         borderColor:
                           formData.playerPool === option.value
-                            ? '$green9'
+                            ? '$brandNavy'
                             : '$borderColorHover',
                       }}
                       pressStyle={{
                         scale: 0.95,
                         backgroundColor:
                           formData.playerPool === option.value
-                            ? '$green7'
+                            ? '$brandNavyDark'
                             : '$color4',
                       }}
                     >
                       <Text
                         color={
                           formData.playerPool === option.value
-                            ? '$green12'
+                            ? '$brandGold'
                             : '$color'
                         }
                         fontWeight={
@@ -981,37 +975,37 @@ export function LeagueCreatePage(): React.JSX.Element {
                       flex={1}
                       backgroundColor={
                         formData.draftMode === option.value
-                          ? '$green8'
+                          ? '$brandNavyLight'
                           : '$color2'
                       }
                       borderColor={
                         formData.draftMode === option.value
-                          ? '$green8'
+                          ? '$brandNavyLight'
                           : '$borderColor'
                       }
                       borderWidth={formData.draftMode === option.value ? 2 : 1}
                       hoverStyle={{
                         backgroundColor:
                           formData.draftMode === option.value
-                            ? '$green9'
+                            ? '$brandNavy'
                             : '$color3',
                         borderColor:
                           formData.draftMode === option.value
-                            ? '$green9'
+                            ? '$brandNavy'
                             : '$borderColorHover',
                       }}
                       pressStyle={{
                         scale: 0.95,
                         backgroundColor:
                           formData.draftMode === option.value
-                            ? '$green7'
+                            ? '$brandNavyDark'
                             : '$color4',
                       }}
                     >
                       <Text
                         color={
                           formData.draftMode === option.value
-                            ? '$green12'
+                            ? '$brandGold'
                             : '$color'
                         }
                         fontWeight={
@@ -1051,12 +1045,12 @@ export function LeagueCreatePage(): React.JSX.Element {
                       flex={1}
                       backgroundColor={
                         formData.selectionMethod === option.value
-                          ? '$green8'
+                          ? '$brandNavyLight'
                           : '$color2'
                       }
                       borderColor={
                         formData.selectionMethod === option.value
-                          ? '$green8'
+                          ? '$brandNavyLight'
                           : '$borderColor'
                       }
                       borderWidth={
@@ -1065,25 +1059,25 @@ export function LeagueCreatePage(): React.JSX.Element {
                       hoverStyle={{
                         backgroundColor:
                           formData.selectionMethod === option.value
-                            ? '$green9'
+                            ? '$brandNavy'
                             : '$color3',
                         borderColor:
                           formData.selectionMethod === option.value
-                            ? '$green9'
+                            ? '$brandNavy'
                             : '$borderColorHover',
                       }}
                       pressStyle={{
                         scale: 0.95,
                         backgroundColor:
                           formData.selectionMethod === option.value
-                            ? '$green7'
+                            ? '$brandNavyDark'
                             : '$color4',
                       }}
                     >
                       <Text
                         color={
                           formData.selectionMethod === option.value
-                            ? '$green12'
+                            ? '$brandGold'
                             : '$color'
                         }
                         fontWeight={
@@ -1126,37 +1120,37 @@ export function LeagueCreatePage(): React.JSX.Element {
                       flex={1}
                       backgroundColor={
                         formData.draftOrder === option.value
-                          ? '$green8'
+                          ? '$brandNavyLight'
                           : '$color2'
                       }
                       borderColor={
                         formData.draftOrder === option.value
-                          ? '$green8'
+                          ? '$brandNavyLight'
                           : '$borderColor'
                       }
                       borderWidth={formData.draftOrder === option.value ? 2 : 1}
                       hoverStyle={{
                         backgroundColor:
                           formData.draftOrder === option.value
-                            ? '$green9'
+                            ? '$brandNavy'
                             : '$color3',
                         borderColor:
                           formData.draftOrder === option.value
-                            ? '$green9'
+                            ? '$brandNavy'
                             : '$borderColorHover',
                       }}
                       pressStyle={{
                         scale: 0.95,
                         backgroundColor:
                           formData.draftOrder === option.value
-                            ? '$green7'
+                            ? '$brandNavyDark'
                             : '$color4',
                       }}
                     >
                       <Text
                         color={
                           formData.draftOrder === option.value
-                            ? '$green12'
+                            ? '$brandGold'
                             : '$color'
                         }
                         fontWeight={
@@ -1385,12 +1379,12 @@ export function LeagueCreatePage(): React.JSX.Element {
                       borderWidth={2}
                       borderColor={
                         formData.salaryCapEnabled
-                          ? BRAND_NAVY_LIGHT
+                          ? '$brandNavyLight'
                           : '$borderColor'
                       }
                       backgroundColor={
                         formData.salaryCapEnabled
-                          ? BRAND_NAVY_LIGHT
+                          ? '$brandNavyLight'
                           : 'transparent'
                       }
                       alignItems="center"
@@ -1517,24 +1511,24 @@ export function LeagueCreatePage(): React.JSX.Element {
                     disabled={loading}
                     flex={1}
                     backgroundColor={
-                      !formData.isPublic ? BRAND_NAVY_LIGHT : '$color2'
+                      !formData.isPublic ? '$brandNavyLight' : '$color2'
                     }
                     borderColor={
-                      !formData.isPublic ? BRAND_NAVY_LIGHT : '$borderColor'
+                      !formData.isPublic ? '$brandNavyLight' : '$borderColor'
                     }
                     borderWidth={!formData.isPublic ? 2 : 1}
                     hoverStyle={{
                       backgroundColor: !formData.isPublic
-                        ? BRAND_NAVY
+                        ? '$brandNavy'
                         : '$color3',
                       borderColor: !formData.isPublic
-                        ? BRAND_NAVY
+                        ? '$brandNavy'
                         : '$borderColorHover',
                     }}
                     pressStyle={{ scale: 0.95 }}
                   >
                     <Text
-                      color={!formData.isPublic ? BRAND_GOLD : '$color'}
+                      color={!formData.isPublic ? '$brandGold' : '$color'}
                       fontWeight={!formData.isPublic ? '600' : '400'}
                     >
                       <span role="img" aria-label="private">
@@ -1550,24 +1544,24 @@ export function LeagueCreatePage(): React.JSX.Element {
                     disabled={loading}
                     flex={1}
                     backgroundColor={
-                      formData.isPublic ? BRAND_NAVY_LIGHT : '$color2'
+                      formData.isPublic ? '$brandNavyLight' : '$color2'
                     }
                     borderColor={
-                      formData.isPublic ? BRAND_NAVY_LIGHT : '$borderColor'
+                      formData.isPublic ? '$brandNavyLight' : '$borderColor'
                     }
                     borderWidth={formData.isPublic ? 2 : 1}
                     hoverStyle={{
                       backgroundColor: formData.isPublic
-                        ? BRAND_NAVY
+                        ? '$brandNavy'
                         : '$color3',
                       borderColor: formData.isPublic
-                        ? BRAND_NAVY
+                        ? '$brandNavy'
                         : '$borderColorHover',
                     }}
                     pressStyle={{ scale: 0.95 }}
                   >
                     <Text
-                      color={formData.isPublic ? BRAND_GOLD : '$color'}
+                      color={formData.isPublic ? '$brandGold' : '$color'}
                       fontWeight={formData.isPublic ? '600' : '400'}
                     >
                       <span role="img" aria-label="public">
@@ -1632,21 +1626,21 @@ export function LeagueCreatePage(): React.JSX.Element {
           borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
         >
           <Card.Header padded>
-            <H2 size="$5" color={BRAND_GOLD}>
+            <H2 size="$5" color="$brandGold">
               What happens next?
             </H2>
           </Card.Header>
           <YStack padding="$4" space="$3">
-            <Text size="$3" color={BRAND_GOLD}>
+            <Text size="$3" color="$brandGold">
               • Your league will be created with the specified number of teams
             </Text>
-            <Text size="$3" color={BRAND_GOLD}>
+            <Text size="$3" color="$brandGold">
               • You'll be set as the league commissioner
             </Text>
-            <Text size="$3" color={BRAND_GOLD}>
+            <Text size="$3" color="$brandGold">
               • Teams will be auto-generated and ready for member assignment
             </Text>
-            <Text size="$3" color={BRAND_GOLD}>
+            <Text size="$3" color="$brandGold">
               • You can invite friends to join your league after creation
             </Text>
           </YStack>
