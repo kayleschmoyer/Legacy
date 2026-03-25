@@ -863,20 +863,28 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
 
         // Insert activity log entries for every assignment so the activity feed
         // is populated for random drafts, matching the live pick-by-pick behaviour.
+        const teamCount = teams.length;
         await tx.insert(PublicSchema.leagueActivityLog).values(
-          assignments.map((assignment, index) => ({
-            leagueId: assignment.leagueId,
-            teamId: assignment.teamId,
-            actorUserId: null,
-            eventType: 'draft_pick_made' as const,
-            payload: {
-              playerId: assignment.playerId,
-              positionId: assignment.positionId,
-              overallPick: index + 1,
-              wasAutoPick: true,
-              wasRandomDraft: true,
-            },
-          })),
+          assignments.map((assignment, index) => {
+            const overallPick = index + 1;
+            const round = Math.ceil(overallPick / teamCount);
+            const pickNumber = ((overallPick - 1) % teamCount) + 1;
+            return {
+              leagueId: assignment.leagueId,
+              teamId: assignment.teamId,
+              actorUserId: null,
+              eventType: 'draft_pick_made' as const,
+              payload: {
+                playerId: assignment.playerId,
+                positionId: assignment.positionId,
+                overallPick,
+                round,
+                pickNumber,
+                wasAutoPick: true,
+                wasRandomDraft: true,
+              },
+            };
+          }),
         );
 
         LOGGER.info(
@@ -1330,6 +1338,8 @@ async function runAuctionDraft(leagueId: number): Promise<void> {
             playerId: r.playerId,
             positionId: r.positionId,
             overallPick: r.overallPick,
+            round: r.round,
+            pickNumber: r.pickNumber,
             bidAmount: r.bidAmount,
             wasAutoPick: true,
             wasAuctionDraft: true,
