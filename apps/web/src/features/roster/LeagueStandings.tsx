@@ -544,11 +544,13 @@ export function LeagueStandings({
 
       {/* Team Rows */}
       {divisionGroups ? (
-        <XStack alignItems="flex-start" overflow="hidden">
+        <XStack alignItems="flex-start" overflow="hidden" width="100%">
           {divisionGroups.map(([divId, divTeams], groupIdx) => (
             <YStack
               key={divId}
               flex={1}
+              flexBasis={0}
+              minWidth={0}
               role="list"
               borderRightWidth={groupIdx < divisionGroups.length - 1 ? 1 : 0}
               borderRightColor="$outlineSubtle"
