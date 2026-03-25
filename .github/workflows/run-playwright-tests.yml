@@ -63,7 +63,7 @@ on:
       shard-total:
         description: "Number of parallel shards (1 = no sharding)"
         required: false
-        default: "1"
+        default: "2"
         type: choice
         options:
           - "1"
@@ -83,7 +83,7 @@ on:
       workers:
         description: "Number of parallel workers per shard"
         required: false
-        default: "2"
+        default: "4"
         type: choice
         options:
           - "1"

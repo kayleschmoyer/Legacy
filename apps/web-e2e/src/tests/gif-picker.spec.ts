@@ -249,6 +249,8 @@ async function mockGraphQL(
         body: JSON.stringify({ data: { leagueScoringProfile: null } }),
       });
     } else {
+      // Fall back to the shared baseline mocks in the _apiIsolation fixture.
+      // Do NOT use route.continue() — there is no backend in CI.
       await route.fallback();
     }
   });
@@ -258,15 +260,20 @@ async function mockGiphy(
   page: import('@playwright/test').Page,
   opts: { empty?: boolean } = {},
 ): Promise<void> {
-  await page.route('**/api.giphy.com/**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(
-        opts.empty ? { data: [], meta: { status: 200 } } : MOCK_GIPHY_RESPONSE,
-      ),
-    });
-  });
+  await page.route(
+    (url) => url.hostname === 'api.giphy.com',
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          opts.empty
+            ? { data: [], meta: { status: 200 } }
+            : MOCK_GIPHY_RESPONSE,
+        ),
+      });
+    },
+  );
 }
 
 /** Navigate to overview, switch to Chat sub-tab */

@@ -207,6 +207,24 @@ const isolated = base.extend<{ _apiIsolation: void }>({
             return;
           }
 
+          // Giphy API — tests mock this via page.route() in beforeEach.
+          // Return safe empty data so unmocked Giphy calls don't crash the UI.
+          const isGiphyRequest = (() => {
+            try {
+              return new URL(reqUrl).hostname === 'api.giphy.com';
+            } catch {
+              return false;
+            }
+          })();
+          if (isGiphyRequest) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({ data: [], meta: { status: 200 } }),
+            });
+            return;
+          }
+
           // Any non-GraphQL external request: reject outright.
           await route.fulfill({
             status: 401,
