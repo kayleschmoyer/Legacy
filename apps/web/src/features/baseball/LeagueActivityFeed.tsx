@@ -201,12 +201,22 @@ function eventToActivityItem(event: {
         typeof payload['round'] === 'number' ? payload['round'] : '?';
       const pick =
         typeof payload['pickNumber'] === 'number' ? payload['pickNumber'] : '?';
+      const teamName =
+        typeof payload['teamName'] === 'string' ? payload['teamName'] : null;
+      const playerName =
+        typeof payload['playerName'] === 'string'
+          ? payload['playerName']
+          : null;
+      const draftActor = teamName ?? actor;
+      const detail = playerName
+        ? `${draftActor} drafted ${playerName}.`
+        : `${draftActor} made their draft selection.`;
       return {
         id: String(event.id),
         type: 'draft_pick',
         icon: <Trophy size={16} color={BRAND_GOLD} />,
         title: `Round ${round}, Pick ${pick}`,
-        detail: `${actor} made their draft selection.`,
+        detail,
         isoDate,
         accentColor: BRAND_GOLD,
         linkTo: `/leagues/${lid}/draft`,

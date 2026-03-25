@@ -7,6 +7,7 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import { and, eq } from 'drizzle-orm';
 import type { Context } from '../schema/builder';
 
 export type InsertActivityLogPayload = {
@@ -39,6 +40,86 @@ export async function insertActivityLog(
     LOGGER.error('Failed to insert activity log entry', {
       eventType: data.eventType,
       leagueId: data.leagueId,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+export type DraftPickActivityPayload = {
+  leagueId: number;
+  teamId: number | null;
+  actorUserId: number | null;
+  playerId: number;
+  round?: number | null;
+  pickNumber?: number | null;
+  overallPick?: number | null;
+  wasAutoPick?: boolean;
+  autoPickReason?: string | null;
+  wasCommissionerPick?: boolean;
+};
+
+/**
+ * Log a draft_pick_made activity with resolved player and team names.
+ *
+ * Resolves names from the DB so the frontend can display them without
+ * additional queries. Never throws — errors are swallowed like insertActivityLog.
+ */
+export async function logDraftPickActivity(
+  context: Pick<Context, 'db'>,
+  data: DraftPickActivityPayload,
+): Promise<void> {
+  try {
+    const [playerRow, teamRow] = await Promise.all([
+      context.db
+        .select({
+          firstName: PublicSchema.players.firstName,
+          lastName: PublicSchema.players.lastName,
+        })
+        .from(PublicSchema.players)
+        .where(eq(PublicSchema.players.id, data.playerId))
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
+      data.teamId
+        ? context.db
+            .select({ name: PublicSchema.teams.name })
+            .from(PublicSchema.teams)
+            .where(
+              and(
+                eq(PublicSchema.teams.id, data.teamId),
+                eq(PublicSchema.teams.leagueId, data.leagueId),
+              ),
+            )
+            .limit(1)
+            .then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
+    ]);
+
+    const playerName = playerRow
+      ? `${playerRow.firstName} ${playerRow.lastName}`
+      : null;
+    const teamName = teamRow?.name ?? null;
+
+    await insertActivityLog(context, {
+      leagueId: data.leagueId,
+      teamId: data.teamId,
+      actorUserId: data.actorUserId,
+      eventType: 'draft_pick_made',
+      payload: {
+        playerId: data.playerId,
+        round: data.round,
+        pickNumber: data.pickNumber,
+        overallPick: data.overallPick,
+        ...(playerName && { playerName }),
+        ...(teamName && { teamName }),
+        ...(data.wasAutoPick && { wasAutoPick: true }),
+        ...(data.autoPickReason && { autoPickReason: data.autoPickReason }),
+        ...(data.wasCommissionerPick && { wasCommissionerPick: true }),
+      },
+    });
+  } catch (err) {
+    LOGGER.error('Failed to log draft pick activity', {
+      leagueId: data.leagueId,
+      playerId: data.playerId,
       err: err instanceof Error ? err.message : String(err),
     });
   }

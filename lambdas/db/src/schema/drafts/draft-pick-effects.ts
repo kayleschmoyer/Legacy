@@ -13,7 +13,7 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 
 import { createAllMatchupsForLeague } from '../matchups/mutations';
-import { insertActivityLog } from '../../services/activity-log';
+import { logDraftPickActivity } from '../../services/activity-log';
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -183,21 +183,18 @@ function logAutoPick(
   draftLeagueId: number,
   pickResult: PickEffectsParams['pickResult'],
 ): void {
-  void insertActivityLog(
+  void logDraftPickActivity(
     { db },
     {
       leagueId: draftLeagueId,
       teamId: pickResult.currentPickInfo.teamId,
       actorUserId: null,
-      eventType: 'draft_pick_made',
-      payload: {
-        playerId: pickResult.autoPlayerId,
-        round: pickResult.currentPickInfo.round,
-        pickNumber: pickResult.currentPickInfo.pickNumber,
-        overallPick: pickResult.currentPickInfo.overallPick,
-        wasAutoPick: true,
-        autoPickReason: pickResult.autoPickReason,
-      },
+      playerId: pickResult.autoPlayerId,
+      round: pickResult.currentPickInfo.round,
+      pickNumber: pickResult.currentPickInfo.pickNumber,
+      overallPick: pickResult.currentPickInfo.overallPick,
+      wasAutoPick: true,
+      autoPickReason: pickResult.autoPickReason,
     },
   );
 }

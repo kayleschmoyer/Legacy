@@ -25,7 +25,7 @@ import {
 } from '../helpers';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
-import { insertActivityLog } from '../../../services/activity-log';
+import { logDraftPickActivity } from '../../../services/activity-log';
 import { checkRosterCapacity } from '../../../services/roster-service';
 import {
   AuthenticationError,
@@ -754,18 +754,15 @@ builder.mutationField('makeDraftPick', (t) =>
             }
 
             // Record chained auto-pick in the activity log (LS-538)
-            void insertActivityLog(context, {
+            await logDraftPickActivity(context, {
               leagueId: autoPickResult.leagueId,
               teamId: autoPickResult.currentPickInfo.teamId,
               actorUserId: null, // system-driven auto-pick
-              eventType: 'draft_pick_made',
-              payload: {
-                playerId: autoPickResult.playerId,
-                round: autoPickResult.currentPickInfo.round,
-                pickNumber: autoPickResult.currentPickInfo.pickNumber,
-                overallPick: autoPickResult.currentPickInfo.overallPick,
-                wasAutoPick: true,
-              },
+              playerId: autoPickResult.playerId,
+              round: autoPickResult.currentPickInfo.round,
+              pickNumber: autoPickResult.currentPickInfo.pickNumber,
+              overallPick: autoPickResult.currentPickInfo.overallPick,
+              wasAutoPick: true,
             });
 
             effectiveDraftComplete = autoPickResult.isDraftComplete;
@@ -816,17 +813,14 @@ builder.mutationField('makeDraftPick', (t) =>
         }
 
         // Record draft pick in the activity log (fire-and-forget, non-fatal)
-        void insertActivityLog(context, {
+        void logDraftPickActivity(context, {
           leagueId: result.leagueId,
           teamId: result.currentPickInfo?.teamId ?? null,
           actorUserId: userId,
-          eventType: 'draft_pick_made',
-          payload: {
-            playerId,
-            round: result.currentPickInfo?.round,
-            pickNumber: result.currentPickInfo?.pickNumber,
-            overallPick: result.currentPickInfo?.overallPick,
-          },
+          playerId,
+          round: result.currentPickInfo?.round,
+          pickNumber: result.currentPickInfo?.pickNumber,
+          overallPick: result.currentPickInfo?.overallPick,
         });
 
         return result.draftPick;
