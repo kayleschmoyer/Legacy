@@ -20,6 +20,7 @@ on:
           - game-selection
           - jira-proxy
           - oauth-proxy
+          - rollbar-discord
           - stripe-webhook
           - websocket
   push:
@@ -109,6 +110,12 @@ jobs:
               "s3Prefix":"oauth-proxy", "ssmName":"oauth-proxy",
               "badgeName":"Upload OAuth Proxy Lambda",
               "distPath":"lambdas/oauth-proxy/dist", "rollbar":true
+            },
+            {
+              "project":"rollbar-discord", "dir":"rollbar-discord",
+              "s3Prefix":"rollbar-discord", "ssmName":"rollbar-discord",
+              "badgeName":"Upload Rollbar Discord Lambda",
+              "distPath":"lambdas/rollbar-discord/dist", "rollbar":true
             },
             {
               "project":"stripe-webhook", "dir":"stripe-webhook",

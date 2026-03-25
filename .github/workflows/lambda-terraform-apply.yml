@@ -68,6 +68,9 @@ jobs:
           if [ -z "${{ secrets.STRIPE_WEBHOOK_SECRET }}" ]; then
             MISSING+=("STRIPE_WEBHOOK_SECRET")
           fi
+          if [ -z "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+            MISSING+=("DISCORD_WEBHOOK_URL")
+          fi
           if [ ${#MISSING[@]} -gt 0 ]; then
             echo "::error::Missing required secrets: ${MISSING[*]}"
             exit 1
@@ -187,6 +190,9 @@ jobs:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
           TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
+          TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
@@ -248,6 +254,9 @@ jobs:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
           TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
+          TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
