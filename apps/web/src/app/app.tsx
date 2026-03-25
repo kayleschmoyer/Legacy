@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import {
   Button,
@@ -38,21 +44,11 @@ import {
   PlayerDetailPage,
   PlayerStatsPage,
 } from '../pages/players/PlayerStatsPage';
-import { PlayerComparisonPage } from '../pages/players/PlayerComparisonPage';
 import LeagueCreatePage from '../pages/baseball/LeagueCreatePage';
 import LeagueDetailPage from '../pages/baseball/LeagueDetailPage';
 import { TeamDetailPage } from '../pages/baseball/TeamDetailPage';
 import JoinLeagueByCodePage from '../pages/baseball/JoinLeagueByCodePage';
 import { LeagueDiscoveryPage } from '../pages/baseball/LeagueDiscoveryPage';
-import ManagementPage from '../pages/management/ManagementPage';
-import AboutPage from '../pages/about/AboutPage';
-import HelpPage from '../pages/help/HelpPage';
-import PricingPage from '../pages/pricing/PricingPage';
-import { MockDraftPage } from '../pages/draft/MockDraftPage';
-import { SeasonDraftGamePage } from '../pages/games/SeasonDraftGamePage';
-import { SeasonDraftGamesPage } from '../pages/games/SeasonDraftGamesPage';
-import { SeasonDraftGameCreatePage } from '../pages/games/SeasonDraftGameCreatePage';
-import { EliteDraftBoardScreen } from '../components/EliteDraftBoard';
 import { GlobalAnnouncer } from '../components/a11y/GlobalAnnouncer';
 import { MatchupDetailPage } from '../pages/matchup/MatchupDetailPage';
 import { usePageTracking } from '../hooks/usePageTracking';
@@ -61,14 +57,63 @@ import { useAnalyticsIdentify } from '../hooks/useAnalyticsIdentify';
 import { useWebPushRegistration } from '../hooks/useWebPushRegistration';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
-import { AdminPage } from '../pages/admin/AdminPage';
-import AdminRevenuePage from '../pages/admin/AdminRevenuePage';
-import ProfileSettingsPage from '../pages/profile/ProfileSettingsPage';
-import SubscriptionPage from '../pages/profile/SubscriptionPage';
-import PreferencesPage from '../pages/preferences/PreferencesPage';
-import NotificationsPage from '../pages/notifications/NotificationsPage';
 import { BRAND_GOLD } from '../constants/colors';
 import { NAV_Z_INDEX } from '../constants/dimensions';
+
+/* ────────────────────────────────────────────────────────
+ * Lazy-loaded routes — these pages are split into separate
+ * chunks and only downloaded when the user navigates to them.
+ * ──────────────────────────────────────────────────────── */
+const PlayerComparisonPage = React.lazy(() =>
+  import('../pages/players/PlayerComparisonPage').then((m) => ({
+    default: m.PlayerComparisonPage,
+  })),
+);
+const ManagementPage = React.lazy(
+  () => import('../pages/management/ManagementPage'),
+);
+const AboutPage = React.lazy(() => import('../pages/about/AboutPage'));
+const HelpPage = React.lazy(() => import('../pages/help/HelpPage'));
+const PricingPage = React.lazy(() => import('../pages/pricing/PricingPage'));
+const MockDraftPage = React.lazy(() =>
+  import('../pages/draft/MockDraftPage').then((m) => ({
+    default: m.MockDraftPage,
+  })),
+);
+const SeasonDraftGamePage = React.lazy(
+  () => import('../pages/games/SeasonDraftGamePage'),
+);
+const SeasonDraftGamesPage = React.lazy(
+  () => import('../pages/games/SeasonDraftGamesPage'),
+);
+const SeasonDraftGameCreatePage = React.lazy(
+  () => import('../pages/games/SeasonDraftGameCreatePage'),
+);
+const EliteDraftBoardScreen = React.lazy(() =>
+  import('../components/EliteDraftBoard').then((m) => ({
+    default: m.EliteDraftBoardScreen,
+  })),
+);
+const AdminPage = React.lazy(() =>
+  import('../pages/admin/AdminPage').then((m) => ({
+    default: m.AdminPage,
+  })),
+);
+const AdminRevenuePage = React.lazy(
+  () => import('../pages/admin/AdminRevenuePage'),
+);
+const ProfileSettingsPage = React.lazy(
+  () => import('../pages/profile/ProfileSettingsPage'),
+);
+const SubscriptionPage = React.lazy(
+  () => import('../pages/profile/SubscriptionPage'),
+);
+const PreferencesPage = React.lazy(
+  () => import('../pages/preferences/PreferencesPage'),
+);
+const NotificationsPage = React.lazy(
+  () => import('../pages/notifications/NotificationsPage'),
+);
 
 /* ────────────────────────────────────────────────────────
  * Modern Header – styled components
@@ -509,70 +554,75 @@ function App() {
         role="main"
         tabIndex={-1}
       >
-        <Routes>
-          {/* All routes are now authenticated by default */}
-          <Route path="/" element={<NavigableHomeScreen />} />
-          <Route path="/football" element={<FootballScreen />} />
-          <Route path="/baseball" element={<BaseballScreen />} />
-          <Route
-            path="/baseball/league/:id/draft"
-            element={<EliteDraftBoardScreen />}
-          />
-          <Route path="/baseball/mock-draft" element={<MockDraftPage />} />
-          <Route
-            path="/baseball/league/create"
-            element={<LeagueCreatePage />}
-          />
-          <Route
-            path="/baseball/league/join"
-            element={<JoinLeagueByCodePage />}
-          />
-          <Route
-            path="/baseball/league/join/:inviteCode"
-            element={<JoinLeagueByCodePage />}
-          />
-          <Route path="/baseball/leagues" element={<LeagueDiscoveryPage />} />
-          <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
-          <Route
-            path="/baseball/league/:id/:tab"
-            element={<LeagueDetailPage />}
-          />
-          <Route
-            path="/baseball/league/:id/:tab/:matchupId"
-            element={<LeagueDetailPage />}
-          />
-          <Route path="/baseball/team/:teamId" element={<TeamDetailPage />} />
-          <Route
-            path="/baseball/league/:leagueId/matchups/:matchupId"
-            element={<MatchupDetailPage />}
-          />
-          <Route path="/management" element={<ManagementPage />} />
-          <Route path="/players" element={<PlayersScreen />} />
-          <Route path="/players/stats" element={<PlayerStatsPage />} />
-          <Route path="/players/compare" element={<PlayerComparisonPage />} />
-          <Route path="/players/:id" element={<PlayerDetailPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/help" element={<HelpPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/admin/revenue" element={<AdminRevenuePage />} />
-          <Route path="/profile/settings" element={<ProfileSettingsPage />} />
-          <Route path="/profile/subscription" element={<SubscriptionPage />} />
-          <Route path="/preferences" element={<PreferencesPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
-          <Route
-            path="/games/season-draft"
-            element={<SeasonDraftGamesPage />}
-          />
-          <Route
-            path="/games/season-draft/create"
-            element={<SeasonDraftGameCreatePage />}
-          />
-          <Route
-            path="/games/season-draft/:gameId"
-            element={<SeasonDraftGamePage />}
-          />
-        </Routes>
+        <Suspense fallback={null}>
+          <Routes>
+            {/* All routes are now authenticated by default */}
+            <Route path="/" element={<NavigableHomeScreen />} />
+            <Route path="/football" element={<FootballScreen />} />
+            <Route path="/baseball" element={<BaseballScreen />} />
+            <Route
+              path="/baseball/league/:id/draft"
+              element={<EliteDraftBoardScreen />}
+            />
+            <Route path="/baseball/mock-draft" element={<MockDraftPage />} />
+            <Route
+              path="/baseball/league/create"
+              element={<LeagueCreatePage />}
+            />
+            <Route
+              path="/baseball/league/join"
+              element={<JoinLeagueByCodePage />}
+            />
+            <Route
+              path="/baseball/league/join/:inviteCode"
+              element={<JoinLeagueByCodePage />}
+            />
+            <Route path="/baseball/leagues" element={<LeagueDiscoveryPage />} />
+            <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
+            <Route
+              path="/baseball/league/:id/:tab"
+              element={<LeagueDetailPage />}
+            />
+            <Route
+              path="/baseball/league/:id/:tab/:matchupId"
+              element={<LeagueDetailPage />}
+            />
+            <Route path="/baseball/team/:teamId" element={<TeamDetailPage />} />
+            <Route
+              path="/baseball/league/:leagueId/matchups/:matchupId"
+              element={<MatchupDetailPage />}
+            />
+            <Route path="/management" element={<ManagementPage />} />
+            <Route path="/players" element={<PlayersScreen />} />
+            <Route path="/players/stats" element={<PlayerStatsPage />} />
+            <Route path="/players/compare" element={<PlayerComparisonPage />} />
+            <Route path="/players/:id" element={<PlayerDetailPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/help" element={<HelpPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/revenue" element={<AdminRevenuePage />} />
+            <Route path="/profile/settings" element={<ProfileSettingsPage />} />
+            <Route
+              path="/profile/subscription"
+              element={<SubscriptionPage />}
+            />
+            <Route path="/preferences" element={<PreferencesPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route
+              path="/games/season-draft"
+              element={<SeasonDraftGamesPage />}
+            />
+            <Route
+              path="/games/season-draft/create"
+              element={<SeasonDraftGameCreatePage />}
+            />
+            <Route
+              path="/games/season-draft/:gameId"
+              element={<SeasonDraftGamePage />}
+            />
+          </Routes>
+        </Suspense>
       </YStack>
     </MainLayout>
   );
