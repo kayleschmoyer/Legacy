@@ -164,3 +164,22 @@ export default function Layout() {
     </ErrorBoundary>
   );
 }
+
+// Export testID constants for E2E test selectors
+export const APP_TEST_IDS = {
+  loginScreen: 'login-screen',
+  loginButton: 'login-button',
+  loginTitle: 'login-title',
+  loginError: 'login-error',
+  loginLoading: 'login-loading',
+  homeScreen: 'home-screen',
+  homeTitle: 'home-title',
+  homeContent: 'home-content',
+  sportSelection: 'sport-selection',
+  sportButtonFootball: 'sport-button-football',
+  sportButtonBaseball: 'sport-button-baseball',
+  aboutButton: 'about-button',
+  drawerContent: 'drawer-content',
+  drawerLogout: 'drawer-logout',
+  gestureHandler: 'gesture-handler',
+} as const;

@@ -40,6 +40,7 @@ const Login: React.FC = () => {
 
   return (
     <KeyboardAvoidingView
+      testID="login-screen"
       style={{
         alignItems: 'center',
         flex: 1,
@@ -49,6 +50,7 @@ const Login: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <Text
+        testID="login-title"
         fontSize="$8"
         fontWeight="bold"
         marginBottom="$8"
@@ -59,12 +61,18 @@ const Login: React.FC = () => {
 
       <Animated.View style={[{ width: '100%' }, { opacity: fadeAnim }]}>
         {errorMessage ? (
-          <Text color="$red10" marginTop="$3" textAlign="center">
+          <Text
+            testID="login-error"
+            color="$red10"
+            marginTop="$3"
+            textAlign="center"
+          >
             {errorMessage}
           </Text>
         ) : null}
 
         <Button
+          testID="login-button"
           backgroundColor="$green10"
           borderRadius="$2"
           marginTop="$6"
@@ -78,7 +86,7 @@ const Login: React.FC = () => {
         </Button>
 
         {isLoading && (
-          <YStack alignItems="center" marginTop="$5">
+          <YStack testID="login-loading" alignItems="center" marginTop="$5">
             <Spinner size="large" color="$blue10" />
           </YStack>
         )}

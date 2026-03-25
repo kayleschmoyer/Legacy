@@ -180,9 +180,15 @@ function CustomDrawerContent(
   };
 
   return (
-    <YStack flex={1} backgroundColor="$background" padding="$4">
+    <YStack
+      testID="drawer-content"
+      flex={1}
+      backgroundColor="$background"
+      padding="$4"
+    >
       {ROUTES.map((r) => (
         <Text
+          testID={`drawer-item-${r.route.replace(/\//g, '-')}`}
           key={r.route}
           padding="$3"
           fontSize="$5"
@@ -194,6 +200,7 @@ function CustomDrawerContent(
       ))}
       <Separator marginVertical="$3" />
       <Text
+        testID="drawer-logout"
         padding="$3"
         fontSize="$5"
         color="$red10"
@@ -223,7 +230,7 @@ export default function Layout() {
 
   return (
     <AuthorizedUserContextProvider>
-      <GestureHandlerRootView data-testid="gesture-handler" style={{ flex: 1 }}>
+      <GestureHandlerRootView testID="gesture-handler" style={{ flex: 1 }}>
         <Navigator
           drawerContent={(props: DrawerContentComponentProps) => (
             <CustomDrawerContent {...props} />

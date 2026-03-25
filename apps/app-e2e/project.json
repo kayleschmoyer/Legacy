@@ -47,21 +47,25 @@
       }
     },
     "test-build-verification": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/jest:jest",
       "options": {
-        "command": "jest apps/app-e2e/src/build-verification.spec.ts --config apps/app-e2e/jest.config.json"
+        "jestConfig": "apps/app-e2e/jest.config.json",
+        "testPathPattern": ["build-verification\\.spec\\.ts"]
       }
     },
     "test-sports-functionality": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/jest:jest",
       "options": {
-        "command": "jest apps/app-e2e/src/sports.spec.ts --config apps/app-e2e/jest.config.json"
+        "jestConfig": "apps/app-e2e/jest.config.json",
+        "testPathPattern": ["sports\\.spec\\.ts"]
       }
     },
     "test-smoke": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/jest:jest",
       "options": {
-        "command": "jest apps/app-e2e/src/app.spec.ts --testNamePattern=\"should launch app successfully|should display main navigation\" --config apps/app-e2e/jest.config.json"
+        "jestConfig": "apps/app-e2e/jest.config.json",
+        "testPathPattern": ["app\\.spec\\.ts"],
+        "testNamePattern": "should have root layout component|should have drawer navigator"
       }
     },
     "lint": {

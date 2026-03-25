@@ -21,8 +21,9 @@ export default function Home() {
   const navigation = useNavigation<NavigationProp>();
 
   return (
-    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+    <ScrollView testID="home-screen" contentContainerStyle={{ flexGrow: 1 }}>
       <YStack
+        testID="home-content"
         alignItems="center"
         backgroundColor="$background"
         flexGrow={1}
@@ -30,13 +31,14 @@ export default function Home() {
         padding="$5"
         space="$5"
       >
-        <H1 color="$color" fontSize="$10" fontWeight="bold">
+        <H1 testID="home-title" color="$color" fontSize="$10" fontWeight="bold">
           Fantasy Sports Hub
         </H1>
         <Text color="$gray11" fontSize="$6">
           Choose your sport
         </Text>
         <XStack
+          testID="sport-selection"
           flexWrap="wrap"
           justifyContent="space-around"
           width="100%"
@@ -44,6 +46,7 @@ export default function Home() {
         >
           {sports.map((sport) => (
             <Button
+              testID={`sport-button-${sport.route.toLowerCase()}`}
               key={sport.route}
               alignItems="center"
               backgroundColor="$gray8"
@@ -62,6 +65,7 @@ export default function Home() {
 
         {/* About button */}
         <Button
+          testID="about-button"
           alignItems="center"
           backgroundColor="$blue8"
           borderRadius="$4"
