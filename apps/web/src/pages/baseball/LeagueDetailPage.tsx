@@ -151,10 +151,10 @@ import {
 // ── Matchup Scoring Data (shared with roster component) ─────────────────────
 
 export interface PlayerMatchupData {
-  /** Actual score from games already played */
-  score: number;
-  /** Projected total score (actual + projected remaining) */
-  projection: number;
+  /** Actual score from games already played (null when no game data is available) */
+  score: number | null;
+  /** Projected total score (actual + projected remaining, null when unavailable) */
+  projection: number | null;
   /** Number of games that have been selected/played */
   gamesPlayed: number;
   /** Total games in this matchup */
@@ -1284,8 +1284,11 @@ export function LeagueDetailPage(): React.JSX.Element {
       }
 
       map.set(pid, {
-        score: Math.round(actualScore * 10) / 10,
-        projection: Math.round(projection * 10) / 10,
+        score: gamesPlayed > 0 ? Math.round(actualScore * 10) / 10 : null,
+        projection:
+          gamesPlayed > 0 || projection !== actualScore
+            ? Math.round(projection * 10) / 10
+            : null,
         gamesPlayed,
         totalGames: playerTotalGames,
         isLocked: gamesPlayed > 0,

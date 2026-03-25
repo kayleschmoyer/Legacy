@@ -60,6 +60,13 @@ const getPlayerName = (
   return `${firstName || ''} ${lastName || ''}`.trim() || 'Empty';
 };
 
+/**
+ * Format a matchup stat (score or projection) for display.
+ * Returns a dash when the value is unavailable (null).
+ */
+const formatMatchupStat = (value: number | null): string =>
+  value == null ? '—' : value.toFixed(1);
+
 const getEligiblePositions = (player: TeamMemberFragment): string[] =>
   player.player?.eligiblePositions ?? [];
 
@@ -583,7 +590,7 @@ function RosterRow({
               Score
             </Text>
             <Text fontSize="$3" fontWeight="700" color="$color12">
-              {matchupData.score.toFixed(1)}
+              {formatMatchupStat(matchupData.score)}
             </Text>
           </YStack>
           <YStack alignItems="center" minWidth={36}>
@@ -596,7 +603,7 @@ function RosterRow({
               Proj
             </Text>
             <Text fontSize="$3" fontWeight="700" color={BRAND_GOLD_LIGHT}>
-              {matchupData.projection.toFixed(1)}
+              {formatMatchupStat(matchupData.projection)}
             </Text>
           </YStack>
         </XStack>
@@ -973,7 +980,7 @@ function BenchPlayerCard({
               Score
             </Text>
             <Text fontSize="$2" fontWeight="700" color="$color12">
-              {matchupData.score.toFixed(1)}
+              {formatMatchupStat(matchupData.score)}
             </Text>
           </YStack>
           <YStack alignItems="center" minWidth={32}>
@@ -986,7 +993,7 @@ function BenchPlayerCard({
               Proj
             </Text>
             <Text fontSize="$2" fontWeight="700" color={BRAND_GOLD_LIGHT}>
-              {matchupData.projection.toFixed(1)}
+              {formatMatchupStat(matchupData.projection)}
             </Text>
           </YStack>
         </XStack>
