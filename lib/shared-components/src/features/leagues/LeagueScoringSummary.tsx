@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
-import { Card, XStack, YStack } from '@legacy-sports/shared-components';
+import { Card, XStack, YStack } from 'tamagui';
 import { BarChart3 } from '@tamagui/lucide-icons';
 import { Text } from 'tamagui';
 import {
   createDefaultScoringSettings,
   type ScoringSettings,
-} from '../../lib/scoring';
+} from '@legacy-sports/scoring';
 import {
   BG_DARK,
   BLACK,
@@ -14,7 +14,7 @@ import {
   GREEN,
   ORANGE,
   withAlpha,
-} from '../../constants/colors';
+} from '../../utils/colors';
 
 /** Human-readable labels for baseball stat column names (camelCase + snake_case). */
 const STAT_LABELS: Record<string, string> = {
