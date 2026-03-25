@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import { BaseModal } from './BaseModal';
-import { CareerArcChart, type CareerArcMode } from './CareerArcChart';
+import type { CareerArcMode } from './CareerArcChart';
 import { StatCard, type StatRowData } from './StatCard';
 import { StatTable } from './StatTable';
 import {
@@ -23,6 +23,10 @@ import {
   WHITE,
   withAlpha,
 } from '../constants/colors';
+
+const CareerArcChart = React.lazy(() =>
+  import('./CareerArcChart').then((m) => ({ default: m.CareerArcChart })),
+);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -702,11 +706,13 @@ export function PlayerDetailModal({
                       />
                     </XStack>
                   )}
-                  <CareerArcChart
-                    battingSeasons={arcData?.playerSeasonBatting}
-                    pitchingSeasons={arcData?.playerSeasonPitching}
-                    mode={hasBattingArc ? arcMode : 'pitching'}
-                  />
+                  <React.Suspense fallback={<Spinner />}>
+                    <CareerArcChart
+                      battingSeasons={arcData?.playerSeasonBatting}
+                      pitchingSeasons={arcData?.playerSeasonPitching}
+                      mode={hasBattingArc ? arcMode : 'pitching'}
+                    />
+                  </React.Suspense>
                 </YStack>
               )}
 
