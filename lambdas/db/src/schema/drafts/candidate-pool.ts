@@ -320,10 +320,10 @@ async function computeBestBenchPick(
         ('2B', '2B'), ('3B', '3B'), ('C', 'C'),
         ('CF', 'CF'), ('LF', 'LF'), ('RF', 'RF'), ('SS', 'SS'),
         ('SP', 'SP'), ('SP', 'P'), ('RP', 'RP'), ('RP', 'P'),
-        ('OF', 'LF'), ('OF', 'RF'), ('OF', 'CF'),
+        ('OF', 'LF'), ('OF', 'RF'), ('OF', 'CF'), ('OF', 'OF'),
         ('IF', '1B'), ('IF', '2B'), ('IF', '3B'), ('IF', 'SS'),
         ('DH', '1B'), ('DH', '2B'), ('DH', '3B'), ('DH', 'SS'),
-        ('DH', 'LF'), ('DH', 'RF'), ('DH', 'CF'), ('DH', 'C'), ('DH', 'DH'),
+        ('DH', 'LF'), ('DH', 'RF'), ('DH', 'CF'), ('DH', 'OF'), ('DH', 'C'), ('DH', 'DH'),
         ('XDH', 'DH')
     ),
     eligible_players AS (

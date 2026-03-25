@@ -810,6 +810,93 @@ export async function autoPopulateFirstMatchupLineup(
     posSet.add(row.position);
   }
 
+  // 3b. Fallback for players missing from the materialized view (LS-1767).
+  //     The matview applies career-game thresholds and requires a
+  //     career_batting JOIN, so players with season data but no (or
+  //     insufficient) career stats are invisible. Query the underlying
+  //     career tables directly with relaxed criteria to recover positions
+  //     for these players, matching the draft processor's fallback approach.
+  const missingPlayerIds = allPlayerIds.filter((id) => !playerEligMap.has(id));
+
+  if (missingPlayerIds.length > 0) {
+    LOGGER.warn(
+      'autoPopulateFirstMatchupLineup: players missing from matview, querying career tables',
+      {
+        leagueId,
+        missingCount: missingPlayerIds.length,
+        totalPlayers: allPlayerIds.length,
+      },
+    );
+
+    // Query career_fielding_by_position directly (no threshold filter)
+    const fieldingFallback = await db
+      .select({
+        playerId: PublicSchema.careerFieldingByPosition.playerId,
+        pos: PublicSchema.careerFieldingByPosition.pos,
+      })
+      .from(PublicSchema.careerFieldingByPosition)
+      .where(
+        inArray(
+          PublicSchema.careerFieldingByPosition.playerId,
+          missingPlayerIds,
+        ),
+      );
+
+    for (const row of fieldingFallback) {
+      if (!row.playerId || !row.pos || row.pos === 'P') continue;
+      let posSet = playerEligMap.get(row.playerId);
+      if (!posSet) {
+        posSet = new Set();
+        playerEligMap.set(row.playerId, posSet);
+      }
+      posSet.add(row.pos);
+    }
+
+    // Query career_pitching directly for SP/RP eligibility
+    const pitchingFallback = await db
+      .select({
+        playerId: PublicSchema.careerPitching.playerId,
+        g: PublicSchema.careerPitching.g,
+        gs: PublicSchema.careerPitching.gs,
+      })
+      .from(PublicSchema.careerPitching)
+      .where(inArray(PublicSchema.careerPitching.playerId, missingPlayerIds));
+
+    for (const row of pitchingFallback) {
+      if (!row.playerId) continue;
+      let posSet = playerEligMap.get(row.playerId);
+      if (!posSet) {
+        posSet = new Set();
+        playerEligMap.set(row.playerId, posSet);
+      }
+      const g = row.g ?? 0;
+      const gs = row.gs ?? 0;
+      if (gs > 0) posSet.add('SP');
+      if (g - gs > 0) posSet.add('RP');
+    }
+
+    // Last resort: players with still no data get DH (most flexible slot)
+    // so they at least have a chance of being placed.
+    const stillMissing = missingPlayerIds.filter((id) => {
+      const eligible = playerEligMap.get(id);
+      // Treat players with no entry or an empty eligibility set as missing
+      return !eligible || eligible.size === 0;
+    });
+    for (const playerId of stillMissing) {
+      playerEligMap.set(playerId, new Set(['DH']));
+    }
+
+    if (stillMissing.length > 0) {
+      LOGGER.warn(
+        'autoPopulateFirstMatchupLineup: players with no career data at all, defaulting to DH',
+        {
+          leagueId,
+          dhFallbackCount: stillMissing.length,
+        },
+      );
+    }
+  }
+
   // 4. Group matchup_players by (matchupId, teamId) for per-team assignment
   const groups = new Map<string, typeof mpRows>();
   for (const mp of mpRows) {

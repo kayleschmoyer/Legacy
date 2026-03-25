@@ -8,6 +8,10 @@
  *  - lib/db-client  (lineup auto-assignment)
  *  - lambdas/db    (draft auto-pick via ALLOWED_POSITIONS_FOR_AUTO_PICK alias)
  *  - lib/shared-components  (re-exported from PositionModels.ts)
+ *
+ * NOTE: lambdas/db/src/schema/drafts/candidate-pool.ts has a SQL CTE
+ * `position_mapping` that mirrors these mappings. When updating entries here,
+ * keep that CTE in sync.
  */
 export const ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
   Object.freeze({
@@ -16,10 +20,10 @@ export const ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
     '3B': ['3B'],
     C: ['C'],
     CF: ['CF'],
-    DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'C', 'DH'],
+    DH: ['1B', '2B', '3B', 'SS', 'LF', 'RF', 'CF', 'OF', 'C', 'DH'],
     IF: ['1B', '2B', '3B', 'SS'],
     LF: ['LF'],
-    OF: ['LF', 'RF', 'CF'],
+    OF: ['LF', 'RF', 'CF', 'OF'],
     RF: ['RF'],
     RP: ['RP', 'P'],
     SP: ['SP', 'P'],
@@ -34,5 +38,5 @@ export const PITCHING_POSITIONS: ReadonlySet<string> = Object.freeze(
 
 /** Stat positions that count as batting for auto-pick filtering. */
 export const BATTING_POSITIONS: ReadonlySet<string> = Object.freeze(
-  new Set(['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH']),
+  new Set(['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'OF', 'DH']),
 );
