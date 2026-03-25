@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { getToken, tryResolveToken } from './auth.js';
+import { getToken, getRepoOwnerName, tryResolveToken } from './auth.js';
 import type { TokenSource } from './auth.js';
 import type { ToolResult } from './types.js';
 import { closePR } from './tools/close-pr.js';
@@ -66,13 +66,14 @@ type GitHubUserResult =
  * Distinguishes auth failures from transient errors (rate-limit, 5xx, network).
  */
 async function getGitHubUser(token: string): Promise<GitHubUserResult> {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
   try {
     const res = await fetch('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
+      headers,
       signal: AbortSignal.timeout(GH_AUTH_TOKEN_TIMEOUT_MS),
     });
 
@@ -106,6 +107,46 @@ async function getGitHubUser(token: string): Promise<GitHubUserResult> {
         status: 'unknown',
         reason: `GitHub API server error (${res.status}). Token may still be valid.`,
       };
+    }
+
+    // 403 without rate-limit: may be a GitHub App installation token (ghs_*).
+    // App tokens return 403 for /user because they represent an app, not a user.
+    // Fall back to a repo-scoped endpoint that works for both token types.
+    if (res.status === 403) {
+      try {
+        const { owner, name } = await getRepoOwnerName();
+        const repoRes = await fetch(
+          `https://api.github.com/repos/${owner}/${name}`,
+          { headers, signal: AbortSignal.timeout(GH_AUTH_TOKEN_TIMEOUT_MS) },
+        );
+        if (repoRes.ok) {
+          return { status: 'valid', login: `app[bot]` };
+        }
+        if (repoRes.status === 401) return { status: 'invalid' };
+        if (
+          repoRes.status === 429 ||
+          (repoRes.status === 403 &&
+            repoRes.headers.get('x-ratelimit-remaining') === '0')
+        ) {
+          return {
+            status: 'unknown',
+            reason: `GitHub API rate-limited (${repoRes.status}). Token may still be valid.`,
+          };
+        }
+        if (repoRes.status >= 500) {
+          return {
+            status: 'unknown',
+            reason: `GitHub API server error (${repoRes.status}). Token may still be valid.`,
+          };
+        }
+        return { status: 'invalid' };
+      } catch {
+        return {
+          status: 'unknown',
+          reason:
+            'Could not validate app token against repo endpoint. Token may still be valid.',
+        };
+      }
     }
 
     // Other 4xx — likely invalid
@@ -163,10 +204,64 @@ server.tool(
     const userResult = await getGitHubUser(auth.token);
 
     if (userResult.status === 'invalid') {
+      // GitHub App tokens can be auto-refreshed — regenerate instead of asking the user
+      if (auth.source === 'github-app') {
+        try {
+          const refreshed = await tryResolveToken();
+          if (refreshed) {
+            const retryUser = await getGitHubUser(refreshed.token);
+            if (retryUser.status === 'valid') {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        configured: true,
+                        source: refreshed.source,
+                        user: retryUser.login,
+                        fallback: null,
+                      },
+                      null,
+                      2,
+                    ),
+                  },
+                ],
+              };
+            }
+            if (retryUser.status === 'unknown') {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        configured: 'unknown',
+                        source: refreshed.source,
+                        user: null,
+                        reason: retryUser.reason,
+                        fallback:
+                          'A GitHub App token was refreshed but could not be validated due to a transient error (rate-limit, 5xx, or network issue). It may still work — proceed and retry if API calls fail.',
+                      },
+                      null,
+                      2,
+                    ),
+                  },
+                ],
+              };
+            }
+          }
+        } catch {
+          // Fall through to the error message below
+        }
+      }
+
       const fallback =
         auth.source === 'env'
           ? 'A GitHub token was found in the environment, but it appears to be invalid or expired. Double-check GH_TOKEN or GITHUB_TOKEN, or run `gh auth login` to refresh your credentials.'
-          : `A GitHub token was found via ${auth.source}, but it appears to be invalid or expired. Run \`gh auth login\` to refresh your credentials.`;
+          : auth.source === 'github-app'
+            ? 'A GitHub App token was generated but could not be validated. Check that AGENT_AUTHOR_APP_PRIVATE_KEY is correct and the app installation is active.'
+            : `A GitHub token was found via ${auth.source}, but it appears to be invalid or expired. Run \`gh auth login\` to refresh your credentials.`;
 
       return {
         content: [
