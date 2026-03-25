@@ -160,12 +160,14 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "iam:ListAttachedRolePolicies",
           "iam:ListPolicyVersions",
           "iam:ListInstanceProfilesForRole",
+          "iam:GetInstanceProfile",
           "iam:PassRole",
           "iam:GetOpenIDConnectProvider"
         ]
         Resource = [
           "arn:aws:iam::${local.account_id}:role/${local.name_prefix}-*",
           "arn:aws:iam::${local.account_id}:policy/${local.name_prefix}-*",
+          "arn:aws:iam::${local.account_id}:instance-profile/${local.name_prefix}-*",
           "arn:aws:iam::${local.account_id}:oidc-provider/token.actions.githubusercontent.com"
         ]
       },
@@ -208,6 +210,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group::log-stream:"
         ]
       },
@@ -226,7 +230,9 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*"
         ]
       },
       # Secrets Manager read permissions
@@ -276,7 +282,9 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "s3:GetLifecycleConfiguration",
           "s3:GetBucketLogging",
           "s3:GetReplicationConfiguration",
-          "s3:GetBucketObjectLockConfiguration"
+          "s3:GetBucketObjectLockConfiguration",
+          "s3:GetBucketOwnershipControls",
+          "s3:GetBucketNotification"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-*",
@@ -339,7 +347,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${local.name_prefix}/*",
-          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/legacy-sports/${var.environment}/*"
+          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/legacy-sports/${var.environment}/*",
+          "arn:aws:ssm:${local.region}:${local.account_id}:parameter/github-action-runners/${local.name_prefix}-*"
         ]
       },
       # SSM DescribeParameters requires wildcard resource
@@ -423,7 +432,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:route53:::change/*"
         ]
       },
-      # API Gateway read permissions (REST API + WebSocket/HTTP API v2 + custom domains)
+      # API Gateway read permissions (REST API + WebSocket/HTTP API v2 + custom domains + account)
       {
         Effect = "Allow"
         Action = [
@@ -435,10 +444,11 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:apigateway:${local.region}::/apis",
           "arn:aws:apigateway:${local.region}::/apis/*",
           "arn:aws:apigateway:${local.region}::/domainnames",
-          "arn:aws:apigateway:${local.region}::/domainnames/*"
+          "arn:aws:apigateway:${local.region}::/domainnames/*",
+          "arn:aws:apigateway:${local.region}::/account"
         ]
       },
-      # API Gateway write permissions for Terraform apply (integration responses, methods, domains, etc.)
+      # API Gateway write permissions for Terraform apply (integration responses, methods, domains, account, etc.)
       {
         Effect = "Allow"
         Action = [
@@ -452,7 +462,8 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:apigateway:${local.region}::/apis/*",
           "arn:aws:apigateway:${local.region}::/domainnames",
           "arn:aws:apigateway:${local.region}::/domainnames/*",
-          "arn:aws:apigateway:${local.region}::/tags/*"
+          "arn:aws:apigateway:${local.region}::/tags/*",
+          "arn:aws:apigateway:${local.region}::/account"
         ]
       },
       # API Gateway tagging — scoped to PUT only (Terraform tag operations)
