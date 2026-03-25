@@ -10,6 +10,7 @@ import { createPR } from './tools/create-pr.js';
 import { getRepoInfo } from './tools/get-repo-info.js';
 import { getReviewThreads } from './tools/get-review-threads.js';
 import { listPRs } from './tools/list-prs.js';
+import { listReviews } from './tools/list-reviews.js';
 import { manageLabels } from './tools/manage-labels.js';
 import { markPRReady } from './tools/mark-pr-ready.js';
 import { manageLabelsBatch } from './tools/manage-labels-batch.js';
@@ -322,6 +323,24 @@ server.tool(
       .describe('Max results (default: 20)'),
   },
   async (params) => listPRs(params),
+);
+
+// --- github_list_reviews ---
+server.tool(
+  'github_list_reviews',
+  'List reviews on a PR. Useful for checking review status (e.g. whether Copilot has reviewed).',
+  {
+    number: z.coerce.number().int().positive().describe('PR number'),
+    author: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        'Filter by reviewer login (e.g. "copilot-pull-request-reviewer[bot]")',
+      ),
+  },
+  async (params) => listReviews(params),
 );
 
 // --- github_reply_to_thread ---

@@ -53,8 +53,8 @@ Example: `LS-1234 feat(auth): add OAuth2 PKCE flow`
 
 1. If you used the `gh` CLI with `--body-file`, clean up the temp body file: `bash scripts/cleanup-pr-body.sh` (no-op if `.github/tmp-pr-body.md` does not exist)
 2. **Mark ready for review**: `github_mark_pr_ready(number: <PR#>)` — this signals to sweep/review agents that the PR is available. Shell fallback (only if MCP unavailable): `gh pr ready <PR#>`
-3. Transition Jira: `jira_transition(key: "LS-####", status: "In Review")`
-4. Copilot review is requested automatically by CI workflow
+3. **Request Copilot review**: `github_request_review(number: <PR#>)` — Copilot review is triggered automatically by the repository ruleset for user-authored PRs, but **not for PRs authored by GitHub Apps** (the REST API silently drops Copilot when called with installation tokens). Agents must always call this explicitly. Shell fallback: `gh pr edit <PR#> --add-reviewer @copilot`
+4. Transition Jira: `jira_transition(key: "LS-####", status: "In Review")`
 5. **MCP gap audit** (mandatory): review Bash commands from this session, classify gaps (`missing-tool`, `missing-feature`, `missing-awareness`), check for existing tickets under LS-1455, and file new tickets for untracked gaps. Also audit MCP tool overflows. Follow the [audit workflow](../../mcp-gaps/references/audit-workflow.md) directly.
 
 ## Guardrails

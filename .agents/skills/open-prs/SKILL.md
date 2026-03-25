@@ -21,19 +21,19 @@ Supports three modes:
 
 ## Environment Compatibility
 
-| Operation                          | Local Agent | Cloud Agent | Cloud Tool                                  |
-| ---------------------------------- | :---------: | :---------: | ------------------------------------------- |
-| Scan & classify all PRs            |     ✅      |     ✅      | `github_pr_dashboard`                       |
-| Detailed PR inspection             |     ✅      |     ✅      | `github_view_pr`, `github_pr_batch_status`  |
-| Request Copilot reviews (fallback) |     ✅      |     ✅      | `github_request_review` (auto via workflow) |
-| Re-run flaky / failed CI           |     ✅      |     ✅      | `ci_rerun`                                  |
-| Diagnose CI failures (read logs)   |     ✅      |     ✅      | `ci_get_logs`, `ci_search_logs`             |
-| Resolve process/meta threads       |     ✅      |     ✅      | `github_resolve_thread`                     |
-| Fetch review thread details        |     ✅      |     ✅      | `github_get_review_threads`                 |
-| Rebase conflicting PRs             |     ✅      |     ❌      | — (requires git checkout + push)            |
-| Fix review comments (code changes) |     ✅      |     ❌      | — (requires file edits + commit)            |
-| Fix CI failures (code changes)     |     ✅      |     ❌      | — (requires file edits + commit)            |
-| Post-rebase stabilization          |     ✅      |     ❌      | — (requires make pc + push)                 |
+| Operation                          | Local Agent | Cloud Agent | Cloud Tool                                              |
+| ---------------------------------- | :---------: | :---------: | ------------------------------------------------------- |
+| Scan & classify all PRs            |     ✅      |     ✅      | `github_pr_dashboard`                                   |
+| Detailed PR inspection             |     ✅      |     ✅      | `github_view_pr`, `github_pr_batch_status`              |
+| Request Copilot reviews            |     ✅      |     ✅      | `github_request_review` (required for bot-authored PRs) |
+| Re-run flaky / failed CI           |     ✅      |     ✅      | `ci_rerun`                                              |
+| Diagnose CI failures (read logs)   |     ✅      |     ✅      | `ci_get_logs`, `ci_search_logs`                         |
+| Resolve process/meta threads       |     ✅      |     ✅      | `github_resolve_thread`                                 |
+| Fetch review thread details        |     ✅      |     ✅      | `github_get_review_threads`                             |
+| Rebase conflicting PRs             |     ✅      |     ❌      | — (requires git checkout + push)                        |
+| Fix review comments (code changes) |     ✅      |     ❌      | — (requires file edits + commit)                        |
+| Fix CI failures (code changes)     |     ✅      |     ❌      | — (requires file edits + commit)                        |
+| Post-rebase stabilization          |     ✅      |     ❌      | — (requires make pc + push)                             |
 
 > **Cloud agents cannot commit or push code.** Any operation that requires file edits, git commits, or git push must be deferred to a local agent or human developer. The cloud workflow focuses on API-only actions and producing an actionable report.
 
@@ -58,7 +58,7 @@ Supports three modes:
 | "Fix review comments" / "address Copilot feedback" | Pass 2 only (delegates to `fix-copilot-reviews`) |   ❌   |
 | "Fix CI failures"                                  | Pass 3 only (delegates to `debug-ci-failure`)    |   ❌   |
 | "Re-run failed CI" / "retry flaky CI"              | CI rerun only                                    |   ✅   |
-| "Request Copilot reviews"                          | Fallback — reviews are auto-requested on PR open |   ✅   |
+| "Request Copilot reviews"                          | Request on all PRs missing Copilot review        |   ✅   |
 | "Check PR status" / "scan PRs"                     | Scan + report only (no fixes)                    |   ✅   |
 
 ## Sub-Skills (Load on Demand)
@@ -194,6 +194,20 @@ Set-Location D:\code\legacy-sports
 
 ---
 
+## Pass 0: Request Copilot Reviews
+
+Before fixing anything, ensure every open PR has a Copilot review. The repository ruleset (`review_on_push: true`) auto-triggers Copilot for user-authored PRs, but **not for PRs authored by GitHub Apps** (the `requestReviewers` REST API silently drops Copilot when called with installation tokens). Since most agent-created PRs are authored by `legacy-sports-code-bot`, this step is essential.
+
+For each PR without a Copilot review (check `reviews` in the scan results):
+
+```
+github_request_review(number: <PR#>)
+```
+
+The MCP tool uses a user OAuth token (via `gh auth token`) for Copilot requests, bypassing the default app token that would silently fail.
+
+---
+
 ## Pass 1: Rebase Conflicting PRs
 
 For each PR in `$scan.conflicting`:
@@ -307,7 +321,7 @@ This is safe to do even if CI is still running or pending — failing CI will au
 
 ## Full Sweep: Outer Loop
 
-For full sweeps, run passes 1–3 in a loop until every PR is **settled** — either clean or labeled `requires-human-review`. Fixing one category often creates issues in another (rebase → CI fail, fix → new review), so multiple passes are expected.
+For full sweeps, run passes 0–3 in a loop until every PR is **settled** — either clean or labeled `requires-human-review`. Fixing one category often creates issues in another (rebase → CI fail, fix → new review), so multiple passes are expected.
 
 **Settled states** — a PR is settled when it reaches any of these terminal states:
 
@@ -329,6 +343,10 @@ REPEAT (max 10 passes):
 
   IF unsettled is empty → EXIT (all settled)
 
+  Pass 0: Request Copilot reviews on PRs that have none
+    - github_request_review(number: <PR#>) for each PR without a Copilot review
+    - The repo ruleset auto-triggers for user-authored PRs; bot-authored PRs
+      need this explicit request (uses user OAuth token via gh auth)
   Pass 1: Rebase unsettled conflicting PRs (SEQUENTIAL — cascade invalidation)
     - On irrecoverable failure → label requires-human-review → add to settled
   Pass 2: Fix unsettled PRs with unresolved reviews (PARALLEL — batches of 3 sub-agents)
@@ -445,11 +463,13 @@ After re-running, the PR moves to `ciPending`. Track these for the final report.
 
 ## Cloud Step 4: Request Copilot Reviews
 
-Find PRs without a Copilot review and request one. Use the review details from the dashboard or batch status to identify PRs that have no review from `copilot-pull-request-reviewer[bot]`.
+Find PRs without a Copilot review and request one. This is **required** for bot-authored PRs (e.g. `legacy-sports-code-bot`) — the repository ruleset only auto-triggers Copilot review for user-authored PRs. The `requestReviewers` REST API silently drops Copilot when called with GitHub App installation tokens (`ghs_*`); only user OAuth tokens work.
 
 ```
 github_request_review(number: <PR#>, copilot: true)
 ```
+
+> **Note**: The MCP tool automatically uses a user OAuth token (via `gh auth token`) for Copilot requests, bypassing the default app token. If no user token is available, it will report an error instead of silently failing.
 
 ## Cloud Step 5: Resolve Process / Meta Review Threads
 

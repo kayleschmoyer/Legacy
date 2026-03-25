@@ -173,8 +173,16 @@ function parseNetrcPassword(content: string, machine: string): string | null {
   return null;
 }
 
-/** Try `gh auth token` with a 5-second timeout. Returns null on any failure. */
-function tryGhAuthToken(): Promise<string | null> {
+/**
+ * Try `gh auth token` with a 5-second timeout. Returns null on any failure.
+ *
+ * Exported because some operations (e.g. requesting Copilot as a PR reviewer)
+ * require a **user** OAuth token — GitHub App installation tokens (`ghs_*`)
+ * are silently ignored by the `requestReviewers` API for Copilot. The `gh` CLI
+ * stores the user's OAuth token from `gh auth login`, which is the only token
+ * type that works for Copilot review requests.
+ */
+export function tryGhAuthToken(): Promise<string | null> {
   const cmd = process.platform === 'win32' ? 'gh.exe' : 'gh';
   return new Promise((res) => {
     execFile(

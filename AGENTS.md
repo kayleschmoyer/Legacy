@@ -47,8 +47,9 @@ This file provides guidance to AI coding agents working with code in this reposi
 12. **Ship (REQUIRED — do NOT stop before this step)**: Create PR as **draft** first, then mark ready after validation. This prevents sweep/review agents from racing with the creating agent.
     - 12a. **Create draft PR**: `github_create_pr(title: "LS-#### type(scope): msg", body: <markdown>, draft: true, worktreePath: <path>)`. Shell fallback (only if MCP unavailable): `gh pr create --draft --title "LS-#### type(scope): msg" --body-file .github/tmp-pr-body.md --base main` then `bash scripts/cleanup-pr-body.sh`.
     - 12b. **Mark ready for review**: after PR creation succeeds, `github_mark_pr_ready(number: <PR#>)`. Shell fallback: `gh pr ready <PR#>`. This signals to sweep/review agents that the PR is available.
-    - 12c. **Jira "In Review"**: transition the ticket after marking the PR ready.
-    - 12d. **MCP gap audit (REQUIRED)**: follow the audit workflow in `skills/mcp-gaps/SKILL.md` to review Bash commands from this session, classify gaps, check for existing LS-1455 tickets, and file new ones. Also audit MCP tool overflows. This step is mandatory — it is how we continuously improve the agentic environment.
+    - 12c. **Request Copilot review**: `github_request_review(number: <PR#>)` (copilot defaults to true). The repository ruleset triggers Copilot review automatically for user-authored PRs, but **not for PRs authored by GitHub Apps** (the `requestReviewers` REST API silently drops Copilot when called with installation tokens). Agents must explicitly request Copilot review using a user OAuth token. Shell fallback: `gh pr edit <PR#> --add-reviewer @copilot`.
+    - 12d. **Jira "In Review"**: transition the ticket after marking the PR ready.
+    - 12e. **MCP gap audit (REQUIRED)**: follow the audit workflow in `skills/mcp-gaps/SKILL.md` to review Bash commands from this session, classify gaps, check for existing LS-1455 tickets, and file new ones. Also audit MCP tool overflows. This step is mandatory — it is how we continuously improve the agentic environment.
 13. Cleanup: `twig worktree clean` then `git branch -d LS-####/description` then Jira "Done" — **NEVER use `git worktree remove` directly** (see Rules)
 
 ## Command Patterns — Avoid `cd` Compound Commands
@@ -169,6 +170,7 @@ Call `jira_auth_status` at the start of any Jira workflow. If `configured: true`
 | `gh pr edit --add-label`          | `github_manage_labels`                             |
 | `gh api graphql` (resolve thread) | `github_resolve_thread` / `github_resolve_threads` |
 | `gh api` (review threads)         | `github_get_review_threads`                        |
+| `gh api` (PR reviews)             | `github_list_reviews`                              |
 | `gh pr view`                      | `github_view_pr`                                   |
 | `gh pr list`                      | `github_list_prs` / `github_pr_dashboard`          |
 | `gh run list`                     | `ci_list_runs`                                     |

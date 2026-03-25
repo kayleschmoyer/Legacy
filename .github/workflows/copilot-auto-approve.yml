@@ -1,7 +1,12 @@
 name: Copilot Auto-Approve
 
 # Workflow jobs:
-# 1. request-review: requests a Copilot review when a PR is opened or updated
+# 1. request-review: sets bot-review status when a PR is opened or updated.
+#    Copilot review is triggered automatically by the repository ruleset
+#    ("Copilot review for default branch" with review_on_push: true).
+#    The requestReviewers REST API silently drops Copilot when called with
+#    any installation token (App or GITHUB_TOKEN) — only user OAuth tokens
+#    work, so we rely on the ruleset instead.
 # 2. auto-approve: approves the PR when Copilot's review has no unresolved comments
 #
 # The auto-approve job uses workflow_run to chain off the built-in "Copilot code review"
@@ -62,29 +67,15 @@ jobs:
           app-id: 3142924
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
-      - name: Request Copilot review
-        if: github.event.pull_request.user.login != 'dependabot[bot]'
-        uses: actions/github-script@v8
-        with:
-          github-token: ${{ steps.bot-token.outputs.token }}
-          script: |
-            try {
-              await github.rest.pulls.requestReviewers({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.payload.pull_request.number,
-                reviewers: ['copilot-pull-request-reviewer[bot]'],
-              });
-              core.info(`Requested Copilot review on PR #${context.payload.pull_request.number}`);
-            } catch (error) {
-              // Don't fail the workflow if the request fails (e.g., bot not installed)
-              core.warning(`Failed to request Copilot review: ${error.message}`);
-            }
+      # Copilot review is requested automatically by the repository ruleset
+      # ("Copilot review for default branch" with review_on_push: true).
+      # No explicit requestReviewers call is needed.
 
       - name: Set bot-review status
         if: github.event.pull_request.user.login != 'dependabot[bot]'
         uses: actions/github-script@v8
         with:
+          github-token: ${{ steps.bot-token.outputs.token }}
           script: |
             const prNumber = context.payload.pull_request.number;
             const sha = context.payload.pull_request.head.sha;
