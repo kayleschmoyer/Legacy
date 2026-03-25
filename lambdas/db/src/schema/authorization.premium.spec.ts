@@ -169,6 +169,14 @@ describe('Premium authorization helpers', () => {
       expect(tier).toBe('free');
     });
 
+    it('returns "premium" for admin users without querying the DB', async () => {
+      const ctx = makeContext(adminUser, 'free');
+      const selectSpy = jest.spyOn(ctx.db, 'select');
+      const tier = await getSubscriptionTier(ctx as any);
+      expect(tier).toBe('premium');
+      expect(selectSpy).not.toHaveBeenCalled();
+    });
+
     it('throws AuthenticationError when user is not authenticated', async () => {
       const ctx = makeContext(null, 'free');
       await expect(getSubscriptionTier(ctx as any)).rejects.toThrow();

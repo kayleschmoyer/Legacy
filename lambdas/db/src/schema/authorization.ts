@@ -138,7 +138,8 @@ export type AuthorizedHandler<TParent, TArgs, TResult> = (
 
 /**
  * Returns the subscription tier (`'free'` | `'premium'`) for the authenticated
- * user.  Performs a single DB lookup against `app_internal.users`.
+ * user.  Admin users are treated as premium immediately (no DB lookup);
+ * for non-admin users, performs a single DB lookup against `app_internal.users`.
  *
  * @throws Error when `context.user` is null/undefined (same as {@link requireAuth}).
  */
@@ -146,6 +147,8 @@ export async function getSubscriptionTier(
   context: Context,
 ): Promise<'free' | 'premium'> {
   const user = requireAuth(context);
+  // Admins are always treated as premium regardless of DB tier
+  if (user.isAdmin) return 'premium';
   const rows = await context.db
     .select({ tier: InternalSchema.usersInAppInternal.subscriptionTier })
     .from(InternalSchema.usersInAppInternal)
