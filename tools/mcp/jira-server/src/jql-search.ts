@@ -17,7 +17,10 @@ interface SearchOptions {
   jql: string;
   fields: string[];
   maxResults?: number;
+  pageToken?: string;
 }
+
+type SearchResult<F> = JqlSearchResponse<F>;
 
 /**
  * Execute a JQL search and return a single page of results.
@@ -25,12 +28,16 @@ interface SearchOptions {
  */
 export async function searchJql<F>(
   opts: SearchOptions,
-): Promise<{ issues: Array<{ key: string; fields: F }> }> {
-  const { jql, fields, maxResults = 100 } = opts;
+): Promise<SearchResult<F>> {
+  const { jql, fields, maxResults = 100, pageToken } = opts;
+  const body: Record<string, unknown> = { jql, fields, maxResults };
+  if (pageToken) {
+    body.nextPageToken = pageToken;
+  }
   return jiraRequest<JqlSearchResponse<F>>({
     method: 'POST',
     path: '/rest/api/3/search/jql',
-    body: { jql, fields, maxResults },
+    body,
   });
 }
 

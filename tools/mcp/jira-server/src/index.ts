@@ -162,7 +162,7 @@ server.tool(
 // --- jira_list_children ---
 server.tool(
   'jira_list_children',
-  'List child tickets of an epic or story. Optionally filter by status.',
+  'List child tickets of an epic or story. Returns paginated results (default 25 per page). Pass pageToken=<nextPageToken> from a previous response to fetch the next page.',
   {
     key: z
       .string()
@@ -175,6 +175,17 @@ server.tool(
       .string()
       .optional()
       .describe('Filter by status (e.g. "To Do", "Done")'),
+    limit: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .default(25)
+      .describe('Max results per page (default: 25, max: 100)'),
+    pageToken: z
+      .string()
+      .optional()
+      .describe('Cursor token from a previous response to fetch the next page'),
   },
   async (params) => listChildren(params),
 );
