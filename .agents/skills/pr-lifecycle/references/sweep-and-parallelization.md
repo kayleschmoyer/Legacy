@@ -46,13 +46,40 @@ IF unsettled PRs remain after max passes:
 
 Each PR lives in its own junctioned worktree. The shared `node_modules` is **read-only** during `make pc`, so parallel validation is safe.
 
-| Phase                  | Parallelizable?       | Reason                                                                |
-| ---------------------- | --------------------- | --------------------------------------------------------------------- |
-| Rebase (Pass 1)        | **No — sequential**   | Merging PR A shifts `main`, invalidating PR B's rebase                |
-| `make pc` validation   | **Yes — `Start-Job`** | Each worktree reads shared `node_modules`, writes only local outputs  |
-| CI wait/polling        | **Yes — batch poll**  | Just polling `ci_view_run` / `github_pr_batch_status` — no contention |
-| Review fixes (Pass 2)  | **No — sequential**   | Each fix requires reading context, reasoning, editing                 |
-| CI code fixes (Pass 3) | **No — sequential**   | Sub-agents lack tool permissions; process each PR sequentially        |
+| Phase                  | Parallelizable?       | Reason                                                                       |
+| ---------------------- | --------------------- | ---------------------------------------------------------------------------- |
+| Rebase (Pass 1)        | **No — sequential**   | Merging PR A shifts `main`, invalidating PR B's rebase                       |
+| `make pc` validation   | **Yes — `Start-Job`** | Each worktree reads shared `node_modules`, writes only local outputs         |
+| CI wait/polling        | **Yes — batch poll**  | Just polling `ci_view_run` / `github_pr_batch_status` — no contention        |
+| Review fixes (Pass 2)  | **Yes — sub-agents**  | Each PR is in its own worktree; agents work independently (max 3 concurrent) |
+| CI code fixes (Pass 3) | **Yes — sub-agents**  | Each PR is in its own worktree; agents work independently (max 3 concurrent) |
+
+### Parallel Sub-Agents for Review Fixes and CI Fixes
+
+Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in separate worktrees with no shared mutable state, making them safe to parallelize via sub-agents.
+
+**How it works:**
+
+1. After the scan identifies PRs needing review fixes or CI fixes, group them into a batch (max 3 concurrent)
+2. Spawn one `Agent` per PR, each working in its own worktree. Example prompt:
+
+   > Fix review comments on PR #\<number\> in worktree \<path\>.
+   > Read unresolved threads, apply fixes, run make pc, commit, push.
+   > Resolve each fixed thread via github_resolve_thread.
+   > If unfixable, label requires-human-review and comment with the reason.
+
+3. Wait for all agents in the batch to complete before spawning the next batch
+4. Collect results from each agent — verify PR state (fixed, labeled, or failed)
+
+**Concurrency limit**: max 3 concurrent sub-agents. Each agent runs `make pc` in its own worktree, and junctioned `node_modules` is read-only during validation. More than 3 saturates disk I/O and risks API rate limits.
+
+**Failure handling**: if a sub-agent fails (crashes, times out), the orchestrator labels the PR `requires-human-review` and continues with remaining PRs. Failed agents do not block the batch.
+
+**When to fall back to sequential**:
+
+- Fewer than 3 PRs in the pass (parallelism overhead outweighs benefit)
+- PRs touch overlapping files where a fix on one PR may inform the fix on another
+- Agent platform does not support concurrent sub-agents
 
 ### Parallel `make pc` Pattern
 

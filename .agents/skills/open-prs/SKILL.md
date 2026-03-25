@@ -216,20 +216,26 @@ If a rebase fails irrecoverably: `git rebase --abort`, label the PR `requires-hu
 
 ## Pass 2: Fix Unresolved Review Comments
 
-For each PR in `$scan.reviews`:
+**Parallel by default** — PRs with review comments are independent and can be fixed concurrently. Spawn up to 3 sub-agents, each working in its own worktree. See [sweep-and-parallelization.md](../pr-lifecycle/references/sweep-and-parallelization.md) for the agent prompt template and failure handling.
+
+For each PR in `$scan.reviews` (in parallel batches of 3):
 
 1. Enter the worktree (Step 2)
 2. **Load `skills/pr-lifecycle/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
 3. After pushing, re-check for new threads (Copilot re-reviews on push)
-4. If a review fix agent fails, analyze **why** it failed and retry with a different approach (e.g., read the module source, check related files for patterns, try an alternative implementation). Only label `requires-human-review` if the blocker is genuinely outside agent capability (needs credentials, product decisions, or external dependencies) — not because the fix is complex.
+4. If a review fix sub-agent **cannot complete the task but runs successfully**, analyze why, and optionally do **one** orchestrator-driven retry with a different approach (e.g., read the module source, check related files for patterns, try an alternative implementation). If it still cannot resolve the comments, or the blocker is genuinely outside agent capability (needs credentials, product decisions, or external dependencies), label the PR `requires-human-review` and move on. If the sub-agent **execution itself fails** (crash, timeout, or tool error), do not retry — label the PR `requires-human-review` immediately and continue to the next PR.
 
 > **No manual labeling needed.** The `copilot-auto-approve` bot labels clean PRs automatically after Copilot re-reviews the pushed fixes.
+>
+> **Fall back to sequential** when fewer than 3 PRs need fixes or when PRs touch overlapping files.
 
 ---
 
 ## Pass 3: Fix Failing CI
 
-For each PR in `$scan.ciFailing`:
+**Parallel by default** — CI fixes for different PRs are independent. After the orchestrator classifies each failure (3a), spawn up to 3 sub-agents for PRs that need code fixes. PRs needing only a CI re-run (`flaky`, `infrastructure`) are handled inline by the orchestrator — no sub-agent needed. See [sweep-and-parallelization.md](../pr-lifecycle/references/sweep-and-parallelization.md) for details.
+
+For each PR in `$scan.ciFailing` (in parallel batches of 3 for code fixes):
 
 ### 3a. Automated CI Triage
 
@@ -323,14 +329,14 @@ REPEAT (max 10 passes):
 
   IF unsettled is empty → EXIT (all settled)
 
-  Pass 1: Rebase unsettled conflicting PRs
+  Pass 1: Rebase unsettled conflicting PRs (SEQUENTIAL — cascade invalidation)
     - On irrecoverable failure → label requires-human-review → add to settled
-  Pass 2: Fix unsettled PRs with unresolved reviews
+  Pass 2: Fix unsettled PRs with unresolved reviews (PARALLEL — batches of 3 sub-agents)
     - On unfixable review → label requires-human-review → add to settled
-  Pass 3: Fix unsettled PRs with failing CI
+  Pass 3: Fix unsettled PRs with failing CI (PARALLEL — batches of 3 sub-agents)
     - On unfixable CI failure → label requires-human-review → add to settled
-  Validate all changed PRs: make pc in each worktree (NEVER skip — see callout below)
-  Push passing PRs
+  Each sub-agent runs make pc before pushing (NEVER skip — see callout below)
+  Collect results from all sub-agents; verify passing PRs have their branches/PRs updated
 
   Mark clean PRs (no conflicts, CI pass, no threads) → add to settled
   Mark PRs with only pending CI after final pass → add to settled
