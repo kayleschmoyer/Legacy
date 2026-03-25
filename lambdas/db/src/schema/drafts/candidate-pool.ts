@@ -187,7 +187,9 @@ async function fetchUndraftedCandidates(
           ELSE 0 END
           +
           CASE WHEN COALESCE(cf.g, 0) > 0 THEN
-            COALESCE(cf.e_def,0) * -1.0 / cf.g * ${gamesPerMatchup}
+            (COALESCE(cf.po,0)*0.02 + COALESCE(cf.a,0)*0.1 +
+             COALESCE(cf.dp_def,0)*0.5 + COALESCE(cf.e_def,0)*-0.5
+            ) / cf.g * ${gamesPerMatchup}
           ELSE 0 END
         ) AS fpg
       FROM players p

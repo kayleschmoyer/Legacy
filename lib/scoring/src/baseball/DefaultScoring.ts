@@ -22,7 +22,10 @@ export const DEFAULT_BATTING_SCORING = Object.freeze<
 export const DEFAULT_FIELDING_SCORING = Object.freeze<
   Partial<Record<keyof SeasonFielding, number>>
 >({
-  eDef: -1,
+  po: 0.02,
+  a: 0.1,
+  eDef: -0.5,
+  dpDef: 0.5,
 });
 
 export const DEFAULT_PITCHING_SCORING = Object.freeze<
