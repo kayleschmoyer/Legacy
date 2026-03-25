@@ -178,6 +178,7 @@ const PageContainer = styled(YStack, {
 const HeroBar = styled(XStack, {
   position: 'relative',
   overflow: 'hidden',
+  width: '100%',
   paddingHorizontal: '$6',
   paddingVertical: '$6',
   gap: '$5',
