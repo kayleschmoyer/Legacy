@@ -86,6 +86,19 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             : t,
       );
 
+      // When running specific tests via --testPathPatterns, automatically add
+      // --all to override --onlyChanged baked into package.json test scripts.
+      // Without this, jest's --onlyChanged filters out files that haven't been
+      // modified in git, causing "0 tests found" even with an explicit pattern.
+      if (
+        params.target === 'test' &&
+        translated.some((t) => t.startsWith('--testPathPatterns'))
+      ) {
+        if (!translated.some((t) => t === '--all' || t === '--onlyChanged')) {
+          translated.push('--all');
+        }
+      }
+
       nxArgs.push('--', ...translated);
     }
 
