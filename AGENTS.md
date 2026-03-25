@@ -95,6 +95,10 @@ pnpm --prefix lib/db-client run db:up
 
 # GraphQL codegen:
 make codegen
+
+# Self-hosted runner AMI (requires AWS SSO):
+make ami-build VPC_ID=vpc-xxx SUBNET_ID=subnet-xxx  # build new AMI with Packer
+make ami-list                                        # list existing runner AMIs
 ```
 
 **`scratch/` directory**: use `scratch/` for ad-hoc output files (lint results, CI logs, debug dumps, Playwright output). Everything in `scratch/` is gitignored. Each worktree has its own isolated `scratch/` directory.

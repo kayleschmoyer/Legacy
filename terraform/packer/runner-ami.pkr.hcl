@@ -82,6 +82,9 @@ build {
       "export DEBIAN_FRONTEND=noninteractive",
       "sudo apt-get update -qq",
       "sudo apt-get upgrade -y -qq",
+      # Refresh package index after upgrade — upgrade can invalidate the index,
+      # causing "no installation candidate" for packages like zip/build-essential.
+      "sudo apt-get update -qq",
       "sudo apt-get install -y -qq curl jq zip unzip git build-essential libssl-dev",
       "echo 'umask 0022' | sudo tee -a /etc/profile",
       "sudo sed -i 's/^UMASK.*/UMASK\t\t022/' /etc/login.defs",

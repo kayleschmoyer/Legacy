@@ -23,6 +23,7 @@ Covers all infrastructure operations: AWS authentication, Terraform changes, Lam
 | Read CloudWatch Lambda logs         | [references/cloudwatch-logs.md](references/cloudwatch-logs.md)                         |
 | Parse GitHub Actions CI logs        | [references/github-actions-logs.md](references/github-actions-logs.md)                 |
 | Sync environment variables from AWS | [references/sync-env.md](references/sync-env.md)                                       |
+| Rebuild self-hosted runner AMI      | [references/ami-build.md](references/ami-build.md)                                     |
 
 ## Critical Rules
 
@@ -86,6 +87,7 @@ See [references/terraform-common-issues.md](references/terraform-common-issues.m
 - [references/cloud-github-auth.md](references/cloud-github-auth.md) — GitHub authentication setup and troubleshooting for cloud agent environments
 - [references/version-information.md](references/version-information.md) — Build version info for debugging deployments, health endpoints, and adding version metadata to new services
 - [references/sync-env.md](references/sync-env.md) — Sync environment variables from AWS Parameter Store to local `.env` files
+- [references/ami-build.md](references/ami-build.md) — Build self-hosted runner AMI with Packer, verify rollout, troubleshoot
 
 ## Related Documentation
 

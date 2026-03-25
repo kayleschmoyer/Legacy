@@ -10,6 +10,7 @@
 	android ios build-android build-ios \
 	db-migrate db-studio db-reset db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas deploy-infrastructure terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy \
+	ami-build ami-list \
 	sync-env check-services graph affected list-projects workspace-lint pr \
 	ci ci-force ci-full release full-deploy full-check dev-setup \
 	fix-windows-locks diagnose kill-stale \
@@ -500,6 +501,20 @@ terraform-apply-auto: ## Apply Terraform changes (auto-approve, use with caution
 terraform-destroy: ## Destroy Terraform infrastructure
 	@$(call echo_yellow,Destroying Terraform infrastructure...)
 	cd terraform && terraform destroy
+
+# Self-Hosted Runner AMI (see .agents/skills/infrastructure/references/ami-build.md)
+ami-build: ## Build self-hosted runner AMI with Packer (requires VPC_ID and SUBNET_ID)
+	@if [ -z "$(VPC_ID)" ] || [ -z "$(SUBNET_ID)" ]; then \
+		$(call echo_red,Error: VPC_ID and SUBNET_ID are required. Usage: make ami-build VPC_ID=vpc-xxx SUBNET_ID=subnet-xxx); \
+		exit 1; \
+	fi
+	@$(call echo_blue,Building self-hosted runner AMI...)
+	@$(call echo_yellow,This will create a new EC2 AMI. Typical build time: 5-10 minutes.)
+	cd terraform$(PATH_SEP)packer && packer init runner-ami.pkr.hcl && packer build -var "vpc_id=$(VPC_ID)" -var "subnet_id=$(SUBNET_ID)" runner-ami.pkr.hcl
+
+ami-list: ## List existing runner AMIs (most recent first)
+	@$(call echo_blue,Listing runner AMIs...)
+	aws ec2 describe-images --owners self --filters "Name=name,Values=legacy-sports-runner-*" --query "Images | sort_by(@, &CreationDate) | reverse(@) | [*].{Name:Name,ImageId:ImageId,Created:CreationDate}" --output table
 
 # Environment Management
 sync-env: ## Sync environment variables
