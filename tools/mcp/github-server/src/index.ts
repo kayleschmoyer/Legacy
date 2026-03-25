@@ -24,6 +24,7 @@ import { secretList } from './tools/secret-list.js';
 import { setCommitStatus } from './tools/set-commit-status.js';
 import { secretSet } from './tools/secret-set.js';
 import { requestReview } from './tools/request-review.js';
+import { requestReviewBatch } from './tools/request-review-batch.js';
 import { resolveThread } from './tools/resolve-thread.js';
 import { resolveThreads } from './tools/resolve-threads.js';
 import { secretsCheck } from './tools/secrets-check.js';
@@ -502,6 +503,28 @@ server.tool(
       .describe('Request Copilot review (default: true)'),
   },
   async (params) => requestReview(params),
+);
+
+// --- github_request_review_batch ---
+server.tool(
+  'github_request_review_batch',
+  'Request reviewers on multiple PRs in one call. Requests Copilot by default. Useful for bulk PR sweeps.',
+  {
+    prs: z
+      .array(z.coerce.number().int().positive())
+      .min(1)
+      .max(100)
+      .describe('PR numbers'),
+    reviewers: z
+      .array(z.string())
+      .optional()
+      .describe('Human reviewer usernames'),
+    copilot: z
+      .boolean()
+      .default(true)
+      .describe('Request Copilot review (default: true)'),
+  },
+  async (params) => requestReviewBatch(params),
 );
 
 // --- github_resolve_thread ---

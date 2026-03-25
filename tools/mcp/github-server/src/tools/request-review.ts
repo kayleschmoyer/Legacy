@@ -1,4 +1,5 @@
 import { getRepoOwnerName } from '../auth.js';
+import { COPILOT_BOT } from '../constants.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
@@ -7,8 +8,6 @@ interface RequestReviewParams {
   reviewers?: string[];
   copilot?: boolean;
 }
-
-const COPILOT_BOT = 'copilot-pull-request-reviewer[bot]';
 
 export async function requestReview(
   params: RequestReviewParams,
