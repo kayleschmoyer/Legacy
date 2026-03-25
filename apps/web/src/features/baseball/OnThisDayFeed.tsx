@@ -390,6 +390,21 @@ export function OnThisDayFeed(): React.JSX.Element {
                 ? BRAND_SEAM_RED_LIGHT
                 : BRAND_GOLD_LIGHT;
 
+            const description = (() => {
+              let desc = cleanDescription(event.description ?? '');
+              if (
+                event.playerName &&
+                /[\u0080-\uFFFF]/.test(event.playerName)
+              ) {
+                // Replace ASCII-only player name with accented canonical name
+                const ascii = event.playerName
+                  .normalize('NFD')
+                  .replace(/[\u0300-\u036f]/g, '');
+                desc = desc.replace(ascii, event.playerName);
+              }
+              return desc;
+            })();
+
             return (
               <React.Fragment key={event.id ?? idx}>
                 {idx > 0 && (
@@ -442,7 +457,7 @@ export function OnThisDayFeed(): React.JSX.Element {
                       </StatBadge>
                     </XStack>
                     <Text fontSize="$3" color="$textMuted" numberOfLines={2}>
-                      {cleanDescription(event.description ?? '')}
+                      {description}
                     </Text>
                   </YStack>
                 </XStack>
