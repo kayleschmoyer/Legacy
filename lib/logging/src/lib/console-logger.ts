@@ -41,6 +41,12 @@ export class ConsoleLogger implements ILogger {
     return []; // ConsoleLogger doesn't support dynamic destinations
   }
 
+  setLevel(level: string): void {
+    if (level.toLowerCase() in LOG_LEVELS) {
+      this.currentLogLevel = level.toLowerCase();
+    }
+  }
+
   private formatMessage(
     level: LogLevel,
     message: string,

@@ -241,11 +241,7 @@ function parseRow<T extends object>(
     rowId: !rowId ? yearCell?.text : rowId,
   } as T;
 
-  // Debug: Log all found data-stat attributes
-  const foundStats = allCells
-    .map((col) => col.getAttribute('data-stat'))
-    .filter((stat) => stat !== undefined);
-  LOGGER.debug(`Found data-stat attributes: ${foundStats.join(', ')}`);
+  const mappedFields: string[] = [];
 
   for (const col of allCells) {
     const stat = col.getAttribute('data-stat');
@@ -259,11 +255,10 @@ function parseRow<T extends object>(
     const statField = StatMapping[stat.toUpperCase()];
 
     if (!statField) {
-      LOGGER.debug(`Skipping field ${stat} (text: '${text}')`);
       continue;
-    } else {
-      LOGGER.debug(`Mapping field ${stat} (text: '${text}') -> ${statField}`);
     }
+
+    mappedFields.push(statField);
 
     let value: string | number | null = text === '' ? null : text;
 
@@ -287,6 +282,10 @@ function parseRow<T extends object>(
       [statField]: value,
     });
   }
+
+  LOGGER.debug(
+    `Parsed row for player ${playerId}: ${mappedFields.length} fields mapped`,
+  );
 
   if (!('team' in stats) || stats.team === null || stats.team === 'TOT') {
     return null;

@@ -64,6 +64,7 @@ export interface ILogger {
   removeDestination(destination: OutputDestination): void;
   clearDestinations(): void;
   getDestinations(): OutputDestination[];
+  setLevel(level: string): void;
 }
 
 // Utility functions

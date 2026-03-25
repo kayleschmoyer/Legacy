@@ -21,6 +21,7 @@ interface HandleLoadCareerStatsArgs {
   limit?: number;
   'prioritize-new'?: boolean;
   'show-summary'?: boolean;
+  quiet?: boolean;
 }
 
 const CACHE_CLEAR_INTERVAL = 100; // Clear the bref HTML cache every N players
@@ -92,6 +93,12 @@ async function getPlayersPrioritized(
 export async function handleLoadCareerStats(
   args: HandleLoadCareerStatsArgs,
 ): Promise<void> {
+  // --quiet reduces log level to 'warn' to prevent Nx's output buffer
+  // from overflowing during bulk operations (V8 string length limit).
+  if (args.quiet) {
+    LOGGER.setLevel('warn');
+  }
+
   LOGGER.debug(
     `Loading Player Stats (limit: ${args.limit}, prioritize-new: ${args['prioritize-new']})`,
   );

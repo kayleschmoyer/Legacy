@@ -46,6 +46,10 @@ export class Logger implements ILogger {
     return [...this.config.outputDestinations];
   }
 
+  setLevel(level: string): void {
+    this.minimumLevel = level;
+  }
+
   private logToDestinations(
     level: LogLevel,
     message: string,

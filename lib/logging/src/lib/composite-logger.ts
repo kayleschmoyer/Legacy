@@ -35,6 +35,10 @@ export class CompositeLogger implements ILogger {
     return []; // CompositeLogger doesn't support dynamic destinations
   }
 
+  setLevel(level: string): void {
+    this.consoleLogger.setLevel(level);
+  }
+
   debug(message: string, ...args: LogArgs): void {
     this.consoleLogger.debug(message, ...args);
     if (this.isNode) {

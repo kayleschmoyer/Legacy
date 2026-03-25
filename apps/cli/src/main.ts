@@ -125,18 +125,21 @@ async function run(): Promise<void> {
     .option('--remote', 'Send to SQS queue instead of processing directly')
     .option('--prioritize-new', 'Prioritize players without stats')
     .option('--show-summary', 'Show stats refresh summary before loading')
+    .option('-q, --quiet', 'Suppress debug/info logs (only warn/error)')
     .action(
       (options: {
         limit?: number;
         remote?: boolean;
         prioritizeNew?: boolean;
         showSummary?: boolean;
+        quiet?: boolean;
       }) =>
         handleLoadCareerStats({
           limit: options.limit,
           remote: options.remote ?? false,
           'prioritize-new': options.prioritizeNew ?? false,
           'show-summary': options.showSummary ?? false,
+          quiet: options.quiet ?? false,
         }),
     );
 
