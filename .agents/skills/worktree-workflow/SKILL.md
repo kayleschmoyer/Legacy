@@ -63,6 +63,23 @@ Junctioned worktrees share the main repo's `node_modules`. Key rules:
 
 > 📎 **Full concurrent safety rules, recovery steps, and what's safe in parallel**: see [references/concurrent-agent-safety.md](references/concurrent-agent-safety.md)
 
+## Multi-Agent Worktree Locking
+
+When multiple agents work concurrently, use advisory locks to signal worktree ownership:
+
+```
+worktree_lock(worktree: "LS-1234", agent: "work-ticket", task: "implementing feature")
+# ... do work ...
+worktree_unlock(worktree: "LS-1234")
+```
+
+- **Lock on entry**: call `worktree_lock` after `worktree_set` when starting work
+- **Unlock on exit**: call `worktree_unlock` before `worktree_clean` or when done
+- **Check before entering**: `worktree_list` displays lock status (ACTIVE/STALE/none) for each worktree — skip ones with ACTIVE locks
+- **Stale locks auto-expire**: default TTL is 2 hours; stale locks are replaced automatically
+- **Force override**: pass `force: true` to `worktree_lock` to break another agent's lock (use sparingly)
+- **Advisory only**: locks are not enforced — they signal intent, not prevent access
+
 ## Key Rules
 
 | Rule                    | Detail                                                                                                  |

@@ -41,6 +41,69 @@ const MAIN_REPO = getMainRepoPath();
 let activeWorktree: string | null = null;
 
 // ---------------------------------------------------------------------------
+// Worktree locking — file-based coordination for multi-agent workflows
+// ---------------------------------------------------------------------------
+
+/** Default lock TTL: 2 hours (in seconds). */
+const DEFAULT_LOCK_TTL_SECONDS = 2 * 60 * 60;
+const LOCK_FILENAME = '.agent-lock';
+
+interface AgentLock {
+  /** Identifier of the agent holding the lock (e.g. session ID, agent name). */
+  agent: string;
+  /** Process ID of the locking agent (for stale detection). */
+  pid: number;
+  /** ISO timestamp when the lock was acquired. */
+  acquired: string;
+  /** Lock TTL in seconds — lock is stale after acquired + ttl. */
+  ttl: number;
+  /** Optional human-readable description of what the agent is doing. */
+  task?: string;
+}
+
+function lockFilePath(worktreePath: string): string {
+  return join(worktreePath, LOCK_FILENAME);
+}
+
+function readLock(worktreePath: string): AgentLock | null {
+  const p = lockFilePath(worktreePath);
+  try {
+    const raw = readFileSync(p, 'utf-8');
+    return JSON.parse(raw) as AgentLock;
+  } catch {
+    return null;
+  }
+}
+
+function isLockStale(lock: AgentLock): boolean {
+  const acquiredTime = Date.parse(lock.acquired);
+  if (!Number.isFinite(acquiredTime)) {
+    // Malformed or unparseable acquisition time: treat lock as stale.
+    return true;
+  }
+  const ttlMs = Number(lock.ttl) * 1000;
+  if (!Number.isFinite(ttlMs) || ttlMs < 0) {
+    // Invalid TTL (NaN, Infinity, or negative): treat lock as stale.
+    return true;
+  }
+  const expiresAt = acquiredTime + ttlMs;
+  return Date.now() >= expiresAt;
+}
+
+function writeLock(worktreePath: string, lock: AgentLock): void {
+  writeFileSync(lockFilePath(worktreePath), JSON.stringify(lock, null, 2));
+}
+
+function removeLock(worktreePath: string): boolean {
+  try {
+    unlinkSync(lockFilePath(worktreePath));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -50,6 +113,8 @@ interface WorktreeInfo {
   branch: string | null;
   hasJunctionedNodeModules: boolean;
   nodeModulesTarget: string | null;
+  lock: AgentLock | null;
+  lockStale: boolean;
 }
 
 function isJunction(p: string): boolean {
@@ -106,6 +171,7 @@ function getWorktrees(): WorktreeInfo[] {
     const nmPath = join(wtPath, 'node_modules');
     const junctioned = isJunction(nmPath);
     const target = junctioned ? getJunctionTarget(nmPath) : null;
+    const lock = readLock(wtPath);
 
     worktrees.push({
       key,
@@ -113,6 +179,8 @@ function getWorktrees(): WorktreeInfo[] {
       branch,
       hasJunctionedNodeModules: junctioned,
       nodeModulesTarget: target,
+      lock,
+      lockStale: lock ? isLockStale(lock) : false,
     });
   }
 
@@ -684,6 +752,57 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
         },
         required: ['command'],
+      },
+    },
+    {
+      name: 'worktree_lock',
+      description:
+        'Acquire an advisory lock on a worktree for multi-agent coordination. ' +
+        'Signals to other agents that the worktree is in use so they should avoid modifying it concurrently. ' +
+        'Locks have a TTL and are automatically cleaned up when stale.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description: 'Ticket key (default: active)',
+          },
+          agent: {
+            type: 'string',
+            description:
+              'Agent identifier (e.g. session ID, agent name). Defaults to "claude-session".',
+          },
+          task: {
+            type: 'string',
+            description:
+              'Human-readable description of what the agent is doing (optional).',
+          },
+          ttl: {
+            type: 'number',
+            description:
+              'Lock TTL in seconds (default: 7200 = 2 hours). Lock expires after this period.',
+          },
+          force: {
+            type: 'boolean',
+            description:
+              'Force-acquire even if another agent holds the lock (default: false).',
+          },
+        },
+      },
+    },
+    {
+      name: 'worktree_unlock',
+      description:
+        'Release an advisory lock on a worktree. Any agent can release any lock ' +
+        '(locks are advisory, not enforced).',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description: 'Ticket key (default: active)',
+          },
+        },
       },
     },
     {
@@ -1523,11 +1642,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           : existsSync(join(w.path, 'node_modules'))
             ? 'node_modules: independent'
             : 'node_modules: missing';
+        const lockStatus = w.lock
+          ? w.lockStale
+            ? `Lock: STALE (agent: ${w.lock.agent}, acquired: ${w.lock.acquired})`
+            : `Lock: ACTIVE (agent: ${w.lock.agent}, task: ${w.lock.task ?? 'n/a'}, acquired: ${w.lock.acquired})`
+          : 'Lock: none';
         return [
           w.key,
           `  Path:   ${w.path}`,
           `  Branch: ${w.branch ?? 'unknown'}`,
           `  ${nmStatus}`,
+          `  ${lockStatus}`,
         ].join('\n');
       });
 
@@ -3274,6 +3399,184 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
         isError: failed > 0,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_lock
+    // -----------------------------------------------------------------------
+    case 'worktree_lock': {
+      const {
+        worktree: wtKey,
+        agent = 'claude-session',
+        task,
+        ttl = DEFAULT_LOCK_TTL_SECONDS,
+        force = false,
+      } = args as {
+        worktree?: string;
+        agent?: string;
+        task?: string;
+        ttl?: number;
+        force?: boolean;
+      };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const targetPath = target.path;
+      const existing = readLock(targetPath);
+
+      if (existing && !force) {
+        const stale = isLockStale(existing);
+        if (!stale) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    acquired: false,
+                    reason: 'Worktree is locked by another agent.',
+                    existingLock: existing,
+                    hint: 'Use force:true to override, or worktree_unlock to release.',
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
+        // Stale lock — auto-clean and proceed
+      }
+
+      // Validate TTL
+      let normalizedTtl = DEFAULT_LOCK_TTL_SECONDS;
+      if (ttl !== undefined && ttl !== null) {
+        if (typeof ttl !== 'number' || !Number.isFinite(ttl) || ttl <= 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    acquired: false,
+                    reason: 'Invalid ttl: must be a finite, positive number.',
+                    hint: 'Provide a finite, positive integer ttl value in seconds.',
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+            isError: true,
+          };
+        }
+        normalizedTtl = Math.max(Math.floor(ttl), 1);
+      }
+
+      const newLock: AgentLock = {
+        agent,
+        pid: process.pid,
+        acquired: new Date().toISOString(),
+        ttl: normalizedTtl,
+        ...(task ? { task } : {}),
+      };
+
+      writeLock(targetPath, newLock);
+
+      // Re-read the lock to detect race conditions (another agent may have overwritten)
+      const confirmed = readLock(targetPath);
+      if (
+        !confirmed ||
+        confirmed.agent !== newLock.agent ||
+        confirmed.pid !== newLock.pid ||
+        confirmed.acquired !== newLock.acquired
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  acquired: false,
+                  reason:
+                    'Failed to acquire worktree lock: another agent won the race.',
+                  existingLock: confirmed ?? existing ?? null,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const replaced = existing
+        ? isLockStale(existing)
+          ? 'stale'
+          : 'forced'
+        : null;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                acquired: true,
+                lock: newLock,
+                worktree: targetPath,
+                ...(replaced ? { replaced, previousLock: existing } : {}),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_unlock
+    // -----------------------------------------------------------------------
+    case 'worktree_unlock': {
+      const { worktree: wtKey } = args as { worktree?: string };
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+
+      const targetPath = target.path;
+      const existing = readLock(targetPath);
+      const removed = removeLock(targetPath);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                released: removed,
+                worktree: targetPath,
+                previousLock: existing,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
       };
     }
 
