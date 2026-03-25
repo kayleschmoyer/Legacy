@@ -33,7 +33,7 @@ import {
   isNegroLeague,
   SEASON_MATCHUP_MULTIPLIER,
 } from '@legacy-sports/utils';
-import { and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { type GenericDatabase } from './client/abstract/BaseDbClient';
 import { PublicSchema } from './client/PublicDbClient';
@@ -852,18 +852,61 @@ export async function autoPopulateFirstMatchupLineup(
     return { assignedCount: 0 };
   }
 
-  // 6. Persist the lineup assignments
+  // 6+7. Persist lineup assignments to matchup_players AND mirror to
+  //       team_members inside a single transaction so both tables stay
+  //       consistent even if an individual UPDATE fails.
+  const mpById = new Map(mpRows.map((mp) => [mp.id, mp]));
+  const teamMemberUpdates = new Map<
+    string,
+    { teamId: number; playerId: number; positionId: number }
+  >();
   for (const [mpId, posId] of assignments) {
-    await db
-      .update(PublicSchema.matchupPlayers)
-      .set({ positionId: posId })
-      .where(eq(PublicSchema.matchupPlayers.id, mpId));
+    const mp = mpById.get(mpId);
+    if (!mp) continue;
+    // Use first assignment per (team, player) — one player can only occupy one slot
+    const key = `${mp.teamId}-${mp.playerId}`;
+    if (!teamMemberUpdates.has(key)) {
+      teamMemberUpdates.set(key, {
+        teamId: mp.teamId,
+        playerId: mp.playerId,
+        positionId: posId,
+      });
+    }
   }
+
+  await db.transaction(async (tx) => {
+    // 6. Persist the lineup assignments to matchup_players
+    for (const [mpId, posId] of assignments) {
+      await tx
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId: posId })
+        .where(eq(PublicSchema.matchupPlayers.id, mpId));
+    }
+
+    // 7. Mirror position assignments to team_members so the league overview
+    //    stats bar (MY STARTERS / ON BENCH) reflects the auto-populated lineup.
+    //    Only update rows where positionId IS NULL to avoid overwriting
+    //    user/commissioner roster positions set before matchups were created.
+    for (const { teamId, playerId, positionId } of teamMemberUpdates.values()) {
+      await tx
+        .update(PublicSchema.teamMembers)
+        .set({ positionId })
+        .where(
+          and(
+            eq(PublicSchema.teamMembers.teamId, teamId),
+            eq(PublicSchema.teamMembers.playerId, playerId),
+            eq(PublicSchema.teamMembers.leagueId, leagueId),
+            isNull(PublicSchema.teamMembers.positionId),
+          ),
+        );
+    }
+  });
 
   LOGGER.info('Auto-populated first matchup lineup after draft', {
     leagueId,
     week1MatchupCount: week1MatchupIds.length,
     assignedCount: assignments.size,
+    teamMembersSynced: teamMemberUpdates.size,
   });
 
   return { assignedCount: assignments.size };
