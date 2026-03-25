@@ -1234,6 +1234,7 @@ export function BaseballLandingPage() {
             maxWidth={560}
             width="100%"
             maxHeight="90vh"
+            padding="$5"
             backgroundColor="$color2"
             borderColor={withAlpha(BRAND_NAVY, 0.28)}
             borderRadius="$7"
