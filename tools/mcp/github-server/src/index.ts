@@ -519,13 +519,21 @@ server.tool(
 // --- github_resolve_threads ---
 server.tool(
   'github_resolve_threads',
-  'Batch-resolve review threads (groups of 50).',
+  'Batch-resolve review threads (groups of 50). If prNumber is provided, triggers bot-review recheck after resolving.',
   {
     threadIds: z
       .array(z.string())
       .min(1)
       .max(100)
       .describe('Thread node IDs from github_get_review_threads'),
+    prNumber: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'PR number — triggers Copilot Auto-Approve recheck after resolving threads',
+      ),
   },
   async (params) => resolveThreads(params),
 );

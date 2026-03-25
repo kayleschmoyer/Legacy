@@ -1,8 +1,10 @@
-import { githubGraphQL } from '../github-api.js';
+import { getRepoOwnerName } from '../auth.js';
+import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface ResolveThreadsParams {
   threadIds: string[];
+  prNumber?: number;
 }
 
 interface ResolveResponse {
@@ -91,13 +93,49 @@ export async function resolveThreads(
   const resolved = results.filter((r) => r.isResolved && !r.error).length;
   const failed = results.filter((r) => r.error).length;
 
+  // If a PR number was provided and threads were resolved, trigger the
+  // Copilot Auto-Approve recheck workflow so bot-review status gets updated.
+  // This closes the gap where threads are resolved without a code push.
+  let recheckTriggered = false;
+  let recheckError: string | undefined;
+  if (params.prNumber && resolved > 0 && failed === 0) {
+    try {
+      const repo = await getRepoOwnerName();
+      await githubRest({
+        method: 'POST',
+        path: `/repos/${repo.owner}/${repo.name}/actions/workflows/copilot-auto-approve.yml/dispatches`,
+        body: {
+          ref: 'main',
+          inputs: { pr_number: String(params.prNumber) },
+        },
+      });
+      recheckTriggered = true;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      // Workflow dispatch requires Actions write permission (classic PAT
+      // needs the `workflow` scope; fine-grained tokens need Actions write).
+      // Surface this clearly so the caller knows what to fix.
+      recheckError =
+        `Failed to trigger bot-review recheck: ${msg}. ` +
+        'Ensure the token has Actions workflow permissions ' +
+        '(classic PAT: `workflow` scope; fine-grained: Actions write).';
+    }
+  }
+
   return {
     isError: failed > 0 ? true : undefined,
     content: [
       {
         type: 'text',
         text: JSON.stringify(
-          { total: results.length, resolved, failed, results },
+          {
+            total: results.length,
+            resolved,
+            failed,
+            results,
+            recheckTriggered,
+            ...(recheckError ? { recheckError } : {}),
+          },
           null,
           2,
         ),
