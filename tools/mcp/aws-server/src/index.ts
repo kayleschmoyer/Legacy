@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { apigatewayInspect } from './tools/apigateway-inspect.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
 import { ssmGet } from './tools/ssm-get.js';
@@ -10,6 +11,25 @@ const server = new McpServer({
   name: 'legacy-sports-aws',
   version: '1.0.0',
 });
+
+// --- aws_apigateway_inspect ---
+server.tool(
+  'aws_apigateway_inspect',
+  'Inspect API Gateway routes. Finds routes by path pattern, shows integrations, and flags routes with missing Lambda integrations.',
+  {
+    path: z
+      .string()
+      .optional()
+      .describe(
+        'Regex pattern to filter routes by path (e.g. "rollbar-discord"). Omit to list all routes.',
+      ),
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe('AWS environment (default: dev)'),
+  },
+  async (params) => apigatewayInspect(params),
+);
 
 // --- aws_logs_tail ---
 server.tool(
