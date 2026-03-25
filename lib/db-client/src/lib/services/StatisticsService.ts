@@ -950,10 +950,30 @@ export class StatisticsService {
           ),
         )
         .orderBy(desc(PublicSchema.onThisDayEvents.year))
-        .limit(limit)
+        // Over-fetch to compensate for duplicates that will be removed during
+        // in-memory dedupe, so we still return up to `limit` unique events.
+        .limit(limit * 3)
         .execute();
 
-      return rows.map((row) => ({
+      // Deduplicate rows that share the same (year, eventType, playerName, description).
+      // Rows with NULL mlb_transaction_id bypass the DB unique constraint, so
+      // duplicate entries can exist for the same real-world transaction.
+      const seen = new Set<string>();
+      const deduped: typeof rows = [];
+      for (const row of rows) {
+        const key = JSON.stringify([
+          row.year,
+          row.eventType,
+          row.playerName ?? null,
+          row.description,
+        ]);
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(row);
+        }
+      }
+
+      return deduped.slice(0, limit).map((row) => ({
         id: row.id,
         month: row.month,
         day: row.day,

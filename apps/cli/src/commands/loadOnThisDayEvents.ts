@@ -175,7 +175,32 @@ export async function handleLoadOnThisDayEvents(
                   to_team = EXCLUDED.to_team
               `);
               totalInserted++;
+            } else if (mlbTransactionId === null) {
+              // For rows without an mlb_transaction_id, use an atomic
+              // INSERT ... WHERE NOT EXISTS to avoid duplicates without an
+              // extra round trip or race conditions between concurrent runs.
+              const result = await db.execute(sql`
+                INSERT INTO on_this_day_events
+                  (month, day, year, event_type, description, player_name, from_team, to_team, mlb_transaction_id)
+                SELECT
+                  ${month}, ${day}, ${year}, ${eventType}, ${description}, ${playerName}, ${fromTeam}, ${toTeam}, ${mlbTransactionId}
+                WHERE NOT EXISTS (
+                  SELECT 1
+                  FROM on_this_day_events
+                  WHERE month = ${month}
+                    AND day = ${day}
+                    AND year = ${year}
+                    AND event_type = ${eventType}
+                    AND description = ${description}
+                )
+              `);
+              if (result.rowCount && result.rowCount > 0) {
+                totalInserted++;
+              } else {
+                totalSkipped++;
+              }
             } else {
+              // Has an mlb_transaction_id but upsert is false — plain insert
               try {
                 await db.execute(sql`
                   INSERT INTO on_this_day_events
