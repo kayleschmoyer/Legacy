@@ -319,6 +319,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   // Keep the ref pointing at the latest function on every render
   scheduleProactiveRefreshRef.current = scheduleProactiveRefresh;
 
+  // ─── Listen for token-refreshed events from Apollo error link ───────────
+  // The Apollo client's silentlyRefreshJwt() runs outside React context.
+  // When it successfully refreshes a JWT, it dispatches an
+  // `auth:token-refreshed` window event with the decoded user profile so
+  // the auth state reflects claim changes (e.g. accessLevel promotion)
+  // without requiring a full page reload.
+  useEffect(() => {
+    const handleTokenRefreshed = (event: Event) => {
+      const detail = (event as CustomEvent<{ user: User; exp?: number }>)
+        .detail;
+      if (!detail?.user) return;
+
+      // Ignore token-refreshed events during admin impersonation — the
+      // refreshed JWT belongs to the real admin, not the impersonated user.
+      const hasImpersonationToken =
+        typeof localStorage !== 'undefined' &&
+        !!localStorage.getItem('auth_jwt');
+      if (hasImpersonationToken) return;
+
+      dispatchAuth({ type: 'AUTH_SUCCESS', payload: detail.user });
+      authService.storeUserProfile(detail.user);
+
+      // Reschedule proactive refresh with the new expiry
+      if (detail.exp) {
+        scheduleProactiveRefresh(detail.exp);
+      }
+    };
+
+    window.addEventListener('auth:token-refreshed', handleTokenRefreshed);
+    return () => {
+      window.removeEventListener('auth:token-refreshed', handleTokenRefreshed);
+    };
+  }, [authService, scheduleProactiveRefresh]);
+
   // Initialize auth state on mount
   useEffect(() => {
     let isMounted = true;
@@ -368,6 +402,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             if (expiry > currentTime) {
               // Token not expired yet — schedule refresh before expiry
               scheduleProactiveRefresh(expiry);
+
+              // Fire a background refresh to pick up any server-side claim
+              // changes (e.g. accessLevel promotion) that happened while the
+              // user was away. The UI already shows the cached profile (no
+              // loading flash), so this is a silent update.
+              authService
+                .refreshJwt()
+                .then((freshToken) => {
+                  if (!freshToken || !isMounted) return;
+                  // Always reschedule proactive refresh when we have a fresh
+                  // token, even if user decoding fails.
+                  scheduleProactiveRefresh(freshToken);
+                  const freshUser = decodeUserFromToken(freshToken);
+                  if (freshUser) {
+                    authService.storeUserProfile(freshUser);
+                    dispatchAuth({
+                      type: 'AUTH_SUCCESS',
+                      payload: freshUser,
+                    });
+                  }
+                })
+                .catch(() => {
+                  // Silently ignore — the cached profile is still valid
+                });
             } else {
               // Token may be expired — attempt a silent refresh
               const newToken = await authService.refreshJwt();

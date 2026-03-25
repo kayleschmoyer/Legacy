@@ -64,10 +64,81 @@ const authLink = setContext((_, { headers }) => {
 let refreshInFlight: Promise<string | null> | null = null;
 
 /**
+ * Decode a JWT payload without signature verification.
+ * Returns null if the token cannot be decoded.
+ */
+export function decodeJwtPayload(jwt: string): Record<string, unknown> | null {
+  try {
+    const parts = jwt.split('.');
+    if (parts.length !== 3) return null;
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    return JSON.parse(atob(padded)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * After a successful JWT refresh, update the cached user profile in
+ * localStorage and notify the AuthProvider via a window event so the
+ * UI immediately reflects any claim changes (e.g. accessLevel promotion).
+ */
+export function syncUserProfileFromJwt(jwt: string): void {
+  const payload = decodeJwtPayload(jwt);
+  if (!payload) return;
+
+  const updatedProfile = {
+    id: (payload['id'] as number) || 0,
+    email: (payload['email'] as string) || '',
+    username:
+      (payload['username'] as string) ||
+      (payload['name'] as string) ||
+      'Unknown',
+    picture: payload['picture'] as string | undefined,
+    accessLevel:
+      (payload['accessLevel'] as 'none' | 'user' | 'admin') || 'user',
+  };
+
+  // Update the localStorage cache so page reloads also pick up the change
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('ls_user_profile', JSON.stringify(updatedProfile));
+    }
+  } catch {
+    // Storage unavailable — the event dispatch below is the primary mechanism
+  }
+
+  // Persist the token expiry for proactive-refresh scheduling
+  const exp = payload['exp'] as number | undefined;
+  if (exp) {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('ls_token_expiry', String(exp));
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Dispatch a window event so the AuthProvider can update React state
+  // without tight coupling between the Apollo module and the React context.
+  window.dispatchEvent(
+    new CustomEvent('auth:token-refreshed', {
+      detail: { user: updatedProfile, exp },
+    }),
+  );
+}
+
+/**
  * Silently refresh the JWT by calling the oauth proxy's /refresh-jwt endpoint.
  * The server reads the JWT from the HttpOnly cookie and returns a new one
  * (also set as a cookie). Deduplicates concurrent calls so only one network
  * request is made even when multiple queries fail simultaneously.
+ *
+ * After a successful refresh, the cached user profile in localStorage is
+ * updated and an `auth:token-refreshed` event is dispatched so the
+ * AuthProvider can reflect any claim changes (e.g. accessLevel) immediately.
  */
 async function silentlyRefreshJwt(): Promise<string | null> {
   // Deduplicate: if a refresh is already in-flight, wait for it
@@ -99,6 +170,17 @@ async function silentlyRefreshJwt(): Promise<string | null> {
       // Persist the refreshed CSRF token so subsequent requests include it.
       if (result.csrfToken) {
         storeCsrfToken(result.csrfToken);
+      }
+
+      // Sync the cached user profile and notify the AuthProvider so the UI
+      // immediately reflects any claim changes (e.g. accessLevel promotion).
+      // Skip profile sync during admin impersonation — the refreshed JWT
+      // belongs to the real admin, not the impersonated user.
+      const hasImpersonationToken =
+        typeof window !== 'undefined' &&
+        !!window.localStorage?.getItem('auth_jwt');
+      if (!hasImpersonationToken) {
+        syncUserProfileFromJwt(result.jwt);
       }
 
       // The server also sets updated cookies automatically.
