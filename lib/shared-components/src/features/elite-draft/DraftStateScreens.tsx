@@ -1,5 +1,4 @@
 import React from 'react';
-import type { NavigateFunction } from 'react-router-dom';
 import { CSS } from './styles';
 import { SkeletonCard } from './SkeletonCard';
 
@@ -43,9 +42,9 @@ function StateScreen({
 }
 
 export function NoLeagueScreen({
-  navigate,
+  onNavigate,
 }: {
-  navigate: NavigateFunction;
+  onNavigate: (path: string) => void;
 }): React.JSX.Element {
   return (
     <StateScreen
@@ -54,7 +53,7 @@ export function NoLeagueScreen({
       title="Live Draft Board"
       description="Navigate to a league and start a live draft from the commissioner panel."
       buttonText="Go to Leagues"
-      onButtonClick={() => navigate('/baseball')}
+      onButtonClick={() => onNavigate('/baseball')}
     />
   );
 }
@@ -99,10 +98,10 @@ export function LoadingScreen(): React.JSX.Element {
 
 export function LeagueErrorScreen({
   isUnauthorized,
-  navigate,
+  onNavigate,
 }: {
   isUnauthorized: boolean;
-  navigate: NavigateFunction;
+  onNavigate: (path: string) => void;
 }): React.JSX.Element {
   return (
     <StateScreen
@@ -115,7 +114,7 @@ export function LeagueErrorScreen({
           : "This league doesn't exist or the draft room is unavailable."
       }
       buttonText="Back to Leagues"
-      onButtonClick={() => navigate('/baseball')}
+      onButtonClick={() => onNavigate('/baseball')}
     />
   );
 }

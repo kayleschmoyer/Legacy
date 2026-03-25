@@ -1,0 +1,406 @@
+# Live Draft GraphQL Operations
+# Used by the EliteDraftBoard component for pick-by-pick live drafting
+
+mutation InitializeLiveDraft(
+  $leagueId: Int!
+  $draftOrder: String
+  $draftMode: String
+  $selectionMethod: String
+) {
+  initializeDraft(
+    leagueId: $leagueId
+    draftOrder: $draftOrder
+    draftMode: $draftMode
+    selectionMethod: $selectionMethod
+  ) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    draftStartedAt
+    createdAt
+  }
+}
+
+mutation MakeDraftPick($draftId: Int!, $playerId: Int!) {
+  makeDraftPick(draftId: $draftId, playerId: $playerId) {
+    id
+    draftId
+    teamId
+    playerId
+    round
+    pickNumber
+    overallPick
+    pickedAt
+  }
+}
+
+mutation PauseDraft($leagueId: Int!) {
+  pauseDraft(leagueId: $leagueId) {
+    id
+    currentPick
+  }
+}
+
+mutation ResumeDraft($leagueId: Int!) {
+  resumeDraft(leagueId: $leagueId) {
+    id
+    currentPick
+  }
+}
+
+mutation CommissionerPick($draftId: Int!, $playerId: Int!) {
+  commissionerPick(draftId: $draftId, playerId: $playerId) {
+    id
+    teamId
+    playerId
+    round
+    pickNumber
+    overallPick
+    pickedAt
+  }
+}
+
+mutation SetDraftOrder($draftId: Int!, $teamIds: [Int!]!) {
+  setDraftOrder(draftId: $draftId, teamIds: $teamIds) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    draftStartedAt
+    createdAt
+  }
+}
+
+mutation RandomizeDraftOrder($draftId: Int!) {
+  randomizeDraftOrder(draftId: $draftId) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    draftStartedAt
+    createdAt
+  }
+}
+
+query GetDraftTeamOrder($draftId: Int!) {
+  getDraftTeamOrder(draftId: $draftId) {
+    teamId
+    teamName
+    draftOrder
+  }
+}
+
+mutation NudgeExpiredDraftPick($leagueId: Int!) {
+  autoProcessDraftPicks(leagueId: $leagueId) {
+    draftsProcessed
+    picksAutoMade
+  }
+}
+
+mutation ToggleDraftAutoPick($draftId: Int!, $enable: Boolean!) {
+  toggleDraftAutoPick(draftId: $draftId, enable: $enable)
+}
+
+mutation UndoLastDraftPick($draftId: Int!) {
+  undoLastDraftPick(draftId: $draftId) {
+    id
+    draftId
+    teamId
+    playerId
+    round
+    pickNumber
+    overallPick
+    pickedAt
+  }
+}
+
+mutation CommissionerSetDraftAutoPickDisabled(
+  $draftId: Int!
+  $disabled: Boolean!
+) {
+  commissionerSetDraftAutoPickDisabled(draftId: $draftId, disabled: $disabled) {
+    id
+    autoPickDisabled
+  }
+}
+
+# --- Draft Queue (LS-473) ---
+
+query GetMyDraftQueue($draftId: Int!) {
+  getMyDraftQueue(draftId: $draftId) {
+    id
+    draftId
+    teamId
+    playerId
+    priority
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+mutation SetDraftQueue($draftId: Int!, $playerIds: [Int!]!) {
+  setDraftQueue(draftId: $draftId, playerIds: $playerIds) {
+    id
+    draftId
+    teamId
+    playerId
+    priority
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+mutation AddToDraftQueue($draftId: Int!, $playerId: Int!) {
+  addToDraftQueue(draftId: $draftId, playerId: $playerId) {
+    id
+    draftId
+    teamId
+    playerId
+    priority
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+mutation RemoveFromDraftQueue($draftId: Int!, $playerId: Int!) {
+  removeFromDraftQueue(draftId: $draftId, playerId: $playerId) {
+    id
+    draftId
+    teamId
+    playerId
+    priority
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+mutation ReorderDraftQueue($draftId: Int!, $playerIds: [Int!]!) {
+  reorderDraftQueue(draftId: $draftId, playerIds: $playerIds) {
+    id
+    draftId
+    teamId
+    playerId
+    priority
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+query GetMyDraftTeamAutoPick($draftId: Int!) {
+  getMyDraftTeamAutoPick(draftId: $draftId)
+}
+
+query GetDraftTeamAutoPickStatuses($draftId: Int!) {
+  getDraftTeamAutoPickStatuses(draftId: $draftId) {
+    teamId
+    autoPick
+  }
+}
+
+query GetLiveDraftLeagueDraft($leagueId: Int!) {
+  getLeagueDraft(leagueId: $leagueId) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    pickTimeLimitSeconds
+    currentPickDeadline
+    draftStartedAt
+    draftCompletedAt
+    scheduledAt
+    createdAt
+    autoPickDisabled
+  }
+}
+
+query GetDraft($draftId: Int!) {
+  getDraft(draftId: $draftId) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    draftStartedAt
+    draftCompletedAt
+    createdAt
+  }
+}
+
+query GetCurrentDraftPick($draftId: Int!) {
+  getCurrentDraftPick(draftId: $draftId) {
+    draftId
+    teamId
+    round
+    pickNumber
+    overallPick
+    isComplete
+  }
+}
+
+query GetDraftPicks($draftId: Int!) {
+  getDraftPicks(draftId: $draftId) {
+    id
+    draftId
+    round
+    pickNumber
+    overallPick
+    pickedAt
+    teamId
+    playerId
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+query GetAvailableDraftPlayers(
+  $draftId: Int!
+  $search: String
+  $position: String
+  $orderBy: String
+  $limit: Int
+  $offset: Int
+) {
+  getAvailableDraftPlayers(
+    draftId: $draftId
+    search: $search
+    position: $position
+    orderBy: $orderBy
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    firstName
+    lastName
+    brefId
+    eligiblePositions
+    hitterAvgPointsPerGame
+    pitchingAvgPointsPerGame
+  }
+}
+
+# Fetch career pitching stats for pitcher cards
+query GetDraftPitcherStats($limit: Int, $minGames: Int) {
+  careerPitchingStats(limit: $limit, minGames: $minGames) {
+    playerId
+    era
+    wins
+    losses
+    saves
+    strikeouts
+    games
+    gamesStarted
+  }
+}
+
+# Fetch career batting stats for player cards (uses existing connection that works on deployed server)
+query GetDraftPlayerStats($first: Int, $searchTerm: String, $minGames: Int) {
+  careerBattingStats(
+    first: $first
+    searchTerm: $searchTerm
+    minGames: $minGames
+  ) {
+    edges {
+      node {
+        playerId
+        primaryPosition
+        games
+        atBats
+        hits
+        homeRuns
+        rbi
+        runs
+        stolenBases
+        battingAverage
+        onBasePercentage
+        sluggingPercentage
+        offensiveWAR
+        player {
+          id
+          firstName
+          lastName
+        }
+      }
+    }
+    totalCount
+  }
+}
+
+# Fetch career pitching stats for pitcher player cards
+query GetDraftPitchingStats($limit: Int, $minGames: Int) {
+  careerPitchingStats(limit: $limit, minGames: $minGames) {
+    playerId
+    wins
+    losses
+    era
+    games
+    gamesStarted
+    strikeouts
+    saves
+    earnedRuns
+    baseOnBalls
+    outsRecorded
+    winPercentage
+    hits
+  }
+}
+
+# Server-computed draft pick recommendations (LS-467)
+# Refetch after each pick to keep suggestions current.
+query GetDraftRecommendations($draftId: Int!, $teamId: Int!) {
+  getDraftRecommendations(draftId: $draftId, teamId: $teamId) {
+    playerId
+    playerName
+    position
+    score
+    reason
+    topStats {
+      label
+      value
+    }
+  }
+}
+
+mutation InitializeMockDraft(
+  $numTeams: Int!
+  $rosterSize: Int!
+  $userPickPosition: Int!
+  $pickTimeLimitSeconds: Int
+) {
+  initializeMockDraft(
+    numTeams: $numTeams
+    rosterSize: $rosterSize
+    userPickPosition: $userPickPosition
+    pickTimeLimitSeconds: $pickTimeLimitSeconds
+  ) {
+    leagueId
+    draftId
+  }
+}

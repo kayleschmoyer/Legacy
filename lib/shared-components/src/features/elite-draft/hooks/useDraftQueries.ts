@@ -201,13 +201,13 @@ export function useDraftQueries({
         )
         .map((p) => ({
           id: String(p.id),
-          draftId: p.draftId!,
-          round: p.round!,
-          pickNumber: p.pickNumber!,
-          overallPick: p.overallPick!,
-          pickedAt: p.pickedAt!,
-          teamId: p.teamId!,
-          playerId: p.playerId!,
+          draftId: p.draftId as number,
+          round: p.round as number,
+          pickNumber: p.pickNumber as number,
+          overallPick: p.overallPick as number,
+          pickedAt: p.pickedAt as string,
+          teamId: p.teamId as number,
+          playerId: p.playerId as number,
           player:
             p.player?.id != null
               ? {
@@ -427,7 +427,10 @@ export function useDraftQueries({
     skip: !draftId || isAuctionDraft,
     fetchPolicy: 'cache-and-network',
   });
-  const queueEntries = queueData?.getMyDraftQueue ?? [];
+  const queueEntries = useMemo(
+    () => queueData?.getMyDraftQueue ?? [],
+    [queueData],
+  );
   const queuedPlayerIds = useMemo(
     () => new Set(queueEntries.map((e) => e.playerId ?? e.player?.id ?? 0)),
     [queueEntries],

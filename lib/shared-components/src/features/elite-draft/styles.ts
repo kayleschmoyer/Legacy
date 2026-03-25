@@ -2,7 +2,8 @@
 // Component-scoped CSS for EliteDraftBoard
 // ---------------------------------------------------------------------------
 
-import { NAV_HEIGHT_PX, NAV_Z_INDEX } from '../../constants/dimensions';
+const NAV_HEIGHT_PX = 75;
+const NAV_Z_INDEX = 200;
 
 export const CSS = `
 /* ===== Custom Properties (aligned with Legacy Sports theme) ===== */

@@ -19,6 +19,8 @@ export const TIMER_RADIUS = 50;
 export const TIMER_CIRCUMFERENCE = 2 * Math.PI * TIMER_RADIUS;
 export const DEFAULT_PICK_TIME = 120; // matches server default
 
+export const DEFAULT_NUM_TEAMS = 12;
+
 export const CONFETTI_COLORS = [
   '#C5A55A',
   '#22C55E',

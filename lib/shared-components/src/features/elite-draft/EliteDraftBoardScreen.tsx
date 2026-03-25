@@ -1,6 +1,4 @@
 import React, { useMemo } from 'react';
-import { useAuth } from '@legacy-sports/shared-components';
-import { useNavigate, useParams } from 'react-router-dom';
 import { CSS } from './styles';
 import { DraftCompleteView } from './DraftCompleteView';
 import { DraftPlayerBoard } from './DraftPlayerBoard';
@@ -25,12 +23,27 @@ import {
   usePlayerData,
 } from './hooks';
 import { DraftChatOverlay } from './DraftChatOverlay';
-import { DEFAULT_NUM_TEAMS } from '../../constants/league';
+import { DEFAULT_NUM_TEAMS } from './constants';
+import type { DraftChatRenderer } from './DraftChatOverlay';
+import { useAuth } from '../../features/auth';
 
-export function EliteDraftBoardScreen(): React.JSX.Element {
-  const { id: leagueIdParam } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const leagueId = leagueIdParam ? parseInt(leagueIdParam, 10) : null;
+export interface EliteDraftBoardScreenProps {
+  /** League ID to load (replaces route param). */
+  leagueId: number | null;
+  /** Navigation callback (replaces react-router useNavigate). */
+  onNavigate: (path: string) => void;
+  /** WebSocket URL for live draft updates. */
+  websocketUrl: string;
+  /** Optional render prop for the chat overlay. If omitted, chat is disabled. */
+  renderChat?: DraftChatRenderer;
+}
+
+export function EliteDraftBoardScreen({
+  leagueId,
+  onNavigate,
+  websocketUrl,
+  renderChat,
+}: EliteDraftBoardScreenProps): React.JSX.Element {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
   const isPremium = user?.accessLevel === 'admin';
@@ -113,6 +126,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
     refetchPickHistory: queries.refetchPickHistory,
     refetchAvailablePlayers: queries.refetchAvailablePlayers,
     refetchQueue: queries.refetchQueue,
+    websocketUrl,
   });
 
   const { timeRemaining } = useDraftTimer({
@@ -193,7 +207,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
   const filteredPlayers = playerData.enrichedPlayers;
 
   // ---- Early returns for special states ----
-  if (!leagueId) return <NoLeagueScreen navigate={navigate} />;
+  if (!leagueId) return <NoLeagueScreen onNavigate={onNavigate} />;
 
   if (
     (queries.leagueLoading || queries.availablePlayersLoading) &&
@@ -220,7 +234,10 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         e.extensions?.['code'] === 'FORBIDDEN',
     );
     return (
-      <LeagueErrorScreen isUnauthorized={isUnauthorized} navigate={navigate} />
+      <LeagueErrorScreen
+        isUnauthorized={isUnauthorized}
+        onNavigate={onNavigate}
+      />
     );
   }
 
@@ -253,7 +270,7 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         myTeamPicks={playerData.myTeamPicks}
         leagueTeams={queries.leagueTeams}
         statsLookup={playerData.statsLookup}
-        navigate={navigate}
+        onNavigate={onNavigate}
       />
     );
   }
@@ -470,12 +487,13 @@ export function EliteDraftBoardScreen(): React.JSX.Element {
         {ui.urgentMessage}
       </div>
 
-      {ui.chatOpen && leagueId !== null && (
+      {ui.chatOpen && leagueId !== null && renderChat && (
         <DraftChatOverlay
           leagueId={leagueId}
           userId={userId}
           leagueTeams={queries.leagueTeams}
           onClose={() => ui.setChatOpen(false)}
+          renderChat={renderChat}
         />
       )}
     </div>

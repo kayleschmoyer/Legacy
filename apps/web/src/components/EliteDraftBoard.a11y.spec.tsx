@@ -13,6 +13,25 @@ jest.mock('../features/baseball/LeagueChatTab', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// EliteDraftBoardScreen (in shared-components) calls useAuth() internally via
+// a relative import.  Mock the auth barrel so the component gets a fake user
+// without requiring a full AuthProvider tree.
+// ---------------------------------------------------------------------------
+jest.mock('../../../../lib/shared-components/src/features/auth', () => ({
+  useAuth: () => ({
+    isAuthenticated: true,
+    isLoading: false,
+    user: {
+      id: 1,
+      username: 'testuser',
+      email: 'test@test.com',
+      accessLevel: 'user',
+    },
+    logout: jest.fn(),
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // Apollo mock — every useQuery returns all possible top-level fields so the
 // component finds the data it needs regardless of which query document was
 // passed.  useMutation returns a no-op callable.

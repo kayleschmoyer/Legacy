@@ -37,7 +37,7 @@ import {
   GREEN,
   RED,
   withAlpha,
-} from '../../../constants/colors';
+} from '../../../utils/colors';
 
 // ---------------------------------------------------------------------------
 // Countdown timer hook — counts down to a deadline ISO string

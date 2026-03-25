@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
 } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   type DraftCompletedNotification,
   type DraftPausedNotification,
@@ -17,11 +18,9 @@ import {
   type UserLeftNotification,
   type UserListNotification,
   useWebSocket,
-} from '@legacy-sports/shared-components';
-import { LOGGER } from '@legacy-sports/logging';
+} from '../../../hooks/useWebSocket';
 import type { AvailableDraftPlayer, DraftPlayer } from '../types';
 import { normalizeTeamId } from '../utils';
-import { env } from '../../../config/environment';
 
 interface UseDraftWebSocketParams {
   leagueId: number | null;
@@ -54,6 +53,7 @@ interface UseDraftWebSocketParams {
   refetchPickHistory: () => unknown;
   refetchAvailablePlayers: () => unknown;
   refetchQueue: () => Promise<unknown>;
+  websocketUrl: string;
 }
 
 export function useDraftWebSocket({
@@ -80,6 +80,7 @@ export function useDraftWebSocket({
   refetchPickHistory,
   refetchAvailablePlayers,
   refetchQueue,
+  websocketUrl,
 }: UseDraftWebSocketParams) {
   const handleDraftStarted = useCallback(
     (notification: DraftStartedNotification) => {
@@ -290,7 +291,7 @@ export function useDraftWebSocket({
   );
 
   const { connected: wsConnected } = useWebSocket({
-    url: env.websocketUrl,
+    url: websocketUrl,
     leagueId: leagueId ?? undefined,
     viewContext: 'league',
     autoConnect: !!leagueId && isAuthenticated && !isAuctionDraft,

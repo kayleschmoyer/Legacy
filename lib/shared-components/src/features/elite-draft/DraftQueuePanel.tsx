@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import {
   GetMyDraftQueue as GET_MY_DRAFT_QUEUE,
@@ -38,7 +38,7 @@ export function DraftQueuePanel({
     },
   );
 
-  const entries = data?.getMyDraftQueue ?? [];
+  const entries = useMemo(() => data?.getMyDraftQueue ?? [], [data]);
 
   const [removeFromQueue, { loading: removing }] = useMutation(
     REMOVE_FROM_DRAFT_QUEUE,

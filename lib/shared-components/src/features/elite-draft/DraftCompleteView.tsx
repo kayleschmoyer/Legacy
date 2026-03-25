@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import type { NavigateFunction } from 'react-router-dom';
 import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { CSS } from './styles';
 import { BaseballCard } from './BaseballCard';
@@ -13,7 +12,7 @@ interface DraftCompleteViewProps {
   myTeamPicks: DraftPickRecord[];
   leagueTeams: LeagueTeam[];
   statsLookup: Map<number, DraftPlayer>;
-  navigate: NavigateFunction;
+  onNavigate: (path: string) => void;
 }
 
 export function DraftCompleteView({
@@ -25,7 +24,7 @@ export function DraftCompleteView({
   myTeamPicks,
   leagueTeams,
   statsLookup,
-  navigate,
+  onNavigate,
 }: DraftCompleteViewProps): React.JSX.Element {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(
     myTeamId !== null ? String(myTeamId) : null,
@@ -104,14 +103,14 @@ export function DraftCompleteView({
           >
             <button
               className="d-state-btn"
-              onClick={() => navigate(`/baseball/league/${leagueId}/roster`)}
+              onClick={() => onNavigate(`/baseball/league/${leagueId}/roster`)}
             >
               Set My Lineup
             </button>
             <button
               className="d-state-btn"
               style={{ background: 'rgba(255,255,255,0.1)' }}
-              onClick={() => navigate(`/baseball/league/${leagueId}`)}
+              onClick={() => onNavigate(`/baseball/league/${leagueId}`)}
             >
               Back to League
             </button>
@@ -131,14 +130,14 @@ export function DraftCompleteView({
           >
             <button
               className="d-state-btn"
-              onClick={() => navigate('/baseball/mock-draft')}
+              onClick={() => onNavigate('/baseball/mock-draft')}
             >
               Practice Again
             </button>
             <button
               className="d-state-btn"
               style={{ background: 'rgba(255,255,255,0.1)' }}
-              onClick={() => navigate('/baseball')}
+              onClick={() => onNavigate('/baseball')}
             >
               Go to My Leagues
             </button>

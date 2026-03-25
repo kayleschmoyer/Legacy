@@ -1,12 +1,20 @@
 import React from 'react';
 import type { LeagueTeam } from './types';
-import { LeagueChatTab } from '../../features/baseball/LeagueChatTab';
+
+export interface DraftChatProps {
+  leagueId: number;
+  userId: number;
+  mentionableTeams: Array<{ id: number; name: string }>;
+}
+
+export type DraftChatRenderer = (props: DraftChatProps) => React.ReactNode;
 
 interface DraftChatOverlayProps {
   leagueId: number;
   userId: number;
   leagueTeams: LeagueTeam[];
   onClose: () => void;
+  renderChat: DraftChatRenderer;
 }
 
 export function DraftChatOverlay({
@@ -14,6 +22,7 @@ export function DraftChatOverlay({
   userId,
   leagueTeams,
   onClose,
+  renderChat,
 }: DraftChatOverlayProps): React.JSX.Element {
   return (
     <div
@@ -62,14 +71,14 @@ export function DraftChatOverlay({
           flexDirection: 'column',
         }}
       >
-        <LeagueChatTab
-          leagueId={leagueId}
-          userId={userId}
-          mentionableTeams={leagueTeams.map((t) => ({
+        {renderChat({
+          leagueId,
+          userId,
+          mentionableTeams: leagueTeams.map((t) => ({
             id: parseInt(t.id, 10),
             name: t.name,
-          }))}
-        />
+          })),
+        })}
       </div>
     </div>
   );

@@ -182,3 +182,6 @@ export * from './components/BannerPicker';
 
 // Heritage Line icon system
 export * from './components/icons';
+
+// Elite Draft Board (promoted from web)
+export * from './features/elite-draft';
