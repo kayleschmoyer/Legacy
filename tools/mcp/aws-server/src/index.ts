@@ -1,7 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
+import { ssmGet } from './tools/ssm-get.js';
 import { ssoStatus } from './tools/sso-status.js';
 
 const server = new McpServer({
@@ -26,6 +28,48 @@ server.tool(
       .describe('AWS environment (default: dev)'),
   },
   async (params) => logsTail(params),
+);
+
+// --- aws_lambda_status ---
+server.tool(
+  'aws_lambda_status',
+  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found.',
+  {
+    function: z
+      .string()
+      .describe(
+        'Lambda short name (e.g. "graphql", "rollbar-discord"). Expanded to legacy-sports-{env}-{name}.',
+      ),
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe('AWS environment (default: dev)'),
+  },
+  async (params) => lambdaStatus(params),
+);
+
+// --- aws_ssm_get ---
+server.tool(
+  'aws_ssm_get',
+  'Get SSM parameter(s). Tries exact match first, then path prefix. Useful for checking deploy versions.',
+  {
+    name: z
+      .string()
+      .describe(
+        'Parameter name or path. Absolute paths (starting with /) used as-is; relative paths expanded to /legacy-sports/{env}/{name}.',
+      ),
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe('AWS environment (default: dev)'),
+    decrypt: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Decrypt SecureString values (default: false). When false, SecureString values are redacted.',
+      ),
+  },
+  async (params) => ssmGet(params),
 );
 
 // --- aws_sso_status ---
