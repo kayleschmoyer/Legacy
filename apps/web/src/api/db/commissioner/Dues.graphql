@@ -1,0 +1,28 @@
+# ── League Dues ──────────────────────────────────────────────────────────────
+
+fragment DuesSettings on LeagueDuesSettings {
+  id
+  leagueId
+  enabled
+  amountCents
+  reminderEnabled
+  reminderDayOfWeek
+  createdAt
+  updatedAt
+}
+
+# ── Queries ────────────────────────────────────────────────────────────────
+
+query GetLeagueDuesSettings($leagueId: Int!) {
+  leagueDuesSettings(leagueId: $leagueId) {
+    ...DuesSettings
+  }
+}
+
+# ── Mutations ──────────────────────────────────────────────────────────────
+
+mutation UpdateDuesSettings($input: UpdateDuesSettingsInput!) {
+  updateDuesSettings(input: $input) {
+    ...DuesSettings
+  }
+}

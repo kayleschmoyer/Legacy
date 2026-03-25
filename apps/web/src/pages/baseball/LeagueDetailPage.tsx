@@ -121,6 +121,7 @@ import { LeagueBrandingControl } from '../../components/commissioner/LeagueBrand
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
 import { TiebreakerConfig } from '../../components/league/TiebreakerConfig';
 import { SeasonAwardsControl } from '../../components/commissioner/SeasonAwardsControl';
+import { LeagueDuesControl } from '../../components/commissioner/LeagueDuesControl';
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
 import {
@@ -3251,6 +3252,19 @@ export function LeagueDetailPage(): React.JSX.Element {
             currentPlayoffEnabled={league.playoffEnabled ?? true}
             currentPlayoffFormat={league.playoffFormat ?? '4-team'}
             currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
+            onSuccess={showMatchupSuccess}
+            onError={(err) => {
+              setMatchupErrorMessage(err.message);
+            }}
+          />
+        ),
+      },
+      {
+        id: 'league-dues',
+        title: 'League Dues',
+        content: (
+          <LeagueDuesControl
+            leagueId={leagueId}
             onSuccess={showMatchupSuccess}
             onError={(err) => {
               setMatchupErrorMessage(err.message);
