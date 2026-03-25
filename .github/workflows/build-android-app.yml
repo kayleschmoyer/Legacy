@@ -109,6 +109,11 @@ jobs:
             apps/app/app.json
             pnpm-lock.yaml
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-${{ env.ANDROID_API_LEVEL }} build-tools;${{ env.ANDROID_API_LEVEL }}.0.0 ndk;${{ env.NDK_VERSION }}"
+
       - name: Build Android APK
         id: build
         uses: ./.github/actions/build-android
