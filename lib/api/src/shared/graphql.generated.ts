@@ -1244,6 +1244,8 @@ export type Mutation = {
   setDraftOrder?: Maybe<Draft>;
   /** Replace the current user's draft queue for a draft. The order of playerIds defines pick priority (index 0 = first pick). Pass an empty array to clear. */
   setDraftQueue?: Maybe<Array<DraftQueueEntry>>;
+  /** Set or clear a custom nickname for a player on your roster. Pass null or empty string to remove the nickname. */
+  setNickname?: Maybe<TeamMember>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
@@ -1671,6 +1673,11 @@ export type MutationSetDraftOrderArgs = {
 export type MutationSetDraftQueueArgs = {
   draftId: Scalars['Int']['input'];
   playerIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationSetNicknameArgs = {
+  nickname?: InputMaybe<Scalars['String']['input']>;
+  teamMemberId: Scalars['Int']['input'];
 };
 
 export type MutationSetTeamLockArgs = {
@@ -2980,8 +2987,6 @@ export type SeasonPitching = {
   baseOnBalls?: Maybe<Scalars['Int']['output']>;
   basesOnBallsPerNine?: Maybe<Scalars['Float']['output']>;
   battersFaced?: Maybe<Scalars['Int']['output']>;
-  /** Baseball Reference WAR (bWAR) for this season */
-  bwar?: Maybe<Scalars['Float']['output']>;
   completeGames?: Maybe<Scalars['Int']['output']>;
   earnedRunAverage?: Maybe<Scalars['String']['output']>;
   earnedRunAveragePlus?: Maybe<Scalars['Float']['output']>;
@@ -3001,6 +3006,8 @@ export type SeasonPitching = {
   losses?: Maybe<Scalars['Int']['output']>;
   outsRecorded?: Maybe<Scalars['Int']['output']>;
   playerId?: Maybe<Scalars['Int']['output']>;
+  /** Baseball Reference pitching WAR for this season (distinct from position-player bWAR) */
+  pwar?: Maybe<Scalars['Float']['output']>;
   rowId?: Maybe<Scalars['String']['output']>;
   runs?: Maybe<Scalars['Int']['output']>;
   saves?: Maybe<Scalars['Int']['output']>;
@@ -3128,6 +3135,8 @@ export type TeamMember = {
   askingPrice?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** Optional custom nickname for this player on this roster. (LS-1813) */
+  nickname?: Maybe<Scalars['String']['output']>;
   onTradeBlock?: Maybe<Scalars['Boolean']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;

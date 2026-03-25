@@ -718,7 +718,7 @@ export const SeasonPitchingRef = builder.objectRef<{
   strikeoutsPerNine: number | null;
   strikeoutsPerBaseOnBalls: number | null;
   awardSummary: string | null;
-  bwar: number | null;
+  pwar: number | null;
   outsRecorded: number | null;
 }>('SeasonPitching');
 
@@ -764,9 +764,10 @@ SeasonPitchingRef.implement({
       nullable: true,
     }),
     awardSummary: t.exposeString('awardSummary', { nullable: true }),
-    bwar: t.exposeFloat('bwar', {
+    pwar: t.exposeFloat('pwar', {
       nullable: true,
-      description: 'Baseball Reference WAR (bWAR) for this season',
+      description:
+        'Baseball Reference pitching WAR for this season (distinct from position-player bWAR)',
     }),
     outsRecorded: t.exposeInt('outsRecorded', { nullable: true }),
     // Computed statistics

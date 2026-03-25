@@ -2759,11 +2759,6 @@ type SeasonPitching {
   baseOnBalls: Int
   basesOnBallsPerNine: Float
   battersFaced: Int
-
-  """
-  Baseball Reference WAR (bWAR) for this season
-  """
-  bwar: Float
   completeGames: Int
   earnedRunAverage: String
   earnedRunAveragePlus: Float
@@ -2783,6 +2778,11 @@ type SeasonPitching {
   losses: Int
   outsRecorded: Int
   playerId: Int
+
+  """
+  Baseball Reference pitching WAR for this season (distinct from position-player bWAR)
+  """
+  pwar: Float
   rowId: String
   runs: Int
   saves: Int

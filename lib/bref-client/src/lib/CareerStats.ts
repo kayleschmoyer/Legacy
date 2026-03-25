@@ -104,7 +104,7 @@ const StatMapping: Record<
   P_BB_PER_NINE: 'basesOnBallsPerNine',
   P_SO_PER_NINE: 'strikeoutsPerNine',
   P_STRIKEOUTS_PER_BASE_ON_BALLS: 'strikeoutsPerBaseOnBalls',
-  P_WAR: 'bwar',
+  P_WAR: 'pwar',
 
   // Legacy mappings (keeping for backwards compatibility)
   '2B': 'doubles',
@@ -174,7 +174,7 @@ const StatMapping: Record<
   W: 'w',
   WHIP: 'whip',
   WAR_BAT: 'bwar',
-  WAR_PITCH: 'bwar',
+  WAR_PITCH: 'pwar',
   WIN_LOSS_PERC: 'winLossPerc',
   WP: 'wp',
 };

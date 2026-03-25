@@ -199,7 +199,7 @@ export const seasonPitching = pgTable(
     awardSummary: text('award_summary'),
     team: varchar('team', { length: 50 }).notNull(),
     lgId: varchar('lg_id', { length: 50 }),
-    bwar: doublePrecision('bwar'),
+    pwar: doublePrecision('pwar'),
     outsRecorded: integer('outs_recorded').generatedAlwaysAs(
       sql`((floor(ip) * (3)::double precision) + ((ip - floor(ip)) * (10)::double precision))`,
     ),
