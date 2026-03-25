@@ -298,6 +298,8 @@ test.describe
       const playerRows = dialog
         .getByRole('button')
         .filter({ hasText: /\w+ \w+/ });
+      // Wait for at least one player button to render (async query)
+      await expect(playerRows.first()).toBeVisible({ timeout: 15_000 });
       const count = await playerRows.count();
       for (let i = 0; i < count; i++) {
         const text = await playerRows.nth(i).innerText();
@@ -342,7 +344,12 @@ test.describe
       const msgInput = dialog.getByPlaceholder(
         /Add a message to your trade offer/i,
       );
-      if (await msgInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      if (
+        await msgInput
+          .waitFor({ state: 'visible', timeout: 2_000 })
+          .then(() => true)
+          .catch(() => false)
+      ) {
         await msgInput.fill('Activity feed test trade');
       }
 
@@ -369,7 +376,12 @@ test.describe
 
       // Handle confirmation dialog if present
       const confirmBtn = page.getByRole('button', { name: /Confirm/i });
-      if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      if (
+        await confirmBtn
+          .waitFor({ state: 'visible', timeout: 3_000 })
+          .then(() => true)
+          .catch(() => false)
+      ) {
         await confirmBtn.click();
       }
 
