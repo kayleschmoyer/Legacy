@@ -350,7 +350,7 @@ describe('checkPlayersNotLocked', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('resolves when league has no active matchup', async () => {
+  it('resolves when league has no active matchup and no currentWeek', async () => {
     const memberRows = [{ id: 1, teamId: 10, leagueId: 2, playerId: 50 }];
     let selectCall = 0;
     const select = jest.fn(() => {
@@ -361,8 +361,10 @@ describe('checkPlayersNotLocked', () => {
         const from = jest.fn(() => ({ where }));
         return { from };
       }
-      // league query — no current matchup
-      const limit = jest.fn().mockResolvedValue([{ currentMatchup: null }]);
+      // league query — no currentWeek, no current matchup
+      const limit = jest
+        .fn()
+        .mockResolvedValue([{ currentWeek: null, currentMatchup: null }]);
       const where = jest.fn(() => ({ limit }));
       const from = jest.fn(() => ({ where }));
       return { from };
@@ -372,6 +374,87 @@ describe('checkPlayersNotLocked', () => {
     await expect(
       checkPlayersNotLocked(db as never, [1]),
     ).resolves.toBeUndefined();
+  });
+
+  it('uses currentWeek directly when available (LS-1592)', async () => {
+    const memberRows = [{ id: 1, teamId: 10, leagueId: 2, playerId: 50 }];
+    let selectCall = 0;
+    const select = jest.fn(() => {
+      selectCall++;
+      if (selectCall === 1) {
+        // getTeamMemberInfo
+        const where = jest.fn().mockResolvedValue(memberRows);
+        return { from: jest.fn(() => ({ where })) };
+      }
+      if (selectCall === 2) {
+        // League query — currentWeek is set (should NOT need refMatchup lookup)
+        const limit = jest
+          .fn()
+          .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
+        return {
+          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+        };
+      }
+      // locked count query — no game selections for current week
+      const where = jest.fn(() => ({
+        then: jest.fn((resolve: (v: unknown) => void) => resolve([{ cnt: 0 }])),
+      }));
+      const innerJoin = jest.fn().mockReturnThis();
+      const from = jest.fn(() => ({ where, innerJoin }));
+      return { from };
+    });
+    const db = { select };
+
+    // Should resolve without error — skips the refMatchup lookup entirely
+    await expect(
+      checkPlayersNotLocked(db as never, [1]),
+    ).resolves.toBeUndefined();
+    // Only 3 select calls: getTeamMemberInfo, league, locked count
+    // (no refMatchup call because currentWeek was set)
+    expect(selectCall).toBe(3);
+  });
+
+  it('falls back to currentMatchup FK when currentWeek is null', async () => {
+    const memberRows = [{ id: 1, teamId: 10, leagueId: 2, playerId: 50 }];
+    let selectCall = 0;
+    const select = jest.fn(() => {
+      selectCall++;
+      if (selectCall === 1) {
+        // getTeamMemberInfo
+        const where = jest.fn().mockResolvedValue(memberRows);
+        return { from: jest.fn(() => ({ where })) };
+      }
+      if (selectCall === 2) {
+        // League query — currentWeek is null, falls back to currentMatchup
+        const limit = jest
+          .fn()
+          .mockResolvedValue([{ currentWeek: null, currentMatchup: 42 }]);
+        return {
+          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+        };
+      }
+      if (selectCall === 3) {
+        // refMatchup week number (legacy fallback)
+        const limit = jest.fn().mockResolvedValue([{ weekNumber: 5 }]);
+        return {
+          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+        };
+      }
+      // locked count query
+      const where = jest.fn(() => ({
+        then: jest.fn((resolve: (v: unknown) => void) => resolve([{ cnt: 0 }])),
+      }));
+      const innerJoin = jest.fn().mockReturnThis();
+      const from = jest.fn(() => ({ where, innerJoin }));
+      return { from };
+    });
+    const db = { select };
+
+    await expect(
+      checkPlayersNotLocked(db as never, [1]),
+    ).resolves.toBeUndefined();
+    // 4 select calls: getTeamMemberInfo, league, refMatchup, locked count
+    expect(selectCall).toBe(4);
   });
 
   it('throws when a player is locked (game selections exist)', async () => {
@@ -385,14 +468,13 @@ describe('checkPlayersNotLocked', () => {
         return { from: jest.fn(() => ({ where })) };
       }
       if (selectCall === 2) {
-        // League current matchup
-        const limit = jest.fn().mockResolvedValue([{ currentMatchup: 42 }]);
-        return { from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })) };
-      }
-      if (selectCall === 3) {
-        // refMatchup week number
-        const limit = jest.fn().mockResolvedValue([{ weekNumber: 5 }]);
-        return { from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })) };
+        // League query — currentWeek is set
+        const limit = jest
+          .fn()
+          .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
+        return {
+          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+        };
       }
       // locked count query
       const where = jest.fn(() => ({
@@ -611,15 +693,10 @@ describe('authorized() wrapper', () => {
           return { from: jest.fn(() => ({ where })) };
         }
         if (selectCall === 4) {
-          // checkPlayersNotLocked → league current matchup
-          const limit = jest.fn().mockResolvedValue([{ currentMatchup: 42 }]);
-          return {
-            from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
-          };
-        }
-        if (selectCall === 5) {
-          // checkPlayersNotLocked → refMatchup week number
-          const limit = jest.fn().mockResolvedValue([{ weekNumber: 5 }]);
+          // checkPlayersNotLocked → league currentWeek + currentMatchup
+          const limit = jest
+            .fn()
+            .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
           return {
             from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
           };

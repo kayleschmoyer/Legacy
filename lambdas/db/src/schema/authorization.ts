@@ -381,27 +381,38 @@ export async function checkPlayersNotLocked(
   const members = await getTeamMemberInfo(db, teamMemberIds);
   if (members.length === 0) return;
 
-  // Get the current matchup for the league
+  // Get the current week for the league.
+  // Prefer the authoritative `currentWeek` column; fall back to resolving
+  // via the legacy `currentMatchup` FK (LS-1592).
   const leagueId = members[0].leagueId;
   const leagueRows = await db
-    .select({ currentMatchup: PublicSchema.leagues.currentMatchup })
+    .select({
+      currentWeek: PublicSchema.leagues.currentWeek,
+      currentMatchup: PublicSchema.leagues.currentMatchup,
+    })
     .from(PublicSchema.leagues)
     .where(eq(PublicSchema.leagues.id, leagueId))
     .limit(1);
 
-  const currentMatchupId = leagueRows[0]?.currentMatchup;
-  if (!currentMatchupId) return; // No active matchup — nothing is locked
+  const leagueRow = leagueRows[0];
+  if (!leagueRow) return;
 
-  // The `currentMatchup` column points to a single matchup row, but each
-  // week may have multiple matchups (round-robin).  Find the week number
-  // first, then check each player against that week's matchups.
-  const refMatchup = await db
-    .select({ weekNumber: PublicSchema.matchups.weekNumber })
-    .from(PublicSchema.matchups)
-    .where(eq(PublicSchema.matchups.id, currentMatchupId))
-    .limit(1);
+  let weekNumber: number | null = leagueRow.currentWeek ?? null;
 
-  const weekNumber = refMatchup[0]?.weekNumber;
+  if (weekNumber == null) {
+    // Fall back to legacy currentMatchup FK
+    const currentMatchupId = leagueRow.currentMatchup;
+    if (!currentMatchupId) return; // No active matchup — nothing is locked
+
+    const refMatchup = await db
+      .select({ weekNumber: PublicSchema.matchups.weekNumber })
+      .from(PublicSchema.matchups)
+      .where(eq(PublicSchema.matchups.id, currentMatchupId))
+      .limit(1);
+
+    weekNumber = refMatchup[0]?.weekNumber ?? null;
+  }
+
   if (weekNumber == null) return;
 
   for (const member of members) {

@@ -37,22 +37,35 @@ async function syncCurrentMatchupPositions(
 ): Promise<void> {
   if (changes.length === 0) return;
 
-  // 1. Find the current active matchup pointer for the league
+  // 1. Find the current week for the league.
+  //    Prefer the authoritative `currentWeek` column; fall back to resolving
+  //    via the legacy `currentMatchup` FK (LS-1592).
   const leagueRows = await db
-    .select({ currentMatchup: PublicSchema.leagues.currentMatchup })
+    .select({
+      currentWeek: PublicSchema.leagues.currentWeek,
+      currentMatchup: PublicSchema.leagues.currentMatchup,
+    })
     .from(PublicSchema.leagues)
     .where(eq(PublicSchema.leagues.id, leagueId))
     .limit(1);
-  const currentMatchupId = leagueRows[0]?.currentMatchup;
-  if (!currentMatchupId) return; // No active matchup — nothing to sync
+  const leagueRow = leagueRows[0];
+  if (!leagueRow) return;
 
-  // 2. Resolve the current week number from the reference matchup
-  const refMatchup = await db
-    .select({ weekNumber: PublicSchema.matchups.weekNumber })
-    .from(PublicSchema.matchups)
-    .where(eq(PublicSchema.matchups.id, currentMatchupId))
-    .limit(1);
-  const weekNumber = refMatchup[0]?.weekNumber;
+  let weekNumber: number | null = leagueRow.currentWeek ?? null;
+
+  if (weekNumber == null) {
+    // Fall back to legacy currentMatchup FK
+    const currentMatchupId = leagueRow.currentMatchup;
+    if (!currentMatchupId) return; // No active matchup — nothing to sync
+
+    const refMatchup = await db
+      .select({ weekNumber: PublicSchema.matchups.weekNumber })
+      .from(PublicSchema.matchups)
+      .where(eq(PublicSchema.matchups.id, currentMatchupId))
+      .limit(1);
+    weekNumber = refMatchup[0]?.weekNumber ?? null;
+  }
+
   if (weekNumber == null) return;
 
   // 3. Load all matchups for this league at or after the current week
