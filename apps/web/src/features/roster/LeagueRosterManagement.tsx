@@ -1473,10 +1473,7 @@ export function LeagueRosterManagement({
     Boolean(getAssignedPlayer(p)),
   ).length;
   const emptyCount = positions.length - filledCount;
-  const totalBench =
-    benchFielders.length +
-    dualEligiblePlayers.length +
-    unclassifiedPlayers.length;
+  const totalBench = benchFielders.length + unclassifiedPlayers.length;
   const totalBullpen = bullpenPlayers.length + dualEligiblePlayers.length;
 
   // In read-only mode, use a no-op for player selection
@@ -1762,11 +1759,7 @@ export function LeagueRosterManagement({
             />
 
             <BenchPanel
-              players={[
-                ...benchFielders,
-                ...dualEligiblePlayers,
-                ...unclassifiedPlayers,
-              ]}
+              players={[...benchFielders, ...unclassifiedPlayers]}
               selectedPlayer={readOnly ? null : selectedPlayer}
               onPlayerSelect={handlePlayerSelect}
               onBench={readOnly ? undefined : handleBenchPlayer}
