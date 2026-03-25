@@ -115,6 +115,24 @@ This skill delegates to specialized sub-skills for each operation category. Load
 - **Use MCP tools over raw `gh` commands** — the MCP servers handle error formatting and retries
 - **Always produce an actionable report** — flag items that need a local agent or human developer
 
+### MCP Fallback Protocol
+
+When an MCP tool fails, **do not assume the entire server is down**. Different tools have different permission requirements — one tool failing does not mean all tools on that server are broken.
+
+**Before falling back to `gh` CLI:**
+
+1. **Test another tool on the same server** — e.g., if `github_pr_scan` fails, try `github_list_prs`. If a simpler tool works, only the failing tool has an issue.
+2. **Distinguish GitHub auth failures, scope failures, and MCP outages:**
+   - **GitHub auth/permissions failure** (401/403 on all GitHub MCP tools) → credentials or scopes are invalid. Use `github_auth_status` first; if needed, confirm with `gh auth status`. Fix auth or scopes rather than switching tools — raw `gh` will hit the same GitHub errors.
+   - **Scope/permission failure on a specific tool** (403 on one tool while others on the same server work) → that tool's query or operation needs broader scopes. Continue using the server for everything else and fall back to simpler tools (`github_list_prs` + `github_view_pr`, etc.) for the failing operation.
+   - **MCP server / transport failure** (connection errors, 5xx from the MCP layer, or multiple tools timing out) → treat as an MCP availability problem. In this case only, fall back to raw `gh` CLI for critical GitHub operations until the MCP server recovers.
+3. **Check other MCP servers independently** — a GitHub MCP failure does not affect CI MCP tools. Always use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs` for CI operations regardless of GitHub MCP status.
+
+**Known scope-sensitive tools:**
+
+- `github_pr_scan` uses a heavier GraphQL query (including `mergeable` and other enriched fields) that may fail with `Resource not accessible by integration` on tokens with limited scopes, while simpler tools (`github_list_prs`, `github_request_review`) often continue to work. Note that `github_view_pr` also queries `statusCheckRollup` and may share similar scope limitations, so it is not a guaranteed fallback when `github_pr_scan` fails due to permissions.
+- `github_pr_dashboard` and `github_pr_batch_status` also use enriched queries — fall back to `github_list_prs` + individual `github_view_pr` if they fail
+
 ---
 
 # Local Agent Workflow
