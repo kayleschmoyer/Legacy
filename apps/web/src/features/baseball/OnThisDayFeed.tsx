@@ -15,7 +15,10 @@ import {
   TrendingUp,
   Zap,
 } from '@tamagui/lucide-icons';
-import { cleanDescription } from '@legacy-sports/utils';
+import {
+  cleanDescription,
+  extractPlayerNameFromDescription,
+} from '@legacy-sports/utils';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -389,6 +392,9 @@ export function OnThisDayFeed(): React.JSX.Element {
               event.eventType === 'TR'
                 ? BRAND_SEAM_RED_LIGHT
                 : BRAND_GOLD_LIGHT;
+            const displayName =
+              event.playerName ||
+              extractPlayerNameFromDescription(event.description ?? '');
 
             const description = (() => {
               let desc = cleanDescription(event.description ?? '');
@@ -436,14 +442,14 @@ export function OnThisDayFeed(): React.JSX.Element {
 
                   <YStack flex={1} gap="$0.5" minWidth={0}>
                     <XStack alignItems="center" gap="$2" flexWrap="wrap">
-                      {event.playerName && (
+                      {displayName && (
                         <Text
                           fontSize="$4"
                           fontWeight="700"
                           color="$color"
                           numberOfLines={1}
                         >
-                          {event.playerName}
+                          {displayName}
                         </Text>
                       )}
                       <StatBadge>

@@ -4,6 +4,7 @@ export {
   cryptoRandomInt,
   cryptoRandomFloat,
   cleanDescription,
+  extractPlayerNameFromDescription,
 } from './lib/utils';
 export * from './lib/ErrorHandling';
 export * from './lib/league-utils';

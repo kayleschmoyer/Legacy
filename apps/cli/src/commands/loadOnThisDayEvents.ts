@@ -23,7 +23,10 @@
  */
 
 import { LOGGER } from '@legacy-sports/logging';
-import { cleanDescription } from '@legacy-sports/utils';
+import {
+  cleanDescription,
+  extractPlayerNameFromDescription,
+} from '@legacy-sports/utils';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '@legacy-sports/db-client';
 import { sql } from 'drizzle-orm';
@@ -154,7 +157,9 @@ export async function handleLoadOnThisDayEvents(
 
           for (const tx of notable) {
             const mlbTransactionId = tx.id ?? null;
-            const playerName = tx.person?.fullName ?? null;
+            const playerName =
+              tx.person?.fullName ??
+              extractPlayerNameFromDescription(tx.description ?? '');
             const fromTeam = tx.fromTeam?.name ?? null;
             const toTeam = tx.toTeam?.name ?? null;
             const eventType = tx.typeCode ?? '';

@@ -56,3 +56,33 @@ export function shuffleArray<T>(array: T[]): T[] {
 export function cleanDescription(desc: string): string {
   return desc.replace(/(?:,\s*)+and\.\s*$/, '.');
 }
+
+// ─── Player name extraction ─────────────────────────────────────────────────
+
+/**
+ * Position abbreviations recognised in MLB transaction descriptions.
+ * Used by {@link extractPlayerNameFromDescription} to locate the player name
+ * that follows a position token.
+ */
+const POSITIONS = 'C|1B|2B|3B|SS|OF|LF|CF|RF|P|SP|RP|DH|IF|INF|UTIL|RHP|LHP';
+
+const PLAYER_NAME_RE = new RegExp(
+  `(?:traded|signed(?:\\s+free\\s+agent)?)\\s+(?:${POSITIONS})\\s+(.+?)(?:\\s+to\\s+|\\s+for\\s+|\\.|,|$)`,
+  'i',
+);
+
+/**
+ * Extract a player name from an MLB transaction description when the
+ * structured `person` / `playerName` field is missing.
+ *
+ * Common patterns:
+ *   "Team traded POS Name to …"
+ *   "Team signed free agent POS Name"
+ *
+ * Returns `null` when no name can be extracted.
+ */
+export function extractPlayerNameFromDescription(
+  description: string,
+): string | null {
+  return PLAYER_NAME_RE.exec(description)?.[1]?.trim() || null;
+}
