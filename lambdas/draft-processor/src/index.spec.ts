@@ -181,7 +181,7 @@ import { getDbOptions } from '@legacy-sports/utils/node';
 
 // ── Import under test ───────────────────────────────────────────────────────
 
-import { handler } from './index';
+import { buildBenchAssignments, handler } from './index';
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
@@ -363,5 +363,86 @@ describe('draft-processor handler', () => {
 
       expect(result.batchItemFailures).toHaveLength(1);
     });
+  });
+});
+
+// ── Bench assignment tests ────────────────────────────────────────────────
+
+describe('buildBenchAssignments', () => {
+  function makePlayer(id: number, isPitcher: boolean) {
+    return { id, isPitcher };
+  }
+
+  it('interleaves batters and pitchers across bench slots', () => {
+    // 4 batters (ids 1-4) and 4 pitchers (ids 11-14)
+    const players = [
+      makePlayer(1, false),
+      makePlayer(2, false),
+      makePlayer(3, false),
+      makePlayer(4, false),
+      makePlayer(11, true),
+      makePlayer(12, true),
+      makePlayer(13, true),
+      makePlayer(14, true),
+    ];
+    const teams = [{ id: 100 }];
+    const result = buildBenchAssignments(players, teams, 8, 1);
+
+    // With one team, interleaving means batter, pitcher, batter, pitcher, ...
+    const ids = result.map((a) => a.playerId);
+    expect(ids).toEqual([1, 11, 2, 12, 3, 13, 4, 14]);
+  });
+
+  it('uses snake-order so even-team-count benches are balanced', () => {
+    // 2 teams, 2 bench slots, 4 remaining players: B1, P1, B2, P2
+    const players = [
+      makePlayer(1, false), // batter
+      makePlayer(11, true), // pitcher
+      makePlayer(2, false), // batter
+      makePlayer(12, true), // pitcher
+    ];
+    const teams = [{ id: 100 }, { id: 200 }];
+    const result = buildBenchAssignments(players, teams, 2, 1);
+
+    // Round 0 (even): teams in order [100, 200]
+    //   100 gets player 1 (batter), 200 gets player 11 (pitcher)
+    // Round 1 (odd):  teams reversed [200, 100]
+    //   200 gets player 2 (batter), 100 gets player 12 (pitcher)
+    const team100 = result.filter((a) => a.teamId === 100);
+    const team200 = result.filter((a) => a.teamId === 200);
+
+    // Each team should have 1 batter and 1 pitcher
+    expect(team100.map((a) => a.playerId)).toEqual([1, 12]);
+    expect(team200.map((a) => a.playerId)).toEqual([11, 2]);
+  });
+
+  it('handles more teams than remaining players gracefully', () => {
+    const players = [makePlayer(1, false)];
+    const teams = [{ id: 100 }, { id: 200 }, { id: 300 }];
+    const result = buildBenchAssignments(players, teams, 1, 1);
+
+    // Only one player — only one assignment
+    expect(result).toHaveLength(1);
+    expect(result[0].teamId).toBe(100);
+    expect(result[0].playerId).toBe(1);
+    expect(result[0].positionId).toBeNull();
+  });
+
+  it('sets positionId to null and correct leagueId for all assignments', () => {
+    const players = [makePlayer(1, false), makePlayer(2, true)];
+    const teams = [{ id: 100 }];
+    const result = buildBenchAssignments(players, teams, 2, 42);
+
+    for (const a of result) {
+      expect(a.positionId).toBeNull();
+      expect(a.leagueId).toBe(42);
+    }
+  });
+
+  it('returns empty array when benchSlots is zero', () => {
+    const players = [makePlayer(1, false)];
+    const teams = [{ id: 100 }];
+    const result = buildBenchAssignments(players, teams, 0, 1);
+    expect(result).toEqual([]);
   });
 });

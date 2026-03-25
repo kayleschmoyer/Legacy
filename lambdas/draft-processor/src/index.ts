@@ -104,6 +104,55 @@ interface PlayerWithPositions {
 }
 
 /**
+ * Build an interleaved list of remaining players (alternating batters and pitchers)
+ * and assign them to bench slots using snake-order team traversal so each team
+ * gets a balanced mix of batters and pitchers on its bench.
+ *
+ * Exported for testability.
+ */
+export function buildBenchAssignments(
+  remainingPlayers: { id: number; isPitcher: boolean }[],
+  teams: { id: number }[],
+  benchSlots: number,
+  leagueId: number,
+): { teamId: number; leagueId: number; playerId: number; positionId: null }[] {
+  // Split by pitcher/batter and interleave to produce balanced benches
+  const batters = remainingPlayers.filter((p) => !p.isPitcher);
+  const pitchers = remainingPlayers.filter((p) => p.isPitcher);
+  const interleaved: { id: number; isPitcher: boolean }[] = [];
+  const maxLen = Math.max(batters.length, pitchers.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (i < batters.length) interleaved.push(batters[i]);
+    if (i < pitchers.length) interleaved.push(pitchers[i]);
+  }
+
+  // Snake-order: reverse team traversal on odd bench rounds so each team
+  // alternates between batter/pitcher picks across its bench slots.
+  const assignments: {
+    teamId: number;
+    leagueId: number;
+    playerId: number;
+    positionId: null;
+  }[] = [];
+  let playerIndex = 0;
+  for (let benchSlot = 0; benchSlot < benchSlots; benchSlot++) {
+    const teamsInOrder = benchSlot % 2 === 0 ? teams : [...teams].reverse();
+    for (const team of teamsInOrder) {
+      if (playerIndex < interleaved.length) {
+        assignments.push({
+          teamId: team.id,
+          leagueId,
+          playerId: interleaved[playerIndex].id,
+          positionId: null,
+        });
+        playerIndex++;
+      }
+    }
+  }
+  return assignments;
+}
+
+/**
  * Load player position eligibility from the player_eligible_positions materialized view.
  *
  * This is the single source of truth for position eligibility — the same view consumed
@@ -751,38 +800,25 @@ async function randomlyAssignPlayers(leagueId: number): Promise<void> {
           `Filling ${benchSlots} bench slots per team (maxRosterSize: ${maxRosterSize}, explicit positions: ${explicitPositions})`,
         );
 
-        // Get all remaining players (not used in explicit positions)
-        const remainingPlayers = enhancedPlayers.filter(
+        const remainingAll = enhancedPlayers.filter(
           (player) => !usedPlayerIds.has(player.id),
         );
 
-        // Assign remaining players to bench slots (positionId = null)
-        let playerIndex = 0;
-        for (let benchSlot = 0; benchSlot < benchSlots; benchSlot++) {
-          for (const team of teams) {
-            if (playerIndex < remainingPlayers.length) {
-              const assignedPlayer = remainingPlayers[playerIndex];
+        const benchAssignments = buildBenchAssignments(
+          remainingAll,
+          teams,
+          benchSlots,
+          leagueId,
+        );
 
-              // Create bench assignment (positionId = null for bench)
-              assignments.push({
-                teamId: team.id,
-                leagueId: leagueId,
-                playerId: assignedPlayer.id,
-                positionId: null, // null indicates bench spot
-              });
-
-              usedPlayerIds.add(assignedPlayer.id);
-              LOGGER.debug(
-                `Queued bench: ${assignedPlayer.firstName} ${assignedPlayer.lastName} → ${team.name} (bench)`,
-              );
-              playerIndex++;
-            } else {
-              LOGGER.warn(
-                `No more available players for bench slot in ${team.name}`,
-              );
-            }
-          }
+        for (const benchAssignment of benchAssignments) {
+          assignments.push(benchAssignment);
+          usedPlayerIds.add(benchAssignment.playerId);
         }
+
+        LOGGER.debug(
+          `Assigned ${benchAssignments.length} bench players across ${teams.length} teams`,
+        );
       }
 
       addBreadcrumb('Assignment planning completed', {
