@@ -89,6 +89,7 @@ async function writeCachedToken(
 
 async function invalidateCachedToken(): Promise<void> {
   cachedToken = null;
+  cachedTokenSource = null;
   try {
     const { unlink } = await import('node:fs/promises');
     await unlink(TOKEN_PATH);
@@ -513,14 +514,29 @@ export type TokenSource =
  * device flow. Returns the token and its source, or null if no valid token
  * is found.
  *
- * This is used by `github_auth_status` to report auth state without side effects.
+ * This is used by `github_auth_status` to report auth state. Note: if an expired
+ * cached token file is detected, it will be deleted to prevent re-validating the
+ * same bad token on subsequent calls. Validated tokens from .netrc or gh CLI are
+ * written to the cache file for performance.
  */
 export async function tryResolveToken(): Promise<{
   token: string;
   source: TokenSource;
 } | null> {
-  if (cachedToken && cachedTokenSource)
-    return { token: cachedToken, source: cachedTokenSource };
+  // Validate in-memory cached token — it may have expired since it was first resolved
+  // (e.g. GitHub App tokens expire after 1 hour, PATs can be revoked mid-session).
+  // Without this check, an expired in-memory token causes github_auth_status to
+  // report configured:false without ever trying downstream sources (LS-1845).
+  if (cachedToken && cachedTokenSource) {
+    if (await validateToken(cachedToken)) {
+      return { token: cachedToken, source: cachedTokenSource };
+    }
+    process.stderr.write(
+      `Warning: Previously cached ${cachedTokenSource} token is no longer valid — re-resolving.\n`,
+    );
+    cachedToken = null;
+    cachedTokenSource = null;
+  }
 
   // 1. Environment variables (skip empty/whitespace — LS-1822)
   const envToken = (
@@ -547,9 +563,9 @@ export async function tryResolveToken(): Promise<{
       cachedTokenSource = 'cached-file';
       return { token: fileToken, source: 'cached-file' };
     }
-    // Don't delete the cached token file here — tryResolveToken is a read-only
-    // probe. Cache invalidation is the caller's responsibility (e.g. getToken
-    // or invalidateToken on 401).
+    // Stale file token — remove it so downstream sources can cache a fresh
+    // token and we don't re-validate the same bad token on subsequent calls.
+    await invalidateCachedToken();
   }
 
   // 3. GitHub App token (AGENT_AUTHOR_APP_PRIVATE_KEY env var)
@@ -576,6 +592,12 @@ export async function tryResolveToken(): Promise<{
     if (await validateToken(netrcToken)) {
       cachedToken = netrcToken;
       cachedTokenSource = 'netrc';
+      // Cache to file so subsequent calls (and restarts) don't re-parse .netrc
+      await writeCachedToken(netrcToken).catch((err) => {
+        process.stderr.write(
+          `Warning: Failed to cache netrc token to file: ${err instanceof Error ? err.message : err}\n`,
+        );
+      });
       return { token: netrcToken, source: 'netrc' };
     }
   }
@@ -586,6 +608,12 @@ export async function tryResolveToken(): Promise<{
     if (await validateToken(ghToken)) {
       cachedToken = ghToken;
       cachedTokenSource = 'gh-cli';
+      // Cache to file so subsequent calls don't shell out to `gh` again
+      await writeCachedToken(ghToken).catch((err) => {
+        process.stderr.write(
+          `Warning: Failed to cache gh-cli token to file: ${err instanceof Error ? err.message : err}\n`,
+        );
+      });
       return { token: ghToken, source: 'gh-cli' };
     }
   }
