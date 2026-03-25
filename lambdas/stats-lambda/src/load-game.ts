@@ -10,9 +10,14 @@ import {
   withRollbar,
 } from '@legacy-sports/rollbar';
 import { createNotificationService } from '@legacy-sports/aws-utils';
-import { PublicSchema, runWithPublicClient } from '@legacy-sports/db-client';
+import {
+  getScoringMultipliersForLeague,
+  PublicSchema,
+  runWithPublicClient,
+} from '@legacy-sports/db-client';
 import { cleanupCache, getCacheStats } from '@legacy-sports/bref-client';
 
+import type { ScoringSettings } from '@legacy-sports/scoring';
 import type { LoadMatchupStatsMessage } from './load-game-types';
 import { PLAYER_PROCESSING_BUDGET_MS } from './load-game-types';
 
@@ -24,6 +29,7 @@ import {
   updateMatchupStatus,
 } from './game-state-manager';
 import { loadPlayerGameStats } from './player-stats-loader';
+import { calculateAndUpdateMatchupScores } from './scoring-utils';
 
 // Initialize Rollbar
 const rollbarConfig = getRollbarConfigFromEnv();
@@ -348,6 +354,77 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
               maxRetries,
             },
           );
+
+          // Calculate and persist matchup scores after stats loading completes
+          if (finalStatus === 'completed') {
+            try {
+              // Fetch league-specific scoring multipliers (snake_case keys from DB)
+              // and convert to camelCase for the scoring engine
+              let scoringSettings: ScoringSettings | undefined;
+              if (leagueId !== null) {
+                const rawMultipliers = await getScoringMultipliersForLeague(
+                  db,
+                  leagueId,
+                );
+                const toCamelCase = (
+                  record: Record<string, number>,
+                ): Record<string, number> => {
+                  const result: Record<string, number> = {};
+                  for (const [key, value] of Object.entries(record)) {
+                    result[
+                      key.replace(/_([a-z])/g, (_, c: string) =>
+                        c.toUpperCase(),
+                      )
+                    ] = value;
+                  }
+                  return result;
+                };
+                scoringSettings = {
+                  batting: toCamelCase(rawMultipliers.batting),
+                  pitching: toCamelCase(rawMultipliers.pitching),
+                  fielding: toCamelCase(rawMultipliers.fielding),
+                };
+              }
+
+              const scoreResult = await calculateAndUpdateMatchupScores(
+                db,
+                message.matchupId,
+                scoringSettings,
+                true, // forceRecalculation — always recalculate on stats completion
+              );
+              LOGGER.info(
+                `Calculated scores for matchup ${message.matchupId}: team1=${scoreResult.team1Score}, team2=${scoreResult.team2Score}`,
+                {
+                  matchupId: message.matchupId,
+                  team1Score: scoreResult.team1Score,
+                  team2Score: scoreResult.team2Score,
+                  updated: scoreResult.updated,
+                },
+              );
+            } catch (scoreError) {
+              LOGGER.error(
+                `Failed to calculate scores for matchup ${message.matchupId}`,
+                {
+                  error:
+                    scoreError instanceof Error
+                      ? scoreError.message
+                      : String(scoreError),
+                  matchupId: message.matchupId,
+                },
+              );
+              captureError(
+                scoreError instanceof Error
+                  ? scoreError
+                  : new Error(String(scoreError)),
+                {
+                  matchupId: message.matchupId,
+                  context: 'post-stats-score-calculation',
+                },
+              );
+              // Score calculation failure is non-fatal — stats are loaded,
+              // scores can be recalculated later via the standalone handler
+            }
+          }
 
           // Send notification that all matchup stats are complete (using cached leagueId)
           if (
