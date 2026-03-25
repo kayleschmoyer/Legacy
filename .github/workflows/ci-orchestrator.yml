@@ -183,6 +183,8 @@ jobs:
       - name: "🔒 Resolve Runner Label"
         id: runner-access
         uses: ./.github/actions/resolve-runner-label
+        with:
+          runner-label: ${{ vars.CI_RUNNER_LABEL }}
 
   ci-pipeline:
     name: "🚀 CI Pipeline"

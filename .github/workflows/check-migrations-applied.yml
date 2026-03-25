@@ -62,6 +62,8 @@ jobs:
       - name: "Resolve Runner Label"
         id: resolve
         uses: ./.github/actions/resolve-runner-label
+        with:
+          runner-label: ${{ vars.CI_RUNNER_LABEL }}
 
   check:
     name: "Verify All Migrations Applied"

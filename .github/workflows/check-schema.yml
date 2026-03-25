@@ -55,6 +55,8 @@ jobs:
       - name: "Resolve Runner Label"
         id: resolve
         uses: ./.github/actions/resolve-runner-label
+        with:
+          runner-label: ${{ vars.CI_RUNNER_LABEL }}
 
   # ---------------------------------------------------------------------------
   # Schema drift check + codegen compatibility (single runner, one print-schema)
