@@ -332,6 +332,15 @@ jobs:
         env:
           EPIC_KEY: ${{ steps.epic.outputs.key }}
         run: |
+          # Debounce: when a parent PR merges, the merge queue retargets
+          # dependent PRs to main. This fires new pull_request events,
+          # triggering concurrent jira-branch-sync runs. Both the parent's
+          # "Done" transition and the child's "In Review" transition race
+          # to recalculate epic status simultaneously. A short delay lets
+          # concurrent ticket transitions settle before we read children.
+          echo "⏳ Waiting 10s for concurrent ticket transitions to settle..."
+          sleep 10
+
           # Fetch all children of the epic via JQL search (paginated)
           ENCODED_JQL=$(echo -n "parent=$EPIC_KEY" | jq -sRr @uri)
           ALL_STATUSES=""
