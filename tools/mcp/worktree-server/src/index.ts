@@ -107,6 +107,39 @@ function removeLock(worktreePath: string): boolean {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Normalize and validate the `files` MCP parameter.
+ * MCP args are unvalidated `unknown` at runtime — clients may send a single
+ * string, an array, null, or other unexpected types.
+ *
+ * @returns `string[]` for valid input, `undefined` when omitted, or an error
+ *          message string for invalid input.
+ */
+function normalizeFilesParam(
+  raw: unknown,
+): string[] | undefined | { error: string } {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw === 'string') {
+    if (raw.trim() === '')
+      return {
+        error: 'Invalid "files" parameter: paths must be non-empty strings.',
+      };
+    return [raw];
+  }
+  if (Array.isArray(raw)) {
+    const hasInvalid = raw.some(
+      (f) => typeof f !== 'string' || f.trim() === '',
+    );
+    if (hasInvalid)
+      return {
+        error:
+          'Invalid "files" parameter: all entries must be non-empty strings.',
+      };
+    return raw as string[];
+  }
+  return { error: 'Invalid "files" parameter: expected string or string[].' };
+}
+
 interface WorktreeInfo {
   key: string;
   path: string;
@@ -420,8 +453,10 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description: 'Conventional format: type(scope): description',
           },
           files: {
-            type: 'array' as const,
-            items: { type: 'string' },
+            anyOf: [
+              { type: 'string' as const },
+              { type: 'array' as const, items: { type: 'string' } },
+            ],
             description: 'Files to stage (default: all)',
           },
           worktree: {
@@ -573,8 +608,10 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         type: 'object' as const,
         properties: {
           files: {
-            type: 'array' as const,
-            items: { type: 'string' },
+            anyOf: [
+              { type: 'string' as const },
+              { type: 'array' as const, items: { type: 'string' } },
+            ],
             description: 'Files to stage (default: all)',
           },
           worktree: {
@@ -708,8 +745,10 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         type: 'object' as const,
         properties: {
           files: {
-            type: 'array' as const,
-            items: { type: 'string' },
+            anyOf: [
+              { type: 'string' as const },
+              { type: 'array' as const, items: { type: 'string' } },
+            ],
             description:
               'File paths to unstage (relative to repo root). Use ["."] to unstage all.',
           },
@@ -1080,15 +1119,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     case 'worktree_commit': {
       const {
         message,
-        files,
+        files: rawFiles,
         worktree: wtKey,
         amend,
       } = args as {
         message?: string;
-        files?: string[];
+        files?: unknown;
         worktree?: string;
         amend?: boolean;
       };
+
+      // Normalize and validate files parameter
+      const filesResult = normalizeFilesParam(rawFiles);
+      if (
+        filesResult &&
+        typeof filesResult === 'object' &&
+        'error' in filesResult
+      ) {
+        return {
+          content: [{ type: 'text', text: filesResult.error }],
+          isError: true,
+        };
+      }
+      const files = filesResult;
 
       // message is required for new commits, optional for amend
       if (!amend && !message) {
@@ -2357,10 +2410,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_rebase_continue
     // -----------------------------------------------------------------------
     case 'worktree_rebase_continue': {
-      const { files, worktree: wtKey } = args as {
-        files?: string[];
+      const { files: rawFiles, worktree: wtKey } = args as {
+        files?: unknown;
         worktree?: string;
       };
+
+      // Normalize and validate files parameter
+      const filesResult = normalizeFilesParam(rawFiles);
+      if (
+        filesResult &&
+        typeof filesResult === 'object' &&
+        'error' in filesResult
+      ) {
+        return {
+          content: [{ type: 'text', text: filesResult.error }],
+          isError: true,
+        };
+      }
+      const files = filesResult;
 
       const target = resolveTargetDir(wtKey);
       if ('error' in target) {
@@ -3192,10 +3259,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_unstage
     // -----------------------------------------------------------------------
     case 'worktree_unstage': {
-      const { files, worktree: wtKey } = args as {
-        files: string[];
+      const { files: rawFiles, worktree: wtKey } = args as {
+        files: unknown;
         worktree?: string;
       };
+
+      // Normalize and validate files parameter
+      const filesResult = normalizeFilesParam(rawFiles);
+      if (
+        filesResult &&
+        typeof filesResult === 'object' &&
+        'error' in filesResult
+      ) {
+        return {
+          content: [{ type: 'text', text: filesResult.error }],
+          isError: true,
+        };
+      }
+      const files = filesResult ?? [];
 
       const target = resolveTargetDir(wtKey);
       if ('error' in target) {
@@ -3206,7 +3287,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       const cwd = target.path;
 
-      if (!files || files.length === 0) {
+      if (files.length === 0) {
         return {
           content: [
             {
