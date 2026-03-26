@@ -44,6 +44,17 @@ runs:
 
           // Use the PR author (not context.actor, which can be a merge bot or re-runner)
           const prAuthor = context.payload.pull_request?.user?.login || context.actor;
+
+          // GitHub App bots (e.g. legacy-sports-code-bot[bot]) are trusted — they
+          // are owned by the repo and the collaborator permission API doesn't support
+          // app installation accounts (returns 404).
+          if (prAuthor.endsWith('[bot]')) {
+            core.setOutput('runner-label', label);
+            core.setOutput('is-self-hosted', 'true');
+            core.info(`PR author "${prAuthor}" is a GitHub App bot — using self-hosted runner`);
+            return;
+          }
+
           try {
             const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
               owner: context.repo.owner, repo: context.repo.repo, username: prAuthor,
