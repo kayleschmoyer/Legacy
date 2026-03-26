@@ -20,7 +20,7 @@ import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import { EnvironmentVariable } from '../EnvironmentVariables';
 
 export interface AuthHandlers {
-  googleLogin: () => void;
+  googleLogin: () => Promise<void>;
   logout: () => Promise<void>;
 }
 

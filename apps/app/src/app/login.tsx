@@ -35,7 +35,7 @@ const Login: React.FC = () => {
 
   const onLogin = () => {
     setIsLoading(true);
-    googleLogin();
+    void googleLogin();
   };
 
   return (
