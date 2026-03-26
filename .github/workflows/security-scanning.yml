@@ -348,6 +348,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          GITLEAKS_ARTIFACT_RETENTION: 7
         continue-on-error: true
 
       - name: "🔐 Manual Secret Pattern Detection"
@@ -587,7 +588,7 @@ jobs:
         with:
           name: codeql-sarif-results
           path: sarif-results/
-          retention-days: 30
+          retention-days: 7
 
       - name: "🔐 ESLint Security Rules"
         id: eslint-security

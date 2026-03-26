@@ -220,7 +220,7 @@ jobs:
           path: |
             ${{ steps.artifacts.outputs.ipa_path }}
             ${{ steps.artifacts.outputs.latest_path }}
-          retention-days: 90
+          retention-days: 7
           if-no-files-found: error
 
       - name: Upload App Bundle as GitHub Artifact (Debug)
@@ -229,7 +229,7 @@ jobs:
         with:
           name: ${{ steps.version.outputs.artifact_name }}
           path: ${{ steps.artifacts.outputs.app_zip_path }}
-          retention-days: 30
+          retention-days: 7
           if-no-files-found: error
 
       - name: Create Release (Release builds only)

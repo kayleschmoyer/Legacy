@@ -288,7 +288,7 @@ jobs:
         with:
           name: playwright-report-${{ strategy.job-index }}
           path: apps/web-e2e/playwright-report/
-          retention-days: 14
+          retention-days: 7
           if-no-files-found: ignore
 
       - name: "Upload Blob Report"
@@ -306,7 +306,7 @@ jobs:
         with:
           name: test-results-${{ strategy.job-index }}
           path: apps/web-e2e/test-results/
-          retention-days: 14
+          retention-days: 7
           if-no-files-found: ignore
 
   # ===========================================================================
@@ -345,7 +345,7 @@ jobs:
         with:
           name: playwright-report-merged
           path: playwright-report/
-          retention-days: 14
+          retention-days: 7
           if-no-files-found: ignore
 
   # ===========================================================================
