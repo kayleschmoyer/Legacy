@@ -31,7 +31,7 @@ env:
 jobs:
   setup:
     name: Setup and Version
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     outputs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
@@ -54,7 +54,7 @@ jobs:
 
   build-and-deploy:
     name: Build and Deploy Web
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     needs: setup
     timeout-minutes: 15
     environment:
@@ -202,7 +202,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     needs: [setup, build-and-deploy]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -245,7 +245,7 @@ jobs:
   # are published regularly.
   notify-release:
     name: Discord Release Summary
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     needs: [setup, create-release]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 

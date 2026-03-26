@@ -41,7 +41,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request' &&
       !github.event.pull_request.draft
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
       - name: Auto-pass bot-review for dependabot PRs
         if: github.event.pull_request.user.login == 'dependabot[bot]'
@@ -215,7 +215,7 @@ jobs:
       github.event_name == 'pull_request_review' &&
       !github.event.pull_request.draft &&
       github.event.pull_request.user.login != 'dependabot[bot]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
       - name: Generate bot token
         id: bot-token
@@ -348,7 +348,7 @@ jobs:
   auto-approve:
     # Runs when the built-in "Copilot code review" workflow completes for a PR
     if: github.event_name == 'workflow_run'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
       - name: Get PR number
         id: pr
@@ -527,7 +527,7 @@ jobs:
     # Triggered by workflow_dispatch (e.g., after an agent resolves review threads
     # without pushing code). Re-evaluates Copilot thread state and updates bot-review.
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
       - name: Generate bot token
         id: bot-token

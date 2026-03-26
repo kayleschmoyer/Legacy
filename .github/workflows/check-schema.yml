@@ -43,7 +43,7 @@ jobs:
   # ---------------------------------------------------------------------------
   check-runner-access:
     name: "Resolve Runner Label"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 2
     outputs:
       runner-label: ${{ steps.resolve.outputs.runner-label }}

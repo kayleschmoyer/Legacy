@@ -108,7 +108,7 @@ jobs:
   # Compute the shard matrix in a tiny job so the expression stays under line-length limits.
   prepare:
     name: "Prepare Matrix"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 1
     outputs:
       shards: ${{ steps.set.outputs.shards }}
@@ -316,7 +316,7 @@ jobs:
     name: "Merge Playwright Reports"
     needs: [run-tests]
     if: ${{ !cancelled() && inputs.shard-total != '1' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - name: "Checkout Repository"
@@ -355,7 +355,7 @@ jobs:
     name: "Deploy Playwright Report"
     needs: [run-tests, merge-reports]
     if: ${{ !cancelled() && needs.run-tests.result != 'skipped' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - name: "Download HTML Report (single shard)"

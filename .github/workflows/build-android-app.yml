@@ -142,7 +142,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     needs: build-android
     if: github.event.inputs.create_releases != 'false'
 
@@ -188,7 +188,7 @@ jobs:
 
   notify:
     name: Notify Build Results
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     needs: [build-android, create-release]
     if: always()
 

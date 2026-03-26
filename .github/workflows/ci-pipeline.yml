@@ -82,7 +82,7 @@ jobs:
   # ============================================================================
   detect-changes:
     name: "Detect Project Changes"
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
     outputs:
@@ -318,7 +318,7 @@ jobs:
     name: "Deploy Playwright Report"
     needs: [e2e]
     if: "!cancelled() && needs.e2e.result != 'skipped'"
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - name: "Checkout Repository"
@@ -398,7 +398,7 @@ jobs:
     name: "Summarize & Report"
     needs: [detect-changes, quality-gates, build-validation, e2e]
     if: "!cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     outputs:
       overall-status: ${{ steps.collect-results.outputs.overall-status }}

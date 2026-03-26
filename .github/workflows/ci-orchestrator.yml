@@ -65,7 +65,7 @@ permissions:
 jobs:
   determine-scope:
     name: "🔍 Determine Workflow Scope"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     outputs:
       run-security: ${{ steps.scope.outputs.run-security }}
       security-scan-type: ${{ steps.scope.outputs.security-scan-type }}
@@ -221,9 +221,9 @@ jobs:
   # ============================================================================
   label-pr:
     name: "🏷️ Label PR"
-    needs: [security-scanning]
+    needs: [determine-scope, security-scanning]
     if: "!cancelled() && github.event.pull_request.number"
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.determine-scope.outputs.runner-label }}
     timeout-minutes: 3
     steps:
       - name: "Label PR on Security Failure"
@@ -283,12 +283,12 @@ jobs:
   # ============================================================================
   remove-merge-label-on-failure:
     name: "🏷️ Remove Merge Label on Failure"
-    needs: [ci-pipeline]
+    needs: [determine-scope, ci-pipeline]
     if: >-
       !cancelled() &&
       github.event_name == 'pull_request' &&
       needs.ci-pipeline.outputs.overall-status == 'failure'
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.determine-scope.outputs.runner-label }}
     steps:
       - name: Remove merge-when-ready label
         uses: actions/github-script@v8

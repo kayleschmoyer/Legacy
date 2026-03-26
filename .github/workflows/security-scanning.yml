@@ -29,7 +29,7 @@ env:
 jobs:
   security-scan-plan:
     name: "Security Scan Planning"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 3
 
     outputs:
@@ -129,7 +129,7 @@ jobs:
 
   dependency-scan:
     name: "Dependency Vulnerability Scan"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-dependency-scan == 'true'
@@ -330,7 +330,7 @@ jobs:
 
   secret-detection:
     name: "Secret Detection Scan"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 8
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-secret-scan == 'true'
@@ -464,7 +464,7 @@ jobs:
 
   sast-scan:
     name: "Static Application Security Testing"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-sast-scan == 'true'
@@ -716,7 +716,7 @@ jobs:
 
   security-summary:
     name: "Security Scan Summary"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: [security-scan-plan, dependency-scan, secret-detection, sast-scan]
     if: always()
