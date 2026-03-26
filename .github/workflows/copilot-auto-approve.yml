@@ -100,55 +100,70 @@ jobs:
                   .filter(r => copilotReviewLogins.includes(r.user.login))
                   .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
 
-                // Check thread state regardless of review state — threads may have
-                // been resolved since Copilot submitted CHANGES_REQUESTED.
                 if (copilotReviews.length > 0) {
-                  // Check for unresolved Copilot review threads
-                  let allThreads = [];
-                  let hasNextPage = true;
-                  let cursor = null;
-                  while (hasNextPage) {
-                    const result = await github.graphql(`
-                      query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
-                        repository(owner: $owner, name: $repo) {
-                          pullRequest(number: $number) {
-                            reviewThreads(first: 100, after: $cursor) {
-                              pageInfo { hasNextPage endCursor }
-                              nodes {
-                                isResolved
-                                isOutdated
-                                comments(first: 1) {
-                                  nodes { author { login } }
+                  const latest = copilotReviews[0];
+                  let carryForward = false;
+
+                  // If latest Copilot review explicitly approved, old threads
+                  // are superseded — carry forward immediately.
+                  if (latest.state === 'APPROVED') {
+                    core.info('Latest Copilot review is APPROVED — carrying forward');
+                    carryForward = true;
+                  } else {
+                    // Latest Copilot review is not APPROVED — check threads
+                    // (threads may have been resolved or become outdated since the last review)
+                    const copilotLogins = [
+                      'copilot-pull-request-reviewer',
+                      'copilot-pull-request-reviewer[bot]',
+                      'Copilot',
+                    ];
+                    let allThreads = [];
+                    let hasNextPage = true;
+                    let cursor = null;
+                    while (hasNextPage) {
+                      const result = await github.graphql(`
+                        query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                          repository(owner: $owner, name: $repo) {
+                            pullRequest(number: $number) {
+                              reviewThreads(first: 100, after: $cursor) {
+                                pageInfo { hasNextPage endCursor }
+                                nodes {
+                                  isResolved
+                                  isOutdated
+                                  comments(first: 1) {
+                                    nodes { author { login } }
+                                  }
                                 }
                               }
                             }
                           }
                         }
-                      }
-                    `, {
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      number: prNumber,
-                      cursor,
-                    });
-                    const threads = result.repository.pullRequest.reviewThreads;
-                    allThreads.push(...threads.nodes);
-                    hasNextPage = threads.pageInfo.hasNextPage;
-                    cursor = threads.pageInfo.endCursor;
+                      `, {
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        number: prNumber,
+                        cursor,
+                      });
+                      const threads = result.repository.pullRequest.reviewThreads;
+                      allThreads.push(...threads.nodes);
+                      hasNextPage = threads.pageInfo.hasNextPage;
+                      cursor = threads.pageInfo.endCursor;
+                    }
+
+                    const unresolvedThreads = allThreads.filter(t =>
+                      !t.isOutdated &&
+                      !t.isResolved &&
+                      t.comments.nodes.some(c => copilotLogins.includes(c.author.login))
+                    );
+
+                    if (unresolvedThreads.length === 0) {
+                      carryForward = true;
+                    } else {
+                      core.info(`Copilot has ${unresolvedThreads.length} unresolved thread(s) — setting pending`);
+                    }
                   }
 
-                  const copilotLogins = [
-                    'copilot-pull-request-reviewer',
-                    'copilot-pull-request-reviewer[bot]',
-                    'Copilot',
-                  ];
-                  const unresolvedThreads = allThreads.filter(t =>
-                    !t.isOutdated &&
-                    !t.isResolved &&
-                    t.comments.nodes.some(c => copilotLogins.includes(c.author.login))
-                  );
-
-                  if (unresolvedThreads.length === 0) {
+                  if (carryForward) {
                     await github.rest.repos.createCommitStatus({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
@@ -185,12 +200,9 @@ jobs:
                     } catch (e) {
                       core.warning(`Carry-forward labeling failed: ${e.message}`);
                     }
-                    core.info(`Copilot already reviewed with no unresolved threads — carried forward success + approval for PR #${prNumber}`);
+                    core.info(`Carried forward success + approval for PR #${prNumber}`);
                     return;
                   }
-                  core.info(`Copilot has ${unresolvedThreads.length} unresolved thread(s) — setting pending`);
-                } else if (copilotReviews.length > 0) {
-                  core.info(`Latest Copilot review is ${copilotReviews[0].state} — not carrying forward, setting pending`);
                 }
               } catch (error) {
                 core.warning(`Carry-forward check failed: ${error.message} — falling back to pending`);
@@ -239,6 +251,7 @@ jobs:
               pull_number: prNumber,
             });
             const copilotReviewLogins = ['copilot-pull-request-reviewer[bot]', 'Copilot'];
+            const copilotLogins = ['copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]', 'Copilot'];
             const copilotReviews = reviews.data
               .filter(r => copilotReviewLogins.includes(r.user.login));
             if (copilotReviews.length === 0) {
@@ -246,65 +259,72 @@ jobs:
               return;
             }
 
-            // Sort by most recent first (don't skip CHANGES_REQUESTED — threads
-            // may have been resolved since the review was submitted)
+            // Sort by most recent first
             const sorted = copilotReviews.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+            const latest = sorted[0];
 
-            // Check for unresolved Copilot review threads
-            let allThreads = [];
-            let hasNextPage = true;
-            let cursor = null;
-            while (hasNextPage) {
-              const result = await github.graphql(`
-                query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
-                  repository(owner: $owner, name: $repo) {
-                    pullRequest(number: $number) {
-                      reviewThreads(first: 100, after: $cursor) {
-                        pageInfo { hasNextPage endCursor }
-                        nodes {
-                          isResolved
-                          isOutdated
-                          comments(first: 1) {
-                            nodes { author { login } }
+            // If latest Copilot review explicitly approved, old threads are
+            // superseded — skip thread check entirely.
+            if (latest.state === 'APPROVED') {
+              core.info('Latest Copilot review is APPROVED — old threads superseded');
+              // Fall through to set success + approve + label below
+            } else {
+              // Latest Copilot review is not APPROVED — check threads
+              // (threads may have been resolved or become outdated since the last review)
+              let allThreads = [];
+              let hasNextPage = true;
+              let cursor = null;
+              while (hasNextPage) {
+                const result = await github.graphql(`
+                  query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                    repository(owner: $owner, name: $repo) {
+                      pullRequest(number: $number) {
+                        reviewThreads(first: 100, after: $cursor) {
+                          pageInfo { hasNextPage endCursor }
+                          nodes {
+                            isResolved
+                            isOutdated
+                            comments(first: 1) {
+                              nodes { author { login } }
+                            }
                           }
                         }
                       }
                     }
                   }
-                }
-              `, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                number: prNumber,
-                cursor,
-              });
-              const threads = result.repository.pullRequest.reviewThreads;
-              allThreads.push(...threads.nodes);
-              hasNextPage = threads.pageInfo.hasNextPage;
-              cursor = threads.pageInfo.endCursor;
+                `, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  number: prNumber,
+                  cursor,
+                });
+                const threads = result.repository.pullRequest.reviewThreads;
+                allThreads.push(...threads.nodes);
+                hasNextPage = threads.pageInfo.hasNextPage;
+                cursor = threads.pageInfo.endCursor;
+              }
+
+              const unresolvedThreads = allThreads.filter(t =>
+                !t.isOutdated &&
+                !t.isResolved &&
+                t.comments.nodes.some(c => copilotLogins.includes(c.author.login))
+              );
+
+              if (unresolvedThreads.length > 0) {
+                core.info(`${unresolvedThreads.length} unresolved Copilot thread(s) — not approving`);
+                await github.rest.repos.createCommitStatus({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  sha,
+                  state: 'failure',
+                  context: 'bot-review',
+                  description: `Copilot review has ${unresolvedThreads.length} unresolved comment(s)`,
+                });
+                return;
+              }
             }
 
-            const copilotLogins = ['copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]', 'Copilot'];
-            const unresolvedThreads = allThreads.filter(t =>
-              !t.isOutdated &&
-              !t.isResolved &&
-              t.comments.nodes.some(c => copilotLogins.includes(c.author.login))
-            );
-
-            if (unresolvedThreads.length > 0) {
-              core.info(`${unresolvedThreads.length} unresolved Copilot thread(s) — not approving`);
-              await github.rest.repos.createCommitStatus({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                sha,
-                state: 'failure',
-                context: 'bot-review',
-                description: `Copilot review has ${unresolvedThreads.length} unresolved comment(s)`,
-              });
-              return;
-            }
-
-            // All threads resolved — set bot-review success
+            // All threads resolved or superseded — set bot-review success
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -428,9 +448,49 @@ jobs:
           github-token: ${{ steps.bot-token.outputs.token }}
           script: |
             const prNumber = parseInt('${{ steps.pr.outputs.number }}', 10);
+            const currentSha = '${{ github.event.workflow_run.head_sha }}';
+            const copilotReviewLogins = ['copilot-pull-request-reviewer[bot]', 'Copilot'];
+            const copilotLogins = ['copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]', 'Copilot'];
 
-            // Check thread state (don't skip CHANGES_REQUESTED — threads may
-            // have been resolved since the review was submitted)
+            // Check if the latest Copilot review already signals a clean pass.
+            // When Copilot re-reviews after a fix-push, it may submit a new
+            // APPROVED review — or it may not submit a new review at all (the
+            // workflow just completes successfully). In either case, old
+            // unresolved threads from a prior CHANGES_REQUESTED review are
+            // superseded and should not block bot-review.
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const copilotReviews = reviews.data
+              .filter(r => copilotReviewLogins.includes(r.user.login))
+              .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+
+            if (copilotReviews.length > 0) {
+              const latest = copilotReviews[0];
+              // Case 1: Copilot explicitly approved — threads are superseded.
+              // Note: Copilot never uses "approve with comments" — it either
+              // APPROVED (clean) or COMMENTED (with threads), so this is safe.
+              if (latest.state === 'APPROVED') {
+                core.setOutput('has_comments', 'false');
+                core.info('Latest Copilot review is APPROVED — old threads superseded');
+                return;
+              }
+              // Case 2: Copilot's latest review is on an older commit, but the
+              // workflow just completed successfully for the current HEAD. This
+              // means Copilot re-reviewed the new code and raised no new issues
+              // (it didn't submit a new CHANGES_REQUESTED). Old threads from
+              // the prior review cycle are superseded.
+              if (latest.commit_id !== currentSha) {
+                core.setOutput('has_comments', 'false');
+                core.info(`Latest Copilot review is on ${latest.commit_id.slice(0, 7)}, current HEAD is ${currentSha.slice(0, 7)} — old review superseded by clean workflow run`);
+                return;
+              }
+            }
+
+            // Latest Copilot review is CHANGES_REQUESTED on the current commit —
+            // fall through to thread check (threads may have been resolved since).
 
             // Check for unresolved Copilot review threads
             let allThreads = [];
@@ -473,10 +533,6 @@ jobs:
               cursor = threads.pageInfo.endCursor;
             }
 
-            // GraphQL uses 'copilot-pull-request-reviewer' (no [bot] suffix)
-            // REST API uses 'copilot-pull-request-reviewer[bot]'
-            // Webhook event uses 'Copilot'
-            const copilotLogins = ['copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]', 'Copilot'];
             const copilotThreads = allThreads.filter(t =>
               !t.isOutdated &&
               !t.isResolved &&
@@ -566,68 +622,78 @@ jobs:
               pull_number: prNumber,
             });
             const copilotReviewLogins = ['copilot-pull-request-reviewer[bot]', 'Copilot'];
+            const copilotLogins = ['copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]', 'Copilot'];
             const copilotReviews = reviews.data
-              .filter(r => copilotReviewLogins.includes(r.user.login));
+              .filter(r => copilotReviewLogins.includes(r.user.login))
+              .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
             if (copilotReviews.length === 0) {
               core.info('No Copilot reviews yet — skipping');
               return;
             }
 
-            // Check for unresolved Copilot review threads
-            let allThreads = [];
-            let hasNextPage = true;
-            let cursor = null;
-            while (hasNextPage) {
-              const result = await github.graphql(`
-                query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
-                  repository(owner: $owner, name: $repo) {
-                    pullRequest(number: $number) {
-                      reviewThreads(first: 100, after: $cursor) {
-                        pageInfo { hasNextPage endCursor }
-                        nodes {
-                          isResolved
-                          isOutdated
-                          comments(first: 1) {
-                            nodes { author { login } }
+            const latest = copilotReviews[0];
+
+            // If latest Copilot review explicitly approved, old threads are
+            // superseded — skip thread check entirely.
+            if (latest.state === 'APPROVED') {
+              core.info('Latest Copilot review is APPROVED — old threads superseded');
+            } else {
+              // Latest Copilot review is not APPROVED — check threads
+              // (threads may have been resolved or become outdated since the last review)
+              let allThreads = [];
+              let hasNextPage = true;
+              let cursor = null;
+              while (hasNextPage) {
+                const result = await github.graphql(`
+                  query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                    repository(owner: $owner, name: $repo) {
+                      pullRequest(number: $number) {
+                        reviewThreads(first: 100, after: $cursor) {
+                          pageInfo { hasNextPage endCursor }
+                          nodes {
+                            isResolved
+                            isOutdated
+                            comments(first: 1) {
+                              nodes { author { login } }
+                            }
                           }
                         }
                       }
                     }
                   }
-                }
-              `, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                number: prNumber,
-                cursor,
-              });
-              const threads = result.repository.pullRequest.reviewThreads;
-              allThreads.push(...threads.nodes);
-              hasNextPage = threads.pageInfo.hasNextPage;
-              cursor = threads.pageInfo.endCursor;
+                `, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  number: prNumber,
+                  cursor,
+                });
+                const threads = result.repository.pullRequest.reviewThreads;
+                allThreads.push(...threads.nodes);
+                hasNextPage = threads.pageInfo.hasNextPage;
+                cursor = threads.pageInfo.endCursor;
+              }
+
+              const unresolvedThreads = allThreads.filter(t =>
+                !t.isOutdated &&
+                !t.isResolved &&
+                t.comments.nodes.some(c => copilotLogins.includes(c.author.login))
+              );
+
+              if (unresolvedThreads.length > 0) {
+                core.info(`${unresolvedThreads.length} unresolved Copilot thread(s) — not approving`);
+                await github.rest.repos.createCommitStatus({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  sha,
+                  state: 'failure',
+                  context: 'bot-review',
+                  description: `Copilot review has ${unresolvedThreads.length} unresolved comment(s)`,
+                });
+                return;
+              }
             }
 
-            const copilotLogins = ['copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]', 'Copilot'];
-            const unresolvedThreads = allThreads.filter(t =>
-              !t.isOutdated &&
-              !t.isResolved &&
-              t.comments.nodes.some(c => copilotLogins.includes(c.author.login))
-            );
-
-            if (unresolvedThreads.length > 0) {
-              core.info(`${unresolvedThreads.length} unresolved Copilot thread(s) — not approving`);
-              await github.rest.repos.createCommitStatus({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                sha,
-                state: 'failure',
-                context: 'bot-review',
-                description: `Copilot review has ${unresolvedThreads.length} unresolved comment(s)`,
-              });
-              return;
-            }
-
-            // All threads resolved — set bot-review success
+            // All threads resolved or superseded — set bot-review success
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
