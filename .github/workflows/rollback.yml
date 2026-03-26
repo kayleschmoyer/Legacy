@@ -1,0 +1,570 @@
+name: Deployment Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "What to roll back"
+        required: true
+        type: choice
+        options:
+          - web
+          - lambda
+          - all
+      lambda_name:
+        description: "Specific lambda to roll back (blank = all lambdas)"
+        required: false
+        type: choice
+        options:
+          - ""
+          - db
+          - stats-lambda
+          - draft-processor
+          - game-selection
+          - jira-proxy
+          - oauth-proxy
+          - rollbar-discord
+          - stripe-webhook
+          - websocket
+      version_override:
+        description: "Override: deploy this specific commit SHA (web) or version string (lambda) instead of auto-detecting previous"
+        required: false
+        type: string
+        default: ""
+      dry_run:
+        description: "Dry run -- show what would change without executing"
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.target }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  actions: read
+
+env:
+  NX_DAEMON: false
+  NX_PARALLEL: 2
+  NX_CACHE_DIRECTORY: .nx-cache
+  NX_SKIP_NX_CACHE: false
+  NX_NO_CLOUD: true
+  NODE_OPTIONS: "--max_old_space_size=4096"
+  AWS_REGION: us-east-1
+  AWS_STAGE: dev
+  LAMBDA_PREFIX: legacy-sports-dev
+
+# ---------------------------------------------------------------------------
+# Job 1 -- Roll back web deployment
+# ---------------------------------------------------------------------------
+jobs:
+  rollback-web:
+    name: Rollback Web
+    if: inputs.target == 'web' || inputs.target == 'all'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Find Previous Successful Deploy
+        id: find-previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "::group::Finding previous successful web deployment"
+
+          if [ -n "${{ inputs.version_override }}" ]; then
+            echo "Using version override: ${{ inputs.version_override }}"
+            echo "target_sha=${{ inputs.version_override }}" >> "$GITHUB_OUTPUT"
+            echo "source=manual override" >> "$GITHUB_OUTPUT"
+          else
+            echo "Searching for previous successful deploy-web run..."
+
+            RUNS=$(gh api \
+              "repos/${{ github.repository }}/actions/workflows/deploy-web.yml/runs?status=success&branch=main&per_page=2" \
+              --jq '.workflow_runs | .[1] | {sha: .head_sha, id: .id, created: .created_at}')
+
+            if [ -z "$RUNS" ] || [ "$RUNS" = "null" ]; then
+              echo "::error::No previous successful web deployment found to roll back to"
+              exit 1
+            fi
+
+            TARGET_SHA=$(echo "$RUNS" | jq -r '.sha')
+            RUN_ID=$(echo "$RUNS" | jq -r '.id')
+            CREATED=$(echo "$RUNS" | jq -r '.created')
+
+            echo "Found previous deploy: SHA=$TARGET_SHA, run=$RUN_ID, created=$CREATED"
+            echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+            echo "source=auto-detected from run $RUN_ID ($CREATED)" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "::endgroup::"
+
+      - name: Dry Run Summary
+        if: inputs.dry_run
+        env:
+          TARGET_SHA: ${{ steps.find-previous.outputs.target_sha }}
+          SOURCE: ${{ steps.find-previous.outputs.source }}
+        run: |
+          echo "## Dry Run: Web Rollback" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Parameter | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Target SHA | \`$TARGET_SHA\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Source | $SOURCE |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Current SHA | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**No changes were made.** Remove the dry-run flag to execute." >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::DRY RUN would roll back web to $TARGET_SHA ($SOURCE)"
+
+      - name: Checkout Target Revision
+        if: "!inputs.dry_run"
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.find-previous.outputs.target_sha }}
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        if: "!inputs.dry_run"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          skip-system-deps: true
+
+      - name: Build Web App
+        if: "!inputs.dry_run"
+        env:
+          VITE_OAUTH_PROXY_URL: ${{ secrets.VITE_OAUTH_PROXY_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GRAPHQL_HOST: ${{ secrets.VITE_GRAPHQL_HOST }}
+          VITE_WEBSOCKET_URL: ${{ secrets.VITE_WEBSOCKET_URL }}
+          VITE_GA_MEASUREMENT_ID: ${{ secrets.VITE_GA_MEASUREMENT_ID }}
+          VITE_GIPHY_API_KEY: ${{ secrets.VITE_GIPHY_API_KEY }}
+          VITE_ROLLBAR_ACCESS_TOKEN: ${{ secrets.VITE_ROLLBAR_ACCESS_TOKEN }}
+          VITE_COMMIT_SHA: ${{ steps.find-previous.outputs.target_sha }}
+          VITE_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+          VITE_BRANCH: rollback
+          ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          NODE_ENV: production
+        run: |
+          VERSION=$(node -p "require('./apps/web/package.json').version")
+          export VITE_VERSION="$VERSION"
+          export VITE_APP_VERSION="$VERSION"
+          export VITE_JIRA_PROXY_URL="${VITE_GRAPHQL_HOST%/graphql}/jira"
+
+          TARGET_SHA="${{ steps.find-previous.outputs.target_sha }}"
+          echo "Building web app at rollback revision ${TARGET_SHA:0:7}..."
+
+          NX_CMD="${NX_COMMAND:-}"
+          if [ -z "$NX_CMD" ]; then
+            if command -v pnpm >/dev/null 2>&1; then
+              NX_CMD="pnpm exec nx --"
+            else
+              NX_CMD="pnpm exec nx"
+            fi
+          fi
+
+          $NX_CMD build web --configuration=deploy
+
+      - name: Add CNAME for Custom Domain
+        if: "!inputs.dry_run"
+        run: |
+          mkdir -p ./dist/apps/web
+          echo "legacy-fantasy.com" > ./dist/apps/web/CNAME
+
+      - name: Setup Pages
+        if: "!inputs.dry_run"
+        uses: actions/configure-pages@v5
+
+      - name: Upload to GitHub Pages
+        if: "!inputs.dry_run"
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./dist/apps/web
+
+      - name: "Rollbar Deploy Started (Rollback)"
+        if: "!inputs.dry_run"
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: production
+          revision: ${{ steps.find-previous.outputs.target_sha }}
+          status: started
+          comment: "Web ROLLBACK to ${{ steps.find-previous.outputs.target_sha }} (run ${{ github.run_id }})"
+
+      - name: Deploy to GitHub Pages
+        if: "!inputs.dry_run"
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: "Rollbar Deploy Succeeded (Rollback)"
+        if: "!inputs.dry_run && success()"
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: production
+          revision: ${{ steps.find-previous.outputs.target_sha }}
+          status: succeeded
+          comment: "Web ROLLBACK to ${{ steps.find-previous.outputs.target_sha }} (run ${{ github.run_id }})"
+
+      - name: "Rollbar Deploy Failed (Rollback)"
+        if: "!inputs.dry_run && failure()"
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: production
+          revision: ${{ steps.find-previous.outputs.target_sha }}
+          status: failed
+          comment: "Web ROLLBACK to ${{ steps.find-previous.outputs.target_sha }} (run ${{ github.run_id }})"
+
+      - name: "Discord Rollback Notification"
+        if: "!inputs.dry_run && always()"
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "Web Rollback"
+          environment: production
+          description: "Rolled back web to commit ${{ steps.find-previous.outputs.target_sha }} (${{ steps.find-previous.outputs.source }})"
+
+  # ---------------------------------------------------------------------------
+  # Job 2 -- Roll back lambda deployment(s)
+  # ---------------------------------------------------------------------------
+  rollback-lambda:
+    name: Rollback Lambda
+    if: inputs.target == 'lambda' || inputs.target == 'all'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Determine Lambdas to Roll Back
+        id: detect
+        run: |
+          REGISTRY='[
+            {"project":"db","ssmName":"graphql","badgeName":"GraphQL Lambda"},
+            {"project":"stats-lambda","ssmName":"stats","badgeName":"Stats Lambda"},
+            {"project":"draft-processor","ssmName":"draft-processor","badgeName":"Draft Processor Lambda"},
+            {"project":"game-selection","ssmName":"game-selection","badgeName":"Game Selection Lambda"},
+            {"project":"jira-proxy","ssmName":"jira-proxy","badgeName":"Jira Proxy Lambda"},
+            {"project":"oauth-proxy","ssmName":"oauth-proxy","badgeName":"OAuth Proxy Lambda"},
+            {"project":"rollbar-discord","ssmName":"rollbar-discord","badgeName":"Rollbar Discord Lambda"},
+            {"project":"stripe-webhook","ssmName":"stripe-webhook","badgeName":"Stripe Webhook Lambda"},
+            {"project":"websocket","ssmName":"websocket","badgeName":"WebSocket Lambda"}
+          ]'
+
+          if [ -n "${{ inputs.lambda_name }}" ]; then
+            TARGETS=$(echo "$REGISTRY" | jq -c "[.[] | select(.project == \"${{ inputs.lambda_name }}\")]")
+          else
+            TARGETS="$REGISTRY"
+          fi
+
+          COUNT=$(echo "$TARGETS" | jq 'length')
+          echo "Rolling back $COUNT lambda(s)"
+          echo "$TARGETS" | jq -r '.[].ssmName'
+          echo "targets=$(echo "$TARGETS" | jq -c '.')" >> "$GITHUB_OUTPUT"
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Get Previous Versions from SSM History
+        id: versions
+        env:
+          TARGETS: ${{ steps.detect.outputs.targets }}
+        run: |
+          echo "::group::Reading SSM parameter history for rollback versions"
+
+          ROLLBACK_PLAN="[]"
+          ERRORS=""
+
+          for SSM_NAME in $(echo "$TARGETS" | jq -r '.[].ssmName'); do
+            PARAM_PATH="/legacy-sports/${{ env.AWS_STAGE }}/lambda/${SSM_NAME}/version"
+            echo "--- $SSM_NAME ---"
+
+            CURRENT=$(aws ssm get-parameter \
+              --name "$PARAM_PATH" \
+              --query "Parameter.Value" \
+              --output text \
+              --region "${{ env.AWS_REGION }}" 2>/dev/null || echo "")
+
+            if [ -z "$CURRENT" ]; then
+              echo "::warning::No SSM parameter found for $SSM_NAME"
+              continue
+            fi
+
+            echo "  Current version: $CURRENT"
+
+            if [ -n "${{ inputs.version_override }}" ]; then
+              PREVIOUS="${{ inputs.version_override }}"
+              echo "  Using override version: $PREVIOUS"
+            else
+              PREVIOUS=$(aws ssm get-parameter-history \
+                --name "$PARAM_PATH" \
+                --query "Parameters[?Value!=\`${CURRENT}\`] | [-1].Value" \
+                --output text \
+                --region "${{ env.AWS_REGION }}" 2>/dev/null || echo "")
+
+              if [ -z "$PREVIOUS" ] || [ "$PREVIOUS" = "None" ]; then
+                echo "::warning::No previous version found for $SSM_NAME"
+                ERRORS="${ERRORS}No previous version for ${SSM_NAME}. "
+                continue
+              fi
+
+              echo "  Previous version: $PREVIOUS"
+            fi
+
+            ROLLBACK_PLAN=$(echo "$ROLLBACK_PLAN" | jq -c \
+              --arg name "$SSM_NAME" \
+              --arg current "$CURRENT" \
+              --arg previous "$PREVIOUS" \
+              --arg param "$PARAM_PATH" \
+              '. + [{"name": $name, "current": $current, "previous": $previous, "param": $param}]')
+          done
+
+          echo "::endgroup::"
+
+          PLAN_COUNT=$(echo "$ROLLBACK_PLAN" | jq 'length')
+          echo "plan=$ROLLBACK_PLAN" >> "$GITHUB_OUTPUT"
+          echo "plan_count=$PLAN_COUNT" >> "$GITHUB_OUTPUT"
+
+          if [ "$PLAN_COUNT" -eq 0 ]; then
+            echo "::error::No lambdas eligible for rollback. $ERRORS"
+            exit 1
+          fi
+
+          echo "Rollback plan: $PLAN_COUNT lambda(s)"
+
+      - name: Dry Run Summary
+        if: inputs.dry_run
+        env:
+          PLAN: ${{ steps.versions.outputs.plan }}
+        run: |
+          echo "## Dry Run: Lambda Rollback" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Lambda | Current Version | Rollback Version |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|----------------|-----------------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "$PLAN" | jq -r '.[] | "| \(.name) | `\(.current)` | `\(.previous)` |"' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**No changes were made.** Remove the dry-run flag to execute." >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::DRY RUN would roll back $(echo "$PLAN" | jq 'length') lambda(s)"
+
+      - name: Update SSM Parameters
+        if: "!inputs.dry_run"
+        env:
+          PLAN: ${{ steps.versions.outputs.plan }}
+        run: |
+          echo "::group::Rolling back SSM parameters"
+
+          for ROW in $(echo "$PLAN" | jq -c '.[]'); do
+            NAME=$(echo "$ROW" | jq -r '.name')
+            PARAM=$(echo "$ROW" | jq -r '.param')
+            PREVIOUS=$(echo "$ROW" | jq -r '.previous')
+
+            echo "Rolling back $NAME to $PREVIOUS..."
+            aws ssm put-parameter \
+              --name "$PARAM" \
+              --value "$PREVIOUS" \
+              --overwrite \
+              --region "${{ env.AWS_REGION }}"
+            echo "  SSM updated for $NAME"
+          done
+
+          echo "::endgroup::"
+
+      - name: "Rollbar Deploy Started (Lambda Rollback)"
+        if: "!inputs.dry_run"
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: ${{ env.AWS_STAGE }}
+          status: started
+          comment: "Lambda ROLLBACK (${{ steps.versions.outputs.plan_count }} function(s), run ${{ github.run_id }})"
+
+      - name: Setup Terraform
+        if: "!inputs.dry_run"
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~> 1.14"
+
+      - name: Initialize Terraform
+        if: "!inputs.dry_run"
+        working-directory: terraform
+        run: terraform init -input=false
+
+      - name: Clear Stale Locks
+        if: "!inputs.dry_run"
+        run: |
+          STATE_KEY="legacy-sports-terraform-state/legacy-sports/terraform.tfstate"
+          LOCK_ITEM=$(aws dynamodb get-item \
+            --table-name terraform-state-locks \
+            --key "{\"LockID\":{\"S\":\"$STATE_KEY\"}}" \
+            --region us-east-1 \
+            --output json 2>&1) || true
+
+          if echo "$LOCK_ITEM" | jq -e '.Item' > /dev/null 2>&1; then
+            echo "Removing stale Terraform lock..."
+            aws dynamodb delete-item \
+              --table-name terraform-state-locks \
+              --key "{\"LockID\":{\"S\":\"$STATE_KEY\"}}" \
+              --region us-east-1
+          else
+            echo "No stale locks detected"
+          fi
+
+      - name: Validate Required Secrets
+        if: "!inputs.dry_run"
+        run: |
+          MISSING=()
+          if [ -z "${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}" ]; then
+            MISSING+=("GOOGLE_OAUTH_CLIENT_SECRET")
+          fi
+          if [ -z "${{ secrets.JWT_SECRET_KEY }}" ]; then
+            MISSING+=("JWT_SECRET_KEY")
+          fi
+          if [ -z "${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}" ]; then
+            MISSING+=("OAUTH_PROXY_COOKIE_SECRET")
+          fi
+          if [ -z "${{ secrets.JIRA_CREDENTIALS }}" ]; then
+            MISSING+=("JIRA_CREDENTIALS")
+          fi
+          if [ -z "${{ secrets.ROLLBAR_ACCESS_TOKEN }}" ]; then
+            MISSING+=("ROLLBAR_ACCESS_TOKEN")
+          fi
+          if [ -z "${{ secrets.STRIPE_SECRET_KEY }}" ]; then
+            MISSING+=("STRIPE_SECRET_KEY")
+          fi
+          if [ -z "${{ secrets.STRIPE_WEBHOOK_SECRET }}" ]; then
+            MISSING+=("STRIPE_WEBHOOK_SECRET")
+          fi
+          if [ -z "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+            MISSING+=("DISCORD_WEBHOOK_URL")
+          fi
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::Missing required secrets: ${MISSING[*]}"
+            exit 1
+          fi
+
+      - name: Plan and Apply Terraform
+        if: "!inputs.dry_run"
+        id: terraform-apply
+        working-directory: terraform
+        env:
+          TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
+          TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
+          TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
+          TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+          TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
+          TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
+          TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+          TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
+        run: |
+          echo "Planning Terraform changes for rollback..."
+          terraform plan -input=false -out=tfplan -lock-timeout=5m
+
+          echo "Applying Terraform changes..."
+          terraform apply -input=false -auto-approve -lock-timeout=5m tfplan
+
+      - name: Release Lock on Failure
+        if: always() && !inputs.dry_run && steps.terraform-apply.outcome == 'failure'
+        run: |
+          aws dynamodb delete-item \
+            --table-name terraform-state-locks \
+            --key '{"LockID":{"S":"legacy-sports-terraform-state/legacy-sports/terraform.tfstate"}}' \
+            --region us-east-1 2>&1 || true
+
+      - name: Health Check Lambdas
+        if: "!inputs.dry_run && steps.terraform-apply.outcome == 'success'"
+        env:
+          PLAN: ${{ steps.versions.outputs.plan }}
+        run: |
+          echo "::group::Post-rollback health checks"
+
+          HEALTHY=0
+          UNHEALTHY=0
+
+          for SSM_NAME in $(echo "$PLAN" | jq -r '.[].name'); do
+            FUNC_NAME="${{ env.LAMBDA_PREFIX }}-${SSM_NAME}"
+            STATE=$(aws lambda get-function-configuration \
+              --function-name "$FUNC_NAME" \
+              --region "${{ env.AWS_REGION }}" \
+              --query "State" --output text 2>/dev/null || echo "unknown")
+
+            if [ "$STATE" = "Active" ]; then
+              echo "  $SSM_NAME: Active"
+              HEALTHY=$((HEALTHY + 1))
+            else
+              echo "::warning::$SSM_NAME is in state: $STATE"
+              UNHEALTHY=$((UNHEALTHY + 1))
+            fi
+          done
+
+          echo "::endgroup::"
+
+          echo "## Lambda Health Check" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Healthy: $HEALTHY" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Unhealthy: $UNHEALTHY" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$UNHEALTHY" -gt 0 ]; then
+            echo "::warning::$UNHEALTHY lambda(s) not in Active state after rollback"
+          fi
+
+      - name: "Rollbar Deploy Succeeded (Lambda Rollback)"
+        if: "!inputs.dry_run && success()"
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: ${{ env.AWS_STAGE }}
+          status: succeeded
+          comment: "Lambda ROLLBACK (${{ steps.versions.outputs.plan_count }} function(s), run ${{ github.run_id }})"
+
+      - name: "Rollbar Deploy Failed (Lambda Rollback)"
+        if: "!inputs.dry_run && failure()"
+        uses: ./.github/actions/rollbar-deploy
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          environment: ${{ env.AWS_STAGE }}
+          status: failed
+          comment: "Lambda ROLLBACK (${{ steps.versions.outputs.plan_count }} function(s), run ${{ github.run_id }})"
+
+      - name: "Discord Rollback Notification"
+        if: "!inputs.dry_run && always()"
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          title: "Lambda Rollback"
+          environment: ${{ env.AWS_STAGE }}
+          description: "Rolled back ${{ steps.versions.outputs.plan_count }} lambda(s)"
+
+      - name: Rollback Summary
+        if: "!inputs.dry_run && always()"
+        env:
+          PLAN: ${{ steps.versions.outputs.plan }}
+        run: |
+          echo "## Lambda Rollback Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Lambda | Previous Version | Rolled Back To |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-----------------|---------------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "$PLAN" | jq -r '.[] | "| \(.name) | `\(.current)` | `\(.previous)` |"' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Status**: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
