@@ -37,7 +37,22 @@ import { viewPR } from './tools/view-pr.js';
  * array). Each label must be non-empty after trimming.
  */
 const labelList = z.preprocess(
-  (val) => (typeof val === 'string' ? [val] : val),
+  (val) => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      // Handle JSON-encoded array strings (e.g. '["merge-when-ready"]')
+      if (val.trimStart().startsWith('[')) {
+        try {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed)) return parsed;
+        } catch {
+          // Not valid JSON — treat as bare label string
+        }
+      }
+      return [val];
+    }
+    return val;
+  },
   z.array(z.string().trim().min(1, 'Label name must be non-empty')),
 );
 
