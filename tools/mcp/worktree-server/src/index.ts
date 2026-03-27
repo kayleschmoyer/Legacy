@@ -669,7 +669,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_stabilize',
       description:
-        'Post-rebase stabilization: install, schema, codegen. Must run BEFORE push.',
+        'Post-rebase stabilization: install, db:print-schema, codegen. Must run BEFORE push.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -2809,8 +2809,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       const cwd = target.path;
       const log: string[] = [`[cwd: ${cwd}]`, '', 'Post-rebase stabilization:'];
+
+      // Check if node_modules is a junction/symlink — skip install if so
+      const nodeModulesPath = join(cwd, 'node_modules');
+      const nodeModulesIsJunction = isJunction(nodeModulesPath);
+
       const steps = [
-        { label: 'make install', cmd: 'make install', timeout: 300_000 },
+        ...(nodeModulesIsJunction
+          ? []
+          : [
+              {
+                label: 'make install',
+                cmd: 'make install',
+                timeout: 300_000,
+              },
+            ]),
         {
           label: 'pnpm exec nx run db:print-schema',
           cmd: 'pnpm exec nx run db:print-schema',
@@ -2822,6 +2835,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           timeout: 120_000,
         },
       ];
+
+      if (nodeModulesIsJunction) {
+        log.push(
+          '⚠ node_modules is a junction/symlink — skipping make install to avoid mutating shared deps',
+        );
+      }
 
       for (const step of steps) {
         log.push(``, `$ ${step.label}`);
