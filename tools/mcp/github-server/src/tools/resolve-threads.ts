@@ -97,6 +97,7 @@ export async function resolveThreads(
   // Copilot Auto-Approve recheck workflow so bot-review status gets updated.
   // This closes the gap where threads are resolved without a code push.
   let recheckTriggered = false;
+  let recheckNote: string | undefined;
   let recheckError: string | undefined;
   if (params.prNumber && resolved > 0 && failed === 0) {
     try {
@@ -112,13 +113,22 @@ export async function resolveThreads(
       recheckTriggered = true;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      // Workflow dispatch requires Actions write permission (classic PAT
-      // needs the `workflow` scope; fine-grained tokens need Actions write).
-      // Surface this clearly so the caller knows what to fix.
-      recheckError =
-        `Failed to trigger bot-review recheck: ${msg}. ` +
-        'Ensure the token has Actions workflow permissions ' +
-        '(classic PAT: `workflow` scope; fine-grained: Actions write).';
+      const status =
+        typeof error === 'object' && error !== null && 'status' in error
+          ? (error as { status?: number }).status
+          : undefined;
+      const is403 = status === 403 || msg.includes('(403)');
+      // 403 is expected when the token lacks Actions workflow dispatch
+      // permission (common with app tokens). Only surface as a hard error
+      // for non-permission failures.
+      if (is403) {
+        recheckNote =
+          'Recheck skipped: token lacks Actions workflow dispatch permission ' +
+          '(expected when the token lacks this permission, common with app tokens). ' +
+          'The auto-approve workflow will run on next push or manual trigger.';
+      } else {
+        recheckError = `Recheck failed: ${msg}`;
+      }
     }
   }
 
@@ -134,6 +144,7 @@ export async function resolveThreads(
             failed,
             results,
             recheckTriggered,
+            ...(recheckNote ? { recheckNote } : {}),
             ...(recheckError ? { recheckError } : {}),
           },
           null,
