@@ -269,6 +269,87 @@ jobs:
             }
 
   # ============================================================================
+  # Nightly Discord notifications (start + finish, threaded in forum channels)
+  # ============================================================================
+  notify-nightly-start:
+    name: "🔔 Nightly Start"
+    needs: [determine-scope]
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      thread-id: ${{ steps.notify.outputs.thread-id }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+
+      - name: "Discord Nightly Starting"
+        id: notify
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_CI_WEBHOOK_URL }}
+          status: running
+          title: "Nightly E2E Test Suite"
+          description: "Full E2E suite started — 3 shards, all tests (no filters)."
+          thread-name: "Nightly E2E — ${{ github.run_id }}"
+
+  notify-nightly-finish:
+    name: "🔔 Nightly Results"
+    needs: [ci-pipeline, notify-nightly-start]
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v6
+
+      - name: "Resolve Nightly Status"
+        id: nightly-status
+        shell: bash
+        run: |
+          PIPELINE_OUTPUT="${{ needs.ci-pipeline.outputs.overall-status }}"
+          PIPELINE_RESULT="${{ needs.ci-pipeline.result }}"
+
+          # Prefer the structured output; fall back to the job-level result
+          if [ -n "$PIPELINE_OUTPUT" ] && [ "$PIPELINE_OUTPUT" != "" ]; then
+            STATUS="$PIPELINE_OUTPUT"
+          else
+            STATUS="$PIPELINE_RESULT"
+          fi
+
+          # Treat skipped/cancelled as failure — the nightly suite should always run
+          case "$STATUS" in
+            success) ;;
+            failure) ;;
+            cancelled|skipped)
+              STATUS="failure"
+              ;;
+            *)
+              STATUS="failure"
+              ;;
+          esac
+
+          # Tag user on any non-success result
+          if [ "$STATUS" != "success" ]; then
+            echo "content=<@205483185893670912>" >> "$GITHUB_OUTPUT"
+          else
+            echo "content=" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: "Discord Nightly Results"
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_CI_WEBHOOK_URL }}
+          status: ${{ steps.nightly-status.outputs.status }}
+          title: "Nightly E2E Test Suite — Results"
+          description: |
+            **[📊 Playwright Report](https://bkrupa.github.io/legacy-sports-deploys/playwright-report/${{ github.run_id }}/)**
+          content: ${{ steps.nightly-status.outputs.content }}
+          thread-id: ${{ needs.notify-nightly-start.outputs.thread-id }}
+
+  # ============================================================================
   # Remove "merge-when-ready" label on CI failure
   # ============================================================================
   # Prevents a failing PR from sitting in the merge queue indefinitely.
