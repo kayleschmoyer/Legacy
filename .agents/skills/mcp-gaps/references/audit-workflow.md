@@ -15,11 +15,14 @@ Review the conversation history for all `Bash` tool invocations. Ignore:
 - **File listing/search via Bash** when a dedicated tool exists — `ls | tail`, `ls -1 | sort`, `find . -name "*.ts"` should use **Glob** (pattern matching, sorted by modification time). `ls` is fine for quick directory orientation, but when used to discover files by name/pattern or determine naming conventions (e.g., listing migrations to find the latest timestamp), Glob is the correct tool. Classify as `missing-awareness` if the agent used Bash instead
 - **Commands with no realistic MCP equivalent** (e.g., interactive editors, ad-hoc `python -c` scripts)
 
+**Do NOT ignore documented Bash exceptions.** AGENTS.md and skill docs sometimes document shell commands as accepted workarounds (e.g., "no Nx target equivalent", "shell fallback"). These are _acknowledged_ gaps, not permanent exemptions. The audit should still flag them as gaps (usually `missing-tool` or `missing-feature` as appropriate) so they get tracked and eventually closed. Add a note in the ticket description: `This is a documented exception in AGENTS.md/skill docs — filing to track closure.`
+
 Focus on commands that:
 
 - Were used to accomplish a **repeatable workflow step** (build, test, deploy, query, migrate)
 - Have an existing MCP server that _should_ cover them but doesn't
 - Were run because the agent didn't know an MCP tool existed, or the MCP tool was missing a feature
+- Are documented as accepted Bash exceptions in AGENTS.md or skill docs (these represent known gaps worth tracking)
 
 #### Commonly dismissed but recurring patterns
 
