@@ -30,9 +30,9 @@ interface PRNode {
   title: string;
   headRefName: string;
   isDraft: boolean;
-  mergeable: string;
+  mergeable?: string;
   labels: { nodes: Array<{ name: string }> };
-  commits: {
+  commits?: {
     nodes: Array<{
       commit: {
         statusCheckRollup: {
@@ -317,6 +317,25 @@ query($owner: String!, $repo: String!, $first: Int!) {
   }
 }`;
 
+/**
+ * Lighter query that omits permission-gated fields (mergeable, statusCheckRollup).
+ * Used as a fallback when the full query fails with 403 (e.g. GitHub App tokens).
+ */
+const LIST_OPEN_PRS_LIGHT_QUERY = `
+query($owner: String!, $repo: String!, $first: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(first: $first, states: [OPEN], orderBy: {field: UPDATED_AT, direction: DESC}) {
+      nodes {
+        number
+        title
+        headRefName
+        isDraft
+        labels(first: 20) { nodes { name } }
+      }
+    }
+  }
+}`;
+
 interface ListOpenPRsResponse {
   repository: {
     pullRequests: {
@@ -328,18 +347,39 @@ interface ListOpenPRsResponse {
 export async function prScan(params: PRScanParams): Promise<ToolResult> {
   try {
     const repo = await getRepoOwnerName();
-    const limit = Math.min(params.limit ?? 100, 100);
+    const limit = Math.min(params.limit ?? 100, 200);
 
-    const result = await githubGraphQL<ListOpenPRsResponse>(
-      LIST_OPEN_PRS_QUERY,
-      {
-        owner: repo.owner,
-        repo: repo.name,
-        first: limit,
-      },
-    );
+    let allPrs: PRNode[];
+    let degraded = false;
 
-    const allPrs = result.data.repository.pullRequests.nodes;
+    try {
+      const result = await githubGraphQL<ListOpenPRsResponse>(
+        LIST_OPEN_PRS_QUERY,
+        { owner: repo.owner, repo: repo.name, first: limit },
+      );
+      allPrs = result.data.repository.pullRequests.nodes;
+    } catch (fullQueryError) {
+      const msg =
+        fullQueryError instanceof Error
+          ? fullQueryError.message
+          : String(fullQueryError);
+      // On known field-level permission errors, fall back to the light query
+      const isFieldLevelPermissionError =
+        msg.includes('Resource not accessible by integration') ||
+        msg.includes('Resource not accessible due to missing scopes') ||
+        msg.includes('Resource not accessible');
+      if (isFieldLevelPermissionError) {
+        const fallback = await githubGraphQL<ListOpenPRsResponse>(
+          LIST_OPEN_PRS_LIGHT_QUERY,
+          { owner: repo.owner, repo: repo.name, first: limit },
+        );
+        allPrs = fallback.data.repository.pullRequests.nodes;
+        degraded = true;
+      } else {
+        throw fullQueryError;
+      }
+    }
+
     const excludeDrafts = params.excludeDrafts ?? true;
     const draftsExcluded = excludeDrafts
       ? allPrs.filter((pr) => pr.isDraft).length
@@ -369,7 +409,14 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
         conflicting.push(base);
       }
 
-      const commitNode = pr.commits.nodes[0];
+      // In degraded mode, CI/merge data is unavailable — treat as CI unknown
+      // but still classify PRs so they appear in the clean bucket
+      if (degraded) {
+        ciPassingNumbers.add(pr.number);
+        continue;
+      }
+
+      const commitNode = pr.commits?.nodes[0];
       const checkNodes =
         commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
 
@@ -448,12 +495,17 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
       );
     }
 
+    const degradedNote = degraded
+      ? 'Degraded mode: mergeable status and CI checks unavailable (token lacks required permissions). Review threads are still fetched.'
+      : undefined;
+
     // Compact mode: return only essential fields to reduce token usage
     if (params.compact) {
       const compactOutput = {
         scannedAt: new Date().toISOString(),
         totalOpen: prs.length,
         ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
+        ...(degradedNote ? { degradedNote } : {}),
         conflicting: conflicting.map((p) => ({
           number: p.number,
           branch: p.headRefName,
@@ -488,6 +540,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
       scannedAt: new Date().toISOString(),
       totalOpen: prs.length,
       ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
+      ...(degradedNote ? { degradedNote } : {}),
       conflicting,
       reviews,
       ciFailing,
