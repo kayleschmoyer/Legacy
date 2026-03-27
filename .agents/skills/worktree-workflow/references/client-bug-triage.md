@@ -39,20 +39,22 @@ Read the ticket description thoroughly. Client bug reports typically include:
 
 Also check ticket comments for additional context using `jira_get_comments`.
 
-### 3. Reproduce the bug
+### 3. Reproduce the bug and capture "before" evidence
 
 **Before investigating code, observe the broken behavior.** This ensures you understand the actual user experience and gives you a baseline to verify against after the fix.
 
-Choose the reproduction method based on bug category:
+Choose the reproduction method based on bug category. **You MUST save a named artifact** — this artifact is required in step 6 (verify) and step 9 (ship).
 
-| Bug category           | How to reproduce                                                                                                                                                                                                                                                                                            |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **UI / visual**        | `browser_dev_start({ worktreePath: $wt })` → `browser_navigate({ url: "/affected-page", port })` → `browser_screenshot({ name: "bug-before" })`. Follow the user's steps from the ticket to trigger the broken state.                                                                                       |
-| **Resolver / logic**   | Write a **failing test** that exercises the broken code path — unit test or DB integration test (`lambdas/db/**/*.integration.spec.ts`). The test should assert the expected (correct) behavior and fail against the current code.                                                                          |
-| **Distributed system** | Write or extend a Playwright integration test (`apps/web-e2e/src/integration/tests/`) that triggers the async flow and asserts the expected end-state. Use `expect.poll()` or `waitForStatsLoaded` helpers for async processes. Alternatively, use `aws_logs_tail` to capture the error in CloudWatch logs. |
-| **Data / query**       | Use `db_query` to demonstrate the incorrect data or query result. Save the output for comparison after the fix.                                                                                                                                                                                             |
+| Bug category           | How to reproduce                                                                                                                                                                                                                                                                                            | Required artifact                                                                                                     |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **UI / visual**        | `browser_dev_start({ worktreePath: $wt })` → `browser_navigate({ url: "/affected-page", port })` → `browser_screenshot({ name: "bug-before" })`. Follow the user's steps from the ticket to trigger the broken state.                                                                                       | Screenshot file: `bug-before.png` (via `browser_screenshot`)                                                          |
+| **Resolver / logic**   | Write a **failing test** that exercises the broken code path — unit test or DB integration test (`lambdas/db/**/*.integration.spec.ts`). The test should assert the expected (correct) behavior and fail against the current code.                                                                          | Failing test output: copy the `FAIL` output block (test name + expected/received) to `scratch/before-test-output.txt` |
+| **Distributed system** | Write or extend a Playwright integration test (`apps/web-e2e/src/integration/tests/`) that triggers the async flow and asserts the expected end-state. Use `expect.poll()` or `waitForStatsLoaded` helpers for async processes. Alternatively, use `aws_logs_tail` to capture the error in CloudWatch logs. | Failing test output or error log: save to `scratch/before-test-output.txt` or `scratch/before-logs.txt`               |
+| **Data / query**       | Use `db_query` to demonstrate the incorrect data or query result. Save the output for comparison after the fix.                                                                                                                                                                                             | Query result: save to `scratch/before-query-result.txt`                                                               |
 
-> **If reproduction is not possible** (environment-specific, production data required, mobile-only): document why in the PR body under a `## Verification` section and add a regression test covering the code path.
+> **Checkpoint:** after this step you must have at least one named artifact. If you cannot produce one, document why (see "reproduction not possible" below) — but do not proceed to step 4 without either an artifact or a documented reason.
+
+> **If reproduction is not possible** (environment-specific, production data required, mobile-only): document why in the PR body under a `## Verification` section and add a regression test covering the code path. See [bug-verification-templates.md](../../pr-lifecycle/references/bug-verification-templates.md) for the "reproduction not possible" template.
 
 ### 4. Investigate the root cause
 
@@ -88,18 +90,20 @@ Follow the [fix-bugs skill](../../debugging/references/bug-fixing.md) principles
 - **Add appropriate null guards** where data can legitimately be missing
 - **Fix race conditions** with proper locking or sequencing
 
-### 6. Verify the fix
+### 6. Verify the fix and capture "after" evidence
 
-**Re-run the exact reproduction scenario from step 3.** The broken behavior must be gone.
+**Re-run the exact reproduction scenario from step 3.** The broken behavior must be gone. Save the "after" artifact alongside the "before" artifact from step 3.
 
-| Bug category           | How to verify                                                                                                                                                                                                                                   |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **UI / visual**        | `browser_navigate` to the same page → `browser_screenshot(name: "bug-after")` → confirm the broken behavior is resolved. Upload before/after screenshots via `browser_screenshot_upload()` — these go in the PR body.                           |
-| **Resolver / logic**   | Run the failing test from step 3 — it must now pass. The test stays as permanent regression coverage.                                                                                                                                           |
-| **Distributed system** | Run the integration test — the async flow must complete successfully. For multi-step flows, verify each phase reaches the expected state. If reproduction used `aws_logs_tail`, re-check CloudWatch logs to confirm the error no longer occurs. |
-| **Data / query**       | Re-run the same `db_query` — results must be correct.                                                                                                                                                                                           |
+| Bug category           | How to verify                                                                                                                                                                                                                                   | Required artifact                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **UI / visual**        | `browser_navigate` to the same page → `browser_screenshot({ name: "bug-after" })` → confirm the broken behavior is resolved. Upload before/after screenshots via `browser_screenshot_upload()` — these go in the PR body.                       | Screenshot file: `bug-after.png` (via `browser_screenshot`)               |
+| **Resolver / logic**   | Run the failing test from step 3 — it must now pass. The test stays as permanent regression coverage.                                                                                                                                           | Passing test output: save to `scratch/after-test-output.txt`              |
+| **Distributed system** | Run the integration test — the async flow must complete successfully. For multi-step flows, verify each phase reaches the expected state. If reproduction used `aws_logs_tail`, re-check CloudWatch logs to confirm the error no longer occurs. | Passing test output or clean log: save to `scratch/after-test-output.txt` |
+| **Data / query**       | Re-run the same `db_query` — results must be correct.                                                                                                                                                                                           | Query result: save to `scratch/after-query-result.txt`                    |
 
 **Mixed bugs** (e.g., UI caused by a resolver issue): verify at the layer the user experiences — if the ticket reports broken UI, screenshot verification is required even if the root cause was in a resolver.
+
+> **Checkpoint:** you must now have both a "before" artifact (step 3) and an "after" artifact. Both are required for the `## Verification` section in step 9.
 
 > This step is **not optional**. `make pc` passing proves the code compiles and existing tests pass — it does not prove the reported bug is fixed.
 
@@ -122,8 +126,14 @@ Follow the standard workflow:
 
 1. Commit with conventional message: `fix(scope): description`
 2. Push with `--force-with-lease`
-3. Create PR as draft with `github_create_pr({ draft: true })`, then mark ready with `github_mark_pr_ready` — include a `## Verification` section in the PR body with before/after evidence (screenshots, test output, or query results)
-4. Transition Jira ticket to "In Review"
+3. **Build the `## Verification` section** from the artifacts collected in steps 3 and 6. Use the appropriate template from [bug-verification-templates.md](../../pr-lifecycle/references/bug-verification-templates.md):
+   - UI bugs: upload `bug-before.png` and `bug-after.png` via `browser_screenshot_upload()`, embed the markdown image URLs
+   - Resolver/logic bugs: paste the failing and passing test output from `scratch/before-test-output.txt` and `scratch/after-test-output.txt`
+   - Data/query bugs: paste query results from `scratch/before-query-result.txt` and `scratch/after-query-result.txt`
+   - Distributed system bugs: paste log/test output from the corresponding scratch files
+   - Mixed bugs: combine templates for each layer involved
+4. Create PR as draft with `github_create_pr({ draft: true })`, then mark ready with `github_mark_pr_ready`. The PR body **must** use the [bug-fix PR body template](../../pr-lifecycle/references/create-pr.md#bug-fix-pr-body-template) with the `## Verification` section populated from steps 3 and 6 above. **Do not create the PR if the `## Verification` section is empty.**
+5. Transition Jira ticket to "In Review"
 
 ## Gotchas
 

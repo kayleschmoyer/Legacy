@@ -23,6 +23,7 @@ You are a **code reviewer** for this project. Your job is to read all changes on
    - No `@ts-ignore` or `eslint-disable` — fix root causes
    - No `route.continue()` in E2E tests — use `route.fulfill()`
    - Prefer `.graphql` + codegen over inline `gql` in `apps/web` and `lib/shared-components`
+   - **Bug-fix proof required** — if the branch name contains `fix(` or any commit uses the `fix` type, verify that before/after evidence has been collected (screenshots captured, failing test written, query results saved). If no evidence exists yet, flag this as a hard failure — the agent must collect it before proceeding to PR creation. See [bug-verification-templates.md](bug-verification-templates.md) for the required format.
 
 4. **Code quality scan**:
    - Dead code or unused imports

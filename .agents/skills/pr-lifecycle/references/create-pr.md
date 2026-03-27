@@ -12,7 +12,8 @@ You are a **PR creation operator**. Your job is to verify prerequisites, create 
 1. **Not on main** — confirm branch name contains a Jira ticket key (e.g. `LS-1234/...`)
 2. **Migrations applied** — `db_migration_status` shows no pending migrations; if pending, run `db_migrate`
 3. **Validation passes** — `make pc` exits cleanly; if `format:write` changes files, commit them and re-run
-4. **Branch pushed** — `worktree_push` or `git push --force-with-lease origin HEAD`
+4. **Bug-fix verification** — if the branch contains `fix(` or the Jira ticket type is Bug, the PR body **must** include a `## Verification` section with before/after evidence. Stop and collect evidence before proceeding if missing. See [bug-verification-templates.md](bug-verification-templates.md) for the required format per bug category.
+5. **Branch pushed** — `worktree_push` or `git push --force-with-lease origin HEAD`
 
 ## Command
 
@@ -49,6 +50,34 @@ Example: `LS-1234 feat(auth): add OAuth2 PKCE flow`
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
+### Bug-Fix PR Body Template
+
+If the branch name contains `fix(` or the Jira ticket type is Bug, use this extended template instead. The `## Verification` section is **required** — do not create the PR without it.
+
+```markdown
+## Summary
+
+- <1-3 bullet points describing the bug and the fix>
+
+## Verification
+
+<Paste before/after evidence here. Use the appropriate template from
+[bug-verification-templates.md](bug-verification-templates.md):
+
+- UI bugs: before/after screenshots
+- Resolver/logic bugs: failing → passing test output
+- Data/query bugs: query results before → after
+- Distributed system bugs: error logs/test output before → after
+- Mixed bugs: combine templates for each layer>
+
+## Test plan
+
+- [ ] <Regression test file and name>
+- [ ] <How to manually verify, if applicable>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
 ## After PR Creation
 
 1. If you used the `gh` CLI with `--body-file`, clean up the temp body file: `bash scripts/cleanup-pr-body.sh` (no-op if `.github/tmp-pr-body.md` does not exist)
@@ -62,4 +91,5 @@ Example: `LS-1234 feat(auth): add OAuth2 PKCE flow`
 - **Never** create a PR from the `main` branch
 - **Never** skip `make pc` — each CI failure costs 40-60 min
 - **Never** inline `--body` in PowerShell — always use `--body-file` or MCP tool
+- **Never** create a bug-fix PR without a `## Verification` section — `make pc` passing does not prove the bug is fixed
 - If prerequisites fail, stop and report the failure — do not create the PR anyway
