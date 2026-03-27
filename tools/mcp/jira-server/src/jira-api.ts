@@ -6,6 +6,19 @@ import {
 } from './netrc.js';
 import { getAccessToken } from './oauth.js';
 
+/** Truncate API error bodies and redact potential auth tokens. */
+function sanitizeErrorBody(text: string, maxLen = 500): string {
+  let sanitized = text
+    .replace(/Bearer\s+[A-Za-z0-9_\-.]+/gi, 'Bearer ***')
+    .replace(/token\s+[A-Za-z0-9_\-.]+/gi, 'token ***')
+    .replace(/Basic\s+[A-Za-z0-9+/=]+/gi, 'Basic ***');
+  if (sanitized.length > maxLen) {
+    const suffix = '... (truncated)';
+    sanitized = sanitized.slice(0, maxLen - suffix.length) + suffix;
+  }
+  return sanitized;
+}
+
 interface JiraRequestOptions {
   method: 'GET' | 'PUT' | 'POST' | 'DELETE';
   path: string;
@@ -83,7 +96,7 @@ export async function jiraRequest<T = unknown>(
   if (!response.ok) {
     const text = await response.text();
     throw new Error(
-      `Jira API ${opts.method} ${opts.path} failed (${response.status}): ${text}`,
+      `Jira API ${opts.method} ${opts.path} failed (${response.status}): ${sanitizeErrorBody(text)}`,
     );
   }
 

@@ -100,12 +100,14 @@ curl -s -X POST http://localhost:5000/graphql \
 
 The dev GraphQL server falls back to an admin user (id=1) when no JWT is provided, so most queries work without auth headers.
 
-For mutations or queries needing a specific user, pass a JWT:
+For mutations or queries needing a specific user, pass a dev JWT. The dev server skips signature verification, so any valid-shaped JWT works — **never use production tokens here**:
 
-```powershell
+```bash
+# Generate a dev-only JWT (no real secret needed — dev server skips verification)
+DEV_JWT=$(node -e "console.log(require('jsonwebtoken').sign({sub:'1',role:'admin'},'dev-secret'))")
 curl -s -X POST http://localhost:5000/graphql \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <jwt>" \
+  -H "Authorization: Bearer $DEV_JWT" \
   -d '{"query": "mutation { createLeague(input: { name: \"Test\" }) { id } }"}'
 ```
 

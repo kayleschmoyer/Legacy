@@ -58,6 +58,7 @@ steps:
       # Export GH_TOKEN so the legacy-sports-github MCP server picks it up.
       # The MCP server checks GH_TOKEN first, then GITHUB_TOKEN at runtime.
       if [ -n "$AGENT_AUTHOR_TOKEN" ]; then
+        echo "::add-mask::$AGENT_AUTHOR_TOKEN"
         echo "GH_TOKEN=$AGENT_AUTHOR_TOKEN" >> "$GITHUB_ENV"
         echo "GH_TOKEN exported to environment for MCP server"
       fi

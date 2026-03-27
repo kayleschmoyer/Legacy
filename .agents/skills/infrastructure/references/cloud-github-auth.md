@@ -90,7 +90,7 @@ The token is cached to `~/.config/legacy-sports-github/token.json` and reused un
 ### "401 Unauthorized" on PR creation
 
 1. Check if the token is set: look for `GH_TOKEN` in environment settings
-2. Verify the token hasn't expired: `curl -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/user`
+2. Verify the token hasn't expired: `curl -sf -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/user` (prints only the HTTP status code, not the token)
 3. Verify the token has required permissions (see Token options above)
 4. If using a cached token, delete `~/.config/legacy-sports-github/token.json` to force re-auth
 

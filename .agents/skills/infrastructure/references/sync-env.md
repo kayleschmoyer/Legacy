@@ -67,13 +67,11 @@ Typically: `/legacy-sports/{environment}/{parameter-name}`
 **Solution**:
 
 ```powershell
-# Configure AWS CLI credentials
+# Configure AWS CLI credentials (preferred — avoids credentials in shell history)
 aws configure
 
-# Or set environment variables
-$env:AWS_ACCESS_KEY_ID = "your-key"
-$env:AWS_SECRET_ACCESS_KEY = "your-secret"
-$env:AWS_REGION = "us-east-1"
+# Or use AWS SSO
+aws sso login --profile your-profile
 ```
 
 ### Issue: Permission denied to access parameters

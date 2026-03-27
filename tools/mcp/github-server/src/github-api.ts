@@ -3,6 +3,24 @@ import { getToken, invalidateToken } from './auth.js';
 const BASE_URL = 'https://api.github.com';
 const API_VERSION = '2022-11-28';
 
+/** Truncate API error bodies and redact potential auth tokens. */
+function sanitizeErrorBody(text: string, maxLen = 500): string {
+  let sanitized = text
+    .replace(/Bearer\s+[A-Za-z0-9_\-.]+/gi, 'Bearer ***')
+    .replace(/Basic\s+[A-Za-z0-9+/=]+/gi, 'Basic ***')
+    .replace(/token\s+[A-Za-z0-9_\-.]+/gi, 'token ***')
+    .replace(/ghp_[A-Za-z0-9_]+/g, 'ghp_***')
+    .replace(/gho_[A-Za-z0-9_]+/g, 'gho_***')
+    .replace(/ghs_[A-Za-z0-9_]+/g, 'ghs_***')
+    .replace(/ghu_[A-Za-z0-9_]+/g, 'ghu_***')
+    .replace(/github_pat_[A-Za-z0-9_]+/g, 'github_pat_***');
+  if (sanitized.length > maxLen) {
+    const suffix = '... (truncated)';
+    sanitized = sanitized.slice(0, maxLen - suffix.length) + suffix;
+  }
+  return sanitized;
+}
+
 interface RestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   path: string;
@@ -73,7 +91,7 @@ async function doRest<T>(opts: RestOptions, canRetry: boolean): Promise<T> {
   if (!response.ok) {
     const text = await response.text();
     throw new Error(
-      `GitHub API ${opts.method} ${opts.path} failed (${response.status}): ${text}`,
+      `GitHub API ${opts.method} ${opts.path} failed (${response.status}): ${sanitizeErrorBody(text)}`,
     );
   }
 
@@ -129,7 +147,9 @@ async function doGraphQL<T>(
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`GitHub GraphQL failed (${response.status}): ${text}`);
+    throw new Error(
+      `GitHub GraphQL failed (${response.status}): ${sanitizeErrorBody(text)}`,
+    );
   }
 
   const result = (await response.json()) as GraphQLResponse<T>;

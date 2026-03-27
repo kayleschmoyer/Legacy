@@ -146,7 +146,7 @@ if [ "$DRY_RUN" = "true" ]; then
     echo "DRY RUN - Would update the following variables:"
     echo ""
     while IFS='=' read -r key value; do
-        if [[ $key =~ (PASSWORD|SECRET) ]]; then
+        if [[ $key =~ (PASSWORD|SECRET|TOKEN|_KEY|CREDENTIAL|DATABASE_URL) ]]; then
             masked_value=$(printf '%*s' ${#value} | tr ' ' '*')
             echo "  $key=$masked_value"
         else
@@ -189,7 +189,7 @@ while IFS= read -r line; do
             echo "$key=$new_value" >> "$NEW_ENV_FILE"
             
             # Show what changed (mask sensitive values)
-            if [[ $key =~ (PASSWORD|SECRET) ]]; then
+            if [[ $key =~ (PASSWORD|SECRET|TOKEN|_KEY|CREDENTIAL|DATABASE_URL) ]]; then
                 old_masked=$(printf '%*s' ${#old_value} | tr ' ' '*')
                 new_masked=$(printf '%*s' ${#new_value} | tr ' ' '*')
                 echo "  ✓ Updated $key (masked)"

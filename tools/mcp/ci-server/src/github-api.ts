@@ -4,6 +4,24 @@ import { fileURLToPath } from 'node:url';
 
 const GITHUB_API = 'https://api.github.com';
 
+/** Truncate API error bodies and redact potential auth tokens. */
+function sanitizeErrorBody(text: string, maxLen = 500): string {
+  let sanitized = text
+    .replace(/Bearer\s+[A-Za-z0-9_\-.]+/gi, 'Bearer ***')
+    .replace(/Basic\s+[A-Za-z0-9+/=]+/gi, 'Basic ***')
+    .replace(/token\s+[A-Za-z0-9_\-.]+/gi, 'token ***')
+    .replace(/ghp_[A-Za-z0-9_]+/g, 'ghp_***')
+    .replace(/gho_[A-Za-z0-9_]+/g, 'gho_***')
+    .replace(/ghs_[A-Za-z0-9_]+/g, 'ghs_***')
+    .replace(/ghu_[A-Za-z0-9_]+/g, 'ghu_***')
+    .replace(/github_pat_[A-Za-z0-9_]+/g, 'github_pat_***');
+  if (sanitized.length > maxLen) {
+    const suffix = '... (truncated)';
+    sanitized = sanitized.slice(0, maxLen - suffix.length) + suffix;
+  }
+  return sanitized;
+}
+
 /** Resolve the repository root from this script's location (tools/mcp/ci-server/src/). */
 export function getRepoRoot(): string {
   const thisDir = resolve(fileURLToPath(import.meta.url), '..');
@@ -100,7 +118,7 @@ export async function githubGet<T>(
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${body}`);
+    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
   }
 
   return (await res.json()) as T;
@@ -123,7 +141,7 @@ export async function githubGetText(path: string): Promise<string> {
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${body}`);
+    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
   }
 
   return res.text();
@@ -147,7 +165,7 @@ export async function githubGetArrayBuffer(path: string): Promise<ArrayBuffer> {
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${body}`);
+    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
   }
 
   return res.arrayBuffer();
@@ -169,7 +187,7 @@ export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${text}`);
+    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(text)}`);
   }
 
   // Some POST endpoints return 201 with a body, others return 204 with no body

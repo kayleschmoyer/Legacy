@@ -39,13 +39,11 @@ terraform force-unlock <lock-id-from-error>
 **Solution**: Configure AWS credentials
 
 ```powershell
-# Set environment variables
-$env:AWS_ACCESS_KEY_ID = "your-key"
-$env:AWS_SECRET_ACCESS_KEY = "your-secret"
-$env:AWS_REGION = "us-east-1"
-
-# Or use AWS CLI
+# Use AWS CLI (preferred — avoids credentials in shell history)
 aws configure
+
+# Or use AWS SSO
+aws sso login --profile your-profile
 ```
 
 ### Issue: Terraform state drift

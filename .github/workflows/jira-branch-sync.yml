@@ -175,7 +175,7 @@ jobs:
             2>&1) || {
             echo "❌ Failed to obtain OAuth access token from Atlassian."
             echo "   Check that client_id and client_secret are valid."
-            echo "Response: $TOKEN_RESPONSE"
+            echo "   Response keys: $(echo "$TOKEN_RESPONSE" | jq -r 'keys | join(", ")' 2>/dev/null || echo '(non-JSON response)')"
             exit 1
           }
 
