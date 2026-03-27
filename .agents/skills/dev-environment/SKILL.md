@@ -72,7 +72,7 @@ See [references/docker-local.md](references/docker-local.md) for full details (s
 1. **Install dependencies**: `make install` (never raw `pnpm install` in worktrees)
 2. **Sync environment variables**: `make sync-env` or `.\scripts\sync-env.ps1`
 3. **Database accessible**: local PostgreSQL running or Docker Compose stack up
-4. **Migrations applied**: `pnpm --prefix lib/db-client run db:status` then `pnpm --prefix lib/db-client run db:up`
+4. **Migrations applied**: `db_migration_status(worktreePath: "$wt")` then `db_migrate(worktreePath: "$wt")` (MCP tools). Shell fallback: `pnpm --prefix lib/db-client run db:status` then `pnpm --prefix lib/db-client run db:up`
 
 ## Full Stack Local Workflow
 

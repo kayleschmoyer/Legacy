@@ -281,19 +281,21 @@ git push -u origin HEAD
 ### Step 6b: Apply Pending Migrations 🚨 Required
 
 **Always do this step — even if you think no migrations were added.**
-Run `db:status` to check, then apply any pending migrations before running `make pc`.
+Run `db_migration_status` to check, then apply any pending migrations before running `make pc`.
 Tests may depend on the updated schema, so migrations must be applied first.
 
-```powershell
-# Check for pending migrations
-pnpm --prefix $wt/lib/db-client run db:status
+```
+# MCP tools (preferred)
+db_migration_status(worktreePath: "$wt")
+db_migrate(worktreePath: "$wt")
 
-# Apply any that are pending
+# Shell fallback
+pnpm --prefix $wt/lib/db-client run db:status
 pnpm --prefix $wt/lib/db-client run db:up
 ```
 
-Confirm `db:up` output shows `Applied N new migrations` or `No new migrations to apply`.
-If it throws an error, fix the migration SQL, re-commit, push, and re-run `db:up`.
+Confirm the MCP response contains `"applied": N` (with N >= 0) or the shell output shows `Applied N new migrations` / `No new migrations to apply`.
+If it throws an error, fix the migration SQL, re-commit, push, and re-run.
 
 > 🛑 **Blocked here? Do NOT open the PR.** A PR with an unapplied migration leaves the
 > local database out of sync and breaks any developer who pulls the branch.
@@ -427,7 +429,8 @@ worktree_push(worktree: "LS-####", setUpstream: true)
 # Shell fallback: git -C $wt add . ; git -C $wt commit -m "feat(scope): msg (LS-####)" ; git -C $wt push -u origin HEAD
 
 # 5. Migrations + validate
-pnpm --prefix $wt/lib/db-client run db:up
+db_migration_status(worktreePath: "$wt")
+db_migrate(worktreePath: "$wt")
 make -C $wt pc
 
 # 6. PR + Jira (DO NOT stop at make pc) — MCP tools primary

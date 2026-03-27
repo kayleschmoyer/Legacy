@@ -35,12 +35,12 @@ This file provides guidance to AI coding agents working with code in this reposi
 5. Setup worktree: `make wt-setup WT=$wt` (or manually: navigate to `$wt` then `make install`, copy `.env`, junction `.twig`)
    - 5b. **Agent multi-root access** (optional): `make sync-worktrees` then `code legacy-sports.code-workspace` — gives agents search access across all worktrees in one window.
 6. **All remaining work happens at the worktree path (`$wt`), NOT `D:\code\legacy-sports`.** Every file edit, terminal command, and git operation must target `$wt`.
-7. Code: `make <target>` (e.g. `make test`, `make build`, `make typecheck`, `make lint-fix`). For project-specific targets: `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly (exception: `lib/db-client` migration scripts — see step 10).
+7. Code: `make <target>` (e.g. `make test`, `make build`, `make typecheck`, `make lint-fix`). For project-specific targets: `pnpm exec nx run <project>:<target>`. Never use `pnpm run` directly (shell fallback for `lib/db-client` migration scripts is the sole exception — see step 10).
    - 7b. **Test new test files (MANDATORY)**: if you wrote or modified any test file (`.spec.ts`, `.spec.tsx`, `.test.ts`, `.test.tsx`, `.integration.spec.ts`), run those tests locally and confirm they pass **before committing**. For Jest: `pnpm exec nx run <project>:test --testPathPattern="SpecName"`. For Playwright E2E: `pnpm exec nx build web` then `pnpm exec nx e2e web-e2e -- --grep='test name' --config=apps/web-e2e/playwright.config.ts`. Never push untested test code. See `.agents/skills/testing/SKILL.md`.
 8. Commit: `worktree_commit(message: "type(scope): msg")` then `worktree_push()` (shell fallback: `git commit` / `git push`)
 9. Rebase onto parent: `git fetch origin ; twig rebase` — keeps branch current with its parent (main or a stacked branch)
    - 9b. **Post-rebase stabilization (BEFORE push)**: `make install ; pnpm exec nx run db:print-schema ; pnpm exec nx affected -t codegen --base=origin/main` — main may have changed deps, schema, or formatting. **Do NOT push until `make pc` passes** (see `skills/rebase/SKILL.md` Step 4).
-10. **Migrations (BEFORE make pc)**: run `pnpm --prefix lib/db-client run db:status` and `pnpm --prefix lib/db-client run db:up` — **always do this even if you think no migrations were added.** Confirm `Applied N new migrations` or `No new migrations to apply`. (See `skills/repo-tooling/SKILL.md`.) _Note: `pnpm run` is allowed here because these are `lib/db-client` package scripts with no Nx target equivalent._
+10. **Migrations (BEFORE make pc)**: run `db_migration_status(worktreePath: "$wt")` and `db_migrate(worktreePath: "$wt")` MCP tools — **always do this even if you think no migrations were added.** Confirm the MCP response contains `"applied": N` (with N >= 0) or the shell output shows `Applied N new migrations` / `No new migrations to apply`. (See `skills/repo-tooling/SKILL.md`.) Shell fallback: `pnpm --prefix lib/db-client run db:status` and `pnpm --prefix lib/db-client run db:up`.
 11. Validate: `make pc` — must pass before pushing or opening PR. If `nx format:write` rewrites any files, `make pc` **fails** with a list of the changed files; commit them and re-run `make pc`.
     - 11b. **Self-review (BEFORE first push)**: run the `/review` skill (or follow the self-review steps in `skills/pr-lifecycle/SKILL.md`) to catch project-rule violations and code quality issues that `make pc` does not check. This significantly reduces Copilot review rounds.
     - 11c. **Push only after `make pc` passes**: `worktree_push()` (shell fallback: `git push --force-with-lease origin HEAD`) — pushing before validating is the #1 cause of post-rebase CI failures.
@@ -56,12 +56,11 @@ This file provides guidance to AI coding agents working with code in this reposi
 
 **Never use `cd <dir> && <command>` or `cd <dir> ; <command>` patterns.** These trigger security prompts in some agents and obscure which directory a command targets. Use flag-based alternatives:
 
-| Pattern                            | Replacement                           |
-| ---------------------------------- | ------------------------------------- |
-| `cd lib/db-client && pnpm run ...` | `pnpm --prefix lib/db-client run ...` |
-| `cd $wt && git ...`                | `git -C $wt ...`                      |
-| `cd $wt && make ...`               | `make -C $wt ...`                     |
-| `cd terraform && terraform ...`    | `terraform -chdir=terraform ...`      |
+| Pattern                         | Replacement                      |
+| ------------------------------- | -------------------------------- |
+| `cd $wt && git ...`             | `git -C $wt ...`                 |
+| `cd $wt && make ...`            | `make -C $wt ...`                |
+| `cd terraform && terraform ...` | `terraform -chdir=terraform ...` |
 
 ## Commands
 
@@ -90,10 +89,6 @@ make kill-stale                              # kill stale node processes
 pnpm exec nx run <project>:<target>
 pnpm exec nx affected -t <target>
 
-# db-client migration scripts only (no Nx target equivalent):
-pnpm --prefix lib/db-client run db:status
-pnpm --prefix lib/db-client run db:up
-
 # GraphQL codegen:
 make codegen
 
@@ -121,7 +116,7 @@ scripts/       PowerShell and shell automation scripts
 
 **Cross-platform components**: `lib/shared-components/src/platform-components/` — `.native.ts` files are auto-resolved by Metro. The `__PLATFORM_COMPONENTS__` magic string is used for build-time resolution of more complex platform splits.
 
-**Database**: Drizzle ORM with PostgreSQL. Schema lives in `lib/db-client`. Always run `pnpm --prefix lib/db-client run db:status` and `pnpm --prefix lib/db-client run db:up` before `make pc`.
+**Database**: Drizzle ORM with PostgreSQL. Schema lives in `lib/db-client`. Always run `db_migration_status(worktreePath: "$wt")` and `db_migrate(worktreePath: "$wt")` (MCP tools) before `make pc`.
 
 **Logging**: Import `LOGGER` from `@legacy-sports/logging`. ESLint enforces `no-console`.
 
@@ -204,7 +199,7 @@ When running as a **cloud coding agent**:
 - **Linux** — `bash` shell, `/` paths. No junctions or file locks.
 - **Native integrations (Claude Code on the web)** — Claude Code provides built-in GitHub and Atlassian connectors that work without configuring secrets. Prefer these over custom MCP servers when available (see details below).
 
-**Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make <target>` → `pnpm --prefix lib/db-client run db:status` → `pnpm --prefix lib/db-client run db:up` → `make pc` → commit + push → `github_create_pr(draft: true)` → `github_mark_pr_ready` → Jira "In Review"
+**Cloud workflow:** Jira (`jira_create_ticket` → `jira_check_blockers` → `jira_transition` "In Progress") → code → `make <target>` → `db_migration_status` → `db_migrate` → `make pc` → commit + push → `github_create_pr(draft: true)` → `github_mark_pr_ready` → Jira "In Review"
 
 **GitHub authentication for PR creation:**
 
