@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { autoFix } from './tools/auto-fix.js';
+import { dispatchWorkflow } from './tools/dispatch-workflow.js';
 import { getLogs } from './tools/get-logs.js';
 import { listRuns } from './tools/list-runs.js';
 import { rerun } from './tools/rerun.js';
@@ -189,6 +190,28 @@ server.tool(
       .describe('Include GitHub App installation permissions (default: false)'),
   },
   async (params) => workflowInfo(params),
+);
+
+server.tool(
+  'ci_dispatch_workflow',
+  'Trigger a GitHub Actions workflow_dispatch event. Accepts workflow file name (e.g. "deploy.yml") or numeric ID, plus optional ref and input parameters.',
+  {
+    workflow: z
+      .union([z.string(), z.number().int()])
+      .transform(String)
+      .describe('Workflow filename (e.g. "deploy.yml") or numeric ID'),
+    ref: z
+      .string()
+      .default('main')
+      .describe('Git ref (branch/tag) to run against (default: "main")'),
+    inputs: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe(
+        'Key-value map of workflow input parameters (all values must be strings)',
+      ),
+  },
+  async (params) => dispatchWorkflow(params),
 );
 
 const transport = new StdioServerTransport();
