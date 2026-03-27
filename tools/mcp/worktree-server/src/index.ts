@@ -723,6 +723,35 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_show_remote',
+      description:
+        'Read a file from a remote branch without needing a worktree. ' +
+        'Auto-fetches the remote ref first, then reads the file via `git show`. ' +
+        'Useful for inspecting files on PR branches before deciding whether to create a worktree.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          ref: {
+            type: 'string',
+            description:
+              'Remote ref to read from (e.g. "origin/LS-1901/ci-dispatch-workflow"). ' +
+              'If no remote prefix is given, "origin/" is prepended automatically.',
+          },
+          path: {
+            type: 'string',
+            description:
+              'File path relative to repo root (e.g. "tools/mcp/ci-server/src/tools/dispatch-workflow.ts").',
+          },
+          lines: {
+            type: 'string',
+            description:
+              'Optional line range to return (e.g. "1-30", "50-100"). Returns the full file if omitted.',
+          },
+        },
+        required: ['ref', 'path'],
+      },
+    },
+    {
       name: 'worktree_unjunction',
       description:
         'Remove node_modules junction so worktree gets independent deps via make install.',
@@ -3261,6 +3290,274 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const output =
           rawOutput.length > MAX_ERROR_CHARS
             ? rawOutput.slice(0, MAX_ERROR_CHARS) + '\n... [truncated]'
+            : rawOutput;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to read ${filePath} at ${ref}: ${output.trim()}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_show_remote
+    // -----------------------------------------------------------------------
+    case 'worktree_show_remote': {
+      const {
+        ref: rawRef,
+        path: filePath,
+        lines,
+      } = args as {
+        ref: string;
+        path: string;
+        lines?: string;
+      };
+
+      // Auto-prepend "origin/" if the ref doesn't already start with a known remote name
+      let ref: string;
+      try {
+        const remotesOutput = execFileSync('git', ['remote'], {
+          cwd: MAIN_REPO,
+          encoding: 'utf8',
+        });
+        const remotes = remotesOutput
+          .split(/\r?\n/)
+          .filter((name) => name.length > 0);
+        const firstSegment = rawRef.split('/', 1)[0];
+        const hasExplicitRemote =
+          rawRef.includes('/') && remotes.includes(firstSegment);
+        ref = hasExplicitRemote ? rawRef : `origin/${rawRef}`;
+      } catch {
+        ref = rawRef.includes('/') ? rawRef : `origin/${rawRef}`;
+      }
+
+      // Validate ref
+      if (ref.startsWith('-')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Ref must not start with '-'.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(ref)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Only alphanumeric, '.', '/', '~', '^', '-', '_', '{', '}' allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Validate path
+      if (
+        filePath.startsWith('/') ||
+        filePath.includes(':') ||
+        filePath.startsWith('-') ||
+        /(?:^|\/)\.\.(?:\/|$)/.test(filePath)
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid path: "${filePath}". Path must be relative and must not contain ':', start with '-' or '/', or contain '..' segments.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Parse line range if provided
+      let startLine: number | undefined;
+      let endLine: number | undefined;
+      if (lines) {
+        const rangeMatch = lines.match(/^(\d+)(?:-(\d+))?$/);
+        if (!rangeMatch) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid line range: "${lines}". Expected format: "N" or "N-M" (e.g. "1-30").`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        startLine = parseInt(rangeMatch[1], 10);
+        endLine = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : startLine;
+
+        // Validate line range bounds
+        if (startLine < 1) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid line range: startLine must be >= 1, got ${startLine}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (endLine < startLine) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid line range: endLine (${endLine}) must be >= startLine (${startLine}).`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        const MAX_LINE_RANGE = 1000;
+        if (endLine - startLine + 1 > MAX_LINE_RANGE) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Line range too large: ${endLine - startLine + 1} lines requested, max is ${MAX_LINE_RANGE}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      const cwd = MAIN_REPO;
+
+      // Fetch the remote ref first
+      // Extract the remote name (part before first /) and the branch name
+      const slashIdx = ref.indexOf('/');
+      const remote = ref.slice(0, slashIdx);
+      const branchName = ref.slice(slashIdx + 1);
+
+      // Validate remote and branchName are non-empty
+      if (!remote || !branchName) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid ref: "${ref}". Both remote and branch name must be non-empty.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Validate that remote is a configured git remote
+      try {
+        const configuredRemotes = execFileSync('git', ['remote'], {
+          cwd,
+          encoding: 'utf8',
+        })
+          .split(/\r?\n/)
+          .filter((name) => name.length > 0);
+        if (!configuredRemotes.includes(remote)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid remote: "${remote}". Configured remotes: ${configuredRemotes.join(', ') || '(none)'}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch {
+        // If git remote fails, skip remote validation and let fetch surface the error
+      }
+
+      // Reject rev-parse characters (~, ^, {}) in the branch name portion
+      if (/[~^{}]/.test(branchName)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid branch name: "${branchName}". Rev-parse characters (~, ^, {, }) are not allowed.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        runGit(['fetch', remote, branchName], cwd, { timeout: 30_000 });
+      } catch (err: unknown) {
+        const e = err as { stderr?: string; message?: string };
+        const msg = e.stderr || e.message || String(err);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to fetch ${remote}/${branchName}: ${msg.trim()}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        let content = runGit(['show', `${ref}:${filePath}`], cwd);
+
+        // Apply line range if specified
+        if (startLine !== undefined) {
+          const allLines = content.split('\n');
+          const sliced = allLines.slice(startLine - 1, endLine ?? startLine);
+          content = sliced
+            .map((line, i) => `${startLine + i}\t${line}`)
+            .join('\n');
+        }
+
+        const MAX_OUTPUT_CHARS = 512_000;
+        const jsonPayload = JSON.stringify(
+          {
+            ref,
+            path: filePath,
+            ...(lines ? { lines } : {}),
+            content,
+            truncated: false,
+          },
+          null,
+          2,
+        );
+
+        const truncated = jsonPayload.length > MAX_OUTPUT_CHARS;
+        const safeText = truncated
+          ? JSON.stringify(
+              {
+                ref,
+                path: filePath,
+                ...(lines ? { lines } : {}),
+                content:
+                  content.slice(0, MAX_OUTPUT_CHARS) +
+                  `\n\n... [truncated — output exceeds ${MAX_OUTPUT_CHARS / 1000}KB]`,
+                truncated: true,
+              },
+              null,
+              2,
+            )
+          : jsonPayload;
+
+        return { content: [{ type: 'text', text: safeText }] };
+      } catch (err: unknown) {
+        const e = err as { stdout?: string; stderr?: string; message?: string };
+        const rawOutput =
+          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
+          e.message ||
+          String(err);
+        const output =
+          rawOutput.length > 4_000
+            ? rawOutput.slice(0, 4_000) + '\n... [truncated]'
             : rawOutput;
         return {
           content: [
