@@ -9,7 +9,7 @@ description: 'Identify and implement MCP tooling gaps. Phase 1 (Audit): run afte
 
 Two-phase workflow for closing MCP tooling gaps:
 
-1. **Audit** — after every agent session, review Bash commands and MCP tool overflows to identify gaps, then file tickets under the **LS-1455** epic.
+1. **Audit** — after every agent session, review Bash commands, MCP tool overflows, and MCP tool failures to identify gaps, then file tickets under the **LS-1455** epic.
 2. **Triage** — pick up tickets from the LS-1455 backlog, implement the fix, validate, and ship a PR.
 
 This skill enforces the **MCP-first principle** from AGENTS.md: shell commands are fallbacks, not defaults.
@@ -36,6 +36,7 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 4. **Check** for existing tickets under LS-1455 (`jira_list_children` or JQL `parent = LS-1455`)
 5. **Create** tickets for new gaps using the template in the reference doc
 6. **Audit overflows** — review MCP tool calls that exceeded token limits; classify as `agent-error`, `bad-default`, or `missing-parameter`
+   6b. **Audit failures** — review MCP tool calls that returned errors (403, path bugs, etc.); classify as `permission-gap`, `bug`, `config-issue`, or `expected-limitation`
 7. **Report** findings to the user
 
 ---

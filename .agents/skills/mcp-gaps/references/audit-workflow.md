@@ -2,7 +2,10 @@
 
 After every agent session, review the Bash commands that were executed and determine which ones should have been (or could become) MCP tool invocations. For each identified gap, check whether a ticket already exists under the **LS-1455** epic ("AI Workspace Improvements") and create one if not.
 
-This workflow also catches MCP tools that _were_ used but returned results too large for the context window — a silent productivity killer that wastes context on failed tool calls.
+This workflow also catches two additional categories of MCP issues:
+
+- **Overflows** — MCP tools that _were_ used but returned results too large for the context window (a silent productivity killer that wastes context on failed tool calls)
+- **Failures** — MCP tools that were called but returned errors (403, path bugs, permission gaps), causing agents to fall back to Bash commands
 
 ## Steps
 
@@ -183,6 +186,71 @@ This tool overflowed <N> times in recent sessions, wasting agent context on each
 Identified during MCP overflow audit on <date>.
 ```
 
+### 6b. Audit MCP tool failures
+
+Review the conversation history for MCP tool calls that returned errors — look for:
+
+- **403 / "Resource not accessible by integration"** — permission-scoped failures
+- **Path resolution errors** — `fatal: /`, `is outside repository`, `No worktree found`
+- **500 / timeout / connection errors** — infrastructure failures
+- **Unexpected empty results** — tool returns success but data is missing or malformed
+
+These failures are distinct from overflows (Step 6) — the tool was invoked with correct parameters but failed at the server level. When tools fail silently, agents fall back to Bash commands, negating the MCP-first principle.
+
+For each failure, record:
+
+| Field          | Description                                                                   |
+| -------------- | ----------------------------------------------------------------------------- |
+| **MCP tool**   | Server and tool name (e.g., `legacy-sports-github / github_pr_scan`)          |
+| **Error**      | The error message or HTTP status                                              |
+| **Impact**     | What the agent did instead (e.g., fell back to 22 `gh` CLI commands)          |
+| **Root cause** | Why the tool failed                                                           |
+| **Fix type**   | `permission-gap`, `bug`, `config-issue`, or `expected-limitation` (see below) |
+
+#### Classification
+
+- **`permission-gap`**: Tool works but the token lacks required scopes (e.g., 403 on GraphQL fields that need elevated permissions). Create a ticket to either add the permission or add graceful degradation.
+- **`bug`**: Tool has a code defect that causes it to fail under certain conditions (e.g., path resolution generating `/` instead of the worktree path). Create a ticket with reproduction steps.
+- **`config-issue`**: Tool needs a different setup to work (e.g., missing env var, wrong token type). This is usually a doc fix — update AGENTS.md or the relevant skill doc to guide agents toward correct configuration.
+- **`expected-limitation`**: Tool correctly reports an unsupported operation (e.g., worktree tool refusing to push `main`). No ticket needed — the tool is working as designed.
+
+#### Known broken/degraded tool patterns
+
+These are recurring failure modes observed across sessions. If you encounter them during an audit, check whether a fix has already been shipped before filing a new ticket.
+
+| Tool                     | Failure mode                                  | Fix type         | Notes                                                               |
+| ------------------------ | --------------------------------------------- | ---------------- | ------------------------------------------------------------------- |
+| `github_pr_scan`         | 403 on `mergeable`/`statusCheckRollup` fields | `permission-gap` | Fixed in LS-1903 — falls back to light query in degraded mode       |
+| `github_resolve_threads` | 403 on workflow dispatch (recheck)            | `permission-gap` | Fixed in LS-1906 — downgraded from error to note                    |
+| `worktree_unstage`       | Path resolution generates `/` instead of path | `bug`            | Fixed in LS-1904 — string-to-array normalization on `files` param   |
+| `worktree_stabilize`     | `make install` fails on junctioned worktrees  | `bug`            | Fixed in LS-1905 — skips install when junction detected             |
+| `github_manage_labels`   | Response serializes array param as string     | `bug`            | Fixed in LS-1907 — handles JSON-encoded array strings in preprocess |
+
+For `permission-gap` and `bug` types, follow Steps 4-5 to check for existing tickets and create new ones under LS-1455. Use this description template:
+
+```
+## Gap Identified — MCP Tool Failure
+
+**MCP tool**: `<server> / <tool_name>`
+**Error observed**: `<error message>`
+**Impact**: <what the agent fell back to, how many Bash commands resulted>
+**Fix type**: permission-gap | bug
+
+## Root Cause
+
+<Why the tool failed — missing permission, code defect, etc.>
+
+## Proposed Fix
+
+**Option A**: <e.g., add graceful degradation with lighter query>
+**Option B**: <e.g., request additional token permissions>
+
+## Context
+
+Observed during agent session on <date>.
+<Reproduction steps if applicable.>
+```
+
 ### 7. Report findings
 
 Summarize the audit results to the user:
@@ -190,9 +258,10 @@ Summarize the audit results to the user:
 - Total Bash commands reviewed
 - Commands identified as MCP gaps
 - MCP tool overflows identified (with fix types)
+- MCP tool failures identified (with fix types)
 - Existing tickets found (with keys)
 - New tickets created (with keys)
-- Any `missing-awareness` or `agent-error` issues noted (skill/doc fixes needed)
+- Any `missing-awareness`, `agent-error`, or `config-issue` items noted (skill/doc fixes needed)
 
 ## Gotchas
 
