@@ -169,6 +169,7 @@ export * from './constants/presets';
 // League feature components
 export * from './features/leagues/LeagueActivityFeed';
 export * from './features/leagues/LeagueScoringSummary';
+export * from './features/leagues/OnThisDayFeed';
 
 // Commissioner tools
 export * from './features/commissioner';

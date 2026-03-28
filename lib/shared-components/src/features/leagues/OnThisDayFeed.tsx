@@ -6,7 +6,6 @@
  * plus off-season events (signings, trades) from the on_this_day_events table.
  */
 import React, { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Separator, Spinner, styled, Text, XStack, YStack } from 'tamagui';
 import {
   ArrowLeftRight,
@@ -28,7 +27,7 @@ import {
   BRAND_SEAM_RED,
   BRAND_SEAM_RED_LIGHT,
   withAlpha,
-} from '../../constants/colors';
+} from '../../utils/colors';
 import {
   useGetOnThisDayEventsQuery,
   useGetOnThisDayQuery,
@@ -36,6 +35,7 @@ import {
 
 // ─── Styled components ───────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const FeedContainer = styled(YStack, {
   borderRadius: '$7',
   borderWidth: 1,
@@ -45,6 +45,7 @@ const FeedContainer = styled(YStack, {
   hoverStyle: { borderColor: '$glassBorderHover' },
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const FeedHeader = styled(XStack, {
   alignItems: 'center',
   gap: '$3',
@@ -54,6 +55,7 @@ const FeedHeader = styled(XStack, {
   borderBottomColor: '$glassBorder',
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const EntryRow = styled(XStack, {
   alignItems: 'center',
   paddingHorizontal: '$5',
@@ -70,6 +72,7 @@ const EntryRow = styled(XStack, {
   },
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const StatBadge = styled(XStack, {
   alignItems: 'center',
   gap: '$1',
@@ -191,8 +194,14 @@ function EntryIcon({ type }: EntryIconProps) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function OnThisDayFeed(): React.JSX.Element {
-  const navigate = useNavigate();
+export interface OnThisDayFeedProps {
+  /** Callback when a player entry is tapped. Consumers handle navigation. */
+  onPlayerPress?: (playerId: number) => void;
+}
+
+export function OnThisDayFeed({
+  onPlayerPress,
+}: OnThisDayFeedProps = {}): React.JSX.Element {
   const today = useMemo(() => new Date(), []);
   const month = today.getMonth() + 1; // 1-indexed
   const day = today.getDate();
@@ -317,8 +326,8 @@ export function OnThisDayFeed(): React.JSX.Element {
                 )}
                 <EntryRow
                   onPress={() => {
-                    if (entry.playerId) {
-                      navigate(`/players/${entry.playerId}`);
+                    if (entry.playerId && onPlayerPress) {
+                      onPlayerPress(entry.playerId);
                     }
                   }}
                   accessibilityLabel={`View ${playerName} profile`}

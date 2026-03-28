@@ -5532,6 +5532,61 @@ export type MarkAllNotificationsAsReadMutation = {
   markAllNotificationsAsRead?: boolean | null;
 };
 
+export type GetOnThisDayQueryVariables = Exact<{
+  month: Scalars['Int']['input'];
+  day: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetOnThisDayQuery = {
+  __typename?: 'Query';
+  onThisDay?: Array<{
+    __typename?: 'OnThisDayEntry';
+    entryType?: string | null;
+    playerId?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    brefId?: string | null;
+    season?: number | null;
+    gameIdentifier?: string | null;
+    homeRuns?: number | null;
+    rbi?: number | null;
+    hits?: number | null;
+    doubles?: number | null;
+    triples?: number | null;
+    atBats?: number | null;
+    baseOnBalls?: number | null;
+    runs?: number | null;
+    strikeouts?: number | null;
+    inningsPitched?: number | null;
+    earnedRuns?: number | null;
+    saves?: number | null;
+    wins?: number | null;
+    hitsAllowed?: number | null;
+    walksAllowed?: number | null;
+  }> | null;
+};
+
+export type GetOnThisDayEventsQueryVariables = Exact<{
+  month: Scalars['Int']['input'];
+  day: Scalars['Int']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetOnThisDayEventsQuery = {
+  __typename?: 'Query';
+  onThisDayEvents?: Array<{
+    __typename?: 'OnThisDayEvent';
+    id?: number | null;
+    year?: number | null;
+    eventType?: string | null;
+    description?: string | null;
+    playerName?: string | null;
+    fromTeam?: string | null;
+    toTeam?: string | null;
+  }> | null;
+};
+
 export type PlayerFragment = {
   __typename?: 'Player';
   id?: number | null;
@@ -12346,6 +12401,214 @@ export type MarkAllNotificationsAsReadMutationResult =
 export type MarkAllNotificationsAsReadMutationOptions = BaseMutationOptions<
   MarkAllNotificationsAsReadMutation,
   MarkAllNotificationsAsReadMutationVariables
+>;
+export const GetOnThisDay = gql`
+  query GetOnThisDay($month: Int!, $day: Int!, $limit: Int) {
+    onThisDay(month: $month, day: $day, limit: $limit) {
+      entryType
+      playerId
+      firstName
+      lastName
+      brefId
+      season
+      gameIdentifier
+      homeRuns
+      rbi
+      hits
+      doubles
+      triples
+      atBats
+      baseOnBalls
+      runs
+      strikeouts
+      inningsPitched
+      earnedRuns
+      saves
+      wins
+      hitsAllowed
+      walksAllowed
+    }
+  }
+`;
+
+/**
+ * __useGetOnThisDayQuery__
+ *
+ * To run a query within a React component, call `useGetOnThisDayQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetOnThisDayQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetOnThisDayQuery({
+ *   variables: {
+ *      month: // value for 'month'
+ *      day: // value for 'day'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetOnThisDayQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetOnThisDayQuery,
+    GetOnThisDayQueryVariables
+  > &
+    (
+      | { variables: GetOnThisDayQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetOnThisDayQuery, GetOnThisDayQueryVariables>(
+    GetOnThisDay,
+    options,
+  );
+}
+export function useGetOnThisDayLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetOnThisDayQuery,
+    GetOnThisDayQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetOnThisDayQuery, GetOnThisDayQueryVariables>(
+    GetOnThisDay,
+    options,
+  );
+}
+export function useGetOnThisDaySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetOnThisDayQuery,
+        GetOnThisDayQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<GetOnThisDayQuery, GetOnThisDayQueryVariables>(
+    GetOnThisDay,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetOnThisDayQuery,
+          GetOnThisDayQueryVariables
+        >,
+  );
+}
+export type GetOnThisDayQueryHookResult = ReturnType<
+  typeof useGetOnThisDayQuery
+>;
+export type GetOnThisDayLazyQueryHookResult = ReturnType<
+  typeof useGetOnThisDayLazyQuery
+>;
+export type GetOnThisDaySuspenseQueryHookResult = ReturnType<
+  typeof useGetOnThisDaySuspenseQuery
+>;
+export type GetOnThisDayQueryResult = Apollo.QueryResult<
+  GetOnThisDayQuery,
+  GetOnThisDayQueryVariables
+>;
+export const GetOnThisDayEvents = gql`
+  query GetOnThisDayEvents($month: Int!, $day: Int!, $limit: Int) {
+    onThisDayEvents(month: $month, day: $day, limit: $limit) {
+      id
+      year
+      eventType
+      description
+      playerName
+      fromTeam
+      toTeam
+    }
+  }
+`;
+
+/**
+ * __useGetOnThisDayEventsQuery__
+ *
+ * To run a query within a React component, call `useGetOnThisDayEventsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetOnThisDayEventsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetOnThisDayEventsQuery({
+ *   variables: {
+ *      month: // value for 'month'
+ *      day: // value for 'day'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGetOnThisDayEventsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetOnThisDayEventsQuery,
+    GetOnThisDayEventsQueryVariables
+  > &
+    (
+      | { variables: GetOnThisDayEventsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetOnThisDayEventsQuery,
+    GetOnThisDayEventsQueryVariables
+  >(GetOnThisDayEvents, options);
+}
+export function useGetOnThisDayEventsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetOnThisDayEventsQuery,
+    GetOnThisDayEventsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetOnThisDayEventsQuery,
+    GetOnThisDayEventsQueryVariables
+  >(GetOnThisDayEvents, options);
+}
+export function useGetOnThisDayEventsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetOnThisDayEventsQuery,
+        GetOnThisDayEventsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetOnThisDayEventsQuery,
+    GetOnThisDayEventsQueryVariables
+  >(
+    GetOnThisDayEvents,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetOnThisDayEventsQuery,
+          GetOnThisDayEventsQueryVariables
+        >,
+  );
+}
+export type GetOnThisDayEventsQueryHookResult = ReturnType<
+  typeof useGetOnThisDayEventsQuery
+>;
+export type GetOnThisDayEventsLazyQueryHookResult = ReturnType<
+  typeof useGetOnThisDayEventsLazyQuery
+>;
+export type GetOnThisDayEventsSuspenseQueryHookResult = ReturnType<
+  typeof useGetOnThisDayEventsSuspenseQuery
+>;
+export type GetOnThisDayEventsQueryResult = Apollo.QueryResult<
+  GetOnThisDayEventsQuery,
+  GetOnThisDayEventsQueryVariables
 >;
 export const GetLeagueScoringProfile = gql`
   query GetLeagueScoringProfile($leagueId: Int!) {

@@ -19,6 +19,7 @@ import {
   Text,
   H2 as TH2,
 } from 'tamagui';
+import { OnThisDayFeed } from '@legacy-sports/shared-components';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 import { OnboardingTutorial } from '../../components/onboarding';
 import {
@@ -28,7 +29,6 @@ import {
 } from '../../components/icons';
 import { PageMeta } from '../../components/PageMeta';
 import { useGetUserLeaguesQuery } from '../../api/db/graphql.generated';
-import { OnThisDayFeed } from '../../features/baseball';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -731,7 +731,9 @@ export function HomePage(): React.JSX.Element {
                   season in the database.
                 </Paragraph>
               </YStack>
-              <OnThisDayFeed />
+              <OnThisDayFeed
+                onPlayerPress={(id) => navigate(`/players/${id}`)}
+              />
             </YStack>
           </ContentContainer>
         </PageContainer>
@@ -980,7 +982,9 @@ export function HomePage(): React.JSX.Element {
                     in the database — see which players you manage made history.
                   </Paragraph>
                 </YStack>
-                <OnThisDayFeed />
+                <OnThisDayFeed
+                  onPlayerPress={(id) => navigate(`/players/${id}`)}
+                />
               </YStack>
             )}
 
