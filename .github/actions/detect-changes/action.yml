@@ -31,6 +31,9 @@ outputs:
   e2e:
     description: "Whether E2E test files are affected"
     value: ${{ steps.detect-changes.outputs.e2e }}
+  api-surface:
+    description: "Whether backend API surface changed (GraphQL resolvers, schema, data loaders, scoring)"
+    value: ${{ steps.detect-changes.outputs.api-surface }}
   dependencies:
     description: "Whether dependencies have changed"
     value: ${{ steps.detect-changes.outputs.package-json }}
@@ -228,6 +231,11 @@ runs:
           e2e:
             - apps/web-e2e/**
             - apps/app-e2e/**
+          api-surface:
+            - lambdas/db/**
+            - lib/db-client/**
+            - lib/data-loaders/**
+            - lib/scoring/**
 
     - name: "Analyze Change Impact"
       id: analyze

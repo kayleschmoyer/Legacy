@@ -91,6 +91,7 @@ jobs:
       lambdas: ${{ steps.detect.outputs.lambdas }}
       terraform: ${{ steps.detect.outputs.terraform }}
       e2e: ${{ steps.detect.outputs.e2e }}
+      api-surface: ${{ steps.detect.outputs.api-surface }}
       affected-components: ${{ steps.detect.outputs.affected-components }}
       requires-full-build: ${{ steps.detect.outputs.requires-full-build }}
     steps:
@@ -262,7 +263,10 @@ jobs:
       needs.quality-gates.outputs.result == 'success' &&
       needs.build-validation.result == 'success' &&
       needs.build-validation.outputs.overall-result == 'success' &&
-      (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.requires-full-build == 'true')
+      (needs.detect-changes.outputs.web == 'true' ||
+      needs.detect-changes.outputs.e2e == 'true' ||
+      needs.detect-changes.outputs.api-surface == 'true' ||
+      needs.detect-changes.outputs.requires-full-build == 'true')
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     strategy:
