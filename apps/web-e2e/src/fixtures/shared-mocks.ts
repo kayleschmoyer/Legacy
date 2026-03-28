@@ -117,6 +117,11 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = {
 
   // ── Waiver / trade (league pages) ──────────────────────────────
   getwaiverorder: { data: { waiverOrder: [] } },
+
+  // ── Dues ────────────────────────────────────────────────────────
+  getleagueduesstatus: {
+    data: { leagueDuesSettings: null, leagueDuesStatus: [] },
+  },
 };
 
 // ---------------------------------------------------------------------------

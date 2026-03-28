@@ -122,6 +122,7 @@ import { AchievementRestrictionsControl } from '../../components/commissioner/Ac
 import { TiebreakerConfig } from '../../components/league/TiebreakerConfig';
 import { SeasonAwardsControl } from '../../components/commissioner/SeasonAwardsControl';
 import { LeagueDuesControl } from '../../components/commissioner/LeagueDuesControl';
+import { LeagueDuesStatusDashboard } from '../../components/commissioner/LeagueDuesStatusDashboard';
 import { WaiverProcessControl } from '../../features/commissioner/WaiverProcessControl';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
 import {
@@ -2193,6 +2194,18 @@ export function LeagueDetailPage(): React.JSX.Element {
                 )}
               </YStack>
             </SidebarCard>
+          )}
+
+          {/* League Dues Status — visible to all members */}
+          {isCommissioner && (
+            <LeagueDuesStatusDashboard
+              leagueId={leagueId}
+              isCommissioner={isCommissioner}
+              onSuccess={showMatchupSuccess}
+              onError={(err) => {
+                setMatchupErrorMessage(err.message);
+              }}
+            />
           )}
 
           {/* Invite Friends */}
