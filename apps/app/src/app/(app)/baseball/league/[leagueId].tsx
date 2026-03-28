@@ -40,6 +40,7 @@ import { LeagueRosterManagement } from '../../../../features/roster/LeagueRoster
 import { LeagueStandings } from '../../../../features/roster/LeagueStandings';
 import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
 import { LeagueScoringEditor } from '../../../../features/scoring/LeagueScoringEditor';
+import { LeagueDuesSetup } from '../../../../features/commissioner/LeagueDuesSetup';
 import { MatchupList } from '../../../../features/matchup/components/MatchupList';
 import { useMatchupsForLeague } from '../../../../features/matchup/hooks/useMatchup';
 import { useLeagueScoringSettings } from '../../../../common/scoring';
@@ -489,6 +490,13 @@ export default function LeagueId(): React.JSX.Element {
                 <CommissionerNoteControl
                   leagueId={numLeagueId}
                   currentNote={league?.lmNotes ?? ''}
+                  onSuccess={(msg) => Alert.alert('Success', msg)}
+                  onError={(err) => Alert.alert('Error', err.message)}
+                />
+
+                {/* League Dues */}
+                <LeagueDuesSetup
+                  leagueId={numLeagueId}
                   onSuccess={(msg) => Alert.alert('Success', msg)}
                   onError={(err) => Alert.alert('Error', err.message)}
                 />

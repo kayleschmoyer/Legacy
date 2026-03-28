@@ -3446,6 +3446,56 @@ export type WaiverClaim = {
   userId?: Maybe<Scalars['Int']['output']>;
 };
 
+export type DuesSettingsFragment = {
+  __typename?: 'LeagueDuesSettings';
+  id?: number | null;
+  leagueId?: number | null;
+  enabled?: boolean | null;
+  amountCents?: number | null;
+  reminderEnabled?: boolean | null;
+  reminderDayOfWeek?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type GetLeagueDuesSettingsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetLeagueDuesSettingsQuery = {
+  __typename?: 'Query';
+  leagueDuesSettings?: {
+    __typename?: 'LeagueDuesSettings';
+    id?: number | null;
+    leagueId?: number | null;
+    enabled?: boolean | null;
+    amountCents?: number | null;
+    reminderEnabled?: boolean | null;
+    reminderDayOfWeek?: number | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
+export type UpdateDuesSettingsMutationVariables = Exact<{
+  input: UpdateDuesSettingsInput;
+}>;
+
+export type UpdateDuesSettingsMutation = {
+  __typename?: 'Mutation';
+  updateDuesSettings?: {
+    __typename?: 'LeagueDuesSettings';
+    id?: number | null;
+    leagueId?: number | null;
+    enabled?: boolean | null;
+    amountCents?: number | null;
+    reminderEnabled?: boolean | null;
+    reminderDayOfWeek?: number | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
 export type LeagueFragment = {
   __typename?: 'League';
   id?: number | null;
@@ -4859,6 +4909,18 @@ export type UpdateUserAvatarMutation = {
   } | null;
 };
 
+export const DuesSettingsFragmentDoc = gql`
+  fragment DuesSettings on LeagueDuesSettings {
+    id
+    leagueId
+    enabled
+    amountCents
+    reminderEnabled
+    reminderDayOfWeek
+    createdAt
+    updatedAt
+  }
+`;
 export const LeagueMemberFragmentDoc = gql`
   fragment LeagueMember on LeagueMember {
     leagueId
@@ -5119,6 +5181,148 @@ export const UserFragmentDoc = gql`
     subscriptionTier
   }
 `;
+export const GetLeagueDuesSettings = gql`
+  query GetLeagueDuesSettings($leagueId: Int!) {
+    leagueDuesSettings(leagueId: $leagueId) {
+      ...DuesSettings
+    }
+  }
+  ${DuesSettingsFragmentDoc}
+`;
+
+/**
+ * __useGetLeagueDuesSettingsQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueDuesSettingsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueDuesSettingsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueDuesSettingsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeagueDuesSettingsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueDuesSettingsQuery,
+    GetLeagueDuesSettingsQueryVariables
+  > &
+    (
+      | { variables: GetLeagueDuesSettingsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueDuesSettingsQuery,
+    GetLeagueDuesSettingsQueryVariables
+  >(GetLeagueDuesSettings, options);
+}
+export function useGetLeagueDuesSettingsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueDuesSettingsQuery,
+    GetLeagueDuesSettingsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueDuesSettingsQuery,
+    GetLeagueDuesSettingsQueryVariables
+  >(GetLeagueDuesSettings, options);
+}
+export function useGetLeagueDuesSettingsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueDuesSettingsQuery,
+        GetLeagueDuesSettingsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueDuesSettingsQuery,
+    GetLeagueDuesSettingsQueryVariables
+  >(
+    GetLeagueDuesSettings,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueDuesSettingsQuery,
+          GetLeagueDuesSettingsQueryVariables
+        >,
+  );
+}
+export type GetLeagueDuesSettingsQueryHookResult = ReturnType<
+  typeof useGetLeagueDuesSettingsQuery
+>;
+export type GetLeagueDuesSettingsLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueDuesSettingsLazyQuery
+>;
+export type GetLeagueDuesSettingsSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueDuesSettingsSuspenseQuery
+>;
+export type GetLeagueDuesSettingsQueryResult = Apollo.QueryResult<
+  GetLeagueDuesSettingsQuery,
+  GetLeagueDuesSettingsQueryVariables
+>;
+export const UpdateDuesSettings = gql`
+  mutation UpdateDuesSettings($input: UpdateDuesSettingsInput!) {
+    updateDuesSettings(input: $input) {
+      ...DuesSettings
+    }
+  }
+  ${DuesSettingsFragmentDoc}
+`;
+export type UpdateDuesSettingsMutationFn = MutationFunction<
+  UpdateDuesSettingsMutation,
+  UpdateDuesSettingsMutationVariables
+>;
+
+/**
+ * __useUpdateDuesSettingsMutation__
+ *
+ * To run a mutation, you first call `useUpdateDuesSettingsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateDuesSettingsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateDuesSettingsMutation, { data, loading, error }] = useUpdateDuesSettingsMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateDuesSettingsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateDuesSettingsMutation,
+    UpdateDuesSettingsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateDuesSettingsMutation,
+    UpdateDuesSettingsMutationVariables
+  >(UpdateDuesSettings, options);
+}
+export type UpdateDuesSettingsMutationHookResult = ReturnType<
+  typeof useUpdateDuesSettingsMutation
+>;
+export type UpdateDuesSettingsMutationResult =
+  Apollo.MutationResult<UpdateDuesSettingsMutation>;
+export type UpdateDuesSettingsMutationOptions = BaseMutationOptions<
+  UpdateDuesSettingsMutation,
+  UpdateDuesSettingsMutationVariables
+>;
 export const GetLeagueById = gql`
   query GetLeagueById(
     $id: Int!
