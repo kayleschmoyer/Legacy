@@ -133,3 +133,20 @@ mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
     scheduledAt
   }
 }
+
+mutation UpdateLeagueBranding($input: UpdateLeagueSettingsInput!) {
+  updateLeagueSettings(input: $input) {
+    id
+    name
+    logoUrl
+    bannerUrl
+    primaryColor
+    secondaryColor
+  }
+}
+
+mutation UpdateLeagueSettings($input: UpdateLeagueSettingsInput!) {
+  updateLeagueSettings(input: $input) {
+    ...League
+  }
+}

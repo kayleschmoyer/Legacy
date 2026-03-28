@@ -3875,46 +3875,84 @@ export type DeleteAchievementRestrictionMutationVariables = Exact<{
 export type DeleteAchievementRestrictionMutation = {
   __typename?: 'Mutation';
   deleteAchievementRestriction?: boolean | null;
-export type GetLeagueDraftQueryVariables = Exact<{
-  leagueId: Scalars['Int']['input'];
+export type UpdateLeagueBrandingMutationVariables = Exact<{
+  input: UpdateLeagueSettingsInput;
 }>;
 
-export type GetLeagueDraftQuery = {
-  __typename?: 'Query';
-  getLeagueDraft?: {
-    __typename?: 'Draft';
+export type UpdateLeagueBrandingMutation = {
+  __typename?: 'Mutation';
+  updateLeagueSettings?: {
+    __typename?: 'League';
     id?: number | null;
-    leagueId?: number | null;
-    draftMode?: string | null;
-    selectionMethod?: string | null;
-    draftOrder?: string | null;
-    currentPick?: number | null;
-    pickTimeLimitSeconds?: number | null;
-    draftStartedAt?: string | null;
-    draftCompletedAt?: string | null;
-    scheduledAt?: string | null;
+    name?: string | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
   } | null;
 };
 
-export type UpdateDraftSettingsMutationVariables = Exact<{
-  input: UpdateDraftSettingsInput;
+export type UpdateLeagueSettingsMutationVariables = Exact<{
+  input: UpdateLeagueSettingsInput;
 }>;
 
-export type UpdateDraftSettingsMutation = {
+export type UpdateLeagueSettingsMutation = {
   __typename?: 'Mutation';
-  updateDraftSettings?: {
-    __typename?: 'UpdateDraftSettingsPayload';
+  updateLeagueSettings?: {
+    __typename?: 'League';
     id?: number | null;
-    leagueId?: number | null;
-    draftMode?: string | null;
-    selectionMethod?: string | null;
-    draftOrder?: string | null;
-    currentPick?: number | null;
-    pickTimeLimitSeconds?: number | null;
+    name?: string | null;
+    owner?: number | null;
+    maxRosterSize?: number | null;
+    currentMatchup?: number | null;
+    currentWeekNumber?: number | null;
+    draftStatus?: string | null;
+    leaguePhase?: string | null;
+    inviteCode?: string | null;
     playerPool?: string | null;
-    draftStartedAt?: string | null;
-    draftCompletedAt?: string | null;
-    scheduledAt?: string | null;
+    weekAdvanceStatus?: string | null;
+    waiverType?: string | null;
+    waiverEnabled?: boolean | null;
+    faabBudgetDefault?: number | null;
+    spStartsPerMatchup?: number | null;
+    gamesPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
+    totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
+    lmNotes?: string | null;
+    isMockDraft?: boolean | null;
+    isPublic?: boolean | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    previousLeagueId?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
+    salaryFloor?: number | null;
+    luxuryTaxThreshold?: number | null;
+    minSalary?: number | null;
+    salaryEscalationPct?: number | null;
+    salaryDecayPct?: number | null;
+    auctionBudget?: number | null;
+    auctionMinBid?: number | null;
+    eraFilter?: string | null;
+    hofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    userMembership?: {
+      __typename?: 'LeagueMember';
+      leagueId?: number | null;
+      userId?: number | null;
+      teamId?: number | null;
+      permissionLevel?: string | null;
+      username?: string | null;
+    } | null;
   } | null;
 };
 
@@ -4532,38 +4570,6 @@ export type GetSeasonDraftGamesQuery = {
     gameMode?: SeasonDraftGameMode | null;
     playerType?: SeasonDraftPlayerType | null;
     isMyTurn?: boolean | null;
-  }> | null;
-};
-
-export type GetTeamMembersQueryVariables = Exact<{
-  teamId: Scalars['Int']['input'];
-}>;
-
-export type GetTeamMembersQuery = {
-  __typename?: 'Query';
-  teamMembers?: Array<{
-    __typename?: 'TeamMember';
-    id?: number | null;
-    playerId?: number | null;
-    positionId?: number | null;
-    teamId?: number | null;
-    leagueId?: number | null;
-    onTradeBlock?: boolean | null;
-    salary?: number | null;
-    askingPrice?: string | null;
-    player?: {
-      __typename?: 'Player';
-      id?: number | null;
-      firstName?: string | null;
-      lastName?: string | null;
-      brefId?: string | null;
-      eligiblePositions?: Array<string> | null;
-      seasonsPlayed?: number | null;
-      careerBatting?: {
-        __typename?: 'CareerBatting';
-        games?: number | null;
-      } | null;
-    } | null;
   }> | null;
 };
 
@@ -7753,35 +7759,12 @@ export const GetAchievementRestrictions = gql`
  *
  * To run a query within a React component, call `useGetAchievementRestrictionsQuery` and pass it any options that fit your needs.
  * When your component renders, `useGetAchievementRestrictionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
-export const GetLeagueDraft = gql`
-  query GetLeagueDraft($leagueId: Int!) {
-    getLeagueDraft(leagueId: $leagueId) {
-      id
-      leagueId
-      draftMode
-      selectionMethod
-      draftOrder
-      currentPick
-      pickTimeLimitSeconds
-      draftStartedAt
-      draftCompletedAt
-      scheduledAt
-    }
-  }
-`;
-
-/**
- * __useGetLeagueDraftQuery__
- *
- * To run a query within a React component, call `useGetLeagueDraftQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetLeagueDraftQuery` returns an object from Apollo Client that contains loading, error, and data properties
  * you can use to render your UI.
  *
  * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
  *
  * @example
  * const { data, loading, error } = useGetAchievementRestrictionsQuery({
- * const { data, loading, error } = useGetLeagueDraftQuery({
  *   variables: {
  *      leagueId: // value for 'leagueId'
  *   },
@@ -7794,13 +7777,6 @@ export function useGetAchievementRestrictionsQuery(
   > &
     (
       | { variables: GetAchievementRestrictionsQueryVariables; skip?: boolean }
-export function useGetLeagueDraftQuery(
-  baseOptions: Apollo.QueryHookOptions<
-    GetLeagueDraftQuery,
-    GetLeagueDraftQueryVariables
-  > &
-    (
-      | { variables: GetLeagueDraftQueryVariables; skip?: boolean }
       | { skip: boolean }
     ),
 ) {
@@ -7828,29 +7804,6 @@ export function useGetAchievementRestrictionsSuspenseQuery(
     | Apollo.SuspenseQueryHookOptions<
         GetAchievementRestrictionsQuery,
         GetAchievementRestrictionsQueryVariables
-  return Apollo.useQuery<GetLeagueDraftQuery, GetLeagueDraftQueryVariables>(
-    GetLeagueDraft,
-    options,
-  );
-}
-export function useGetLeagueDraftLazyQuery(
-  baseOptions?: Apollo.LazyQueryHookOptions<
-    GetLeagueDraftQuery,
-    GetLeagueDraftQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useLazyQuery<GetLeagueDraftQuery, GetLeagueDraftQueryVariables>(
-    GetLeagueDraft,
-    options,
-  );
-}
-export function useGetLeagueDraftSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<
-        GetLeagueDraftQuery,
-        GetLeagueDraftQueryVariables
       >,
 ) {
   const options =
@@ -7903,58 +7856,28 @@ export type UpsertAchievementRestrictionMutationFn = MutationFunction<
  *
  * To run a mutation, you first call `useUpsertAchievementRestrictionMutation` within a React component and pass it any options that fit your needs.
  * When your component renders, `useUpsertAchievementRestrictionMutation` returns a tuple that includes:
-    GetLeagueDraftQuery,
-    GetLeagueDraftQueryVariables
-  >(
-    GetLeagueDraft,
-    options as
-      | Apollo.SkipToken
-      | Apollo.SuspenseQueryHookOptions<
-          GetLeagueDraftQuery,
-          GetLeagueDraftQueryVariables
-        >,
-  );
-}
-export type GetLeagueDraftQueryHookResult = ReturnType<
-  typeof useGetLeagueDraftQuery
->;
-export type GetLeagueDraftLazyQueryHookResult = ReturnType<
-  typeof useGetLeagueDraftLazyQuery
->;
-export type GetLeagueDraftSuspenseQueryHookResult = ReturnType<
-  typeof useGetLeagueDraftSuspenseQuery
->;
-export type GetLeagueDraftQueryResult = Apollo.QueryResult<
-  GetLeagueDraftQuery,
-  GetLeagueDraftQueryVariables
->;
-export const UpdateDraftSettings = gql`
-  mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
-    updateDraftSettings(input: $input) {
+export const UpdateLeagueBranding = gql`
+  mutation UpdateLeagueBranding($input: UpdateLeagueSettingsInput!) {
+    updateLeagueSettings(input: $input) {
       id
-      leagueId
-      draftMode
-      selectionMethod
-      draftOrder
-      currentPick
-      pickTimeLimitSeconds
-      playerPool
-      draftStartedAt
-      draftCompletedAt
-      scheduledAt
+      name
+      logoUrl
+      bannerUrl
+      primaryColor
+      secondaryColor
     }
   }
 `;
-export type UpdateDraftSettingsMutationFn = MutationFunction<
-  UpdateDraftSettingsMutation,
-  UpdateDraftSettingsMutationVariables
+export type UpdateLeagueBrandingMutationFn = MutationFunction<
+  UpdateLeagueBrandingMutation,
+  UpdateLeagueBrandingMutationVariables
 >;
 
 /**
- * __useUpdateDraftSettingsMutation__
+ * __useUpdateLeagueBrandingMutation__
  *
- * To run a mutation, you first call `useUpdateDraftSettingsMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useUpdateDraftSettingsMutation` returns a tuple that includes:
+ * To run a mutation, you first call `useUpdateLeagueBrandingMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateLeagueBrandingMutation` returns a tuple that includes:
  * - A mutate function that you can call at any time to execute the mutation
  * - An object with fields that represent the current status of the mutation's execution
  *
@@ -7962,7 +7885,7 @@ export type UpdateDraftSettingsMutationFn = MutationFunction<
  *
  * @example
  * const [upsertAchievementRestrictionMutation, { data, loading, error }] = useUpsertAchievementRestrictionMutation({
- * const [updateDraftSettingsMutation, { data, loading, error }] = useUpdateDraftSettingsMutation({
+ * const [updateLeagueBrandingMutation, { data, loading, error }] = useUpdateLeagueBrandingMutation({
  *   variables: {
  *      input: // value for 'input'
  *   },
@@ -7972,10 +7895,10 @@ export function useUpsertAchievementRestrictionMutation(
   baseOptions?: Apollo.MutationHookOptions<
     UpsertAchievementRestrictionMutation,
     UpsertAchievementRestrictionMutationVariables
-export function useUpdateDraftSettingsMutation(
+export function useUpdateLeagueBrandingMutation(
   baseOptions?: Apollo.MutationHookOptions<
-    UpdateDraftSettingsMutation,
-    UpdateDraftSettingsMutationVariables
+    UpdateLeagueBrandingMutation,
+    UpdateLeagueBrandingMutationVariables
   >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
@@ -8014,6 +7937,37 @@ export type DeleteAchievementRestrictionMutationFn = MutationFunction<
  *
  * To run a mutation, you first call `useDeleteAchievementRestrictionMutation` within a React component and pass it any options that fit your needs.
  * When your component renders, `useDeleteAchievementRestrictionMutation` returns a tuple that includes:
+    UpdateLeagueBrandingMutation,
+    UpdateLeagueBrandingMutationVariables
+  >(UpdateLeagueBranding, options);
+}
+export type UpdateLeagueBrandingMutationHookResult = ReturnType<
+  typeof useUpdateLeagueBrandingMutation
+>;
+export type UpdateLeagueBrandingMutationResult =
+  Apollo.MutationResult<UpdateLeagueBrandingMutation>;
+export type UpdateLeagueBrandingMutationOptions = BaseMutationOptions<
+  UpdateLeagueBrandingMutation,
+  UpdateLeagueBrandingMutationVariables
+>;
+export const UpdateLeagueSettings = gql`
+  mutation UpdateLeagueSettings($input: UpdateLeagueSettingsInput!) {
+    updateLeagueSettings(input: $input) {
+      ...League
+    }
+  }
+  ${LeagueFragmentDoc}
+`;
+export type UpdateLeagueSettingsMutationFn = MutationFunction<
+  UpdateLeagueSettingsMutation,
+  UpdateLeagueSettingsMutationVariables
+>;
+
+/**
+ * __useUpdateLeagueSettingsMutation__
+ *
+ * To run a mutation, you first call `useUpdateLeagueSettingsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateLeagueSettingsMutation` returns a tuple that includes:
  * - A mutate function that you can call at any time to execute the mutation
  * - An object with fields that represent the current status of the mutation's execution
  *
@@ -8031,6 +7985,16 @@ export function useDeleteAchievementRestrictionMutation(
   baseOptions?: Apollo.MutationHookOptions<
     DeleteAchievementRestrictionMutation,
     DeleteAchievementRestrictionMutationVariables
+ * const [updateLeagueSettingsMutation, { data, loading, error }] = useUpdateLeagueSettingsMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateLeagueSettingsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateLeagueSettingsMutation,
+    UpdateLeagueSettingsMutationVariables
   >,
 ) {
   const options = { ...defaultOptions, ...baseOptions };
@@ -8047,18 +8011,18 @@ export type DeleteAchievementRestrictionMutationResult =
 export type DeleteAchievementRestrictionMutationOptions = BaseMutationOptions<
   DeleteAchievementRestrictionMutation,
   DeleteAchievementRestrictionMutationVariables
-    UpdateDraftSettingsMutation,
-    UpdateDraftSettingsMutationVariables
-  >(UpdateDraftSettings, options);
+    UpdateLeagueSettingsMutation,
+    UpdateLeagueSettingsMutationVariables
+  >(UpdateLeagueSettings, options);
 }
-export type UpdateDraftSettingsMutationHookResult = ReturnType<
-  typeof useUpdateDraftSettingsMutation
+export type UpdateLeagueSettingsMutationHookResult = ReturnType<
+  typeof useUpdateLeagueSettingsMutation
 >;
-export type UpdateDraftSettingsMutationResult =
-  Apollo.MutationResult<UpdateDraftSettingsMutation>;
-export type UpdateDraftSettingsMutationOptions = BaseMutationOptions<
-  UpdateDraftSettingsMutation,
-  UpdateDraftSettingsMutationVariables
+export type UpdateLeagueSettingsMutationResult =
+  Apollo.MutationResult<UpdateLeagueSettingsMutation>;
+export type UpdateLeagueSettingsMutationOptions = BaseMutationOptions<
+  UpdateLeagueSettingsMutation,
+  UpdateLeagueSettingsMutationVariables
 >;
 export const CreateSeasonDraftGame = gql`
   mutation CreateSeasonDraftGame(
@@ -9638,97 +9602,6 @@ export type GetSeasonDraftGamesSuspenseQueryHookResult = ReturnType<
 export type GetSeasonDraftGamesQueryResult = Apollo.QueryResult<
   GetSeasonDraftGamesQuery,
   GetSeasonDraftGamesQueryVariables
->;
-export const GetTeamMembers = gql`
-  query GetTeamMembers($teamId: Int!) {
-    teamMembers(teamId: $teamId) {
-      ...TeamMember
-    }
-  }
-  ${TeamMemberFragmentDoc}
-`;
-
-/**
- * __useGetTeamMembersQuery__
- *
- * To run a query within a React component, call `useGetTeamMembersQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetTeamMembersQuery` returns an object from Apollo Client that contains loading, error, and data properties
- * you can use to render your UI.
- *
- * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
- *
- * @example
- * const { data, loading, error } = useGetTeamMembersQuery({
- *   variables: {
- *      teamId: // value for 'teamId'
- *   },
- * });
- */
-export function useGetTeamMembersQuery(
-  baseOptions: Apollo.QueryHookOptions<
-    GetTeamMembersQuery,
-    GetTeamMembersQueryVariables
-  > &
-    (
-      | { variables: GetTeamMembersQueryVariables; skip?: boolean }
-      | { skip: boolean }
-    ),
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useQuery<GetTeamMembersQuery, GetTeamMembersQueryVariables>(
-    GetTeamMembers,
-    options,
-  );
-}
-export function useGetTeamMembersLazyQuery(
-  baseOptions?: Apollo.LazyQueryHookOptions<
-    GetTeamMembersQuery,
-    GetTeamMembersQueryVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useLazyQuery<GetTeamMembersQuery, GetTeamMembersQueryVariables>(
-    GetTeamMembers,
-    options,
-  );
-}
-export function useGetTeamMembersSuspenseQuery(
-  baseOptions?:
-    | Apollo.SkipToken
-    | Apollo.SuspenseQueryHookOptions<
-        GetTeamMembersQuery,
-        GetTeamMembersQueryVariables
-      >,
-) {
-  const options =
-    baseOptions === Apollo.skipToken
-      ? baseOptions
-      : { ...defaultOptions, ...baseOptions };
-  return Apollo.useSuspenseQuery<
-    GetTeamMembersQuery,
-    GetTeamMembersQueryVariables
-  >(
-    GetTeamMembers,
-    options as
-      | Apollo.SkipToken
-      | Apollo.SuspenseQueryHookOptions<
-          GetTeamMembersQuery,
-          GetTeamMembersQueryVariables
-        >,
-  );
-}
-export type GetTeamMembersQueryHookResult = ReturnType<
-  typeof useGetTeamMembersQuery
->;
-export type GetTeamMembersLazyQueryHookResult = ReturnType<
-  typeof useGetTeamMembersLazyQuery
->;
-export type GetTeamMembersSuspenseQueryHookResult = ReturnType<
-  typeof useGetTeamMembersSuspenseQuery
->;
-export type GetTeamMembersQueryResult = Apollo.QueryResult<
-  GetTeamMembersQuery,
-  GetTeamMembersQueryVariables
 >;
 export const GetLeagueActivity = gql`
   query GetLeagueActivity(

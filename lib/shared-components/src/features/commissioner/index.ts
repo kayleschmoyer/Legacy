@@ -15,3 +15,7 @@ export { DraftOrderControl } from './DraftOrderControl';
 export type { DraftOrderControlProps } from './DraftOrderControl';
 export { DraftSettingsControl } from './DraftSettingsControl';
 export type { DraftSettingsControlProps } from './DraftSettingsControl';
+export { LeagueBrandingControl } from './LeagueBrandingControl';
+export type { LeagueBrandingControlProps } from './LeagueBrandingControl';
+export { LeagueSettingsControl } from './LeagueSettingsControl';
+export type { LeagueSettingsControlProps } from './LeagueSettingsControl';
