@@ -341,6 +341,36 @@ jobs:
       github.ref == 'refs/heads/main'
 
     steps:
+      - name: Checkout (for commit history)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Build commit changelog
+        id: changelog
+        shell: bash
+        env:
+          RELEASE_TAG: web-v${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
+        run: |
+          # Find the previous web release tag
+          PREV_TAG=$(git tag --list 'web-v*' --sort=-version:refname | grep -v "^${RELEASE_TAG}$" | head -n 1)
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Commits since ${PREV_TAG}:"
+            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --no-merges | head -20)
+          else
+            echo "No previous web release tag found — showing last 20 commits"
+            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' --no-merges -20)
+          fi
+
+          # Write to multiline output
+          {
+            echo "commits<<CHANGELOG_EOF"
+            echo "$COMMITS"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Post Release Summary
         shell: bash
         env:
@@ -349,6 +379,7 @@ jobs:
           BUILD_NUMBER: ${{ needs.setup.outputs.build_number }}
           COMMIT_SHA: ${{ needs.setup.outputs.commit_sha }}
           RELEASE_TAG: web-v${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
+          COMMITS: ${{ steps.changelog.outputs.commits }}
         run: |
           # Skip if webhook URL is not configured
           if [ -z "$DISCORD_WEBHOOK_URL" ]; then
@@ -357,14 +388,36 @@ jobs:
           fi
 
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${RELEASE_TAG}"
-
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${COMMIT_SHA}"
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          PAYLOAD=$(jq -n \
-            --arg title "🌐 Web Release v${VERSION}-${BUILD_NUMBER}" \
-            --arg desc "A new Web release has been published. [View on GitHub](${RELEASE_URL})" \
+          # Build fields array with jq
+          FIELDS="[]"
+          FIELDS=$(echo "$FIELDS" | jq \
             --arg version "${VERSION}-${BUILD_NUMBER}" \
-            --arg commit "$COMMIT_SHA" \
+            '. + [{"name": "Version", "value": $version, "inline": true}]')
+          FIELDS=$(echo "$FIELDS" | jq \
+            '. + [{"name": "Platform", "value": "Web", "inline": true}]')
+          FIELDS=$(echo "$FIELDS" | jq \
+            --arg sha "[\`${SHORT_SHA}\`](${COMMIT_URL})" \
+            '. + [{"name": "Commit", "value": $sha, "inline": true}]')
+
+          # Append commit changelog if available (truncate to 1000 chars for Discord field limit)
+          if [ -n "$COMMITS" ]; then
+            COMMIT_TEXT="$COMMITS"
+            if [ ${#COMMIT_TEXT} -gt 1000 ]; then
+              COMMIT_TEXT="${COMMIT_TEXT:0:1000}…"
+            fi
+            FIELDS=$(echo "$FIELDS" | jq \
+              --arg commits "$COMMIT_TEXT" \
+              '. + [{"name": "Changes", "value": $commits, "inline": false}]')
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "Web Release v${VERSION}-${BUILD_NUMBER}" \
+            --arg desc "A new Web release has been published. [View on GitHub](${RELEASE_URL})" \
+            --argjson fields "$FIELDS" \
             --arg actor "${{ github.actor }}" \
             --arg timestamp "$TIMESTAMP" \
             '{
@@ -372,11 +425,7 @@ jobs:
                 title: $title,
                 description: $desc,
                 color: 5793266,
-                fields: [
-                  { name: "Version", value: $version, inline: true },
-                  { name: "Platform", value: "Web", inline: true },
-                  { name: "Commit", value: $commit, inline: true }
-                ],
+                fields: $fields,
                 timestamp: $timestamp,
                 footer: { text: ("Released by " + $actor + " • Legacy Sports") }
               }]

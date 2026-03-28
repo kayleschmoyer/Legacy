@@ -383,6 +383,27 @@ jobs:
           status: failed
           comment: "Lambda infrastructure apply (run ${{ github.run_id }})"
 
+      - name: Build deploy changelog
+        id: deploy-changelog
+        if: always()
+        shell: bash
+        run: |
+          # Get recent commits touching lambdas/ or terraform/ (last 15 non-merge commits)
+          COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
+            --no-merges -15 -- lambdas/ terraform/)
+
+          if [ -z "$COMMITS" ]; then
+            # Fallback: last 10 commits on main
+            COMMITS=$(git log --pretty=format:'[`%h`](https://github.com/${{ github.repository }}/commit/%H) %s' \
+              --no-merges -10)
+          fi
+
+          {
+            echo "commits<<CHANGELOG_EOF"
+            echo "$COMMITS"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: "Discord Deploy Succeeded"
         if: steps.apply.outcome == 'success'
         uses: ./.github/actions/discord-notify
@@ -392,6 +413,7 @@ jobs:
           title: "Lambda Infrastructure Deploy"
           environment: ${{ env.AWS_STAGE }}
           description: "Applied Terraform changes for ${{ steps.check-updates.outputs.total_lambdas }} Lambda function(s)"
+          commits: ${{ steps.deploy-changelog.outputs.commits }}
 
       - name: "Discord Deploy Failed"
         if: always() && steps.apply.outcome == 'failure'
@@ -402,6 +424,7 @@ jobs:
           title: "Lambda Infrastructure Deploy"
           environment: ${{ env.AWS_STAGE }}
           description: "Terraform apply failed"
+          commits: ${{ steps.deploy-changelog.outputs.commits }}
 
       - name: Verify Deployment
         if: steps.plan.outputs.has_changes == 'true'

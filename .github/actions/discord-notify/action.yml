@@ -44,6 +44,10 @@ inputs:
     description: "Post into an existing thread instead of the channel root."
     required: false
     default: ""
+  commits:
+    description: "Newline-separated commit log (e.g. 'abc1234 feat: thing'). Shown as a 'Changes' field. Truncated to fit Discord embed limits."
+    required: false
+    default: ""
 
 outputs:
   thread-id:
@@ -72,6 +76,7 @@ runs:
         NOTIFY_CONTENT: ${{ inputs.content }}
         NOTIFY_THREAD_NAME: ${{ inputs.thread-name }}
         NOTIFY_THREAD_ID: ${{ inputs.thread-id }}
+        NOTIFY_COMMITS: ${{ inputs.commits }}
         GITHUB_REPO: ${{ github.repository }}
         GITHUB_SERVER: ${{ github.server_url }}
       run: |
@@ -135,6 +140,18 @@ runs:
         FIELDS=$(echo "$FIELDS" | jq \
           --arg url "[View Run](${RUN_URL})" \
           '. + [{"name": "Workflow", "value": $url, "inline": true}]')
+
+        # Append commits as a non-inline "Changes" field (truncated to 1024 chars — Discord field limit)
+        if [ -n "$NOTIFY_COMMITS" ]; then
+          # Truncate to 1000 chars to leave room for the ellipsis marker
+          COMMIT_TEXT="$NOTIFY_COMMITS"
+          if [ ${#COMMIT_TEXT} -gt 1000 ]; then
+            COMMIT_TEXT="${COMMIT_TEXT:0:1000}…"
+          fi
+          FIELDS=$(echo "$FIELDS" | jq \
+            --arg commits "$COMMIT_TEXT" \
+            '. + [{"name": "Changes", "value": $commits, "inline": false}]')
+        fi
 
         # Build description
         DESC=""
