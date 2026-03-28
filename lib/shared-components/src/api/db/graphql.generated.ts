@@ -4373,6 +4373,32 @@ export type GetMatchupRecapQuery = {
   } | null;
 };
 
+export type GetMatchupsByWeekQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  weekNumber: Scalars['Int']['input'];
+}>;
+
+export type GetMatchupsByWeekQuery = {
+  __typename?: 'Query';
+  getMatchupsByWeek?: Array<{
+    __typename?: 'Matchup';
+    id?: string | null;
+    weekNumber?: number | null;
+    leagueId?: number | null;
+    team1Id?: number | null;
+    team2Id?: number | null;
+    team1Score?: number | null;
+    team2Score?: number | null;
+    status?: MatchupStatus | null;
+    statsLoadingStatus?: StatsLoadingStatus | null;
+    gamesPerMatchup?: number | null;
+    spStartsPerMatchup?: number | null;
+    selectedGamesCount?: number | null;
+    startTime?: string | null;
+    endTime?: string | null;
+  }> | null;
+};
+
 export type GetSeasonDraftGameQueryVariables = Exact<{
   gameId: Scalars['Int']['input'];
 }>;
@@ -8863,6 +8889,98 @@ export type GetMatchupRecapSuspenseQueryHookResult = ReturnType<
 export type GetMatchupRecapQueryResult = Apollo.QueryResult<
   GetMatchupRecapQuery,
   GetMatchupRecapQueryVariables
+>;
+export const GetMatchupsByWeek = gql`
+  query GetMatchupsByWeek($leagueId: Int!, $weekNumber: Int!) {
+    getMatchupsByWeek(leagueId: $leagueId, weekNumber: $weekNumber) {
+      ...Matchup
+    }
+  }
+  ${MatchupFragmentDoc}
+`;
+
+/**
+ * __useGetMatchupsByWeekQuery__
+ *
+ * To run a query within a React component, call `useGetMatchupsByWeekQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMatchupsByWeekQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMatchupsByWeekQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      weekNumber: // value for 'weekNumber'
+ *   },
+ * });
+ */
+export function useGetMatchupsByWeekQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetMatchupsByWeekQuery,
+    GetMatchupsByWeekQueryVariables
+  > &
+    (
+      | { variables: GetMatchupsByWeekQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMatchupsByWeekQuery,
+    GetMatchupsByWeekQueryVariables
+  >(GetMatchupsByWeek, options);
+}
+export function useGetMatchupsByWeekLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMatchupsByWeekQuery,
+    GetMatchupsByWeekQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMatchupsByWeekQuery,
+    GetMatchupsByWeekQueryVariables
+  >(GetMatchupsByWeek, options);
+}
+export function useGetMatchupsByWeekSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupsByWeekQuery,
+        GetMatchupsByWeekQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMatchupsByWeekQuery,
+    GetMatchupsByWeekQueryVariables
+  >(
+    GetMatchupsByWeek,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMatchupsByWeekQuery,
+          GetMatchupsByWeekQueryVariables
+        >,
+  );
+}
+export type GetMatchupsByWeekQueryHookResult = ReturnType<
+  typeof useGetMatchupsByWeekQuery
+>;
+export type GetMatchupsByWeekLazyQueryHookResult = ReturnType<
+  typeof useGetMatchupsByWeekLazyQuery
+>;
+export type GetMatchupsByWeekSuspenseQueryHookResult = ReturnType<
+  typeof useGetMatchupsByWeekSuspenseQuery
+>;
+export type GetMatchupsByWeekQueryResult = Apollo.QueryResult<
+  GetMatchupsByWeekQuery,
+  GetMatchupsByWeekQueryVariables
 >;
 export const GetSeasonDraftGame = gql`
   query GetSeasonDraftGame($gameId: Int!) {

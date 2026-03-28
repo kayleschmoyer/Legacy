@@ -6,20 +6,20 @@ import {
   ChevronRight,
   RotateCcw,
 } from '@tamagui/lucide-icons';
-import { useNavigate } from 'react-router-dom';
 import {
   type MatchupFragment,
   useGetLeagueTeamsQuery,
+  useGetMatchupsByWeekQuery,
 } from '../../api/db/graphql.generated';
-import { useMatchupsByWeek } from '../../hooks/useMatchup';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   withAlpha,
-} from '../../constants/colors';
+} from '../../utils/colors';
 
 // ── Styled Components ─────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const NavCard = styled(Card, {
   overflow: 'hidden',
   borderRadius: '$6',
@@ -29,6 +29,7 @@ const NavCard = styled(Card, {
   width: '100%',
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const WeekStepperRow = styled(XStack, {
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -38,6 +39,7 @@ const WeekStepperRow = styled(XStack, {
   borderBottomColor: '$surfacePanelBorder',
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const StepperButton = styled(XStack, {
   alignItems: 'center',
   justifyContent: 'center',
@@ -59,6 +61,7 @@ const StepperButton = styled(XStack, {
   } as const,
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const WeekBadge = styled(XStack, {
   alignItems: 'center',
   gap: '$1.5',
@@ -68,6 +71,7 @@ const WeekBadge = styled(XStack, {
   borderWidth: 1,
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const MatchupCardButton = styled(YStack, {
   borderRadius: '$5',
   borderWidth: 1.5,
@@ -96,6 +100,7 @@ const MatchupCardButton = styled(YStack, {
   } as const,
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const UserBadge = styled(XStack, {
   alignItems: 'center',
   paddingHorizontal: '$2',
@@ -106,6 +111,7 @@ const UserBadge = styled(XStack, {
   borderColor: '$green7',
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- Tamagui styled() returns loosely typed
 const BackToCurrentButton = styled(XStack, {
   alignItems: 'center',
   justifyContent: 'center',
@@ -136,8 +142,8 @@ export interface MatchupNavigationControlsProps {
   userTeamId?: number | null;
   /** Whether we're showing a different matchup than the user's current one */
   isViewingOther?: boolean;
-  /** Optional callback for matchup changes (for inline navigation). If not provided, uses router navigation. */
-  onMatchupChange?: (matchupId: string) => void;
+  /** Callback for matchup changes. Required — consumers handle navigation. */
+  onMatchupChange: (matchupId: string) => void;
   /** Callback to reset to the user's current matchup */
   onResetToDefault?: () => void;
 }
@@ -161,8 +167,6 @@ export function MatchupNavigationControls({
   onMatchupChange,
   onResetToDefault,
 }: MatchupNavigationControlsProps) {
-  const navigate = useNavigate();
-
   // The league's actual "now" week — used for badge labelling only
   const currentLeagueWeek =
     currentLeagueWeekProp ?? currentMatchup?.weekNumber ?? 1;
@@ -215,9 +219,16 @@ export function MatchupNavigationControls({
     variables: { leagueId },
   });
 
-  // Fetch matchups for the selected week
-  const { matchups: weekMatchupsRaw, loading: matchupsLoading } =
-    useMatchupsByWeek(leagueId, selectedWeek);
+  // Fetch matchups for the selected week (inlined from useMatchupsByWeek)
+  const { data: matchupsByWeekData, loading: matchupsLoading } =
+    useGetMatchupsByWeekQuery({
+      variables: { leagueId, weekNumber: selectedWeek },
+      skip: !leagueId || !selectedWeek,
+    });
+  const weekMatchupsRaw = useMemo(
+    () => matchupsByWeekData?.getMatchupsByWeek ?? [],
+    [matchupsByWeekData],
+  );
 
   // Sort so the user's matchup always appears first
   const weekMatchups = useMemo(() => {
@@ -249,14 +260,7 @@ export function MatchupNavigationControls({
   // ── Handlers ──────────────────────────────────────────────────────────
 
   const handleMatchupSelect = (matchupId: string) => {
-    if (onMatchupChange) {
-      onMatchupChange(matchupId);
-    } else {
-      const numericId = parseInt(matchupId, 10);
-      if (!isNaN(numericId)) {
-        navigate(`/baseball/league/${leagueId}/matchups/${numericId}`);
-      }
-    }
+    onMatchupChange(matchupId);
   };
 
   const handlePrevWeek = () => {

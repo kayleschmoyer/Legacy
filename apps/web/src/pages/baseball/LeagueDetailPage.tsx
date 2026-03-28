@@ -133,7 +133,7 @@ import {
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { GamesRemaining } from '../../features/matchup/GamesRemaining';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
-import { MatchupNavigationControls } from '../../features/matchup/MatchupNavigationControls';
+import { MatchupNavigationControls } from '@legacy-sports/shared-components';
 import { announcePolite } from '../../utils/a11y';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {

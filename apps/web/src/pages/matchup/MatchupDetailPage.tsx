@@ -7,7 +7,7 @@ import { PremiumGate } from '../../components/PremiumGate';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { MatchupWinProbabilityPanel } from '../../features/matchup/MatchupWinProbabilityPanel';
 import { GamesRemaining } from '../../features/matchup/GamesRemaining';
-import { MatchupNavigationControls } from '../../features/matchup/MatchupNavigationControls';
+import { MatchupNavigationControls } from '@legacy-sports/shared-components';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
 import { MatchupRosterEditor } from '../../features/matchup/MatchupRosterEditor';
 import {
@@ -189,6 +189,12 @@ export function MatchupDetailPage() {
             userCurrentMatchup != null &&
             matchup.id !== userCurrentMatchup.id
           }
+          onMatchupChange={(matchupId) => {
+            const numericId = parseInt(matchupId, 10);
+            if (!isNaN(numericId)) {
+              navigate(`/baseball/league/${leagueId}/matchups/${numericId}`);
+            }
+          }}
           onResetToDefault={() => {
             if (userCurrentMatchup?.id) {
               navigate(

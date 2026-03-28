@@ -1,0 +1,5 @@
+query GetMatchupsByWeek($leagueId: Int!, $weekNumber: Int!) {
+  getMatchupsByWeek(leagueId: $leagueId, weekNumber: $weekNumber) {
+    ...Matchup
+  }
+}
