@@ -265,6 +265,10 @@ test.describe
     const NUDGE_INTERVAL_MS = 5_000;
 
     await test.step('Loop: make user picks on each turn; wait for AI picks', async () => {
+      // Track drafted players to avoid clicking stale buttons whose card
+      // is still visible due to Apollo cache update lag.
+      const draftedPlayers = new Set<string>();
+
       while (pickCount < maxPicks) {
         // Check if draft is already complete
         const draftDone = await page
@@ -274,42 +278,92 @@ test.describe
         if (draftDone) break;
 
         // Is it the user's turn?
+        // NOTE: locator.isVisible({ timeout }) is deprecated in Playwright
+        // v1.40+ — the timeout is silently ignored and the call returns
+        // immediately.  Use waitFor() to actually wait for the element.
         const isMyTurn = await page
-          .getByText('YOUR PICK')
+          .getByText('YOUR PICK', { exact: true })
           .first()
-          .isVisible({ timeout: 2_000 })
+          .waitFor({ state: 'visible', timeout: 2_000 })
+          .then(() => true)
           .catch(() => false);
 
         if (isMyTurn) {
-          // Find the first available "Draft X now" button and click it
-          const draftBtn = page
-            .getByRole('button', { name: /Draft .* now/i })
-            .first();
-          const btnReady = await draftBtn
-            .isVisible({ timeout: 3_000 })
-            .catch(() => false);
-
-          if (btnReady) {
-            const ariaLabel = await draftBtn
-              .getAttribute('aria-label')
+          // Find the first available "Draft X now" button for a player we
+          // haven't already drafted this session.
+          const allDraftBtns = page.getByRole('button', {
+            name: /Draft .* now/i,
+          });
+          const btnCount = await allDraftBtns.count().catch(() => 0);
+          let draftBtnIdx = -1;
+          let ariaLabel: string | null = null;
+          for (let i = 0; i < btnCount; i++) {
+            const btn = allDraftBtns.nth(i);
+            const visible = await btn.isVisible().catch(() => false);
+            if (!visible) continue;
+            const btnLabel = await btn
+              .getAttribute('aria-label', { timeout: 1_000 })
               .catch(() => null);
-            await draftBtn.click({ force: true });
+            const playerName = btnLabel
+              ?.replace(/^Draft\s+/i, '')
+              .replace(/\s+now$/i, '');
+            if (playerName && draftedPlayers.has(playerName)) continue;
+            draftBtnIdx = i;
+            ariaLabel = btnLabel;
+            break;
+          }
 
-            // Confirm pick accepted: the button should disappear from available players
-            const wasAccepted = ariaLabel
-              ? await page
-                  .getByRole('button', { name: ariaLabel, exact: true })
-                  .waitFor({ state: 'hidden', timeout: 8_000 })
-                  .then(() => true)
-                  .catch(() => false)
-              : true;
+          if (draftBtnIdx >= 0) {
+            // Capture the current pick label so we can detect when the pick
+            // advances — robust even for back-to-back picks in snake drafts
+            // where "YOUR PICK" may remain visible across picks.
+            const currentPickLocator = page
+              .getByText(/Round .* · Pick .*/)
+              .first();
+            const previousPickText = await currentPickLocator
+              .textContent()
+              .catch(() => null);
+
+            await allDraftBtns.nth(draftBtnIdx).click({ force: true });
+
+            let wasAccepted = false;
+
+            if (previousPickText) {
+              const trimmedPrevious = previousPickText.trim();
+              const timeoutMs = 8_000;
+              const pollIntervalMs = 250;
+              const start = Date.now();
+
+              while (Date.now() - start < timeoutMs) {
+                const currentText = await currentPickLocator
+                  .textContent()
+                  .catch(() => null);
+                if (currentText && currentText.trim() !== trimmedPrevious) {
+                  wasAccepted = true;
+                  break;
+                }
+                await page.waitForTimeout(pollIntervalMs);
+              }
+            } else {
+              // Fallback: use "YOUR PICK" disappearance heuristic
+              wasAccepted = await page
+                .getByText('YOUR PICK', { exact: true })
+                .first()
+                .waitFor({ state: 'hidden', timeout: 8_000 })
+                .then(() => true)
+                .catch(() => false);
+            }
 
             if (wasAccepted) {
               pickCount++;
               consecutiveMisses = 0;
+              const playerName = ariaLabel
+                ?.replace(/^Draft\s+/i, '')
+                .replace(/\s+now$/i, '');
+              if (playerName) draftedPlayers.add(playerName);
             }
           } else {
-            // "YOUR PICK" visible but button not ready — give the UI a moment
+            // "YOUR PICK" visible but no undrafted button found — give the UI a moment
             await page.waitForTimeout(1_000);
           }
         } else {
