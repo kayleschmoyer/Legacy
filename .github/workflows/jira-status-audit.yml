@@ -1,0 +1,163 @@
+name: "🔍 Jira Status Audit"
+
+# Detects mismatches between Jira ticket statuses and GitHub PR states.
+# Jira sync is one-directional (GitHub → Jira). If someone manually changes
+# a ticket status in Jira, GitHub PRs remain unaware. This workflow catches
+# those divergences and posts PR comments + labels so they're visible.
+#
+# Authentication: Uses Atlassian OAuth 2.0 (client credentials grant).
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # Daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  audit:
+    name: Audit Jira ↔ GitHub Status
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout (for workflow context)
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            .github
+          sparse-checkout-cone-mode: false
+
+      - name: Authenticate with Jira (OAuth 2.0)
+        id: auth
+        env:
+          JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
+        run: |
+          if [[ -z "$JIRA_CREDENTIALS" ]]; then
+            echo "::warning::JIRA_CREDENTIALS not set — skipping audit"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CLIENT_ID=$(echo "$JIRA_CREDENTIALS" | jq -r '.client_id')
+          CLIENT_SECRET=$(echo "$JIRA_CREDENTIALS" | jq -r '.client_secret')
+          CLOUD_ID=$(echo "$JIRA_CREDENTIALS" | jq -r '.cloud_id')
+
+          echo "::add-mask::$CLIENT_SECRET"
+          echo "::add-mask::$CLIENT_ID"
+
+          TOKEN_RESPONSE=$(curl -sf \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --data "$(jq -n --arg id "$CLIENT_ID" --arg secret "$CLIENT_SECRET" \
+              '{grant_type:"client_credentials",client_id:$id,client_secret:$secret}')" \
+            "https://auth.atlassian.com/oauth/token" 2>&1) || {
+            echo "::warning::Failed to obtain Jira OAuth token — skipping audit"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+          echo "::add-mask::$ACCESS_TOKEN"
+
+          {
+            echo "JIRA_ACCESS_TOKEN=$ACCESS_TOKEN"
+            echo "JIRA_API_BASE=https://api.atlassian.com/ex/jira/$CLOUD_ID"
+          } >> "$GITHUB_ENV"
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "✅ Jira authenticated"
+
+      - name: Audit PR ↔ Jira Status
+        if: steps.auth.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "🔍 Fetching open PRs with LS-* branch pattern..."
+
+          # Get all open PRs
+          PRS=$(gh pr list --state open --json number,headRefName,isDraft --limit 200)
+          TOTAL=$(echo "$PRS" | jq 'length')
+          echo "Found $TOTAL open PRs"
+
+          MISMATCHES=0
+          FIXED=0
+          SUMMARY=""
+
+          echo "$PRS" | jq -c '.[]' | while read -r PR; do
+            NUMBER=$(echo "$PR" | jq -r '.number')
+            BRANCH=$(echo "$PR" | jq -r '.headRefName')
+            IS_DRAFT=$(echo "$PR" | jq -r '.isDraft')
+
+            # Extract Jira key from branch
+            KEY=$(echo "$BRANCH" | grep -oP 'LS-\d+' | head -1 || true)
+            if [[ -z "$KEY" ]]; then
+              continue
+            fi
+
+            # Fetch Jira ticket status
+            JIRA_RESPONSE=$(curl -sf \
+              --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
+              --header "Accept: application/json" \
+              "$JIRA_API_BASE/rest/api/3/issue/$KEY?fields=status" 2>/dev/null) || {
+              echo "  ⚠️  Could not fetch $KEY — skipping"
+              continue
+            }
+
+            JIRA_STATUS=$(echo "$JIRA_RESPONSE" | jq -r '.fields.status.name')
+
+            # Expected: open PR = "In Review" (or "In Progress" if draft)
+            EXPECTED="In Review"
+            if [[ "$IS_DRAFT" == "true" ]]; then
+              EXPECTED="In Progress"
+            fi
+
+            # Check for mismatch
+            if [[ "$JIRA_STATUS" != "$EXPECTED" && "$JIRA_STATUS" != "In Progress" ]]; then
+              echo "  ❌ PR #$NUMBER ($KEY): Jira='$JIRA_STATUS' but expected='$EXPECTED'"
+              MISMATCHES=$((MISMATCHES + 1))
+
+              # Check if already labeled
+              HAS_LABEL=$(gh pr view "$NUMBER" --json labels --jq '.labels[].name' 2>/dev/null | grep -c 'jira-mismatch' || true)
+
+              if [[ "$HAS_LABEL" == "0" ]]; then
+                # Add label and comment
+                gh pr edit "$NUMBER" --add-label "jira-mismatch" 2>/dev/null || true
+                COMMENT_BODY=$(cat <<COMMENT_EOF
+          ⚠️ **Jira Status Mismatch**
+
+          **${KEY}** is \`${JIRA_STATUS}\` in Jira, but this PR is open (expected: \`${EXPECTED}\`).
+
+          This usually means someone manually changed the ticket status in Jira. Please verify the correct status.
+
+          _Detected by the Jira Status Audit workflow._
+          COMMENT_EOF
+                )
+                gh pr comment "$NUMBER" --body "$COMMENT_BODY" 2>/dev/null || true
+              fi
+            else
+              # Check if previously mismatched but now correct — remove label
+              HAS_LABEL=$(gh pr view "$NUMBER" --json labels --jq '.labels[].name' 2>/dev/null | grep -c 'jira-mismatch' || true)
+              if [[ "$HAS_LABEL" != "0" ]]; then
+                gh pr edit "$NUMBER" --remove-label "jira-mismatch" 2>/dev/null || true
+                FIXED=$((FIXED + 1))
+                echo "  ✅ PR #$NUMBER ($KEY): mismatch resolved, label removed"
+              fi
+            fi
+          done
+
+          echo ""
+          echo "## 🔍 Jira Status Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Open PRs scanned**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mismatches found**: $MISMATCHES" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previously mismatched, now fixed**: $FIXED" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "$MISMATCHES" -gt 0 ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ PRs with \`jira-mismatch\` label need attention." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All Jira statuses match GitHub PR states." >> $GITHUB_STEP_SUMMARY
+          fi
