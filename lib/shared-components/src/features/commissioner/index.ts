@@ -9,3 +9,5 @@ export { TiebreakerConfig } from './TiebreakerConfig';
 export type { TiebreakerConfigProps } from './TiebreakerConfig';
 export { TiebreakerHistory } from './TiebreakerHistory';
 export type { TiebreakerHistoryProps } from './TiebreakerHistory';
+export { AchievementRestrictionsControl } from './AchievementRestrictionsControl';
+export type { AchievementRestrictionsControlProps } from './AchievementRestrictionsControl';

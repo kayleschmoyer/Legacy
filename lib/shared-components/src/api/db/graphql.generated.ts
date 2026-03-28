@@ -3810,6 +3810,72 @@ export type DeleteLeagueMutation = {
   deleteLeague?: string | null;
 };
 
+export type AchievementRestrictionFragment = {
+  __typename?: 'AchievementRestriction';
+  id?: number | null;
+  leagueId?: number | null;
+  achievementType?: string | null;
+  isRepeatable?: boolean | null;
+  playerMinCount?: number | null;
+  rosterMin?: number | null;
+  rosterMax?: number | null;
+  repeatableRosterMax?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type GetAchievementRestrictionsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetAchievementRestrictionsQuery = {
+  __typename?: 'Query';
+  achievementRestrictions?: Array<{
+    __typename?: 'AchievementRestriction';
+    id?: number | null;
+    leagueId?: number | null;
+    achievementType?: string | null;
+    isRepeatable?: boolean | null;
+    playerMinCount?: number | null;
+    rosterMin?: number | null;
+    rosterMax?: number | null;
+    repeatableRosterMax?: number | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  }> | null;
+};
+
+export type UpsertAchievementRestrictionMutationVariables = Exact<{
+  input: UpsertAchievementRestrictionInput;
+}>;
+
+export type UpsertAchievementRestrictionMutation = {
+  __typename?: 'Mutation';
+  upsertAchievementRestriction?: {
+    __typename?: 'AchievementRestriction';
+    id?: number | null;
+    leagueId?: number | null;
+    achievementType?: string | null;
+    isRepeatable?: boolean | null;
+    playerMinCount?: number | null;
+    rosterMin?: number | null;
+    rosterMax?: number | null;
+    repeatableRosterMax?: number | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
+export type DeleteAchievementRestrictionMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  achievementType: Scalars['String']['input'];
+}>;
+
+export type DeleteAchievementRestrictionMutation = {
+  __typename?: 'Mutation';
+  deleteAchievementRestriction?: boolean | null;
+};
+
 export type CreateSeasonDraftGameMutationVariables = Exact<{
   name: Scalars['String']['input'];
   playerNames: Array<Scalars['String']['input']> | Scalars['String']['input'];
@@ -6252,6 +6318,20 @@ export const CommissionerAuditLogFragmentDoc = gql`
     createdAt
   }
 `;
+export const AchievementRestrictionFragmentDoc = gql`
+  fragment AchievementRestriction on AchievementRestriction {
+    id
+    leagueId
+    achievementType
+    isRepeatable
+    playerMinCount
+    rosterMin
+    rosterMax
+    repeatableRosterMax
+    createdAt
+    updatedAt
+  }
+`;
 export const LeagueMemberFragmentDoc = gql`
   fragment LeagueMember on LeagueMember {
     leagueId
@@ -7503,6 +7583,205 @@ export type DeleteLeagueMutationResult =
 export type DeleteLeagueMutationOptions = BaseMutationOptions<
   DeleteLeagueMutation,
   DeleteLeagueMutationVariables
+>;
+export const GetAchievementRestrictions = gql`
+  query GetAchievementRestrictions($leagueId: Int!) {
+    achievementRestrictions(leagueId: $leagueId) {
+      ...AchievementRestriction
+    }
+  }
+  ${AchievementRestrictionFragmentDoc}
+`;
+
+/**
+ * __useGetAchievementRestrictionsQuery__
+ *
+ * To run a query within a React component, call `useGetAchievementRestrictionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAchievementRestrictionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAchievementRestrictionsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetAchievementRestrictionsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetAchievementRestrictionsQuery,
+    GetAchievementRestrictionsQueryVariables
+  > &
+    (
+      | { variables: GetAchievementRestrictionsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetAchievementRestrictionsQuery,
+    GetAchievementRestrictionsQueryVariables
+  >(GetAchievementRestrictions, options);
+}
+export function useGetAchievementRestrictionsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetAchievementRestrictionsQuery,
+    GetAchievementRestrictionsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetAchievementRestrictionsQuery,
+    GetAchievementRestrictionsQueryVariables
+  >(GetAchievementRestrictions, options);
+}
+export function useGetAchievementRestrictionsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetAchievementRestrictionsQuery,
+        GetAchievementRestrictionsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetAchievementRestrictionsQuery,
+    GetAchievementRestrictionsQueryVariables
+  >(
+    GetAchievementRestrictions,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetAchievementRestrictionsQuery,
+          GetAchievementRestrictionsQueryVariables
+        >,
+  );
+}
+export type GetAchievementRestrictionsQueryHookResult = ReturnType<
+  typeof useGetAchievementRestrictionsQuery
+>;
+export type GetAchievementRestrictionsLazyQueryHookResult = ReturnType<
+  typeof useGetAchievementRestrictionsLazyQuery
+>;
+export type GetAchievementRestrictionsSuspenseQueryHookResult = ReturnType<
+  typeof useGetAchievementRestrictionsSuspenseQuery
+>;
+export type GetAchievementRestrictionsQueryResult = Apollo.QueryResult<
+  GetAchievementRestrictionsQuery,
+  GetAchievementRestrictionsQueryVariables
+>;
+export const UpsertAchievementRestriction = gql`
+  mutation UpsertAchievementRestriction(
+    $input: UpsertAchievementRestrictionInput!
+  ) {
+    upsertAchievementRestriction(input: $input) {
+      ...AchievementRestriction
+    }
+  }
+  ${AchievementRestrictionFragmentDoc}
+`;
+export type UpsertAchievementRestrictionMutationFn = MutationFunction<
+  UpsertAchievementRestrictionMutation,
+  UpsertAchievementRestrictionMutationVariables
+>;
+
+/**
+ * __useUpsertAchievementRestrictionMutation__
+ *
+ * To run a mutation, you first call `useUpsertAchievementRestrictionMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpsertAchievementRestrictionMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [upsertAchievementRestrictionMutation, { data, loading, error }] = useUpsertAchievementRestrictionMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpsertAchievementRestrictionMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpsertAchievementRestrictionMutation,
+    UpsertAchievementRestrictionMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpsertAchievementRestrictionMutation,
+    UpsertAchievementRestrictionMutationVariables
+  >(UpsertAchievementRestriction, options);
+}
+export type UpsertAchievementRestrictionMutationHookResult = ReturnType<
+  typeof useUpsertAchievementRestrictionMutation
+>;
+export type UpsertAchievementRestrictionMutationResult =
+  Apollo.MutationResult<UpsertAchievementRestrictionMutation>;
+export type UpsertAchievementRestrictionMutationOptions = BaseMutationOptions<
+  UpsertAchievementRestrictionMutation,
+  UpsertAchievementRestrictionMutationVariables
+>;
+export const DeleteAchievementRestriction = gql`
+  mutation DeleteAchievementRestriction(
+    $leagueId: Int!
+    $achievementType: String!
+  ) {
+    deleteAchievementRestriction(
+      leagueId: $leagueId
+      achievementType: $achievementType
+    )
+  }
+`;
+export type DeleteAchievementRestrictionMutationFn = MutationFunction<
+  DeleteAchievementRestrictionMutation,
+  DeleteAchievementRestrictionMutationVariables
+>;
+
+/**
+ * __useDeleteAchievementRestrictionMutation__
+ *
+ * To run a mutation, you first call `useDeleteAchievementRestrictionMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteAchievementRestrictionMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteAchievementRestrictionMutation, { data, loading, error }] = useDeleteAchievementRestrictionMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      achievementType: // value for 'achievementType'
+ *   },
+ * });
+ */
+export function useDeleteAchievementRestrictionMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    DeleteAchievementRestrictionMutation,
+    DeleteAchievementRestrictionMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    DeleteAchievementRestrictionMutation,
+    DeleteAchievementRestrictionMutationVariables
+  >(DeleteAchievementRestriction, options);
+}
+export type DeleteAchievementRestrictionMutationHookResult = ReturnType<
+  typeof useDeleteAchievementRestrictionMutation
+>;
+export type DeleteAchievementRestrictionMutationResult =
+  Apollo.MutationResult<DeleteAchievementRestrictionMutation>;
+export type DeleteAchievementRestrictionMutationOptions = BaseMutationOptions<
+  DeleteAchievementRestrictionMutation,
+  DeleteAchievementRestrictionMutationVariables
 >;
 export const CreateSeasonDraftGame = gql`
   mutation CreateSeasonDraftGame(
