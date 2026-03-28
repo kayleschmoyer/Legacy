@@ -75,6 +75,7 @@ query GetPlayersWithStats(
       earnedRuns
       outsRecorded
       winPercentage
+      pitchingWAR
     }
     careerAchievements {
       allStarSelections

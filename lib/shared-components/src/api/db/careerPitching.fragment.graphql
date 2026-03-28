@@ -26,6 +26,7 @@ fragment CareerPitching on CareerPitching {
   outRate
   era
   winPercentage
+  pitchingWAR
   player {
     id
     firstName

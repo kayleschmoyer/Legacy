@@ -303,6 +303,8 @@ export type CareerPitching = {
   losses?: Maybe<Scalars['Int']['output']>;
   outRate?: Maybe<Scalars['Int']['output']>;
   outsRecorded?: Maybe<Scalars['Int']['output']>;
+  /** Approximate pitching WAR computed from career counting stats. Uses FIP-based run estimation with season-specific cFIP constants, league ERA baseline, and replacement level (20 runs per 200 IP). */
+  pitchingWAR?: Maybe<Scalars['Float']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   positionsPlayed?: Maybe<Scalars['String']['output']>;
@@ -5470,6 +5472,7 @@ export type GetDraftPitcherStatsQuery = {
     strikeouts?: number | null;
     games?: number | null;
     gamesStarted?: number | null;
+    pitchingWAR?: number | null;
   }> | null;
 };
 
@@ -5534,6 +5537,7 @@ export type GetDraftPitchingStatsQuery = {
     outsRecorded?: number | null;
     winPercentage?: number | null;
     hits?: number | null;
+    pitchingWAR?: number | null;
   }> | null;
 };
 
@@ -7049,6 +7053,7 @@ export type GetPlayersWithStatsQuery = {
       earnedRuns?: number | null;
       outsRecorded?: number | null;
       winPercentage?: number | null;
+      pitchingWAR?: number | null;
     } | null;
     careerAchievements?: {
       __typename?: 'CareerAchievements';
@@ -14442,6 +14447,7 @@ export const GetDraftPitcherStats = gql`
       strikeouts
       games
       gamesStarted
+      pitchingWAR
     }
   }
 `;
@@ -14655,6 +14661,7 @@ export const GetDraftPitchingStats = gql`
       outsRecorded
       winPercentage
       hits
+      pitchingWAR
     }
   }
 `;
@@ -17101,6 +17108,7 @@ export const GetPlayersWithStats = gql`
         earnedRuns
         outsRecorded
         winPercentage
+        pitchingWAR
       }
       careerAchievements {
         allStarSelections

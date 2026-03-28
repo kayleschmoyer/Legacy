@@ -336,6 +336,11 @@ type CareerPitching {
   losses: Int
   outRate: Int
   outsRecorded: Int
+
+  """
+  Approximate pitching WAR computed from career counting stats. Uses FIP-based run estimation with season-specific cFIP constants, league ERA baseline, and replacement level (20 runs per 200 IP).
+  """
+  pitchingWAR: Float
   player: Player
   playerId: Int
   positionsPlayed: String

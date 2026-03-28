@@ -309,6 +309,8 @@ export type CareerPitching = {
   losses?: Maybe<Scalars['Int']['output']>;
   outRate?: Maybe<Scalars['Int']['output']>;
   outsRecorded?: Maybe<Scalars['Int']['output']>;
+  /** Approximate pitching WAR computed from career counting stats. Uses FIP-based run estimation with season-specific cFIP constants, league ERA baseline, and replacement level (20 runs per 200 IP). */
+  pitchingWAR?: Maybe<Scalars['Float']['output']>;
   player?: Maybe<Player>;
   playerId?: Maybe<Scalars['Int']['output']>;
   positionsPlayed?: Maybe<Scalars['String']['output']>;
@@ -3665,6 +3667,7 @@ export type CareerPitchingFragment = {
   outRate?: number | null;
   era?: string | null;
   winPercentage?: number | null;
+  pitchingWAR?: number | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -4096,6 +4099,7 @@ export type GetCareerPitchingStatsQuery = {
     outRate?: number | null;
     era?: string | null;
     winPercentage?: number | null;
+    pitchingWAR?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -6454,6 +6458,7 @@ export const CareerPitchingFragmentDoc = gql`
     outRate
     era
     winPercentage
+    pitchingWAR
     player {
       id
       firstName

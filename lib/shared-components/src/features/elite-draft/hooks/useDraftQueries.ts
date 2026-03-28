@@ -348,6 +348,7 @@ export function useDraftQueries({
         gamesStarted: number;
         whip: number;
         winPct: number;
+        war: number;
       }
     >();
     const rows = pitchingStatsData?.careerPitchingStats;
@@ -370,6 +371,7 @@ export function useDraftQueries({
         gamesStarted: r.gamesStarted ?? 0,
         whip: Math.round(whip * 1000) / 1000,
         winPct: r.winPercentage ?? 0,
+        war: r.pitchingWAR ?? 0,
       });
     }
     return map;

@@ -332,6 +332,7 @@ export const careerPitching = pgView('career_pitching', {
   // You can use { mode: "bigint" } if numbers are exceeding js number limitations
   outRate: bigint('out_rate', { mode: 'number' }),
   era: numeric('era'),
+  pitchingWar: doublePrecision('pitching_war'),
 }).as(sql`SELECT player_id,
        w,
        l,

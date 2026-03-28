@@ -423,6 +423,7 @@ export const CareerPitchingRef = builder.objectRef<{
   outsRecorded: number | null;
   outRate: number | null;
   era: string | null;
+  pitchingWar: number | null;
 }>('CareerPitching');
 
 CareerPitchingRef.implement({
@@ -450,6 +451,19 @@ CareerPitchingRef.implement({
     outsRecorded: t.exposeInt('outsRecorded', { nullable: true }),
     outRate: t.exposeInt('outRate', { nullable: true }),
     era: t.exposeString('era', { nullable: true }),
+    /**
+     * Pitching WAR — read from the career_pitching view's computed column.
+     * Formula: FIP-based runs above average + replacement level, per season, summed.
+     */
+    pitchingWAR: t.field({
+      type: 'Float',
+      nullable: true,
+      description:
+        'Approximate pitching WAR computed from career counting stats. ' +
+        'Uses FIP-based run estimation with season-specific cFIP constants, ' +
+        'league ERA baseline, and replacement level (20 runs per 200 IP).',
+      resolve: (stats) => stats.pitchingWar ?? null,
+    }),
     // Computed statistics
     winPercentage: t.field({
       type: 'Float',
