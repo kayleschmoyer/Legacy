@@ -54,8 +54,8 @@ env:
   PREVIEW_BASE_URL: https://bkrupa.github.io/legacy-sports-deploys
 
 jobs:
-  deploy-preview:
-    name: Deploy PR Preview
+  build-preview:
+    name: Build PR Preview
     # Only run on successful CI for pull_request events
     if: >-
       github.event_name == 'workflow_run' &&
@@ -63,6 +63,11 @@ jobs:
       github.event.workflow_run.event == 'pull_request'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
+    outputs:
+      pr_number: ${{ steps.pr.outputs.number }}
+      pr_skip: ${{ steps.pr.outputs.skip }}
+      head_sha: ${{ steps.pr.outputs.head_sha }}
+      head_branch: ${{ steps.pr.outputs.head_branch }}
     env:
       NX_DAEMON: false
       NX_SKIP_NX_CACHE: false
@@ -188,9 +193,34 @@ jobs:
         if: steps.pr.outputs.skip != 'true' && steps.download.outcome != 'success'
         run: cp ./dist/apps/web/index.html ./dist/apps/web/404.html
 
+      - name: Upload Preview Artifact
+        if: steps.pr.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-preview-${{ steps.pr.outputs.number }}
+          path: dist/apps/web
+          retention-days: 1
+
+  deploy-preview:
+    name: Deploy PR Preview
+    needs: [build-preview]
+    if: needs.build-preview.outputs.pr_skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Serialize pushes to the deploy repo to prevent race conditions
+    concurrency:
+      group: deploy-repo-gh-pages-push
+      cancel-in-progress: false
+
+    steps:
+      - name: Download Preview Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-preview-${{ needs.build-preview.outputs.pr_number }}
+          path: dist/apps/web
+
       # ── Deploy to the preview repo ───────────────────────────────────────
       - name: Generate App Token
-        if: steps.pr.outputs.skip != 'true'
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
@@ -200,35 +230,38 @@ jobs:
           repositories: legacy-sports-deploys
 
       - name: Deploy to Preview Repo
-        if: steps.pr.outputs.skip != 'true'
         uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ steps.app-token.outputs.token }}
           external_repository: bkrupa/legacy-sports-deploys
           publish_branch: gh-pages
           publish_dir: ./dist/apps/web
-          destination_dir: pr-${{ steps.pr.outputs.number }}
+          destination_dir: pr-${{ needs.build-preview.outputs.pr_number }}
 
       - name: Comment Preview URL
-        if: steps.pr.outputs.skip != 'true'
         uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: pr-preview
-          number: ${{ steps.pr.outputs.number }}
+          number: ${{ needs.build-preview.outputs.pr_number }}
           message: |
             ## 🌐 PR Preview
 
             | | |
             |---|---|
-            | **URL** | [${{ env.PREVIEW_BASE_URL }}/pr-${{ steps.pr.outputs.number }}/](${{ env.PREVIEW_BASE_URL }}/pr-${{ steps.pr.outputs.number }}/) |
-            | **Branch** | `${{ steps.pr.outputs.head_branch }}` |
-            | **Commit** | `${{ steps.pr.outputs.head_sha }}` |
+            | **URL** | [${{ env.PREVIEW_BASE_URL }}/pr-${{ needs.build-preview.outputs.pr_number }}/](${{ env.PREVIEW_BASE_URL }}/pr-${{ needs.build-preview.outputs.pr_number }}/) |
+            | **Branch** | `${{ needs.build-preview.outputs.head_branch }}` |
+            | **Commit** | `${{ needs.build-preview.outputs.head_sha }}` |
 
   cleanup-preview:
     name: Cleanup PR Preview
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
+    # Serialize pushes to the deploy repo to prevent race conditions.
+    # Cleanup is lightweight so job-level concurrency is acceptable here.
+    concurrency:
+      group: deploy-repo-gh-pages-push
+      cancel-in-progress: false
 
     steps:
       - name: Generate App Token

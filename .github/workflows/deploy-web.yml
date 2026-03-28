@@ -205,16 +205,20 @@ jobs:
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     needs: [setup, build-and-deploy]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Release creation is non-critical — don't fail the overall deploy
+    continue-on-error: true
 
     steps:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: web-v${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
+          target_commitish: ${{ github.sha }}
           name: "Web Release v${{ needs.setup.outputs.version }} (${{ needs.setup.outputs.commit_sha }})"
           draft: false
           prerelease: false
           generate_release_notes: true
+          make_latest: "true"
           body: |
             ## 🌐 Web Application Release
 
@@ -246,8 +250,15 @@ jobs:
   notify-release:
     name: Discord Release Summary
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    needs: [setup, create-release]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [setup, build-and-deploy, create-release]
+    # Only notify when both deploy and release creation succeeded.
+    # This avoids posting links to non-existent or failed releases.
+    if: >-
+      !cancelled() &&
+      needs.build-and-deploy.result == 'success' &&
+      needs.create-release.result == 'success' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
 
     steps:
       - name: Post Release Summary
