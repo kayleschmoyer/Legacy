@@ -173,6 +173,7 @@ export * from './features/chat/GifPicker';
 export * from './features/leagues/LeagueActivityFeed';
 export * from './features/leagues/LeagueScoringSummary';
 export * from './features/leagues/OnThisDayFeed';
+export * from './features/leagues/TradingCenter';
 
 // Commissioner tools
 export * from './features/commissioner';

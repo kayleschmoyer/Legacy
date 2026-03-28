@@ -4494,6 +4494,38 @@ export type GetSeasonDraftGamesQuery = {
   }> | null;
 };
 
+export type GetTeamMembersQueryVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+}>;
+
+export type GetTeamMembersQuery = {
+  __typename?: 'Query';
+  teamMembers?: Array<{
+    __typename?: 'TeamMember';
+    id?: number | null;
+    playerId?: number | null;
+    positionId?: number | null;
+    teamId?: number | null;
+    leagueId?: number | null;
+    onTradeBlock?: boolean | null;
+    salary?: number | null;
+    askingPrice?: string | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      brefId?: string | null;
+      eligiblePositions?: Array<string> | null;
+      seasonsPlayed?: number | null;
+      careerBatting?: {
+        __typename?: 'CareerBatting';
+        games?: number | null;
+      } | null;
+    } | null;
+  }> | null;
+};
+
 export type LeagueMemberFragment = {
   __typename?: 'LeagueMember';
   leagueId?: number | null;
@@ -9443,6 +9475,97 @@ export type GetSeasonDraftGamesSuspenseQueryHookResult = ReturnType<
 export type GetSeasonDraftGamesQueryResult = Apollo.QueryResult<
   GetSeasonDraftGamesQuery,
   GetSeasonDraftGamesQueryVariables
+>;
+export const GetTeamMembers = gql`
+  query GetTeamMembers($teamId: Int!) {
+    teamMembers(teamId: $teamId) {
+      ...TeamMember
+    }
+  }
+  ${TeamMemberFragmentDoc}
+`;
+
+/**
+ * __useGetTeamMembersQuery__
+ *
+ * To run a query within a React component, call `useGetTeamMembersQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTeamMembersQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTeamMembersQuery({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *   },
+ * });
+ */
+export function useGetTeamMembersQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTeamMembersQuery,
+    GetTeamMembersQueryVariables
+  > &
+    (
+      | { variables: GetTeamMembersQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetTeamMembersQuery, GetTeamMembersQueryVariables>(
+    GetTeamMembers,
+    options,
+  );
+}
+export function useGetTeamMembersLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTeamMembersQuery,
+    GetTeamMembersQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetTeamMembersQuery, GetTeamMembersQueryVariables>(
+    GetTeamMembers,
+    options,
+  );
+}
+export function useGetTeamMembersSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamMembersQuery,
+        GetTeamMembersQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTeamMembersQuery,
+    GetTeamMembersQueryVariables
+  >(
+    GetTeamMembers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTeamMembersQuery,
+          GetTeamMembersQueryVariables
+        >,
+  );
+}
+export type GetTeamMembersQueryHookResult = ReturnType<
+  typeof useGetTeamMembersQuery
+>;
+export type GetTeamMembersLazyQueryHookResult = ReturnType<
+  typeof useGetTeamMembersLazyQuery
+>;
+export type GetTeamMembersSuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamMembersSuspenseQuery
+>;
+export type GetTeamMembersQueryResult = Apollo.QueryResult<
+  GetTeamMembersQuery,
+  GetTeamMembersQueryVariables
 >;
 export const GetLeagueActivity = gql`
   query GetLeagueActivity(
