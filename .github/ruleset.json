@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json.schemastore.org/github-ruleset.json",
+  "_comment": "Branch protection ruleset for the main branch. Applied via scripts/apply-ruleset.sh.",
+  "name": "main-branch-protection",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/main"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "_comment": "Prevent force pushes to main — history must be linear and immutable.",
+      "type": "non_fast_forward"
+    },
+    {
+      "_comment": "Prevent direct deletion of the main branch.",
+      "type": "deletion"
+    },
+    {
+      "_comment": "Require a pull request before merging into main.",
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true
+      }
+    },
+    {
+      "_comment": "Require all three CI status checks to pass before merge.",
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {
+            "_comment": "Linting, typechecking, unit tests, formatting, and migration immutability checks.",
+            "context": "Quality Gates"
+          },
+          {
+            "_comment": "Full project build validation (apps and lambdas).",
+            "context": "Build Validation"
+          },
+          {
+            "_comment": "Copilot / bot review gate — set by copilot-auto-approve.yml. Ensures every PR has been reviewed by the bot reviewer before merge.",
+            "context": "bot-review"
+          }
+        ]
+      }
+    }
+  ],
+  "bypass_actors": [
+    {
+      "_comment": "Allow repository admins to bypass in emergencies (e.g., hotfixes).",
+      "actor_id": 5,
+      "actor_type": "RepositoryRole",
+      "bypass_mode": "always"
+    }
+  ]
+}

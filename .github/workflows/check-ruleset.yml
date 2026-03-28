@@ -1,0 +1,82 @@
+# check-ruleset.yml — Weekly drift detection for branch protection rulesets.
+# Compares the live ruleset on GitHub against the checked-in JSON config.
+# Posts a warning annotation if they diverge.
+
+name: Check Ruleset Drift
+
+on:
+  schedule:
+    # Every Monday at 09:00 UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-drift:
+    name: "Ruleset Drift Detection"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Fetch live ruleset from GitHub
+        id: fetch
+        env:
+          GH_TOKEN: ${{ secrets.RULESET_ADMIN_TOKEN }}
+          REPO: ${{ github.repository }}
+          RULESET_NAME: main-branch-protection
+        run: |
+          echo "==> Fetching rulesets for $REPO..."
+          live_json=$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name == \"$RULESET_NAME\")")
+
+          if [[ -z "$live_json" ]]; then
+            echo "::warning::Ruleset '$RULESET_NAME' not found on GitHub. Run scripts/apply-ruleset.sh to create it."
+            echo "drift=missing" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Normalize: keep only the fields we track (drop id, node_id, created_at, etc.)
+          echo "$live_json" | jq '{
+            name, target, enforcement, conditions, rules,
+            bypass_actors: [.bypass_actors[]? | {actor_id, actor_type, bypass_mode}]
+          }' > /tmp/live-ruleset.json
+
+          echo "drift=fetched" >> "$GITHUB_OUTPUT"
+
+      - name: Compare with checked-in config
+        if: steps.fetch.outputs.drift == 'fetched'
+        env:
+          RULESET_FILE: .github/ruleset.json
+        run: |
+          # Strip _comment keys and null integration_id from the local config for comparison
+          jq 'walk(if type == "object" then del(._comment) else . end)
+            | del(."$schema")
+            | .rules |= map(
+                if .type == "required_status_checks"
+                then .parameters.required_status_checks |= map(del(.integration_id))
+                else .
+                end
+              )' "$RULESET_FILE" > /tmp/local-ruleset.json
+
+          # Normalize the live ruleset the same way
+          jq '.rules |= map(
+                if .type == "required_status_checks"
+                then .parameters.required_status_checks |= map(del(.integration_id))
+                else .
+                end
+              )' /tmp/live-ruleset.json > /tmp/live-ruleset-normalized.json
+
+          if diff <(jq -S . /tmp/local-ruleset.json) <(jq -S . /tmp/live-ruleset-normalized.json) > /tmp/ruleset-diff.txt 2>&1; then
+            echo "==> Ruleset is in sync."
+          else
+            echo "::warning::Ruleset drift detected! The live ruleset on GitHub differs from .github/ruleset.json."
+            echo "==> Differences:"
+            cat /tmp/ruleset-diff.txt
+            echo ""
+            echo "Run 'scripts/apply-ruleset.sh' to reconcile."
+            exit 1
+          fi
