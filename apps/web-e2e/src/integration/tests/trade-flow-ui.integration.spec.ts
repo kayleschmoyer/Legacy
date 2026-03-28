@@ -112,6 +112,8 @@ async function proposeTradeViaUI(
   page: Page,
   toTeamName: string | RegExp,
 ): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: /Propose Trade/i });
+
   // Open the dialog
   const proposeBtn = page
     .getByRole('button', { name: /propose trade/i })
@@ -132,89 +134,72 @@ async function proposeTradeViaUI(
     timeout: 10000,
   });
 
-  // Wait for the player list to load (spinner disappears)
-  await page.waitForTimeout(1500);
-  const offerPlayerBtns = page.locator(
-    '[role="button"]:not([disabled]):not(:has-text(/propose trade/i)):not(:has-text(/next/i))',
-  );
-  // Pick the first visible player offer button (exclude Nav/Step buttons)
-  const offerSection = page.locator('text=/you will give/i').locator('..');
-  // Use a more targeted approach — locate buttons in the offer step container
-  // by clicking the first player button that appears after the "you will give" label
-  const firstOfferPlayer = page
-    .locator('[data-step="offer"] button, button')
-    .filter({ hasNotText: /propose trade|next|back|send/i })
-    .first();
-
-  // Simpler: just grab all visible buttons in the dialog area that are player choices
-  const dialogButtons = page.locator(
-    '[role="dialog"] button, [aria-modal] button',
-  );
+  // Wait for at least one player button to render in the dialog
+  const dialogButtons = dialog.getByRole('button');
+  await expect(dialogButtons.first()).toBeVisible({ timeout: 15_000 });
   const dialogCount = await dialogButtons.count();
 
-  if (dialogCount === 0) {
-    // Fallback: look for any clickable list item inside the fixed overlay
-    const overlay = page.locator(
-      '[style*="position: fixed"], [style*="z-index: 1000"]',
-    );
-    const playerItems = overlay.locator('button');
-    const itemCount = await playerItems.count();
-    if (itemCount > 0) {
-      await playerItems.first().click();
-    }
-  } else {
-    // Click first player button (skip navigation/step buttons by checking text length)
-    for (let i = 0; i < dialogCount; i++) {
-      const btn = dialogButtons.nth(i);
-      const text = (await btn.textContent()) ?? '';
-      const trimmed = text.trim();
-      // Player name buttons have substantial text and don't match navigation labels
-      if (
-        trimmed.length > 3 &&
-        !/^(next|back|send|propose|review|cancel|confirm|\d|✓)$/i.test(trimmed)
-      ) {
-        await btn.click();
-        break;
-      }
+  // Click the first player button (skip navigation/step buttons)
+  let playerClicked = false;
+  for (let i = 0; i < dialogCount; i++) {
+    const btn = dialogButtons.nth(i);
+    const text = (await btn.textContent()) ?? '';
+    const trimmed = text.trim();
+    // Player name buttons have substantial text and don't match navigation labels
+    if (
+      trimmed.length > 3 &&
+      !/^(?:[←→]\s*)?(?:next|back|send|propose|review|cancel|confirm|\d|✓)(?:\s*[←→])?$/i.test(
+        trimmed,
+      ) &&
+      !/next.*select|select their/i.test(trimmed)
+    ) {
+      await btn.click();
+      playerClicked = true;
+      break;
     }
   }
+  expect(playerClicked).toBe(true);
 
-  // Click "Next — Select Their Players"
+  // Click "Next — Select Their Players" (must wait — appears after selection)
   const nextBtn = page.getByRole('button', {
     name: /Next.*Select Their Players/i,
   });
-  if (await nextBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await nextBtn.click();
-  }
+  await expect(nextBtn).toBeVisible({ timeout: 10_000 });
+  await nextBtn.click();
 
   // Step 3: Select at least one player to request (first available)
   await expect(page.getByText(/give you/i).first()).toBeVisible({
     timeout: 10000,
   });
-  await page.waitForTimeout(1500);
 
-  const dialogButtons2 = page.locator(
-    '[role="dialog"] button, [aria-modal] button',
-  );
+  // Wait for player list to load
+  const dialogButtons2 = dialog.getByRole('button');
+  await expect(dialogButtons2.first()).toBeVisible({ timeout: 15_000 });
   const dialogCount2 = await dialogButtons2.count();
+
+  let requestPlayerClicked = false;
   for (let i = 0; i < dialogCount2; i++) {
     const btn = dialogButtons2.nth(i);
     const text = (await btn.textContent()) ?? '';
     const trimmed = text.trim();
     if (
       trimmed.length > 3 &&
-      !/^(next|back|send|propose|review|cancel|confirm|\d|✓)$/i.test(trimmed)
+      !/^(?:[←→]\s*)?(?:next|back|send|propose|review|cancel|confirm|\d|✓)(?:\s*[←→])?$/i.test(
+        trimmed,
+      ) &&
+      !/review trade/i.test(trimmed)
     ) {
       await btn.click();
+      requestPlayerClicked = true;
       break;
     }
   }
+  expect(requestPlayerClicked).toBe(true);
 
-  // Click "Review Trade"
+  // Click "Review Trade" (must wait — appears after selection)
   const reviewBtn = page.getByRole('button', { name: /Review Trade/i });
-  if (await reviewBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await reviewBtn.click();
-  }
+  await expect(reviewBtn).toBeVisible({ timeout: 10_000 });
+  await reviewBtn.click();
 
   // Step 4: Confirm — click "Send Trade Offer"
   await expect(
@@ -615,9 +600,10 @@ test.describe
       ).toBeVisible({ timeout: 10000 });
 
       // Pick the first team button in the dialog
-      const teamButtons = page.locator(
-        '[role="dialog"] button, [aria-modal] button',
-      );
+      const counterDialog = page.getByRole('dialog', {
+        name: /Propose Trade/i,
+      });
+      const teamButtons = counterDialog.getByRole('button');
       await page.waitForTimeout(1000);
       const teamCount = await teamButtons.count();
       let teamClicked = false;
@@ -627,7 +613,7 @@ test.describe
         const trimmed = text.trim();
         if (
           trimmed.length > 2 &&
-          !/^(propose|next|back|send|review|cancel|confirm|✓|\d)$/i.test(
+          !/^(?:[←→]\s*)?(?:next|back|send|propose|review|cancel|confirm|\d|✓)(?:\s*[←→])?$/i.test(
             trimmed,
           )
         ) {
@@ -642,65 +628,63 @@ test.describe
       await expect(page.getByText(/you will give/i).first()).toBeVisible({
         timeout: 10000,
       });
-      await page.waitForTimeout(1500);
-
-      const offerBtns = page.locator(
-        '[role="dialog"] button, [aria-modal] button',
-      );
+      const offerBtns = counterDialog.getByRole('button');
+      await expect(offerBtns.first()).toBeVisible({ timeout: 15_000 });
       const offerCount = await offerBtns.count();
+      let offerPlayerClicked = false;
       for (let i = 0; i < offerCount; i++) {
         const btn = offerBtns.nth(i);
         const text = (await btn.textContent()) ?? '';
         const trimmed = text.trim();
         if (
           trimmed.length > 3 &&
-          !/^(next|back|send|propose|review|cancel|confirm|\d|✓)$/i.test(
+          !/^(?:[←→]\s*)?(?:next|back|send|propose|review|cancel|confirm|\d|✓)(?:\s*[←→])?$/i.test(
             trimmed,
           )
         ) {
           await btn.click();
+          offerPlayerClicked = true;
           break;
         }
       }
+      expect(offerPlayerClicked).toBe(true);
 
-      // Click "Next — Select Their Players"
+      // Click "Next — Select Their Players" (must wait — appears after selection)
       const nextBtn2 = page.getByRole('button', {
         name: /Next.*Select Their Players/i,
       });
-      if (await nextBtn2.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await nextBtn2.click();
-      }
+      await expect(nextBtn2).toBeVisible({ timeout: 10_000 });
+      await nextBtn2.click();
 
       // Step 3: Select requesting player (first available)
       await expect(page.getByText(/give you/i).first()).toBeVisible({
         timeout: 10000,
       });
-      await page.waitForTimeout(1500);
-
-      const requestBtns = page.locator(
-        '[role="dialog"] button, [aria-modal] button',
-      );
+      const requestBtns = counterDialog.getByRole('button');
+      await expect(requestBtns.first()).toBeVisible({ timeout: 15_000 });
       const requestCount = await requestBtns.count();
+      let requestPlayerClicked2 = false;
       for (let i = 0; i < requestCount; i++) {
         const btn = requestBtns.nth(i);
         const text = (await btn.textContent()) ?? '';
         const trimmed = text.trim();
         if (
           trimmed.length > 3 &&
-          !/^(next|back|send|propose|review|cancel|confirm|\d|✓)$/i.test(
+          !/^(?:[←→]\s*)?(?:next|back|send|propose|review|cancel|confirm|\d|✓)(?:\s*[←→])?$/i.test(
             trimmed,
           )
         ) {
           await btn.click();
+          requestPlayerClicked2 = true;
           break;
         }
       }
+      expect(requestPlayerClicked2).toBe(true);
 
-      // Click "Review Trade"
+      // Click "Review Trade" (must wait — appears after selection)
       const reviewBtn2 = page.getByRole('button', { name: /Review Trade/i });
-      if (await reviewBtn2.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await reviewBtn2.click();
-      }
+      await expect(reviewBtn2).toBeVisible({ timeout: 10_000 });
+      await reviewBtn2.click();
 
       // Step 4: Send
       await expect(
