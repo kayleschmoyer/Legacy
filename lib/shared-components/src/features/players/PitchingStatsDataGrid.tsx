@@ -609,6 +609,7 @@ export function PitchingStatsDataGrid({
               key={column.key}
               width={column.width || 'auto'}
               minWidth={column.minWidth}
+              flexGrow={1}
               justifyContent={
                 column.align === 'center'
                   ? 'center'
@@ -765,6 +766,7 @@ export function PitchingStatsDataGrid({
                     key={column.key}
                     width={column.width || 'auto'}
                     minWidth={column.minWidth}
+                    flexGrow={1}
                     justifyContent={
                       column.align === 'center'
                         ? 'center'
