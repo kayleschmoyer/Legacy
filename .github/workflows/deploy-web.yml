@@ -8,6 +8,12 @@ on:
       - lib/shared-components/**
       - .github/workflows/deploy-web.yml
   workflow_dispatch:
+    inputs:
+      skip-ci-check:
+        description: "Skip CI status verification (use with caution)"
+        required: false
+        default: false
+        type: boolean
 
 # Cancel in-progress deployments for the same branch
 concurrency:
@@ -29,8 +35,82 @@ env:
   NX_NO_CLOUD: true
 
 jobs:
+  verify-ci:
+    name: Verify CI Status
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    if: >-
+      !(github.event_name == 'workflow_dispatch' &&
+        github.event.inputs.skip-ci-check == 'true')
+    timeout-minutes: 5
+    steps:
+      - name: Check CI Pipeline Status
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const sha = context.sha;
+            core.info(`Checking CI status for commit ${sha}`);
+
+            // Query completed workflow runs for this commit
+            const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head_sha: sha,
+              status: 'completed',
+            });
+
+            const ciRun = workflowRuns.workflow_runs.find(run =>
+              run.name === '🧠 Legacy Sports CI Orchestrator' ||
+              run.name === 'Legacy Sports CI Pipeline'
+            );
+
+            if (!ciRun) {
+              // Check if CI is still in progress
+              const { data: allRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: sha,
+              });
+
+              const pendingCi = allRuns.workflow_runs.find(run =>
+                (run.name === '🧠 Legacy Sports CI Orchestrator' ||
+                 run.name === 'Legacy Sports CI Pipeline') &&
+                run.status !== 'completed'
+              );
+
+              if (pendingCi) {
+                core.setFailed(
+                  `CI pipeline is still running for ${sha} (status: ${pendingCi.status}). ` +
+                  `Wait for CI to complete before deploying. ` +
+                  `Run: ${pendingCi.html_url}`
+                );
+              } else {
+                core.setFailed(
+                  `No CI pipeline run found for commit ${sha}. ` +
+                  `CI must pass before deploying to production. ` +
+                  `Use workflow_dispatch with skip-ci-check=true to bypass.`
+                );
+              }
+              return;
+            }
+
+            core.info(`Found CI run: ${ciRun.name} (#${ciRun.run_number})`);
+            core.info(`Status: ${ciRun.status}, Conclusion: ${ciRun.conclusion}`);
+            core.info(`URL: ${ciRun.html_url}`);
+
+            if (ciRun.conclusion !== 'success') {
+              core.setFailed(
+                `CI pipeline did not succeed for ${sha} (conclusion: ${ciRun.conclusion}). ` +
+                `Fix CI failures before deploying to production. ` +
+                `Run: ${ciRun.html_url}`
+              );
+            } else {
+              core.info(`CI pipeline passed for ${sha} — proceeding with deployment`);
+            }
+
   setup:
     name: Setup and Version
+    needs: [verify-ci]
+    if: always() && (needs.verify-ci.result == 'success' || needs.verify-ci.result == 'skipped')
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     outputs:
       version: ${{ steps.version.outputs.version }}
