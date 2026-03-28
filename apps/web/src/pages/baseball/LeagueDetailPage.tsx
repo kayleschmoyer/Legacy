@@ -1,4 +1,5 @@
 import React, {
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -115,7 +116,6 @@ import {
 import { NextStepControl } from '../../features/commissioner/NextStepControl';
 import { AvatarImage, AvatarPicker } from '../../components/common';
 import { DraftSettingsControl } from '../../components/commissioner/DraftSettingsControl';
-import { DraftOrderControl } from '../../components/commissioner/DraftOrderControl';
 import { LeagueSettingsControl } from '../../components/commissioner/LeagueSettingsControl';
 import { LeagueBrandingControl } from '../../components/commissioner/LeagueBrandingControl';
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
@@ -148,6 +148,11 @@ import {
   setUserTeamId,
   updateTeamMember,
 } from '../../store/leagueSlice';
+const DraftOrderControl = React.lazy(() =>
+  import('../../components/commissioner/DraftOrderControl').then((m) => ({
+    default: m.DraftOrderControl,
+  })),
+);
 
 // ── Matchup Scoring Data (shared with roster component) ─────────────────────
 
@@ -3210,14 +3215,31 @@ export function LeagueDetailPage(): React.JSX.Element {
         id: 'draft-order',
         title: 'Draft Pick Order',
         content: (
-          <DraftOrderControl
-            leagueId={leagueId}
-            draftStatus={league.draftStatus}
-            onSuccess={showMatchupSuccess}
-            onError={(err) => {
-              setMatchupErrorMessage(err.message);
-            }}
-          />
+          <Suspense
+            fallback={
+              <Card padding="$4" backgroundColor="$backgroundStrong">
+                <YStack
+                  alignItems="center"
+                  justifyContent="center"
+                  gap="$2"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <Spinner size="large" />
+                  <Text>Loading draft order…</Text>
+                </YStack>
+              </Card>
+            }
+          >
+            <DraftOrderControl
+              leagueId={leagueId}
+              draftStatus={league.draftStatus}
+              onSuccess={showMatchupSuccess}
+              onError={(err) => {
+                setMatchupErrorMessage(err.message);
+              }}
+            />
+          </Suspense>
         ),
       },
       {
