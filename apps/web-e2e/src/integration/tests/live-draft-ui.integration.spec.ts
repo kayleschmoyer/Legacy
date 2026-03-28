@@ -262,19 +262,22 @@ test.describe
         if (draftDone) break;
 
         // Find the page showing "YOUR PICK" — the draft board shows
-        // "🎯 YOUR PICK" when isMyPick=true, "⏳ ON THE CLOCK" otherwise.
+        // "YOUR PICK" when isMyPick=true, "ON THE CLOCK" otherwise.
         // Only click on the page whose turn it actually is.
         //
-        // Use the exact status-bar text "🎯 YOUR PICK" to avoid false
-        // positives from the PickAnnouncement overlay ("🎉 YOUR PICK")
-        // which briefly appears on the picker's page after a successful
-        // pick and would cause the test to double-credit the same manager.
+        // Use exact:true to avoid false positives from the
+        // PickAnnouncement overlay ("\ud83c\udf89 YOUR PICK") which briefly
+        // appears after a successful pick.
+        //
+        // NOTE: isVisible({ timeout }) is deprecated in Playwright
+        // v1.40+ — the timeout is silently ignored.  Use waitFor().
         let pickerFound = false;
         for (const { label, page } of pages) {
           const isMyTurn = await page
-            .getByText('🎯 YOUR PICK', { exact: true })
+            .getByText('YOUR PICK', { exact: true })
             .first()
-            .isVisible({ timeout: 2000 })
+            .waitFor({ state: 'visible', timeout: 2000 })
+            .then(() => true)
             .catch(() => false);
           if (!isMyTurn) continue;
 
@@ -285,16 +288,21 @@ test.describe
           const allDraftBtns = page.getByRole('button', {
             name: /Draft .* now/i,
           });
+          // Wait for at least one draft button to render after "YOUR PICK"
+          // appears - the player list may lag behind the turn indicator.
+          await allDraftBtns
+            .first()
+            .waitFor({ state: 'visible', timeout: 5_000 })
+            .catch((e: Error) => {
+              if (e.name !== 'TimeoutError') throw e;
+              /* noop - buttons may not exist yet */
+            });
           const btnCount = await allDraftBtns.count().catch(() => 0);
           let draftBtnIdx = -1;
           let ariaLabel: string | null = null;
           for (let i = 0; i < btnCount; i++) {
             const btn = allDraftBtns.nth(i);
-            // Give the first button a full 3 s to appear; subsequent buttons
-            // are already rendered so a short timeout is fine.
-            const visible = await btn
-              .isVisible({ timeout: i === 0 ? 3000 : 200 })
-              .catch(() => false);
+            const visible = await btn.isVisible().catch(() => false);
             if (!visible) continue;
             const btnLabel = await btn.getAttribute('aria-label');
             const playerName = btnLabel
@@ -311,19 +319,14 @@ test.describe
           await allDraftBtns.nth(draftBtnIdx).click({ force: true });
 
           // Verify the pick was accepted by checking the turn advanced:
-          // "🎯 YOUR PICK" must disappear from this page, meaning the server
-          // confirmed the pick and moved to the next drafter.
-          //
-          // Use the exact status-bar text to avoid confusion with the
-          // "🎉 YOUR PICK" announcement overlay (which lingers ~3 s and
-          // would cause a false wasAccepted=false with the old generic
-          // 'YOUR PICK' selector).
+          // "YOUR PICK" (exact) must disappear from this page, meaning
+          // the server confirmed the pick and moved to the next drafter.
           //
           // Do NOT check whether the player button disappears — it can
           // vanish due to an incoming WebSocket update about another
           // manager's pick (false positive), causing duplicate-pick logs.
           const wasAccepted = await page
-            .getByText('🎯 YOUR PICK', { exact: true })
+            .getByText('YOUR PICK', { exact: true })
             .first()
             .waitFor({ state: 'hidden', timeout: 8000 })
             .then(() => true)
