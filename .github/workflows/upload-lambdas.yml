@@ -23,6 +23,11 @@ on:
           - rollbar-discord
           - stripe-webhook
           - websocket
+      skip-ci-check:
+        description: "Skip CI status verification (emergency deploys only)"
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [main]
     paths:
@@ -40,11 +45,83 @@ permissions:
   contents: read
 
 # ---------------------------------------------------------------------------
-# Job 1 — Detect which lambdas need building
+# Job 0 — Verify CI pipeline passed for this commit
 # ---------------------------------------------------------------------------
 jobs:
+  verify-ci:
+    name: Verify CI Status
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    if: >-
+      !(github.event_name == 'workflow_dispatch' &&
+        github.event.inputs.skip-ci-check == 'true')
+    timeout-minutes: 5
+    steps:
+      - name: Check CI Pipeline Status
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const sha = context.sha;
+            core.info(`Checking CI status for commit ${sha}`);
+
+            const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head_sha: sha,
+              status: 'completed',
+            });
+
+            const ciRun = workflowRuns.workflow_runs.find(run =>
+              run.name === '🧠 Legacy Sports CI Orchestrator' ||
+              run.name === 'Legacy Sports CI Pipeline'
+            );
+
+            if (!ciRun) {
+              const { data: allRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: sha,
+              });
+
+              const pendingCi = allRuns.workflow_runs.find(run =>
+                (run.name === '🧠 Legacy Sports CI Orchestrator' ||
+                 run.name === 'Legacy Sports CI Pipeline') &&
+                run.status !== 'completed'
+              );
+
+              if (pendingCi) {
+                core.setFailed(
+                  `CI pipeline is still running for ${sha} (status: ${pendingCi.status}). ` +
+                  `Wait for CI to complete before uploading. Run: ${pendingCi.html_url}`
+                );
+              } else {
+                core.setFailed(
+                  `No CI pipeline run found for commit ${sha}. ` +
+                  `CI must pass before uploading lambdas. ` +
+                  `Use workflow_dispatch with skip-ci-check=true to bypass.`
+                );
+              }
+              return;
+            }
+
+            core.info(`Found CI run: ${ciRun.name} (#${ciRun.run_number})`);
+            core.info(`Conclusion: ${ciRun.conclusion}`);
+
+            if (ciRun.conclusion !== 'success') {
+              core.setFailed(
+                `CI pipeline did not succeed for ${sha} (conclusion: ${ciRun.conclusion}). ` +
+                `Fix CI failures before uploading lambdas. Run: ${ciRun.html_url}`
+              );
+            } else {
+              core.info(`CI pipeline passed for ${sha} — proceeding with upload`);
+            }
+
+  # ---------------------------------------------------------------------------
+  # Job 1 — Detect which lambdas need building
+  # ---------------------------------------------------------------------------
   detect:
     name: Detect Affected Lambdas
+    needs: [verify-ci]
+    if: always() && (needs.verify-ci.result == 'success' || needs.verify-ci.result == 'skipped')
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
