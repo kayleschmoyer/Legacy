@@ -30,9 +30,11 @@ interface PRNode {
   title: string;
   headRefName: string;
   isDraft: boolean;
-  mergeable?: string;
+  /** May be null in partial responses (app token permission limitation). */
+  mergeable: string | null;
   labels: { nodes: Array<{ name: string }> };
-  commits?: {
+  /** May be null in partial responses (app token permission limitation). */
+  commits: {
     nodes: Array<{
       commit: {
         statusCheckRollup: {
@@ -42,7 +44,7 @@ interface PRNode {
         } | null;
       };
     }>;
-  };
+  } | null;
 }
 
 interface ThreadDetail {
@@ -409,19 +411,17 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
         conflicting.push(base);
       }
 
-      // In degraded mode, CI/merge data is unavailable — treat as CI unknown
-      // but still classify PRs so they appear in the clean bucket
-      if (degraded) {
-        ciPassingNumbers.add(pr.number);
-        continue;
-      }
-
+      // In degraded mode, commits/statusCheckRollup may be null — skip CI classification.
       const commitNode = pr.commits?.nodes[0];
       const checkNodes =
         commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
 
       if (checkNodes.length === 0) {
-        ciPending.push(base);
+        // In degraded mode with no check data, treat as unknown (not pending)
+        // so these PRs don't wrongly land in ciPending.
+        if (!degraded) {
+          ciPending.push(base);
+        }
         continue;
       }
 
@@ -469,9 +469,12 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
           threadsTruncated: truncated,
         });
       } else if (
-        ciPassingNumbers.has(pr.number) &&
-        pr.mergeable !== 'CONFLICTING'
+        pr.mergeable === 'MERGEABLE' &&
+        ciPassingNumbers.has(pr.number)
       ) {
+        // Only classify as clean when CI is positively passing and mergeable
+        // is positively known. In degraded mode, skip label sync instead of
+        // assuming clean based on incomplete data.
         clean.push({
           number: pr.number,
           title: pr.title,
@@ -496,7 +499,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
     }
 
     const degradedNote = degraded
-      ? 'Degraded mode: mergeable status and CI checks unavailable (token lacks required permissions). Review threads are still fetched.'
+      ? 'Degraded mode: mergeable status and CI checks may be incomplete (token lacks required GraphQL field access). Review threads are still fetched.'
       : undefined;
 
     // Compact mode: return only essential fields to reduce token usage

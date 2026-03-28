@@ -103,21 +103,34 @@ async function doRest<T>(opts: RestOptions, canRetry: boolean): Promise<T> {
   return (await response.json()) as T;
 }
 
+export interface GraphQLError {
+  message: string;
+  type?: string;
+  path?: Array<string | number>;
+}
+
 interface GraphQLResponse<T> {
+  data?: T | null;
+  errors?: GraphQLError[];
+}
+
+export interface GraphQLResult<T> {
   data: T;
-  errors?: Array<{ message: string; type?: string; path?: string[] }>;
+  /** Per-node warnings from partial GraphQL responses (e.g. permission-gated fields). */
+  warnings?: GraphQLError[];
 }
 
 /**
  * Make an authenticated GitHub GraphQL API request.
  *
- * GitHub returns 200 even on GraphQL errors — this function checks the
- * `errors` array and throws if present.
+ * GitHub returns 200 even on GraphQL errors. When partial data is available
+ * (data + errors), returns the data with errors attached as `warnings`.
+ * When no data is available, throws.
  */
 export async function githubGraphQL<T>(
   query: string,
   variables: Record<string, unknown>,
-): Promise<{ data: T }> {
+): Promise<GraphQLResult<T>> {
   return doGraphQL<T>(query, variables, true);
 }
 
@@ -125,7 +138,7 @@ async function doGraphQL<T>(
   query: string,
   variables: Record<string, unknown>,
   canRetry: boolean,
-): Promise<{ data: T }> {
+): Promise<GraphQLResult<T>> {
   const headers = await buildHeaders();
 
   const response = await fetch(`${BASE_URL}/graphql`, {
@@ -154,6 +167,13 @@ async function doGraphQL<T>(
 
   const result = (await response.json()) as GraphQLResponse<T>;
   if (result.errors?.length) {
+    // Partial response: data is present alongside errors (e.g. per-node
+    // permission failures for fields like statusCheckRollup with app tokens).
+    // Return the usable data with errors attached as warnings.
+    if (result.data != null) {
+      return { data: result.data, warnings: result.errors };
+    }
+    // Fatal: no data at all — throw as before.
     throw new Error(
       `GitHub GraphQL errors: ${result.errors.map((e) => e.message).join('; ')}`,
     );
