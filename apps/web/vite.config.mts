@@ -1,4 +1,4 @@
-/// <reference types='vitest' />
+﻿/// <reference types='vitest' />
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
@@ -8,6 +8,7 @@ import { tamaguiPlugin } from '@tamagui/vite-plugin';
 import reactNativeWeb from 'vite-plugin-react-native-web';
 import { execSync } from 'child_process';
 import { rollbarSourcemapPlugin } from '../../tools/vite-configs';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig(({ mode }) => {
   // Load environment variables from workspace root and merge with process.env
@@ -38,7 +39,7 @@ export default defineConfig(({ mode }) => {
   const appVersion = process.env.VITE_APP_VERSION || '0.0.0';
   const buildDate = new Date().toISOString();
 
-  console.log(`🔧 Build Configuration:
+  console.log(`ðŸ”§ Build Configuration:
     - Mode: ${mode}
     - Is Deploy Build: ${isDeployBuild}
     - Is Production: ${isProduction}
@@ -49,7 +50,14 @@ export default defineConfig(({ mode }) => {
   // Use VITE_BASE_PATH for PR preview deploys, otherwise root path for custom domain
   const basePath = process.env.VITE_BASE_PATH || '/';
 
-  console.log(`📍 Base Path: ${basePath}`);
+  console.log(`ðŸ“ Base Path: ${basePath}`);
+
+  const analyzeBundle = process.env.ANALYZE === 'true';
+  if (analyzeBundle) {
+    console.log(
+      `ðŸ“Š Bundle analysis enabled â€” report: scratch/bundle-report.html`,
+    );
+  }
 
   return {
     root: __dirname,
@@ -108,6 +116,17 @@ export default defineConfig(({ mode }) => {
               version: commitSha,
               publicPath: 'https://legacy-fantasy.com',
               deleteFilesAfterUpload: true,
+            }),
+          ]
+        : []),
+      ...(analyzeBundle
+        ? [
+            visualizer({
+              filename: resolve(__dirname, '../../scratch/bundle-report.html'),
+              open: !process.env.CI,
+              gzipSize: true,
+              brotliSize: true,
+              template: 'treemap',
             }),
           ]
         : []),
@@ -174,7 +193,7 @@ export default defineConfig(({ mode }) => {
           __dirname,
           '../../lib/shared-components/src/platform-components/index.ts',
         ),
-        // Deduplicate Tamagui packages — defense-in-depth alongside the
+        // Deduplicate Tamagui packages â€” defense-in-depth alongside the
         // pnpm.overrides in the root package.json. Without this, sub-packages
         // under lib/ could resolve different versions of @tamagui/web and
         // @tamagui/core, causing the Tamagui config set by createTamagui() in
@@ -203,7 +222,7 @@ export default defineConfig(({ mode }) => {
       'process.env.PLATFORM': JSON.stringify('web'),
       __DEV__: process.env.NODE_ENV === 'development',
 
-      // Rollbar browser-side token — read via process.env in rollbar.web.ts
+      // Rollbar browser-side token â€” read via process.env in rollbar.web.ts
       'process.env.VITE_ROLLBAR_ACCESS_TOKEN': JSON.stringify(
         env.VITE_ROLLBAR_ACCESS_TOKEN || '',
       ),

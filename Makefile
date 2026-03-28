@@ -334,6 +334,14 @@ build-web: ## Build web application
 	@$(call echo_blue,Building web application...)
 	pnpm exec nx build web
 
+analyze: ## Build web app with bundle size visualization (opens treemap in browser)
+	@$(call echo_blue,Building web with bundle analysis...)
+ifeq ($(DETECTED_OS),Windows)
+	set "ANALYZE=true" && pnpm exec nx build web
+else
+	ANALYZE=true pnpm exec nx build web
+endif
+
 build-mobile: ## Build mobile application
 	@$(call echo_blue,Building mobile application...)
 	pnpm exec nx build app

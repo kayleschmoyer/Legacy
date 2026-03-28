@@ -330,6 +330,7 @@
     "prettier": "^3.8.0",
     "react-native-svg-transformer": "^1.5.3",
     "react-native-svg-web": "~1.0.9",
+    "rollup-plugin-visualizer": "^7.0.1",
     "swc-loader": "0.1.15",
     "ts-jest": "29.4.6",
     "ts-node": "^10.9.2",
