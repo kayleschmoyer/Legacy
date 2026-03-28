@@ -11,3 +11,7 @@ export { TiebreakerHistory } from './TiebreakerHistory';
 export type { TiebreakerHistoryProps } from './TiebreakerHistory';
 export { AchievementRestrictionsControl } from './AchievementRestrictionsControl';
 export type { AchievementRestrictionsControlProps } from './AchievementRestrictionsControl';
+export { DraftOrderControl } from './DraftOrderControl';
+export type { DraftOrderControlProps } from './DraftOrderControl';
+export { DraftSettingsControl } from './DraftSettingsControl';
+export type { DraftSettingsControlProps } from './DraftSettingsControl';

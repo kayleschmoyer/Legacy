@@ -102,3 +102,34 @@ mutation DeleteAchievementRestriction(
     achievementType: $achievementType
   )
 }
+
+query GetLeagueDraft($leagueId: Int!) {
+  getLeagueDraft(leagueId: $leagueId) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    pickTimeLimitSeconds
+    draftStartedAt
+    draftCompletedAt
+    scheduledAt
+  }
+}
+
+mutation UpdateDraftSettings($input: UpdateDraftSettingsInput!) {
+  updateDraftSettings(input: $input) {
+    id
+    leagueId
+    draftMode
+    selectionMethod
+    draftOrder
+    currentPick
+    pickTimeLimitSeconds
+    playerPool
+    draftStartedAt
+    draftCompletedAt
+    scheduledAt
+  }
+}
