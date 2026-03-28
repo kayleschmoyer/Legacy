@@ -11,6 +11,18 @@ fragment DuesSettings on LeagueDuesSettings {
   updatedAt
 }
 
+fragment MemberPaymentStatus on LeagueMemberPaymentStatus {
+  id
+  leagueId
+  userId
+  username
+  paid
+  paidAt
+  markedBy
+  createdAt
+  updatedAt
+}
+
 # ── Queries ────────────────────────────────────────────────────────────────
 
 query GetLeagueDuesSettings($leagueId: Int!) {
@@ -19,10 +31,31 @@ query GetLeagueDuesSettings($leagueId: Int!) {
   }
 }
 
+query GetLeagueDuesStatus($leagueId: Int!) {
+  leagueDuesSettings(leagueId: $leagueId) {
+    ...DuesSettings
+  }
+  leagueDuesStatus(leagueId: $leagueId) {
+    ...MemberPaymentStatus
+  }
+}
+
 # ── Mutations ──────────────────────────────────────────────────────────────
 
 mutation UpdateDuesSettings($input: UpdateDuesSettingsInput!) {
   updateDuesSettings(input: $input) {
     ...DuesSettings
+  }
+}
+
+mutation MarkMemberPaid($leagueId: Int!, $userId: Int!) {
+  markMemberPaid(leagueId: $leagueId, userId: $userId) {
+    ...MemberPaymentStatus
+  }
+}
+
+mutation MarkMemberUnpaid($leagueId: Int!, $userId: Int!) {
+  markMemberUnpaid(leagueId: $leagueId, userId: $userId) {
+    ...MemberPaymentStatus
   }
 }
