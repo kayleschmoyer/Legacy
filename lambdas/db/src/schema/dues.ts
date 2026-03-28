@@ -7,13 +7,15 @@
  */
 import { LOGGER } from '@legacy-sports/logging';
 import { PublicSchema } from '@legacy-sports/db-client';
-import { eq } from 'drizzle-orm';
-import { builder } from './builder';
+import { and, eq, sql } from 'drizzle-orm';
+import { builder, type Context } from './builder';
 import { AuthenticationError, UserInputError } from './graphql-errors';
 import {
   verifyCommissionerAccess,
   verifyLeagueMembership,
 } from './authorization';
+import { assertAuthorized } from './matchups/system-auth';
+import { isValidDiscordWebhookUrl } from '../services/discord-league';
 
 // ─── GraphQL object types ────────────────────────────────────────────────────
 
@@ -322,6 +324,288 @@ builder.mutationField('markMemberPaid', (t) =>
         createdAt: new Date(row.createdAt),
         updatedAt: new Date(row.updatedAt),
         paidAt: row.paidAt ? new Date(row.paidAt) : null,
+      };
+    },
+  }),
+);
+
+// ─── Scheduled Reminder ─────────────────────────────────────────────────────
+
+interface SendDuesRemindersResultShape {
+  leaguesChecked: number;
+  remindersSent: number;
+  errors: string[];
+}
+
+const SendDuesRemindersResult = builder.objectRef<SendDuesRemindersResultShape>(
+  'SendDuesRemindersResult',
+);
+
+builder.objectType(SendDuesRemindersResult, {
+  description:
+    'Result of the scheduled dues reminder check across all active leagues',
+  fields: (t) => ({
+    leaguesChecked: t.exposeInt('leaguesChecked'),
+    remindersSent: t.exposeInt('remindersSent'),
+    errors: t.exposeStringList('errors'),
+  }),
+});
+
+/** Timeout for Discord webhook requests (ms). */
+const DUES_WEBHOOK_TIMEOUT_MS = 10_000;
+
+/** Max length for a Discord embed field value. */
+const DISCORD_EMBED_FIELD_MAX = 1024;
+
+/**
+ * Truncate a list of names to fit within `maxLen` characters,
+ * appending "and X more" when truncated.
+ */
+function truncateNamesList(names: string[], maxLen: number): string {
+  const joined = names.join(', ');
+  if (joined.length <= maxLen) return joined;
+
+  let result = '';
+  let included = 0;
+  for (const name of names) {
+    const separator = included === 0 ? '' : ', ';
+    const remaining = names.length - included;
+    const suffix = `, and ${remaining} more`;
+    if ((result + separator + name + suffix).length > maxLen) {
+      break;
+    }
+    result += separator + name;
+    included++;
+  }
+
+  const remaining = names.length - included;
+  if (remaining > 0) {
+    result += `, and ${remaining} more`;
+  }
+
+  return result;
+}
+
+/**
+ * Post a formatted dues reminder embed to a Discord webhook URL.
+ */
+async function postDuesReminderToDiscord(
+  webhookUrl: string,
+  leagueName: string,
+  amountDollars: string,
+  unpaidUsernames: string[],
+): Promise<boolean> {
+  if (!isValidDiscordWebhookUrl(webhookUrl)) {
+    LOGGER.error('Invalid Discord webhook URL for dues reminder', {
+      webhookUrl,
+    });
+    return false;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, DUES_WEBHOOK_TIMEOUT_MS);
+
+  try {
+    const fieldValue = truncateNamesList(
+      unpaidUsernames,
+      DISCORD_EMBED_FIELD_MAX,
+    );
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [
+          {
+            title: '\uD83D\uDCB0 Dues Reminder',
+            description: `**${leagueName}** has outstanding league dues of **$${amountDollars}** per member.`,
+            color: 0xf59e0b,
+            fields: [
+              {
+                name: `Unpaid Members (${unpaidUsernames.length})`,
+                value: fieldValue,
+              },
+            ],
+            timestamp: new Date().toISOString(),
+            footer: { text: 'Legacy Sports Dues' },
+          },
+        ],
+        allowed_mentions: { parse: [] },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      LOGGER.error('Discord dues reminder webhook failed', {
+        status: response.status,
+        statusText: response.statusText,
+      });
+      return false;
+    }
+
+    return true;
+  } catch (error: unknown) {
+    LOGGER.error('Discord dues reminder webhook threw', { error });
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// TODO: Add tests for sendDuesReminders mutation (SSRF validation, truncation,
+// mock-draft filtering, message type, and end-to-end reminder flow).
+builder.mutationField('sendDuesReminders', (t) =>
+  t.field({
+    type: SendDuesRemindersResult,
+    description:
+      'Check all leagues with dues reminders enabled and post reminders ' +
+      'to league chat (and Discord if configured) for unpaid members. ' +
+      'Only fires for leagues whose reminder day matches the current day of week. ' +
+      'Triggered daily by EventBridge.',
+    args: {
+      leagueId: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context: Context) => {
+      await assertAuthorized(context, args.leagueId);
+
+      const now = new Date();
+      const currentDayOfWeek = now.getUTCDay(); // 0=Sunday, 6=Saturday
+      const errors: string[] = [];
+      let remindersSent = 0;
+
+      // 1. Find active leagues (excluding mock drafts) with dues reminders enabled for today
+      const conditions = [
+        eq(PublicSchema.leagueDuesSettings.enabled, true),
+        eq(PublicSchema.leagueDuesSettings.reminderEnabled, true),
+        eq(PublicSchema.leagueDuesSettings.reminderDayOfWeek, currentDayOfWeek),
+        eq(PublicSchema.leagues.isMockDraft, false),
+      ];
+
+      if (args.leagueId) {
+        conditions.push(
+          eq(PublicSchema.leagueDuesSettings.leagueId, args.leagueId),
+        );
+      }
+
+      const leagues = await context.db
+        .select({
+          leagueId: PublicSchema.leagueDuesSettings.leagueId,
+          amountCents: PublicSchema.leagueDuesSettings.amountCents,
+          leagueName: PublicSchema.leagues.name,
+          discordWebhookUrl: PublicSchema.leagues.discordWebhookUrl,
+        })
+        .from(PublicSchema.leagueDuesSettings)
+        .innerJoin(
+          PublicSchema.leagues,
+          eq(PublicSchema.leagueDuesSettings.leagueId, PublicSchema.leagues.id),
+        )
+        .where(and(...conditions));
+
+      LOGGER.info('Dues reminder check', {
+        dayOfWeek: currentDayOfWeek,
+        leaguesMatched: leagues.length,
+      });
+
+      // 2. For each league, find unpaid members and post reminder
+      for (const league of leagues) {
+        try {
+          // Get unpaid members
+          const unpaidMembers = await context.db
+            .select({
+              userId: PublicSchema.leagueMembers.userId,
+              username: PublicSchema.users.username,
+            })
+            .from(PublicSchema.leagueMembers)
+            .innerJoin(
+              PublicSchema.users,
+              eq(PublicSchema.leagueMembers.userId, PublicSchema.users.id),
+            )
+            .leftJoin(
+              PublicSchema.leagueMemberPaymentStatus,
+              and(
+                eq(
+                  PublicSchema.leagueMemberPaymentStatus.leagueId,
+                  league.leagueId,
+                ),
+                eq(
+                  PublicSchema.leagueMemberPaymentStatus.userId,
+                  PublicSchema.leagueMembers.userId,
+                ),
+                eq(PublicSchema.leagueMemberPaymentStatus.paid, true),
+              ),
+            )
+            .where(
+              and(
+                eq(PublicSchema.leagueMembers.leagueId, league.leagueId),
+                sql`${PublicSchema.leagueMemberPaymentStatus.id} IS NULL`,
+              ),
+            );
+
+          if (unpaidMembers.length === 0) {
+            LOGGER.info('All members paid, skipping reminder', {
+              leagueId: league.leagueId,
+            });
+            continue;
+          }
+
+          const amountDollars = (league.amountCents / 100).toFixed(2);
+          const unpaidNames = unpaidMembers.map(
+            (m) => m.username ?? `User ${m.userId}`,
+          );
+
+          // Post reminder message to league chat
+          const messagePrefix =
+            `\uD83D\uDCB0 Dues Reminder: ${unpaidMembers.length} member${unpaidMembers.length === 1 ? '' : 's'} ` +
+            `still owe${unpaidMembers.length === 1 ? 's' : ''} $${amountDollars} in league dues. ` +
+            `Unpaid: `;
+          const maxNamesLen = 2000 - messagePrefix.length;
+          const messageText =
+            messagePrefix + truncateNamesList(unpaidNames, maxNamesLen);
+
+          await context.db.insert(PublicSchema.leagueMessages).values({
+            leagueId: league.leagueId,
+            userId: null,
+            messageText,
+            messageType: 'text',
+          });
+
+          // Post to Discord if configured
+          if (league.discordWebhookUrl) {
+            const sent = await postDuesReminderToDiscord(
+              league.discordWebhookUrl,
+              league.leagueName,
+              amountDollars,
+              unpaidNames,
+            );
+            if (!sent) {
+              errors.push(
+                `Discord webhook failed for league ${league.leagueId}`,
+              );
+            }
+          }
+
+          remindersSent++;
+
+          LOGGER.info('Sent dues reminder', {
+            leagueId: league.leagueId,
+            unpaidCount: unpaidMembers.length,
+          });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          errors.push(`League ${league.leagueId}: ${msg}`);
+          LOGGER.error('Failed to send dues reminder', {
+            leagueId: league.leagueId,
+            err,
+          });
+        }
+      }
+
+      return {
+        leaguesChecked: leagues.length,
+        remindersSent,
+        errors,
       };
     },
   }),

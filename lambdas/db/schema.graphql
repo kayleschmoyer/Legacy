@@ -1605,6 +1605,11 @@ type Mutation {
   Post weekly recaps (results, standings, top scorer) to Discord for all active leagues. Triggered weekly by EventBridge after matchup advancement.
   """
   sendDiscordWeeklyRecaps(leagueId: Int): SendDiscordWeeklyRecapsResult
+
+  """
+  Check all leagues with dues reminders enabled and post reminders to league chat (and Discord if configured) for unpaid members. Only fires for leagues whose reminder day matches the current day of week. Triggered daily by EventBridge.
+  """
+  sendDuesReminders(leagueId: Int): SendDuesRemindersResult
   sendLeagueMessage(
     gifUrl: String
     leagueId: Int!
@@ -2836,6 +2841,15 @@ type SendDiscordWeeklyRecapsResult {
   errors: [String!]
   leaguesChecked: Int
   recapsSent: Int
+}
+
+"""
+Result of the scheduled dues reminder check across all active leagues
+"""
+type SendDuesRemindersResult {
+  errors: [String!]
+  leaguesChecked: Int
+  remindersSent: Int
 }
 
 input SetTeamLockInput {

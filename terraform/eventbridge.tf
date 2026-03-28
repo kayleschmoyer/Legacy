@@ -4,7 +4,7 @@
 # with a GraphQL mutation payload. This lets us use the same endpoint for both
 # manual (UI) and automatic (cron) triggers.
 
-# ── Waiver Claim Processing ─────────────────────────────────────────────────
+# ── Waiver Claim Processing ─────────────────────────────────────────
 # Processes pending waiver claims nightly at 2am EST.
 # 2am EST = 07:00 UTC (standard time) / 06:00 UTC (daylight saving).
 # Using 07:00 UTC (EST year-round); adjust if DST precision is needed.
@@ -47,7 +47,7 @@ resource "aws_lambda_permission" "process_waiver_claims_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.process_waiver_claims.arn
 }
 
-# ── Nightly Game Selection ──────────────────────────────────────────────────
+# ── Nightly Game Selection ──────────────────────────────────────────
 # Selects the next game for all active leagues every night at midnight EST.
 # Midnight EST = 05:00 UTC (standard time) / 04:00 UTC (daylight saving).
 # Using 05:00 UTC (EST year-round); adjust if DST precision is needed.
@@ -90,7 +90,7 @@ resource "aws_lambda_permission" "auto_select_games_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.auto_select_games.arn
 }
 
-# ── Weekly Matchup Advancement ──────────────────────────────────────────────
+# ── Weekly Matchup Advancement ──────────────────────────────────────
 # Advances matchups for leagues where all games are complete.
 # Runs every Sunday at 3am EST = 08:00 UTC (standard) / 07:00 UTC (DST).
 # Using 08:00 UTC (EST year-round).
@@ -133,7 +133,7 @@ resource "aws_lambda_permission" "auto_advance_matchups_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.auto_advance_matchups.arn
 }
 
-# ── Draft Pick Deadline Processing ──────────────────────────────────────────
+# ── Draft Pick Deadline Processing ──────────────────────────────────
 # Auto-picks for teams that exceed their pick deadline during live drafts.
 # Runs every minute (the minimum EventBridge rate). The mutation contains an
 # inner retry loop that chains through ALL consecutively-expired deadlines
@@ -180,7 +180,7 @@ resource "aws_lambda_permission" "auto_process_draft_picks_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.auto_process_draft_picks.arn
 }
 
-# ── Discord Score Alerts ───────────────────────────────────────────────────
+# ── Discord Score Alerts ───────────────────────────────────────────
 # Posts matchup score summaries and close-game alerts to league Discord channels.
 # Runs every 4 hours during active seasons. Short-circuits quickly when no
 # leagues have active matchups with webhooks configured.
@@ -223,7 +223,7 @@ resource "aws_lambda_permission" "discord_score_alerts_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.discord_score_alerts.arn
 }
 
-# ── Discord Lineup Lock Reminders ──────────────────────────────────────────
+# ── Discord Lineup Lock Reminders ──────────────────────────────────
 # Runs hourly. Checks all active leagues with Discord webhooks for
 # upcoming matchup locks within their configured reminder window,
 # and posts a reminder to the league's Discord channel.
@@ -266,7 +266,7 @@ resource "aws_lambda_permission" "discord_lineup_reminders_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.discord_lineup_reminders.arn
 }
 
-# ── Discord Weekly Recaps ──────────────────────────────────────────────────
+# ── Discord Weekly Recaps ──────────────────────────────────────────
 # Posts weekly recap (results, standings, top scorer) to league Discord channels.
 # Runs Sunday at 10am Eastern (15:00 UTC) — after autoAdvanceMatchups (8am UTC)
 # has advanced the week, so currentWeek-1 contains the just-completed week.
@@ -309,4 +309,49 @@ resource "aws_lambda_permission" "discord_weekly_recaps_eventbridge" {
   function_name = aws_lambda_function.graphql.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.discord_weekly_recaps.arn
+}
+
+# ── Dues Reminders ───────────────────────────────────────────────────
+# Checks all leagues with dues reminders enabled and posts a reminder
+# to league chat (and Discord if configured) for unpaid members.
+# Runs daily at 14:00 UTC (9am EST / 10am EDT). Only fires for leagues whose
+# configured reminder day matches the current day of week. This uses a fixed UTC
+# time, so the local execution time will shift by one hour during DST.
+
+resource "aws_cloudwatch_event_rule" "dues_reminders" {
+  name                = "${local.name_prefix}-dues-reminders"
+  description         = "Send dues reminders to league chat daily at 14:00 UTC (9am EST / 10am EDT)"
+  schedule_expression = "cron(0 14 * * ? *)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "dues_reminders" {
+  rule      = aws_cloudwatch_event_rule.dues_reminders.name
+  target_id = "dues-reminders"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { sendDuesReminders { leaguesChecked remindersSent errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "dues_reminders_eventbridge" {
+  statement_id  = "AllowEventBridgeDuesReminders"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.dues_reminders.arn
 }
