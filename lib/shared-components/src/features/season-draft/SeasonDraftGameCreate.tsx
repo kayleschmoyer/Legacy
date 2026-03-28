@@ -79,7 +79,9 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
 }) => {
   const [gameName, setGameName] = useState('');
   const [playerType, setPlayerType] = useState<'hitter' | 'pitcher'>('hitter');
-  const [gameMode, setGameMode] = useState<'season' | 'career_team'>('season');
+  const [gameMode, setGameMode] = useState<
+    'season' | 'career_team' | 'most_teams'
+  >('season');
   const [statKey, setStatKey] = useState('hr');
   const [userSearch, setUserSearch] = useState('');
   const [players, setPlayers] = useState<SelectedPlayer[]>([
@@ -237,7 +239,7 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
             <Text fontWeight="bold" marginBottom="$2">
               Game Mode
             </Text>
-            <XStack space="$2">
+            <XStack space="$2" flexWrap="wrap">
               <Button
                 flex={1}
                 size="$4"
@@ -256,36 +258,49 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
               >
                 Career w/ Team
               </Button>
+              <Button
+                flex={1}
+                size="$4"
+                variant={gameMode === 'most_teams' ? undefined : 'outlined'}
+                theme={gameMode === 'most_teams' ? 'active' : undefined}
+                onPress={() => setGameMode('most_teams')}
+              >
+                Most Teams
+              </Button>
             </XStack>
             <Text fontSize="$2" color="$gray9" marginTop="$2">
               {gameMode === 'season'
                 ? "Draft a player + specific year. Score is that player's stat in that season."
-                : 'Draft a player + team. Score is their career total with that franchise.'}
+                : gameMode === 'career_team'
+                  ? 'Draft a player + team. Score is their career total with that franchise.'
+                  : 'Draft a player. Score is the number of distinct teams they played for.'}
             </Text>
           </Card>
 
-          {/* Stat Key */}
-          <Card padding="$4">
-            <Text fontWeight="bold" marginBottom="$2">
-              Stat to Draft
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <XStack space="$2" flexWrap="wrap">
-                {statKeys.map((key) => (
-                  <Button
-                    key={key}
-                    size="$3"
-                    variant={statKey === key ? undefined : 'outlined'}
-                    theme={statKey === key ? 'active' : undefined}
-                    onPress={() => setStatKey(key)}
-                    marginBottom="$1"
-                  >
-                    {STAT_LABELS[key] ?? key}
-                  </Button>
-                ))}
-              </XStack>
-            </ScrollView>
-          </Card>
+          {/* Stat Key (hidden for most_teams — derived stat) */}
+          {gameMode !== 'most_teams' && (
+            <Card padding="$4">
+              <Text fontWeight="bold" marginBottom="$2">
+                Stat to Draft
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <XStack space="$2" flexWrap="wrap">
+                  {statKeys.map((key) => (
+                    <Button
+                      key={key}
+                      size="$3"
+                      variant={statKey === key ? undefined : 'outlined'}
+                      theme={statKey === key ? 'active' : undefined}
+                      onPress={() => setStatKey(key)}
+                      marginBottom="$1"
+                    >
+                      {STAT_LABELS[key] ?? key}
+                    </Button>
+                  ))}
+                </XStack>
+              </ScrollView>
+            </Card>
+          )}
 
           {/* Players */}
           <Card padding="$4">

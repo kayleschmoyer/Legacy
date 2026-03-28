@@ -22,7 +22,8 @@ import { players } from './Players';
  * Supports:
  * - Multiple stat keys (hr, h, rbi, sb, r, doubles, triples, bb, tb for hitters;
  *   w, so, sv, sho, ip, cg for pitchers)
- * - Two game modes: season (player+year) or career_team (player+team career total)
+ * - Three game modes: season (player+year), career_team (player+team career total),
+ *   or most_teams (player only — COUNT(DISTINCT team))
  * - Hitter or pitcher player types with different roster layouts
  */
 
@@ -44,6 +45,7 @@ export const seasonDraftPlayerType = pgEnum('season_draft_player_type', [
 export const seasonDraftGameMode = pgEnum('season_draft_game_mode', [
   'season', // Player + specific year
   'career_team', // Player + specific team (career total with that franchise)
+  'most_teams', // Player only — stat is COUNT(DISTINCT team)
 ]);
 
 // Main game table

@@ -33,9 +33,9 @@ const SeasonDraftPlayerType = builder.enumType('SeasonDraftPlayerType', {
 });
 
 const SeasonDraftGameMode = builder.enumType('SeasonDraftGameMode', {
-  values: ['season', 'career_team'] as const,
+  values: ['season', 'career_team', 'most_teams'] as const,
   description:
-    'Game mode: season (player+year) or career_team (player+team career total)',
+    'Game mode: season (player+year), career_team (player+team career total), or most_teams (count of distinct teams)',
 });
 
 const SeasonDraftRosterSlot = builder.objectRef<{
@@ -209,7 +209,8 @@ SeasonDraftGame.implement({
     statKey: t.exposeString('statKey'),
     gameMode: t.field({
       type: SeasonDraftGameMode,
-      resolve: (parent) => parent.gameMode as 'season' | 'career_team',
+      resolve: (parent) =>
+        parent.gameMode as 'season' | 'career_team' | 'most_teams',
     }),
     playerType: t.field({
       type: SeasonDraftPlayerType,
@@ -249,7 +250,8 @@ SeasonDraftGameSummary.implement({
     statKey: t.exposeString('statKey'),
     gameMode: t.field({
       type: SeasonDraftGameMode,
-      resolve: (parent) => parent.gameMode as 'season' | 'career_team',
+      resolve: (parent) =>
+        parent.gameMode as 'season' | 'career_team' | 'most_teams',
     }),
     playerType: t.field({
       type: SeasonDraftPlayerType,
@@ -387,7 +389,10 @@ builder.queryFields((t) => ({
         args.position,
         (args.statKey as string) || 'hr',
         ((args.playerType as string) || 'hitter') as 'hitter' | 'pitcher',
-        ((args.gameMode as string) || 'season') as 'season' | 'career_team',
+        ((args.gameMode as string) || 'season') as
+          | 'season'
+          | 'career_team'
+          | 'most_teams',
         (args.team as string) || undefined,
       );
     },
@@ -439,6 +444,7 @@ builder.mutationFields((t) => ({
         gameMode: ((args.gameMode as string) || undefined) as
           | 'season'
           | 'career_team'
+          | 'most_teams'
           | undefined,
         playerType: ((args.playerType as string) || undefined) as
           | 'hitter'

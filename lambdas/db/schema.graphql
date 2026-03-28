@@ -2643,10 +2643,11 @@ type SeasonDraftGame {
 }
 
 """
-Game mode: season (player+year) or career_team (player+team career total)
+Game mode: season (player+year), career_team (player+team career total), or most_teams (count of distinct teams)
 """
 enum SeasonDraftGameMode {
   career_team
+  most_teams
   season
 }
 

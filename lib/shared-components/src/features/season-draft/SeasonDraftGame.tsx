@@ -202,8 +202,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     },
   });
 
+  const isMostTeamsMode = gameState?.gameMode === SeasonDraftGameMode.MostTeams;
   const statLabel = gameState
-    ? (STAT_LABELS[gameState.statKey] ?? gameState.statKey)
+    ? isMostTeamsMode
+      ? 'Teams'
+      : (STAT_LABELS[gameState.statKey] ?? gameState.statKey)
     : '';
   const isCareerTeamMode =
     gameState?.gameMode === SeasonDraftGameMode.CareerTeam;
@@ -327,11 +330,24 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
 
   // Preview stat value for selection
   const previewSelection = useCallback(() => {
-    if (!selectedPlayer || !selectedPosition || !selectedOption) {
+    if (!selectedPlayer || !selectedPosition) {
       return;
     }
 
-    if (isCareerTeamMode) {
+    if (isMostTeamsMode) {
+      // most_teams mode: no team/season needed
+      void previewQuery({
+        variables: {
+          playerId: selectedPlayer.id,
+          season: 0,
+          position: selectedPosition,
+          statKey: 'teams_played',
+          playerType: gameState?.playerType,
+          gameMode: 'most_teams',
+        },
+      });
+    } else if (isCareerTeamMode) {
+      if (!selectedOption) return;
       void previewQuery({
         variables: {
           playerId: selectedPlayer.id,
@@ -344,6 +360,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
         },
       });
     } else {
+      if (!selectedOption) return;
       const year = parseInt(selectedOption);
       if (isNaN(year) || year < 1900 || year > new Date().getFullYear()) return;
       void previewQuery({
@@ -362,6 +379,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     selectedOption,
     selectedPosition,
     previewQuery,
+    isMostTeamsMode,
     isCareerTeamMode,
     gameState,
   ]);
@@ -373,16 +391,18 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
       return;
     }
 
-    if (isCareerTeamMode) {
-      if (!selectedOption) {
-        setErrorMessage('Please enter a team abbreviation (e.g., NYY)');
-        return;
-      }
-    } else {
-      const year = parseInt(selectedOption);
-      if (isNaN(year) || year < 1900 || year > new Date().getFullYear()) {
-        setErrorMessage('Please enter a valid 4-digit year');
-        return;
+    if (!isMostTeamsMode) {
+      if (isCareerTeamMode) {
+        if (!selectedOption) {
+          setErrorMessage('Please enter a team abbreviation (e.g., NYY)');
+          return;
+        }
+      } else {
+        const year = parseInt(selectedOption);
+        if (isNaN(year) || year < 1900 || year > new Date().getFullYear()) {
+          setErrorMessage('Please enter a valid 4-digit year');
+          return;
+        }
       }
     }
 
@@ -395,7 +415,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
           gameId,
           rosterSlotId: selectedSlotId,
           playerId: selectedPlayer.id,
-          season: isCareerTeamMode ? 0 : parseInt(selectedOption),
+          season: isMostTeamsMode
+            ? 0
+            : isCareerTeamMode
+              ? 0
+              : parseInt(selectedOption),
           position: selectedPosition,
           team: isCareerTeamMode ? selectedOption : undefined,
         },
@@ -444,6 +468,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     if (
       player &&
       gameState &&
+      !isMostTeamsMode &&
       playerOptions.length === 0 &&
       !statsLoadingPlayerIds.has(player.id) &&
       prevLoading.has(player.id)
@@ -461,6 +486,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     gameState,
     fetchPlayerOptions,
     playerOptions.length,
+    isMostTeamsMode,
   ]);
 
   if (loading) {
@@ -590,7 +616,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               •
             </Text>
             <Text color="$blue3" fontSize="$2">
-              {isCareerTeamMode ? 'Career w/ Team' : 'Season'}
+              {isMostTeamsMode
+                ? 'Most Teams'
+                : isCareerTeamMode
+                  ? 'Career w/ Team'
+                  : 'Season'}
             </Text>
           </XStack>
         </YStack>
@@ -716,8 +746,8 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
                           setPlayerSearch(
                             `${player.firstName} ${player.lastName}`,
                           );
-                          // Fetch available teams/seasons for this player
-                          if (gameState) {
+                          // Fetch available teams/seasons for this player (skip in most_teams mode)
+                          if (gameState && !isMostTeamsMode) {
                             void fetchPlayerOptions({
                               variables: {
                                 playerId: player.id,
@@ -777,8 +807,8 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               </Card>
             )}
 
-            {/* Team / Season Picker (shown after a player is selected) */}
-            {selectedPlayer && (
+            {/* Team / Season Picker (hidden for most_teams — no selection needed) */}
+            {selectedPlayer && !isMostTeamsMode && (
               <YStack marginBottom="$3">
                 <Text fontWeight="bold" marginBottom="$2">
                   {isCareerTeamMode ? 'Select Team:' : 'Select Season:'}
@@ -859,9 +889,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
                 {previewStatValue === 0 && (
                   <Text fontSize="$3" color="$red10">
                     Warning:{' '}
-                    {isPitcherDraft
-                      ? `Player had 0 ${statLabel.toLowerCase()} in this ${isCareerTeamMode ? 'franchise' : 'season'}`
-                      : `Player had no eligibility at this position in ${isCareerTeamMode ? 'this franchise' : selectedOption}, or had 0 ${statLabel.toLowerCase()}`}
+                    {isMostTeamsMode
+                      ? 'Player has no recorded teams'
+                      : isPitcherDraft
+                        ? `Player had 0 ${statLabel.toLowerCase()} in this ${isCareerTeamMode ? 'franchise' : 'season'}`
+                        : `Player had no eligibility at this position in ${isCareerTeamMode ? 'this franchise' : selectedOption}, or had 0 ${statLabel.toLowerCase()}`}
                   </Text>
                 )}
               </Card>
@@ -875,7 +907,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               disabled={
                 !selectedPlayer ||
                 !selectedSlotId ||
-                !selectedOption ||
+                (!isMostTeamsMode && !selectedOption) ||
                 submitting ||
                 (selectedPlayer && statsLoadingPlayerIds.has(selectedPlayer.id))
               }
@@ -955,9 +987,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
                       >
                         <Text>
                           {slot.pick.playerName}
-                          {isCareerTeamMode && slot.pick.team
-                            ? ` (${slot.pick.team})`
-                            : ` (${slot.pick.season})`}
+                          {isMostTeamsMode
+                            ? ''
+                            : isCareerTeamMode && slot.pick.team
+                              ? ` (${slot.pick.team})`
+                              : ` (${slot.pick.season})`}
                         </Text>
                         <Text fontWeight="bold">
                           {slot.pick.statValue} {statLabel}
@@ -990,9 +1024,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               </Text>
               <Text flex={1}>
                 {pick.playerName} selected {pick.baseballPlayerName}
-                {isCareerTeamMode && pick.team
-                  ? ` (${pick.team})`
-                  : ` (${pick.season})`}
+                {isMostTeamsMode
+                  ? ''
+                  : isCareerTeamMode && pick.team
+                    ? ` (${pick.team})`
+                    : ` (${pick.season})`}
                 {!isPitcherDraft && ` @ ${pick.position}`} - {pick.statValue}{' '}
                 {statLabel}
               </Text>

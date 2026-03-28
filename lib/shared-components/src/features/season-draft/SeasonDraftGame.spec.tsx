@@ -30,6 +30,48 @@ jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
 }));
 
+// Override the global react-native mock so TouchableOpacity maps onPress to
+// onClick (the global setup uses a bare string 'button' which drops onPress).
+jest.mock('react-native', () => {
+  const mockReact = jest.requireActual<typeof import('react')>('react');
+  return {
+    Platform: {
+      OS: 'web',
+      select: (obj: Record<string, unknown>) =>
+        obj.web ?? obj.default ?? obj.ios,
+    },
+    Dimensions: {
+      get: jest.fn(() => ({ width: 1024, height: 768 })),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    },
+    StyleSheet: {
+      create: (styles: Record<string, unknown>) => styles,
+      flatten: (style: unknown) => style,
+      compose: (
+        ...styles: Record<string, unknown>[]
+      ): Record<string, unknown> =>
+        Object.assign({}, ...styles) as Record<string, unknown>,
+    },
+    Touchable: { Mixin: {} },
+    processColor: jest.fn((color: unknown) => color),
+    View: 'div',
+    Text: 'span',
+    TouchableOpacity: ({
+      children,
+      onPress,
+    }: {
+      children?: React.ReactNode;
+      onPress?: () => void;
+    }) => mockReact.createElement('button', { onClick: onPress }, children),
+    ScrollView: 'div',
+    ActivityIndicator: 'div',
+    TextInput: 'input',
+    FlatList: 'div',
+    Alert: { alert: jest.fn() },
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -184,6 +226,154 @@ describe('SeasonDraftGame', () => {
 
     await waitFor(() => {
       expect(queryByText('Failed to cancel game.')).toBeNull();
+    });
+  });
+
+  // ── most_teams mode ─────────────────────────────────────────────────────
+
+  describe('most_teams mode', () => {
+    const mostTeamsGameState = {
+      ...mockGameState,
+      gameMode: 'most_teams' as const,
+      statKey: 'teams_played',
+      players: [
+        {
+          id: 1,
+          userId: 1,
+          playerName: 'Player One',
+          draftOrder: 1,
+          totalScore: 0,
+          roster: [
+            { id: 10, position: 'C', slotNumber: 0, isFilled: false },
+            { id: 11, position: '1B', slotNumber: 0, isFilled: false },
+          ],
+        },
+      ],
+    };
+
+    const mockSearchPlayers = jest.fn();
+
+    beforeEach(() => {
+      jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
+        data: { seasonDraftGame: mostTeamsGameState },
+        loading: false,
+        refetch: mockRefetch,
+      } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
+
+      // Provide a search result so the player suggestion list renders
+      mockSearchPlayers.mockReturnValue(undefined);
+      jest.mocked(useSearchPlayersForDraftLazyQuery).mockReturnValue([
+        mockSearchPlayers,
+        {
+          data: {
+            players: [
+              {
+                id: 99,
+                firstName: 'Babe',
+                lastName: 'Ruth',
+                statsLastFetchedAt: '2024-01-01',
+              },
+            ],
+          },
+        },
+      ] as unknown as ReturnType<typeof useSearchPlayersForDraftLazyQuery>);
+    });
+
+    it('renders the Most Teams mode label and hides the team/season picker after player selection', () => {
+      const mockFetchPlayerOptions = jest.fn();
+      jest
+        .mocked(useGetSeasonDraftGamePlayerOptionsLazyQuery)
+        .mockReturnValue([
+          mockFetchPlayerOptions,
+          { data: null },
+        ] as unknown as ReturnType<
+          typeof useGetSeasonDraftGamePlayerOptionsLazyQuery
+        >);
+
+      const { getByText, queryByText } = render(
+        <SeasonDraftGame gameId={1} currentUserId={1} />,
+      );
+
+      // Mode label should show "Most Teams"
+      expect(getByText('Most Teams')).toBeTruthy();
+
+      // Stat label should show "Teams"
+      expect(getByText('Teams')).toBeTruthy();
+
+      // Click the player suggestion to select a player. The
+      // TouchableOpacity (mocked as <button onClick={onPress}>) wraps the
+      // player name, so we walk up to the <button> ancestor.
+      const babeRuthText = getByText('Babe Ruth');
+      const touchable =
+        babeRuthText.closest('button') ?? babeRuthText.parentElement;
+      expect(touchable).not.toBeNull();
+      fireEvent.click(touchable as HTMLElement);
+
+      // In most_teams mode, fetchPlayerOptions is skipped entirely.
+      expect(mockFetchPlayerOptions).not.toHaveBeenCalled();
+
+      // After selecting a player, team/season picker should still NOT be
+      // present in most_teams mode (the picker is gated on
+      // `selectedPlayer && !isMostTeamsMode`)
+      expect(queryByText('Select Team:')).toBeNull();
+      expect(queryByText('Select Season:')).toBeNull();
+    });
+
+    it('enables Confirm Pick without selectedOption in most_teams mode', async () => {
+      const mockFetchPlayerOptions = jest.fn();
+      jest
+        .mocked(useGetSeasonDraftGamePlayerOptionsLazyQuery)
+        .mockReturnValue([
+          mockFetchPlayerOptions,
+          { data: null },
+        ] as unknown as ReturnType<
+          typeof useGetSeasonDraftGamePlayerOptionsLazyQuery
+        >);
+
+      const { getByText, getAllByText } = render(
+        <SeasonDraftGame gameId={1} currentUserId={1} />,
+      );
+
+      // The drafting UI should render (it's the current user's turn)
+      expect(getByText('Your Turn!')).toBeTruthy();
+      expect(getByText('Make Your Pick')).toBeTruthy();
+
+      // Click the player suggestion to select a player.
+      const babeRuthText = getByText('Babe Ruth');
+      const touchable =
+        babeRuthText.closest('button') ?? babeRuthText.parentElement;
+      expect(touchable).not.toBeNull();
+      fireEvent.click(touchable as HTMLElement);
+
+      // In most_teams mode, fetchPlayerOptions is skipped entirely.
+      expect(mockFetchPlayerOptions).not.toHaveBeenCalled();
+
+      // Select a roster slot (position) — multiple elements show "C"
+      // (the slot button and the roster label), so pick the first one
+      // which is the interactive button in the draft interface.
+      const cElements = getAllByText('C');
+      fireEvent.click(cElements[0]);
+
+      // In most_teams mode, with a player and slot selected but no
+      // selectedOption, the Confirm Pick button should be enabled.
+      // The disabled condition is:
+      //   !selectedPlayer || !selectedSlotId || (!isMostTeamsMode && !selectedOption) || submitting
+      // Since isMostTeamsMode is true, !selectedOption is not checked.
+      // Press the button and verify the mutation is called (proving it's enabled)
+      mockMakePickMutation.mockResolvedValue({});
+      fireEvent.click(getByText('Confirm Pick'));
+
+      await waitFor(() => {
+        expect(mockMakePickMutation).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variables: expect.objectContaining({
+              gameId: 1,
+              season: 0,
+              position: 'C',
+            }) as unknown,
+          }) as unknown,
+        );
+      });
     });
   });
 });

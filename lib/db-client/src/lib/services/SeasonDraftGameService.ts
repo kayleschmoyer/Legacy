@@ -12,7 +12,8 @@ import type { PublicDb } from '../client/PublicDbClient';
  *
  * Supports:
  * - Configurable stat key (HR, H, RBI, SB, etc. for hitters; W, SO, SV, etc. for pitchers)
- * - Two game modes: season (player+year) or career_team (player+team career total)
+ * - Three game modes: season (player+year), career_team (player+team career total),
+ *   or most_teams (COUNT(DISTINCT team))
  * - Hitter or pitcher drafts with different roster layouts
  */
 
@@ -36,7 +37,7 @@ export type HitterStatKey = (typeof HITTER_STAT_KEYS)[number];
 export type PitcherStatKey = (typeof PITCHER_STAT_KEYS)[number];
 export type StatKey = HitterStatKey | PitcherStatKey;
 export type PlayerType = 'hitter' | 'pitcher';
-export type GameMode = 'season' | 'career_team';
+export type GameMode = 'season' | 'career_team' | 'most_teams';
 
 export interface CreateSeasonDraftGameParams {
   name: string;
@@ -121,25 +122,30 @@ export class SeasonDraftGameService {
     }
 
     const playerType: PlayerType = params.playerType ?? 'hitter';
-    const statKey = params.statKey ?? 'hr';
     const gameMode: GameMode = params.gameMode ?? 'season';
 
-    // Validate stat key matches player type
-    if (
-      playerType === 'hitter' &&
-      !HITTER_STAT_KEYS.includes(statKey as HitterStatKey)
-    ) {
-      throw new Error(
-        `Invalid stat key '${statKey}' for hitter draft. Valid: ${HITTER_STAT_KEYS.join(', ')}`,
-      );
-    }
-    if (
-      playerType === 'pitcher' &&
-      !PITCHER_STAT_KEYS.includes(statKey as PitcherStatKey)
-    ) {
-      throw new Error(
-        `Invalid stat key '${statKey}' for pitcher draft. Valid: ${PITCHER_STAT_KEYS.join(', ')}`,
-      );
+    // For most_teams mode, statKey is a derived stat — auto-set to 'teams_played'
+    const statKey =
+      gameMode === 'most_teams' ? 'teams_played' : (params.statKey ?? 'hr');
+
+    // Validate stat key matches player type (skip for most_teams — derived stat)
+    if (gameMode !== 'most_teams') {
+      if (
+        playerType === 'hitter' &&
+        !HITTER_STAT_KEYS.includes(statKey as HitterStatKey)
+      ) {
+        throw new Error(
+          `Invalid stat key '${statKey}' for hitter draft. Valid: ${HITTER_STAT_KEYS.join(', ')}`,
+        );
+      }
+      if (
+        playerType === 'pitcher' &&
+        !PITCHER_STAT_KEYS.includes(statKey as PitcherStatKey)
+      ) {
+        throw new Error(
+          `Invalid stat key '${statKey}' for pitcher draft. Valid: ${PITCHER_STAT_KEYS.join(', ')}`,
+        );
+      }
     }
 
     // Create game
@@ -393,6 +399,11 @@ export class SeasonDraftGameService {
     gameMode: GameMode = 'season',
     team?: string,
   ): Promise<number> {
+    // most_teams mode: COUNT(DISTINCT team) — no position eligibility check
+    if (gameMode === 'most_teams') {
+      return this.getMostTeamsStatValue(db, playerId, playerType);
+    }
+
     if (playerType === 'pitcher') {
       return this.getPitcherStatValue(
         db,
@@ -413,6 +424,29 @@ export class SeasonDraftGameService {
       gameMode,
       team,
     );
+  }
+
+  /**
+   * Get the number of distinct teams a player played for (most_teams mode)
+   */
+  private static async getMostTeamsStatValue(
+    db: PublicDb,
+    playerId: number,
+    playerType: PlayerType,
+  ): Promise<number> {
+    const table =
+      playerType === 'pitcher'
+        ? PublicSchema.seasonPitching
+        : PublicSchema.seasonBatting;
+
+    const result = await db
+      .select({
+        stat_value: sql<number>`COUNT(DISTINCT ${table.team})::int`,
+      })
+      .from(table)
+      .where(eq(table.playerId, playerId));
+
+    return result[0]?.stat_value ?? 0;
   }
 
   /**
@@ -568,6 +602,11 @@ export class SeasonDraftGameService {
     gameMode: GameMode,
     playerType: PlayerType,
   ): Promise<string[]> {
+    // most_teams mode: no team/season selection needed
+    if (gameMode === 'most_teams') {
+      return [];
+    }
+
     if (gameMode === 'career_team') {
       const table =
         playerType === 'pitcher'
@@ -722,27 +761,42 @@ export class SeasonDraftGameService {
       throw new Error('Roster slot is already filled');
     }
 
-    // Check for duplicate player+season (or player+team in career_team mode) in this game
+    // Check for duplicate picks in this game
+    // most_teams: same player can't be drafted twice
+    // career_team: same player+team can't be drafted twice
+    // season: same player+season can't be drafted twice
+    const duplicateConditions = [
+      eq(PublicSchema.seasonDraftPicks.gameId, params.gameId),
+      eq(PublicSchema.seasonDraftPicks.playerId, params.playerId),
+    ];
+
+    if (game.gameMode === 'career_team') {
+      duplicateConditions.push(
+        eq(PublicSchema.seasonDraftPicks.team, params.team ?? ''),
+      );
+    } else if (game.gameMode !== 'most_teams') {
+      // season mode
+      duplicateConditions.push(
+        eq(PublicSchema.seasonDraftPicks.season, params.season),
+      );
+    }
+    // most_teams: only check gameId + playerId (no additional condition)
+
     const existingPicks = await db
       .select({ id: PublicSchema.seasonDraftPicks.id })
       .from(PublicSchema.seasonDraftPicks)
-      .where(
-        and(
-          eq(PublicSchema.seasonDraftPicks.gameId, params.gameId),
-          eq(PublicSchema.seasonDraftPicks.playerId, params.playerId),
-          game.gameMode === 'career_team'
-            ? eq(PublicSchema.seasonDraftPicks.team, params.team ?? '')
-            : eq(PublicSchema.seasonDraftPicks.season, params.season),
-        ),
-      )
+      .where(and(...duplicateConditions))
       .limit(1);
 
     if (existingPicks.length > 0) {
-      throw new Error(
-        game.gameMode === 'career_team'
-          ? 'This player + team combination has already been drafted in this game'
-          : 'This player + season combination has already been drafted in this game',
-      );
+      const messages: Record<string, string> = {
+        career_team:
+          'This player + team combination has already been drafted in this game',
+        most_teams: 'This player has already been drafted in this game',
+        season:
+          'This player + season combination has already been drafted in this game',
+      };
+      throw new Error(messages[game.gameMode] ?? messages.season);
     }
 
     // Get stat value for this player/season/position using game config

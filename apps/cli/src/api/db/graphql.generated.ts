@@ -2878,9 +2878,10 @@ export type SeasonDraftGame = {
   status?: Maybe<SeasonDraftGameStatus>;
 };
 
-/** Game mode: season (player+year) or career_team (player+team career total) */
+/** Game mode: season (player+year), career_team (player+team career total), or most_teams (count of distinct teams) */
 export enum SeasonDraftGameMode {
   CareerTeam = 'career_team',
+  MostTeams = 'most_teams',
   Season = 'season',
 }
 

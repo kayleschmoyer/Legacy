@@ -664,5 +664,61 @@ describe('Season Draft Game Resolver', () => {
         mockSeasonDraftGameService.getPlayerDraftOptions,
       ).toHaveBeenCalledWith(mockDb, 42, 'season', 'hitter');
     });
+
+    it('passes most_teams gameMode through to the service', async () => {
+      mockSeasonDraftGameService.getPlayerDraftOptions.mockResolvedValue([]);
+
+      const resolver = getQuery('seasonDraftGamePlayerOptions');
+      const result = await resolver(
+        {},
+        { playerId: 7, gameMode: 'most_teams', playerType: 'hitter' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual([]);
+      expect(
+        mockSeasonDraftGameService.getPlayerDraftOptions,
+      ).toHaveBeenCalledWith(mockDb, 7, 'most_teams', 'hitter');
+    });
+  });
+
+  // ── most_teams mode: seasonDraftGamePlayerSeasonStatValue ───────────────
+
+  describe('seasonDraftGamePlayerSeasonStatValue with most_teams mode', () => {
+    it('passes gameMode most_teams and teams_played statKey through to the service', async () => {
+      mockSeasonDraftGameService.getStatValueForPlayerSeasonPosition.mockResolvedValueOnce(
+        8,
+      );
+
+      const resolver = getQuery('seasonDraftGamePlayerSeasonStatValue');
+      const result = await resolver(
+        {},
+        {
+          playerId: 10,
+          season: 0,
+          position: 'CF',
+          statKey: 'teams_played',
+          playerType: 'hitter',
+          gameMode: 'most_teams',
+        },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(8);
+      expect(
+        mockSeasonDraftGameService.getStatValueForPlayerSeasonPosition,
+      ).toHaveBeenCalledWith(
+        mockDb,
+        10,
+        0,
+        'CF',
+        'teams_played',
+        'hitter',
+        'most_teams',
+        undefined,
+      );
+    });
   });
 });
