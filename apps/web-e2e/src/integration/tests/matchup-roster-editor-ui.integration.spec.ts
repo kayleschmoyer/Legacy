@@ -48,6 +48,12 @@ interface RosterEditorState {
 
 let state: RosterEditorState;
 
+/**
+ * Regex matching player names ("First Last") while excluding UI header text
+ * like "Edit Lineup" or "Current Lineup" that also match the two-word pattern.
+ */
+const PLAYER_NAME_RE = /^(?!Edit |Current )[A-Z][a-z]+ [A-Z][a-z]+/;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -346,7 +352,7 @@ test.describe
         .first();
 
       // Look for any player name text within the editor (player cards have player names)
-      const playerCells = editorCard.locator('text=/^[A-Z][a-z]+ [A-Z][a-z]+/');
+      const playerCells = editorCard.getByText(PLAYER_NAME_RE);
       await expect(playerCells.first()).toBeVisible({ timeout: 15_000 });
     });
   });
@@ -377,24 +383,10 @@ test.describe
         .filter({ hasText: 'STARTERS' })
         .first();
 
-      // Find player rows in the starters section (above the Bench section),
-      // with a non-empty player name (not "Empty" italic text).
-      // Starters have a position badge like SP, 1B, 2B, etc.
-      // We look for rows within the starters area that have actual player name text.
-      const starterSection = editorCard
-        .locator('text=STARTERS')
-        .locator('..')
-        .locator('..');
-      const playerRows = starterSection.locator(
-        'xpath=following-sibling::div[1]//div[not(contains(text(), "Empty"))]',
-      );
-
-      // Simpler: find any pressable/clickable element within the editor that
-      // shows a player name (First Last pattern) and is above the bench divider.
-      // The full editor card is scoped; within it find rows that have a player.
-      const anyPlayerInEditor = editorCard
-        .getByText(/^[A-Z][a-z]+ [A-Z][a-z]+/)
-        .first();
+      // Find a player name (First Last pattern) inside the editor card.
+      // Use a negative lookahead to skip header text like "Edit Lineup" or
+      // "Current Lineup" which also match the two-capitalized-word pattern.
+      const anyPlayerInEditor = editorCard.getByText(PLAYER_NAME_RE).first();
       await expect(anyPlayerInEditor).toBeVisible({ timeout: 15_000 });
 
       // Capture the player name for later verification
