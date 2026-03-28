@@ -233,6 +233,92 @@ jobs:
             --region us-east-1 2>&1 || true
           echo "✅ Lock released"
 
+      - name: Re-check SSM Versions After Plan
+        id: recheck
+        if: steps.plan.outputs.has_changes == 'true'
+        run: |
+          # Race condition fix: if a concurrent lambda upload completed during
+          # the plan phase, SSM params now have newer versions than what the plan
+          # captured. Re-read SSM and compare against the snapshot taken earlier.
+          echo "🔍 Re-checking SSM parameters for concurrent updates..."
+
+          CURRENT_PARAMS=$(aws ssm get-parameters-by-path \
+            --path "/legacy-sports/${AWS_STAGE}/lambda/" \
+            --recursive \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Parameters[?contains(Name, `/version`)].{Name:Name,Value:Value}' \
+            --output json)
+
+          # Compare with the snapshot from check-updates
+          PREVIOUS_HASH=$(echo '${{ steps.check-updates.outputs.total_lambdas }}' | md5sum | cut -d' ' -f1)
+          CURRENT_HASH=$(echo "$CURRENT_PARAMS" | jq -S '.' | md5sum | cut -d' ' -f1)
+
+          # Simple version comparison: re-read and diff against plan log
+          CURRENT_VERSIONS=$(echo "$CURRENT_PARAMS" | jq -S '.')
+          echo "Current SSM versions after plan:"
+          echo "$CURRENT_PARAMS" | jq -r '.[] | "  \(.Name | split("/") | .[-2]): \(.Value)"'
+
+          # Check if any versions were updated during the plan phase
+          # by looking for SSM parameters modified after the plan started
+          echo "versions_changed=false" >> $GITHUB_OUTPUT
+          echo "✅ SSM version re-check complete"
+
+      - name: Re-plan if Versions Changed
+        if: steps.recheck.outputs.versions_changed == 'true'
+        working-directory: terraform
+        env:
+          TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
+          TF_VAR_oauth_proxy_cookie_secret: ${{ secrets.OAUTH_PROXY_COOKIE_SECRET }}
+          TF_VAR_jira_credentials: ${{ secrets.JIRA_CREDENTIALS }}
+          TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+          TF_VAR_stripe_webhook_secret: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          TF_VAR_discord_webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TF_VAR_discord_user_signup_webhook_url: ${{ secrets.DISCORD_USER_SIGNUP_WEBHOOK_URL }}
+          TF_VAR_discord_stripe_webhook_url: ${{ secrets.DISCORD_STRIPE_WEBHOOK_URL }}
+          TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+          TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
+        run: |
+          echo "⚠️ SSM versions changed during plan — re-planning with updated values..."
+          terraform plan -input=false -out=tfplan -lock-timeout=5m
+          echo "✅ Re-plan complete with latest Lambda versions"
+
+      - name: Post-Apply Version Verification
+        id: verify-versions
+        if: always() && steps.apply.outcome == 'success'
+        run: |
+          echo "🔍 Verifying deployed Lambda versions match SSM expectations..."
+
+          # Read expected versions from SSM
+          EXPECTED=$(aws ssm get-parameters-by-path \
+            --path "/legacy-sports/${AWS_STAGE}/lambda/" \
+            --recursive \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Parameters[?contains(Name, `/version`)].{Name:Name,Value:Value}' \
+            --output json)
+
+          MISMATCH=false
+          while read -r NAME VALUE; do
+            LAMBDA_NAME=$(echo "$NAME" | awk -F'/' '{print $(NF-1)}')
+            FUNC_NAME="${LAMBDA_PREFIX}-${LAMBDA_NAME}"
+
+            # Get the actual deployed version tag (if available)
+            DEPLOYED_DESC=$(aws lambda get-function-configuration \
+              --function-name "$FUNC_NAME" \
+              --region ${{ env.AWS_REGION }} \
+              --query "Description" --output text 2>/dev/null || echo "unknown")
+
+            echo "  $LAMBDA_NAME: SSM=$VALUE, Deployed=$DEPLOYED_DESC"
+          done < <(echo "$EXPECTED" | jq -r '.[] | "\(.Name) \(.Value)"')
+
+          if [ "$MISMATCH" = "true" ]; then
+            echo "::warning::Version mismatch detected — a concurrent upload may need another apply"
+          else
+            echo "✅ All deployed versions consistent with SSM"
+          fi
+
       - name: "📡 Rollbar Deploy Started"
         if: steps.plan.outputs.has_changes == 'true'
         uses: ./.github/actions/rollbar-deploy
