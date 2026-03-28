@@ -198,6 +198,94 @@ jobs:
           } >> "$GITHUB_ENV"
 
       # -----------------------------------------------------------------------
+      # 4c. Define reusable retry wrapper for Jira API calls
+      # -----------------------------------------------------------------------
+      - name: Define Jira API helper
+        if: steps.ticket.outputs.skip != 'true' && steps.guard.outputs.skip != 'true'
+        run: |
+          # Write a reusable retry function to a sourceable script.
+          # Retries 3 times with exponential backoff (2s, 4s, 8s).
+          # Fails fast on 401/403 (auth errors). Retries on 429/5xx.
+          cat > /tmp/jira-api.sh << 'FUNC_EOF'
+          jira_api() {
+            local METHOD="${1:-GET}"
+            local URL="$2"
+            local DATA="${3:-}"
+            local MAX_RETRIES=3
+            local RETRY_DELAY=2
+
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              local CURL_ARGS=(
+                -s -w "\n%{http_code}"
+                --header "Authorization: Bearer $JIRA_ACCESS_TOKEN"
+                --header "Accept: application/json"
+                --connect-timeout 10
+                --max-time 30
+              )
+
+              if [[ "$METHOD" == "POST" ]]; then
+                CURL_ARGS+=(--request POST --header "Content-Type: application/json")
+                if [[ -n "$DATA" ]]; then
+                  CURL_ARGS+=(--data "$DATA")
+                fi
+              fi
+
+              local RAW_RESPONSE
+              RAW_RESPONSE=$(curl "${CURL_ARGS[@]}" "$URL" 2>&1) || true
+
+              local HTTP_CODE
+              HTTP_CODE=$(echo "$RAW_RESPONSE" | tail -1)
+              local BODY
+              BODY=$(echo "$RAW_RESPONSE" | head -n -1)
+
+              # Success
+              if [[ "$HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+                echo "$BODY"
+                return 0
+              fi
+
+              # Auth errors — fail immediately, no point retrying
+              if [[ "$HTTP_CODE" == "401" || "$HTTP_CODE" == "403" ]]; then
+                echo "❌ Auth error (HTTP $HTTP_CODE) — not retrying" >&2
+                echo "$BODY" >&2
+                return 1
+              fi
+
+              # Rate limit — respect Retry-After if present
+              if [[ "$HTTP_CODE" == "429" ]]; then
+                local WAIT=$RETRY_DELAY
+                local RETRY_AFTER
+                RETRY_AFTER=$(echo "$BODY" | jq -r '.retryAfter // empty' 2>/dev/null || true)
+                if [[ -n "$RETRY_AFTER" && "$RETRY_AFTER" =~ ^[0-9]+$ ]]; then
+                  WAIT=$RETRY_AFTER
+                fi
+                echo "⚠️  Rate limited (429). Retry $attempt/$MAX_RETRIES in ${WAIT}s..." >&2
+                sleep "$WAIT"
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                continue
+              fi
+
+              # Server errors (5xx) — retry with backoff
+              if [[ "$HTTP_CODE" =~ ^5[0-9][0-9]$ ]]; then
+                echo "⚠️  Server error (HTTP $HTTP_CODE). Retry $attempt/$MAX_RETRIES in ${RETRY_DELAY}s..." >&2
+                sleep "$RETRY_DELAY"
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                continue
+              fi
+
+              # Other errors — fail
+              echo "❌ Unexpected HTTP $HTTP_CODE" >&2
+              echo "$BODY" >&2
+              return 1
+            done
+
+            echo "❌ All $MAX_RETRIES retries exhausted" >&2
+            return 1
+          }
+          FUNC_EOF
+          echo "✅ Jira API retry helper defined"
+
+      # -----------------------------------------------------------------------
       # 5. Fetch available transitions and find the ID for our target
       # -----------------------------------------------------------------------
       - name: Get available transitions
@@ -207,13 +295,10 @@ jobs:
           TICKET: ${{ steps.ticket.outputs.key }}
           TARGET: ${{ steps.target.outputs.transition }}
         run: |
-          RESPONSE=$(curl -sf \
-            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
-            --header "Accept: application/json" \
-            "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions" \
-            2>&1) || {
-            echo "❌ Failed to fetch transitions for $TICKET (curl exit $?)"
-            echo "Response: $RESPONSE"
+          source /tmp/jira-api.sh
+
+          RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions") || {
+            echo "❌ Failed to fetch transitions for $TICKET"
             exit 1
           }
 
@@ -240,25 +325,16 @@ jobs:
           TRANSITION_ID: ${{ steps.transitions.outputs.id }}
           TARGET: ${{ steps.target.outputs.transition }}
         run: |
-          RESPONSE=$(curl -s -w "\n%{http_code}" \
-            --request POST \
-            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
-            --header "Content-Type: application/json" \
-            --header "Accept: application/json" \
-            --data "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" \
-            "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions")
+          source /tmp/jira-api.sh
 
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -n -1)
-
-          if [[ "$HTTP_CODE" == "204" ]]; then
+          jira_api POST "$JIRA_API_BASE/rest/api/3/issue/$TICKET/transitions" \
+            "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" > /dev/null && {
             echo "✅ $TICKET → $TARGET"
             echo "success=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "❌ Failed to transition $TICKET to '$TARGET'. HTTP $HTTP_CODE"
-            echo "$BODY"
+          } || {
+            echo "❌ Failed to transition $TICKET to '$TARGET' after retries"
             exit 1
-          fi
+          }
 
       # -----------------------------------------------------------------------
       # 7. Fetch parent epic (if any)
@@ -269,11 +345,9 @@ jobs:
         env:
           TICKET: ${{ steps.ticket.outputs.key }}
         run: |
-          RESPONSE=$(curl -sf \
-            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
-            --header "Accept: application/json" \
-            "$JIRA_API_BASE/rest/api/3/issue/$TICKET?fields=parent" \
-            2>&1) || {
+          source /tmp/jira-api.sh
+
+          RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$TICKET?fields=parent") || {
             echo "⚠️  Could not fetch ticket $TICKET details — skipping epic sync."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -303,11 +377,9 @@ jobs:
         env:
           EPIC_KEY: ${{ steps.epic.outputs.key }}
         run: |
-          RESPONSE=$(curl -sf \
-            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
-            --header "Accept: application/json" \
-            "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY?fields=labels" \
-            2>&1) || {
+          source /tmp/jira-api.sh
+
+          RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY?fields=labels") || {
             echo "⚠️  Could not fetch labels for $EPIC_KEY — proceeding with sync."
             echo "pinned=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -341,6 +413,8 @@ jobs:
           echo "⏳ Waiting 10s for concurrent ticket transitions to settle..."
           sleep 10
 
+          source /tmp/jira-api.sh
+
           # Fetch all children of the epic via JQL search (paginated)
           ENCODED_JQL=$(echo -n "parent=$EPIC_KEY" | jq -sRr @uri)
           ALL_STATUSES=""
@@ -348,11 +422,7 @@ jobs:
           PAGE_SIZE=200
 
           while true; do
-            RESPONSE=$(curl -sf \
-              --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
-              --header "Accept: application/json" \
-              "$JIRA_API_BASE/rest/api/3/search?jql=$ENCODED_JQL&fields=status&maxResults=$PAGE_SIZE&startAt=$START_AT" \
-              2>&1) || {
+            RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/search?jql=$ENCODED_JQL&fields=status&maxResults=$PAGE_SIZE&startAt=$START_AT") || {
               echo "⚠️  Could not fetch children of $EPIC_KEY — skipping epic sync."
               echo "skip=true" >> "$GITHUB_OUTPUT"
               exit 0
@@ -438,11 +508,9 @@ jobs:
           EPIC_KEY: ${{ steps.epic.outputs.key }}
           TARGET: ${{ steps.epic-status.outputs.transition }}
         run: |
-          RESPONSE=$(curl -sf \
-            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
-            --header "Accept: application/json" \
-            "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY?fields=status" \
-            2>&1) || {
+          source /tmp/jira-api.sh
+
+          RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY?fields=status") || {
             echo "⚠️  Could not fetch epic $EPIC_KEY status — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -467,12 +535,10 @@ jobs:
           EPIC_KEY: ${{ steps.epic.outputs.key }}
           TARGET: ${{ steps.epic-status.outputs.transition }}
         run: |
+          source /tmp/jira-api.sh
+
           # Fetch available transitions for the epic
-          RESPONSE=$(curl -sf \
-            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
-            --header "Accept: application/json" \
-            "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions" \
-            2>&1) || {
+          RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions") || {
             echo "⚠️  Could not fetch transitions for $EPIC_KEY — skipping."
             exit 0
           }
@@ -486,21 +552,10 @@ jobs:
             exit 0
           fi
 
-          RESPONSE=$(curl -s -w "\n%{http_code}" \
-            --request POST \
-            --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
-            --header "Content-Type: application/json" \
-            --header "Accept: application/json" \
-            --data "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" \
-            "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions")
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-
-          if [[ "$HTTP_CODE" == "204" ]]; then
+          jira_api POST "$JIRA_API_BASE/rest/api/3/issue/$EPIC_KEY/transitions" \
+            "{\"transition\":{\"id\":\"$TRANSITION_ID\"}}" > /dev/null && {
             echo "✅ Epic $EPIC_KEY → $TARGET"
-          else
-            BODY=$(echo "$RESPONSE" | head -n -1)
-            echo "⚠️  Failed to transition epic $EPIC_KEY to '$TARGET'. HTTP $HTTP_CODE"
-            echo "$BODY"
+          } || {
+            echo "⚠️  Failed to transition epic $EPIC_KEY to '$TARGET' after retries"
             # Non-fatal: epic sync is best-effort and should not fail the workflow
-          fi
+          }
