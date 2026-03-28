@@ -306,20 +306,37 @@ export class StatisticsService {
         const orderDirection = queryOptions.orderDirection || 'desc';
 
         const getOrderByClause = () => {
-          if (queryOptions.orderBy === 'wins') {
-            return orderDirection === 'desc'
-              ? desc(PublicSchema.careerPitching.w)
-              : asc(PublicSchema.careerPitching.w);
-          } else if (queryOptions.orderBy === 'strikeouts') {
-            return orderDirection === 'desc'
-              ? desc(PublicSchema.careerPitching.so)
-              : asc(PublicSchema.careerPitching.so);
-          } else if (queryOptions.orderBy === 'era') {
-            return orderDirection === 'desc'
-              ? desc(PublicSchema.careerPitching.era)
-              : asc(PublicSchema.careerPitching.era);
+          const dir = orderDirection === 'desc' ? 'DESC' : 'ASC';
+          switch (queryOptions.orderBy) {
+            case 'wins':
+              return sql`${PublicSchema.careerPitching.w} ${sql.raw(dir)} NULLS LAST`;
+            case 'losses':
+              return sql`${PublicSchema.careerPitching.l} ${sql.raw(dir)} NULLS LAST`;
+            case 'strikeouts':
+              return sql`${PublicSchema.careerPitching.so} ${sql.raw(dir)} NULLS LAST`;
+            case 'era':
+              return sql`${PublicSchema.careerPitching.era} ${sql.raw(dir)} NULLS LAST`;
+            case 'games':
+              return sql`${PublicSchema.careerPitching.g} ${sql.raw(dir)} NULLS LAST`;
+            case 'gamesStarted':
+              return sql`${PublicSchema.careerPitching.gs} ${sql.raw(dir)} NULLS LAST`;
+            case 'completeGames':
+              return sql`${PublicSchema.careerPitching.cg} ${sql.raw(dir)} NULLS LAST`;
+            case 'shutouts':
+              return sql`${PublicSchema.careerPitching.sho} ${sql.raw(dir)} NULLS LAST`;
+            case 'saves':
+              return sql`${PublicSchema.careerPitching.sv} ${sql.raw(dir)} NULLS LAST`;
+            case 'baseOnBalls':
+              return sql`${PublicSchema.careerPitching.bb} ${sql.raw(dir)} NULLS LAST`;
+            case 'hits':
+              return sql`${PublicSchema.careerPitching.h} ${sql.raw(dir)} NULLS LAST`;
+            case 'earnedRuns':
+              return sql`${PublicSchema.careerPitching.er} ${sql.raw(dir)} NULLS LAST`;
+            case 'homeRuns':
+              return sql`${PublicSchema.careerPitching.hr} ${sql.raw(dir)} NULLS LAST`;
+            default:
+              return sql`${PublicSchema.careerPitching.w} DESC NULLS LAST`;
           }
-          return desc(PublicSchema.careerPitching.w);
         };
 
         const searchTerm = queryOptions.filters?.searchTerm;
