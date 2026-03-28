@@ -3,6 +3,10 @@
     "ENABLE_TOOL_SEARCH": "true"
   },
   "permissions": {
+    "additionalDirectories": [
+      "D:\\code\\legacy-sports",
+      "D:\\code\\legacy-sports-worktrees"
+    ],
     "allow": [
       "mcp__82d0c0eb-ec68-497e-bef5-b0faa209ebbb__*",
       "mcp__legacy-sports-aws__aws_apigateway_inspect",
