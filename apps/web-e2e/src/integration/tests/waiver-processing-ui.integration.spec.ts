@@ -117,9 +117,15 @@ async function submitWaiverClaimViaUI(
   await page.waitForLoadState('load');
   await expect(page).toHaveURL(/\/free-agents/);
 
-  // Search by last name to reliably surface the specific player row
+  // Search by last name to reliably surface the specific player row.
+  // NOTE: isVisible({ timeout }) is deprecated in Playwright v1.40+ —
+  // the timeout is silently ignored.  Use waitFor() instead.
   const searchInput = page.getByPlaceholder(/search players/i);
-  if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+  const searchVisible = await searchInput
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (searchVisible) {
     const lastName = playerName.split(' ').pop() ?? playerName;
     await searchInput.fill(lastName);
     await page.waitForTimeout(500);
@@ -130,65 +136,78 @@ async function submitWaiverClaimViaUI(
   const exactAddBtn = page.locator(`button[aria-label="Add ${playerName}"]`);
   const firstAddBtn = page.locator('button[aria-label^="Add "]').first();
   const hasExact = await exactAddBtn
-    .isVisible({ timeout: 10000 })
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
     .catch(() => false);
   const addBtn = hasExact ? exactAddBtn : firstAddBtn;
-  await expect(addBtn).toBeVisible({ timeout: 5000 });
+  await expect(addBtn).toBeVisible({ timeout: 5_000 });
   await addBtn.click();
 
   // WaiverClaimModal opens
   await expect(page.getByText('Claim Free Agent')).toBeVisible({
-    timeout: 10000,
+    timeout: 10_000,
   });
 
   // Wait for the roster status message to appear
   const rosterLoaded = page.getByText(
     /select a player to drop|Roster has space/i,
   );
-  await expect(rosterLoaded).toBeVisible({ timeout: 15000 });
+  await expect(rosterLoaded).toBeVisible({ timeout: 15_000 });
 
   // When the roster is full after the draft, the modal requires a drop
-  // — this path exercises the "drop" feature from the ticket requirements
+  // — this path exercises the "drop" feature from the ticket requirements.
+  // The rosterLoaded assertion above ensures one of the two texts is already
+  // visible, so isVisible() here correctly reflects the current state.
   const dropPrompt = page.getByText(/select a player to drop/i);
-  if (await dropPrompt.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await dropPrompt.isVisible()) {
     const byTestId = page.locator('[data-testid^="drop-player-"]').first();
     const byRole = page.getByRole('option', { name: /^Drop /i }).first();
 
-    if (await byTestId.isVisible({ timeout: 3000 }).catch(() => false)) {
+    const foundByTestId = await byTestId
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (foundByTestId) {
       await byTestId.click();
-    } else if (await byRole.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await byRole.click();
     } else {
-      // Coordinate fallback: click the first pointer-cursor element inside
-      // the modal — Tamagui renders selectable items as styled divs
-      const rect = await page.evaluate(() => {
-        const modal = document.querySelector<HTMLElement>(
-          '[aria-labelledby="claim-title"]',
-        );
-        if (!modal) return null;
-        for (const div of modal.querySelectorAll<HTMLElement>('div')) {
-          if (
-            getComputedStyle(div).cursor === 'pointer' &&
-            div.children.length >= 2
-          ) {
-            const box = div.getBoundingClientRect();
-            return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      const foundByRole = await byRole
+        .waitFor({ state: 'visible', timeout: 3_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (foundByRole) {
+        await byRole.click();
+      } else {
+        // Coordinate fallback: click the first pointer-cursor element inside
+        // the modal — Tamagui renders selectable items as styled divs
+        const rect = await page.evaluate(() => {
+          const modal = document.querySelector<HTMLElement>(
+            '[aria-labelledby="claim-title"]',
+          );
+          if (!modal) return null;
+          for (const div of modal.querySelectorAll<HTMLElement>('div')) {
+            if (
+              getComputedStyle(div).cursor === 'pointer' &&
+              div.children.length >= 2
+            ) {
+              const box = div.getBoundingClientRect();
+              return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+            }
           }
-        }
-        return null;
-      });
-      if (rect) await page.mouse.click(rect.x, rect.y);
+          return null;
+        });
+        if (rect) await page.mouse.click(rect.x, rect.y);
+      }
     }
 
-    await expect(page.getByText('Dropping')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Dropping')).toBeVisible({ timeout: 5_000 });
   }
 
   const submitBtn = page.getByRole('button', { name: /Submit Claim/i });
-  await expect(submitBtn).toBeEnabled({ timeout: 5000 });
+  await expect(submitBtn).toBeEnabled({ timeout: 5_000 });
   await submitBtn.click();
 
   await expect(page.getByText('Waiver Claim Submitted!')).toBeVisible({
-    timeout: 10000,
+    timeout: 10_000,
   });
 
   await page.getByRole('button', { name: 'Done' }).click();
@@ -535,7 +554,8 @@ test.describe
       const playerVisible = await page
         .getByText(state.freeAgentPlayerName, { exact: false })
         .first()
-        .isVisible({ timeout: 5000 })
+        .waitFor({ state: 'visible', timeout: 5_000 })
+        .then(() => true)
         .catch(() => false);
       if (!playerVisible) {
         // Fall back: verify there's at least a cancel button for some claim
