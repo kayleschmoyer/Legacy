@@ -52,6 +52,7 @@ concurrency:
 # - checks: read          → Required for status check queries (ci-pipeline validation)
 # - issues: write         → Required for issue creation on failures (ci-reporting action)
 # - security-events: write → Required for SARIF uploads (security-scanning workflow)
+# - statuses: write       → Required for commit status updates (security-gate job)
 #
 # Reducing these permissions causes startup_failure in called workflows (LS-106)
 permissions:
@@ -61,6 +62,7 @@ permissions:
   checks: read
   issues: write
   security-events: write
+  statuses: write
 
 jobs:
   determine-scope:

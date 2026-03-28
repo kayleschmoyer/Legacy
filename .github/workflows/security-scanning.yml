@@ -18,6 +18,7 @@ permissions:
   security-events: write
   pull-requests: write
   issues: write
+  statuses: write
 
 env:
   # Security scan configuration
@@ -808,3 +809,128 @@ jobs:
           echo "- **Scheduled**: Every Monday at 2 AM UTC" >> $GITHUB_STEP_SUMMARY
           echo "- **Automatic**: On every PR and main branch push" >> $GITHUB_STEP_SUMMARY
           echo "- **Manual**: Available via workflow dispatch" >> $GITHUB_STEP_SUMMARY
+
+  # ======================================================================
+  # SECURITY GATE - sets commit status based on scan results
+  # ======================================================================
+  # This job evaluates all scan results and sets a 'security-scan' commit
+  # status that can be used as a required status check for branch protection.
+  #
+  # Policy:
+  #   - Secret scan (Gitleaks) failure -> always blocks merge (status: failure)
+  #   - SAST/dependency HIGH/CRITICAL findings -> blocks merge unless PR has
+  #     'security-override' label
+  #   - All clean or only LOW/MEDIUM findings -> passes (status: success)
+  # ======================================================================
+
+  security-gate:
+    name: "Security Gate"
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    needs: [security-scan-plan, dependency-scan, secret-detection, sast-scan]
+    if: always()
+
+    steps:
+      - name: "Evaluate Security Gate"
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sha = context.sha || context.payload.pull_request?.head?.sha;
+            if (!sha) {
+              core.warning('No SHA available - skipping commit status');
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Collect scan results from upstream jobs
+            const secretResult = '${{ needs.secret-detection.result }}';
+            const depResult = '${{ needs.dependency-scan.result }}';
+            const sastResult = '${{ needs.sast-scan.result }}';
+
+            core.info(`Secret detection: ${secretResult}`);
+            core.info(`Dependency scan: ${depResult}`);
+            core.info(`SAST scan: ${sastResult}`);
+
+            // Check for security-override label on the PR
+            let hasOverrideLabel = false;
+            const prNumber = context.payload?.pull_request?.number;
+            if (prNumber) {
+              try {
+                const { data: pr } = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: prNumber,
+                });
+                hasOverrideLabel = pr.labels.some(l => l.name === 'security-override');
+                if (hasOverrideLabel) {
+                  core.info(`PR #${prNumber} has security-override label`);
+                }
+              } catch (e) {
+                core.warning(`Failed to fetch PR labels: ${e.message}`);
+              }
+            }
+
+            // Determine gate outcome
+            let state = 'success';
+            let description = 'All security scans passed';
+            const failures = [];
+
+            // Rule 1: Secret scan (Gitleaks) failure ALWAYS blocks - no override
+            if (secretResult === 'failure') {
+              state = 'failure';
+              failures.push('secret detection');
+            }
+
+            // Rule 2: SAST/dependency HIGH/CRITICAL findings block unless overridden
+            const hasSastOrDepFailure = depResult === 'failure' || sastResult === 'failure';
+            if (hasSastOrDepFailure) {
+              if (hasOverrideLabel) {
+                // Override: allow merge but note it in description
+                if (state !== 'failure') {
+                  description = 'Security findings overridden via security-override label';
+                }
+                core.warning('SAST/dependency failures overridden by security-override label');
+              } else {
+                state = 'failure';
+                if (depResult === 'failure') failures.push('dependency scan');
+                if (sastResult === 'failure') failures.push('SAST scan');
+              }
+            }
+
+            // Build final description
+            if (state === 'failure') {
+              description = `Blocked: ${failures.join(', ')} failed`;
+            } else if (hasOverrideLabel && hasSastOrDepFailure) {
+              description = 'Security findings overridden via security-override label';
+            }
+
+            // Handle skipped scans - if all scans were skipped, still pass
+            const allSkipped = [secretResult, depResult, sastResult].every(
+              r => r === 'skipped' || r === 'cancelled'
+            );
+            if (allSkipped) {
+              description = 'All security scans were skipped';
+            }
+
+            core.info(`Setting commit status: ${state} - ${description}`);
+
+            // Set the commit status
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha,
+              state,
+              target_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+              description,
+              context: 'security-scan',
+            });
+
+            core.info(`Commit status 'security-scan' set to '${state}' on ${sha}`);
+
+            // Fail the job if gate failed (makes the workflow result reflect the gate)
+            if (state === 'failure') {
+              core.setFailed(`Security gate failed: ${description}`);
+            }
