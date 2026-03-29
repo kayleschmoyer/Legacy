@@ -169,12 +169,12 @@ const ALLOWED_TARGETS = new Set([
 
 interface RunTargetParams {
   target: string;
-  cwd?: string;
+  worktreePath?: string;
   variables?: string;
 }
 
 export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
-  const { target, cwd, variables } = params;
+  const { target, worktreePath, variables } = params;
 
   if (!ALLOWED_TARGETS.has(target)) {
     return {
@@ -188,7 +188,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     };
   }
 
-  const workDir = cwd || getRepoRoot();
+  const workDir = worktreePath || getRepoRoot();
   const args = [target];
 
   // Parse optional make variables (e.g., "DRYRUN=1 FORCE=1")
@@ -242,7 +242,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       const result: Record<string, unknown> = {
         success: allPassed,
         target,
-        cwd: workDir,
+        worktreePath: workDir,
         summary: allPassed
           ? `${target} passed${steps.length > 0 ? ` (${steps.length} steps)` : ''}`
           : `${target} completed with failures`,
@@ -262,7 +262,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             {
               success: true,
               target,
-              cwd: workDir,
+              worktreePath: workDir,
               output: truncateOutput(output, MAX_OUTPUT_CHARS),
             },
             null,
@@ -280,7 +280,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       const result: Record<string, unknown> = {
         success: false,
         target,
-        cwd: workDir,
+        worktreePath: workDir,
         summary: `${target} failed`,
       };
       if (steps.length > 0) result.steps = steps;
@@ -300,7 +300,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             {
               success: false,
               target,
-              cwd: workDir,
+              worktreePath: workDir,
               error: truncateOutput(errorMsg, MAX_OUTPUT_CHARS),
             },
             null,

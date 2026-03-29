@@ -22,11 +22,11 @@ server.tool(
   'Run a whitelisted Makefile target. Covers: pc, build, test, lint, typecheck, format, codegen, install, kill-stale, etc.',
   {
     target: z.string().describe('Make target'),
-    cwd: z
+    worktreePath: z
       .string()
-      .regex(ABSOLUTE_PATH_REGEX, 'cwd must be an absolute path')
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
       .optional()
-      .describe('Working directory (default: repo root)'),
+      .describe('Worktree or working directory (default: repo root)'),
     variables: z
       .string()
       .optional()
