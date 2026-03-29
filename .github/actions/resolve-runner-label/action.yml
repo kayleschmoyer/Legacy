@@ -45,13 +45,18 @@ runs:
           // Use the PR author (not context.actor, which can be a merge bot or re-runner)
           const prAuthor = context.payload.pull_request?.user?.login || context.actor;
 
-          // GitHub App bots (e.g. legacy-sports-code-bot[bot]) are trusted — they
-          // are owned by the repo and the collaborator permission API doesn't support
-          // app installation accounts (returns 404).
-          if (prAuthor.endsWith('[bot]')) {
+          // Trusted GitHub App bots for this repo (repo-owned apps + Dependabot).
+          // The collaborator permission API returns 404 for app installation accounts,
+          // so we allowlist by login instead of using a broad [bot] suffix check.
+          const TRUSTED_BOTS = [
+            'legacy-sports-code-bot[bot]',   // Agent Author  (App ID 3158619)
+            'legacy-sports-review-bot[bot]', // Agent Reviewer (App ID 3142924)
+            'dependabot[bot]',               // GitHub Dependabot
+          ];
+          if (TRUSTED_BOTS.includes(prAuthor)) {
             core.setOutput('runner-label', label);
             core.setOutput('is-self-hosted', 'true');
-            core.info(`PR author "${prAuthor}" is a GitHub App bot — using self-hosted runner`);
+            core.info(`PR author "${prAuthor}" is a trusted bot — using self-hosted runner`);
             return;
           }
 
