@@ -262,7 +262,6 @@ export function PlayerStatsPage({
           >
             {/* Batting Tab */}
             <Tabs.Tab
-              flex={1}
               value="batting"
               data-testid="tab-trigger-batting"
               style={{
@@ -282,8 +281,8 @@ export function PlayerStatsPage({
                 transition: 'all 0.22s ease',
                 cursor: 'pointer',
               }}
-              paddingVertical="$3"
-              paddingHorizontal="$4"
+              paddingVertical="$2"
+              paddingHorizontal="$3"
             >
               <XStack alignItems="center" gap="$2" justifyContent="center">
                 <Text
@@ -324,7 +323,6 @@ export function PlayerStatsPage({
 
             {/* Pitching Tab */}
             <Tabs.Tab
-              flex={1}
               value="pitching"
               data-testid="tab-trigger-pitching"
               style={{
@@ -344,8 +342,8 @@ export function PlayerStatsPage({
                 transition: 'all 0.22s ease',
                 cursor: 'pointer',
               }}
-              paddingVertical="$3"
-              paddingHorizontal="$4"
+              paddingVertical="$2"
+              paddingHorizontal="$3"
             >
               <XStack alignItems="center" gap="$2" justifyContent="center">
                 <Text

@@ -153,9 +153,7 @@ export function LeagueSettingsControl({
   const [salaryCapEnabled, setSalaryCapEnabled] = useState(
     currentSalaryCapEnabled,
   );
-  const [salaryCap, setSalaryCap] = useState<number | null | undefined>(
-    currentSalaryCap,
-  );
+  const [salaryCap, setSalaryCap] = useState<number | null>(currentSalaryCap);
   const [hasChanges, setHasChanges] = useState(false);
 
   const isLocked = draftStatus === 'completed';
