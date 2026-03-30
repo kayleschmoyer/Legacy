@@ -551,8 +551,28 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_list',
       description:
-        'List active worktrees with junction status and branch info.',
-      inputSchema: { type: 'object' as const, properties: {} },
+        'List active worktrees with junction status and branch info. ' +
+        'Pass remote=true to list remote branches instead (with optional pattern filter and ahead/behind counts).',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          remote: {
+            type: 'boolean',
+            description:
+              'List remote branches instead of local worktrees (default: false)',
+          },
+          pattern: {
+            type: 'string',
+            description:
+              'Glob pattern to filter remote branches (e.g. "*LS-193*"). Only used when remote=true.',
+          },
+          limit: {
+            type: 'number',
+            description:
+              'Maximum number of remote branches to return (default: 50). Only used when remote=true.',
+          },
+        },
+      },
     },
     {
       name: 'worktree_log',
@@ -1757,6 +1777,151 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // worktree_list
     // -----------------------------------------------------------------------
     case 'worktree_list': {
+      const { remote, pattern, limit } = args as {
+        remote?: boolean;
+        pattern?: string;
+        limit?: number;
+      };
+
+      // Remote branch listing mode
+      if (remote) {
+        // Validate pattern — only safe glob chars
+        if (pattern && !/^[a-zA-Z0-9_./\-*?[\]{}]+$/.test(pattern)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid pattern: "${pattern}". Only alphanumeric, glob wildcards (*?[]{}) and '.', '/', '-', '_' allowed.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        try {
+          // Fetch latest remote state
+          runGit(['fetch', 'origin', '--prune'], MAIN_REPO, {
+            timeout: 30_000,
+          });
+
+          // List remote branches (optionally filtered by pattern)
+          const listArgs = ['branch', '-r', '--list'];
+          if (pattern) {
+            // Ensure pattern targets origin/ namespace
+            const fullPattern = pattern.startsWith('origin/')
+              ? pattern
+              : `origin/${pattern}`;
+            listArgs.push(fullPattern);
+          }
+          const branchOutput = runGit(listArgs, MAIN_REPO);
+          const branches = branchOutput
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(
+              (line) => line.length > 0 && !line.includes(' -> '), // skip HEAD alias
+            );
+
+          if (branches.length === 0) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: pattern
+                    ? `No remote branches matching "${pattern}".`
+                    : 'No remote branches found.',
+                },
+              ],
+            };
+          }
+
+          // Cap the number of branches to avoid slow sequential git operations
+          const maxBranches = limit && limit > 0 ? limit : 50;
+          const cappedBranches = branches.slice(0, maxBranches);
+          const truncated = branches.length > maxBranches;
+
+          // Get ahead/behind counts relative to origin/main for each branch
+          const results: Array<{
+            branch: string;
+            ahead: number;
+            behind: number;
+            lastCommitDate: string;
+          }> = [];
+
+          for (const branch of cappedBranches) {
+            if (branch === 'origin/main' || branch === 'origin/HEAD') continue;
+            try {
+              const counts = runGit(
+                [
+                  'rev-list',
+                  '--left-right',
+                  '--count',
+                  `origin/main...${branch}`,
+                ],
+                MAIN_REPO,
+              ).trim();
+              const parts = counts.split(/\s+/);
+              const parsedBehind = Number(parts[0]);
+              const parsedAhead = Number(parts[1]);
+              const behindCount =
+                parts.length >= 2 && !Number.isNaN(parsedBehind)
+                  ? parsedBehind
+                  : 0;
+              const aheadCount =
+                parts.length >= 2 && !Number.isNaN(parsedAhead)
+                  ? parsedAhead
+                  : 0;
+              const lastDate = runGit(
+                ['log', '-1', '--format=%ci', branch],
+                MAIN_REPO,
+              ).trim();
+              results.push({
+                branch: branch.replace(/^origin\//, ''),
+                ahead: aheadCount,
+                behind: behindCount,
+                lastCommitDate: lastDate,
+              });
+            } catch {
+              results.push({
+                branch: branch.replace(/^origin\//, ''),
+                ahead: 0,
+                behind: 0,
+                lastCommitDate: 'unknown',
+              });
+            }
+          }
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    count: results.length,
+                    totalRemote: branches.length,
+                    truncated,
+                    branches: results,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Failed to list remote branches: ${message}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
+      // Default: list local worktrees
       const worktrees = getWorktrees();
       const activeLabel = activeWorktree
         ? `\nActive worktree: ${activeWorktree}`
