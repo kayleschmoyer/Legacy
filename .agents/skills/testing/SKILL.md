@@ -35,15 +35,41 @@ description: 'Write, run, and debug tests: Jest unit tests, Playwright E2E tests
 
 ## Commands
 
+### MCP-first (preferred)
+
+Use the `nx_run` MCP tool for all test runs — it provides structured output and avoids shell quoting issues:
+
+```
+# Run all tests for a project
+nx_run(project: "scoring", target: "test")
+
+# Run a specific test file with verbose output
+nx_run(project: "web", target: "test", args: ["--testPathPatterns=csrf\\.spec", "--verbose"])
+
+# Bypass Nx cache (use when output appears empty or stale)
+nx_run(project: "web", target: "test", args: ["--testPathPatterns=useAuth\\.spec", "--verbose"], noCache: true)
+
+# Run in a worktree
+nx_run(project: "scoring", target: "test", args: ["--testPathPatterns=lwar\\.spec", "--verbose"], worktreePath: "$wt")
+```
+
+> **`--testPathPatterns` preferred**: always use `--testPathPatterns` (plural) in new commands. The singular `--testPathPattern` still works — the `nx_run` MCP tool auto-translates it — but it is deprecated in Jest 30+. Common causes of "0 tests found": wrong project (e.g., a project whose `test` target delegates to sub-targets rather than running Jest directly), typo in the pattern, or missing `--all` flag (see shell fallback note below).
+
+> **Empty output?** If `nx_run` returns no test names or truncated output, re-run with `noCache: true` before falling back to Bash. Nx cache can replay stale summaries that omit verbose detail.
+
+### Shell fallback
+
+Use these only when the `nx_run` MCP tool is unavailable:
+
 ```bash
 # Run affected tests (preferred)
 make test
 
-# Test a specific project (prefer nx_run MCP tool when available)
+# Test a specific project
 pnpm exec nx run <project>:test
 
-# Run specific test file
-pnpm exec nx run <project>:test --testPathPattern="SpecName"
+# Run specific test file with verbose output (--all bypasses --onlyChanged default)
+pnpm exec nx run <project>:test -- --all --testPathPatterns="SpecName" --verbose
 
 # E2E tests (build first: pnpm exec nx build web)
 pnpm exec nx e2e web-e2e -- --grep='test name' --config=apps/web-e2e/playwright.config.ts
