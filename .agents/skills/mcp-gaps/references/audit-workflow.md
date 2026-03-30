@@ -37,6 +37,40 @@ These commands look "investigative" but represent repeatable workflows every age
 - **Comparing branches**: `git diff origin/main...origin/branch -- path` — needed for understanding PR scope. `worktree_diff` covers this — if the agent used raw `git diff` instead, classify as `missing-awareness`
 - **Listing files by pattern**: `ls -1 path/*.ts | tail -5`, `ls -1 path/ | sort` — needed for discovering naming conventions, finding latest files. The **Glob** tool handles this natively (returns files sorted by modification time) — classify as `missing-awareness`
 
+### 1b. Collect non-MCP commands from subagent sessions
+
+Subagent sessions contribute **more** Bash commands than parent sessions in practice (87 git/ls/find commands from subagents vs 82 from parents across 60 audited sessions). The main conversation audit (Step 1) only captures parent-level commands.
+
+**Where to look**: subagent transcripts live at `~/.claude/projects/<project-hash>/<sessionId>/subagents/*.jsonl`. Each JSONL line is a message object; Bash tool calls appear as:
+
+```json
+{
+  "message": {
+    "content": [
+      { "type": "tool_use", "name": "Bash", "input": { "command": "..." } }
+    ]
+  }
+}
+```
+
+**What to collect**: extract all `Bash` tool calls from subagent JSONL files for the current session. Apply the same filtering rules as Step 1 (ignore one-off investigative commands, focus on repeatable patterns).
+
+**Common subagent anti-patterns** (highest frequency first):
+
+| Pattern                                                              | Correct tool                | Gap type            | Notes                                                 |
+| -------------------------------------------------------------------- | --------------------------- | ------------------- | ----------------------------------------------------- |
+| `find $wt -type f -name "*.tsx"` (56x across 60 sessions)            | Glob                        | `missing-awareness` | Subagents lack AGENTS.md context; see LS-1954         |
+| `grep -rl "pattern" $wt/src/` (23x across 60 sessions)               | Grep                        | `missing-awareness` | Same root cause as `find`                             |
+| `ls -1 $wt/path/` (8x across 60 sessions)                            | Glob                        | `missing-awareness` | Used to discover file naming patterns                 |
+| `git -C .claude/worktrees/agent-* fetch` (15x across 60 sessions)    | worktree MCP (if supported) | `missing-feature`   | Ephemeral worktrees not supported by MCP; see LS-1953 |
+| `git -C .claude/worktrees/agent-* checkout` (15x across 60 sessions) | worktree MCP (if supported) | `missing-feature`   | Same as above                                         |
+
+**How to handle**:
+
+- `missing-awareness` patterns in subagents → verify that parent agents include tool preference hints when spawning subagents (see AGENTS.md for tool preference guidance). If hints are missing, that's the fix — not a new ticket.
+- `missing-feature` patterns (e.g., ephemeral worktree support) → follow Steps 4-5 to check/create tickets under LS-1455.
+- If you can't access JSONL transcripts (e.g., cloud agent without filesystem access), note this in the audit report and skip to Step 2.
+
 ### 2. Classify each command
 
 For each candidate command, determine:
