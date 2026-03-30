@@ -15,9 +15,9 @@ Complete reference for the Legacy Sports ticket-to-merge pipeline. Covers every 
    - Blocker In Review -- branch off the blocker's branch (use `PARENT=LS-XXXX/branch`).
    - Blocker Done or no blockers -- branch off `origin/main`.
 3. **Transition to In Progress** -- only after blockers pass.
-4. **Create worktree** -- `make worktree TICKET=#### DESC=description`. This creates the branch, worktree, and registers the parent dependency.
-5. **Setup worktree** -- `make wt-setup WT=$wt` (installs deps, copies `.env`, junctions `.twig`).
-6. All subsequent work happens inside the worktree path, never in the main repo.
+4. **Create worktree (Windows-only helper)** -- `make worktree TICKET=#### DESC=description`. This creates the branch, worktree, and registers the parent dependency. On macOS/Linux, create a ticket branch and worktree using standard `git` commands.
+5. **Setup worktree (Windows-only helper)** -- `make wt-setup WT=$wt` (installs deps, copies `.env`, junctions `.twig`). On macOS/Linux, run the equivalent steps manually: install dependencies, copy `.env`, and link shared resources.
+6. **Working directory** -- All subsequent work happens inside the worktree path, never in the main repo.
 
 ## Phase 1: Local Validation
 
@@ -25,7 +25,7 @@ Three local validation gates run before code reaches CI.
 
 ### Pre-Commit Hook (5 checks)
 
-Installed via `make setup-hooks`. Runs automatically on `git commit`:
+Installed via `pnpm security:install-hooks` (copies `scripts/git-hooks/pre-commit` into `.git/hooks/pre-commit`). Runs automatically on `git commit`:
 
 | #   | Check                               | Purpose                                                                              |
 | --- | ----------------------------------- | ------------------------------------------------------------------------------------ |
@@ -35,30 +35,37 @@ Installed via `make setup-hooks`. Runs automatically on `git commit`:
 | 4   | Migration immutability              | Ensures previously-landed migrations are not modified or deleted                     |
 | 5   | `@legacy-sports` package validation | Prevents npm-installing workspace packages that should use pnpm workspace references |
 
-### `make pc` (9-step pipeline)
+### `make pc` (pre-commit pipeline)
 
-The full pre-commit validation pipeline. **Must pass before pushing or opening a PR.**
+The full pre-commit validation pipeline backed by the `pre-commit` Makefile target. **Must pass before pushing or opening a PR.**
 
-1. Migration immutability check
-2. `nx format:write` -- auto-formats code (if any files change, `make pc` **fails** -- commit the formatted files and re-run)
-3. `nx affected -t lint` -- ESLint on changed projects
-4. `nx affected -t typecheck` -- TypeScript type checking
-5. `nx affected -t test` -- Jest unit/integration tests
-6. `nx affected -t build` -- build validation
-7. Skill lint (`scripts/lint-skills.js`)
-8. YAML validation on changed files
-9. JSON validation on changed files
+1. Migration immutability check (ensures previously-landed migrations are not modified or deleted)
+2. Schema generation for database changes (`nx run db:print-schema`)
+3. DB code generation for database changes (`nx affected -t codegen`)
+4. `nx affected -t typecheck` -- TypeScript type checking on affected projects
+5. `nx format:write` -- auto-formats code; if the working tree was clean, it will format and auto-amend the commit, otherwise you must commit the formatted files and re-run
+6. `nx affected -t lint --fix` -- ESLint on affected projects with auto-fix where possible
+7. Workflow validation (`scripts/validate-workflows.js`)
+8. `nx affected -t test` -- Jest unit/integration tests on affected projects
+9. `nx affected -t build` -- build validation on affected projects
 
-### Pre-Push Hook (2 checks)
+Some steps are conditionally skipped (e.g., steps 1-3 for non-database changes, steps 4/6/8/9 for docs-only changes).
 
-Runs automatically on `git push` (PowerShell script `scripts/git-hooks/pre-push.ps1`):
+### Pre-Push Hook (format & safety checks)
 
-| #   | Check                      | Purpose                         |
-| --- | -------------------------- | ------------------------------- |
-| 1   | `nx affected -t typecheck` | Type checking affected projects |
-| 2   | `nx affected -t lint`      | Linting affected projects       |
+Installed via `make setup-hooks`, which copies `.github/hooks/pre-push` (shell) into your Git hooks directory as `pre-push`. Runs automatically on `git push`:
 
-Skips validation during rebase/merge operations. Can be bypassed with `--no-verify`.
+| #   | Check / Behavior                            | Purpose                                                                      |
+| --- | ------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | git-lfs integration                         | Ensures large files are handled via Git LFS where required                   |
+| 2   | Conflict marker scan \*                     | Prevents pushing files that still contain unresolved merge conflict markers  |
+| 3   | Conditional `terraform validate` \*         | Validates Terraform when Terraform files are part of the push                |
+| 4   | `nx format:write` \*                        | Auto-formats code before push                                                |
+| 5   | Auto-amend + abort on formatting changes \* | Amends the last commit with formatting changes and aborts the push to review |
+
+\* Checks 2--5 only run when `node_modules` is present (i.e., a non-docs-only worktree). In docs-only worktrees without dependencies, the pre-push hook exits after the git-lfs integration step and skips checks 2--5.
+
+Can be bypassed with `--no-verify`.
 
 ## Phase 2: PR Creation
 
@@ -66,7 +73,7 @@ Skips validation during rebase/merge operations. Can be bypassed with `--no-veri
 2. **Push** -- `worktree_push(setUpstream: true)`.
 3. **Create draft PR** -- `github_create_pr(draft: true)`. Draft-first prevents sweep/review agents from racing with the creating agent.
 4. **Mark ready for review** -- `github_mark_pr_ready(number: <PR#>)`.
-5. **Request Copilot review** -- `github_request_review(number: <PR#>)`. The repository ruleset triggers Copilot review automatically for user-authored PRs, but **not for GitHub App PRs** -- agents must explicitly request it.
+5. **Copilot review** -- For user-authored PRs, the repository ruleset automatically requests Copilot review; no explicit call is needed. For GitHub App-authored PRs, agents should call `github_request_review(number: <PR#>)` with a user OAuth token. Note: the REST `requestReviewers` API silently drops Copilot when called with `GITHUB_TOKEN` or installation tokens.
 6. **Transition Jira to In Review** -- `jira_transition(key: "LS-####", status: "In Review")`.
 
 ## Phase 3: CI Pipeline
@@ -111,12 +118,12 @@ gates     validation
 
 **Stage 2a -- Quality Gates:** Runs in parallel with build validation.
 
+- Agent skill lint (`node scripts/lint-skills.js`)
 - Migration immutability check
-- `nx format:check`
+- Prettier formatting check (`pnpm exec prettier --check --ignore-unknown ...`)
 - `nx affected -t lint`
 - `nx affected -t typecheck`
 - `nx affected -t test`
-- Skill lint (`scripts/lint-skills.js`)
 
 **Stage 2b -- Build Validation:** Runs in parallel with quality gates.
 
@@ -160,7 +167,7 @@ The CI pipeline automatically labels PRs with failure reasons. Labels are added 
 | Label                        | Source                                                                      |
 | ---------------------------- | --------------------------------------------------------------------------- |
 | `CI: Migration Immutability` | Quality gates -- migration files modified                                   |
-| `CI: Formatting`             | Quality gates -- `nx format:check` failed                                   |
+| `CI: Formatting`             | Quality gates -- Prettier formatting check failed                           |
 | `CI: Lint Failure`           | Quality gates -- ESLint errors                                              |
 | `CI: Type Error`             | Quality gates -- TypeScript errors                                          |
 | `CI: Test Failure`           | Quality gates -- Jest test failures                                         |
@@ -214,13 +221,13 @@ Automatically keeps Jira ticket statuses in sync with branch/PR activity.
 
 ### Transition Table
 
-| Event                               | Action     | Jira Transition |
-| ----------------------------------- | ---------- | --------------- |
-| `push` to `LS-*/...` branch         | No open PR | In Progress     |
-| `pull_request` opened               | --         | In Review       |
-| `pull_request` reopened             | --         | In Review       |
-| `pull_request` closed + merged      | --         | Done            |
-| `pull_request` closed without merge | --         | In Progress     |
+| Event                               | Action | Jira Transition |
+| ----------------------------------- | ------ | --------------- |
+| `push` to `LS-*/...` branch         | --     | In Progress     |
+| `pull_request` opened               | --     | In Review       |
+| `pull_request` reopened             | --     | In Review       |
+| `pull_request` closed + merged      | --     | Done            |
+| `pull_request` closed without merge | --     | In Progress     |
 
 ### Epic Sync
 
@@ -292,13 +299,13 @@ When multiple CI runs complete within seconds, multiple `workflow_run` triggers 
 
 ### Deploy Workflows
 
-| Workflow                     | Trigger                                      | Targets                                   |
-| ---------------------------- | -------------------------------------------- | ----------------------------------------- |
-| `deploy-web.yml`             | Push to `main` (web/shared-components paths) | GitHub Pages (legacy-fantasy.com)         |
-| `upload-lambdas.yml`         | Push to `main` (lambda paths)                | S3 artifact upload for Lambda deployment  |
-| `lambda-terraform-apply.yml` | Push to `main` (terraform/lambda paths)      | Terraform apply + Lambda function updates |
-| `deploy-storybook.yml`       | Push to `main` (component paths)             | GitHub Pages (Storybook)                  |
-| `deploy-pr-preview.yml`      | PR events                                    | Preview deployments for PRs               |
+| Workflow                     | Trigger                                             | Targets                                   |
+| ---------------------------- | --------------------------------------------------- | ----------------------------------------- |
+| `deploy-web.yml`             | Push to `main` (web/shared-components paths)        | GitHub Pages (legacy-fantasy.com)         |
+| `upload-lambdas.yml`         | Push to `main` (lambda paths)                       | S3 artifact upload for Lambda deployment  |
+| `lambda-terraform-apply.yml` | workflow_run: "Upload Lambdas" (on main) + dispatch | Terraform apply + Lambda function updates |
+| `deploy-storybook.yml`       | Push to `main` (component paths)                    | GitHub Pages (Storybook)                  |
+| `deploy-pr-preview.yml`      | PR events                                           | Preview deployments for PRs               |
 
 ### Web Deploy Pipeline
 
@@ -344,9 +351,9 @@ These must pass for the merge queue to process a PR:
 | GraphQL Schema & Codegen                  | `check-schema.yml` (when GraphQL files change)               |
 | Verify All Migrations Applied             | `check-migrations-applied.yml` (when migration files change) |
 
-### Advisory (Non-Blocking) Checks
+### Advisory Checks (Not Required by Branch Protection)
 
-These run but do not block merging:
+These checks are not configured as _required_ branch protection rules, but they still produce GitHub check runs/commit statuses. The merge queue (`merge-queue.yml`) waits for all checks to complete and will block on any failing or pending check unless explicitly configured to ignore it, so failures here can still delay a queued merge.
 
 | Check                    | Source Workflow              | Notes                                         |
 | ------------------------ | ---------------------------- | --------------------------------------------- |
