@@ -153,7 +153,12 @@ export const HelpDropdown: React.FC = () => {
   };
 
   return (
-    <YStack position="relative" ref={dropdownRef} onKeyDown={onKeyDown}>
+    <YStack
+      position="relative"
+      flexShrink={0}
+      ref={dropdownRef}
+      onKeyDown={onKeyDown}
+    >
       <DropdownButton
         highlight={isHighlighted}
         onPress={() => setIsOpen(!isOpen)}

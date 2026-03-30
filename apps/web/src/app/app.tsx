@@ -151,6 +151,9 @@ const NavLinks = styled(XStack, {
   justifyContent: 'center',
   minWidth: 0,
   flexWrap: 'nowrap',
+  // Explicit overflow: visible ensures dropdown menus extending below the nav
+  // are not clipped (CSS default, but stated for clarity).
+  overflow: 'visible' as never,
 });
 
 /** Pill-shaped nav link button with active indicator dot */
@@ -161,6 +164,7 @@ const NavLinkButton = styled(Button, {
   borderWidth: 0,
   paddingHorizontal: '$4',
   gap: '$2',
+  flexShrink: 0,
   hoverStyle: {
     backgroundColor: '$color3',
   },
@@ -277,6 +281,7 @@ function Navigation() {
       // NAV_Z_INDEX must exceed every secondary sticky element (e.g. CONTENT_STICKY_Z_INDEX)
       // so the nav bar always remains above page content when both are sticky.
       zIndex={NAV_Z_INDEX}
+      overflow={'visible' as never}
     >
       {/* Gradient accent strip */}
       <AccentBar
@@ -334,7 +339,7 @@ function Navigation() {
 
             <Link
               to="/games/season-draft"
-              style={{ textDecoration: 'none' }}
+              style={{ textDecoration: 'none', flexShrink: 0 }}
               aria-current={
                 location.pathname.startsWith('/games') ? 'page' : undefined
               }
