@@ -99,3 +99,42 @@ query GetLeagueTeams($leagueId: Int!) {
     leagueId
   }
 }
+
+# ── Public League Discovery ──────────────────────────────────────────────
+
+query GetPublicLeagues(
+  $search: String
+  $draftStatus: String
+  $playerPool: String
+  $limit: Int
+  $offset: Int
+) {
+  publicLeagues(
+    search: $search
+    draftStatus: $draftStatus
+    playerPool: $playerPool
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    name
+    owner
+    maxRosterSize
+    draftStatus
+    playerPool
+    isPublic
+    totalSpots
+    availableSpots
+    isFull
+    isAlreadyMember
+  }
+}
+
+mutation JoinPublicLeague($leagueId: Int!, $teamName: String!) {
+  joinPublicLeague(leagueId: $leagueId, teamName: $teamName) {
+    success
+    message
+    leagueId
+    teamId
+  }
+}

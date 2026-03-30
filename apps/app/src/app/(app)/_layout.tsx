@@ -12,6 +12,7 @@ import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import BaseballHome from './baseball';
 import DraftBoardPage from './DraftBoardPage';
 import FootballHome from './football';
+import LeagueDiscoveryScreen from './league-discovery';
 import SeasonDraftGamesScreen from './season-draft';
 import SeasonDraftGameScreen from './season-draft/[gameId]';
 import SeasonDraftGameCreateScreen from './season-draft/create';
@@ -52,6 +53,7 @@ export type AppDrawerParamList = {
   'baseball/matchup': { matchupId: string; leagueId: string };
   'football/index': undefined;
   DraftBoardPage: undefined;
+  'league-discovery': undefined;
   'season-draft/index': undefined;
   'season-draft/[gameId]': { gameId: string };
   'season-draft/create': undefined;
@@ -124,6 +126,10 @@ const ROUTES = Object.freeze<Route[]>([
   {
     route: 'baseball/league/join',
     title: 'Join League',
+  },
+  {
+    route: 'league-discovery',
+    title: 'Browse Leagues',
   },
   {
     route: 'notifications',
@@ -334,6 +340,11 @@ export default function Layout() {
             name="baseball/league/join"
             options={{ title: 'Join League' }}
             component={JoinLeagueByCode}
+          />
+          <Screen
+            name="league-discovery"
+            options={{ title: 'Browse Leagues' }}
+            component={LeagueDiscoveryScreen}
           />
           <Screen
             name="baseball/matchup"
