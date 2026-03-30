@@ -6,7 +6,7 @@ import {
 } from 'google-auth-library';
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
-import { captureError } from '@legacy-sports/rollbar';
+
 import { readSecret } from '@legacy-sports/aws-utils';
 import memoizeOne from 'memoize-one';
 import { InternalUser } from '@legacy-sports/db-client';
@@ -114,9 +114,9 @@ export const handleGoogleAuthorize = async (
   } catch (error) {
     LOGGER.error(
       'Google authorize error:',
-      error instanceof Error ? error.message : String(error),
+      error instanceof Error ? error : new Error(String(error)),
+      { handler: 'handleGoogleAuthorize' },
     );
-    captureError(error as Error, { handler: 'handleGoogleAuthorize' });
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -186,9 +186,9 @@ export const handleGoogleCallback = async (
   } catch (error) {
     LOGGER.error(
       'Google callback error:',
-      error instanceof Error ? error.message : String(error),
+      error instanceof Error ? error : new Error(String(error)),
+      { handler: 'handleGoogleCallback' },
     );
-    captureError(error as Error, { handler: 'handleGoogleCallback' });
     return {
       statusCode: 500,
       headers: {
@@ -401,9 +401,9 @@ export const handleSecureGoogleAuth = async (
   } catch (error) {
     LOGGER.error(
       'Secure Google auth error:',
-      error instanceof Error ? error.message : String(error),
+      error instanceof Error ? error : new Error(String(error)),
+      { handler: 'handleSecureGoogleAuth' },
     );
-    captureError(error as Error, { handler: 'handleSecureGoogleAuth' });
 
     return {
       statusCode: 500,
@@ -582,12 +582,9 @@ export const handleGoogleAuth = async (event: ExtendedAPIGatewayEvent) => {
   } catch (dbError) {
     LOGGER.error(
       'Database unavailable during authentication — refusing to issue JWT:',
-      dbError instanceof Error ? dbError.message : String(dbError),
+      dbError instanceof Error ? dbError : new Error(String(dbError)),
+      { handler: 'handleGoogleAuth', context: 'db_access' },
     );
-    captureError(dbError as Error, {
-      handler: 'handleGoogleAuth',
-      context: 'db_access',
-    });
     return {
       statusCode: 503,
       body: JSON.stringify({

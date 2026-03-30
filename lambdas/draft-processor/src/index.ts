@@ -22,7 +22,6 @@ import {
 } from '@legacy-sports/aws-utils';
 import {
   addBreadcrumb,
-  captureError,
   getRollbarConfigFromEnv,
   initRollbar,
   withRollbar,
@@ -1399,21 +1398,17 @@ async function updateDraftStatus(
   } catch (error) {
     LOGGER.error(
       `Failed to update draft status to '${status}' for league ${leagueId}:`,
-      error instanceof Error ? error.message : String(error),
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        tags: { lambda: 'draft-processor', operation: 'updateDraftStatus' },
+        extra: {
+          leagueId,
+          targetStatus: status,
+          context,
+          ...(!(error instanceof Error) && { originalError: error }),
+        },
+      },
     );
-
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: {
-        lambda: 'draft-processor',
-        operation: 'updateDraftStatus',
-      },
-      extra: {
-        leagueId,
-        targetStatus: status,
-        context,
-        originalError: error,
-      },
-    });
 
     throw error;
   }
@@ -1573,15 +1568,13 @@ async function processDraftMessage(
       }
     } catch (notificationError) {
       // Don't fail the draft if notification fails
-      LOGGER.error('Failed to send draft completion notification', {
-        error: notificationError,
-        leagueId,
-      });
-      captureError(
+      LOGGER.error(
+        'Failed to send draft completion notification',
         notificationError instanceof Error
           ? notificationError
           : new Error(String(notificationError)),
         {
+          leagueId,
           tags: { lambda: 'draft-processor', operation: 'notification' },
           extra: { leagueId, selectionMethod },
         },
@@ -1608,17 +1601,15 @@ async function processDraftMessage(
         });
       } catch (pushNotificationError) {
         // Don't fail the draft if push notification queuing fails
-        LOGGER.error('Failed to queue draft completion push notification', {
-          error: pushNotificationError,
-          leagueId,
-          selectionMethod,
-          userId: message.payload.requestedBy,
-        });
-        captureError(
+        LOGGER.error(
+          'Failed to queue draft completion push notification',
           pushNotificationError instanceof Error
             ? pushNotificationError
             : new Error(String(pushNotificationError)),
           {
+            leagueId,
+            selectionMethod,
+            userId: message.payload.requestedBy,
             tags: {
               lambda: 'draft-processor',
               operation: 'push_notification',
@@ -1643,34 +1634,32 @@ async function processDraftMessage(
       message: `${selectionMethod} draft completed successfully for league ${leagueId}`,
     };
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
 
     LOGGER.error(
       `Error processing draft message for league ${leagueId}:`,
-      errorMessage,
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        tags: {
+          lambda: 'draft-processor',
+          operation: 'processDraftMessage',
+          selectionMethod,
+          failureType: 'processing_error',
+        },
+        extra: {
+          leagueId,
+          draftMode,
+          selectionMethod,
+          requestedBy,
+          timestamp,
+          errorMessage,
+          errorStack,
+          processingPhase: 'draft_processing',
+          ...(!(error instanceof Error) && { originalError: error }),
+        },
+      },
     );
-
-    // Capture detailed error context with Sentry
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: {
-        lambda: 'draft-processor',
-        operation: 'processDraftMessage',
-        selectionMethod,
-        failureType: 'processing_error',
-      },
-      extra: {
-        leagueId,
-        draftMode,
-        selectionMethod,
-        requestedBy,
-        timestamp,
-        errorMessage,
-        errorStack,
-        processingPhase: 'draft_processing',
-      },
-    });
 
     // Critical: Reset draft status to 'not-started' for retry capability
     try {
@@ -1693,11 +1682,6 @@ async function processDraftMessage(
 
       LOGGER.error(
         `CRITICAL: Failed to reset draft status for league ${leagueId} after processing error:`,
-        statusErrorMessage,
-      );
-
-      // This is a critical error - we failed to reset the status AND the original processing failed
-      captureError(
         statusError instanceof Error
           ? statusError
           : new Error(String(statusError)),
@@ -1771,19 +1755,19 @@ const baseDraftProcessorHandler = async (
       if (!result.success) {
         LOGGER.error(
           `Draft processing failed for league ${result.leagueId}: ${result.error}`,
+          new Error(`Draft processing failed: ${result.error}`),
+          {
+            tags: {
+              lambda: 'draft-processor',
+              operation: 'processDraftMessage',
+            },
+            extra: {
+              leagueId: result.leagueId,
+              messageId: record.messageId,
+              error: result.error,
+            },
+          },
         );
-
-        captureError(new Error(`Draft processing failed: ${result.error}`), {
-          tags: {
-            lambda: 'draft-processor',
-            operation: 'processDraftMessage',
-          },
-          extra: {
-            leagueId: result.leagueId,
-            messageId: record.messageId,
-            error: result.error,
-          },
-        });
 
         batchItemFailures.push({ itemIdentifier: record.messageId });
       } else {
@@ -1792,19 +1776,12 @@ const baseDraftProcessorHandler = async (
     } catch (error) {
       LOGGER.error(
         'Error processing SQS record:',
-        error instanceof Error ? error.message : String(error),
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          tags: { lambda: 'draft-processor', operation: 'sqsRecordProcessing' },
+          extra: { messageId: record.messageId, recordBody: record.body },
+        },
       );
-
-      captureError(error instanceof Error ? error : new Error(String(error)), {
-        tags: {
-          lambda: 'draft-processor',
-          operation: 'sqsRecordProcessing',
-        },
-        extra: {
-          messageId: record.messageId,
-          recordBody: record.body,
-        },
-      });
 
       batchItemFailures.push({ itemIdentifier: record.messageId });
     }

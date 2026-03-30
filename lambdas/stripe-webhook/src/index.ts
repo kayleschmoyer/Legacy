@@ -15,7 +15,6 @@ import {
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import {
-  captureError,
   getRollbarConfigFromEnv,
   initRollbar,
   withRollbar,
@@ -809,14 +808,17 @@ const baseStripeWebhookHandler = async (
         });
     }
   } catch (err) {
-    captureError(err instanceof Error ? err : new Error(String(err)), {
-      tags: { lambda: 'stripe-webhook', eventType: stripeEvent.type },
-    });
-    LOGGER.error('Error processing Stripe webhook event', {
-      eventId: stripeEvent.id,
-      eventType: stripeEvent.type,
-      err,
-    });
+    LOGGER.error(
+      'Error processing Stripe webhook event',
+      err instanceof Error ? err : new Error(String(err)),
+      {
+        eventId: stripeEvent.id,
+        eventType: stripeEvent.type,
+        // tags and extra are nested under logArgs in RollbarOutputDestination
+        tags: { lambda: 'stripe-webhook', eventType: stripeEvent.type },
+        ...(!(err instanceof Error) && { originalError: err }),
+      },
+    );
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal server error' }),
@@ -830,12 +832,14 @@ const baseStripeWebhookHandler = async (
   try {
     await recordEvent(stripeEvent.id);
   } catch (err) {
-    captureError(err instanceof Error ? err : new Error(String(err)), {
-      tags: { lambda: 'stripe-webhook', eventType: stripeEvent.type },
-    });
     LOGGER.error(
       'Failed to record Stripe event — idempotency record missing; returning 200 to prevent duplicate side effects on retry',
-      { eventId: stripeEvent.id, err },
+      err instanceof Error ? err : new Error(String(err)),
+      {
+        eventId: stripeEvent.id,
+        tags: { lambda: 'stripe-webhook', eventType: stripeEvent.type },
+        ...(!(err instanceof Error) && { originalError: err }),
+      },
     );
   }
 

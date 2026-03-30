@@ -10,7 +10,6 @@ import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   addBreadcrumb,
-  captureError,
   getRollbarConfigFromEnv,
   initRollbar,
   withRollbar,
@@ -110,18 +109,17 @@ const baseCreateMatchupHandler = async (
         await createMatchup(db.db, matchup);
       } catch (err) {
         failures.push({ itemIdentifier: record.messageId });
-        LOGGER.error(err instanceof Error ? err.message : String(err));
-
-        captureError(err instanceof Error ? err : new Error(String(err)), {
-          tags: {
-            lambda: 'game-selection-create-matchup',
-            operation: 'createMatchup',
+        LOGGER.error(
+          'Error processing create-matchup record',
+          err instanceof Error ? err : new Error(String(err)),
+          {
+            tags: {
+              lambda: 'game-selection-create-matchup',
+              operation: 'createMatchup',
+            },
+            extra: { messageId: record.messageId, recordBody: record.body },
           },
-          extra: {
-            messageId: record.messageId,
-            recordBody: record.body,
-          },
-        });
+        );
       }
     }
   } finally {

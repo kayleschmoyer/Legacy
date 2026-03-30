@@ -23,6 +23,7 @@ jest.mock('@legacy-sports/rollbar', () => ({
   initRollbar: jest.fn(),
   addBreadcrumb: jest.fn(),
   captureError: jest.fn(),
+  captureWarning: jest.fn(),
   // withRollbar: return the wrapped fn unchanged so we test real handler logic
   withRollbar: jest.fn(
     <T extends (...args: unknown[]) => unknown>(fn: T) => fn,

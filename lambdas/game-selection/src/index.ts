@@ -9,7 +9,6 @@ import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
-  captureError,
   captureWarning,
   getRollbarConfigFromEnv,
   initRollbar,
@@ -240,13 +239,11 @@ async function queueMatchupStatsLoad(
       `Successfully queued all ${batches.length} batches for matchup ${matchupId}`,
     );
   } catch (error) {
-    LOGGER.error(`Failed to queue matchup stats loading:`, {
-      error: error instanceof Error ? error.message : String(error),
-      matchupId,
-    });
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      matchupId,
-    });
+    LOGGER.error(
+      `Failed to queue matchup stats loading:`,
+      error instanceof Error ? error : new Error(String(error)),
+      { matchupId },
+    );
     throw error;
   }
 }
@@ -981,21 +978,20 @@ const baseGameSelectionHandler = async (
       }),
     });
   } catch (error) {
-    LOGGER.error('Error in game selection handler:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
-      errorObject: JSON.stringify(error, Object.getOwnPropertyNames(error)),
-      path: event.path,
-      method: event.httpMethod,
-    });
-    captureError(error instanceof Error ? error : new Error(String(error)), {
-      tags: {
-        lambda: 'game-selection',
+    LOGGER.error(
+      'Error in game selection handler:',
+      error instanceof Error ? error : new Error(String(error)),
+      {
         path: event.path,
         method: event.httpMethod,
+        tags: {
+          lambda: 'game-selection',
+          path: event.path,
+          method: event.httpMethod,
+        },
+        ...(!(error instanceof Error) && { originalError: error }),
       },
-    });
+    );
 
     return cors({
       statusCode: 500,

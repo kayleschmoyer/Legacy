@@ -2,7 +2,6 @@ import { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
-  captureError,
   getRollbarConfigFromEnv,
   initRollbar,
   withRollbar,
@@ -51,11 +50,14 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
 
       await deliverNotification(payload);
     } catch (error) {
-      LOGGER.error('Failed to process notification record', {
-        messageId: record.messageId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      captureError(error instanceof Error ? error : new Error(String(error)));
+      LOGGER.error(
+        'Failed to process notification record',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          messageId: record.messageId,
+          ...(!(error instanceof Error) && { originalError: error }),
+        },
+      );
       // Report failure so SQS retries this record
       batchItemFailures.push({ itemIdentifier: record.messageId });
     }

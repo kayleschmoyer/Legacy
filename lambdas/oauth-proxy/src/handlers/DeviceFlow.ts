@@ -8,7 +8,7 @@ import {
   UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb';
 import { LOGGER } from '@legacy-sports/logging';
-import { captureError } from '@legacy-sports/rollbar';
+
 import { getUserByEmail } from '@legacy-sports/db-client';
 import crypto from 'crypto';
 import { parseEventBody } from '../util/lambda';
@@ -343,9 +343,9 @@ export const handleDeviceAuthorize = async (
   } catch (error) {
     LOGGER.error(
       'Device authorization error:',
-      error instanceof Error ? error.message : String(error),
+      error instanceof Error ? error : new Error(String(error)),
+      { handler: 'handleDeviceAuthorize' },
     );
-    captureError(error as Error, { handler: 'handleDeviceAuthorize' });
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -415,9 +415,9 @@ export const handleDeviceToken = async (
   } catch (error) {
     LOGGER.error(
       'Device token error:',
-      error instanceof Error ? error.message : String(error),
+      error instanceof Error ? error : new Error(String(error)),
+      { handler: 'handleDeviceToken' },
     );
-    captureError(error as Error, { handler: 'handleDeviceToken' });
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -612,9 +612,9 @@ export const handleDeviceCompleteLocal = async (
   } catch (error) {
     LOGGER.error(
       'Device flow local auth error:',
-      error instanceof Error ? error.message : String(error),
+      error instanceof Error ? error : new Error(String(error)),
+      { handler: 'handleDeviceCompleteLocal' },
     );
-    captureError(error as Error, { handler: 'handleDeviceCompleteLocal' });
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },

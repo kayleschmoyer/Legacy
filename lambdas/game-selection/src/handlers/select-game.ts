@@ -3,7 +3,6 @@ import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
-  captureError,
   getRollbarConfigFromEnv,
   initRollbar,
   withRollbar,
@@ -232,21 +231,17 @@ const baseSelectGameHandler = async (
           });
         }
 
-        LOGGER.error('Error processing record', {
-          error: err instanceof Error ? err.message : String(err),
-          stack: err instanceof Error ? err.stack : undefined,
-        });
-
-        captureError(err instanceof Error ? err : new Error(String(err)), {
-          tags: {
-            lambda: 'game-selection-select-game',
-            operation: 'selectGamesForMatchup',
+        LOGGER.error(
+          'Error processing record',
+          err instanceof Error ? err : new Error(String(err)),
+          {
+            tags: {
+              lambda: 'game-selection-select-game',
+              operation: 'selectGamesForMatchup',
+            },
+            extra: { messageId: record.messageId, recordBody: record.body },
           },
-          extra: {
-            messageId: record.messageId,
-            recordBody: record.body,
-          },
-        });
+        );
       }
     }
   });
