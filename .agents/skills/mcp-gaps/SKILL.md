@@ -7,7 +7,7 @@ description: 'Identify and implement MCP tooling gaps. Phase 1 (Audit): run afte
 
 ## Overview
 
-Two-phase workflow for closing MCP tooling gaps:
+Three-phase workflow for closing MCP tooling gaps:
 
 1. **Audit** — after every agent session, review Bash commands, MCP tool overflows, and MCP tool failures to identify gaps, then file tickets under the **LS-1455** epic.
 2. **Triage** — pick up tickets from the LS-1455 backlog, implement the fix, validate, and ship a PR.
@@ -53,6 +53,94 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 3. **Implement** following the target MCP server's conventions
 4. **Validate** with `make pc`
 5. **Ship** — commit, push, create PR, transition Jira to "In Review"
+
+---
+
+## Phase 3: Periodic Deep Audit (Transcript Mining)
+
+Per-session audits (Phase 1) rely on agents self-reporting. Patterns that agents don't notice — or that only emerge across many sessions — stay invisible. Periodic transcript mining catches these.
+
+### When to run
+
+- Monthly, or after a burst of agent sessions (10+ in a week)
+- When a new MCP tool ships, to check if adoption is displacing Bash usage
+- When investigating a recurring agent behavior (e.g., "why do agents keep using `find`?")
+
+### Where transcripts live
+
+| Location                                                          | Content               |
+| ----------------------------------------------------------------- | --------------------- |
+| `~/.claude/projects/<project-hash>/*.jsonl`                       | Parent session logs   |
+| `~/.claude/projects/<project-hash>/<sessionId>/subagents/*.jsonl` | Subagent session logs |
+
+Each JSONL line is a message object. Bash tool calls appear as:
+
+```json
+{
+  "message": {
+    "content": [
+      { "type": "tool_use", "name": "Bash", "input": { "command": "..." } }
+    ]
+  }
+}
+```
+
+### Extraction procedure
+
+1. **Aggregate Bash commands** across all sessions in the project directory:
+
+   ```python
+   # One-liner to extract all Bash commands from recent sessions
+   python -c "
+   import json, collections
+   from pathlib import Path
+   cmds = collections.Counter()
+   for f in Path('~/.claude/projects').expanduser().rglob('*.jsonl'):
+       for line in open(f):
+           msg = json.loads(line).get('message', {})
+           for block in msg.get('content', []):
+               if block.get('name') == 'Bash':
+                   cmd = block['input']['command'].split()[0]
+                   cmds[cmd] += 1
+   for cmd, count in cmds.most_common(20):
+       print(f'{count:4d}  {cmd}')
+   "
+   ```
+
+2. **Drill into high-frequency commands** — for each command appearing 5+ times, extract the full command strings to understand patterns:
+
+   ```python
+   # Extract full commands for a specific binary (e.g., find)
+   python -c "
+   import json
+   from pathlib import Path
+   for f in Path('~/.claude/projects').expanduser().rglob('*.jsonl'):
+       for line in open(f):
+           msg = json.loads(line).get('message', {})
+           for block in msg.get('content', []):
+               if block.get('name') == 'Bash' and 'find ' in block['input']['command']:
+                   print(block['input']['command'][:120])
+   "
+   ```
+
+3. **Classify** using the same taxonomy as Phase 1 (Step 2): `missing-tool`, `missing-feature`, `missing-awareness`
+
+### Frequency thresholds
+
+| Threshold    | Action                                                       |
+| ------------ | ------------------------------------------------------------ |
+| 5+ across N  | Worth investigating — may warrant a ticket                   |
+| 20+ across N | **High priority** — file ticket immediately under LS-1455    |
+| 50+ across N | **Critical** — likely a systemic gap affecting every session |
+
+### Reporting
+
+After a deep audit, summarize:
+
+- Top 10 Bash commands by frequency
+- New gaps discovered (not already tracked under LS-1455)
+- Existing gaps whose frequency increased (priority bump candidates)
+- Gaps that decreased after recent fixes (effectiveness validation)
 
 ---
 
