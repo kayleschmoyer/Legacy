@@ -232,8 +232,11 @@ runs:
             - apps/web-e2e/**
             - apps/app-e2e/**
           api-surface:
-            - lambdas/db/**
-            - lib/db-client/**
+            - lambdas/db/schema.graphql
+            - lambdas/db/src/schema/**
+            - '!lambdas/db/src/schema/**/*.spec.ts'
+            - '!lambdas/db/src/schema/**/__snapshots__/**'
+            - lib/db-client/src/drizzle/**/schema.ts
             - lib/data-loaders/**
             - lib/scoring/**
 
