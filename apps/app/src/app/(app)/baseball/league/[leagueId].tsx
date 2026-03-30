@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { HeaderTitleProps } from '@react-navigation/elements';
 import { Button, Card, H3, Spinner, Text, XStack, YStack } from 'tamagui';
 import { Tabs } from '@tamagui/tabs';
-import { Alert, ScrollView, Share } from 'react-native';
+import { Alert, Platform, ScrollView, Share } from 'react-native';
 import { gql } from '@apollo/client';
 
 import { useLazyQuery } from '@apollo/client/react';
@@ -18,7 +18,9 @@ import {
   CommissionerNoteControl,
   DeleteLeagueControl,
   LeagueActivityFeed,
+  LeagueScoringSummary,
   LeagueTradeBlock,
+  OnThisDayFeed,
   PendingTradeOffers,
   useWebSocket,
 } from '@legacy-sports/shared-components';
@@ -207,6 +209,8 @@ export default function LeagueId(): React.JSX.Element {
   // Fetch league scoring settings for commissioner scoring editor
   const {
     profile: scoringProfile,
+    settings: scoringSettings,
+    profileName: scoringProfileName,
     loading: scoringLoading,
     error: scoringError,
     refetch: refetchScoringProfile,
@@ -414,6 +418,29 @@ export default function LeagueId(): React.JSX.Element {
                 </Text>
                 <LeagueActivityFeed leagueId={numLeagueId} limit={15} />
               </YStack>
+
+              {/* Scoring Summary — web-only (uses <div>, CSS box-shadow, linear-gradient) */}
+              {Platform.OS === 'web' && (
+                <LeagueScoringSummary
+                  loading={scoringLoading}
+                  error={scoringError}
+                  profileName={scoringProfileName}
+                  settings={scoringSettings}
+                />
+              )}
+
+              {/* On This Day */}
+              <OnThisDayFeed
+                onPlayerPress={(playerId) =>
+                  router.push({
+                    pathname: '/PlayerDetail',
+                    params: {
+                      playerId: String(playerId),
+                      playerName: '',
+                    },
+                  })
+                }
+              />
             </YStack>
           </ScrollView>
         </Tabs.Content>
