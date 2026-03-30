@@ -175,9 +175,31 @@ Write-Host "  Clean: $($scan.clean.Count)"
 
 ---
 
-## Step 2: Enter a PR Worktree
+## Step 2: Find and Enter a PR Worktree
 
-Every fix operation needs a worktree. Use this shared pattern:
+Every fix operation needs a worktree. **Use `worktree_list` to discover existing worktrees** — do not use `ls D:/code/legacy-sports-worktrees/ | grep` or similar shell patterns.
+
+### Discover worktrees (MCP)
+
+```
+worktree_list()
+```
+
+This returns all worktrees with paths, branches, and ticket IDs. Match the PR's branch name or ticket number from the response to find the correct worktree path. Then set it active:
+
+```
+worktree_set(key: "LS-####")
+```
+
+> **Disambiguation**: `worktree_set` resolves by ticket key, full branch name, or directory name. If multiple worktrees share the same ticket key (e.g., `LS-1234/feature-a` and `LS-1234/feature-b`), passing just `LS-1234` will return an ambiguity error. In that case, pass the full branch name or directory name from the `worktree_list` response instead (e.g., `worktree_set(key: "LS-1234/feature-a")`).
+
+### Create a worktree if none exists
+
+If no worktree exists for the PR's branch, create one using the worktree workflow skill.
+
+### Shell fallback
+
+Only when MCP is unavailable:
 
 ```powershell
 Set-Location D:\code\legacy-sports
